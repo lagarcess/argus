@@ -52,25 +52,14 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
     <section className="argus-card-reveal argus-confirmation-reveal w-full overflow-hidden rounded-[20px] border border-[#c9c9cd] bg-white text-[#191c1f] dark:border-white/12 dark:bg-[#1d2023] dark:text-white">
       <div className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
         <div className="min-w-0">
-          <p className="font-display text-[18px] font-medium leading-tight tracking-[-0.18px]">
-            {viewModel.title}
-          </p>
-          {viewModel.metaParts.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-medium leading-snug text-[#505a63] dark:text-[#8d969e]">
-              {viewModel.metaParts.map((part, index) => (
-                <span
-                  key={`${part}-${index}`}
-                  className={
-                    index === 0
-                      ? "min-w-0"
-                      : "min-w-0 border-l border-[#c9c9cd]/45 pl-2 dark:border-white/12"
-                  }
-                >
-                  {part}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            {viewModel.assetSymbols.length > 0 && (
+              <AssetSymbols symbols={viewModel.assetSymbols} />
+            )}
+            <h3 className="font-display text-[18px] font-medium leading-tight tracking-[-0.18px]">
+              {viewModel.strategyLabel}
+            </h3>
+          </div>
         </div>
         <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${artifactStatusToneClassName(displayState.tone)}`}>
           <StatusIcon className={`h-3.5 w-3.5 ${displayState.isSpinning ? "animate-spin" : ""}`} />
@@ -78,23 +67,23 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
         </span>
       </div>
 
-      {(viewModel.featureRows.length > 0 || viewModel.detailRows.length > 0) && (
+      {(viewModel.summaryRows.length > 0 || viewModel.detailRows.length > 0) && (
         <div className="border-t border-[#c9c9cd]/30 px-4 py-4 dark:border-white/[0.06] sm:px-5">
-          {viewModel.featureRows.length > 0 && (
-            <dl className="grid grid-cols-1 gap-4">
-              {viewModel.featureRows.map((row) => (
+          {viewModel.summaryRows.length > 0 && (
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
+              {viewModel.summaryRows.map((row) => (
                 <div key={row.label} className="min-w-0">
                   <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8d969e]">
                     {displayConfirmationRowLabel(row, t)}
                   </dt>
-                  <ConfirmationValue row={row} variant="feature" />
+                  <ConfirmationValue row={row} variant="summary" />
                 </div>
               ))}
             </dl>
           )}
 
           {viewModel.detailRows.length > 0 && (
-            <dl className={`${viewModel.featureRows.length > 0 ? "mt-4 border-t border-[#c9c9cd]/22 pt-4 dark:border-white/[0.04]" : ""} grid grid-cols-1 gap-3 sm:grid-cols-2`}>
+            <dl className={`${viewModel.summaryRows.length > 0 ? "mt-4 border-t border-[#c9c9cd]/22 pt-4 dark:border-white/[0.04]" : ""} grid grid-cols-1 gap-3 sm:grid-cols-2`}>
               {viewModel.detailRows.map((row) => (
                 <div key={row.label} className="min-w-0">
                   <dt className="text-[12px] text-[#8d969e]">
@@ -143,12 +132,12 @@ function ConfirmationValue({
   variant,
 }: {
   row: StrategyConfirmationPayload["rows"][number];
-  variant: "feature" | "detail";
+  variant: "summary" | "detail";
 }) {
   if (confirmationRowKey(row) === "period") {
     const period = splitPeriodDisplay(row.value);
     return (
-      <dd className={variant === "feature"
+      <dd className={variant === "summary"
         ? "mt-1 text-[17px] font-semibold leading-snug tracking-tight text-[#191c1f] dark:text-white"
         : "mt-0.5 text-[14px] font-medium leading-[1.45] text-[#191c1f] dark:text-white/76"
       }>
@@ -162,7 +151,7 @@ function ConfirmationValue({
     );
   }
   return (
-    <dd className={variant === "feature"
+    <dd className={variant === "summary"
       ? "mt-1 whitespace-normal break-words text-[17px] font-semibold leading-snug tracking-tight text-[#191c1f] dark:text-white"
       : "mt-0.5 whitespace-normal break-words text-[14px] font-medium leading-[1.45] text-[#191c1f] dark:text-white/76"
     }>
@@ -211,39 +200,34 @@ function confirmationCardViewModel(
   const strategyRow = rowForKey(rows, "strategy");
   const periodRow = rowForKey(rows, "period");
   const startingCapitalRow = rowForKey(rows, "starting_capital");
-  const cadenceRow = rowForKey(rows, "cadence");
   const contributionRow = rowForKey(rows, "contribution");
-  const promotedRows = [
-    strategyRow,
-    startingCapitalRow,
-    contributionRow,
-    cadenceRow,
-  ].filter(isConfirmationRow);
+  const assetSymbols = splitSymbolList(assetRow?.value ?? "");
+  const primaryCapitalRow = startingCapitalRow ?? contributionRow;
+  const summaryRows = [primaryCapitalRow, periodRow].filter(isConfirmationRow);
   const promotedKeys = new Set<StrategyConfirmationRowKey>([
     "assets",
-    ...promotedRows
+    "strategy",
+    ...summaryRows
       .map((row) => confirmationRowKey(row))
       .filter(isConfirmationRowKey),
   ]);
-  const featureRows = periodRow
-    ? [periodRow]
-    : rows
-        .filter(({ key }) => key === null || !promotedKeys.has(key))
-        .slice(0, 1)
-        .map(({ row }) => row);
-  const featureRowSet = new Set(featureRows);
+  if (primaryCapitalRow === contributionRow) {
+    promotedKeys.add("contribution");
+  }
+  const summaryRowSet = new Set(summaryRows);
   const detailRows = rows
     .filter(
       ({ key, row }) =>
-        !featureRowSet.has(row) && (key === null || !promotedKeys.has(key)),
+        !summaryRowSet.has(row) && (key === null || !promotedKeys.has(key)),
     )
     .map(({ row }) => row);
-  const promotedValues = promotedRows.map((row) => row.value);
+  const promotedValues = summaryRows.map((row) => row.value);
 
   return {
-    title: confirmationAssetTitle(assetRow, confirmation.title, t),
-    metaParts: promotedRows.map((row) => row.value),
-    featureRows,
+    assetSymbols,
+    strategyLabel:
+      strategyRow?.value ?? confirmationAssetTitle(assetRow, confirmation.title, t),
+    summaryRows,
     detailRows,
     assumptions: displayAssumptions(confirmation.assumptions ?? [], promotedValues),
   };
@@ -295,6 +279,21 @@ function displayAssumptions(assumptions: string[], promotedValues: string[]) {
   return assumptions.filter(
     (assumption) =>
       !promotedValues.some((value) => value.trim() && assumption.includes(value.trim())),
+  );
+}
+
+function AssetSymbols({ symbols }: { symbols: string[] }) {
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {symbols.map((symbol) => (
+        <span
+          key={symbol}
+          className="rounded-[7px] border border-[#c9c9cd]/65 px-2 py-1 text-[12px] font-medium leading-none tracking-[0.16px] text-[#505a63] dark:border-white/14 dark:text-[#8d969e]"
+        >
+          {symbol}
+        </span>
+      ))}
+    </span>
   );
 }
 
