@@ -329,7 +329,7 @@ describe("result card playground", () => {
     expect(spanish.timeframeDisplay).toBe("Datos diarios");
     expect(spanish.details).toContainEqual({
       label: "Capital inicial",
-      value: "USD\u00a01,000",
+      value: "$1,000",
     });
   });
 

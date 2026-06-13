@@ -171,9 +171,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(en.chat.starter_actions.tsla.value).toBe("Compare Apple with SPY over the last 12 months.");
     expect(en.chat.starter_actions.btc.value).toBe("What if I bought Bitcoin this year so far?");
     expect(en.chat.starter_actions.dca.value).toBe("What if I bought $250 of Nvidia every week over the last 12 months?");
-    expect(es.chat.starter_actions.tsla.value).toBe("Compara Apple con SPY durante los últimos 12 meses hasta hoy.");
-    expect(es.chat.starter_actions.btc.value).toBe("¿Qué habría pasado si compraba Bitcoin este año hasta hoy?");
-    expect(es.chat.starter_actions.dca.value).toBe("¿Qué habría pasado si compraba $250 de Nvidia cada semana durante los últimos 12 meses hasta hoy?");
+    expect(es.chat.starter_actions.tsla.value).toBe("Compara Apple con SPY durante los últimos 12 meses.");
+    expect(es.chat.starter_actions.btc.value).toBe("¿Qué habría pasado si compraba Bitcoin en lo que va del año?");
+    expect(es.chat.starter_actions.dca.value).toBe("¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?");
   });
 
   test("assistant turn controls use shared tooltips and robust clipboard copy", () => {

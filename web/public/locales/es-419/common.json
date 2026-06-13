@@ -122,14 +122,14 @@
     "trigger_create_strategy": "Quiero crear una nueva estrategia.",
     "trigger_create_collection": "Quiero crear una nueva colección.",
     "placeholder_prompts": [
-      "¿Cómo le ha ido a Apple contra SPY este año?",
-      "¿Qué habría pasado si compraba Bitcoin al inicio de este año?",
+      "¿Cómo le ha ido a Apple contra SPY en lo que va del año?",
+      "¿Qué habría pasado si compraba Bitcoin en lo que va del año?",
       "Explícame un término del mercado en palabras simples.",
-      "¿Qué pasa si mantengo Nvidia durante los últimos 12 meses hasta hoy?",
-      "Compara Ethereum y Bitcoin durante los últimos 12 meses hasta hoy.",
+      "¿Qué pasa si mantengo Nvidia durante los últimos 12 meses?",
+      "Compara Ethereum y Bitcoin durante los últimos 12 meses.",
       "Prueba comprar SPY en lo que va del año.",
       "¿Cómo funciona comprar acciones fuertes?",
-      "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante los últimos 12 meses hasta hoy?",
+      "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?",
       "Prueba una idea simple de comprar y mantener Solana en los últimos 6 meses.",
       "¿Por qué la gente compara una acción con SPY?"
     ],
@@ -140,15 +140,15 @@
     "starter_actions": {
       "tsla": {
         "label": "Prueba Apple vs SPY",
-        "value": "Compara Apple con SPY durante los últimos 12 meses hasta hoy."
+        "value": "Compara Apple con SPY durante los últimos 12 meses."
       },
       "btc": {
         "label": "Prueba mantener Bitcoin (BTC)",
-        "value": "¿Qué habría pasado si compraba Bitcoin este año hasta hoy?"
+        "value": "¿Qué habría pasado si compraba Bitcoin en lo que va del año?"
       },
       "dca": {
         "label": "Prueba compras semanales de Nvidia",
-        "value": "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante los últimos 12 meses hasta hoy?"
+        "value": "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
       }
     },
     "example_queries": {

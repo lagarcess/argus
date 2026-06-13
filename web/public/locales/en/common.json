@@ -122,8 +122,8 @@
     "trigger_create_strategy": "I want to create a new strategy.",
     "trigger_create_collection": "I want to create a new collection.",
     "placeholder_prompts": [
-      "How has Apple performed against SPY this year?",
-      "What if I bought Bitcoin at the start of this year?",
+      "How has Apple performed against SPY this year so far?",
+      "What if I bought Bitcoin this year so far?",
       "Explain a market term in simple words.",
       "What happens if I hold Nvidia over the last 12 months?",
       "Compare Ethereum and Bitcoin over the last 12 months.",

@@ -602,6 +602,7 @@ function formatCurrency(value: number, locale = "en-US") {
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "USD",
+    currencyDisplay: "narrowSymbol",
     maximumFractionDigits: 0,
   }).format(value);
 }

@@ -1285,10 +1285,35 @@ def test_starter_prompts_returns_personalized_suggestions() -> None:
     resp = client.get("/api/v1/chat/starter-prompts")
     assert resp.status_code == 200
     assert len(resp.json()["prompts"]) == 4
-    assert "Show me something interesting" in resp.json()["prompts"]
+    assert "Test Apple against SPY over the last 12 months." in resp.json()["prompts"]
 
     # Set specific goal
     _set_onboarding_ready(client, primary_goal="explore_crypto")
     resp = client.get("/api/v1/chat/starter-prompts")
     assert resp.status_code == 200
-    assert "Backtest Bitcoin halvings" in resp.json()["prompts"]
+    assert "Hold Bitcoin this year so far." in resp.json()["prompts"]
+
+
+def test_starter_prompts_follow_profile_language() -> None:
+    client = _client()
+
+    response = client.patch(
+        "/api/v1/me",
+        json={
+            "language": "es-419",
+            "onboarding": {
+                "stage": "ready",
+                "language_confirmed": True,
+                "primary_goal": "explore_crypto",
+                "completed": False,
+            },
+        },
+    )
+    assert response.status_code == 200
+
+    resp = client.get("/api/v1/chat/starter-prompts")
+    assert resp.status_code == 200
+    prompts = resp.json()["prompts"]
+    assert len(prompts) == 4
+    assert "Mantén Bitcoin en lo que va del año." in prompts
+    assert all("2024" not in prompt for prompt in prompts)

@@ -237,7 +237,7 @@ def result_breakdown_message_with_metadata(run: BacktestRun | None) -> Any:
 def list_starter_prompts(
     user: User = Depends(current_user),  # noqa: B008
 ) -> StarterPromptsResponse:
-    prompts = get_starter_prompts(user.onboarding.primary_goal)
+    prompts = get_starter_prompts(user.onboarding.primary_goal, user.language)
     return StarterPromptsResponse(prompts=prompts)
 
 
