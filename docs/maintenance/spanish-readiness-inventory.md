@@ -45,6 +45,20 @@ secondary field-fidelity audit path uses the same canonical cadence validator,
 so it cannot reintroduce localized cadence prose after the main interpreter
 pass.
 
+**Language-agnostic runtime guardrail:** input language and product locale are
+separate contracts. The LLM interpreter may accept English, Spanish,
+Portuguese, mixed-language shorthand, or other user turns, but executable fields
+must remain canonical Argus values and user-facing artifacts must render in the
+resolved product locale (`en` or `es-419` today) unless the user explicitly asks
+to switch languages. Do not add regex gates, locale phrase tables, or
+language-specific strategy aliases to runtime contracts. If a primary LLM pass
+returns raw multilingual strategy phrasing as unsupported while preserving
+execution evidence, repair it through a structured capability audit that selects
+a canonical supported family or keeps the unsupported constraint. `@` mentions
+remain provenance/disambiguation only: they can help preserve the intended asset
+identity, but they must not bypass the LLM interpreter, provider-backed resolver,
+same-asset validation, capability checks, or execution guardrails.
+
 **Recovery contract update:** recoverable chat failures now use typed recovery
 codes, normalized recovery language, and structured `retry_last_turn` metadata
 instead of durable English prose as the behavior contract. The user-facing
