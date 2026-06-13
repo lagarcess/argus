@@ -6,6 +6,7 @@ import {
   heroDeltaEvidenceView,
 } from "@/lib/result-card-display";
 import { artifactStatusToneClassName } from "@/lib/artifact-status-tones";
+import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import { isVisibleResultAction } from "@/lib/chat-result-actions";
 import { strategiesEnabled } from "@/lib/private-alpha-flags";
 import ResultEquityChart from "./ResultEquityChart";
@@ -62,6 +63,8 @@ export default function StrategyResultCard({
         ? "text-[#d66d75]"
         : "text-[#5a677d] dark:text-[#7da0ca]";
   const trustGroups = view.trustGroups;
+  const periodDisplay =
+    compactDateRangeDisplay(result.dateRange, i18n.language) ?? result.period;
 
   return (
     <section
@@ -78,8 +81,8 @@ export default function StrategyResultCard({
           </div>
           <p className="mt-1.5 text-[13px] leading-snug tracking-[0.16px] text-[#8d969e]">
             {view.timeframeDisplay
-              ? `${result.period} · ${view.timeframeDisplay}`
-              : result.period}
+              ? `${periodDisplay} · ${view.timeframeDisplay}`
+              : periodDisplay}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">

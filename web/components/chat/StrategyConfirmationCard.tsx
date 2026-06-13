@@ -15,6 +15,7 @@ import {
   artifactStatusToneClassName,
   type ArtifactStatusTone,
 } from "@/lib/artifact-status-tones";
+import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import {
   type ChatActionOption,
   type StrategyConfirmationPayload,
@@ -35,13 +36,17 @@ type StrategyConfirmationCardProps = {
   onAction?: (action: ChatActionOption) => void;
 };
 
+type ConfirmationCardRow = StrategyConfirmationPayload["rows"][number] & {
+  fullValue?: string;
+};
+
 const actionClassName =
   "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[12px] font-medium tracking-tight text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22";
 
 export default function StrategyConfirmationCard({ confirmation, onAction }: StrategyConfirmationCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const displayState = confirmationDisplayState(confirmation, t);
-  const viewModel = confirmationCardViewModel(confirmation, t);
+  const viewModel = confirmationCardViewModel(confirmation, t, i18n.language);
   const activeActions =
     confirmation.confirmation_state === "active" || !confirmation.confirmation_state
       ? confirmation.actions ?? []
@@ -131,7 +136,7 @@ function ConfirmationValue({
   row,
   variant,
 }: {
-  row: StrategyConfirmationPayload["rows"][number];
+  row: ConfirmationCardRow;
   variant: "summary" | "detail";
 }) {
   if (confirmationRowKey(row) === "period") {
@@ -140,7 +145,7 @@ function ConfirmationValue({
       <dd className={variant === "summary"
         ? "mt-1 text-[17px] font-semibold leading-snug tracking-tight text-[#191c1f] dark:text-white"
         : "mt-0.5 text-[14px] font-medium leading-[1.45] text-[#191c1f] dark:text-white/76"
-      }>
+      } title={row.fullValue}>
         <span className="block whitespace-normal break-words">{period.label}</span>
         {period.dates && (
           <span className="mt-0.5 block text-[13px] font-medium leading-snug text-[#505a63] dark:text-[#8d969e]">
@@ -191,6 +196,7 @@ function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: 
 function confirmationCardViewModel(
   confirmation: StrategyConfirmationPayload,
   t: TFunction,
+  language: string,
 ) {
   const rows = confirmation.rows.map((row) => ({
     key: confirmationRowKey(row),
@@ -203,7 +209,16 @@ function confirmationCardViewModel(
   const contributionRow = rowForKey(rows, "contribution");
   const assetSymbols = splitSymbolList(assetRow?.value ?? "");
   const primaryCapitalRow = startingCapitalRow ?? contributionRow;
-  const summaryRows = [primaryCapitalRow, periodRow].filter(isConfirmationRow);
+  const compactPeriod = compactDateRangeDisplay(confirmation.date_range, language);
+  const displayPeriodRow =
+    periodRow && compactPeriod
+      ? {
+          ...periodRow,
+          value: compactPeriod,
+          fullValue: confirmation.date_range?.display ?? periodRow.value,
+        }
+      : periodRow;
+  const summaryRows = [primaryCapitalRow, displayPeriodRow].filter(isConfirmationRow);
   const promotedKeys = new Set<StrategyConfirmationRowKey>([
     "assets",
     "strategy",

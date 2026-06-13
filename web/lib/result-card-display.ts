@@ -1,4 +1,5 @@
 import type { StrategyResultPayload } from "@/components/chat/types";
+import { compactDateRangeDisplay } from "@/lib/date-range-display";
 
 type MetricLike = {
   key?: string;
@@ -357,6 +358,8 @@ function executionFacts(
   );
   const startingCapital =
     parsedStartingCapital ?? result.chart?.base_value ?? undefined;
+  const dateRangeDisplay =
+    compactDateRangeDisplay(result.dateRange, locale || "en-US") ?? result.period;
   const capitalBasisLabel = isRecurringContributionResult(
     result,
     resolvedParameters,
@@ -367,7 +370,7 @@ function executionFacts(
     startingCapital == null
       ? undefined
       : { label: capitalBasisLabel, value: formatCurrency(startingCapital, locale) },
-    { label: copy.dateRangeLabel, value: result.period },
+    { label: copy.dateRangeLabel, value: dateRangeDisplay },
     timeframe ? { label: copy.timeframeLabel, value: timeframe } : undefined,
     side ? { label: copy.sideLabel, value: side } : undefined,
     allocation ? { label: copy.allocationLabel, value: allocation } : undefined,

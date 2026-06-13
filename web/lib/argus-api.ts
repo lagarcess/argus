@@ -378,6 +378,7 @@ export function resultCardFromConversationCard(
     strategyLabel: card.strategy_label,
     symbols: card.symbols,
     period: card.date_range.display,
+    dateRange: card.date_range,
     statusLabel: card.status_label,
     metrics: rows.map((row) => ({
       label: displayResultMetricLabel(row, run?.benchmark_symbol),

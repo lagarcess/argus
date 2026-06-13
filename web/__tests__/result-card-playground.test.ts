@@ -302,23 +302,34 @@ describe("result card playground", () => {
   });
 
   test("keeps result card display copy configurable while Spanish is disabled", () => {
-    const spanish = heroDeltaEvidenceView(resultCardPlaygroundFixtures[0].result, {
-      copy: {
-        ...defaultResultCardDisplayCopy,
-        endingValueLabel: "Valor final",
-        comparedWithSymbolLabel: (symbol) => `Comparado con ${symbol}`,
-        worstDropLabel: "Peor caída",
-        gainNoun: "ganancia",
-        totalReturnSuffix: "rendimiento total",
-        percentagePoints: (value) => `${value} puntos porcentuales`,
-        beatBy: (value) => `Superó por ${value}`,
-        startingCapitalLabel: "Capital inicial",
-        timeframeLabel: "Temporalidad",
-        benchmarkLabel: "Referencia",
-        dailyData: "Datos diarios",
+    const spanish = heroDeltaEvidenceView(
+      {
+        ...resultCardPlaygroundFixtures[0].result,
+        dateRange: {
+          start: "2024-01-01",
+          end: "2024-03-31",
+          display: "1 de enero de 2024 al 31 de marzo de 2024",
+        },
       },
-      locale: "es-419",
-    });
+      {
+        copy: {
+          ...defaultResultCardDisplayCopy,
+          endingValueLabel: "Valor final",
+          comparedWithSymbolLabel: (symbol) => `Comparado con ${symbol}`,
+          worstDropLabel: "Peor caída",
+          gainNoun: "ganancia",
+          totalReturnSuffix: "rendimiento total",
+          percentagePoints: (value) => `${value} puntos porcentuales`,
+          beatBy: (value) => `Superó por ${value}`,
+          startingCapitalLabel: "Capital inicial",
+          dateRangeLabel: "Rango de fechas",
+          timeframeLabel: "Temporalidad",
+          benchmarkLabel: "Referencia",
+          dailyData: "Datos diarios",
+        },
+        locale: "es-419",
+      },
+    );
 
     expect(spanish.hero.label).toBe("Valor final");
     expect(spanish.hero.detail).toContain("ganancia");
@@ -330,6 +341,10 @@ describe("result card playground", () => {
     expect(spanish.details).toContainEqual({
       label: "Capital inicial",
       value: "$1,000",
+    });
+    expect(spanish.details).toContainEqual({
+      label: "Rango de fechas",
+      value: "1 ene 2024 \u2192 31 mar 2024",
     });
   });
 

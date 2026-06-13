@@ -247,6 +247,11 @@ def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
     )
 
     assert card is not None
+    assert card["date_range"] == {
+        "start": "2025-05-03",
+        "end": "2026-05-03",
+        "display": "past year (May 3, 2025 - May 3, 2026)",
+    }
     period = next(row["value"] for row in card["rows"] if row["label"] == "Period")
     assert period == "past year (May 3, 2025 - May 3, 2026)"
     assert card["summary"] == (

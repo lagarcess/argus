@@ -57,6 +57,10 @@ def runtime_confirmation_card(
             strategy.get("date_range"),
             language=language,
         )
+    canonical_date_range = _confirmation_date_range_payload(
+        strategy.get("date_range"),
+        display=date_range,
+    )
     title = _confirmation_title(
         assets=assets,
         strategy_type=strategy_type,
@@ -182,7 +186,7 @@ def runtime_confirmation_card(
                 "payload": action_payload,
             },
         )
-    return {
+    card = {
         "confirmation_id": active_confirmation_id,
         "confirmation_state": "active",
         "title": title,
@@ -196,6 +200,9 @@ def runtime_confirmation_card(
         "assumptions": assumptions,
         "actions": actions,
     }
+    if canonical_date_range is not None:
+        card["date_range"] = canonical_date_range
+    return card
 
 
 def _confirmation_row(key: str, label: str, value: str) -> dict[str, str]:
@@ -204,6 +211,22 @@ def _confirmation_row(key: str, label: str, value: str) -> dict[str, str]:
         "label": label,
         "labelKey": f"chat.confirmation.rows.{key}",
         "value": value,
+    }
+
+
+def _confirmation_date_range_payload(
+    value: Any,
+    *,
+    display: str,
+) -> dict[str, str] | None:
+    try:
+        resolved = resolve_date_range(value, today=_confirmation_today())
+    except (TypeError, ValueError):
+        return None
+    return {
+        "start": resolved.start.isoformat(),
+        "end": resolved.end.isoformat(),
+        "display": display,
     }
 
 

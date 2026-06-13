@@ -191,6 +191,9 @@ Machine-readable values must remain ISO 8601 (YYYY-MM-DD). User-facing cards and
 **Examples:**
 - `en-US`: "January 1, 2022 to December 31, 2024"
 - `es-419`: "1 de enero de 2022 al 31 de diciembre de 2024"
+- Compact cards may derive shorter locale-aware labels from the same ISO fields
+  instead of parsing the long `display` string; for example `Jan 1, 2024 → Mar
+  31, 2024` in `en-US` and `1 ene 2024 → 31 mar 2024` in `es-419`.
 
 ```json
 {
@@ -313,6 +316,8 @@ machine-readable fields alongside display labels:
   persisted cards.
 - `rows[].key`: stable row identity such as `strategy`, `assets`, or `period`.
 - `rows[].label` / `rows[].labelKey`: display fallback plus frontend i18n key.
+- `date_range`: optional canonical `{ start, end, display }` range for cards
+  whose period row is visually compacted from ISO fields.
 - `actions[].label` / `actions[].labelKey`: display fallback plus frontend i18n key.
 
 Clients must use `status` and `rows[].key` for behavior. They must not infer

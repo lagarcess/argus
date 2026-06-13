@@ -82,6 +82,11 @@ export type StrategyResultPayload = {
   assetClass?: AssetClass;
   configSnapshot?: Record<string, unknown>;
   period: string;
+  dateRange?: {
+    start: string;
+    end: string;
+    display?: string;
+  };
   benchmarkNote?: string;
   statusLabel?: string;
   metrics: StrategyResultMetric[];
@@ -127,6 +132,12 @@ export type StrategyConfirmationRow = {
   value: string;
 };
 
+export type StrategyConfirmationDateRange = {
+  start: string;
+  end: string;
+  display?: string;
+};
+
 export type StrategyConfirmationPayload = {
   confirmation_id?: string;
   confirmation_state?: "active" | "superseded" | "cancelled";
@@ -139,6 +150,7 @@ export type StrategyConfirmationPayload = {
   status?: StrategyConfirmationStatus;
   statusLabel: string;
   summary: string;
+  date_range?: StrategyConfirmationDateRange;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];
