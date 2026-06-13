@@ -1473,7 +1473,12 @@ def test_explain_stage_localizes_spanish_quick_take_heading() -> None:
         effective_expertise_mode="beginner",
     )
     state.confirmation_payload = {
-        "strategy": {"strategy_thesis": "Probar compra y mantener ETH"},
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Probar compra y mantener ETH",
+            "asset_universe": ["ETH"],
+            "date_range": {"start": "2024-01-01", "end": "2024-03-31"},
+        },
     }
     state.final_response_payload = {
         "result": {
@@ -1487,6 +1492,11 @@ def test_explain_stage_localizes_spanish_quick_take_heading() -> None:
 
     assert result.patch["assistant_response"].startswith("**Resumen rápido**")
     assert not result.patch["assistant_response"].startswith("**Quick take**")
+    assert "- Probado: ETH: comprar y mantener" in result.patch["assistant_response"]
+    assert "1 de enero de 2024 al 31 de marzo de 2024" in result.patch[
+        "assistant_response"
+    ]
+    assert "- Tested:" not in result.patch["assistant_response"]
 
 
 @pytest.mark.asyncio
@@ -1568,7 +1578,10 @@ async def test_explain_stage_async_localizes_spanish_quick_take_heading(
 ) -> None:
     from argus.agent_runtime.stages import explain as explain_module
 
-    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
+    captured: dict[str, object] = {}
+
+    async def fake_quick_take_plan(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
         return {
             "relative_performance_claim": "lagged_benchmark",
             "takeaway": "ETH rindió +55.1%, pero quedó 6.3 puntos porcentuales detrás de BTC.",
@@ -1599,6 +1612,7 @@ async def test_explain_stage_async_localizes_spanish_quick_take_heading(
             "strategy_type": "buy_and_hold",
             "strategy_thesis": "Comprar y mantener ETH",
             "asset_universe": ["ETH"],
+            "date_range": {"start": "2024-01-01", "end": "2024-03-31"},
         },
         "optional_parameters": {},
     }
@@ -1616,6 +1630,15 @@ async def test_explain_stage_async_localizes_spanish_quick_take_heading(
     assert not result.stage_patch["assistant_response"].startswith("**Quick take**")
     assert "ETH rindió +55.1%" in result.stage_patch["assistant_response"]
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
+    messages = captured["messages"]
+    assert isinstance(messages, list)
+    assert "Write every user-facing field" in messages[0]["content"]
+    context = json.loads(messages[1]["content"])
+    assert context["language"] == "es-419"
+    assert context["fact_bank"]["tested_summary"].startswith(
+        "ETH: comprar y mantener del 1 de enero de 2024"
+    )
+    assert "2024-01-01 to 2024-03-31" not in context["fact_bank"]["tested_summary"]
 
 
 @pytest.mark.asyncio
