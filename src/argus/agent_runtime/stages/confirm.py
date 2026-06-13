@@ -142,7 +142,10 @@ def _validated_launch_payload(
         launch_state = state.model_copy(
             update={"confirmation_payload": confirmation_payload}
         )
-        launch_payload = _launch_payload(launch_state)
+        launch_payload = _launch_payload(
+            launch_state,
+            language=_confirmation_payload_language(confirmation_payload),
+        )
         request = LaunchBacktestRequest.model_validate(launch_payload)
         validate_launch_supported(request)
     except ValidationError as exc:
@@ -158,6 +161,17 @@ def _validated_launch_payload(
         "requested_field": None,
         "assistant_prompt": None,
     }
+
+
+def _confirmation_payload_language(confirmation_payload: dict[str, Any]) -> str:
+    strategy = confirmation_payload.get("strategy")
+    if not isinstance(strategy, dict):
+        return "en"
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return "en"
+    language = str(extra_parameters.get("language") or "").strip()
+    return language or "en"
 
 
 def _validation_error_code(exc: ValidationError) -> str:

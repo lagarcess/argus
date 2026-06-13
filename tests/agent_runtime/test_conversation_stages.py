@@ -1820,6 +1820,30 @@ def test_confirm_stage_persists_validated_launch_payload_before_ready() -> None:
     assert launch_payload["parameters"] == {}
 
 
+def test_confirm_stage_preserves_strategy_language_in_launch_payload() -> None:
+    state = RunState.new(
+        current_user_message=(
+            "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+        ),
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Comprar y mantener ETH.",
+        asset_universe=["ETH"],
+        asset_class="crypto",
+        capital_amount=100000,
+        date_range={"start": "2024-01-01", "end": "2024-03-31"},
+        extra_parameters={"language": "es-419"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    launch_payload = result.patch["confirmation_payload"]["launch_payload"]
+    assert result.outcome == "await_approval"
+    assert launch_payload["language"] == "es-419"
+
+
 def test_confirm_stage_prefers_structured_indicator_parameters_for_launch() -> None:
     state = RunState.new(
         current_user_message="Use RSI entry 20 exit 60.",

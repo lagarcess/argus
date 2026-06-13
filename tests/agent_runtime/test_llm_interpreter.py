@@ -756,12 +756,14 @@ async def test_stated_run_field_fidelity_audit_preserves_bare_numeric_capital(
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
     calls: list[tuple[str, str]] = []
+    captured_messages: list[object] = []
 
     async def fake_json_schema(
         *, task, messages, schema_model, schema_name, model_name=None
     ):
-        del messages, model_name
+        del model_name
         calls.append((task, schema_name))
+        captured_messages.extend(messages)
         if schema_name == "StatedRunFieldFidelityAudit":
             return schema_model(capital_amount=100000, confidence=0.95)
         raise AssertionError(f"unexpected schema: {schema_name}")
@@ -808,6 +810,9 @@ async def test_stated_run_field_fidelity_audit_preserves_bare_numeric_capital(
     )
 
     assert calls == [("field_fidelity", "StatedRunFieldFidelityAudit")]
+    assert "con 100000" in captured_messages[0]["content"]
+    assert "allocation phrases in the user's language" in captured_messages[0]["content"]
+    assert "share counts" in captured_messages[0]["content"]
     assert repaired is not None
     draft = repaired.candidate_strategy_draft
     assert draft.capital_amount == 100000
