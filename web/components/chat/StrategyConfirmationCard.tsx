@@ -51,9 +51,6 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
           <p className="font-display text-[18px] font-medium leading-tight tracking-[-0.18px]">
             {confirmation.title}
           </p>
-          <p className="mt-1.5 text-[13px] leading-snug tracking-[0.16px] text-[#505a63] dark:text-[#8d969e]">
-            {confirmation.summary}
-          </p>
         </div>
         <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${artifactStatusToneClassName(displayState.tone)}`}>
           <StatusIcon className={`h-3.5 w-3.5 ${displayState.isSpinning ? "animate-spin" : ""}`} />

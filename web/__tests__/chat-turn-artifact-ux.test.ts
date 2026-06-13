@@ -45,6 +45,7 @@ describe("chat turn artifact UX", () => {
     expect(card).not.toContain("const confirmationToneClasses");
     expect(card).toContain("confirmationDisplayState");
     expect(card).toContain("font-display text-[18px]");
+    expect(card).not.toContain("{confirmation.summary}");
     expect(card).toContain("text-[#505a63] dark:text-[#8d969e]");
     expect(card).toContain("activeActions.length > 0");
     expect(card).toContain("confirmation.confirmation_state === \"active\"");
