@@ -85,7 +85,7 @@ describe("Argus Alpha frontend contract", () => {
   test("chat header keeps the history options affordance", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 
-    expect(chat).toContain('aria-label="Chat options"');
+    expect(chat).toContain('aria-label={t("chat.chat_options", "Chat options")}');
     expect(chat).toContain("MoreVertical");
     expect(chat).toContain("chat.rename_chat");
     expect(chat).toContain("chat.pin_chat");

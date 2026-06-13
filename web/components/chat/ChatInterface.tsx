@@ -2000,7 +2000,7 @@ export default function ChatInterface() {
                   type="button"
                   onClick={() => setShowChatOptions(!showChatOptions)}
                   className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-                  aria-label="Chat options"
+                  aria-label={t("chat.chat_options", "Chat options")}
                 >
                   <MoreVertical className="h-5 w-5" />
                 </button>

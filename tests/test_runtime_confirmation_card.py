@@ -128,6 +128,76 @@ def test_runtime_confirmation_card_uses_starting_capital_for_buy_and_hold() -> N
     assert "$10,000 starting capital" not in card["assumptions"]
 
 
+def test_runtime_confirmation_card_localizes_spanish_confirmation_artifact() -> None:
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Compra y mantén ETH.",
+                    "asset_universe": ["ETH"],
+                    "asset_class": "crypto",
+                    "capital_amount": 100000.0,
+                    "date_range": {"start": "2024-01-01", "end": "2024-03-31"},
+                },
+                "optional_parameters": {
+                    "timeframe": {
+                        "label": "Timeframe",
+                        "source": "default",
+                        "value": "1D",
+                    },
+                    "fees": {"label": "Fees", "source": "default", "value": 0.0},
+                    "slippage": {
+                        "label": "Slippage",
+                        "source": "default",
+                        "value": 0.0,
+                    },
+                },
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbol": "ETH",
+                    "symbols": ["ETH"],
+                    "timeframe": "1D",
+                    "date_range": {"start": "2024-01-01", "end": "2024-03-31"},
+                    "sizing_mode": "capital_amount",
+                    "capital_amount": 100000,
+                    "position_size": None,
+                    "parameters": {},
+                    "risk_rules": [],
+                    "benchmark_symbol": "BTC",
+                },
+                "validation": {"executable": True},
+            },
+        },
+        language="es-419",
+    )
+
+    assert card is not None
+    assert card["title"] == "ETH: Comprar y mantener"
+    assert card["statusLabel"] == "Listo para ejecutar"
+    assert (
+        card["summary"]
+        == "Listo para probar comprar y mantener ETH del 1 de enero de 2024 al 31 de marzo de 2024."
+    )
+    assert any(
+        row["key"] == "strategy" and row["value"] == "Comprar y mantener"
+        for row in card["rows"]
+    )
+    assert any(
+        row["key"] == "period"
+        and row["value"] == "1 de enero de 2024 al 31 de marzo de 2024"
+        for row in card["rows"]
+    )
+    assert "$100,000 capital inicial" in card["assumptions"]
+    assert "Datos diarios" in card["assumptions"]
+    assert "Sin comisiones" in card["assumptions"]
+    assert "Sin deslizamiento" in card["assumptions"]
+    assert "Referencia: BTC" in card["assumptions"]
+    assert all("starting capital" not in value for value in card["assumptions"])
+    assert all("Benchmark:" not in value for value in card["assumptions"])
+
+
 def test_runtime_confirmation_card_uses_explicit_benchmark_assumption() -> None:
     card = runtime_confirmation_card(
         {

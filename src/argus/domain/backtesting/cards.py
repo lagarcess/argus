@@ -7,6 +7,7 @@ from argus.domain.backtesting.execution import _execution_realism_settings
 from argus.domain.benchmark_comparison import (
     benchmark_comparison_from_delta,
 )
+from argus.domain.engine_launch.display import format_date_range_label
 
 
 def _format_money(value: float) -> str:
@@ -144,9 +145,12 @@ def build_result_card(
         "date_range": {
             "start": config["start_date"],
             "end": config["end_date"],
-            "display": f"{start.strftime('%d/%m/%Y')} al {end.strftime('%d/%m/%Y')}"
-            if is_es
-            else f"{start.strftime('%B')} {start.day}, {start.year} to {end.strftime('%B')} {end.day}, {end.year}",
+            "display": format_date_range_label(
+                start,
+                end,
+                language=language,
+                separator=" to " if not is_es else None,
+            ),
         },
         "status_label": status_label,
         "rows": rows,
