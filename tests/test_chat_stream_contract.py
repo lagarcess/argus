@@ -563,6 +563,51 @@ def test_chat_stream_missing_runtime_final_emits_recoverable_error(
     assert response.text.count("data: [DONE]") == 1
 
 
+def test_chat_stream_runtime_initialization_failure_emits_recoverable_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+
+    def _broken_workflow(_request: Any) -> Any:
+        raise RuntimeError("workflow import failed")
+
+    monkeypatch.setattr(api_state, "get_agent_runtime_workflow", _broken_workflow)
+    client = _client()
+    conversation = _conversation(client)
+    message = "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": message,
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    events = _data_events(response.text)
+    assert len(events) == 1
+    assert events[0]["type"] == "error"
+    assert events[0]["code"] == "agent_runtime_failure"
+    assert "Algo salió mal" in events[0]["message"]
+    assert events[0]["recovery"] == {
+        "code": "runtime_failure",
+        "retryable": True,
+        "language": "es-419",
+    }
+    assert events[0]["retry_last_turn"] == {"message": message}
+    assert response.text.count("data: [DONE]") == 1
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assert [message["role"] for message in messages[-2:]] == ["user", "assistant"]
+    assistant_message = messages[-1]
+    assert assistant_message["content"] == events[0]["message"]
+    assert assistant_message["metadata"]["recovery"] == events[0]["recovery"]
+    assert assistant_message["metadata"]["retry_last_turn"] == {"message": message}
+
+
 def test_chat_stream_runtime_failure_persists_retry_last_turn_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -597,9 +642,126 @@ def test_chat_stream_runtime_failure_persists_retry_last_turn_metadata(
     assert assistant_message["metadata"]["retry_last_turn"] == {
         "message": "what if I bought $125 of BTC every two weeks in 2022?"
     }
+    assert assistant_message["metadata"]["recovery"] == {
+        "code": "runtime_failure",
+        "retryable": True,
+        "language": "en",
+    }
     assert assistant_message["metadata"]["agent_runtime_stage_outcome"] == (
         "agent_runtime_failure"
     )
+
+
+def test_chat_stream_runtime_failure_localizes_recovery_for_spanish_user(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _incomplete_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _incomplete_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+    message = "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": message,
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    events = _data_events(response.text)
+    error_event = events[-1]
+    assert error_event["type"] == "error"
+    assert "Algo salió mal" in error_event["message"]
+    assert "Something went wrong" not in error_event["message"]
+    assert error_event["recovery"] == {
+        "code": "runtime_failure",
+        "retryable": True,
+        "language": "es-419",
+    }
+    assert error_event["retry_last_turn"] == {"message": message}
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant_message = messages[-1]
+    assert assistant_message["content"] == error_event["message"]
+    assert assistant_message["metadata"]["retry_last_turn"] == {"message": message}
+    assert assistant_message["metadata"]["recovery"] == error_event["recovery"]
+
+
+def test_chat_stream_final_persists_retry_last_turn_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": (
+                    "Guardé tu mensaje, pero no pude convertirlo en una "
+                    "configuración de prueba confiable. Intenta de nuevo en "
+                    "un momento."
+                ),
+                "retry_last_turn": {
+                    "message": (
+                        "Compra y mantén ETH de enero de 2024 hasta marzo de "
+                        "2024 con 100000"
+                    )
+                },
+                "recovery": {
+                    "code": "interpreter_unavailable",
+                    "retryable": True,
+                    "language": "es-419",
+                },
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": (
+                "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 "
+                "con 100000"
+            ),
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    final_payload = _final_payload(response.text)
+    assert final_payload["retry_last_turn"] == {
+        "message": "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+    }
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant_message = messages[-1]
+    assert assistant_message["metadata"]["retry_last_turn"] == final_payload[
+        "retry_last_turn"
+    ]
+    assert assistant_message["metadata"]["recovery"] == final_payload["recovery"]
 
 
 def test_chat_stream_persists_runtime_start_marker_on_user_message(

@@ -1,4 +1,3 @@
-import unicodedata
 from typing import Any
 
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
@@ -6,13 +5,15 @@ from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 def normalize_template_name(raw_name: Any) -> str | None:
     """
-    Canonicalizes a strategy template name using aliases from the registry.
+    Canonicalizes machine strategy identifiers using aliases from the registry.
     Returns the canonical template key or None if not found.
     """
     if not raw_name:
         return None
 
-    clean = _normalize_alias(raw_name)
+    clean = _normalize_machine_token(raw_name)
+    if clean is None:
+        return None
 
     # Direct match
     if clean in STRATEGY_CAPABILITIES:
@@ -20,13 +21,12 @@ def normalize_template_name(raw_name: Any) -> str | None:
 
     # Alias match
     for template_key, capability in STRATEGY_CAPABILITIES.items():
-        # Check primary template key, aliases, and display_name
-        aliases = [_normalize_alias(a) for a in capability.aliases]
-        if (
-            clean == _normalize_alias(template_key)
-            or clean in aliases
-            or clean == _normalize_alias(capability.display_name)
-        ):
+        aliases = {
+            normalized
+            for alias in capability.aliases
+            if (normalized := _normalize_machine_token(alias)) is not None
+        }
+        if clean == _normalize_machine_token(template_key) or clean in aliases:
             return template_key
 
     return None
@@ -34,7 +34,7 @@ def normalize_template_name(raw_name: Any) -> str | None:
 
 def normalize_parameter_value(template_key: str, param_key: str, raw_value: Any) -> Any:
     """
-    Canonicalizes a parameter value using localized aliases from the registry.
+    Canonicalizes a parameter value using capability-owned aliases from the registry.
     Returns the canonical value if an alias matches, otherwise returns the original value.
     """
     if not raw_value or not template_key or not param_key:
@@ -48,24 +48,30 @@ def normalize_parameter_value(template_key: str, param_key: str, raw_value: Any)
     if not spec:
         return raw_value
 
-    clean_value = _normalize_alias(raw_value)
+    clean_value = _normalize_machine_token(raw_value)
+    if clean_value is None:
+        return raw_value
     res = raw_value
 
     # 1. Check if it's already a canonical allowed value
-    allowed = [_normalize_alias(v) for v in spec.allowed_values]
+    allowed = [_normalize_machine_token(v) for v in spec.allowed_values]
     if clean_value in allowed:
         # Return the actual allowed value (preserving type if it's in the list)
         for v in spec.allowed_values:
-            if _normalize_alias(v) == clean_value:
+            if _normalize_machine_token(v) == clean_value:
                 res = v
                 break
     else:
         # 2. Check value_aliases
         if hasattr(spec, "value_aliases") and spec.value_aliases:
             for canonical_val, aliases in spec.value_aliases.items():
-                clean_aliases = [_normalize_alias(a) for a in aliases]
+                clean_aliases = {
+                    normalized
+                    for alias in aliases
+                    if (normalized := _normalize_machine_token(alias)) is not None
+                }
                 if (
-                    clean_value == _normalize_alias(canonical_val)
+                    clean_value == _normalize_machine_token(canonical_val)
                     or clean_value in clean_aliases
                 ):
                     res = canonical_val
@@ -74,21 +80,8 @@ def normalize_parameter_value(template_key: str, param_key: str, raw_value: Any)
     return res
 
 
-def _normalize_alias(value: Any) -> str:
-    folded = "".join(
-        char
-        for char in unicodedata.normalize("NFKD", str(value).strip().casefold())
-        if not unicodedata.combining(char)
-    )
-    parts: list[str] = []
-    current: list[str] = []
-    for char in folded:
-        if char.isalnum():
-            current.append(char)
-            continue
-        if current:
-            parts.append("".join(current))
-            current = []
-    if current:
-        parts.append("".join(current))
-    return " ".join(parts)
+def _normalize_machine_token(value: Any) -> str | None:
+    token = str(value or "").strip().casefold()
+    if not token or any(char.isspace() for char in token):
+        return None
+    return token

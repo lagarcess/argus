@@ -31,6 +31,7 @@ from argus.domain.market_data import clear_asset_cache
 from argus.llm import openrouter
 from argus.llm.openrouter import (
     log_openrouter_failure,
+    openrouter_profile_for_task,
     openrouter_structured_model_candidates,
     resolve_openrouter_structured_model,
 )
@@ -211,6 +212,13 @@ def test_openrouter_factory_applies_task_token_budget(
             "openrouter_api_key": "test-key",
         }
     ]
+
+
+def test_interpretation_profile_has_bounded_reasoning_for_semantic_repair() -> None:
+    profile = openrouter_profile_for_task("interpretation")
+
+    assert profile.temperature == 0
+    assert profile.reasoning_effort == "medium"
 
 
 def test_result_summary_timeout_budget_is_safe_for_render_workflows(

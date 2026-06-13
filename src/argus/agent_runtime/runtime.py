@@ -258,6 +258,8 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "artifact_references",
         "latest_failed_action_reference",
         "result_fact_bank",
+        "retry_last_turn",
+        "recovery",
     }
     serialized = {
         key: _serialize_public_value(key, value)

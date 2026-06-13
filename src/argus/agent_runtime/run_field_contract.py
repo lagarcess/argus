@@ -1,32 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
-
 from argus.domain.indicators import EXECUTABLE_INDICATORS
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
-from argus.nlp.natural_time import resolve_current_message_date_patch
-
-
-def current_message_dca_cadence(message: str) -> str | None:
-    """Return a user-stated DCA cadence using the strategy capability contract."""
-
-    tokens = field_fidelity_tokens(str(message or "").casefold())
-    if not tokens:
-        return None
-    capability = STRATEGY_CAPABILITIES.get("dca_accumulation")
-    cadence_spec = capability.parameters.get("dca_cadence") if capability else None
-    if cadence_spec is None:
-        return None
-    for cadence in cadence_spec.allowed_values:
-        normalized = str(cadence).strip().casefold()
-        if not normalized:
-            continue
-        aliases = [normalized, *cadence_spec.value_aliases.get(normalized, [])]
-        for alias in aliases:
-            alias_tokens = field_fidelity_tokens(str(alias).casefold())
-            if alias_tokens and _contains_ordered_token_span(tokens, alias_tokens):
-                return normalized
-    return None
 
 
 def current_message_execution_context_tokens(
@@ -94,39 +69,9 @@ def _contains_ordered_token_span(tokens: list[str], span: list[str]) -> bool:
     return False
 
 
-def current_message_date_range(
-    message: str,
-    *,
-    today: date | None = None,
-) -> dict[str, str] | None:
-    return resolve_current_message_date_patch(message, today=today or date.today())
-
-
 def field_fidelity_tokens(text: str) -> list[str]:
     separators = ",.;:!?()[]{}"
     cleaned = text
     for separator in separators:
         cleaned = cleaned.replace(separator, " ")
     return [token for token in cleaned.split() if token]
-
-
-def message_states_bar_timeframe(message: str) -> bool:
-    tokens = set(field_fidelity_tokens(str(message or "").casefold()))
-    return bool(
-        tokens
-        & {
-            "bar",
-            "bars",
-            "candle",
-            "candles",
-            "daily",
-            "hour",
-            "hourly",
-            "intraday",
-            "minute",
-            "minutes",
-            "1d",
-            "1h",
-            "4h",
-        }
-    )

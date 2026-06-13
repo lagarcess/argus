@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import calendar
 import inspect
 import os
 from dataclasses import dataclass
@@ -27,6 +26,11 @@ from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
+from argus.agent_runtime.recovery_messages import (
+    recovery_message,
+    recovery_state_stage_patch,
+    retry_last_turn_stage_patch,
+)
 from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
@@ -50,10 +54,7 @@ from argus.agent_runtime.rule_specs import (
     strategy_rule,
 )
 from argus.agent_runtime.run_field_contract import (
-    current_message_date_range,
-    current_message_dca_cadence,
     current_message_execution_context_tokens,
-    message_states_bar_timeframe,
 )
 from argus.agent_runtime.semantic_integrity import (
     SemanticIntegrityReport,
@@ -142,6 +143,11 @@ from argus.domain.indicators import (
     normalize_indicator_parameters,
 )
 from argus.domain.market_data import resolve_asset
+from argus.nlp.natural_time import (
+    dateparser_languages_for_user_language,
+    parse_explicit_date_text,
+    resolve_date_range_intent,
+)
 from argus.llm.openrouter import invoke_openrouter_chat_completion
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
@@ -314,6 +320,7 @@ async def _pending_date_answer_result_when_interpreter_unavailable(
 ) -> StageResult | None:
     interpretation = _pending_date_answer_interpretation_when_unavailable(
         current_user_message=state.current_user_message,
+        language=user.language_preference,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
     )
@@ -385,6 +392,7 @@ def _pending_asset_answer_interpretation_when_unavailable(
 def _pending_date_answer_interpretation_when_unavailable(
     *,
     current_user_message: str,
+    language: str | None,
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
 ) -> StructuredInterpretation | None:
@@ -399,6 +407,7 @@ def _pending_date_answer_interpretation_when_unavailable(
     endpoint = _parse_pending_date_endpoint_answer(
         current_user_message,
         endpoint_role=endpoint_role,
+        language=language,
     )
     if endpoint is None:
         return None
@@ -432,103 +441,14 @@ def _parse_pending_date_endpoint_answer(
     message: str,
     *,
     endpoint_role: str,
+    language: str | None,
 ) -> date | None:
-    folded = str(message or "").strip().casefold()
-    if not folded:
-        return None
-    if any(
-        token in folded
-        for token in ("today", "now", "present", "current", "through now")
-    ):
-        return date.today()
-    tokens = _date_answer_tokens(folded)
-    year = _first_year_token(tokens)
-    if year is None:
-        return None
-    month = _first_month_token(tokens)
-    day = _first_day_token(tokens, year=year)
-    if month is not None and day is not None:
-        try:
-            return date(year, month, day)
-        except ValueError:
-            return None
-    is_end = endpoint_role == "end" or any(
-        token in tokens for token in ("end", "through", "until", "to")
+    endpoint = "end" if endpoint_role == "end" else "start"
+    return parse_explicit_date_text(
+        message,
+        endpoint=endpoint,
+        languages=dateparser_languages_for_user_language(language),
     )
-    if month is not None:
-        day = calendar.monthrange(year, month)[1] if is_end else 1
-        return date(year, month, day)
-    return date(year, 12, 31) if is_end else date(year, 1, 1)
-
-
-def _date_answer_tokens(value: str) -> list[str]:
-    tokens: list[str] = []
-    current: list[str] = []
-    for char in value:
-        if char.isalnum():
-            current.append(char)
-            continue
-        if current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
-
-
-def _first_year_token(tokens: list[str]) -> int | None:
-    for token in tokens:
-        if len(token) == 4 and token.isdigit():
-            year = int(token)
-            if 1900 <= year <= 2100:
-                return year
-    return None
-
-
-_MONTH_NAME_TO_NUMBER = {
-    "jan": 1,
-    "january": 1,
-    "feb": 2,
-    "february": 2,
-    "mar": 3,
-    "march": 3,
-    "apr": 4,
-    "april": 4,
-    "may": 5,
-    "jun": 6,
-    "june": 6,
-    "jul": 7,
-    "july": 7,
-    "aug": 8,
-    "august": 8,
-    "sep": 9,
-    "sept": 9,
-    "september": 9,
-    "oct": 10,
-    "october": 10,
-    "nov": 11,
-    "november": 11,
-    "dec": 12,
-    "december": 12,
-}
-
-
-def _first_month_token(tokens: list[str]) -> int | None:
-    for token in tokens:
-        month = _MONTH_NAME_TO_NUMBER.get(token)
-        if month is not None:
-            return month
-    return None
-
-
-def _first_day_token(tokens: list[str], *, year: int) -> int | None:
-    for token in tokens:
-        if not token.isdigit() or int(token) == year:
-            continue
-        day = int(token)
-        if 1 <= day <= 31:
-            return day
-    return None
 
 
 async def _call_structured_interpreter(
@@ -1189,10 +1109,7 @@ def _strategy_with_current_message_run_field_contract(
     current_user_message: str,
     supported_timeframes: tuple[str, ...],
 ) -> tuple[StrategySummary, StructuredInterpretation]:
-    raw_date_range = _explicit_date_range_from_current_message_for_repair(
-        current_user_message,
-        strategy=strategy,
-    )
+    raw_date_range = _explicit_date_range_from_strategy_for_repair(strategy)
     date_range, date_endpoint_patch_applied = (
         _complete_current_message_date_endpoint_patch(
             strategy=strategy,
@@ -1204,7 +1121,7 @@ def _strategy_with_current_message_run_field_contract(
     repaired_field_bases: set[str] = set()
     repair_reason_codes = ["current_message_run_field_contract_repair"]
     if date_endpoint_patch_applied:
-        repair_reason_codes.append("current_message_date_endpoint_patch_applied")
+        repair_reason_codes.append("structured_date_endpoint_patch_applied")
     if (
         date_range is not None
         and not has_partial_explicit_date_range(date_range)
@@ -1217,25 +1134,11 @@ def _strategy_with_current_message_run_field_contract(
         updated.date_range = date_range
         changed = True
         repaired_field_bases.add("date_range")
-    dca_cadence = current_message_dca_cadence(current_user_message)
-    if _strategy_needs_current_message_dca_contract_repair(
-        strategy=updated,
-        cadence=dca_cadence,
-    ):
-        if executable_strategy_type(updated) != "dca_accumulation":
-            updated.strategy_type = "dca_accumulation"
-            repaired_field_bases.update({"entry_logic", "exit_logic", "strategy_type"})
-        if updated.cadence in (None, "", [], {}):
-            updated.cadence = dca_cadence
-            repaired_field_bases.add("cadence")
-        changed = True
-        repair_reason_codes.append("current_message_dca_contract_repair")
     if (
         _strategy_has_non_executable_timeframe_label(
             updated,
             supported_timeframes=supported_timeframes,
         )
-        and not message_states_bar_timeframe(current_user_message)
     ):
         updated.timeframe = None
         changed = True
@@ -1252,14 +1155,7 @@ def _strategy_with_current_message_run_field_contract(
         for field in interpretation.ambiguous_fields
         if field.field_name.split("[", 1)[0] not in repaired_field_bases
     ]
-    unsupported_constraints = [
-        constraint
-        for constraint in interpretation.unsupported_constraints
-        if not (
-            "current_message_dca_contract_repair" in repair_reason_codes
-            and constraint.category == "unsupported_strategy_logic"
-        )
-    ]
+    unsupported_constraints = list(interpretation.unsupported_constraints)
     requires_clarification = interpretation.requires_clarification
     assistant_response = interpretation.assistant_response
     if (
@@ -1306,46 +1202,22 @@ def _complete_current_message_date_endpoint_patch(
     return {"start": str(start), "end": str(end)}, True
 
 
-def _strategy_needs_current_message_dca_contract_repair(
-    *,
-    strategy: StrategySummary,
-    cadence: str | None,
-) -> bool:
-    if cadence is None:
-        return False
-    strategy_family = _declared_strategy_family(strategy)
-    if strategy_family not in {None, "dca_accumulation"}:
-        return False
-    return bool(
-        strategy.asset_universe
-        and strategy.capital_amount is not None
-    )
-
-
-def _explicit_date_range_from_current_message_for_repair(
-    current_user_message: str,
-    *,
+def _explicit_date_range_from_strategy_for_repair(
     strategy: StrategySummary,
 ) -> dict[str, str] | None:
-    date_range = current_message_date_range(current_user_message)
-    if date_range is not None:
-        return date_range
-    if strategy.date_range not in (None, "", [], {}):
-        return None
-    try:
-        resolved = resolve_date_range(current_user_message)
-    except Exception:
-        return None
-    if resolved.used_default or not isinstance(resolved.payload, dict):
-        return None
-    payload = {
-        key: str(value)
-        for key in ("start", "end")
-        if (value := resolved.payload.get(key)) not in (None, "")
-    }
-    if set(payload) != {"start", "end"}:
-        return None
-    return payload
+    intent = strategy.extra_parameters.get("date_range_intent")
+    if isinstance(intent, dict):
+        resolved = resolve_date_range_intent(intent)
+        if resolved is not None:
+            return resolved.payload
+    if isinstance(strategy.date_range, dict):
+        payload = {
+            key: str(value)
+            for key in ("start", "end")
+            if (value := strategy.date_range.get(key)) not in (None, "")
+        }
+        return payload or None
+    return None
 
 
 def _strategy_date_range_needs_current_message_repair(
@@ -1355,7 +1227,13 @@ def _strategy_date_range_needs_current_message_repair(
     current_date_range: dict[str, str],
 ) -> bool:
     if interpretation.semantic_turn_act == "answer_pending_need":
-        return False
+        return (
+            strategy.date_range in (None, "", [], {})
+            or has_partial_explicit_date_range(strategy.date_range)
+            or not isinstance(strategy.date_range, dict)
+            or _date_range_endpoints(strategy.date_range)
+            != _date_range_endpoints(current_date_range)
+        )
     if strategy.date_range in (None, "", [], {}):
         return True
     if has_partial_explicit_date_range(strategy.date_range):
@@ -3053,16 +2931,28 @@ def _offline_interpreter_unavailable_result(
         effective_response_profile=effective_profile,
         semantic_turn_act=None,
     )
+    stage_patch: dict[str, Any] = {
+        "assistant_response": _offline_recovery_message(
+            snapshot,
+            current_user_message=current_user_message,
+            selected_thread_metadata=selected_thread_metadata or {},
+            language=user.language_preference,
+        ),
+    }
+    stage_patch.update(
+        recovery_state_stage_patch(
+            "interpreter_unavailable",
+            language=user.language_preference,
+            retryable=True,
+        )
+    )
+    retry_last_turn = retry_last_turn_stage_patch(current_user_message)
+    if retry_last_turn is not None:
+        stage_patch.update(retry_last_turn)
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
-        stage_patch={
-            "assistant_response": _offline_recovery_message(
-                snapshot,
-                current_user_message=current_user_message,
-                selected_thread_metadata=selected_thread_metadata or {},
-            ),
-        },
+        stage_patch=stage_patch,
     )
 
 
@@ -3355,6 +3245,7 @@ def _offline_recovery_message(
     *,
     current_user_message: str = "",
     selected_thread_metadata: dict[str, Any] | None = None,
+    language: str = "en",
 ) -> str:
     if snapshot is not None and snapshot.pending_strategy_summary is not None:
         strategy = snapshot.pending_strategy_summary
@@ -3363,36 +3254,32 @@ def _offline_recovery_message(
             current_user_message=current_user_message,
             selected_thread_metadata=selected_thread_metadata or {},
         ):
-            return (
-                "I saved your reply, but I could not safely apply that assumption "
-                "change, so I left the current idea unchanged. Please retry the "
-                "change in a moment."
-            )
+            return recovery_message("assumption_edit_unapplied", language=language)
         if snapshot.active_confirmation_reference is None:
-            return (
-                f"I still have the {setup_phrase} in this chat, but I could not "
-                "safely apply that change. Please retry in a moment."
+            return recovery_message(
+                "setup_change_unapplied",
+                language=language,
+                setup_phrase=setup_phrase,
             )
         assumptions_response = _draft_assumptions_response(snapshot)
-        action_guidance = (
-            "The visible confirmation is still ready. Use the card to start the "
-            "simulation, or use the card controls to change it."
+        action_guidance = recovery_message(
+            "confirmation_action_guidance",
+            language=language,
         )
         if assumptions_response is not None:
             return f"{assumptions_response} {action_guidance}"
-        return (
-            f"I still have the {setup_phrase} confirmation in this chat, "
-            f"but I could not safely apply that change. {action_guidance}"
+        return recovery_message(
+            "confirmation_change_unapplied",
+            language=language,
+            setup_phrase=setup_phrase,
+            action_guidance=action_guidance,
         )
     if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
-        return (
-            "I still have the latest result in this chat, but I could not safely "
-            "answer that follow-up. Please retry in a moment."
+        return recovery_message(
+            "latest_result_followup_unavailable",
+            language=language,
         )
-    return (
-        "I saved your message, but I could not turn it into a reliable test setup. "
-        "Please retry in a moment."
-    )
+    return recovery_message("interpreter_unavailable", language=language)
 
 
 def _current_setup_phrase(strategy: StrategySummary) -> str:
@@ -3624,30 +3511,6 @@ def _should_apply_current_message_asset_grounding(
     return not bool(prior and prior.asset_universe)
 
 
-def _current_message_date_range_for_contextual_edit(
-    *,
-    current_user_message: str | None,
-    selected_thread_metadata: dict[str, Any],
-) -> dict[str, str] | None:
-    if _field_base(str(selected_thread_metadata.get("requested_field") or "")) != (
-        "date_range"
-    ):
-        return None
-    message = str(current_user_message or "").strip()
-    if not message:
-        return None
-    try:
-        resolved = resolve_date_range(message)
-    except Exception:
-        return None
-    if resolved.used_default:
-        return None
-    payload = resolved.payload
-    if set(payload) != {"start", "end"}:
-        return None
-    return payload
-
-
 def _contextual_date_range_value(
     *,
     base: Any,
@@ -3657,15 +3520,10 @@ def _contextual_date_range_value(
 ) -> dict[str, Any]:
     if _has_complete_date_range(incoming):
         return incoming
-    return (
-        _current_message_date_range_for_contextual_edit(
-            current_user_message=current_user_message,
-            selected_thread_metadata=selected_thread_metadata,
-        )
-        or _merged_contextual_date_range(
-            base=base,
-            incoming=incoming,
-        )
+    del current_user_message, selected_thread_metadata
+    return _merged_contextual_date_range(
+        base=base,
+        incoming=incoming,
     )
 
 

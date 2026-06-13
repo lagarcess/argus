@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 import calendar
-import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from dateparser.date import DateDataParser
 from dateparser.search import search_dates
 
 DatePeriod = Literal["day", "week", "month", "year"]
-
-_TIME_SPAN_SUFFIX_RE = re.compile(r"\s+\((?:start|end)\)$", flags=re.IGNORECASE)
-_COMPACT_RANGE_SEPARATOR_RE = re.compile(r"(?<=\d)\s*[-–—]\s*(?=[^\W\d_])")
+DateIntentUnit = Literal["day", "week", "month", "quarter", "year"]
 
 
 @dataclass(frozen=True)
@@ -25,6 +23,13 @@ class NaturalDateRange:
     @property
     def payload(self) -> dict[str, str]:
         return {"start": self.start.isoformat(), "end": self.end.isoformat()}
+
+
+@dataclass(frozen=True)
+class DateRangeIntentResolution:
+    label: str
+    payload: dict[str, str]
+    evidence_spans: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -97,138 +102,187 @@ def resolve_date_range_text(
     )
 
 
-def resolve_date_window_text(
-    text: str,
+def resolve_date_range_intent(
+    intent: Mapping[str, Any] | object | None,
     *,
     today: date | None = None,
-    languages: tuple[str, ...] | None = None,
-) -> NaturalDateRange | None:
-    """Resolve Argus-supported date-window language behind the NLP boundary.
+) -> DateRangeIntentResolution | None:
+    """Resolve canonical interpreter time intent into an Argus date-range patch.
 
-    This function is the stable runtime-facing wrapper. It keeps dateparser as
-    the multilingual engine while preserving Argus' rolling-window semantics for
-    compact user phrases such as "past month", "last 3 months", and "2mo".
+    This is intentionally not a natural-language parser. The LLM owns phrases such
+    as "los últimos 12 meses" or "year to date" and returns language-neutral
+    fields; this function only performs deterministic date math and validation.
     """
 
-    raw = str(text or "").strip()
-    if not raw:
+    payload = _intent_payload(intent)
+    if not payload:
         return None
     current_date = today or date.today()
-    normalized = _normalize_period_text(raw)
+    if not _intent_confidence_is_usable(payload):
+        return None
 
-    relative = _relative_period(normalized, today=current_date)
-    if relative is not None:
-        return relative
+    kind = str(payload.get("kind") or "").strip()
+    evidence = _intent_evidence_spans(payload)
 
-    parsed_natural = resolve_date_range_text(
-        raw,
-        today=current_date,
-        languages=languages,
-    )
-    if parsed_natural is not None:
-        return parsed_natural
+    if kind == "rolling_window":
+        count = _positive_int(payload.get("count"))
+        unit = _intent_unit(payload.get("unit"))
+        if count is None or unit is None:
+            return None
+        end = _intent_date(payload.get("end"), today=current_date) or current_date
+        start = _subtract_period(end, count=count, unit=unit)
+        if end < start:
+            return None
+        return DateRangeIntentResolution(
+            label=_relative_label(count=count, unit=unit),
+            payload={"start": start.isoformat(), "end": end.isoformat()},
+            evidence_spans=evidence,
+        )
 
-    multi_year = _multi_year_period(normalized, today=current_date)
-    if multi_year is not None:
-        return multi_year
-    ytd = _year_to_date(normalized, today=current_date)
-    if ytd is not None:
-        return ytd
-    since = _since_year(normalized, today=current_date)
-    if since is not None:
-        return since
-    calendar_year = _calendar_year(normalized, today=current_date)
-    if calendar_year is not None:
-        return calendar_year
-    beginning_last_year = _beginning_last_year(normalized, today=current_date)
-    if beginning_last_year is not None:
-        return beginning_last_year
+    if kind == "year_to_date":
+        year = _positive_int(payload.get("year")) or current_date.year
+        if year > current_date.year:
+            return None
+        end = _intent_date(payload.get("end"), today=current_date) or current_date
+        if end.year != year:
+            end = date(year, 12, 31) if year < current_date.year else current_date
+        return DateRangeIntentResolution(
+            label="year to date" if year == current_date.year else f"{year} so far",
+            payload={"start": date(year, 1, 1).isoformat(), "end": end.isoformat()},
+            evidence_spans=evidence,
+        )
+
+    if kind == "calendar_year":
+        year = _positive_int(payload.get("year"))
+        if year is None or year > current_date.year:
+            return None
+        end = current_date if year == current_date.year else date(year, 12, 31)
+        return DateRangeIntentResolution(
+            label=str(year),
+            payload={"start": date(year, 1, 1).isoformat(), "end": end.isoformat()},
+            evidence_spans=evidence,
+        )
+
+    if kind == "since":
+        start = _intent_date(payload.get("start"), today=current_date)
+        year = _positive_int(payload.get("year"))
+        if start is None and year is not None:
+            start = date(year, 1, 1)
+        if start is None or start > current_date:
+            return None
+        end = _intent_date(payload.get("end"), today=current_date) or current_date
+        if end < start:
+            return None
+        return DateRangeIntentResolution(
+            label=f"since {start.isoformat()}",
+            payload={"start": start.isoformat(), "end": end.isoformat()},
+            evidence_spans=evidence,
+        )
+
+    if kind in {"explicit_range", "endpoint_patch"}:
+        patch: dict[str, str] = {}
+        start = _intent_date(payload.get("start"), today=current_date)
+        end = _intent_date(payload.get("end"), today=current_date)
+        offset_date = _intent_day_offset_date(payload, today=current_date)
+        endpoint = str(payload.get("endpoint") or "").strip()
+        if start is not None:
+            patch["start"] = start.isoformat()
+        if end is not None:
+            patch["end"] = end.isoformat()
+        if kind == "endpoint_patch" and endpoint in {"start", "end"}:
+            endpoint_value = (start if endpoint == "start" else end) or offset_date
+            if endpoint_value is None:
+                return None
+            patch = {endpoint: endpoint_value.isoformat()}
+        if not patch or (
+            patch.get("start")
+            and patch.get("end")
+            and patch["end"] < patch["start"]
+        ):
+            return None
+        label = (
+            f"{patch['start']} to {patch['end']}"
+            if set(patch) == {"start", "end"}
+            else "date endpoint"
+        )
+        return DateRangeIntentResolution(
+            label=label,
+            payload=patch,
+            evidence_spans=evidence,
+        )
     return None
 
 
-def canonical_date_range_label_from_text(
-    text: str,
-    *,
-    today: date | None = None,
-    languages: tuple[str, ...] | None = None,
-) -> str | None:
-    resolved = resolve_date_window_text(text, today=today, languages=languages)
-    if resolved is None:
+def _intent_payload(intent: Mapping[str, Any] | object | None) -> dict[str, Any]:
+    if intent is None:
+        return {}
+    if isinstance(intent, Mapping):
+        return dict(intent)
+    model_dump = getattr(intent, "model_dump", None)
+    if callable(model_dump):
+        dumped = model_dump(mode="python")
+        return dict(dumped) if isinstance(dumped, Mapping) else {}
+    return {}
+
+
+def _intent_confidence_is_usable(payload: Mapping[str, Any]) -> bool:
+    confidence = payload.get("confidence")
+    if confidence in (None, ""):
+        return True
+    try:
+        return float(confidence) >= 0.5
+    except (TypeError, ValueError):
+        return False
+
+
+def _intent_evidence_spans(payload: Mapping[str, Any]) -> tuple[str, ...]:
+    evidence = str(payload.get("evidence") or "").strip()
+    return (evidence,) if evidence else ()
+
+
+def _positive_int(value: Any) -> int | None:
+    if value in (None, ""):
         return None
-    if resolved.label == f"{resolved.start} to {resolved.end}":
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
         return None
-    return resolved.label
+    return parsed if parsed > 0 else None
 
 
-def resolve_current_message_date_patch(
-    text: str,
-    *,
-    today: date | None = None,
-    languages: tuple[str, ...] | None = None,
-) -> dict[str, str] | None:
-    """Resolve date edits/ranges stated in the current user message.
-
-    The return shape intentionally matches the runtime patch contract because a
-    turn can update only one endpoint, e.g. "change the end date to yesterday".
-    """
-
-    raw = str(text or "")
-    current_date = today or date.today()
-    tokens = _tokens(raw.casefold())
-
-    year_so_far = _year_so_far_date_range_from_tokens(tokens, today=current_date)
-    if year_so_far is not None:
-        return year_so_far.payload
-
-    start_endpoint = _date_endpoint_from_marker_tokens(
-        tokens,
-        markers={"start", "starting", "beginning"},
-        endpoint="start",
-    )
-    end_endpoint = _date_endpoint_from_marker_tokens(
-        tokens,
-        markers={"end", "ending"},
-        endpoint="end",
-    )
-    if start_endpoint is not None and end_endpoint is not None:
-        return {"start": start_endpoint.isoformat(), "end": end_endpoint.isoformat()}
-    if start_endpoint is not None and not _tokens_after_year_include_date_endpoint(
-        tokens,
-        endpoint=start_endpoint,
-    ):
-        return {"start": start_endpoint.isoformat()}
-    if end_endpoint is not None:
-        return {"end": end_endpoint.isoformat()}
-
-    relative_endpoint = _relative_date_endpoint_from_marker_tokens(
-        tokens,
-        today=current_date,
-        languages=languages,
-    )
-    if relative_endpoint is not None:
-        return relative_endpoint
-
-    parsed_natural = resolve_date_range_text(
-        raw,
-        today=current_date,
-        languages=languages,
-    )
-    if parsed_natural is not None:
-        return parsed_natural.payload
-
-    has_named_date = contains_named_date_evidence(
-        raw,
-        today=current_date,
-        languages=languages,
-    )
-    if not has_named_date:
-        multi_year = _multi_year_period(raw, today=current_date)
-        if multi_year is not None:
-            return multi_year.payload
-        calendar_year = _calendar_year(raw, today=current_date)
-        if calendar_year is not None:
-            return calendar_year.payload
+def _intent_unit(value: Any) -> DateIntentUnit | None:
+    normalized = str(value or "").strip()
+    if normalized in {"day", "week", "month", "quarter", "year"}:
+        return cast(DateIntentUnit, normalized)
     return None
+
+
+def _intent_date(value: Any, *, today: date) -> date | None:
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text in {"today", "current_date"}:
+        return today
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def _intent_day_offset_date(payload: Mapping[str, Any], *, today: date) -> date | None:
+    offset = payload.get("day_offset")
+    if offset in (None, ""):
+        return None
+    anchor = str(payload.get("anchor") or "today").strip()
+    if anchor not in {"today", "current_date"}:
+        return None
+    try:
+        days = int(offset)
+    except (TypeError, ValueError):
+        return None
+    return today + timedelta(days=days)
 
 
 def parse_date_text(
@@ -246,6 +300,29 @@ def parse_date_text(
     if parsed is None:
         return None
     return _endpoint_date(parsed, endpoint=endpoint, today=today or date.today())
+
+
+def parse_explicit_date_text(
+    text: str,
+    *,
+    today: date | None = None,
+    endpoint: Literal["start", "end"] = "start",
+    languages: tuple[str, ...] | None = None,
+) -> date | None:
+    raw = str(text or "").strip()
+    if not raw or not any(char.isdigit() for char in raw):
+        return None
+    return parse_date_text(raw, today=today, endpoint=endpoint, languages=languages)
+
+
+def dateparser_languages_for_user_language(language: str | None) -> tuple[str, ...]:
+    primary = str(language or "en").strip().replace("_", "-").split("-", 1)[0]
+    primary = primary.casefold()
+    if not primary or not primary.isalpha():
+        return ("en",)
+    if primary == "en":
+        return ("en",)
+    return (primary, "en")
 
 
 def parse_relative_endpoint_text(
@@ -451,418 +528,70 @@ def _relative_base(value: date) -> datetime:
 
 
 def _normalize_compact_range_separators(value: str) -> str:
-    return _COMPACT_RANGE_SEPARATOR_RE.sub(" to ", str(value or ""))
+    text = str(value or "")
+    output: list[str] = []
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char not in {"-", "–", "—"}:
+            output.append(char)
+            index += 1
+            continue
+        prev_index = _previous_non_space_index(text, index - 1)
+        next_index = _next_non_space_index(text, index + 1)
+        if (
+            prev_index is not None
+            and next_index is not None
+            and text[prev_index].isdigit()
+            and text[next_index].isalpha()
+        ):
+            while output and output[-1].isspace():
+                output.pop()
+            output.append(" to ")
+            index = next_index
+            continue
+        output.append(char)
+        index += 1
+    return "".join(output)
 
 
 def _strip_time_span_suffix(value: str) -> str:
-    return _TIME_SPAN_SUFFIX_RE.sub("", str(value or "")).strip()
+    stripped = str(value or "").strip()
+    lowered = stripped.casefold()
+    for suffix in ("(start)", "(end)"):
+        if lowered.endswith(suffix):
+            return stripped[: -len(suffix)].rstrip()
+    return stripped
 
 
 def _span_has_explicit_year(value: str) -> bool:
-    return any(
-        len(part) == 4 and part.isdigit()
-        for part in re.findall(r"\b\d{4}\b", str(value or ""))
-    )
-
-
-def _normalize_period_text(value: str) -> str:
-    normalized = _tokens_to_text(value)
-    return _normalize_period_number_words(normalized)
-
-
-def _normalize_period_number_words(value: str) -> str:
-    number_words = {
-        "one": "1",
-        "two": "2",
-        "three": "3",
-        "four": "4",
-        "five": "5",
-        "six": "6",
-        "seven": "7",
-        "eight": "8",
-        "nine": "9",
-        "ten": "10",
-    }
-    period_units = {
-        "day",
-        "days",
-        "week",
-        "weeks",
-        "month",
-        "months",
-        "quarter",
-        "quarters",
-        "year",
-        "years",
-    }
-    tokens = _tokens(value)
-    normalized: list[str] = []
-    for index, token in enumerate(tokens):
-        next_token = tokens[index + 1] if index + 1 < len(tokens) else None
-        normalized.append(number_words[token] if token in number_words and next_token in period_units else token)
-    return " ".join(normalized)
-
-
-def _year_to_date(value: str, *, today: date) -> NaturalDateRange | None:
-    tokens = _tokens(value)
-    if value in {"ytd", "year_to_date", "year to date"}:
-        return NaturalDateRange(
-            label="year to date",
-            start=date(today.year, 1, 1),
-            end=today,
-        )
-    if {"so", "far"} <= set(tokens):
-        if {"this", "year"} <= set(tokens):
-            return NaturalDateRange(
-                label="this year so far",
-                start=date(today.year, 1, 1),
-                end=today,
-            )
-        for token in tokens:
-            if _is_four_digit_year(token) and int(token) == today.year:
-                year = int(token)
-                return NaturalDateRange(
-                    label=f"{year} so far",
-                    start=date(year, 1, 1),
-                    end=today,
-                )
-    return None
-
-
-def _year_so_far_date_range_from_tokens(
-    tokens: list[str],
-    *,
-    today: date,
-) -> NaturalDateRange | None:
-    return _year_to_date(" ".join(tokens), today=today)
-
-
-def _multi_year_period(value: str, *, today: date) -> NaturalDateRange | None:
-    tokens = _tokens(value)
-    years: list[int] = []
-    for token in tokens:
-        if _is_four_digit_year(token):
-            year = int(token)
-            if 1900 <= year <= today.year and year not in years:
-                years.append(year)
-    if len(years) != 2:
-        return None
-    if not (
-        set(tokens)
-        & {
-            "and",
-            "to",
-            "through",
-            "thru",
-            "until",
-            "till",
-            "from",
-            "between",
-            "over",
-            "during",
-        }
-    ):
-        return None
-    start_year, end_year = years
-    if end_year < start_year:
-        return None
-    if end_year == today.year and (
-        {"so", "far"} <= set(tokens)
-        or set(tokens) & {"today", "now", "present", "current"}
-    ):
-        end = today
-    else:
-        end = date(end_year, 12, 31)
-    return NaturalDateRange(
-        label=f"{start_year} to {end_year}",
-        start=date(start_year, 1, 1),
-        end=end,
-    )
-
-
-def _since_year(value: str, *, today: date) -> NaturalDateRange | None:
-    tokens = _tokens(value)
-    if len(tokens) != 2 or tokens[0] != "since" or not _is_four_digit_year(tokens[1]):
-        return None
-    year = int(tokens[1])
-    if year > today.year:
-        return None
-    return NaturalDateRange(
-        label=f"since {year}",
-        start=date(year, 1, 1),
-        end=today,
-    )
-
-
-def _calendar_year(value: str, *, today: date) -> NaturalDateRange | None:
-    tokens = _tokens(value)
-    year_tokens = [
-        token
-        for token in tokens
-        if _is_four_digit_year(token) and 1900 <= int(token) <= today.year
-    ]
-    if len(set(year_tokens)) != 1:
-        return None
-    for index, token in enumerate(tokens):
-        if not _is_four_digit_year(token):
+    text = str(value or "")
+    for index in range(max(len(text) - 3, 0)):
+        candidate = text[index : index + 4]
+        if not candidate.isdigit():
             continue
-        year = int(token)
-        if year < 1900 or year > today.year:
-            continue
-        previous = tokens[index - 1] if index > 0 else ""
-        if len(tokens) == 1 or previous in {
-            "in",
-            "during",
-            "throughout",
-            "for",
-            "over",
-        }:
-            return NaturalDateRange(
-                label=str(year),
-                start=date(year, 1, 1),
-                end=date(year, 12, 31),
-            )
-    return None
+        previous_ok = index == 0 or not text[index - 1].isdigit()
+        next_index = index + 4
+        next_ok = next_index >= len(text) or not text[next_index].isdigit()
+        if previous_ok and next_ok:
+            return True
+    return False
 
 
-def _beginning_last_year(value: str, *, today: date) -> NaturalDateRange | None:
-    if value not in {
-        "beginning of last year to now",
-        "from the beginning of last year to now",
-    }:
-        return None
-    return NaturalDateRange(
-        label="beginning of last year to now",
-        start=date(today.year - 1, 1, 1),
-        end=today,
-    )
-
-
-def _relative_period(value: str, *, today: date) -> NaturalDateRange | None:
-    tokens = _tokens(value)
-    if tokens in (["past", "year"], ["last", "year"]):
-        return NaturalDateRange(
-            label="past year",
-            start=shift_months(today, -12),
-            end=today,
-        )
-    singular_periods = {
-        "past day": ("day", 1),
-        "last day": ("day", 1),
-        "past week": ("week", 1),
-        "last week": ("week", 1),
-        "past month": ("month", 1),
-        "last month": ("month", 1),
-        "past quarter": ("quarter", 1),
-        "last quarter": ("quarter", 1),
-    }
-    singular_period = singular_periods.get(" ".join(tokens))
-    if singular_period is not None:
-        unit, count = singular_period
-        return NaturalDateRange(
-            label=f"past {unit}",
-            start=_subtract_period(today, count=count, unit=unit),
-            end=today,
-        )
-
-    relative_label = _extract_relative_period_label(tokens)
-    if relative_label is not None:
-        parts = relative_label.split()
-        if len(parts) == 2:
-            _, unit = parts
-            return NaturalDateRange(
-                label=_relative_label(count=1, unit=unit),
-                start=_subtract_period(today, count=1, unit=unit),
-                end=today,
-            )
-        if len(parts) != 3 or not parts[1].isdigit():
-            return None
-        count = int(parts[1])
-        unit = parts[2]
-        return NaturalDateRange(
-            label=_relative_label(count=count, unit=unit),
-            start=_subtract_period(today, count=count, unit=unit),
-            end=today,
-        )
-
-    compact = _split_compact_period_token(value)
-    if compact is not None:
-        count, unit = compact
-        return NaturalDateRange(
-            label=_relative_label(count=count, unit=unit),
-            start=_subtract_period(today, count=count, unit=unit),
-            end=today,
-        )
-    return None
-
-
-def _date_endpoint_from_marker_tokens(
-    tokens: list[str],
-    *,
-    markers: set[str],
-    endpoint: Literal["start", "end"],
-) -> date | None:
-    for index, token in enumerate(tokens):
-        if token not in markers:
-            continue
-        year_index = _first_year_token_index(tokens, start=index + 1, limit=index + 5)
-        if year_index is None:
-            continue
-        year = int(tokens[year_index])
-        return date(year, 12, 31) if endpoint == "end" else date(year, 1, 1)
-    return None
-
-
-def _relative_date_endpoint_from_marker_tokens(
-    tokens: list[str],
-    *,
-    today: date,
-    languages: tuple[str, ...] | None,
-) -> dict[str, str] | None:
-    endpoint_markers: tuple[tuple[set[str], Literal["start", "end"]], ...] = (
-        ({"start", "starting", "beginning", "from"}, "start"),
-        ({"end", "ending", "through", "thru", "until", "till"}, "end"),
-    )
-    for markers, endpoint in endpoint_markers:
-        for index, token in enumerate(tokens):
-            if token not in markers:
-                continue
-            relative_date = _relative_date_token_after_marker(
-                tokens,
-                start=index + 1,
-                limit=index + 5,
-                today=today,
-                languages=languages,
-            )
-            if relative_date is not None:
-                return {endpoint: relative_date.isoformat()}
-    return None
-
-
-def _relative_date_token_after_marker(
-    tokens: list[str],
-    *,
-    start: int,
-    limit: int,
-    today: date,
-    languages: tuple[str, ...] | None,
-) -> date | None:
-    for index in range(max(start, 0), min(limit, len(tokens))):
-        parsed = parse_relative_endpoint_text(
-            tokens[index],
-            today=today,
-            languages=languages,
-        )
-        if parsed is not None:
-            return parsed
-    return None
-
-
-def _first_year_token_index(
-    tokens: list[str],
-    *,
-    start: int,
-    limit: int,
-) -> int | None:
-    for index in range(max(start, 0), min(limit, len(tokens))):
-        token = tokens[index]
-        if len(token) != 4 or not token.isdigit():
-            continue
-        year = int(token)
-        if 1900 <= year <= 2100:
+def _previous_non_space_index(value: str, index: int) -> int | None:
+    while index >= 0:
+        if not value[index].isspace():
             return index
+        index -= 1
     return None
 
 
-def _tokens_after_year_include_date_endpoint(
-    tokens: list[str],
-    *,
-    endpoint: date,
-) -> bool:
-    year = str(endpoint.year)
-    try:
-        index = tokens.index(year)
-    except ValueError:
-        return False
-    endpoint_tokens = {
-        "to",
-        "through",
-        "until",
-        "till",
-        "end",
-        "ending",
-        "today",
-        "now",
-        "present",
-        "current",
-    }
-    return any(token in endpoint_tokens for token in tokens[index + 1 :])
-
-
-def _tokens(value: object) -> list[str]:
-    if not isinstance(value, str):
-        return []
-    tokens: list[str] = []
-    current: list[str] = []
-    for char in value.casefold():
-        if char.isalnum():
-            current.append(char)
-            continue
-        if current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
-
-
-def _tokens_to_text(value: str) -> str:
-    return " ".join(_tokens(value))
-
-
-def _extract_relative_period_label(tokens: list[str]) -> str | None:
-    period_units = {
-        "day",
-        "days",
-        "week",
-        "weeks",
-        "month",
-        "months",
-        "quarter",
-        "quarters",
-        "year",
-        "years",
-    }
-    singular_units = {"day", "week", "month", "quarter", "year"}
-    for index, token in enumerate(tokens):
-        if token not in {"past", "last"}:
-            continue
-        next_token = tokens[index + 1] if index + 1 < len(tokens) else None
-        following_token = tokens[index + 2] if index + 2 < len(tokens) else None
-        if next_token is not None and next_token.isdigit() and following_token in period_units:
-            return f"{token} {next_token} {following_token}"
-        if next_token in singular_units:
-            return f"{token} {next_token}"
+def _next_non_space_index(value: str, index: int) -> int | None:
+    while index < len(value):
+        if not value[index].isspace():
+            return index
+        index += 1
     return None
-
-
-def _split_compact_period_token(value: str) -> tuple[int, str] | None:
-    tokens = _tokens(value)
-    if len(tokens) != 1:
-        return None
-    token = tokens[0]
-    unit_aliases = ("mo", "d", "w", "m", "q", "y")
-    for unit in unit_aliases:
-        if not token.endswith(unit):
-            continue
-        count_text = token[: -len(unit)]
-        if count_text.isdigit():
-            return int(count_text), unit
-    return None
-
-
-def _is_four_digit_year(value: str) -> bool:
-    return len(value) == 4 and value.isdigit()
 
 
 def _relative_label(*, count: int, unit: str) -> str:

@@ -26,7 +26,6 @@ from argus.agent_runtime.result_followups import (
     result_followup_fact_bank,
     result_followup_llm_task,
 )
-from argus.agent_runtime.run_field_contract import current_message_date_range
 from argus.agent_runtime.stages.approval_guard import (
     decision_is_pure_approval,
     decision_replays_visible_confirmation_without_material_change,
@@ -803,7 +802,8 @@ def _deterministic_result_artifact_patch_stage_result_if_applicable(
     )
     if reference is None:
         return None
-    date_range = current_message_date_range(current_user_message)
+    del current_user_message
+    date_range = decision.candidate_strategy_draft.date_range
     if not isinstance(date_range, dict) or not (
         date_range.get("start") and date_range.get("end")
     ):

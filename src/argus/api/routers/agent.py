@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
+from argus.agent_runtime.recovery_messages import recovery_message, recovery_state
 from argus.agent_runtime.resolution import mention_to_provenance
 from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
@@ -334,11 +335,105 @@ async def chat_stream(
         user_id=user.id,
         conversation_id=conversation.id,
     )
-    workflow = api_state.get_agent_runtime_workflow(request)
-    checkpoint_values = await runtime_checkpoint_values(
-        workflow=workflow,
-        conversation_id=conversation.id,
-    )
+    mention_provenance = [
+        mention_to_provenance(mention.model_dump(mode="python"), index=index)
+        for index, mention in enumerate(payload.mentions)
+    ]
+    cancel_confirmation_action = is_cancel_confirmation_action(payload)
+
+    def persist_request_message() -> Any | None:
+        if onboarding_goal is not None or cancel_confirmation_action:
+            return None
+        user_metadata: dict[str, Any] = {
+            "agent_runtime_turn": {
+                "status": "started",
+                "conversation_id": conversation.id,
+                "request_id": request.state.request_id,
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            }
+        }
+        if mention_provenance:
+            user_metadata["mentions"] = [
+                mention.model_dump(mode="python") for mention in payload.mentions
+            ]
+            user_metadata["resolution_provenance"] = [
+                item.model_dump(mode="python") for item in mention_provenance
+            ]
+        if payload.action is not None:
+            user_metadata["chat_action"] = payload.action.model_dump(mode="python")
+        return create_message(
+            user_id=user.id,
+            conversation_id=conversation.id,
+            role="user",
+            content=display_message,
+            metadata=user_metadata,
+        )
+
+    try:
+        workflow = api_state.get_agent_runtime_workflow(request)
+        checkpoint_values = await runtime_checkpoint_values(
+            workflow=workflow,
+            conversation_id=conversation.id,
+        )
+    except Exception:
+        logger.exception(
+            "Agent runtime initialization failed",
+            conversation_id=conversation.id,
+        )
+        persist_request_message()
+        language = payload.language or conversation.language or current_user_profile.language
+        assistant_text = recovery_message("runtime_failure", language=language)
+        retry_metadata = retry_last_turn_metadata(
+            payload=payload,
+            request_message=request_message,
+        )
+        recovery = recovery_state(
+            "runtime_failure",
+            language=language,
+            retryable=retry_metadata is not None,
+        )
+        failure_metadata: dict[str, Any] = {
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "agent_runtime_failure",
+            "recovery": recovery,
+        }
+        if retry_metadata is not None:
+            failure_metadata.update(retry_metadata)
+        retry_last_turn = (
+            retry_metadata.get("retry_last_turn")
+            if isinstance(retry_metadata, dict)
+            else None
+        )
+        assistant_message = create_message(
+            user_id=user.id,
+            conversation_id=conversation.id,
+            role="assistant",
+            content=assistant_text,
+            metadata=failure_metadata,
+        )
+
+        async def initialization_failure_events() -> AsyncIterator[str]:
+            yield sse_data(
+                {
+                    "type": "error",
+                    "code": "agent_runtime_failure",
+                    "message": assistant_text,
+                    "message_id": assistant_message.id,
+                    "recovery": recovery,
+                    **(
+                        {"retry_last_turn": retry_last_turn}
+                        if isinstance(retry_last_turn, dict)
+                        else {}
+                    ),
+                }
+            )
+            yield sse_done()
+
+        return StreamingResponse(
+            initialization_failure_events(),
+            media_type="text/event-stream",
+            headers=headers,
+        )
     runtime_fallback = RuntimeFallbackContext()
     confirmation_action_messages = (
         _recent_messages_for_conversation(
@@ -415,37 +510,7 @@ async def chat_stream(
                     )
                     if result_fallback is not None:
                         runtime_fallback = result_fallback
-    mention_provenance = [
-        mention_to_provenance(mention.model_dump(mode="python"), index=index)
-        for index, mention in enumerate(payload.mentions)
-    ]
-    cancel_confirmation_action = is_cancel_confirmation_action(payload)
-    request_message_record = None
-    if onboarding_goal is None and not cancel_confirmation_action:
-        user_metadata: dict[str, Any] = {
-            "agent_runtime_turn": {
-                "status": "started",
-                "conversation_id": conversation.id,
-                "request_id": request.state.request_id,
-                "started_at": datetime.now(timezone.utc).isoformat(),
-            }
-        }
-        if mention_provenance:
-            user_metadata["mentions"] = [
-                mention.model_dump(mode="python") for mention in payload.mentions
-            ]
-            user_metadata["resolution_provenance"] = [
-                item.model_dump(mode="python") for item in mention_provenance
-            ]
-        if payload.action is not None:
-            user_metadata["chat_action"] = payload.action.model_dump(mode="python")
-        request_message_record = create_message(
-            user_id=user.id,
-            conversation_id=conversation.id,
-            role="user",
-            content=display_message,
-            metadata=user_metadata,
-        )
+    request_message_record = persist_request_message()
 
     onboarding_required = current_user_profile.onboarding.stage in {
         "language_selection",
@@ -1049,6 +1114,12 @@ async def chat_stream(
                     )
                     if isinstance(failed_action_metadata, dict):
                         metadata["failed_action"] = dict(failed_action_metadata)
+                retry_last_turn = runtime_result.get("retry_last_turn")
+                if isinstance(retry_last_turn, dict):
+                    metadata["retry_last_turn"] = dict(retry_last_turn)
+                recovery = runtime_result.get("recovery")
+                if isinstance(recovery, dict):
+                    metadata["recovery"] = dict(recovery)
                 if run is not None:
                     link_shadow_backtest_job_result(
                         user_id=user.id,
@@ -1130,8 +1201,9 @@ async def chat_stream(
                 "Agent runtime chat streaming failed",
                 conversation_id=conversation.id,
             )
-            assistant_text = (
-                "Something went wrong. Your conversation is saved. " "Please try again."
+            assistant_text = recovery_message(
+                "runtime_failure",
+                language=runtime_user.language_preference,
             )
             failure_metadata: dict[str, Any] = {
                 "conversation_mode": "recovery",
@@ -1141,8 +1213,19 @@ async def chat_stream(
                 payload=payload,
                 request_message=request_message,
             )
+            recovery = recovery_state(
+                "runtime_failure",
+                language=runtime_user.language_preference,
+                retryable=retry_metadata is not None,
+            )
+            failure_metadata["recovery"] = recovery
             if retry_metadata is not None:
                 failure_metadata.update(retry_metadata)
+            retry_last_turn = (
+                retry_metadata.get("retry_last_turn")
+                if isinstance(retry_metadata, dict)
+                else None
+            )
             assistant_message = create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -1161,6 +1244,12 @@ async def chat_stream(
                     "code": "agent_runtime_failure",
                     "message": assistant_text,
                     "message_id": assistant_message.id,
+                    "recovery": recovery,
+                    **(
+                        {"retry_last_turn": retry_last_turn}
+                        if isinstance(retry_last_turn, dict)
+                        else {}
+                    ),
                 }
             )
             yield sse_done()

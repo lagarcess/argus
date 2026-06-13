@@ -66,13 +66,16 @@ def runtime_confirmation_card(
         strategy_type=strategy_type,
         language=language,
     )
+    launch_payload = payload.get("launch_payload")
+    if not isinstance(launch_payload, dict):
+        launch_payload = {}
+    canonical_strategy_type = executable_strategy_type(strategy)
 
     rows = [
         _confirmation_row("strategy", "Strategy", strategy_label),
         _confirmation_row("assets", "Assets", assets),
         _confirmation_row("period", "Period", date_range),
     ]
-    canonical_strategy_type = executable_strategy_type(strategy)
     if strategy.get("cadence") and _strategy_type_uses_cadence(canonical_strategy_type):
         rows.append(
             _confirmation_row("cadence", "Cadence", str(strategy["cadence"]).title())
@@ -93,7 +96,13 @@ def runtime_confirmation_card(
                 _format_confirmation_value(strategy["exit_logic"]),
             )
         )
-    if strategy.get("capital_amount"):
+    display_capital = _confirmation_display_capital(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload,
+        strategy_type=canonical_strategy_type,
+    )
+    if display_capital is not None:
         capital_label = (
             "Contribution"
             if _strategy_type_uses_cadence(canonical_strategy_type)
@@ -105,13 +114,10 @@ def runtime_confirmation_card(
                 if _strategy_type_uses_cadence(canonical_strategy_type)
                 else "starting_capital",
                 capital_label,
-                f"${float(strategy['capital_amount']):,.0f}",
+                f"${display_capital:,.0f}",
             )
         )
 
-    launch_payload = payload.get("launch_payload")
-    if not isinstance(launch_payload, dict):
-        launch_payload = {}
     assumptions = _confirmation_assumptions(
         strategy=strategy,
         optional_parameters=optional_parameters,
@@ -222,6 +228,33 @@ def _confirmation_row(key: str, label: str, value: str) -> dict[str, str]:
         "labelKey": f"chat.confirmation.rows.{key}",
         "value": value,
     }
+
+
+def _confirmation_display_capital(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, Any],
+    launch_payload: dict[str, Any],
+    strategy_type: str,
+) -> float | None:
+    strategy_capital = _numeric_money_value(strategy.get("capital_amount"))
+    if _strategy_type_uses_cadence(strategy_type):
+        return strategy_capital
+    return (
+        strategy_capital
+        or _numeric_money_value(
+            _optional_parameter_value(optional_parameters, "initial_capital")
+        )
+        or _numeric_money_value(launch_payload.get("capital_amount"))
+        or _numeric_money_value(launch_payload.get("starting_capital"))
+    )
+
+
+def _numeric_money_value(value: Any) -> float | None:
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        return None
+    amount = float(value)
+    return amount if amount > 0 else None
 
 
 def _confirmation_date_range_payload(

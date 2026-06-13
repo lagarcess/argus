@@ -158,6 +158,11 @@ def filter_unsubstantiated_timeframe_constraints(
         if not _is_timeframe_constraint(constraint):
             filtered.append(constraint)
             continue
+        if strategy.timeframe in (None, "", [], {}) and _has_complete_date_range(
+            strategy.date_range
+        ):
+            removed = True
+            continue
         raw_value = constraint.raw_value or strategy.timeframe or strategy.date_range
         if explicit_date_range_value(
             raw_value,
@@ -285,6 +290,14 @@ def explicit_date_range_value(
     except Exception:
         return False
     return not resolution.used_default
+
+
+def _has_complete_date_range(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    start = value.get("start")
+    end = value.get("end")
+    return bool(start not in (None, "", [], {}) and end not in (None, "", [], {}))
 
 
 def _is_supported_timeframe_value(

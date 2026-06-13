@@ -246,7 +246,16 @@ export type ChatStreamEvent =
   | { event: "final"; data: ChatFinalPayload }
   | { event: "confirmation"; data: { confirmation: StrategyConfirmationPayload } }
   | { event: "result"; data: { run: BacktestRun } }
-  | { event: "error"; data: { code?: string; detail: string; message_id?: string } }
+  | {
+      event: "error";
+      data: {
+        code?: string;
+        detail: string;
+        message_id?: string;
+        recovery?: Record<string, unknown>;
+        retry_last_turn?: Record<string, unknown>;
+      };
+    }
   | { event: "done"; data: { message_id: string | null } };
 
 export type ChatFinalPayload = {
@@ -266,6 +275,8 @@ export type ChatFinalPayload = {
   backtest_job?: BacktestJob | null;
   next_actions?: string[];
   message_id?: string | null;
+  recovery?: Record<string, unknown> | null;
+  retry_last_turn?: Record<string, unknown> | null;
 };
 
 export type ChatActionRequest = {
@@ -958,10 +969,19 @@ export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
         detail: String(payload.message ?? payload.detail ?? "Chat stream failed"),
         message_id:
           typeof payload.message_id === "string" ? payload.message_id : undefined,
+        recovery: recordFromPayload(payload.recovery),
+        retry_last_turn: recordFromPayload(payload.retry_last_turn),
       },
     };
   }
   return null;
+}
+
+function recordFromPayload(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
 }
 
 export async function searchDiscovery(

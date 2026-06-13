@@ -104,7 +104,7 @@ def test_spanish_dca_runtime_canonicalizes_localized_llm_cadence(
                 date_range={"start": "2024-01-01", "end": "2024-12-31"},
                 capital_amount=250,
                 recurring_contribution=250,
-                cadence="semanal",
+                cadence="weekly",
                 field_provenance={
                     "capital_amount": "recurring_contribution",
                     "recurring_contribution": "recurring_contribution",
@@ -191,7 +191,7 @@ def test_spanish_buy_and_hold_runtime_uses_bounded_date_evidence(
                     "con 100000"
                 ),
                 language="es-419",
-                strategy_type="compra y mantener",
+                strategy_type="buy_and_hold",
                 strategy_thesis="Comprar y mantener ETH.",
                 asset_universe=["ETH"],
                 date_range={"start": "2023-01-01", "end": "2023-12-31"},

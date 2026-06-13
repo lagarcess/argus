@@ -289,11 +289,6 @@ def test_active_confirmation_date_edit_refreshes_confirmation_card(
         "resolve_asset",
         lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
     )
-    monkeypatch.setattr(
-        interpret_module,
-        "current_message_date_range",
-        lambda message: {"end": "2026-06-02"},
-    )
     pending = StrategySummary(
         strategy_type="buy_and_hold",
         strategy_thesis="Buy and hold NU this year so far.",
@@ -311,7 +306,18 @@ def test_active_confirmation_date_edit_refreshes_confirmation_card(
             "to use a supported RSI rule?"
         ),
         user_goal_summary="User wants to adjust the visible confirmation date.",
-        candidate_strategy_draft=StrategySummary(),
+        candidate_strategy_draft=StrategySummary(
+            date_range={"end": "2026-06-02"},
+            extra_parameters={
+                "date_range_intent": {
+                    "kind": "endpoint_patch",
+                    "endpoint": "end",
+                    "end": "2026-06-02",
+                    "confidence": 0.8,
+                    "evidence": "yesterday",
+                }
+            },
+        ),
         missing_required_fields=[],
         semantic_turn_act="refine_current_idea",
         artifact_target="active_confirmation",
@@ -329,7 +335,7 @@ def test_active_confirmation_date_edit_refreshes_confirmation_card(
     assert strategy.date_range == {"start": "2026-01-01", "end": "2026-06-02"}
     assert result.stage_patch.get("assistant_response") is None
     assert (
-        "current_message_date_endpoint_patch_applied"
+        "semantic_date_constraint_preserved"
         in result.decision.reason_codes
     )
 
@@ -719,6 +725,7 @@ def test_dca_recurring_amount_with_current_message_evidence_is_preserved(
     from argus.agent_runtime import llm_interpreter as llm_module
     from argus.agent_runtime.llm_interpreter import _validate_capability_boundaries
     from argus.agent_runtime.llm_interpreter_types import (
+        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -3770,6 +3777,7 @@ def test_dca_contract_audit_skips_educational_turn_with_stale_strategy_baggage()
         _response_needs_dca_contract_audit,
     )
     from argus.agent_runtime.llm_interpreter_types import (
+        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -4663,6 +4671,7 @@ def test_stated_run_fidelity_removes_inferred_date_endpoint_and_restores_benchma
         _response_from_stated_run_field_fidelity_audit,
     )
     from argus.agent_runtime.llm_interpreter_types import (
+        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -4703,6 +4712,42 @@ def test_stated_run_fidelity_removes_inferred_date_endpoint_and_restores_benchma
         "stated_run_field_fidelity_audit"
     )
     assert "stated_run_field_fidelity_audit" in repaired.reason_codes
+
+
+def test_stated_run_fidelity_audit_rejects_localized_raw_cadence() -> None:
+    from argus.agent_runtime.llm_interpreter import (
+        StatedRunFieldFidelityAudit,
+        _response_from_stated_run_field_fidelity_audit,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants recurring ETH buys.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="dca_accumulation",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            capital_amount=100,
+            cadence=None,
+        ),
+        semantic_turn_act="new_idea",
+    )
+    audit = StatedRunFieldFidelityAudit(cadence="semanal")
+
+    repaired = _response_from_stated_run_field_fidelity_audit(
+        response=response,
+        audit=audit,
+    )
+
+    assert repaired is None
+    assert response.candidate_strategy_draft.cadence is None
 
 
 def test_stated_run_fidelity_audit_uses_current_message_context() -> None:
@@ -5200,6 +5245,7 @@ async def test_dca_calendar_period_label_does_not_become_timeframe_clarification
         _response_ready_for_runtime,
     )
     from argus.agent_runtime.llm_interpreter_types import (
+        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -5239,6 +5285,11 @@ async def test_dca_calendar_period_label_does_not_become_timeframe_clarification
             asset_universe=["NVDA"],
             asset_class="equity",
             date_range={"end": "2024"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="calendar_year",
+                year=2024,
+                evidence="2024",
+            ),
             timeframe="calendar_year",
             cadence="weekly",
             capital_amount=250,
@@ -5366,11 +5417,9 @@ def test_stated_run_fidelity_preserves_current_year_so_far_contract() -> None:
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
-    from argus.agent_runtime.run_field_contract import current_message_date_range
 
     current_message = "how did apple perform against QQQ in 2026 so far?"
-    expected_range = current_message_date_range(current_message)
-    assert expected_range is not None
+    expected_range = {"start": "2026-01-01", "end": "2026-06-01"}
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
@@ -5399,24 +5448,18 @@ def test_stated_run_fidelity_preserves_current_year_so_far_contract() -> None:
 
 
 def test_current_message_contract_repairs_full_future_year_to_so_far(
-    monkeypatch,
 ) -> None:
-    from argus.agent_runtime import llm_interpreter as llm_module
     from argus.agent_runtime.llm_interpreter import (
         _response_from_current_message_run_field_contract,
     )
     from argus.agent_runtime.llm_interpreter_types import (
+        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
     from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 
     expected_range = {"start": "2026-01-01", "end": "2026-06-01"}
-    monkeypatch.setattr(
-        llm_module,
-        "_date_range_from_current_message",
-        lambda message: expected_range,
-    )
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
@@ -5427,6 +5470,12 @@ def test_current_message_contract_repairs_full_future_year_to_so_far(
             asset_universe=["AAPL"],
             asset_class="equity",
             date_range={"start": "2026-01-01", "end": "2026-12-31"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="year_to_date",
+                year=2026,
+                end="2026-06-01",
+                evidence="2026 so far",
+            ),
             comparison_baseline="QQQ",
         ),
         semantic_turn_act="new_idea",
@@ -5471,6 +5520,11 @@ def test_interpret_stage_repairs_dca_calendar_period_before_clarifying_timeframe
             cadence="weekly",
             capital_amount=250,
             extra_parameters={
+                "date_range_intent": {
+                    "kind": "calendar_year",
+                    "year": 2024,
+                    "evidence": "2024",
+                },
                 "field_provenance": {
                     "capital_amount": "recurring_contribution",
                     "cadence": "explicit_user",
@@ -5511,11 +5565,6 @@ def test_interpret_stage_repairs_current_year_so_far_before_execution(
         "resolve_asset",
         lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
     )
-    monkeypatch.setattr(
-        interpret_module,
-        "current_message_date_range",
-        lambda message: {"start": "2026-01-01", "end": "2026-06-01"},
-    )
     response = StructuredInterpretation(
         intent="backtest_execution",
         task_relation="new_task",
@@ -5529,7 +5578,14 @@ def test_interpret_stage_repairs_current_year_so_far_before_execution(
             date_range={"start": "2026-01-01", "end": "2026-12-31"},
             comparison_baseline="QQQ",
             extra_parameters={
-                "field_provenance": {"comparison_baseline": "explicit_user"}
+                "field_provenance": {"comparison_baseline": "explicit_user"},
+                "date_range_intent": {
+                    "kind": "year_to_date",
+                    "year": 2026,
+                    "end": "2026-06-01",
+                    "confidence": 0.8,
+                    "evidence": "2026 so far",
+                },
             },
         ),
         semantic_turn_act="new_idea",

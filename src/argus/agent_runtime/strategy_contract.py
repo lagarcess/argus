@@ -11,16 +11,11 @@ from argus.domain.backtesting.rules import (
     rule_spec_from_signal_rule,
     validate_rule_spec,
 )
+from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 from argus.domain.indicators import executable_indicator_spec
 from argus.domain.slot_normalizer import normalize_template_name
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
-from argus.nlp.natural_time import (
-    NaturalDateRange,
-    canonical_date_range_label_from_text,
-    parse_date_text,
-    resolve_date_window_text,
-    shift_months,
-)
+from argus.nlp.natural_time import shift_months
 
 SUPPORTED_STRATEGY_TYPES = {
     "buy_and_hold",
@@ -71,7 +66,7 @@ def canonical_strategy_type(
         if capability is not None and capability.execution_strategy_type:
             return capability.execution_strategy_type
         return template
-    if _has_value(cadence):
+    if _has_canonical_dca_cadence(cadence):
         return "dca_accumulation"
     return normalized
 
@@ -222,11 +217,6 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
                 start=date(1900, 1, 1),
                 end=current_date,
             )
-        parsed_natural = _date_range_resolution_from_natural(
-            resolve_date_window_text(value, today=current_date)
-        )
-        if parsed_natural is not None:
-            return parsed_natural
     start = shift_months(current_date, -12)
     return DateRangeResolution(
         label="past year",
@@ -236,31 +226,14 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
     )
 
 
-def _date_range_resolution_from_natural(
-    value: NaturalDateRange | None,
-) -> DateRangeResolution | None:
-    if value is None:
-        return None
-    label = value.label
-    if label == f"{value.start} to {value.end}":
-        label = f"{format_display_date(value.start)} to {format_display_date(value.end)}"
-    return DateRangeResolution(label=label, start=value.start, end=value.end)
-
-
 def normalize_date_range_candidate(
     value: Any,
     *,
     raw_user_phrasing: str | None = None,
     today: date | None = None,
 ) -> Any:
+    del raw_user_phrasing, today
     if isinstance(value, dict):
-        if not _date_range_dict_uses_natural_endpoint(value):
-            relative_label = _relative_date_label_from_user_phrasing(
-                raw_user_phrasing,
-                today=today,
-            )
-            if relative_label is not None:
-                return relative_label
         return {
             key: nested_value
             for key, nested_value in value.items()
@@ -284,32 +257,6 @@ def _first_present_endpoint(value: dict[Any, Any], *keys: str) -> Any | None:
         endpoint = value.get(key)
         if endpoint not in (None, "", [], {}):
             return endpoint
-    return None
-
-
-def _date_range_dict_uses_natural_endpoint(value: dict[Any, Any]) -> bool:
-    endpoints = [value.get(key) for key in ("start", "end", "from", "to")]
-    endpoint_values = [endpoint for endpoint in endpoints if endpoint not in (None, "")]
-    return any(
-        isinstance(endpoint, str) and _parse_iso_date(endpoint) is None
-        for endpoint in endpoint_values
-    )
-
-
-def _relative_date_label_from_user_phrasing(
-    raw_user_phrasing: str | None,
-    *,
-    today: date | None,
-) -> str | None:
-    if not isinstance(raw_user_phrasing, str) or not raw_user_phrasing.strip():
-        return None
-    current_date = today or date.today()
-    parsed_natural = canonical_date_range_label_from_text(
-        raw_user_phrasing,
-        today=current_date,
-    )
-    if parsed_natural is not None:
-        return parsed_natural
     return None
 
 
@@ -345,6 +292,14 @@ def _has_value(value: Any) -> bool:
     if isinstance(value, list):
         return bool(value)
     return True
+
+
+def _has_canonical_dca_cadence(value: Any) -> bool:
+    if isinstance(value, str):
+        return _normalize_token(value) in SUPPORTED_DCA_CADENCE_VALUES
+    if isinstance(value, list):
+        return any(_has_canonical_dca_cadence(item) for item in value)
+    return False
 
 
 def _explicit_strategy_type(payload: dict[str, Any]) -> str | None:
@@ -471,6 +426,7 @@ def _parse_date_token(
     today: date,
     endpoint: str | None = None,
 ) -> date | None:
+    del today
     parsed = _parse_iso_date(value)
     if parsed is not None:
         return parsed
@@ -478,31 +434,22 @@ def _parse_date_token(
         parsed_month = _parse_iso_month(value, endpoint=endpoint)
         if parsed_month is not None:
             return parsed_month
-    if not isinstance(value, str):
-        return None
-    if endpoint in {"start", "end"}:
-        return parse_date_text(value, today=today, endpoint=endpoint)
-    return parse_date_text(value, today=today)
+    return None
 
 
 def _explicit_iso_range(value: str) -> DateRangeResolution | None:
     collapsed = _collapse_spaces(value.lower())
-    start: date | None = None
-    end: date | None = None
-    for connector in (" to ", " through ", " until ", " till "):
-        if connector not in collapsed:
-            continue
-        start_text, end_text = collapsed.split(connector, 1)
-        start = _parse_iso_date(start_text.strip()) or _parse_iso_month(
-            start_text.strip(),
-            endpoint="start",
-        )
-        end = _parse_iso_date(end_text.strip()) or _parse_iso_month(
-            end_text.strip(),
-            endpoint="end",
-        )
-        if start is not None and end is not None:
-            break
+    if " to " not in collapsed:
+        return None
+    start_text, end_text = collapsed.split(" to ", 1)
+    start = _parse_iso_date(start_text.strip()) or _parse_iso_month(
+        start_text.strip(),
+        endpoint="start",
+    )
+    end = _parse_iso_date(end_text.strip()) or _parse_iso_month(
+        end_text.strip(),
+        endpoint="end",
+    )
     if start is None or end is None:
         return None
     return DateRangeResolution(

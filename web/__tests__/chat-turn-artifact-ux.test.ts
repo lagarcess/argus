@@ -98,6 +98,19 @@ describe("chat turn artifact UX", () => {
     expect(message).not.toContain("const shouldShowTextFooter =");
   });
 
+  test("final recovery responses hydrate retry controls from structured metadata", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+
+    expect(chat).toContain("retryLastTurnActionFromMetadata");
+    expect(chat).toContain("const finalMessageId =");
+    expect(chat).toContain("failedActionRetryActionFromMetadata(finalPayload)");
+    expect(chat).toContain("retryLastTurnActionFromMetadata(finalPayload");
+    expect(chat).not.toContain("Please retry in a moment");
+  });
+
   test("async job cards only promise retry when the turn has a retry action", () => {
     const card = readFileSync(
       join(root, "components/chat/BacktestJobCard.tsx"),
@@ -148,6 +161,7 @@ describe("chat turn artifact UX", () => {
     const errorBlock = chat.slice(errorStart, errorEnd);
 
     expect(errorStart).toBeGreaterThan(-1);
+    expect(errorBlock).toContain("retryLastTurnActionFromMetadata(errorPayload");
     expect(errorBlock).toContain("setInputActions([])");
     expect(errorBlock).toContain("settleOpenConfirmationsAfterStreamError(");
     expect(errorBlock).not.toContain("settleOpenConfirmationsAfterTextFinal(");

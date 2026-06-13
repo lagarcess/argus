@@ -57,6 +57,7 @@ import {
   failedActionRetryActionFromMetadata,
   hasFailedActionMetadata,
   isRetryAction,
+  retryLastTurnActionFromMetadata,
   retryLastTurnActionFromMessage,
   retryLastTurnFailedAssistantIdFromAction,
   retryLastTurnMessageFromAction,
@@ -1283,13 +1284,18 @@ export default function ChatInterface() {
         );
       }
       if (event.event === "error") {
+        const errorPayload = event.data as typeof event.data & Record<string, unknown>;
         const persistedErrorMessageId = event.data.message_id?.trim();
+        const metadataRetryAction = retryLastTurnActionFromMetadata(errorPayload, {
+          assistantMessageId: persistedErrorMessageId,
+        });
         const visibleRetryAction =
-          retryLastTurnAction && persistedErrorMessageId
+          metadataRetryAction ??
+          (retryLastTurnAction && persistedErrorMessageId
             ? retryLastTurnActionFromMessage(trimmed, {
                 assistantMessageId: persistedErrorMessageId,
               })
-            : retryLastTurnAction;
+            : retryLastTurnAction);
         setInputActions([]);
         setStreamStatus(null);
         setIsStreamingResponse(false);
@@ -1321,8 +1327,15 @@ export default function ChatInterface() {
         const finalPayload = event.data as typeof event.data & Record<string, unknown>;
         const finalText = event.data.assistant_response ?? event.data.assistant_prompt ?? "";
         const finalStageOutcome = event.data.stage_outcome;
+        const finalMessageId =
+          typeof finalPayload.message_id === "string"
+            ? finalPayload.message_id
+            : undefined;
         const finalRetryActions = [
           failedActionRetryActionFromMetadata(finalPayload),
+          retryLastTurnActionFromMetadata(finalPayload, {
+            assistantMessageId: finalMessageId,
+          }),
         ].filter((retryAction): retryAction is ChatActionOption => Boolean(retryAction));
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
         const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
@@ -2156,7 +2169,7 @@ export default function ChatInterface() {
                 {/* Starter Actions / Chips */}
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Compare Apple with SPY over the last 12 months.'))}
+                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Buy and hold AAPL over the last 12 months with SPY as the benchmark.'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />

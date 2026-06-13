@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -96,6 +97,28 @@ def test_interpret_stage_does_not_hide_unexpected_interpreter_exceptions() -> No
             latest_task_snapshot=None,
             structured_interpreter=RaisingInterpreter(),
         )
+
+
+def test_interpreter_unavailable_recovery_uses_user_language_and_retry_metadata() -> None:
+    message = "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+
+    result = interpret_stage(
+        state=RunState.new(current_user_message=message, recent_thread_history=[]),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=None,
+        structured_interpreter=None,
+    )
+
+    assert result.outcome == "ready_to_respond"
+    response = result.stage_patch["assistant_response"]
+    assert "Guardé tu mensaje" in response
+    assert "I saved your message" not in response
+    assert result.stage_patch["retry_last_turn"] == {"message": message}
+    assert result.stage_patch["recovery"] == {
+        "code": "interpreter_unavailable",
+        "retryable": True,
+        "language": "es-419",
+    }
 
 
 def validated_confirmation_payload(strategy: StrategySummary) -> dict[str, Any]:
@@ -3994,7 +4017,7 @@ def test_pending_date_edit_preserves_dca_recurring_contribution_role(
     assert result.decision.unsupported_constraints == []
 
 
-def test_current_message_dca_evidence_recovers_missing_strategy_family(
+def test_canonical_dca_interpreter_output_reaches_confirmation_without_phrase_repair(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -4011,7 +4034,7 @@ def test_current_message_dca_evidence_recovers_missing_strategy_family(
             requires_clarification=False,
             user_goal_summary="User wants weekly Nvidia recurring buys.",
             candidate_strategy_draft=StrategySummary(
-                strategy_type=None,
+                strategy_type="dca_accumulation",
                 strategy_thesis=(
                     "DCA accumulation of Nvidia with $250 weekly investments "
                     "from January 1, 2024 to December 31, 2024."
@@ -4020,6 +4043,15 @@ def test_current_message_dca_evidence_recovers_missing_strategy_family(
                 asset_class="equity",
                 date_range={"start": "2024-01-01", "end": "2024-12-31"},
                 capital_amount=250,
+                cadence="weekly",
+                extra_parameters={
+                    "field_provenance": {
+                        "cadence": "explicit_user",
+                        "capital_amount": "recurring_contribution",
+                    },
+                    "recurring_contribution": 250,
+                    "recurring_cadence": "weekly",
+                },
             ),
             missing_required_fields=[],
             semantic_turn_act="new_idea",
@@ -4047,7 +4079,10 @@ def test_current_message_dca_evidence_recovers_missing_strategy_family(
     assert strategy.capital_amount == 250
     assert result.decision.missing_required_fields == []
     assert result.decision.unsupported_constraints == []
-    assert "current_message_dca_contract_repair" in result.decision.reason_codes
+    assert not any(
+        "dca_contract_repair" in reason
+        for reason in result.decision.reason_codes
+    )
 
 
 def test_pending_dca_assumption_edit_preserves_interpreter_recurring_contribution(
@@ -4333,6 +4368,15 @@ def test_pending_date_answer_removes_mislabeled_timeframe_constraint(
             candidate_strategy_draft=StrategySummary(
                 date_range="past year",
                 timeframe="past year",
+                extra_parameters={
+                    "date_range_intent": {
+                        "kind": "rolling_window",
+                        "count": 1,
+                        "unit": "year",
+                        "anchor": "today",
+                        "evidence": "past year",
+                    }
+                },
             ),
             unsupported_constraints=[
                 UnsupportedConstraint(
@@ -4362,7 +4406,11 @@ def test_pending_date_answer_removes_mislabeled_timeframe_constraint(
     assert len(interpreter.requests) == 1
     assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
-    assert strategy.date_range == "past year"
+    today = date.today()
+    assert strategy.date_range == {
+        "start": today.replace(year=today.year - 1).isoformat(),
+        "end": today.isoformat(),
+    }
     assert strategy.timeframe is None
     assert strategy.entry_rule == entry_rule
     assert strategy.exit_rule == exit_rule
@@ -4489,6 +4537,46 @@ def test_interpreter_unavailable_does_not_parse_pending_date_from_text(
         "assistant_response"
     ].lower()
     assert "interpreter" not in result.patch["assistant_response"].lower()
+
+
+def test_interpreter_unavailable_pending_date_uses_language_aware_date_parser(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Compra y mantiene ETH.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2024-01-01"},
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="marzo de 2024",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-03-31"}
+    assert "deterministic_pending_date_answer_fallback" in result.decision.reason_codes
 
 
 def test_pending_date_answer_does_not_bypass_structured_interpreter_response(

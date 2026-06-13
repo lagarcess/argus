@@ -1,12 +1,12 @@
 from datetime import date
 
 from argus.nlp.natural_time import (
-    canonical_date_range_label_from_text,
     contains_named_date_evidence,
+    dateparser_languages_for_user_language,
+    parse_explicit_date_text,
     parse_relative_endpoint_text,
-    resolve_current_message_date_patch,
+    resolve_date_range_intent,
     resolve_date_range_text,
-    resolve_date_window_text,
 )
 
 
@@ -79,6 +79,53 @@ def test_resolves_current_year_to_date_in_spanish() -> None:
     assert resolved.payload == {"start": "2026-01-01", "end": "2026-06-01"}
 
 
+def test_resolves_canonical_rolling_window_intent_without_language_tokens() -> None:
+    resolved = resolve_date_range_intent(
+        {
+            "kind": "rolling_window",
+            "count": 12,
+            "unit": "month",
+            "anchor": "today",
+            "evidence": "durante los últimos 12 meses",
+        },
+        today=date(2026, 6, 12),
+    )
+
+    assert resolved is not None
+    assert resolved.payload == {"start": "2025-06-12", "end": "2026-06-12"}
+    assert resolved.evidence_spans == ("durante los últimos 12 meses",)
+
+
+def test_resolves_canonical_year_to_date_intent_without_language_tokens() -> None:
+    resolved = resolve_date_range_intent(
+        {
+            "kind": "year_to_date",
+            "anchor": "today",
+            "evidence": "en lo que va del año",
+        },
+        today=date(2026, 6, 12),
+    )
+
+    assert resolved is not None
+    assert resolved.payload == {"start": "2026-01-01", "end": "2026-06-12"}
+    assert resolved.evidence_spans == ("en lo que va del año",)
+
+
+def test_natural_time_does_not_grow_locale_phrase_alias_tables() -> None:
+    from pathlib import Path
+
+    source = Path("src/argus/nlp/natural_time.py").read_text()
+
+    forbidden = [
+        "import re",
+        "re.",
+        "_TIME_TOKEN_ALIASES",
+        "_NUMBER_TOKEN_ALIASES",
+        "_YTD_PROGRESS_TOKENS",
+    ]
+    assert [token for token in forbidden if token in source] == []
+
+
 def test_preserves_exact_day_range_without_broadening_to_whole_years() -> None:
     resolved = resolve_date_range_text(
         "from March 1 2020 to August 1 2021",
@@ -120,68 +167,63 @@ def test_relative_endpoint_parser_rejects_calendar_name_false_positive() -> None
     assert parse_relative_endpoint_text("march", today=today) is None
 
 
-def test_resolves_runtime_relative_windows_in_natural_time_layer() -> None:
-    today = date(2026, 5, 3)
-
-    resolved = resolve_date_window_text(
-        "use the past year instead",
-        today=today,
-        languages=("en", "es"),
-    )
-
-    assert resolved is not None
-    assert resolved.label == "past year"
-    assert resolved.payload == {"start": "2025-05-03", "end": "2026-05-03"}
-
-
-def test_resolves_runtime_calendar_year_shapes_in_natural_time_layer() -> None:
+def test_explicit_date_parser_uses_language_hint_without_locale_phrase_tables() -> None:
     today = date(2026, 6, 1)
 
-    multi_year = resolve_date_window_text("over 2024 and 2025", today=today)
-    year_so_far = resolve_date_window_text("in 2026 so far", today=today)
-    since_year = resolve_date_window_text("since 2021", today=today)
-
-    assert multi_year is not None
-    assert multi_year.payload == {"start": "2024-01-01", "end": "2025-12-31"}
-    assert year_so_far is not None
-    assert year_so_far.label == "2026 so far"
-    assert year_so_far.payload == {"start": "2026-01-01", "end": "2026-06-01"}
-    assert since_year is not None
-    assert since_year.payload == {"start": "2021-01-01", "end": "2026-06-01"}
-
-
-def test_natural_time_owns_current_message_date_patches() -> None:
-    today = date(2026, 6, 3)
-
-    assert resolve_current_message_date_patch(
-        "adjust the end date to yesterday",
-        today=today,
-        languages=("en", "es"),
-    ) == {"end": "2026-06-02"}
-    assert resolve_current_message_date_patch(
-        "how did apple perform over 2024 and 2025?",
-        today=today,
-        languages=("en", "es"),
-    ) == {"start": "2024-01-01", "end": "2025-12-31"}
-
-
-def test_canonical_date_range_label_preserves_user_relative_phrase() -> None:
+    assert dateparser_languages_for_user_language("es-419") == ("es", "en")
+    assert dateparser_languages_for_user_language("pt-BR") == ("pt", "en")
     assert (
-        canonical_date_range_label_from_text(
-            "los ultimos 8 meses hasta hoy",
-            today=date(2026, 6, 1),
-            languages=("es", "en"),
+        parse_explicit_date_text(
+            "marzo de 2024",
+            today=today,
+            endpoint="end",
+            languages=dateparser_languages_for_user_language("es-419"),
         )
-        == "past 8 months"
+        == date(2024, 3, 31)
     )
-
-
-def test_canonical_date_range_label_does_not_stringify_concrete_spans() -> None:
     assert (
-        canonical_date_range_label_from_text(
-            "enero de 2024 hasta marzo de 2024",
-            today=date(2026, 6, 1),
-            languages=("es", "en"),
+        parse_explicit_date_text(
+            "março de 2024",
+            today=today,
+            endpoint="end",
+            languages=dateparser_languages_for_user_language("pt-BR"),
+        )
+        == date(2024, 3, 31)
+    )
+    assert (
+        parse_explicit_date_text(
+            "last month",
+            today=today,
+            endpoint="end",
+            languages=dateparser_languages_for_user_language("en"),
         )
         is None
     )
+
+
+def test_resolves_canonical_endpoint_and_calendar_intents() -> None:
+    today = date(2026, 6, 3)
+
+    endpoint = resolve_date_range_intent(
+        {
+            "kind": "endpoint_patch",
+            "endpoint": "end",
+            "anchor": "today",
+            "day_offset": -1,
+            "evidence": "yesterday",
+        },
+        today=today,
+    )
+    year = resolve_date_range_intent(
+        {
+            "kind": "calendar_year",
+            "year": 2024,
+            "evidence": "2024",
+        },
+        today=today,
+    )
+
+    assert endpoint is not None
+    assert endpoint.payload == {"end": "2026-06-02"}
+    assert year is not None
+    assert year.payload == {"start": "2024-01-01", "end": "2024-12-31"}

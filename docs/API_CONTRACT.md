@@ -299,12 +299,13 @@ messages may store `pending_strategy`, `confirmation_card`,
 `result_strategy_id`, and `result_conversation_id`. Additive artifact metadata
 may also include `artifact_id`, `artifact_type`, `artifact_status`,
 `active_artifact_id`, `supersedes_artifact_id`, `saved_strategy_id`,
-`failed_action`, and `result_fact_bank`. User messages created by action chips
-may store `chat_action` so the transcript can hydrate the selected chip as an
-action item after reload. Action chip requests and persisted `chat_action`
-metadata should preserve `label` plus `labelKey` so localized transcript chips
-survive reload. Clients use these fields to hydrate cards and actions after
-reload. Runtime execution still validates against the LangGraph checkpoint
+`failed_action`, `retry_last_turn`, `recovery`, and `result_fact_bank`. User
+messages created by action chips may store `chat_action` so the transcript can hydrate
+the selected chip as an action item after reload. Action chip requests and
+persisted `chat_action` metadata should preserve `label` plus `labelKey` so
+localized transcript chips survive reload. Clients use these fields to hydrate
+cards and actions after reload. Runtime execution still validates against the
+LangGraph checkpoint
 first. A confirmation card may include `confirmation_id` and
 `confirmation_state`; only the latest active confirmation can execute, and older
 cards are transcript history. Confirmation cards should include stable
@@ -775,6 +776,7 @@ The canonical backtest config used by the engine for execution and reproducibili
 - **Format:** ISO 8601 (YYYY-MM-DD)
 - **Rules:** `start_date` must be before `end_date`. `end_date` cannot be in the future beyond latest market data.
 - *Normalization:* Backend computes rolling 12 months only when dates are omitted. If the user supplies an explicit temporal phrase, that phrase must be normalized, preserved, or clarified before confirmation; it must not silently fall back to the 12-month default.
+- *Language-agnostic temporal contract:* Normal chat interpretation must not use localized regex/phrase gates to decide executable date intent before the LLM. The interpreter should emit canonical `date_range` values when confident, canonical `date_range_intent` for relative or semantic windows such as rolling windows, year-to-date, calendar-year, since, or endpoint patches, and bounded `date_range_raw_text` only as evidence for the natural-time wrapper. Endpoint patches must use ISO dates or canonical offset math such as `anchor=today` plus `day_offset=-1`, not localized relative words. Deterministic code may resolve canonical intent and bounded evidence, then apply provider/data-availability validation.
 
 ## Reality Gap (Deferred)
 Argus Alpha is a "perfect world" simulation. The following are explicitly excluded from Alpha MVP:
@@ -960,6 +962,13 @@ Argus supports English and Spanish (Latin America) in Alpha.
 - **locale:** `en-US`, `es-419`
 
 *Note: `language` controls the AI response language and the static UI preference. `locale` controls formatting (dates, numbers, currency).*
+
+## Runtime Language Contract
+- User input may arrive in any supported language, currently English or Spanish (Latin America).
+- LLM interpretation owns natural-language semantics and must return canonical machine fields; runtime code must not branch on localized whole-turn phrases before interpretation.
+- User-facing assistant prose should follow the resolved `language`, while executable fields such as `strategy_type`, `asset_class`, `timeframe`, `cadence`, `date_range`, `date_range_intent`, and `comparison_baseline` remain language-neutral.
+- Locale-specific rendering, such as compact dates and currency/number formats, belongs in locale-aware presentation code, not backend prose contracts.
+- Capability registries may keep machine compatibility aliases such as snake_case legacy identifiers, but they must not become natural-language phrasebooks in English, Spanish, or future languages.
 
 ## Source of Truth Rules
 - **Authenticated Users**: `profiles.language` and `profiles.locale` are the persisted source of truth. Profile preference wins over browser detection.
@@ -1313,6 +1322,33 @@ completed in-stream run, the final payload includes `backtest_job` and omits
       "retryable": false
     },
     "message_id": "uuid"
+  }
+}
+```
+
+When a turn reaches a recoverable assistant response without a completed card,
+the final payload and persisted assistant message metadata may include
+`retry_last_turn` and `recovery`. `recovery` is a typed status object with a
+stable `code`, `retryable`, and normalized `language`. User-facing recovery copy
+is presentation only; clients must render retry affordances from structured
+metadata, not by matching assistant prose.
+
+Recoverable streaming error frames may also include the same structured fields
+so live clients can render retry controls immediately, before reload hydration:
+
+```json
+{
+  "type": "error",
+  "code": "agent_runtime_failure",
+  "message": "Something went wrong. Your conversation is saved. Please try again.",
+  "message_id": "uuid",
+  "recovery": {
+    "code": "runtime_failure",
+    "retryable": true,
+    "language": "en"
+  },
+  "retry_last_turn": {
+    "message": "What if I bought BTC last year?"
   }
 }
 ```

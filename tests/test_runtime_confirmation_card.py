@@ -128,6 +128,60 @@ def test_runtime_confirmation_card_uses_starting_capital_for_buy_and_hold() -> N
     assert "$10,000 starting capital" not in card["assumptions"]
 
 
+def test_runtime_confirmation_card_promotes_default_starting_capital() -> None:
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold Apple.",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2025-06-13", "end": "2026-06-12"},
+                },
+                "optional_parameters": {
+                    "timeframe": {
+                        "label": "Timeframe",
+                        "source": "default",
+                        "value": "1D",
+                    },
+                    "fees": {"label": "Fees", "source": "default", "value": 0.0},
+                    "slippage": {
+                        "label": "Slippage",
+                        "source": "default",
+                        "value": 0.0,
+                    },
+                },
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbol": "AAPL",
+                    "symbols": ["AAPL"],
+                    "timeframe": "1D",
+                    "date_range": {"start": "2025-06-13", "end": "2026-06-12"},
+                    "sizing_mode": "capital_amount",
+                    "capital_amount": 1000,
+                    "position_size": None,
+                    "parameters": {},
+                    "risk_rules": [],
+                    "benchmark_symbol": "SPY",
+                },
+                "validation": {"executable": True},
+            },
+        }
+    )
+
+    assert card is not None
+    assert any(
+        row["key"] == "starting_capital"
+        and row["labelKey"] == "chat.confirmation.rows.starting_capital"
+        and row["value"] == "$1,000"
+        for row in card["rows"]
+    )
+    assert "$1,000 starting capital" not in card["assumptions"]
+    assert "Benchmark: SPY" in card["assumptions"]
+
+
 def test_runtime_confirmation_card_localizes_spanish_confirmation_artifact() -> None:
     card = runtime_confirmation_card(
         {

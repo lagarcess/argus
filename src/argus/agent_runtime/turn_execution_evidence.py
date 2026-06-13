@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from argus.agent_runtime.run_field_contract import (
-    current_message_date_range,
-    current_message_dca_cadence,
     field_fidelity_tokens,
-    message_states_bar_timeframe,
 )
 from argus.domain.backtesting.rules import explicit_signal_rule_intent_from_text
 
@@ -22,12 +19,6 @@ def current_turn_has_material_execution_evidence(
     if not text.strip():
         return False
 
-    if current_message_date_range(text) is not None:
-        return True
-    if current_message_dca_cadence(text) is not None:
-        return True
-    if message_states_bar_timeframe(text):
-        return True
     if _message_has_numeric_execution_fact(text):
         return True
     if _message_has_explicit_signal_rule(text):

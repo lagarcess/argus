@@ -10,6 +10,7 @@ from argus.agent_runtime.capabilities.contract import build_default_capability_c
 from argus.agent_runtime.llm_interpreter import (
     AssetGroundingAudit,
     LLMInterpretationResponse,
+    LLMDateRangeIntent,
     LLMRiskRule,
     LLMStrategyDraft,
     OpenRouterStructuredInterpreter,
@@ -624,6 +625,9 @@ def test_llm_interpreter_prompt_separates_benchmarks_from_asset_universe() -> No
     prompt = interpreter._system_prompt().lower()
 
     assert "against spy" in prompt
+    assert "with spy as the benchmark" in prompt
+    assert "con spy como referencia" in prompt
+    assert "do not call this an unsupported direct comparison" in prompt
     assert "comparison_baseline" in prompt
     assert "do not add benchmark symbols to asset_universe" in prompt
     assert "exact start/end dates" in prompt
@@ -682,8 +686,12 @@ def test_llm_interpreter_prompt_contracts_language_agnostic_metadata() -> None:
 
     assert "canonical internal values" in prompt
     assert "date_range_raw_text" in prompt
+    assert "date_range_intent" in prompt
+    assert "rolling_window" in prompt
+    assert "year_to_date" in prompt
     assert "evidence_spans" in prompt
     assert "assistant_response in the user's language" in prompt
+    assert "short, messy, or grammatically imperfect" in prompt
 
 
 def test_llm_strategy_draft_carries_language_and_evidence_metadata() -> None:
@@ -713,6 +721,47 @@ def test_llm_strategy_draft_carries_language_and_evidence_metadata() -> None:
         "strategy_type": "Compra y manten",
         "asset_universe": "ETH",
         "date_range": "enero 2024 a marzo 2024",
+    }
+
+
+def test_llm_strategy_draft_resolves_canonical_date_range_intent() -> None:
+    draft = LLMStrategyDraft(
+        raw_user_phrasing="Compra y mantiene AAPL durante los últimos 12 meses.",
+        language="es-419",
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        date_range_intent=LLMDateRangeIntent(
+            kind="rolling_window",
+            count=12,
+            unit="month",
+            anchor="today",
+            evidence="durante los últimos 12 meses",
+        ),
+        evidence_spans={
+            "strategy_type": "Compra y mantiene",
+            "asset_universe": "AAPL",
+            "date_range": "durante los últimos 12 meses",
+        },
+    )
+
+    strategy = _strategy_from_llm(draft)
+
+    assert strategy.date_range == {
+        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
+        "end": date.today().isoformat(),
+    }
+    assert strategy.extra_parameters["date_range_intent"] == {
+        "kind": "rolling_window",
+            "start": None,
+            "end": None,
+            "day_offset": None,
+            "count": 12,
+        "unit": "month",
+        "anchor": "today",
+        "year": None,
+        "endpoint": None,
+        "confidence": 0.8,
+        "evidence": "durante los últimos 12 meses",
     }
 
 
@@ -746,6 +795,44 @@ def test_current_message_run_field_contract_prefers_bounded_date_evidence_span()
     assert repaired.candidate_strategy_draft.date_range == {
         "start": "2024-01-01",
         "end": "2024-03-31",
+    }
+
+
+def test_current_message_run_field_contract_uses_canonical_intent_not_phrase_scan() -> None:
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="El usuario quiere probar AAPL.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Compra y mantiene AAPL durante los últimos 12 meses.",
+            language="es-419",
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL"],
+            date_range_intent=LLMDateRangeIntent(
+                kind="rolling_window",
+                count=12,
+                unit="month",
+                anchor="today",
+                evidence="durante los últimos 12 meses",
+            ),
+            evidence_spans={"date_range": "durante los últimos 12 meses"},
+        ),
+    )
+
+    repaired = _response_from_current_message_run_field_contract(
+        response=response,
+        request=InterpretationRequest(
+            current_user_message="solo hazlo",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert repaired is not None
+    assert repaired.candidate_strategy_draft.date_range == {
+        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
+        "end": date.today().isoformat(),
     }
 
 
@@ -2563,6 +2650,12 @@ async def test_retry_word_inside_new_prompt_uses_focused_strategy_repair(
                 asset_universe=["AAPL"],
                 asset_class="equity",
                 date_range={"start": "2026-01-01", "end": "2026-12-31"},
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="year_to_date",
+                    year=2026,
+                    end="2026-06-01",
+                    evidence="2026 so far",
+                ),
                 comparison_baseline="QQQ",
             ),
             request=request,
@@ -2641,14 +2734,6 @@ async def test_current_year_so_far_repairs_llm_year_end_date_range(
         "_repair_incomplete_strategy_extraction",
         repair_stub,
     )
-    monkeypatch.setattr(
-        interpreter_module,
-        "_date_range_from_current_message",
-        lambda message: {"start": "2026-01-01", "end": "2026-06-01"}
-        if "so far" in message
-        else None,
-    )
-
     response = LLMInterpretationResponse(
         intent="conversation_followup",
         task_relation="continue",
@@ -2706,6 +2791,7 @@ async def test_stated_run_field_contract_repairs_compact_month_year_range(
             asset_universe=["AAPL", "GOOG"],
             asset_class="equity",
             date_range={"start": "2021-01-01", "end": "2024-01-01"},
+            date_range_raw_text="Jan 2021-Jan 2024",
             capital_amount=200,
             cadence="monthly",
         ),

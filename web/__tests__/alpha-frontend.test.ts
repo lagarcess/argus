@@ -168,10 +168,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(starterAndPlaceholderText).not.toContain("Estrategia:");
     expect(starterAndPlaceholderText).not.toContain("Activo:");
     expect(starterAndPlaceholderText).not.toContain("Periodo:");
-    expect(en.chat.starter_actions.tsla.value).toBe("Compare Apple with SPY over the last 12 months.");
+    expect(en.chat.starter_actions.tsla.value).toBe("Buy and hold AAPL over the last 12 months with SPY as the benchmark.");
     expect(en.chat.starter_actions.btc.value).toBe("What if I bought Bitcoin this year so far?");
     expect(en.chat.starter_actions.dca.value).toBe("What if I bought $250 of Nvidia every week over the last 12 months?");
-    expect(es.chat.starter_actions.tsla.value).toBe("Compara Apple con SPY durante los últimos 12 meses.");
+    expect(es.chat.starter_actions.tsla.value).toBe("Compra y mantén AAPL durante los últimos 12 meses con SPY como referencia.");
     expect(es.chat.starter_actions.btc.value).toBe("¿Qué habría pasado si compraba Bitcoin en lo que va del año?");
     expect(es.chat.starter_actions.dca.value).toBe("¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?");
   });
@@ -469,7 +469,7 @@ describe("Argus Alpha frontend contract", () => {
     const stage = parseChatStreamFrame('data: {"type":"stage_start","stage":"execute"}');
     const token = parseChatStreamFrame('data: {"type":"token","content":"Running"}');
     const error = parseChatStreamFrame(
-      'data: {"type":"error","code":"agent_runtime_failure","message":"Something went wrong.","message_id":"assistant-persisted-1"}',
+      'data: {"type":"error","code":"agent_runtime_failure","message":"Something went wrong.","message_id":"assistant-persisted-1","retry_last_turn":{"message":"test AAPL"},"recovery":{"code":"runtime_failure","retryable":true,"language":"en"}}',
     );
     const done = parseChatStreamFrame("data: [DONE]");
 
@@ -481,6 +481,12 @@ describe("Argus Alpha frontend contract", () => {
         code: "agent_runtime_failure",
         detail: "Something went wrong.",
         message_id: "assistant-persisted-1",
+        retry_last_turn: { message: "test AAPL" },
+        recovery: {
+          code: "runtime_failure",
+          retryable: true,
+          language: "en",
+        },
       },
     });
     expect(done).toEqual({ event: "done", data: { message_id: null } });

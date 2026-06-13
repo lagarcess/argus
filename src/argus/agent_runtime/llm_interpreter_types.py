@@ -19,6 +19,52 @@ class LLMRiskRule(BaseModel):
     mode: str | None = None
 
 
+class LLMDateRangeIntent(BaseModel):
+    kind: (
+        Literal[
+            "explicit_range",
+            "rolling_window",
+            "year_to_date",
+            "calendar_year",
+            "since",
+            "endpoint_patch",
+        ]
+        | None
+    ) = Field(
+        default=None,
+        description=(
+            "Canonical, language-neutral temporal intent. Use this for relative "
+            "or semantic windows such as last 12 months or year to date instead "
+            "of asking deterministic code to parse localized prose."
+        ),
+    )
+    start: str | None = Field(
+        default=None,
+        description="ISO date, YYYY-MM-DD, or canonical sentinel 'today'.",
+    )
+    end: str | None = Field(
+        default=None,
+        description="ISO date, YYYY-MM-DD, or canonical sentinel 'today'.",
+    )
+    day_offset: int | None = Field(
+        default=None,
+        description=(
+            "Optional day offset from anchor for endpoint patches, e.g. -1 for "
+            "the previous day. This is canonical machine data, not localized text."
+        ),
+    )
+    count: int | None = Field(default=None, ge=1)
+    unit: Literal["day", "week", "month", "quarter", "year"] | None = None
+    anchor: Literal["today", "current_date"] | None = "today"
+    year: int | None = Field(default=None, ge=1900, le=2100)
+    endpoint: Literal["start", "end"] | None = None
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+    evidence: str | None = Field(
+        default=None,
+        description="Short user-message span supporting this intent.",
+    )
+
+
 class LLMStrategyDraft(BaseModel):
     raw_user_phrasing: str | None = None
     language: str | None = Field(
@@ -52,6 +98,7 @@ class LLMStrategyDraft(BaseModel):
             "window, for example 'last 8 months' or 'enero 2024 a marzo 2024'."
         ),
     )
+    date_range_intent: LLMDateRangeIntent | None = None
     sizing_mode: str | None = None
     capital_amount: float | None = None
     recurring_contribution: float | None = None
@@ -158,6 +205,7 @@ class FocusedStrategyExtraction(BaseModel):
         ),
     )
     date_range_raw_text: str | None = None
+    date_range_intent: LLMDateRangeIntent | None = None
     comparison_baseline: str | None = Field(
         default=None,
         description=(

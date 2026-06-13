@@ -187,28 +187,41 @@ The readiness slice should be sequenced like this:
 
 ### Verdict
 
-Argus is not ready for Spanish-first controlled-alpha execution yet. The
-runtime shape is correct: LangGraph is the conversational spine, normal
-language reaches structured interpretation first, and deterministic validation
-comes afterward. The gap is the multilingual contract between user language and
-canonical executable fields.
+Argus is not ready for Spanish-first controlled-alpha execution yet, but the
+main runtime gap has narrowed. The runtime shape is correct: LangGraph is the
+conversational spine, normal language reaches structured interpretation first,
+and deterministic validation comes afterward. The readiness branch now has
+local work for canonical interpreter metadata, natural-time normalization,
+registry-backed strategy aliases, localized artifacts, and structured recovery.
+The remaining gap is proving that those pieces hold together across the full
+Spanish execution matrix and live production-like Render canary.
 
 ### Evidence
 
-- The interpreter receives a user language preference, but the core interpreter
-  prompt does not clearly require language-agnostic input with canonical
-  machine output.
+- The interpreter now receives language preference and carries language,
+  bounded date text, and evidence-span metadata while asking for canonical
+  Argus machine values. The local tests cover this shape, but live-model
+  extraction across the full Spanish prompt matrix is not proven yet.
 - Run-critical fields such as `strategy_type`, `asset_class`, `timeframe`,
-  `cadence`, `indicator`, and `date_range` are loose strings in the interpreter
-  types.
-- Date and timeframe repair is English-forward. It recognizes English concepts
-  like `to`, `through`, `since`, `last`, `today`, `hour`, and `candle`, but not
-  common Spanish equivalents.
-- Some Spanish aliases already exist for strategy and DCA cadence, but
-  indicator and signal-rule interpretation remains mostly English-shaped.
-- Existing tests prove static i18n, language propagation, Spanish cadence
-  aliases, and Spanish orchestration with fake canonical outputs. They do not
-  prove real Spanish natural-language extraction can produce runnable drafts.
+  `cadence`, `indicator`, and `date_range` still need strict guardrails because
+  they can arrive from a probabilistic model before deterministic validation.
+- Date and window repair now resolves canonical `date_range_intent` from the
+  interpreter first, and only sends bounded evidence spans through
+  `argus.nlp.natural_time`. It no longer uses localized whole-turn phrase
+  scanning as a shortcut around the LLM. Relative endpoint edits use canonical
+  offset math such as `anchor=today` plus `day_offset=-1`, not localized
+  relative-date strings. Timezone/data-availability behavior still needs live
+  QA.
+- Strategy families and DCA cadence now rely on canonical interpreter output;
+  localized source wording stays in evidence spans/prose, and the capability
+  registry is no longer a natural-language phrasebook in English, Spanish, or
+  future languages. The secondary field-fidelity audit
+  path also validates cadence through the canonical cadence set, so it cannot
+  write localized cadence prose into executable state. Indicator and signal-rule
+  interpretation remains the biggest Spanish-language execution risk.
+- Result/card copy, compact dates, asset-class labels, and recoverable runtime
+  fallback copy have local Spanish coverage, but the full chat flow still needs
+  live provider/auth/browser proof.
 
 Relevant code:
 
@@ -222,6 +235,7 @@ Relevant code:
 - `src/argus/agent_runtime/llm_clarifier.py`
 - `src/argus/agent_runtime/response_style.py`
 - `src/argus/agent_runtime/stages/explain.py`
+- `src/argus/agent_runtime/recovery_messages.py`
 - `src/argus/api/chat/confirmation.py`
 
 ### Design Requirements
@@ -235,14 +249,22 @@ Relevant code:
   - unsupported ideas must be explained naturally in the user's language.
 - Strengthen field descriptions or schema so raw localized values cannot become
   executable values unless normalized after interpretation.
-- Extend deterministic normalization after interpretation for Spanish dates,
-  timeframe phrases, cadence phrases, and common indicator names. Date/time
-  language belongs behind `argus.nlp.natural_time`; Argus-domain aliases belong
-  in registries such as `strategy_capabilities.py`, not in runtime contracts.
+- Extend deterministic normalization after interpretation for dates,
+  timeframes, cadences, strategy families, and common indicator names without
+  reintroducing language phrase gates. Relative or semantic date language should
+  become canonical `date_range_intent`; bounded date spans belong behind
+  `argus.nlp.natural_time`; Argus-domain capability registries should describe
+  canonical/internal execution concepts, not grow English or locale phrase
+  tables.
 - Closed locally in the readiness branch: natural date/window interpretation now
-  goes through `argus.nlp.natural_time`, and runtime strategy canonicalization
-  now resolves capability-registry aliases plus registry-owned execution
-  families instead of a duplicate alias table inside `strategy_contract.py`.
+  uses canonical temporal intent or bounded evidence through
+  `argus.nlp.natural_time`, and runtime strategy canonicalization now keeps
+  natural-language strategy/cadence wording out of the capability registry
+  instead of growing duplicate alias tables inside runtime contracts.
+- Closed locally in the readiness worktree: recoverable runtime failures now use
+  typed recovery codes, normalized recovery language, centralized localized
+  fallback copy, and structured `retry_last_turn` metadata. This must remain a
+  fallback safety layer, not a replacement for normal LLM-owned Argus voice.
 - Keep hard constraints in schema, code, or runtime parameters instead of vague
   prose, following the same discipline described in Perplexity's prompt guide:
   focused instructions, clear formatting, grounding, JSON schema where
@@ -1177,11 +1199,20 @@ Before implementing the readiness slice, lock these:
 
 - Add multilingual interpreter contract.
 - Tighten canonical field descriptions.
-- Add Spanish post-LLM normalization through the natural-time wrapper and
-  registry-backed domain aliases, not hardcoded runtime language tables. Closed
-  locally for date/window normalization and strategy alias canonicalization.
-- Add Spanish prompt matrix tests.
-- Local QA with Spanish prompts.
+- Add post-LLM normalization through canonical temporal intent, the natural-time
+  wrapper for bounded evidence, and machine compatibility aliases only, not
+  hardcoded runtime language tables. Closed locally for date/window
+  normalization and canonical strategy/cadence execution fields in a
+  language-agnostic shape that should let Portuguese start from schema/prompt/
+  test coverage instead of refactoring the runtime spine.
+- Keep structured localized recovery as the fallback contract. Closed locally in
+  the readiness worktree for interpreter-unavailable, runtime-failure, and
+  pre-stream initialization failure paths.
+- Add or finish Spanish prompt matrix coverage for indicator/signal-rule
+  prompts, currency pairs, unsupported valuation requests, setup edits, approval
+  turns, and result follow-ups.
+- Local QA with Spanish prompts across the whole matrix, including at least one
+  error/recovery path.
 - Live QA with at least one Spanish prompt in Render staging.
 
 ### Slice 2: Alpha Trust And Legal Shell
@@ -1249,6 +1280,8 @@ Argus is ready for the first controlled alpha tester when:
 
 - Spanish direct backtest, DCA, approval, mixed-asset clarification, and result
   follow-up tests pass locally.
+- Spanish recovery/failure copy is localized and retryable through structured
+  metadata, not prose matching.
 - Focused backtest trust tests pass.
 - Focused security tests pass.
 - Terms/Privacy/consent are live and linked.

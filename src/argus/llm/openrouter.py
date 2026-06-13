@@ -89,7 +89,12 @@ _ROUTE_RECEIPT_CAPTURE: ContextVar[list[OpenRouterRouteReceipt] | None] = Contex
 
 
 OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
-    "interpretation": OpenRouterProfile("interpretation", temperature=0, max_tokens=3200),
+    "interpretation": OpenRouterProfile(
+        "interpretation",
+        temperature=0,
+        max_tokens=3200,
+        reasoning_effort="medium",
+    ),
     "field_fidelity": OpenRouterProfile(
         "field_fidelity",
         temperature=0,

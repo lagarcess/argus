@@ -25,6 +25,7 @@ from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
     LLMAmbiguousField,
+    LLMDateRangeIntent,
     LLMInterpretationResponse,
     LLMRiskRule,
     LLMStrategyDraft,
@@ -45,19 +46,10 @@ from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
 )
 from argus.agent_runtime.run_field_contract import (
-    current_message_date_range as _date_range_from_current_message,
-)
-from argus.agent_runtime.run_field_contract import (
-    current_message_dca_cadence as _dca_cadence_from_current_message,
-)
-from argus.agent_runtime.run_field_contract import (
     current_message_execution_context_tokens,
 )
 from argus.agent_runtime.run_field_contract import (
     field_fidelity_tokens as _field_fidelity_tokens,
-)
-from argus.agent_runtime.run_field_contract import (
-    message_states_bar_timeframe as _message_states_bar_timeframe,
 )
 from argus.agent_runtime.signal_rule_repair import (
     SignalRuleGroundingAudit,
@@ -115,7 +107,11 @@ from argus.llm.openrouter import (
     openrouter_task_timeout_seconds,
     record_openrouter_route_receipt,
 )
-from argus.nlp.natural_time import resolve_date_range_text
+from argus.nlp.natural_time import (
+    dateparser_languages_for_user_language,
+    resolve_date_range_intent,
+    resolve_date_range_text,
+)
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 
@@ -721,12 +717,22 @@ class OpenRouterStructuredInterpreter:
             "semantic_turn_act, artifact_target, and result_followup_focus; do not "
             "translate those machine fields. Put the detected user language in "
             "candidate_strategy_draft.language. Put the exact bounded date/window "
-            "phrase in candidate_strategy_draft.date_range_raw_text and also record "
+            "phrase in candidate_strategy_draft.date_range_raw_text. For relative "
+            "or semantic time windows, also fill candidate_strategy_draft."
+            "date_range_intent with canonical fields: kind=rolling_window with "
+            "count/unit, kind=year_to_date with optional year, kind=calendar_year "
+            "with year, kind=since with start/year, kind=explicit_range with "
+            "ISO start/end, or kind=endpoint_patch with endpoint plus ISO date or "
+            "anchor=today and day_offset for relative day edits. Do not translate "
+            "these machine fields. Also record "
             "short evidence_spans for extracted fields such as strategy_type, "
             "asset_universe, date_range, capital_amount, cadence, and "
             "comparison_baseline. Use date_range for canonical dates only when you "
-            "are confident; deterministic date parsing and validation run after this "
-            "schema. Write assistant_response in the user's language.\n\n"
+            "are confident; deterministic date parsing, intent date math, and validation run after this "
+            "schema. Write assistant_response in the user's language. Treat short, "
+            "messy, or grammatically imperfect follow-ups as normal user input, not "
+            "malformed requests; extract supported strategy intent, asset evidence, "
+            "date/window intent, and language when those facts are visible.\n\n"
             "Supported execution truth for Alpha: long-only backtests; buy_and_hold, "
             "dca_accumulation, registry-backed indicator threshold rules, and "
             "schema-backed signal strategies are executable. RSI is executable with "
@@ -743,11 +749,15 @@ class OpenRouterStructuredInterpreter:
             "are supported through Kraken; currency pair benchmark is the tested "
             "pair itself. No brokerage trading, shorting, mixed asset-class runs, "
             "custom scripting, or real slippage/fee realism.\n\n"
-            "Benchmark language matters: phrases like 'against SPY', 'versus QQQ', "
-            "'compared with BTC', or 'beat the market' describe comparison_baseline "
-            "or the benchmark, not additional assets to buy. Do not add benchmark "
-            "symbols to asset_universe unless the user explicitly says to buy, hold, "
-            "or test both as assets. Set field_provenance.comparison_baseline="
+            "Benchmark language matters in any user language: when a symbol is "
+            "framed as a benchmark, reference, comparison target, or market "
+            "baseline, put it in comparison_baseline instead of asset_universe. "
+            "A one-asset buy/hold request with a separate benchmark is executable "
+            "as the primary asset plus comparison_baseline; do not call that an "
+            "unsupported direct comparison. Do not add benchmark symbols to "
+            "asset_universe unless the user explicitly says to buy, hold, or test "
+            "both as traded assets. "
+            "Set field_provenance.comparison_baseline="
             "'explicit_user' only when the current user message explicitly names "
             "the comparison or benchmark. When the user gives exact start/end dates, "
             "preserve them as date_range {'start':'YYYY-MM-DD','end':'YYYY-MM-DD'}; "
@@ -846,8 +856,9 @@ class OpenRouterStructuredInterpreter:
             "field_provenance.cadence='explicit_user' only when the user explicitly "
             "stated the purchase schedule in the current message or visible active "
             "draft context. Never infer monthly from a multi-year date range.\n\n"
-            "If the user explicitly says buy and hold, hold, or buy-and-hold, classify it as "
-            "buy_and_hold even when the sentence also contains a start date like Jan 1. "
+            "If the user explicitly asks, in their language, for a simple buy-and-hold "
+            "investment test, classify it as buy_and_hold even when the sentence also "
+            "contains a start date. "
             "A start date is the backtest period, not entry logic. If you set "
             "strategy_type to buy_and_hold or dca_accumulation, do not also add "
             "unsupported_strategy_logic unless the user asked for an additional "
@@ -2219,7 +2230,11 @@ def _current_message_has_dca_contract_shape(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
-    if _dca_cadence_from_current_message(request.current_user_message) is None:
+    del request
+    if (
+        _supported_dca_cadence_value(response.candidate_strategy_draft.cadence)
+        is None
+    ):
         return False
     return _draft_contains_structured_capital_context(
         response.candidate_strategy_draft
@@ -2411,7 +2426,7 @@ async def _dca_contribution_role_audited_response(
         draft = response.candidate_strategy_draft.model_copy(deep=True)
         if draft.field_provenance.get("capital_amount") != "recurring_contribution":
             draft.field_provenance["capital_amount"] = "recurring_contribution"
-        cadence = _dca_cadence_from_current_message(request.current_user_message)
+        cadence = _supported_dca_cadence_value(draft.cadence)
         missing_required_fields = list(response.missing_required_fields)
         if cadence is not None:
             draft.cadence = cadence
@@ -2820,6 +2835,7 @@ def _llm_draft_from_strategy_summary(strategy: StrategySummary) -> LLMStrategyDr
     indicator_parameters = extra_parameters.get("indicator_parameters")
     if not isinstance(indicator_parameters, dict):
         indicator_parameters = {}
+    date_range_intent = extra_parameters.get("date_range_intent")
     return LLMStrategyDraft(
         raw_user_phrasing=strategy.raw_user_phrasing,
         strategy_type=strategy.strategy_type,
@@ -2838,6 +2854,11 @@ def _llm_draft_from_strategy_summary(strategy: StrategySummary) -> LLMStrategyDr
         entry_threshold=indicator_parameters.get("entry_threshold"),
         exit_threshold=indicator_parameters.get("exit_threshold"),
         date_range=strategy.date_range,
+        date_range_intent=(
+            LLMDateRangeIntent.model_validate(date_range_intent)
+            if isinstance(date_range_intent, dict)
+            else None
+        ),
         sizing_mode=strategy.sizing_mode,
         capital_amount=strategy.capital_amount,
         recurring_contribution=extra_parameters.get("recurring_contribution"),
@@ -4712,10 +4733,7 @@ def _response_from_current_message_run_field_contract(
     current_message = request.current_user_message
     changed = False
 
-    date_range = _date_range_from_bounded_evidence_or_current_message(
-        draft,
-        current_message=current_message,
-    )
+    date_range = _date_range_from_intent_or_bounded_evidence(draft)
     if (
         date_range is not None
         and (
@@ -4730,10 +4748,7 @@ def _response_from_current_message_run_field_contract(
         )
     ):
         draft.date_range = date_range
-        if (
-            _draft_has_non_executable_timeframe_label(draft)
-            and not _message_states_bar_timeframe(current_message)
-        ):
+        if _draft_has_non_executable_timeframe_label(draft):
             draft.timeframe = None
         if has_partial_explicit_date_range(date_range):
             repaired.requires_clarification = True
@@ -5022,8 +5037,11 @@ def _response_needs_current_message_date_repair(
     draft = response.candidate_strategy_draft
     if not _llm_value_is_empty(draft.date_range):
         return False
-    if _date_range_from_current_message(current_message) is None:
+    del current_message
+    if _date_range_from_intent_or_bounded_evidence(draft) is None:
         return False
+    if _llm_strategy_draft_has_concrete_execution_target(draft):
+        return True
     if _response_has_pending_base_field(response, "date_range"):
         return True
     return response.requires_clarification and _llm_strategy_draft_has_concrete_execution_target(
@@ -5101,10 +5119,7 @@ def _draft_date_range_needs_stated_run_field_audit(
 ) -> bool:
     if _llm_value_is_empty(draft.date_range):
         return False
-    current_message_range = _date_range_from_bounded_evidence_or_current_message(
-        draft,
-        current_message=current_message,
-    )
+    current_message_range = _date_range_from_intent_or_bounded_evidence(draft)
     if (
         current_message_range is not None
         and not has_partial_explicit_date_range(current_message_range)
@@ -5549,22 +5564,21 @@ def _response_from_stated_run_field_fidelity_audit(
             draft.field_provenance["capital_amount"] = "recurring_contribution"
             changed = True
     if audit.cadence:
-        cadence = str(audit.cadence).strip().casefold()
-        if draft.cadence != cadence:
-            draft.cadence = cadence
-            changed = True
-        if draft.field_provenance.get("cadence") != "explicit_user":
-            draft.field_provenance["cadence"] = "explicit_user"
-            changed = True
+        cadence = _supported_dca_cadence_value(audit.cadence)
+        if cadence is not None:
+            if draft.cadence != cadence:
+                draft.cadence = cadence
+                changed = True
+            if draft.field_provenance.get("cadence") != "explicit_user":
+                draft.field_provenance["cadence"] = "explicit_user"
+                changed = True
     if audit.timeframe and draft.timeframe != audit.timeframe:
         draft.timeframe = audit.timeframe
         changed = True
     if audit.date_range not in (None, "", [], {}):
         audited_date_range: Any = audit.date_range
-        expected_date_range = _date_range_from_bounded_evidence_or_current_message(
-            draft,
-            current_message=current_message,
-        )
+        del current_message
+        expected_date_range = _date_range_from_intent_or_bounded_evidence(draft)
         if (
             isinstance(expected_date_range, dict)
             and not has_partial_explicit_date_range(expected_date_range)
@@ -5613,7 +5627,10 @@ def _stated_run_field_audit_omitted_expected_fields(
     request: InterpretationRequest,
 ) -> bool:
     draft = response.candidate_strategy_draft
-    expected_date_range = _date_range_from_current_message(request.current_user_message)
+    del request
+    expected_date_range = _date_range_from_intent_or_bounded_evidence(draft)
+    if expected_date_range is None and isinstance(draft.date_range, dict):
+        expected_date_range = draft.date_range
     if (
         not _llm_value_is_empty(draft.date_range)
         and expected_date_range is not None
@@ -5924,9 +5941,10 @@ def _focused_strategy_extraction_messages(
                 f"{date.today().isoformat()}, not a stale model date. If the user gives "
                 "only a start or only an end, preserve only that endpoint and include "
                 "date_range in missing_required_fields; do not infer today. Preserve "
-                "language, date_range_raw_text, and evidence_spans when available so "
-                "deterministic parsers can resolve bounded natural-language spans after "
-                "interpretation. Preserve "
+                "language, date_range_raw_text, date_range_intent, and evidence_spans "
+                "when available. Use date_range_intent for relative or semantic time "
+                "windows so deterministic code receives canonical date math inputs "
+                "instead of localized prose. Preserve "
                 "user-stated timeframes such as 1 hour candles, hourly bars, 1h, "
                 "4 hour candles, 4h, daily candles, or 1D as timeframe. Normalize "
                 "one-hour/hourly to 1h, four-hour to 4h, and daily to 1D. Preserve "
@@ -5986,6 +6004,7 @@ def _response_from_focused_strategy_extraction(
                 timeframe=extraction.timeframe,
                 date_range=extraction.date_range,
                 date_range_raw_text=extraction.date_range_raw_text,
+                date_range_intent=extraction.date_range_intent,
                 comparison_baseline=extraction.comparison_baseline,
                 capital_amount=extraction.capital_amount,
                 entry_logic=entry_logic,
@@ -6046,6 +6065,7 @@ def _response_from_focused_strategy_extraction(
             timeframe=extraction.timeframe,
             date_range=extraction.date_range,
             date_range_raw_text=extraction.date_range_raw_text,
+            date_range_intent=extraction.date_range_intent,
             comparison_baseline=extraction.comparison_baseline,
             capital_amount=extraction.capital_amount,
             entry_logic=entry_logic,
@@ -6100,6 +6120,7 @@ def _merge_focused_repair_with_base(
         "asset_universe",
         "asset_class",
         "date_range",
+        "date_range_intent",
         "timeframe",
         "cadence",
         "capital_amount",
@@ -6679,6 +6700,9 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
     field_provenance = payload.pop("field_provenance", {}) or {}
     language = _clean_optional_text(payload.pop("language", None))
     date_range_raw_text = _clean_optional_text(payload.pop("date_range_raw_text", None))
+    date_range_intent = _clean_date_range_intent_payload(
+        payload.pop("date_range_intent", None)
+    )
     evidence_spans = _clean_evidence_spans(payload.pop("evidence_spans", {}) or {})
     initial_capital = payload.pop("initial_capital", None)
     total_capital = payload.pop("total_capital", None)
@@ -6745,6 +6769,10 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload.setdefault("extra_parameters", {})["date_range_raw_text"] = (
             date_range_raw_text
         )
+    if date_range_intent:
+        payload.setdefault("extra_parameters", {})["date_range_intent"] = (
+            date_range_intent
+        )
     if evidence_spans:
         payload.setdefault("extra_parameters", {})["evidence_spans"] = evidence_spans
     _normalize_llm_domain_slots(payload)
@@ -6752,6 +6780,13 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload.get("date_range"),
         raw_user_phrasing=payload.get("raw_user_phrasing"),
     )
+    if (
+        date_range_intent
+        and not _has_complete_date_range_payload(payload["date_range"])
+    ):
+        intent_resolution = resolve_date_range_intent(date_range_intent)
+        if intent_resolution is not None:
+            payload["date_range"] = intent_resolution.payload
     if draft.strategy_type:
         payload.setdefault("extra_parameters", {})["raw_strategy_type"] = (
             draft.strategy_type
@@ -6801,15 +6836,36 @@ def _clean_evidence_spans(value: Any) -> dict[str, str]:
     return cleaned
 
 
-def _date_range_from_bounded_evidence_or_current_message(
+def _clean_date_range_intent_payload(value: Any) -> dict[str, Any]:
+    if value in (None, "", [], {}):
+        return {}
+    if isinstance(value, dict):
+        return dict(value)
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        dumped = model_dump(mode="python")
+        return dict(dumped) if isinstance(dumped, dict) else {}
+    return {}
+
+
+def _has_complete_date_range_payload(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    start = value.get("start") or value.get("from")
+    end = value.get("end") or value.get("to")
+    return bool(start not in (None, "", [], {}) and end not in (None, "", [], {}))
+
+
+def _date_range_from_intent_or_bounded_evidence(
     draft: LLMStrategyDraft,
-    *,
-    current_message: str,
 ) -> dict[str, str] | None:
+    intent_resolution = resolve_date_range_intent(draft.date_range_intent)
+    if intent_resolution is not None:
+        return intent_resolution.payload
     bounded = _date_range_from_bounded_evidence(draft)
     if bounded is not None:
         return bounded
-    return _date_range_from_current_message(current_message)
+    return None
 
 
 def _date_range_from_bounded_evidence(
@@ -6818,7 +6874,7 @@ def _date_range_from_bounded_evidence(
     evidence_candidates = _bounded_date_evidence_candidates(draft)
     if not evidence_candidates:
         return None
-    languages = _dateparser_languages_from_interpreter_language(draft.language)
+    languages = dateparser_languages_for_user_language(draft.language)
     for candidate in evidence_candidates:
         resolved = resolve_date_range_text(candidate, languages=languages)
         if resolved is not None:
@@ -6836,18 +6892,6 @@ def _bounded_date_evidence_candidates(draft: LLMStrategyDraft) -> list[str]:
         if value:
             candidates.append(value)
     return list(dict.fromkeys(str(item).strip() for item in candidates if str(item).strip()))
-
-
-def _dateparser_languages_from_interpreter_language(
-    language: str | None,
-) -> tuple[str, ...] | None:
-    normalized = str(language or "").strip().lower()
-    if not normalized:
-        return None
-    primary_subtag = normalized.split("-", 1)[0].split("_", 1)[0]
-    if not primary_subtag.isalpha() or len(primary_subtag) not in {2, 3}:
-        return None
-    return (primary_subtag,)
 
 
 def _non_dca_starting_capital_from_total_fields(
@@ -7312,8 +7356,6 @@ def _dca_cadence_has_user_provenance(
         cadence_source = field_provenance.get("cadence")
         if cadence_source in {"user", "explicit_user", "prior", "visible_draft"}:
             return True
-    if _dca_cadence_from_current_message(request.current_user_message) == cadence:
-        return True
     snapshot = request.latest_task_snapshot
     if snapshot is None:
         return False
