@@ -49,6 +49,11 @@ describe("chat turn artifact UX", () => {
     expect(card).toContain("text-[#505a63] dark:text-[#8d969e]");
     expect(card).toContain("activeActions.length > 0");
     expect(card).toContain("confirmation.confirmation_state === \"active\"");
+    expect(card).toContain("confirmationCardViewModel");
+    expect(card).toContain("confirmationAssetTitle");
+    expect(card).toContain("displayAssumptions");
+    expect(card).not.toContain("confirmation.rows.slice(0, 3)");
+    expect(card).not.toContain("sm:grid-cols-3");
     expect(card).not.toContain("opacity-70");
   });
 

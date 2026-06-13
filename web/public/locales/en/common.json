@@ -306,6 +306,7 @@
       "intent_unsupported_request": "Thinking..."
     },
     "confirmation": {
+      "asset_count": "{{count}} assets",
       "selected_asset": "Selected asset",
       "status": {
         "ready_to_run": "Ready to run",

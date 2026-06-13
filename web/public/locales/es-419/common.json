@@ -306,6 +306,7 @@
       "intent_unsupported_request": "Pensando..."
     },
     "confirmation": {
+      "asset_count": "{{count}} activos",
       "selected_asset": "Activo seleccionado",
       "status": {
         "ready_to_run": "Listo para ejecutar",
