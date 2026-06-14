@@ -19,6 +19,10 @@ import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import {
+  strategyDisplayLabel,
+  strategyTypeFromConfirmation,
+} from "@/lib/strategy-display";
+import {
   type ChatActionOption,
   type StrategyConfirmationPayload,
   type StrategyConfirmationRowKey,
@@ -240,11 +244,17 @@ function confirmationCardViewModel(
     .map(({ row }) => row);
   const promotedValues = summaryRows.map((row) => row.value);
   const assetClassLabel = assetClassDisplayLabel(confirmation.asset_class, t);
+  const localizedStrategyLabel = strategyDisplayLabel(
+    strategyTypeFromConfirmation(confirmation),
+    t,
+    strategyRow?.value,
+  );
 
   return {
     assetSymbols,
     strategyLabel:
-      strategyRow?.value ?? confirmationAssetTitle(assetRow, confirmation.title, t),
+      localizedStrategyLabel ??
+      confirmationAssetTitle(assetRow, confirmation.title, t),
     summaryRows,
     detailRows,
     assumptions: displayAssumptions(

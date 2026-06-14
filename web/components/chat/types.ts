@@ -151,6 +151,7 @@ export type StrategyConfirmationPayload = {
   status?: StrategyConfirmationStatus;
   statusLabel: string;
   summary: string;
+  strategy_type?: string;
   date_range?: StrategyConfirmationDateRange;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];

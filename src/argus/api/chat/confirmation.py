@@ -201,6 +201,7 @@ def runtime_confirmation_card(
             is_ready_to_run=is_ready_to_run,
             language=language,
         ),
+        "strategy_type": canonical_strategy_type,
         "summary": summary,
         "rows": rows,
         "assumptions": assumptions,

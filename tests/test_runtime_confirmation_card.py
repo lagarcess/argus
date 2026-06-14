@@ -41,6 +41,7 @@ def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None
     )
 
     assert card is not None
+    assert card["strategy_type"] == "dca_accumulation"
     assert any(
         row["key"] == "cadence"
         and row["labelKey"] == "chat.confirmation.rows.cadence"

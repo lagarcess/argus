@@ -272,6 +272,12 @@
         "generic": "Datos {{value}}"
       }
     },
+    "strategy_type": {
+      "buy_and_hold": "Comprar y mantener",
+      "dca_accumulation": "Compras recurrentes",
+      "indicator_threshold": "Umbral RSI",
+      "signal_strategy": "Cruce de medias móviles"
+    },
     "discovery": {
       "prompt": "Menciona un activo o indicador",
       "results": "Resultados de búsqueda",

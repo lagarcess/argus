@@ -11,6 +11,7 @@ import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import { isVisibleResultAction } from "@/lib/chat-result-actions";
 import { strategiesEnabled } from "@/lib/private-alpha-flags";
+import { strategyDisplayLabel, strategyTypeFromResult } from "@/lib/strategy-display";
 import ResultEquityChart from "./ResultEquityChart";
 import type { ChatActionOption, StrategyResultPayload } from "./types";
 
@@ -67,6 +68,10 @@ export default function StrategyResultCard({
   const trustGroups = view.trustGroups;
   const periodDisplay =
     compactDateRangeDisplay(result.dateRange, i18n.language) ?? result.period;
+  const strategyLabel =
+    strategyDisplayLabel(strategyTypeFromResult(result), t, result.strategyLabel) ??
+    result.strategyLabel ??
+    result.strategyName;
 
   return (
     <section
@@ -78,7 +83,7 @@ export default function StrategyResultCard({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
             {symbols.length > 0 && <AssetSymbols symbols={symbols} />}
             <h3 className="font-display text-[18px] font-medium leading-tight tracking-[-0.18px] text-[#191c1f] dark:text-white">
-              {result.strategyLabel ?? result.strategyName}
+              {strategyLabel}
             </h3>
           </div>
           <p className="mt-1.5 text-[13px] leading-snug tracking-[0.16px] text-[#8d969e]">
@@ -89,7 +94,7 @@ export default function StrategyResultCard({
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${artifactStatusToneClassName("neutral")}`}>
-            {result.statusLabel || t("chat.simulation_complete", "Simulation Complete")}
+            {t("chat.simulation_complete", result.statusLabel || "Simulation Complete")}
           </span>
         </div>
       </div>

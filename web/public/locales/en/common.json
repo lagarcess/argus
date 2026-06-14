@@ -272,6 +272,12 @@
         "generic": "{{value}} data"
       }
     },
+    "strategy_type": {
+      "buy_and_hold": "Buy and Hold",
+      "dca_accumulation": "Recurring Buys",
+      "indicator_threshold": "RSI Threshold",
+      "signal_strategy": "Moving Average Crossover"
+    },
     "discovery": {
       "prompt": "Mention an asset or indicator",
       "results": "Search results",
