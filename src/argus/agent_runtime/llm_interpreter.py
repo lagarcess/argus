@@ -127,6 +127,15 @@ _DATE_EVIDENCE_SPAN_KEYS = (
 )
 
 
+def _field_path_base(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    for separator in ("[", "."):
+        text = text.split(separator, 1)[0]
+    return text.strip()
+
+
 def _selected_thread_metadata_context(metadata: dict[str, Any]) -> str:
     if not metadata:
         return "none"
@@ -1509,7 +1518,7 @@ def _response_from_requested_asset_answer_candidate_audit(
         missing = [
             field
             for field in response.missing_required_fields
-            if str(field).split("[", 1)[0] != "asset_universe"
+            if _field_path_base(field) != "asset_universe"
         ]
         return response.model_copy(
             update={
@@ -1575,11 +1584,7 @@ def _draft_has_valid_requested_asset_update(
 
 
 def _selected_requested_field_base(request: InterpretationRequest) -> str:
-    return (
-        str(request.selected_thread_metadata.get("requested_field") or "")
-        .split("[", 1)[0]
-        .strip()
-    )
+    return _field_path_base(request.selected_thread_metadata.get("requested_field"))
 
 
 def _prior_strategy_symbols(request: InterpretationRequest) -> set[str]:
@@ -1815,7 +1820,7 @@ def _response_needs_capability_side_question_audit(
     pending_field = str(
         request.selected_thread_metadata.get("requested_field") or ""
     ).strip()
-    if pending_field.split("[", 1)[0] == "refinement":
+    if _field_path_base(pending_field) == "refinement":
         return False
     if pending_field:
         return True
@@ -2010,7 +2015,7 @@ def _response_needs_context_question_audit(
     pending_field = str(
         request.selected_thread_metadata.get("requested_field") or ""
     ).strip()
-    if pending_field.split("[", 1)[0] == "refinement":
+    if _field_path_base(pending_field) == "refinement":
         return False
     if _response_targets_latest_result_followup(response=response, request=request):
         return False
@@ -2377,7 +2382,7 @@ def _dca_contract_missing_fields(
     missing = [
         field
         for field in current_missing
-        if str(field).split("[", 1)[0] not in stale_rule_fields
+        if _field_path_base(field) not in stale_rule_fields
     ]
     if _llm_value_is_empty(draft.date_range) or has_partial_explicit_date_range(
         draft.date_range
@@ -2399,7 +2404,7 @@ def _dca_contract_missing_fields(
     return [
         field
         for field in missing
-        if str(field).split("[", 1)[0] not in present_fields
+        if _field_path_base(field) not in present_fields
     ]
 
 
@@ -2543,12 +2548,12 @@ async def _dca_contribution_role_audited_response(
             missing_required_fields = [
                 field
                 for field in missing_required_fields
-                if str(field).split("[", 1)[0] != "cadence"
+                if _field_path_base(field) != "cadence"
             ]
         missing_required_fields = [
             field
             for field in missing_required_fields
-            if str(field).split("[", 1)[0] != "capital_amount"
+            if _field_path_base(field) != "capital_amount"
         ]
         return response.model_copy(
             update={
@@ -3766,12 +3771,41 @@ def _response_needs_focused_date_window_intent_repair(
             or _supported_partial_draft_has_repairable_shape(draft)
         )
     if _llm_value_is_empty(draft.date_range):
-        return has_semantic_date_evidence
+        return has_semantic_date_evidence or _response_has_repairable_current_turn_date_gap(
+            response=response,
+            request=request,
+        )
     if has_partial_explicit_date_range(draft.date_range):
         return True
     if has_semantic_date_evidence:
         return True
-    return not _llm_value_is_empty(draft.date_range_raw_text)
+    if not _llm_value_is_empty(draft.date_range_raw_text):
+        return True
+    return _response_has_repairable_current_turn_date_gap(
+        response=response,
+        request=request,
+    )
+
+
+def _response_has_repairable_current_turn_date_gap(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if not response.requires_clarification:
+        return False
+    draft = response.candidate_strategy_draft
+    if not _llm_value_is_empty(draft.date_range):
+        return False
+    if not _draft_has_supported_capability_shape_for_date_repair(draft):
+        return False
+    if not _llm_strategy_draft_has_concrete_execution_target(draft):
+        return False
+    return bool(
+        request.current_user_message.strip()
+        or draft.raw_user_phrasing
+        or draft.strategy_thesis
+    )
 
 
 def _pending_supported_execution_date_answer_can_use_focused_audit(
@@ -3929,12 +3963,12 @@ def _response_from_focused_date_window_extraction(
         repaired.missing_required_fields = [
             field
             for field in repaired.missing_required_fields
-            if str(field).split("[", 1)[0] != "date_range"
+            if _field_path_base(field) != "date_range"
         ]
         repaired.ambiguous_fields = [
             field
             for field in repaired.ambiguous_fields
-            if field.field_name.split("[", 1)[0] != "date_range"
+            if _field_path_base(field.field_name) != "date_range"
         ]
     if (
         repaired.requires_clarification
@@ -3985,9 +4019,9 @@ async def _plan_pending_artifact_assumption_edit(
 def _request_targets_pending_artifact_assumption_edit(
     request: InterpretationRequest,
 ) -> bool:
-    requested_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).split("[", 1)[0]
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
     if requested_field != "assumption":
         return False
     snapshot = request.latest_task_snapshot
@@ -4369,9 +4403,9 @@ async def _repair_pending_signal_rule_answer_if_needed(
 
 
 def _request_targets_pending_signal_rule(request: InterpretationRequest) -> bool:
-    requested_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).split("[", 1)[0]
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
     return requested_field in {"entry_logic", "exit_logic"}
 
 
@@ -4723,9 +4757,9 @@ def _response_needs_testable_idea_repair(
 ) -> bool:
     if _is_vague_strategy_start_guidance(response):
         return False
-    requested_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).split("[", 1)[0]
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
     if requested_field:
         return False
     draft = response.candidate_strategy_draft
@@ -4862,7 +4896,7 @@ def _supported_partial_strategy_needs_focused_schema_repair(
     ):
         return False
     missing_fields = {
-        str(field).split("[", 1)[0].strip()
+        _field_path_base(field)
         for field in response.missing_required_fields
         if str(field).strip()
     }
@@ -5616,12 +5650,12 @@ def _response_from_current_message_run_field_contract(
             repaired.missing_required_fields = [
                 field
                 for field in repaired.missing_required_fields
-                if str(field).split("[", 1)[0] != "date_range"
+                if _field_path_base(field) != "date_range"
             ]
             repaired.ambiguous_fields = [
                 field
                 for field in repaired.ambiguous_fields
-                if field.field_name.split("[", 1)[0] != "date_range"
+                if _field_path_base(field.field_name) != "date_range"
             ]
         changed = True
 
@@ -5686,9 +5720,9 @@ def _response_needs_stated_run_field_fidelity_audit(
     current_message = request.current_user_message if request is not None else ""
     requested_field = ""
     if request is not None:
-        requested_field = str(
-            request.selected_thread_metadata.get("requested_field") or ""
-        ).split("[", 1)[0]
+        requested_field = _field_path_base(
+            request.selected_thread_metadata.get("requested_field")
+        )
     if (
         canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
         and _dca_response_needs_semantic_field_audit(response)
@@ -5783,9 +5817,9 @@ def _pending_dca_assumption_reply_needs_stated_run_field_audit(
 ) -> bool:
     if request is None or response.semantic_turn_act != "answer_pending_need":
         return False
-    requested_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).split("[", 1)[0]
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
     if requested_field != "assumption":
         return False
     return canonical_strategy_type(
@@ -5958,10 +5992,10 @@ def _response_has_pending_base_field(
     field_name: str,
 ) -> bool:
     return any(
-        str(field).split("[", 1)[0] == field_name
+        _field_path_base(field) == field_name
         for field in response.missing_required_fields
     ) or any(
-        field.field_name.split("[", 1)[0] == field_name
+        _field_path_base(field.field_name) == field_name
         for field in response.ambiguous_fields
     )
 
@@ -7322,9 +7356,9 @@ def _response_underfills_pending_result_refinement(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
-    requested_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).split("[", 1)[0]
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
     if requested_field != "refinement":
         return False
     snapshot = request.latest_task_snapshot
