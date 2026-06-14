@@ -5624,10 +5624,19 @@ def _response_from_current_message_run_field_contract(
     changed = False
 
     date_range = _date_range_from_intent_or_bounded_evidence(draft)
+    natural_date_range = None
+    if date_range is None:
+        natural_date_range = _current_message_natural_date_range_for_supported_partial(
+            response=repaired,
+            request=request,
+        )
+        if natural_date_range is not None:
+            date_range = natural_date_range.payload
     if (
         date_range is not None
         and (
-            _draft_date_range_needs_stated_run_field_audit(
+            natural_date_range is not None
+            or _draft_date_range_needs_stated_run_field_audit(
                 draft,
                 current_message=current_message,
             )
@@ -5638,6 +5647,14 @@ def _response_from_current_message_run_field_contract(
         )
     ):
         draft.date_range = date_range
+        if natural_date_range is not None:
+            draft.date_range_raw_text = (
+                draft.date_range_raw_text or natural_date_range.label
+            )
+            draft.evidence_spans = {
+                **dict(draft.evidence_spans or {}),
+                "date_range": draft.date_range_raw_text,
+            }
         if _draft_has_non_executable_timeframe_label(draft):
             draft.timeframe = None
         if has_partial_explicit_date_range(date_range):
@@ -5682,6 +5699,45 @@ def _response_from_current_message_run_field_contract(
         )
     )
     return repaired
+
+
+def _current_message_natural_date_range_for_supported_partial(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> Any | None:
+    if not _response_can_use_current_message_natural_time(response=response):
+        return None
+    draft = response.candidate_strategy_draft
+    languages = dateparser_languages_for_user_language(
+        draft.language or request.user.language_preference
+    )
+    return resolve_date_range_text(request.current_user_message, languages=languages)
+
+
+def _response_can_use_current_message_natural_time(
+    *,
+    response: LLMInterpretationResponse,
+) -> bool:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if response.unsupported_constraints or response.ambiguous_fields:
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    if not (draft.asset_universe or draft.asset_class):
+        return False
+    if not _llm_value_is_empty(draft.date_range):
+        return False
+    if resolve_date_range_intent(draft.date_range_intent) is not None:
+        return False
+    missing_fields = {
+        _field_path_base(field)
+        for field in response.missing_required_fields
+        if str(field).strip()
+    }
+    return response.requires_clarification or "date_range" in missing_fields
 
 
 def _response_needs_stated_run_field_fidelity_audit(
@@ -7315,6 +7371,16 @@ def _structured_interpretation_has_required_shape(
     ):
         return False
     if response.requires_clarification and response.assistant_response:
+        if _supported_anchor_needs_focused_run_window_repair(
+            response=response,
+            request=request,
+        ):
+            return False
+        if _supported_partial_strategy_needs_focused_schema_repair(
+            response=response,
+            request=request,
+        ):
+            return False
         return True
     draft = response.candidate_strategy_draft
     if _llm_strategy_draft_has_extractable_fields(draft):

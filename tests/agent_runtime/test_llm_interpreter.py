@@ -582,6 +582,44 @@ def test_structured_interpretation_rejects_underfilled_dca_shape() -> None:
     )
 
 
+def test_structured_interpretation_rejects_supported_partial_clarification() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    current_turn = (
+        "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        assistant_response=(
+            "You mentioned the last 12 months — could you share the exact "
+            "start and end dates you'd like to test?"
+        ),
+        user_goal_summary=current_turn,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=current_turn,
+            strategy_type="buy_and_hold",
+            strategy_thesis=current_turn,
+            asset_universe=["AAPL"],
+            asset_class="equity",
+        ),
+        missing_required_fields=["date_range"],
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    assert not interpreter_module._structured_interpretation_has_required_shape(
+        response,
+        request=InterpretationRequest(
+            current_user_message=current_turn,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+
 def test_llm_interpreter_validates_asset_class_with_alpaca_resolver(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -965,6 +1003,53 @@ def test_current_message_run_field_contract_uses_canonical_intent_not_phrase_sca
     )
 
     assert repaired is not None
+    assert repaired.candidate_strategy_draft.date_range == {
+        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
+        "end": date.today().isoformat(),
+    }
+
+
+def test_current_message_run_field_contract_recovers_supported_current_turn_window() -> None:
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        assistant_response=(
+            "To run the test, I just need the specific 12-month window."
+        ),
+        user_goal_summary=(
+            "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
+        ),
+        missing_required_fields=["date_range"],
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
+            ),
+            language="en",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold AAPL with SPY as the benchmark.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+        ),
+    )
+
+    repaired = _response_from_current_message_run_field_contract(
+        response=response,
+        request=InterpretationRequest(
+            current_user_message=(
+                "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert repaired is not None
+    assert repaired.requires_clarification is False
+    assert repaired.assistant_response is None
+    assert repaired.missing_required_fields == []
     assert repaired.candidate_strategy_draft.date_range == {
         "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
         "end": date.today().isoformat(),
