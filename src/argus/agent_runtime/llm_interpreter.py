@@ -4819,15 +4819,10 @@ def _supported_anchor_needs_focused_run_window_repair(
         and bool(response.assistant_response)
     ):
         return False
-    if response.semantic_turn_act in {
-        "answer_pending_need",
-        "approval",
-        "educational_question",
-        "refine_current_idea",
-        "result_followup",
-        "retry_failed_action",
-        "unsupported_request",
-    }:
+    if _semantic_turn_act_blocks_supported_schema_repair(
+        response=response,
+        request=request,
+    ):
         return False
     if (
         response.capability_question_focus is not None
@@ -4864,15 +4859,10 @@ def _supported_partial_strategy_needs_focused_schema_repair(
         and bool(response.assistant_response)
     ):
         return False
-    if response.semantic_turn_act in {
-        "answer_pending_need",
-        "approval",
-        "educational_question",
-        "refine_current_idea",
-        "result_followup",
-        "retry_failed_action",
-        "unsupported_request",
-    }:
+    if _semantic_turn_act_blocks_supported_schema_repair(
+        response=response,
+        request=request,
+    ):
         return False
     if (
         response.capability_question_focus is not None
@@ -4944,6 +4934,25 @@ def _supported_partial_draft_has_repairable_shape(draft: LLMStrategyDraft) -> bo
             bool(draft.extra_parameters),
         ]
     )
+
+
+def _semantic_turn_act_blocks_supported_schema_repair(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if response.semantic_turn_act == "answer_pending_need":
+        return _request_has_active_strategy_context(
+            request
+        ) and not _request_current_turn_has_material_execution_evidence(request)
+    return response.semantic_turn_act in {
+        "approval",
+        "educational_question",
+        "refine_current_idea",
+        "result_followup",
+        "retry_failed_action",
+        "unsupported_request",
+    }
 
 
 def _response_needs_material_evidence_strategy_repair(
@@ -5687,6 +5696,16 @@ def _response_from_current_message_run_field_contract(
     ):
         repaired.requires_clarification = False
         repaired.assistant_response = None
+    if (
+        changed
+        and not repaired.requires_clarification
+        and not repaired.missing_required_fields
+        and not repaired.ambiguous_fields
+        and not repaired.unsupported_constraints
+        and _llm_strategy_draft_has_concrete_execution_target(draft)
+    ):
+        repaired.intent = "backtest_execution"
+        repaired.semantic_turn_act = "new_idea"
 
     if not changed:
         return None
@@ -6874,9 +6893,10 @@ def _strategy_extraction_repair_is_allowed(
             or response.candidate_strategy_draft.strategy_thesis
             or request.current_user_message.strip()
         )
+    if response.semantic_turn_act == "answer_pending_need":
+        return _request_current_turn_has_material_execution_evidence(request)
     return response.semantic_turn_act not in {
         "refine_current_idea",
-        "answer_pending_need",
         "approval",
         "result_followup",
     }
