@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -485,10 +486,13 @@ async def invoke_openrouter_json_schema(
         )
         try:
             async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
-                response = await _post_openrouter_json_schema(
-                    client=client,
-                    api_key=api_key,
-                    payload=payload,
+                response = await asyncio.wait_for(
+                    _post_openrouter_json_schema(
+                        client=client,
+                        api_key=api_key,
+                        payload=payload,
+                    ),
+                    timeout=profile.timeout_seconds,
                 )
             data = response.json()
             _raise_openrouter_payload_error(data)
@@ -585,10 +589,13 @@ async def invoke_openrouter_chat_completion(
         }
         try:
             async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
-                response = await _post_openrouter_json_schema(
-                    client=client,
-                    api_key=api_key,
-                    payload=payload,
+                response = await asyncio.wait_for(
+                    _post_openrouter_json_schema(
+                        client=client,
+                        api_key=api_key,
+                        payload=payload,
+                    ),
+                    timeout=profile.timeout_seconds,
                 )
                 data = response.json()
                 _raise_openrouter_payload_error(data)

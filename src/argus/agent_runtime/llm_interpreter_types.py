@@ -233,3 +233,38 @@ class FocusedStrategyExtraction(BaseModel):
     assistant_response: str | None = None
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     evidence_spans: dict[str, str] = Field(default_factory=dict)
+
+
+class FocusedDateWindowExtraction(BaseModel):
+    has_date_window: bool = Field(
+        description=(
+            "True when the current user message states a backtest date window, "
+            "lookback window, start/end date, or other temporal constraint."
+        )
+    )
+    date_range_raw_text: str | None = Field(
+        default=None,
+        description=(
+            "Shortest exact user-message span that expresses the temporal window. "
+            "Keep the user's language; this is provenance, not executable input."
+        ),
+    )
+    date_range_intent: LLMDateRangeIntent | None = Field(
+        default=None,
+        description=(
+            "Canonical language-neutral temporal intent. Required for relative or "
+            "semantic windows. Do not calculate endpoint dates for relative windows."
+        ),
+    )
+    date_range: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Use only when the user explicitly states calendar endpoints. Values "
+            "must be ISO dates or the canonical sentinel today/current_date."
+        ),
+    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    evidence: str | None = Field(
+        default=None,
+        description="Short user-message span supporting the temporal extraction.",
+    )

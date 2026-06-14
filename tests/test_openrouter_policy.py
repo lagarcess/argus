@@ -427,10 +427,10 @@ def test_result_breakdown_llm_has_hard_action_budget() -> None:
 def test_default_interpreter_uses_direct_schema_client(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter
 
-    seen: dict[str, Any] = {}
+    calls: list[dict[str, Any]] = []
 
     async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
-        seen.update(kwargs)
+        calls.append(kwargs)
         return LLMInterpretationResponse(
             intent="backtest_execution",
             task_relation="new_task",
@@ -478,8 +478,8 @@ def test_default_interpreter_uses_direct_schema_client(monkeypatch) -> None:
     )
 
     assert result is not None
-    assert seen["task"] == "interpretation"
-    assert seen["schema_model"] is LLMInterpretationResponse
+    assert calls[0]["task"] == "interpretation"
+    assert calls[0]["schema_model"] is LLMInterpretationResponse
     assert result.candidate_strategy_draft.asset_universe == ["TSLA"]
     assert result.candidate_strategy_draft.extra_parameters["indicator"] == "rsi"
     assert (
@@ -488,7 +488,7 @@ def test_default_interpreter_uses_direct_schema_client(monkeypatch) -> None:
         ]
         == 20
     )
-    assert seen["model_name"] == "primary/model"
+    assert calls[0]["model_name"] == "primary/model"
 
 
 @pytest.mark.parametrize(
@@ -1353,6 +1353,12 @@ def test_default_interpreter_retries_empty_unsupported_clarification(
                 is_testable_strategy=True,
                 user_goal_summary="Buy Tesla after big drops.",
             )
+        if schema_name == "FocusedDateWindowExtraction":
+            return llm_interpreter.FocusedDateWindowExtraction(
+                has_date_window=False,
+                confidence=0.35,
+                evidence="",
+            )
         return LLMInterpretationResponse(
             intent="strategy_drafting",
             task_relation="new_task",
@@ -1395,12 +1401,13 @@ def test_default_interpreter_retries_empty_unsupported_clarification(
     )
 
     assert result is not None
-    assert calls == [
+    assert calls[:4] == [
         ("primary/model", "LLMInterpretationResponse"),
         ("primary/model", "FocusedStrategyExtraction"),
         ("fallback/model", "FocusedStrategyExtraction"),
         ("fallback/model", "LLMInterpretationResponse"),
     ]
+    assert ("fallback/model", "FocusedDateWindowExtraction") in calls
     assert result.candidate_strategy_draft.asset_universe == ["TSLA"]
 
 
@@ -2787,7 +2794,7 @@ def test_openrouter_failure_log_includes_visible_diagnostics(monkeypatch) -> Non
     assert kwargs["error_type"] == "RuntimeError"
 
 
-def test_direct_json_schema_payload_disables_reasoning_for_artifact_tasks(
+def test_direct_json_schema_payload_uses_interpretation_profile_reasoning(
     monkeypatch,
 ) -> None:
     observed_payloads: list[dict[str, Any]] = []
@@ -2836,7 +2843,7 @@ def test_direct_json_schema_payload_disables_reasoning_for_artifact_tasks(
     )
 
     assert result is not None
-    assert observed_payloads[0]["reasoning"] == {"effort": "none"}
+    assert observed_payloads[0]["reasoning"] == {"effort": "medium"}
     receipts = openrouter.get_openrouter_route_receipts()
     assert len(receipts) == 1
     receipt = receipts[0]
@@ -3137,6 +3144,63 @@ def test_direct_json_schema_records_openrouter_token_usage(monkeypatch) -> None:
         "completion_tokens": 21,
         "total_tokens": 65,
     }
+
+
+def test_direct_json_schema_enforces_wall_clock_task_budget(monkeypatch) -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
+
+    openrouter.clear_openrouter_route_receipts()
+
+    class SlowAsyncClient:
+        def __init__(self, **_kwargs: object) -> None:
+            return None
+
+        async def __aenter__(self) -> "SlowAsyncClient":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def post(self, *_args: object, **_kwargs: object) -> object:
+            await asyncio.sleep(10)
+            raise AssertionError("the task budget should cancel this request")
+
+    profile = openrouter.OpenRouterProfile(
+        "interpretation",
+        temperature=0,
+        max_tokens=200,
+        timeout_seconds=0.01,
+    )
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "structured/primary")
+    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "")
+    monkeypatch.setattr(openrouter, "openrouter_profile_for_task", lambda _task: profile)
+    monkeypatch.setattr(
+        openrouter.httpx, "AsyncClient", lambda **kwargs: SlowAsyncClient(**kwargs)
+    )
+
+    with pytest.raises(TimeoutError):
+        asyncio.run(
+            asyncio.wait_for(
+                openrouter.invoke_openrouter_json_schema(
+                    task="interpretation",
+                    messages=[{"role": "user", "content": "hello"}],
+                    schema_model=LLMInterpretationResponse,
+                    schema_name="LLMInterpretationResponse",
+                ),
+                timeout=0.2,
+            )
+        )
+
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert len(receipts) == 1
+    receipt = receipts[0]
+    assert receipt.task == "interpretation"
+    assert receipt.model == "structured/primary"
+    assert receipt.outcome == "failed"
+    assert receipt.failure_mode == "TimeoutError"
+    assert receipt.latency_ms < 200
 
 
 def test_direct_json_schema_sync_tries_configured_fallback_for_utility_titles(

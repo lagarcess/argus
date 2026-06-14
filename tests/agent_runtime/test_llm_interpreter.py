@@ -182,6 +182,11 @@ async def test_asset_grounding_keeps_lowercase_provider_ticker_from_messy_turn(
     monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
     monkeypatch.setattr(
         interpreter_module,
+        "_request_current_turn_has_material_execution_evidence",
+        lambda request: False,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
         "invoke_openrouter_json_schema",
         fake_json_schema,
     )
@@ -1036,6 +1041,7 @@ async def test_stated_starting_capital_recheck_repairs_broad_audit_omission(
     focused_prompt = captured_messages["StatedStartingCapitalAudit"][0]["content"]
     assert "focused starting-capital verifier" in focused_prompt
     assert "language-agnostic" in focused_prompt
+    assert "100k -> 100000" in focused_prompt
     assert "con 100000" in focused_prompt
     assert "Do not copy default assumptions" in focused_prompt
     assert repaired is not None
@@ -1190,6 +1196,78 @@ async def test_stated_starting_capital_recheck_runs_when_broad_audit_skips(
     assert draft.capital_amount == 100000
     assert draft.field_provenance["capital_amount"] == "starting_capital"
     assert "stated_starting_capital_recheck" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_stated_starting_capital_recheck_surfaces_draft_prose_evidence(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    captured_messages: list[dict[str, str]] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, model_name
+        assert schema_name == "StatedStartingCapitalAudit"
+        captured_messages.extend(messages)
+        return schema_model(starting_capital=100000, confidence=0.94)
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="El usuario quiere probar ETH.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="compra y manten eth ultimos 8 meses 100k",
+            strategy_type="buy_and_hold",
+            strategy_thesis=(
+                "Compra y mantenimiento de Ethereum (ETH) durante los "
+                "últimos 8 meses con un capital inicial de 100.000."
+            ),
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2025-10-14", "end": "2026-06-13"},
+            date_range_raw_text="ultimos 8 meses",
+            language="es-419",
+        ),
+    )
+
+    repaired = await interpreter_module._audit_stated_starting_capital_fidelity(
+        response=response,
+        request=InterpretationRequest(
+            current_user_message="compra y manten eth ultimos 8 meses 100k",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    prompt_blocks = [message["content"] for message in captured_messages]
+    prose_index = next(
+        index
+        for index, content in enumerate(prompt_blocks)
+        if content.startswith("Draft prose evidence JSON:")
+    )
+    draft_index = next(
+        index
+        for index, content in enumerate(prompt_blocks)
+        if content.startswith("Structured draft JSON:")
+    )
+    assert prose_index < draft_index
+    assert "capital_amount\": null" in prompt_blocks[prose_index]
+    assert "capital inicial de 100.000" in prompt_blocks[prose_index]
+    assert "compra y manten eth ultimos 8 meses 100k" in prompt_blocks[prose_index]
+    assert repaired is not None
+    draft = repaired.candidate_strategy_draft
+    assert draft.capital_amount == 100000
+    assert draft.field_provenance["capital_amount"] == "starting_capital"
 
 
 @pytest.mark.asyncio
@@ -3295,6 +3373,11 @@ async def test_material_execution_evidence_routes_to_structured_repair_before_ca
     monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
     monkeypatch.setattr(
         interpreter_module,
+        "_request_current_turn_has_material_execution_evidence",
+        lambda request: False,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
         "invoke_openrouter_json_schema",
         audit_stub,
     )
@@ -3337,6 +3420,1455 @@ async def test_material_execution_evidence_routes_to_structured_repair_before_ca
     assert ready_response.candidate_strategy_draft.strategy_type == "buy_and_hold"
     assert ready_response.candidate_strategy_draft.asset_universe == ["ETH"]
     assert ready_response.candidate_strategy_draft.capital_amount == 100000
+
+
+@pytest.mark.asyncio
+async def test_anchored_supported_draft_without_date_evidence_gets_schema_repair(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedDateWindowExtraction":
+            return interpreter_module.FocusedDateWindowExtraction(
+                has_date_window=True,
+                date_range_raw_text="last 8 months",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    evidence="last 8 months",
+                ),
+                confidence=0.93,
+                evidence="last 8 months",
+            )
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Backtest holding ETH over the last 8 months.",
+                language="en",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Hold ETH through the period.",
+                asset_universe=["ETH"],
+                asset_class="crypto",
+                date_range_raw_text="last 8 months",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    evidence="last 8 months",
+                ),
+                capital_amount=100000,
+                confidence=0.91,
+                evidence_spans={
+                    "asset_universe": "eth",
+                    "capital_amount": "100k",
+                    "date_range": "last 8 months",
+                    "strategy_type": "bought eth and just held it",
+                },
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="ETH buy-and-hold with $100K.",
+        assistant_response=(
+            "To run the simulation, what 8-month window do you have in mind?"
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="i bought eth and just held it last 8 months with 100k",
+            language="en",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Hold ETH.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            capital_amount=100000,
+            evidence_spans={
+                "asset_universe": "eth",
+                "capital_amount": "100k",
+                "strategy_type": "bought eth and just held it",
+            },
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "i bought eth and just held it last 8 months with 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert calls[0] == "FocusedStrategyExtraction"
+    assert "FocusedDateWindowExtraction" not in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.candidate_strategy_draft.strategy_type == "buy_and_hold"
+    assert ready_response.candidate_strategy_draft.asset_universe == ["ETH"]
+    assert ready_response.candidate_strategy_draft.capital_amount == 100000
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_llm_evidence_span_triggers_date_intent_repair_without_text_gate(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedDateWindowExtraction":
+            return interpreter_module.FocusedDateWindowExtraction(
+                has_date_window=True,
+                date_range_raw_text="last 8 months",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    evidence="last 8 months",
+                ),
+                confidence=0.93,
+                evidence="last 8 months",
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "_request_current_turn_has_material_execution_evidence",
+        lambda _request: False,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="ETH buy-and-hold with $100K.",
+        assistant_response=(
+            "What are the start and end dates for your 8-month ETH hold?"
+        ),
+        missing_required_fields=["date_range"],
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="i bought eth and held it for the last 8 months with 100k",
+            language="en",
+            strategy_type="buy_and_hold",
+            strategy_thesis="User bought ETH and held it for the last 8 months.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            capital_amount=100000,
+            extra_parameters={
+                "evidence_spans": {
+                    "asset": "ETH",
+                    "capital": "$100k",
+                    "date_range": "last 8 months",
+                }
+            },
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert calls[0] == "FocusedDateWindowExtraction"
+    assert "FocusedStrategyExtraction" not in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.candidate_strategy_draft.date_range_intent is not None
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_canonical_supported_fields_trigger_date_intent_repair_without_text_gate(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedDateWindowExtraction":
+            return interpreter_module.FocusedDateWindowExtraction(
+                has_date_window=True,
+                date_range_raw_text="last 8 months",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    evidence="last 8 months",
+                ),
+                confidence=0.93,
+                evidence="last 8 months",
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "_request_current_turn_has_material_execution_evidence",
+        lambda _request: False,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="ETH buy-and-hold with $100K.",
+        assistant_response=(
+            "What date did you buy, and what date are you selling?"
+        ),
+        missing_required_fields=["date_range"],
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="i bought eth and held it for the last 8 months with 100k",
+            language="en",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Ethereum over the last 8 months.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            capital_amount=100000,
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert calls[0] == "FocusedDateWindowExtraction"
+    assert "FocusedStrategyExtraction" not in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_raw_canonical_strategy_metadata_triggers_date_intent_repair(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedDateWindowExtraction":
+            return interpreter_module.FocusedDateWindowExtraction(
+                has_date_window=True,
+                date_range_raw_text="last 8 months",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    evidence="last 8 months",
+                ),
+                confidence=0.93,
+                evidence="last 8 months",
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "_request_current_turn_has_material_execution_evidence",
+        lambda _request: False,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="ETH buy-and-hold with $100K.",
+        assistant_response="What date range should I use?",
+        missing_required_fields=["date_range"],
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="i bought eth and held it for the last 8 months with 100k",
+            language="en",
+            strategy_type=None,
+            strategy_thesis="Buy and hold Ethereum over the last 8 months.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            capital_amount=100000,
+            extra_parameters={"raw_strategy_type": "buy_and_hold"},
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert calls[0] == "FocusedDateWindowExtraction"
+    assert "FocusedStrategyExtraction" not in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_supported_shape_recovers_date_intent_without_capital_gate(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                confidence=0.94,
+            )
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=False,
+                requires_clarification=True,
+                user_goal_summary="Missing date window.",
+                confidence=0.2,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return interpreter_module.FocusedDateWindowExtraction(
+                has_date_window=True,
+                date_range_raw_text="last 8 months",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    evidence="last 8 months",
+                ),
+                confidence=0.93,
+                evidence="last 8 months",
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_request_current_turn_has_material_execution_evidence",
+        lambda _request: False,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="ETH buy-and-hold with shorthand capital.",
+        assistant_response="Which 8-month window should I use?",
+        missing_required_fields=["date_range"],
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="i bought eth and held it for the last 8 months with 100k",
+            language="en",
+            strategy_type=None,
+            strategy_thesis="Buy and hold ETH.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            extra_parameters={"raw_strategy_type": "buy_and_hold"},
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert "StatedRunFieldFidelityAudit" in calls
+    assert "FocusedDateWindowExtraction" in calls
+    assert calls.index("FocusedDateWindowExtraction") < calls.index(
+        "StatedRunFieldFidelityAudit"
+    )
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    draft = ready_response.candidate_strategy_draft
+    assert draft.capital_amount == 100000
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_focused_date_intent_repair_replaces_low_provenance_base_window(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Backtest holding ETH over the last 8 months.",
+                language="es-419",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Mantener ETH durante los ultimos 8 meses.",
+                asset_universe=["ETH"],
+                asset_class="crypto",
+                date_range_raw_text="ultimos 8 meses",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    evidence="ultimos 8 meses",
+                ),
+                capital_amount=100000,
+                confidence=0.91,
+                evidence_spans={
+                    "asset_universe": "eth",
+                    "capital_amount": "100k",
+                    "date_range": "ultimos 8 meses",
+                    "strategy_type": "compre eth y lo mantuve",
+                },
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="ETH buy-and-hold with $100K.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="compre eth y lo mantuve los ultimos 8 meses con 100k",
+            language="es-419",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Mantener ETH durante los ultimos 8 meses.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2025-06-13", "end": "2026-06-12"},
+            capital_amount=100000,
+            evidence_spans={
+                "asset_universe": "eth",
+                "capital_amount": "100k",
+                "strategy_type": "compre eth y lo mantuve",
+            },
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "compre eth y lo mantuve los ultimos 8 meses con 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+    assert ready_response.candidate_strategy_draft.date_range != {
+        "start": "2025-06-13",
+        "end": "2026-06-12",
+    }
+
+
+@pytest.mark.asyncio
+async def test_relative_window_semantic_drift_uses_focused_date_window_intent(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "CapabilitySideQuestionAudit":
+            return interpreter_module.CapabilitySideQuestionAudit(
+                is_capability_question=False,
+                confidence=0.8,
+            )
+        if schema_name == "ContextQuestionAudit":
+            return interpreter_module.ContextQuestionAudit(
+                is_context_question=False,
+                confidence=0.8,
+            )
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Backtest holding ETH over the last 8 months.",
+                language="es-419",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Mantener ETH durante los ultimos 8 meses.",
+                asset_universe=["ETH"],
+                asset_class="crypto",
+                date_range={"start": "2025-06-13", "end": "2026-06-12"},
+                capital_amount=100000,
+                confidence=0.91,
+                evidence_spans={
+                    "asset_universe": "ETH",
+                    "capital_amount": "100k",
+                    "time_window": "los ultimos 8 meses",
+                    "strategy_type": "compre eth y lo mantuve",
+                },
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="los ultimos 8 meses",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    confidence=0.93,
+                    evidence="los ultimos 8 meses",
+                ),
+                confidence=0.93,
+                evidence="los ultimos 8 meses",
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="ETH buy-and-hold with $100K.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="compre eth y lo mantuve los ultimos 8 meses con 100k",
+            language="es-419",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Mantener ETH durante los ultimos 8 meses.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2025-06-13", "end": "2026-06-12"},
+            capital_amount=100000,
+            evidence_spans={
+                "asset_universe": "ETH",
+                "capital_amount": "100k",
+                "time_window": "los ultimos 8 meses",
+                "strategy_type": "compre eth y lo mantuve",
+            },
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "compre eth y lo mantuve los ultimos 8 meses con 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert "FocusedDateWindowExtraction" in calls
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+    assert ready_response.candidate_strategy_draft.date_range_intent is not None
+    assert ready_response.candidate_strategy_draft.date_range_raw_text == (
+        "los ultimos 8 meses"
+    )
+
+
+@pytest.mark.asyncio
+async def test_missing_date_clarification_uses_focused_date_window_intent(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "CapabilitySideQuestionAudit":
+            return interpreter_module.CapabilitySideQuestionAudit(
+                is_capability_question=False,
+                confidence=0.8,
+            )
+        if schema_name == "ContextQuestionAudit":
+            return interpreter_module.ContextQuestionAudit(
+                is_context_question=False,
+                confidence=0.8,
+            )
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=True,
+                user_goal_summary="Backtest holding ETH.",
+                language="es-419",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Mantener ETH.",
+                asset_universe=["ETH"],
+                asset_class="crypto",
+                capital_amount=100000,
+                missing_required_fields=["date_range"],
+                assistant_response="¿En qué fecha exacta comenzaste?",
+                confidence=0.84,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="los ultimos 8 meses",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    confidence=0.92,
+                    evidence="los ultimos 8 meses",
+                ),
+                confidence=0.92,
+                evidence="los ultimos 8 meses",
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="ETH buy-and-hold with $100K.",
+        assistant_response="¿En qué fecha exacta comenzaste?",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="compre eth y lo mantuve los ultimos 8 meses con 100k",
+            language="es-419",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Mantener ETH.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            capital_amount=100000,
+        ),
+        missing_required_fields=["date_range"],
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "compre eth y lo mantuve los ultimos 8 meses con 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert "FocusedDateWindowExtraction" in calls
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.missing_required_fields == []
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_supported_compare_shape_without_capital_gets_date_window_repair(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized == "AAPL":
+            return ResolvedAssetStub(
+                "AAPL",
+                "equity",
+                name="Apple Inc.",
+                raw_symbol="AAPL",
+            )
+        if normalized == "SPY":
+            return ResolvedAssetStub(
+                "SPY",
+                "equity",
+                name="SPDR S&P 500 ETF Trust",
+                raw_symbol="SPY",
+            )
+        raise ValueError("invalid_symbol")
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "AssetGroundingAudit":
+            return interpreter_module.AssetGroundingAudit(
+                grounded_symbols=["AAPL"],
+                confidence=0.92,
+            )
+        if schema_name == "CapabilitySideQuestionAudit":
+            return interpreter_module.CapabilitySideQuestionAudit(
+                is_capability_question=False,
+                confidence=0.8,
+            )
+        if schema_name == "ContextQuestionAudit":
+            return interpreter_module.ContextQuestionAudit(
+                is_context_question=False,
+                confidence=0.8,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="los ultimos 12 meses",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=12,
+                    unit="month",
+                    anchor="today",
+                    confidence=0.92,
+                    evidence="los ultimos 12 meses",
+                ),
+                confidence=0.92,
+                evidence="los ultimos 12 meses",
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                comparison_baseline="SPY",
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "_request_current_turn_has_material_execution_evidence",
+        lambda request: False,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Comparar Apple contra SPY.",
+        assistant_response=(
+            "¿Qué fecha de finalización prefieres para los últimos 12 meses?"
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="compara apple con spy durante los ultimos 12 meses",
+            language="es-419",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Comparar Apple contra SPY.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+        ),
+        missing_required_fields=["date_range"],
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "compara apple con spy durante los ultimos 12 meses"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert "FocusedDateWindowExtraction" in calls
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=12,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.missing_required_fields == []
+    draft = ready_response.candidate_strategy_draft
+    assert draft.date_range == expected_range.payload
+    assert draft.comparison_baseline == "SPY"
+
+
+@pytest.mark.asyncio
+async def test_supported_compare_recovery_normalizes_to_buy_and_hold_contract(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "AssetGroundingAudit":
+            return interpreter_module.AssetGroundingAudit(
+                grounded_symbols=["AAPL"],
+                confidence=0.92,
+            )
+        if schema_name == "CapabilitySideQuestionAudit":
+            return interpreter_module.CapabilitySideQuestionAudit(
+                is_capability_question=False,
+                confidence=0.8,
+            )
+        if schema_name == "ContextQuestionAudit":
+            return interpreter_module.ContextQuestionAudit(
+                is_context_question=False,
+                confidence=0.8,
+            )
+        if schema_name == "SupportedStrategyCapabilityConflictAudit":
+            return interpreter_module.SupportedStrategyCapabilityConflictAudit(
+                selected_strategy_type="buy_and_hold",
+                drop_unsupported_strategy_logic=True,
+                keep_unsupported_strategy_logic=False,
+                confidence=0.92,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="últimos 12 meses",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=12,
+                    unit="month",
+                    anchor="today",
+                    confidence=0.92,
+                    evidence="últimos 12 meses",
+                ),
+                confidence=0.92,
+                evidence="últimos 12 meses",
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                comparison_baseline="SPY",
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Comparar Apple contra SPY.",
+        assistant_response=(
+            "¿Qué tipo de comparación te gustaría hacer? Puedo comparar con "
+            "comprar y mantener."
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="compara apple con spy durante los ultimos 12 meses",
+            language="es-419",
+            strategy_type=None,
+            strategy_thesis=(
+                "Comparar el rendimiento de Apple (AAPL) frente al S&P 500 (SPY) "
+                "durante los últimos 12 meses."
+            ),
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            extra_parameters={
+                "language": "es",
+                "evidence_spans": {
+                    "date_range_raw_text": "últimos 12 meses",
+                    "asset_universe_evidence": "Apple (AAPL)",
+                    "comparison_baseline_evidence": "SPY (S&P 500)",
+                },
+            },
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="Comparar el rendimiento de Apple contra SPY.",
+                explanation="Primary interpretation treated a supported comparison as custom logic.",
+                simplification_labels=[
+                    "Use a supported RSI threshold rule",
+                    "Compare with buy and hold",
+                    "Use a supported moving-average crossover",
+                ],
+            )
+        ],
+        missing_required_fields=["entry_logic", "exit_logic", "date_range"],
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "compara apple con spy durante los ultimos 12 meses"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert "SupportedStrategyCapabilityConflictAudit" in calls
+    assert "FocusedDateWindowExtraction" in calls
+    assert "StatedRunFieldFidelityAudit" in calls
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=12,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.missing_required_fields == []
+    assert ready_response.unsupported_constraints == []
+    draft = ready_response.candidate_strategy_draft
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.asset_universe == ["AAPL"]
+    assert draft.date_range == expected_range.payload
+    assert draft.comparison_baseline == "SPY"
+
+
+@pytest.mark.asyncio
+async def test_fresh_answer_pending_need_with_missing_date_gets_date_repair(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "CapabilitySideQuestionAudit":
+            return interpreter_module.CapabilitySideQuestionAudit(
+                is_capability_question=False,
+                confidence=0.8,
+            )
+        if schema_name == "ContextQuestionAudit":
+            return interpreter_module.ContextQuestionAudit(
+                is_context_question=False,
+                confidence=0.8,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="last 8 months",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    confidence=0.92,
+                    evidence="last 8 months",
+                ),
+                confidence=0.92,
+                evidence="last 8 months",
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="ETH buy-and-hold with $100k.",
+        assistant_response=(
+            "To run the backtest, I just need the exact start and end dates."
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="i bought eth and held it for the last 8 months with 100k",
+            language="en",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Backtest ETH buy-and-hold over the last 8 months.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            capital_amount=100000,
+            extra_parameters={
+                "language": "en",
+                "raw_strategy_type": "buy_and_hold",
+            },
+        ),
+        missing_required_fields=["date_range"],
+        semantic_turn_act="answer_pending_need",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert "FocusedDateWindowExtraction" in calls
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.missing_required_fields == []
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_supported_partial_date_clarification_gets_direct_date_audit(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="last 8 months",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    confidence=0.93,
+                    evidence="last 8 months",
+                ),
+                confidence=0.93,
+                evidence="last 8 months",
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="ETH buy-and-hold with $100K.",
+        assistant_response=(
+            "Got it — ETH buy-and-hold with $100K. "
+            "What date range should I use?"
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+            language="en",
+            strategy_type="buy_and_hold",
+            strategy_thesis="ETH buy-and-hold with $100K.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            capital_amount=100000,
+        ),
+        missing_required_fields=["date_range"],
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert calls[0] == "FocusedDateWindowExtraction"
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.missing_required_fields == []
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+    assert ready_response.candidate_strategy_draft.date_range_raw_text == (
+        "last 8 months"
+    )
 
 
 @pytest.mark.asyncio
@@ -5002,6 +6534,28 @@ def test_focused_strategy_extraction_prompt_preserves_draft_only_strategy_fields
     assert "Shorthand like 'the 50 crosses the 200'" in prompt
 
 
+def test_focused_strategy_extraction_prompt_requires_relative_window_intent() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    messages = interpreter_module._focused_strategy_extraction_messages(
+        InterpretationRequest(
+            current_user_message=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+    prompt = messages[0].content
+
+    assert "Relative windows such as 'last 8 months'" in prompt
+    assert "must become date_range_intent" in prompt
+    assert "Do not ask for exact endpoint dates" in prompt
+    assert "one-time historical acquisition or purchase plus holding" in prompt
+    assert "not unsupported manual trade replay" in prompt
+
+
 def test_focused_strategy_extraction_preserves_non_executable_idea_as_recovery() -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -5903,16 +7457,882 @@ async def test_supported_strategy_capability_audit_canonicalizes_raw_multilingua
     assert calls == [("capability_conflict", "SupportedStrategyCapabilityConflictAudit")]
     assert captured_messages
     assert "Use semantic meaning, not keyword or phrase matching" in captured_messages[0]["content"]
+    assert "plain performance, return, or benchmark comparison" in captured_messages[0]["content"]
     assert audited is not None
     result = interpreter._to_runtime_interpretation(audited, request=request)
     strategy = result.candidate_strategy_draft
     assert strategy.strategy_type == "buy_and_hold"
     assert strategy.asset_universe == ["ETH"]
     assert strategy.capital_amount == 100000
+    expected_range = interpreter_module.resolve_date_range_intent(
+        LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+            evidence="ultimos 8 meses",
+        )
+    )
+    assert expected_range is not None
+    assert strategy.date_range == expected_range.payload
     assert result.unsupported_constraints == []
     assert result.requires_clarification is False
     assert result.semantic_turn_act == "new_idea"
     assert "supported_strategy_capability_conflict_audit" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_supported_capability_recovery_rechecks_dropped_trailing_capital(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+    captured_starting_capital_messages: list[dict[str, str]] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, model_name
+        calls.append(schema_name)
+        if schema_name == "SupportedStrategyCapabilityConflictAudit":
+            return interpreter_module.SupportedStrategyCapabilityConflictAudit(
+                selected_strategy_type="buy_and_hold",
+                drop_unsupported_strategy_logic=True,
+                keep_unsupported_strategy_logic=False,
+                confidence=0.94,
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(confidence=0.88)
+        if schema_name == "StatedStartingCapitalAudit":
+            captured_starting_capital_messages.extend(messages)
+            return interpreter_module.StatedStartingCapitalAudit(
+                starting_capital=100000,
+                confidence=0.93,
+            )
+        raise AssertionError(f"unexpected schema: {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
+
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="El usuario quiere comprar y mantener ETH.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="compra y manten eth ultimos 8 meses 100k",
+            language="es-419",
+            strategy_type="compra y manten",
+            strategy_thesis=(
+                "Estrategia de compra y mantenimiento de ETH por los ultimos "
+                "8 meses con capital inicial de 100.000 USD."
+            ),
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range_intent=LLMDateRangeIntent(
+                kind="rolling_window",
+                count=8,
+                unit="month",
+                anchor="today",
+                evidence="ultimos 8 meses",
+            ),
+            evidence_spans={
+                "strategy_type": "compra y manten",
+                "asset_universe": "eth",
+                "date_range": "ultimos 8 meses",
+            },
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="compra y manten",
+                explanation="No podemos ejecutar compra y manten directamente.",
+            )
+        ],
+        semantic_turn_act="unsupported_request",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="compra y manten eth ultimos 8 meses 100k",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert calls == [
+        "SupportedStrategyCapabilityConflictAudit",
+        "StatedRunFieldFidelityAudit",
+        "StatedStartingCapitalAudit",
+    ]
+    assert captured_starting_capital_messages
+    capital_prompt = captured_starting_capital_messages[0]["content"]
+    assert "standalone numeric magnitude" in capital_prompt
+    assert "structured draft prose" in capital_prompt
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    draft = ready_response.candidate_strategy_draft
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.asset_universe == ["ETH"]
+    assert draft.capital_amount == 100000
+    assert draft.field_provenance["capital_amount"] == "starting_capital"
+    expected_range = interpreter_module.resolve_date_range_intent(
+        LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_supported_capability_shape_beats_primary_capability_focus(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[tuple[str, str]] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del messages, model_name
+        calls.append((task, schema_name))
+        if schema_name == "SupportedStrategyCapabilityConflictAudit":
+            return schema_model(
+                selected_strategy_type="buy_and_hold",
+                drop_unsupported_strategy_logic=True,
+                keep_unsupported_strategy_logic=False,
+                confidence=0.93,
+            )
+        raise AssertionError(f"unexpected repair schema: {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
+
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="The user bought ETH once and held it.",
+        assistant_response=(
+            "That one-time purchase is not directly supported. Choose RSI, "
+            "a moving-average crossover, or buy and hold."
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="bought ETH and held it for 8 months with 100k",
+            language="en",
+            strategy_type="one_time_purchase_hold",
+            strategy_thesis="Bought ETH once and held it for 8 months.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2025-10-13", "end": "2026-06-13"},
+            capital_amount=100000,
+            evidence_spans={
+                "strategy_type": "bought ETH and held it",
+                "asset_universe": "ETH",
+                "date_range": "8 months",
+                "capital_amount": "100k",
+            },
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="one_time_purchase_hold",
+                explanation="The model treated the supported hold shape as custom logic.",
+                simplification_labels=[
+                    "Compare with buy and hold",
+                    "Use a supported RSI threshold rule",
+                ],
+            )
+        ],
+        semantic_turn_act="unsupported_request",
+        capability_question_focus="supported_strategies",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="bought ETH and held it for 8 months with 100k",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert calls[0] == (
+        "capability_conflict",
+        "SupportedStrategyCapabilityConflictAudit",
+    )
+    assert all(schema_name != "FocusedStrategyExtraction" for _, schema_name in calls)
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.capability_question_focus is None
+    assert ready_response.candidate_strategy_draft.strategy_type == "buy_and_hold"
+    assert ready_response.candidate_strategy_draft.asset_universe == ["ETH"]
+    assert ready_response.candidate_strategy_draft.capital_amount == 100000
+    assert ready_response.unsupported_constraints == []
+
+
+@pytest.mark.asyncio
+async def test_supported_shape_inside_unsupported_recovery_gets_focused_repair(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "SupportedStrategyCapabilityConflictAudit":
+            return interpreter_module.SupportedStrategyCapabilityConflictAudit(
+                selected_strategy_type="buy_and_hold",
+                drop_unsupported_strategy_logic=True,
+                keep_unsupported_strategy_logic=False,
+                confidence=0.91,
+            )
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Backtest holding ETH over the last 8 months.",
+                language="en",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Hold ETH through the period.",
+                asset_universe=["ETH"],
+                asset_class="crypto",
+                date_range_raw_text="the last 8 months",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    confidence=0.94,
+                    evidence="the last 8 months",
+                ),
+                capital_amount=100000,
+                confidence=0.92,
+                evidence_spans={
+                    "asset_universe": "eth",
+                    "capital_amount": "100k",
+                    "date_range": "the last 8 months",
+                    "strategy_type": "bought eth and held it",
+                },
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="The user bought ETH and held it.",
+        assistant_response=(
+            "You can't backtest a manual buy-and-hold like that directly here."
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+            language="en",
+            strategy_thesis=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="i bought eth and held it for the last 8 months with 100k",
+                explanation="The model over-routed a supported hold shape.",
+                simplification_labels=["Compare with buy and hold"],
+            )
+        ],
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert "FocusedStrategyExtraction" in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.unsupported_constraints == []
+    draft = ready_response.candidate_strategy_draft
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.asset_universe == ["ETH"]
+    assert draft.asset_class == "crypto"
+    assert draft.capital_amount == 100000
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_unsupported_recovery_allows_focused_spanish_strategy_repair(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "CapabilitySideQuestionAudit":
+            return interpreter_module.CapabilitySideQuestionAudit(
+                is_capability_question=False,
+                confidence=0.8,
+            )
+        if schema_name == "ContextQuestionAudit":
+            return interpreter_module.ContextQuestionAudit(
+                is_context_question=False,
+                confidence=0.8,
+            )
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Probar comprar y mantener ETH durante 8 meses.",
+                language="es-419",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Comprar y mantener ETH durante los ultimos 8 meses.",
+                asset_universe=["ETH"],
+                asset_class="crypto",
+                date_range_raw_text="los ultimos 8 meses",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    confidence=0.94,
+                    evidence="los ultimos 8 meses",
+                ),
+                capital_amount=100000,
+                confidence=0.92,
+                evidence_spans={
+                    "asset_universe": "eth",
+                    "capital_amount": "100k",
+                    "date_range": "los ultimos 8 meses",
+                    "strategy_type": "compre eth y lo mantuve",
+                },
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_request_current_turn_has_material_execution_evidence",
+        lambda _request: False,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="El usuario compró ETH y lo mantuvo.",
+        assistant_response=(
+            "No puedo ejecutar directamente una compra manual pasada."
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="compre eth y lo mantuve los ultimos 8 meses con 100k",
+            language="es-419",
+            strategy_thesis="compre eth y lo mantuve los ultimos 8 meses con 100k",
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="compre eth y lo mantuve los ultimos 8 meses con 100k",
+                explanation=(
+                    "The model over-routed a supported hold shape as manual execution."
+                ),
+                simplification_labels=["Compare with buy and hold"],
+            )
+        ],
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "compre eth y lo mantuve los ultimos 8 meses con 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert "FocusedStrategyExtraction" in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.unsupported_constraints == []
+    draft = ready_response.candidate_strategy_draft
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.asset_universe == ["ETH"]
+    assert draft.asset_class == "crypto"
+    assert draft.capital_amount == 100000
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_supported_partial_spanish_draft_gets_focused_schema_repair(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Probar ETH comprado y mantenido 8 meses.",
+                language="es-419",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Mantener ETH durante el periodo indicado.",
+                asset_universe=["ETH"],
+                asset_class="crypto",
+                date_range_raw_text="ultimos 8 meses",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    confidence=0.94,
+                    evidence="ultimos 8 meses",
+                ),
+                capital_amount=100000,
+                confidence=0.92,
+                evidence_spans={
+                    "asset_universe": "eth",
+                    "capital_amount": "100k",
+                    "date_range": "ultimos 8 meses",
+                    "strategy_type": "compre eth y lo mantuve",
+                },
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "_resolved_asset_mentions_from_message",
+        lambda message: [],
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_request_has_provider_exact_execution_asset",
+        lambda request: False,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="El usuario quiere mantener ETH por 8 meses.",
+        assistant_response=(
+            "Entendido: comprar ETH y mantenerlo 8 meses con 100k. "
+            "Para simularlo, dime el periodo exacto."
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="compre eth y lo mantuve los ultimos 8 meses con 100k",
+            language="es-419",
+            strategy_type="buy_and_hold",
+            asset_class="crypto",
+            capital_amount=100000,
+            strategy_thesis="comprar ETH y mantenerlo 8 meses con 100k",
+        ),
+        missing_required_fields=["asset_universe", "date_range"],
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "compre eth y lo mantuve los ultimos 8 meses con 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert "FocusedStrategyExtraction" in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    draft = ready_response.candidate_strategy_draft
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.asset_universe == ["ETH"]
+    assert draft.asset_class == "crypto"
+    assert draft.capital_amount == 100000
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert draft.date_range == expected_range.payload
+    assert draft.date_range_raw_text == "ultimos 8 meses"
+
+
+@pytest.mark.asyncio
+async def test_supported_partial_draft_gets_schema_repair_after_date_audit_failure(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedDateWindowExtraction":
+            raise RuntimeError("date specialist unavailable")
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Backtest holding ETH over the last 8 months.",
+                language="en",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Hold ETH through the stated period.",
+                asset_universe=["ETH"],
+                asset_class="crypto",
+                date_range_raw_text="last 8 months",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    confidence=0.93,
+                    evidence="last 8 months",
+                ),
+                capital_amount=100000,
+                confidence=0.91,
+                evidence_spans={
+                    "asset_universe": "eth",
+                    "capital_amount": "100k",
+                    "date_range": "last 8 months",
+                    "strategy_type": "bought eth and held it",
+                },
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="ETH buy-and-hold with $100k.",
+        assistant_response=(
+            "To run the backtest, I just need the exact start and end dates."
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="i bought eth and held it for the last 8 months with 100k",
+            language="en",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Backtest ETH buy-and-hold over the last 8 months.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            capital_amount=100000,
+        ),
+        missing_required_fields=["date_range"],
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert calls[0] == "FocusedDateWindowExtraction"
+    assert "FocusedStrategyExtraction" in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_supported_partial_clarification_without_missing_list_repairs(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "ETH":
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(
+            "ETH",
+            "crypto",
+            name="Ethereum",
+            raw_symbol="ETH/USD",
+        )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=False,
+                confidence=0.3,
+                evidence="",
+            )
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Backtest holding ETH over the last 8 months.",
+                language="en",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Hold ETH through the stated period.",
+                asset_universe=["ETH"],
+                asset_class="crypto",
+                date_range_raw_text="last 8 months",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=8,
+                    unit="month",
+                    anchor="today",
+                    confidence=0.93,
+                    evidence="last 8 months",
+                ),
+                capital_amount=100000,
+                confidence=0.91,
+                evidence_spans={
+                    "asset_universe": "eth",
+                    "capital_amount": "100k",
+                    "date_range": "last 8 months",
+                    "strategy_type": "bought eth and held it",
+                },
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                date_range=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="ETH buy-and-hold with $100k.",
+        assistant_response=(
+            "To run the backtest, I just need the exact start and end dates."
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="i bought eth and held it for the last 8 months with 100k",
+            language="en",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Backtest ETH buy-and-hold over the last 8 months.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            capital_amount=100000,
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "i bought eth and held it for the last 8 months with 100k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert calls[0] == "FocusedStrategyExtraction"
+    assert "FocusedDateWindowExtraction" not in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=8,
+            unit="month",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
 
 
 @pytest.mark.asyncio

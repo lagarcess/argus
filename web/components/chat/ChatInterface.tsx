@@ -1893,6 +1893,8 @@ export default function ChatInterface() {
   const composerActions = hasActiveArtifactActionSet(messages)
     ? []
     : visibleComposerActions(inputActions);
+  const actionLabel = (action: ChatActionOption) =>
+    action.labelKey ? t(action.labelKey, action.label) : action.label;
   const latestAssistantContent =
     [...messages].reverse().find((message) => message.role === "ai")?.content?.trim() ?? "";
   const showStreamStatus = Boolean(streamStatus && latestAssistantContent.length === 0);
@@ -2291,7 +2293,7 @@ export default function ChatInterface() {
                             onClick={() => handleAction(action)}
                             className="min-h-11 rounded-full border border-black/10 bg-white/90 px-4 py-2 text-[14px] font-medium tracking-tight text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white dark:hover:bg-white/6"
                           >
-                            {action.label}
+                            {actionLabel(action)}
                           </button>
                         ))}
                       </div>

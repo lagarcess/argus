@@ -111,7 +111,21 @@ Do not reopen these as debt unless a new bug is reproduced:
 
 Codex should own or closely supervise this:
 
-1. **Research Lab product spec**
+1. **Controlled alpha readiness slice**
+   - Active worker branch: `codex/private-alpha-readiness`, targeting
+     `codex/private-alpha-next` after review.
+   - Current local checkpoint: the language-agnostic runtime spine has focused
+     backend tests and Codex browser QA for messy English/Spanish buy-and-hold
+     prompts with shorthand capital (`100k`). This proves the first supported
+     shape can reach the canonical confirmation-card state in the selected
+     product locale without phrase gates or chip-specific shortcuts.
+   - Remaining before merge/release readiness: broader Spanish prompt matrix,
+     multi-turn clarification, result execution, retry/recovery, indicator/DCA
+     coverage, production-parity Render canary, and the rest of the controlled
+     readiness slices in
+     `docs/specs/private-alpha-controlled-readiness-panel.md`.
+
+2. **Research Lab product spec**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
      saved research, and monitoring belong in a dedicated spec before code.
    - The active refined draft is

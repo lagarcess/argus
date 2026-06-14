@@ -9,9 +9,10 @@ allowed to land Spanish scaffolding behind `NEXT_PUBLIC_ENABLE_SPANISH`, but
 Spanish must remain disabled in production-like Render environments until a
 Codex-owned runtime readiness gate passes. The current work stabilizes
 translation keys, static UI coverage, confirmation-card state handling,
-language-aware runtime normalization, and structured recovery metadata; it still
-does not prove the LangGraph chat/backtest spine is fully language agnostic in
-live production-like conditions.
+language-aware runtime normalization, structured recovery metadata, and one
+focused messy-prompt runtime proof for buy-and-hold with shorthand capital. It
+still does not prove the full LangGraph chat/backtest spine is language
+agnostic in live production-like conditions.
 
 **Runtime-state normalization update:** `codex/private-alpha-readiness` adds a
 shared `resolution_provenance` normalizer for workflow snapshots, public runtime
@@ -32,6 +33,16 @@ spine. Relative endpoint edits use canonical offset math such as
 "ayer", "yesterday", or future per-language aliases. The slice still requires
 Spanish transcript QA and live canary evidence before enabling Spanish in
 production-like environments.
+
+**Local language-spine QA checkpoint:** focused backend tests and Codex browser
+QA now prove that messy Spanish and English buy-and-hold prompts with shorthand
+capital, such as `compra y manten eth ultimos 8 meses 100k` and
+`buy and hold eth last 8 months 100k`, reach the same canonical confirmation
+shape. The Spanish browser run rendered the Spanish shell/card copy and
+`$100,000`; the English mirror rendered English shell/card copy and `$100,000`.
+This checkpoint validates LLM-first interpretation plus post-interpretation
+guardrails for that shape. It does not replace the remaining multi-turn,
+result, retry/recovery, indicator/DCA, and production-parity Render QA gates.
 
 **Domain slot normalization update:** LLM-returned strategy and DCA cadence
 values are expected to be canonical engine values such as `buy_and_hold` and
@@ -87,7 +98,7 @@ The findings are grouped by category:
 | **Backend Results** | `src/argus/domain/benchmark_comparison.py` | User phrases generated in backend: `"Beat by {magnitude}"`, `"In line with benchmark"` | High | Product decision | Return structured data (e.g., `{ type: "beat_benchmark", value: magnitude }`) and localize in frontend. |
 | **LLM Prompts** | `src/argus/agent_runtime/stages/interpret.py` | System prompts: `"Supported-strategy facts:"`, `"Available short-lived context packet:"` | High | Codex-owned | Do not change. Treat as Codex-owned runtime contracts.|
 | **Runtime State Hydration** | `src/argus/agent_runtime/state/models.py`, `src/argus/agent_runtime/runtime.py`, `src/argus/agent_runtime/graph/workflow.py`, `src/argus/agent_runtime/stages/interpret.py`, `src/argus/agent_runtime/stages/interpret_types.py`, `src/argus/agent_runtime/llm_interpreter.py` | Dict-shaped `resolution_provenance` entries are normalized/deduped before durable snapshot carry-forward, public payload serialization, interpreter patches, and LLM interpreter capability validation. | Partially resolved | Codex-owned | Keep the regression tests; still run the full Spanish continuation QA matrix before enabling Spanish in Render. |
-| **LLM Interpreter Metadata** | `src/argus/agent_runtime/llm_interpreter.py`, `src/argus/agent_runtime/llm_interpreter_types.py`, `src/argus/nlp/natural_time.py` | Structured interpretation now carries `language`, `date_range_raw_text`, `date_range_intent`, and `evidence_spans`; canonical temporal intent is resolved deterministically, and bounded date evidence is resolved through the natural-time wrapper instead of month/date language tables inside runtime contracts. | Partially resolved | Codex-owned | Keep the canonical-intent, bounded-span, and contract-boundary tests; add Spanish transcript/live QA before enabling Spanish. |
+| **LLM Interpreter Metadata** | `src/argus/agent_runtime/llm_interpreter.py`, `src/argus/agent_runtime/llm_interpreter_types.py`, `src/argus/nlp/natural_time.py` | Structured interpretation now carries `language`, `date_range_raw_text`, `date_range_intent`, and `evidence_spans`; canonical temporal intent is resolved deterministically, bounded date evidence is resolved through the natural-time wrapper instead of month/date language tables inside runtime contracts, and focused audits can reconcile user-stated capital when the LLM preserved it in draft prose but omitted the canonical field. | Partially resolved | Codex-owned | Keep the canonical-intent, bounded-span, field-fidelity, and contract-boundary tests; finish the Spanish transcript/live QA matrix before enabling Spanish. |
 | **Recovery Copy** | `src/argus/agent_runtime/recovery_messages.py`, `src/argus/api/routers/agent.py`, `web/lib/argus-api.ts`, `web/components/chat/ChatInterface.tsx` | Recoverable chat failures now persist typed recovery metadata, localized fallback copy, and structured retry metadata instead of making English prose the durable behavior contract. | Locally resolved | Codex-owned | Keep the recovery contract tests green and include Spanish recovery in the final live canary before enabling Spanish in Render. |
 
 ## Detailed Inventory
@@ -125,7 +136,7 @@ The findings are grouped by category:
 | File / Area | Representative examples | Classification | Risk | Owner | Recommendation |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `src/argus/agent_runtime/state/models.py`, `src/argus/agent_runtime/runtime.py`, `src/argus/agent_runtime/graph/workflow.py`, `src/argus/agent_runtime/stages/interpret.py`, `src/argus/agent_runtime/stages/interpret_types.py`, `src/argus/agent_runtime/llm_interpreter.py` | Shared provenance normalization protects persisted snapshot carry-forward, public runtime payloads, interpreter patches, and LLM capability validation from dict/model drift. | State normalization | Partially resolved | Codex-owned | Broaden Spanish continuation/live QA before enabling the Spanish feature flag. |
-| `src/argus/agent_runtime/llm_interpreter.py`, `src/argus/agent_runtime/llm_interpreter_types.py` | LLM interpreter schema and prompt now require canonical internal values, detected language, bounded date raw text, canonical `date_range_intent`, and evidence spans; conversion stores that metadata in `StrategySummary.extra_parameters`. | Interpreter contract | Partially resolved | Codex-owned | Do not make raw text executable by itself; use canonical intent or bounded evidence, keep deterministic validation, and add Spanish runtime transcript coverage. |
+| `src/argus/agent_runtime/llm_interpreter.py`, `src/argus/agent_runtime/llm_interpreter_types.py` | LLM interpreter schema and prompt now require canonical internal values, detected language, bounded date raw text, canonical `date_range_intent`, and evidence spans; conversion stores that metadata in `StrategySummary.extra_parameters`. Focused field-fidelity audits receive raw user phrasing plus draft-prose evidence so canonical fields can be corrected without adding language-specific parsers. | Interpreter contract | Partially resolved | Codex-owned | Do not make raw text executable by itself; use canonical intent or bounded evidence, keep deterministic validation, and add Spanish runtime transcript coverage. |
 | `src/argus/agent_runtime/llm_interpreter.py`, `src/argus/domain/slot_normalizer.py`, `src/argus/domain/strategy_capabilities.py` | Post-LLM strategy and cadence values are expected to be canonical; localized wording stays in `evidence_spans` and prose. The capability registry keeps machine compatibility aliases only and no longer acts as an English or Spanish phrasebook. | Domain slot normalization | Partially resolved | Codex-owned | Add future languages through schema/prompt/test coverage and live QA, not by expanding capability phrase tables. |
 | `src/argus/nlp/natural_time.py`, `src/argus/agent_runtime/strategy_contract.py`, `src/argus/agent_runtime/run_field_contract.py` | Canonical interpreter temporal intent is resolved with deterministic date math; bounded date evidence is resolved with `dateparser` through the Argus natural-time wrapper. Runtime contracts consume canonical dates and no longer own month alias tables or month-year span parsers. | Natural time parsing | Partially resolved | Codex-owned | Feed only canonical intent or bounded spans; keep the boundary test that prevents date-language tables from returning to runtime contracts. |
 | `src/argus/agent_runtime/recovery_messages.py`, `src/argus/api/routers/agent.py`, `web/lib/argus-api.ts`, `web/components/chat/ChatInterface.tsx` | Runtime recovery carries stable `code`, `retryable`, `language`, and `retry_last_turn` metadata, while localized fallback copy is generated from a central catalog. | Recovery copy | Locally resolved | Codex-owned | Keep recovery behavior structured and language-aware; do not make English or Spanish prose the durable failure contract. |

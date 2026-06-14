@@ -88,6 +88,12 @@ The readiness slice should be sequenced like this:
    - Canonical machine values from Spanish input.
    - Spanish date/timeframe/indicator normalization after LLM interpretation.
    - Spanish result, clarification, unsupported-boundary, and follow-up voice.
+   - Current checkpoint: the readiness worktree now has focused backend tests
+     and Codex browser QA proving the messy English/Spanish buy-and-hold shape
+     with shorthand capital (`100k`) reaches a confirmation card with canonical
+     `capital_amount=100000`, localized shell/card copy, compact localized date
+     ranges, and no hard recovery. This is a local runtime-spine proof, not the
+     full Spanish release gate.
 
 2. **Backtest trust hardening**
    - Provider-backed symbol validation even when `asset_class` is explicit.
@@ -132,9 +138,9 @@ The readiness slice should be sequenced like this:
 
 | Area | Must fix | Why it matters |
 | --- | --- | --- |
-| Spanish execution | Spanish natural language must reach the same executable interpreter and backtest path as English. | Most controlled users prefer Spanish; static UI translation without execution breaks the core promise. |
-| LLM runtime | Interpreter prompt/schema must state: any input language in, canonical machine values out, user-facing prose in resolved language. | Prevents Spanish values like `mensual`, `acciones`, or `comprar_y_mantener` from leaking into executable fields. |
-| Dates/timeframes | Add Spanish post-LLM normalization for `enero`, `desde`, `hasta`, `ultimos`, `hoy`, `velas`, `por hora`, etc. | Date and timeframe repair is currently English-forward. |
+| Spanish execution | Spanish natural language must reach the same executable interpreter and backtest path as English. Focused local proof now exists for messy buy-and-hold prompts with shorthand capital; the broader Spanish matrix still must pass. | Most controlled users prefer Spanish; static UI translation without execution breaks the core promise. |
+| LLM runtime | Interpreter prompt/schema must state: any input language in, canonical machine values out, user-facing prose in resolved language. The current readiness work keeps user phrasing as evidence and asks focused audits to reconcile canonical fields when the primary pass preserved meaning only in prose. | Prevents Spanish values like `mensual`, `acciones`, or `comprar_y_mantener` from leaking into executable fields while also preventing lost user-stated facts such as `100k`. |
+| Dates/timeframes | Date/window handling should use canonical `date_range_intent` and bounded evidence spans after LLM interpretation, not runtime-owned language tables. | Date and timeframe repair must scale beyond English/Spanish without adding phrase gates before the interpreter. |
 | Backtest symbols | Explicit `asset_class` must narrow validation, not bypass provider-backed canonical asset resolution. | Prevents invalid or misclassified symbols from entering a run. |
 | Backtest parity | Metrics, chart markers, fills, and stored run facts need parity tests against one coherent execution model. | Result cards are the trust surface. They must not disagree with engine truth. |
 | Run persistence | `config_snapshot` should be sufficient to reproduce the run's assumptions and execution config. | Reload/history claims depend on durable reproducibility. |
@@ -188,20 +194,31 @@ The readiness slice should be sequenced like this:
 ### Verdict
 
 Argus is not ready for Spanish-first controlled-alpha execution yet, but the
-main runtime gap has narrowed. The runtime shape is correct: LangGraph is the
+main runtime gap has moved from architecture risk to matrix coverage risk for
+the first supported shape. The runtime shape is correct: LangGraph is the
 conversational spine, normal language reaches structured interpretation first,
 and deterministic validation comes afterward. The readiness branch now has
 local work for canonical interpreter metadata, natural-time normalization,
-registry-backed strategy aliases, localized artifacts, and structured recovery.
-The remaining gap is proving that those pieces hold together across the full
-Spanish execution matrix and live production-like Render canary.
+registry-backed strategy aliases, localized artifacts, structured recovery, and
+a focused capital-fidelity audit that catches when the LLM preserves `100k`
+only in draft prose instead of the canonical field. The remaining gap is proving
+that those pieces hold across the full Spanish execution matrix and live
+production-like Render canary.
 
 ### Evidence
 
 - The interpreter now receives language preference and carries language,
   bounded date text, and evidence-span metadata while asking for canonical
-  Argus machine values. The local tests cover this shape, but live-model
-  extraction across the full Spanish prompt matrix is not proven yet.
+  Argus machine values. The local tests cover this shape, and focused Codex
+  browser QA now proves the messy buy-and-hold `100k` prompt in both Spanish and
+  English reaches the localized confirmation-card state with `$100,000` instead
+  of the default `$1,000`.
+- Browser evidence captured locally:
+  `language-spine-es-locale-capital-1781420400003` / conversation
+  `4bd063f3-0558-4dfd-948b-39fb15565b2b` and
+  `language-spine-en-locale-capital-1781420600004` / conversation
+  `d95cc988-ae94-4ed0-8686-c2f09e1711d1`. This is not a production Render
+  canary.
 - Run-critical fields such as `strategy_type`, `asset_class`, `timeframe`,
   `cadence`, `indicator`, and `date_range` still need strict guardrails because
   they can arrive from a probabilistic model before deterministic validation.
@@ -265,6 +282,12 @@ Relevant code:
   typed recovery codes, normalized recovery language, centralized localized
   fallback copy, and structured `retry_last_turn` metadata. This must remain a
   fallback safety layer, not a replacement for normal LLM-owned Argus voice.
+- Closed locally in the readiness worktree for the first supported messy shape:
+  if a live LLM turn captures a user-stated capital amount in strategy prose but
+  fails to populate `capital_amount`, the focused starting-capital audit receives
+  the raw user phrasing and draft-prose evidence before deciding whether to
+  restore the canonical amount. This preserves LLM-first interpretation without
+  adding language phrase gates or chip-specific shortcuts.
 - Keep hard constraints in schema, code, or runtime parameters instead of vague
   prose, following the same discipline described in Perplexity's prompt guide:
   focused instructions, clear formatting, grounding, JSON schema where

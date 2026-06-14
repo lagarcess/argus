@@ -231,6 +231,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(sendState).toContain("message.id !== assistantId");
     expect(retry).not.toContain("content.includes");
     expect(retry).not.toContain(".match(");
+    expect(chat).toContain("const actionLabel = (action: ChatActionOption) =>");
+    expect(chat).toContain("{actionLabel(action)}");
+    expect(chat).not.toContain("{action.label}\n                          </button>");
     expect(message).toContain("action.labelKey ? t(action.labelKey, action.label) : action.label");
     expect(message).toContain("const retryAction = message.actions?.find");
     expect(message).toContain("message.actions?.find(isRetryAction)");
