@@ -124,6 +124,11 @@ def runtime_confirmation_card(
         launch_payload=launch_payload,
         language=language,
     )
+    display_facts = _confirmation_display_facts(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload,
+    )
     summary_period = _confirmation_period_without_parentheses(date_range)
     summary = _confirmation_summary(
         assets=assets,
@@ -207,6 +212,8 @@ def runtime_confirmation_card(
         "assumptions": assumptions,
         "actions": actions,
     }
+    if display_facts:
+        card["display_facts"] = display_facts
     asset_class = _confirmation_asset_class(strategy)
     if asset_class is not None:
         card["asset_class"] = asset_class
@@ -357,6 +364,35 @@ def _data_through_assumption(
     return format_data_through_label(adjustment.get("through"), language=language) or None
 
 
+def _confirmation_display_facts(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, Any],
+    launch_payload: dict[str, Any],
+) -> dict[str, Any]:
+    facts: dict[str, Any] = {}
+    timeframe = _optional_parameter_value(optional_parameters, "timeframe")
+    if timeframe:
+        facts["timeframe"] = timeframe
+    data_adjustment = _data_availability_adjustment(strategy)
+    if data_adjustment is not None:
+        facts["data_through"] = data_adjustment.get("through")
+    fees = _optional_parameter_value(optional_parameters, "fees")
+    if fees is not None:
+        facts["fees"] = fees
+    slippage = _optional_parameter_value(optional_parameters, "slippage")
+    if slippage is not None:
+        facts["slippage"] = slippage
+    benchmark_symbol = _confirmation_benchmark_symbol(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload,
+    )
+    if benchmark_symbol:
+        facts["benchmark_symbol"] = benchmark_symbol
+    return facts
+
+
 def _data_availability_adjustment(strategy: dict[str, Any]) -> dict[str, Any] | None:
     extra_parameters = strategy.get("extra_parameters")
     if not isinstance(extra_parameters, dict):
@@ -396,6 +432,20 @@ def _confirmation_benchmark_assumption(
     launch_payload: dict[str, Any],
     language: str = "en",
 ) -> str | None:
+    symbol = _confirmation_benchmark_symbol(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload,
+    )
+    return _benchmark_assumption(symbol, language=language) if symbol else None
+
+
+def _confirmation_benchmark_symbol(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, Any],
+    launch_payload: dict[str, Any],
+) -> str | None:
     for value in (
         strategy.get("comparison_baseline"),
         strategy.get("benchmark_symbol"),
@@ -403,12 +453,12 @@ def _confirmation_benchmark_assumption(
         launch_payload.get("benchmark_symbol"),
     ):
         if isinstance(value, str) and value.strip():
-            return _benchmark_assumption(value.strip().upper(), language=language)
+            return value.strip().upper()
     asset_class = strategy.get("asset_class")
     if asset_class == "crypto":
-        return _benchmark_assumption("BTC", language=language)
+        return "BTC"
     if asset_class == "equity":
-        return _benchmark_assumption("SPY", language=language)
+        return "SPY"
     return None
 
 

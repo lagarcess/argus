@@ -1,5 +1,6 @@
 import type { AssetClass } from "@/lib/argus-types";
 import type { BacktestJob } from "@/lib/argus-api";
+import type { ConfirmationDisplayFacts } from "@/lib/confirmation-assumptions-display";
 
 export type StrategyResultMetric = {
   label: string;
@@ -152,6 +153,7 @@ export type StrategyConfirmationPayload = {
   statusLabel: string;
   summary: string;
   strategy_type?: string;
+  display_facts?: ConfirmationDisplayFacts;
   date_range?: StrategyConfirmationDateRange;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];

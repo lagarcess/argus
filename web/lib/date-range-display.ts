@@ -21,6 +21,26 @@ export function compactDateRangeDisplay(
   return `${formatter.format(start)} \u2192 ${formatter.format(end)}`;
 }
 
+export function compactDateDisplay(
+  value: string | null | undefined,
+  locale: string,
+  options: { year?: boolean } = {},
+): string | null {
+  const parsed = parseIsoCalendarDate(value);
+  if (!parsed) {
+    return null;
+  }
+  const formatOptions: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  };
+  if (options.year !== false) {
+    formatOptions.year = "numeric";
+  }
+  return new Intl.DateTimeFormat(locale || "en-US", formatOptions).format(parsed);
+}
+
 function parseIsoCalendarDate(value: string | null | undefined): Date | null {
   const parts = value?.split("-").map((part) => Number(part));
   if (!parts || parts.length !== 3) {

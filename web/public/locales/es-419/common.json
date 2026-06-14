@@ -354,6 +354,12 @@
         "change_asset": "Cambiar activo",
         "adjust_assumptions": "Ajustar supuestos",
         "cancel": "Cancelar"
+      },
+      "assumptions": {
+        "through": "Hasta {{date}}",
+        "no_fees": "Sin comisiones",
+        "no_slippage": "Sin deslizamiento",
+        "benchmark": "Referencia: {{symbol}}"
       }
     }
   },

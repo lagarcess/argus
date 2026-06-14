@@ -321,6 +321,10 @@ machine-readable fields alongside display labels:
   `crypto`, or `currency_pair`; clients may render this as muted trust metadata.
 - `date_range`: optional canonical `{ start, end, display }` range for cards
   whose period row is visually compacted from ISO fields.
+- `display_facts`: optional canonical facts for localized card metadata, such as
+  `timeframe`, `data_through`, `fees`, `slippage`, and `benchmark_symbol`.
+  Clients should render these facts through locale-aware presentation code and
+  use legacy `assumptions` strings only as fallback for older persisted cards.
 - `actions[].label` / `actions[].labelKey`: display fallback plus frontend i18n key.
 
 Clients must use `status` and `rows[].key` for behavior. They must not infer

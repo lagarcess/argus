@@ -354,6 +354,12 @@
         "change_asset": "Change asset",
         "adjust_assumptions": "Adjust assumptions",
         "cancel": "Cancel"
+      },
+      "assumptions": {
+        "through": "Through {{date}}",
+        "no_fees": "No fees",
+        "no_slippage": "No slippage",
+        "benchmark": "Benchmark: {{symbol}}"
       }
     }
   },

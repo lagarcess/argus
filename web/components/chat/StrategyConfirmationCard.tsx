@@ -15,8 +15,8 @@ import {
   artifactStatusToneClassName,
   type ArtifactStatusTone,
 } from "@/lib/artifact-status-tones";
-import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { cadenceDisplayLabel } from "@/lib/cadence-display";
+import { confirmationAssumptionDisplay } from "@/lib/confirmation-assumptions-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import {
   strategyDisplayLabel,
@@ -243,7 +243,6 @@ function confirmationCardViewModel(
     )
     .map(({ row }) => row);
   const promotedValues = summaryRows.map((row) => row.value);
-  const assetClassLabel = assetClassDisplayLabel(confirmation.asset_class, t);
   const localizedStrategyLabel = strategyDisplayLabel(
     strategyTypeFromConfirmation(confirmation),
     t,
@@ -257,11 +256,14 @@ function confirmationCardViewModel(
       confirmationAssetTitle(assetRow, confirmation.title, t),
     summaryRows,
     detailRows,
-    assumptions: displayAssumptions(
-      confirmation.assumptions ?? [],
+    assumptions: confirmationAssumptionDisplay({
+      assetClass: confirmation.asset_class,
+      displayFacts: confirmation.display_facts,
+      fallbackAssumptions: confirmation.assumptions ?? [],
+      locale: language,
       promotedValues,
-      assetClassLabel,
-    ),
+      t,
+    }),
   };
 }
 
@@ -318,21 +320,6 @@ function confirmationAssetTitle(
     });
   }
   return fallbackTitle.trim() || t("chat.confirmation.selected_asset", "Selected asset");
-}
-
-function displayAssumptions(
-  assumptions: string[],
-  promotedValues: string[],
-  assetClassLabel?: string,
-) {
-  const filtered = assumptions.filter(
-    (assumption) =>
-      !promotedValues.some((value) => value.trim() && assumption.includes(value.trim())),
-  );
-  if (!assetClassLabel || filtered.includes(assetClassLabel)) {
-    return filtered;
-  }
-  return [assetClassLabel, ...filtered];
 }
 
 function AssetSymbols({ symbols }: { symbols: string[] }) {
