@@ -10,6 +10,7 @@ RecoveryMessageCode = Literal[
     "confirmation_change_unapplied",
     "latest_result_followup_unavailable",
     "confirmation_action_guidance",
+    "clarification_generation_unavailable",
     "runtime_failure",
 ]
 
@@ -76,6 +77,18 @@ RECOVERY_MESSAGES: dict[RecoveryMessageCode, dict[Language, str]] = {
         "es-419": (
             "La confirmación visible sigue lista. Usa la tarjeta para iniciar "
             "la simulación, o usa sus controles para cambiarla."
+        ),
+    },
+    "clarification_generation_unavailable": {
+        "en": (
+            "I could not phrase the follow-up clearly just now. Your draft is "
+            "still here; tell me the detail you want to change, or try again "
+            "in a moment."
+        ),
+        "es-419": (
+            "No pude formular bien el seguimiento en este momento. Tu borrador "
+            "sigue aquí; dime el detalle que quieres cambiar, o intenta de "
+            "nuevo en un momento."
         ),
     },
     "runtime_failure": {

@@ -89,6 +89,32 @@ def test_clarify_confirmation_action_period_uses_llm_voice_in_spanish() -> None:
     assert "Which date" not in result.patch["assistant_prompt"]
 
 
+def test_clarify_offline_fallback_uses_product_language() -> None:
+    state = RunState.new(current_user_message="Cambiar fechas", recent_thread_history=[])
+    state.intent = "strategy_drafting"
+    state.requested_field = "date_range"
+    state.missing_required_fields = ["date_range"]
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        capital_amount=100000,
+    )
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=None,
+        language="es-419",
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"].startswith("No pude formular")
+    assert "I could not" not in result.patch["assistant_prompt"]
+    assert "Which date" not in result.patch["assistant_prompt"]
+
+
 def test_clarify_dca_total_budget_expands_to_execution_details() -> None:
     state = RunState.new(
         current_user_message=(
@@ -678,6 +704,25 @@ def test_clarifier_system_prompt_enforces_user_language() -> None:
     assert "es-419" in messages[1].content
 
 
+def test_clarifier_system_prompt_avoids_stale_fixed_date_examples() -> None:
+    clarifier = OpenRouterClarificationGenerator()
+    request = clarifier.request_model(
+        current_user_message="Cambiar fechas",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL"],
+        ),
+        missing_required_fields=["date_range"],
+        response_intent={"kind": "clarification", "semantic_needs": ["period"]},
+        language="es-419",
+    )
+
+    system_prompt = clarifier._messages(request)[0].content
+
+    assert "avoid arbitrary fixed calendar examples" in system_prompt
+    assert "relative or rolling windows" in system_prompt
+
+
 def test_clarifier_system_prompt_guides_unsupported_recovery_context() -> None:
     clarifier = OpenRouterClarificationGenerator()
     request = clarifier.request_model(
@@ -1123,6 +1168,140 @@ def test_openrouter_clarifier_deduplicates_embedded_direct_question(
     assert question is not None
     assert question.lower().count("what asset") == 1
     assert question.endswith("what time period should we look at?")
+
+
+def test_openrouter_clarifier_deduplicates_identical_direct_question(
+    monkeypatch,
+) -> None:
+    repeated = (
+        "¿Qué período prefieres para la prueba de AAPL? Por ejemplo, dime un "
+        "rango de fechas concreto o una ventana como últimos 3 años."
+    )
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=repeated,
+            direct_question=repeated,
+            question_targets=["period"],
+            directly_asks_user=True,
+            detail_targets=["date_window"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message="Cambiar fechas",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+            ),
+            missing_required_fields=["date_range"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["period"],
+            },
+            language="es-419",
+        )
+    )
+
+    assert question == repeated
+
+
+def test_openrouter_clarifier_deduplicates_repeated_question_paragraph(
+    monkeypatch,
+) -> None:
+    repeated = (
+        "¿Qué período prefieres para la prueba de AAPL? Por ejemplo, dime un "
+        "rango de fechas concreto o una ventana como últimos 3 años."
+    )
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=f"{repeated} {repeated}",
+            question_targets=["period"],
+            directly_asks_user=True,
+            detail_targets=["date_window"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message="Cambiar fechas",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+            ),
+            missing_required_fields=["date_range"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["period"],
+            },
+            language="es-419",
+        )
+    )
+
+    assert question == repeated
+
+
+def test_openrouter_clarifier_does_not_append_embedded_direct_question(
+    monkeypatch,
+) -> None:
+    question_text = (
+        "¿Qué período prefieres para la prueba de AAPL? Puedes darme fechas "
+        "concretas o un rango como últimos 6 meses."
+    )
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=question_text,
+            direct_question="¿Qué período prefieres para la prueba de AAPL?",
+            question_targets=["period"],
+            directly_asks_user=True,
+            detail_targets=["date_window"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    rendered = clarifier(
+        clarifier.request_model(
+            current_user_message="Cambiar fechas",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+            ),
+            missing_required_fields=["date_range"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["period"],
+            },
+            language="es-419",
+        )
+    )
+
+    assert rendered == question_text
 
 
 def test_openrouter_clarifier_keeps_abbreviations_when_deduplicating_question(

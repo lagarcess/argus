@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
-from argus.agent_runtime.clarification_contract import OFFLINE_CLARIFICATION_FALLBACK
 from argus.agent_runtime.stages.compose import (
     compose_response_intent,
     should_prefer_composed_intent,
@@ -224,14 +223,16 @@ def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
     if (
         isinstance(explicit_prompt, str)
         and explicit_prompt.strip()
-        and explicit_prompt != OFFLINE_CLARIFICATION_FALLBACK
-        and not should_prefer_composed_intent(run_state)
     ):
-        if result.get("assistant_response") == explicit_prompt:
+        assistant_response = result.get("assistant_response")
+        if assistant_response == explicit_prompt:
             return result
         patched = dict(result)
-        patched.setdefault("assistant_response", explicit_prompt)
+        if not isinstance(assistant_response, str) or not assistant_response.strip():
+            patched["assistant_response"] = explicit_prompt
         return patched
+    if not should_prefer_composed_intent(run_state):
+        return result
     composed = compose_response_intent(run_state)
     if composed is None:
         return result

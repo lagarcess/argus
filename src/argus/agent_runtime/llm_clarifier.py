@@ -242,6 +242,9 @@ class OpenRouterClarificationGenerator:
                     "should happen too. Keep date guidance aligned with data "
                     "availability truth: equity launch history starts in 2016, and "
                     "currency-pair intraday history has a bounded recent-data window. "
+                    "For date-window clarifications, avoid arbitrary fixed calendar "
+                    "examples or stale years; prefer relative or rolling windows in "
+                    "the requested language unless the user already gave fixed dates. "
                     "For currency-pair tests, use 1h, 4h, or 1D rather than implying "
                     "every intermediate timeframe is available. If the user asks for an "
                     "hourly/intraday timeframe or a long historical window, do not "
@@ -318,6 +321,21 @@ def _render_clarification_response(
     contract_question = _contract_direct_question(request)
     direct_question = contract_question or response.direct_question.strip()
     if direct_question:
+        direct_words = _content_word_set(direct_question)
+        sentences = _sentences(question)
+        if (
+            not contract_question
+            and direct_words
+            and _is_embedded_direct_question(question, direct_words=direct_words)
+            and (
+                not sentences
+                or not _is_embedded_direct_question(
+                    sentences[-1],
+                    direct_words=direct_words,
+                )
+            )
+        ):
+            return question
         context = _clarification_context_without_embedded_question(
             question,
             direct_question=direct_question,
@@ -342,7 +360,29 @@ def _collapse_adjacent_duplicate_sentences(text: str) -> str:
             continue
         collapsed.append(sentence)
         previous_identity = identity
+    collapsed = _collapse_repeated_sentence_block(collapsed)
     return " ".join(collapsed).strip()
+
+
+def _collapse_repeated_sentence_block(sentences: list[str]) -> list[str]:
+    if len(sentences) < 2:
+        return sentences
+    identities = [_sentence_identity(sentence) for sentence in sentences]
+    for block_size in range(1, (len(sentences) // 2) + 1):
+        if len(sentences) % block_size != 0:
+            continue
+        block = identities[:block_size]
+        if not all(block):
+            continue
+        repeats = len(sentences) // block_size
+        if repeats < 2:
+            continue
+        if all(
+            identities[index : index + block_size] == block
+            for index in range(block_size, len(identities), block_size)
+        ):
+            return sentences[:block_size]
+    return sentences
 
 
 def _sentence_identity(sentence: str) -> str:

@@ -530,7 +530,7 @@ def test_next_step_preserves_completed_result_answer() -> None:
     ]
 
 
-def test_runtime_recovers_offline_clarifier_with_composed_intent() -> None:
+def test_runtime_preserves_offline_clarifier_as_recovery() -> None:
     run_state = RunState.new(
         current_user_message="Test buying SPY when it starts rising.",
         recent_thread_history=[],
@@ -551,15 +551,43 @@ def test_runtime_recovers_offline_clarifier_with_composed_intent() -> None:
         {
             "run_state": run_state,
             "assistant_prompt": (
-                "I could not generate the clarifying question right now. "
-                "Please try again."
+                "I could not phrase the follow-up clearly just now. Your draft "
+                "is still here; tell me the detail you want to change, or try "
+                "again in a moment."
             ),
         }
     )
 
-    assert "try again" not in result["assistant_prompt"].lower()
-    assert "date window" in result["assistant_prompt"]
-    assert "specific testable rule" in result["assistant_prompt"]
+    assert result["assistant_prompt"].startswith(
+        "I could not phrase the follow-up clearly"
+    )
+    assert "I can test" not in result["assistant_prompt"]
+    assert "Which date window" not in result["assistant_prompt"]
+    assert result["assistant_response"] == result["assistant_prompt"]
+
+
+def test_runtime_does_not_synthesize_slot_copy_for_general_clarification() -> None:
+    run_state = RunState.new(
+        current_user_message="Cambiar fechas",
+        recent_thread_history=[],
+    )
+    run_state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["period"],
+        requested_fields=["date_range"],
+        facts={
+            "language": "es-419",
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": ["AAPL"],
+            },
+        },
+    )
+
+    result = _compose_runtime_response({"run_state": run_state})
+
+    assert "assistant_prompt" not in result
+    assert "assistant_response" not in result
 
 
 def test_runtime_preserves_successful_llm_rule_clarification() -> None:
@@ -950,7 +978,8 @@ async def test_workflow_confirmation_assumption_action_stays_in_clarification() 
     )
 
     assert result["stage_outcome"] == "await_user_reply"
-    assert "supuesto" in result["assistant_response"].lower()
+    assert result["assistant_response"].startswith("No pude formular")
+    assert "I can test" not in result["assistant_response"]
     assert "confirmation_payload" not in result
 
 

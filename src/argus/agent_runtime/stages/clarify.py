@@ -5,7 +5,7 @@ import inspect
 from typing import Protocol
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
-from argus.agent_runtime.clarification_contract import OFFLINE_CLARIFICATION_FALLBACK
+from argus.agent_runtime.clarification_contract import offline_clarification_fallback
 from argus.agent_runtime.llm_clarifier import ClarificationRequest
 from argus.agent_runtime.stages.compose import (
     compose_response_intent,
@@ -251,7 +251,7 @@ async def _generate_clarifying_question(
     language: str,
 ) -> str:
     if clarification_generator is None:
-        return OFFLINE_CLARIFICATION_FALLBACK
+        return offline_clarification_fallback(language=language)
     request = ClarificationRequest(
         current_user_message=state.current_user_message,
         recent_thread_history=state.recent_thread_history,
@@ -270,7 +270,7 @@ async def _generate_clarifying_question(
     else:
         result = clarification_generator(request)
         question = await result if inspect.isawaitable(result) else result
-    return question or OFFLINE_CLARIFICATION_FALLBACK
+    return question or offline_clarification_fallback(language=language)
 
 
 def _composed_prompt_for_response_intent(
