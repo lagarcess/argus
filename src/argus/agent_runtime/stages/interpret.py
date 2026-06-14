@@ -35,6 +35,7 @@ from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
+from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.response_style import (
     result_followup_heading,
     with_response_heading,
@@ -981,6 +982,7 @@ async def _stage_result_from_interpretation(
         assistant_response=interpretation.assistant_response,
         current_user_message=state.current_user_message,
         artifact_target=artifact_target,
+        language=user.language_preference,
     )
     if context_answer is not None:
         return StageResult(
@@ -993,6 +995,7 @@ async def _stage_result_from_interpretation(
         assistant_response=interpretation.assistant_response,
         current_user_message=state.current_user_message,
         capability_contract=capability_contract,
+        language=user.language_preference,
     )
     if supported_strategy_answer is not None:
         return StageResult(
@@ -1008,6 +1011,7 @@ async def _stage_result_from_interpretation(
         assistant_response=interpretation.assistant_response,
         current_user_message=state.current_user_message,
         capability_contract=capability_contract,
+        language=user.language_preference,
     )
     if capability_answer is not None:
         return StageResult(
@@ -1030,6 +1034,7 @@ async def _stage_result_from_interpretation(
         requires_clarification=requires_clarification,
         current_user_message=state.current_user_message,
         capability_contract=capability_contract,
+        language=user.language_preference,
     )
     if unanchored_strategy_recovery is not None:
         return StageResult(
@@ -1043,6 +1048,7 @@ async def _stage_result_from_interpretation(
         requires_clarification=requires_clarification,
         assistant_response=interpretation.assistant_response,
         current_user_message=state.current_user_message,
+        language=user.language_preference,
     )
     if educational_recovery is not None:
         return StageResult(
@@ -1056,6 +1062,7 @@ async def _stage_result_from_interpretation(
         requires_clarification=requires_clarification,
         assistant_response=interpretation.assistant_response,
         current_user_message=state.current_user_message,
+        language=user.language_preference,
     )
     if unhandled_recovery is not None:
         return StageResult(
@@ -1560,6 +1567,7 @@ async def _capability_answer_if_applicable(
     assistant_response: str | None,
     current_user_message: str,
     capability_contract: Any,
+    language: str,
 ) -> str | None:
     if (
         focus is None
@@ -1574,6 +1582,7 @@ async def _capability_answer_if_applicable(
         focus=focus,
         current_user_message=current_user_message,
         capability_contract=capability_contract,
+        language=language,
     )
     if composed:
         return composed
@@ -1589,6 +1598,7 @@ async def _context_curiosity_answer_if_applicable(
     assistant_response: str | None,
     current_user_message: str,
     artifact_target: ArtifactTarget | None,
+    language: str,
 ) -> str | None:
     if (
         focus is None
@@ -1601,10 +1611,14 @@ async def _context_curiosity_answer_if_applicable(
         focus=focus,
         current_user_message=current_user_message,
         artifact_target=artifact_target,
+        language=language,
     )
     if composed:
         return composed
-    return assistant_response or _context_curiosity_recovery_answer(focus)
+    return assistant_response or _context_curiosity_recovery_answer(
+        focus,
+        language=language,
+    )
 
 
 async def _compose_natural_capability_answer(
@@ -1612,6 +1626,7 @@ async def _compose_natural_capability_answer(
     focus: CapabilityQuestionFocus,
     current_user_message: str,
     capability_contract: Any,
+    language: str = "en",
 ) -> str | None:
     fact_packet = compose_capability_answer(
         focus=focus,
@@ -1622,7 +1637,8 @@ async def _compose_natural_capability_answer(
             "role": "system",
             "content": (
                 "You are Argus, a chat-first investing experimentation assistant. "
-                "Answer in warm, plain English. Keep it concise and useful for a "
+                f"{response_language_instruction(language)} "
+                "Answer in warm, plain language. Keep it concise and useful for a "
                 "normal person. Use the supported-strategy facts as hard bounds. "
                 "Do not invent unsupported strategy families, predictions, or "
                 "investment advice. If the user asks about a concept such as dollar "
@@ -1684,6 +1700,7 @@ async def _supported_strategy_education_repair_if_needed(
     assistant_response: str | None,
     current_user_message: str,
     capability_contract: Any,
+    language: str,
 ) -> str | None:
     if (
         semantic_turn_act != "educational_question"
@@ -1695,6 +1712,7 @@ async def _supported_strategy_education_repair_if_needed(
         focus="supported_strategies",
         current_user_message=current_user_message,
         capability_contract=capability_contract,
+        language=language,
     )
 
 
@@ -1921,6 +1939,7 @@ async def _compose_natural_context_curiosity_answer(
     focus: ContextQuestionFocus,
     current_user_message: str,
     artifact_target: ArtifactTarget | None,
+    language: str = "en",
 ) -> str | None:
     fact_packet = _context_curiosity_fact_packet(focus)
     live_facts = await _live_context_curiosity_facts(focus)
@@ -1928,6 +1947,7 @@ async def _compose_natural_context_curiosity_answer(
         return _packet_grounded_context_recovery_answer(
             focus=focus,
             live_facts=live_facts,
+            language=language,
         )
     provenance_rule = (
         "If you use visible artifact context, say so naturally with phrases like "
@@ -1940,7 +1960,8 @@ async def _compose_natural_context_curiosity_answer(
             "role": "system",
             "content": (
                 "You are Argus, a chat-first investing experimentation assistant. "
-                "Answer broad market or macro curiosity in warm, plain English. "
+                f"{response_language_instruction(language)} "
+                "Answer broad market or macro curiosity in warm, plain language. "
                 "Keep it concise. The opening sentence must give useful investing "
                 "context, not an apology, greeting, or capability rejection. Explain "
                 "any product boundary after the context and only if needed. Offer a "
@@ -2002,6 +2023,7 @@ async def _compose_natural_context_curiosity_answer(
         return _packet_grounded_context_recovery_answer(
             focus=focus,
             live_facts=live_facts,
+            language=language,
         )
     except Exception:
         return None
@@ -2213,16 +2235,16 @@ def _packet_grounded_context_recovery_answer(
     *,
     focus: ContextQuestionFocus,
     live_facts: _LiveContextCuriosityFacts,
+    language: str,
 ) -> str:
     if focus == "market_movers" and live_facts.packet_symbols:
         seeds = _join_context_symbols(live_facts.packet_symbols[:5])
-        return (
-            f"A short-lived movers snapshot can help pick experiment seeds: {seeds}. "
-            "Treat those as symbols to validate, not recommendations or a live "
-            "ranking. Pick one, and I can test buy-and-hold, recurring buys, or a "
-            "supported indicator rule over a historical window."
+        return recovery_message(
+            "context_market_movers_seed_recovery",
+            language=language,
+            seeds=seeds,
         )
-    return _context_curiosity_recovery_answer(focus)
+    return _context_curiosity_recovery_answer(focus, language=language)
 
 
 def _join_context_symbols(symbols: tuple[str, ...]) -> str:
@@ -2256,23 +2278,16 @@ def _supported_experiment_fact_packet() -> str:
     )
 
 
-def _context_curiosity_recovery_answer(focus: ContextQuestionFocus) -> str:
+def _context_curiosity_recovery_answer(
+    focus: ContextQuestionFocus,
+    *,
+    language: str,
+) -> str:
     if focus == "macro_context":
-        return (
-            "Macro conditions can be useful context for a historical test. Give me "
-            "a strategy or symbol and I can help compare how it behaved across "
-            "different rate or inflation backdrops."
-        )
+        return recovery_message("context_macro_recovery", language=language)
     if focus == "corporate_events":
-        return (
-            "Corporate events are most useful when tied to a symbol and period. "
-            "Give me an equity ticker and I can use events like splits or dividends "
-            "as context around a historical test."
-        )
-    return (
-        "A market move can be a useful starting point for an experiment. Give me "
-        "a symbol or idea and I can turn it into a historical test instead of a feed."
-    )
+        return recovery_message("context_corporate_events_recovery", language=language)
+    return recovery_message("context_market_movers_recovery", language=language)
 
 
 async def _unanchored_strategy_route_answer_if_needed(
@@ -2282,6 +2297,7 @@ async def _unanchored_strategy_route_answer_if_needed(
     requires_clarification: bool,
     current_user_message: str,
     capability_contract: Any,
+    language: str,
 ) -> str | None:
     if (
         "unanchored_strategy_route_suppressed" not in reason_codes
@@ -2292,16 +2308,18 @@ async def _unanchored_strategy_route_answer_if_needed(
     composed = await _compose_unanchored_strategy_recovery_answer(
         current_user_message=current_user_message,
         capability_contract=capability_contract,
+        language=language,
     )
     if composed:
         return composed
-    return _llm_composition_unavailable_recovery_answer()
+    return _llm_composition_unavailable_recovery_answer(language=language)
 
 
 async def _compose_unanchored_strategy_recovery_answer(
     *,
     current_user_message: str,
     capability_contract: Any,
+    language: str = "en",
 ) -> str | None:
     fact_packet = compose_capability_answer(
         focus="supported_strategies",
@@ -2314,7 +2332,8 @@ async def _compose_unanchored_strategy_recovery_answer(
                 "You are Argus, a chat-first investing experimentation assistant. "
                 "The user expressed a broad or vague investing strategy intention, "
                 "but deterministic validation found no executable strategy anchor "
-                "yet. Do not create a draft. Answer in warm, plain English. Give "
+                f"yet. Do not create a draft. {response_language_instruction(language)} "
+                "Answer in warm, plain language. Give "
                 "useful beginner-friendly context, name only supported experiment "
                 "families from the facts, and offer one clear next step. Do not use "
                 "report tone, do not say generic filler like 'I'm here', and do not "
@@ -2342,6 +2361,7 @@ async def _educational_answer_recovery_if_needed(
     requires_clarification: bool,
     assistant_response: str | None,
     current_user_message: str,
+    language: str,
 ) -> str | None:
     if (
         semantic_turn_act != "educational_question"
@@ -2351,11 +2371,12 @@ async def _educational_answer_recovery_if_needed(
     ):
         return None
     composed = await _compose_general_educational_answer(
-        current_user_message=current_user_message
+        current_user_message=current_user_message,
+        language=language,
     )
     if composed:
         return composed
-    return _llm_composition_unavailable_recovery_answer()
+    return _llm_composition_unavailable_recovery_answer(language=language)
 
 
 async def _unhandled_response_recovery_if_needed(
@@ -2365,26 +2386,29 @@ async def _unhandled_response_recovery_if_needed(
     requires_clarification: bool,
     assistant_response: str | None,
     current_user_message: str,
+    language: str,
 ) -> str | None:
     if expects_strategy_route or requires_clarification or assistant_response:
         return None
     composed = await _compose_unhandled_conversation_answer(
         semantic_turn_act=semantic_turn_act,
         current_user_message=current_user_message,
+        language=language,
     )
     if composed:
         return composed
-    return _llm_composition_unavailable_recovery_answer()
+    return _llm_composition_unavailable_recovery_answer(language=language)
 
 
-def _llm_composition_unavailable_recovery_answer() -> str:
-    return (
-        "I couldn't shape that cleanly just now. Try giving me an asset and rough "
-        "time window, and I'll turn it into the closest runnable historical test."
-    )
+def _llm_composition_unavailable_recovery_answer(*, language: str) -> str:
+    return recovery_message("interpreter_unavailable", language=language)
 
 
-async def _compose_general_educational_answer(*, current_user_message: str) -> str | None:
+async def _compose_general_educational_answer(
+    *,
+    current_user_message: str,
+    language: str = "en",
+) -> str | None:
     messages = [
         {
             "role": "system",
@@ -2392,7 +2416,8 @@ async def _compose_general_educational_answer(*, current_user_message: str) -> s
                 "You are Argus, a chat-first investing experimentation assistant. "
                 "The structured interpreter identified this as an educational or "
                 "broad investing-curiosity turn but did not produce user-facing prose. "
-                "Answer in warm, plain English. Start with useful context, keep it "
+                f"{response_language_instruction(language)} "
+                "Answer in warm, plain language. Start with useful context, keep it "
                 "concise, avoid report tone, do not name data vendors, do not imply "
                 "live news coverage, and do not give investment advice. End with one "
                 "nearby historical experiment or recoverable next step when useful."
@@ -2415,6 +2440,7 @@ async def _compose_unhandled_conversation_answer(
     *,
     semantic_turn_act: SemanticTurnAct | None,
     current_user_message: str,
+    language: str = "en",
 ) -> str | None:
     messages = [
         {
@@ -2422,8 +2448,10 @@ async def _compose_unhandled_conversation_answer(
             "content": (
                 "You are Argus, a chat-first investing experimentation assistant. "
                 "The runtime has no executable strategy, no clarification contract, "
-                "and no user-facing answer for this turn. Recover by answering in "
-                "warm, plain English. Do not use report tone. Do not name data "
+                "and no user-facing answer for this turn. "
+                f"{response_language_instruction(language)} "
+                "Recover by answering in warm, plain language. Do not use report tone. "
+                "Do not name data "
                 "vendors, imply live market-news coverage, invent current facts, "
                 "or give investment advice. Preserve continuity of exploration by "
                 "offering one nearby historical experiment or recoverable next step "
@@ -3019,6 +3047,7 @@ async def _active_confirmation_followup_when_interpreter_unavailable(
         setup_phrase=setup_phrase,
         assumptions_response=assumptions_response,
         action_guidance=action_guidance,
+        language=user.language_preference,
     )
     if response is None:
         return None

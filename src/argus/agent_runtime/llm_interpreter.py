@@ -37,6 +37,7 @@ from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
+from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.result_followups import result_followup_fact_bank
 from argus.agent_runtime.rule_specs import (
     executable_rule_spec_from_strategy,
@@ -5395,7 +5396,9 @@ def _executable_strategy_grounding_messages(
                 "the user's choice. Valuation language like cheap, undervalued, or P/E "
                 "is financially valid context, but Argus needs a supported historical "
                 "proxy or explicit baseline before running it. Do not expose provider "
-                "plumbing. Write assistant_response in warm, plain English, with short "
+                "plumbing. "
+                f"{response_language_instruction(request.user.language_preference)} "
+                "Write assistant_response in warm, plain language, with short "
                 "sentences and no report tone. Return only JSON matching the schema."
             ),
         },

@@ -11,6 +11,10 @@ RecoveryMessageCode = Literal[
     "latest_result_followup_unavailable",
     "confirmation_action_guidance",
     "clarification_generation_unavailable",
+    "context_macro_recovery",
+    "context_corporate_events_recovery",
+    "context_market_movers_recovery",
+    "context_market_movers_seed_recovery",
     "runtime_failure",
 ]
 
@@ -89,6 +93,57 @@ RECOVERY_MESSAGES: dict[RecoveryMessageCode, dict[Language, str]] = {
             "No pude formular bien el seguimiento en este momento. Tu borrador "
             "sigue aquí; dime el detalle que quieres cambiar, o intenta de "
             "nuevo en un momento."
+        ),
+    },
+    "context_macro_recovery": {
+        "en": (
+            "Macro conditions can be useful context for a historical test. "
+            "Choose a symbol, strategy, or comparison window and I can help "
+            "frame a supported experiment."
+        ),
+        "es-419": (
+            "Las condiciones macro pueden ser contexto útil para una prueba "
+            "histórica. Elige un símbolo, una estrategia o una ventana de "
+            "comparación y puedo ayudarte a plantear un experimento compatible."
+        ),
+    },
+    "context_corporate_events_recovery": {
+        "en": (
+            "Corporate events are most useful when tied to a symbol and period. "
+            "Choose an equity ticker and I can use events like splits or "
+            "dividends as context around a supported historical test."
+        ),
+        "es-419": (
+            "Los eventos corporativos son más útiles cuando están ligados a un "
+            "símbolo y un periodo. Elige un ticker de acciones y puedo usar "
+            "eventos como splits o dividendos como contexto de una prueba "
+            "histórica compatible."
+        ),
+    },
+    "context_market_movers_recovery": {
+        "en": (
+            "A market move can be a useful starting point for an experiment. "
+            "Choose a symbol or idea and I can turn it into a supported "
+            "historical test instead of a live feed."
+        ),
+        "es-419": (
+            "Un movimiento del mercado puede ser un buen punto de partida para "
+            "un experimento. Elige un símbolo o una idea y puedo convertirlo en "
+            "una prueba histórica compatible, no en un feed en vivo."
+        ),
+    },
+    "context_market_movers_seed_recovery": {
+        "en": (
+            "A short-lived movers snapshot can help pick experiment seeds: "
+            "{seeds}. Treat those as symbols to validate, not recommendations "
+            "or a live ranking. Choose one and I can shape a supported "
+            "historical test."
+        ),
+        "es-419": (
+            "Una foto momentánea de movimientos puede ayudar a elegir semillas "
+            "para un experimento: {seeds}. Trátalas como símbolos por validar, "
+            "no como recomendaciones ni como un ranking en vivo. Elige uno y "
+            "puedo plantear una prueba histórica compatible."
         ),
     },
     "runtime_failure": {

@@ -170,3 +170,20 @@ def test_production_paths_do_not_import_legacy_response_composer() -> None:
                 violations.append(f"{relative_path}: {token}")
 
     assert violations == []
+
+
+def test_runtime_llm_voice_prompts_are_not_english_locked() -> None:
+    """LLM recovery voice must follow locale, not English-only prompt idioms."""
+
+    prompt_files = [
+        "src/argus/agent_runtime/llm_interpreter.py",
+        "src/argus/agent_runtime/stages/interpret.py",
+        "src/argus/agent_runtime/stages/recovery_composer.py",
+    ]
+    violations = [
+        relative_path
+        for relative_path in prompt_files
+        if "plain English" in Path(relative_path).read_text()
+    ]
+
+    assert violations == []

@@ -633,7 +633,7 @@ async def chat_stream(
                 mapping = {
                     "learn_basics": (
                         "I'll keep this beginner-friendly. You can ask me to explain an investing term, "
-                        "walk through an asset in plain English, or set up a simple historical test. "
+                        "walk through an asset in plain language, or set up a simple historical test. "
                         "If you name an asset like Apple or Bitcoin, I'll help you choose a sensible next step."
                     ),
                     "test_stock_idea": (

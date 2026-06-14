@@ -1078,6 +1078,51 @@ def test_market_movers_without_packet_does_not_return_hallucinated_symbols(
     assert "historical test" in answer
 
 
+def test_market_movers_without_packet_uses_user_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completion_calls = 0
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.fetch_alpaca_market_movers_packet",
+        lambda **_: None,
+    )
+
+    async def _fake_chat_completion(**_: Any) -> str:
+        nonlocal completion_calls
+        completion_calls += 1
+        return "Current top movers include TSLA, NVDA, and AAPL right now."
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _fake_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User asks for current top market movers.",
+        semantic_turn_act="educational_question",
+        context_question_focus="market_movers",
+        artifact_target="none",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="cuales son los movimientos fuertes del mercado hoy?",
+        response=response,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert completion_calls == 0
+    assert "prueba histórica compatible" in answer
+    assert "historical test" not in answer
+    assert "TSLA" not in answer
+    assert "NVDA" not in answer
+    assert "AAPL" not in answer
+
+
 def test_empty_educational_turn_uses_chat_tier_recovery_not_blank_response(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -5461,6 +5506,53 @@ def test_interpreter_unavailable_active_confirmation_can_answer_side_question(
     assert "Benchmark: BTC" not in answer
     assert captured["current_user_message"] == "explain what dollar cost averaging means"
     assert "Benchmark: BTC" in captured["assumptions_response"]
+
+
+def test_interpreter_unavailable_active_confirmation_passes_user_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_compose_active_confirmation_interpreter_recovery(
+        **kwargs: Any,
+    ) -> str:
+        captured.update(kwargs)
+        return "Claro, la confirmación sigue lista."
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret."
+        "compose_active_confirmation_interpreter_recovery",
+        fake_compose_active_confirmation_interpreter_recovery,
+        raising=False,
+    )
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Comprar y mantener ETH.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2025-10-14", "end": "2026-06-14"},
+            capital_amount=100000,
+        ),
+        active_confirmation_reference=ArtifactReference(
+            artifact_kind="confirmation",
+            artifact_id="confirmation-1",
+            artifact_status="active",
+        ),
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="que significa esto?",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert captured["language"] == "es-419"
 
 
 def test_interpreter_unavailable_during_assumption_edit_does_not_answer_stale_assumptions() -> None:
