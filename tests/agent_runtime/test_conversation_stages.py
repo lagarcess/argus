@@ -2372,7 +2372,7 @@ def test_confirm_stage_clarifies_non_executable_signal_rule_before_date() -> Non
     assert result.patch["missing_required_fields"] == ["entry_logic"]
 
 
-def test_confirm_stage_blocks_signal_rule_when_window_cannot_cover_warmup() -> None:
+def test_confirm_stage_blocks_canonical_signal_window_when_window_cannot_cover_warmup() -> None:
     state = RunState.new(
         current_user_message=(
             "Test SPY when the 50-day SMA crosses above the 200-day SMA last month."
@@ -2387,6 +2387,16 @@ def test_confirm_stage_blocks_signal_rule_when_window_cannot_cover_warmup() -> N
         date_range="last month",
         entry_logic="50-day SMA crosses above 200-day SMA",
         exit_logic="50-day SMA crosses below 200-day SMA",
+        extra_parameters={
+            "date_range_intent": {
+                "kind": "rolling_window",
+                "count": 1,
+                "unit": "month",
+                "anchor": "today",
+                "confidence": 0.92,
+                "evidence": "last month",
+            }
+        },
         entry_rule={
             "type": "moving_average_crossover",
             "fast_indicator": "sma",

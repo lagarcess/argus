@@ -21,7 +21,7 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
-    resolve_date_range,
+    resolve_executable_date_range,
 )
 from argus.domain.engine_launch.results import (
     is_user_safe_failure_code,
@@ -298,7 +298,10 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         "timeframe": _resolve_optional_value(
             optional_parameters, "timeframe", default="1D"
         ),
-        "date_range": _resolve_date_range(strategy.get("date_range")),
+        "date_range": _resolve_date_range(
+            strategy.get("date_range"),
+            extra_parameters=strategy.get("extra_parameters"),
+        ),
         "entry_rule": _resolve_entry_rule(strategy, strategy_type),
         "exit_rule": _resolve_exit_rule(strategy, strategy_type),
         "rule_spec": (
@@ -899,8 +902,15 @@ def _resolve_symbols(strategy: dict[str, Any]) -> list[str]:
     return []
 
 
-def _resolve_date_range(value: Any) -> dict[str, str]:
-    return resolve_date_range(value).payload
+def _resolve_date_range(
+    value: Any,
+    *,
+    extra_parameters: Any = None,
+) -> dict[str, str]:
+    return resolve_executable_date_range(
+        value,
+        extra_parameters=extra_parameters if isinstance(extra_parameters, dict) else None,
+    ).payload
 
 
 def _resolve_entry_rule(

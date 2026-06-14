@@ -15,7 +15,7 @@ from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 from argus.domain.indicators import executable_indicator_spec
 from argus.domain.slot_normalizer import normalize_template_name
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
-from argus.nlp.natural_time import shift_months
+from argus.nlp.natural_time import resolve_date_range_intent, shift_months
 
 SUPPORTED_STRATEGY_TYPES = {
     "buy_and_hold",
@@ -224,6 +224,47 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
         end=current_date,
         used_default=True,
     )
+
+
+def resolve_executable_date_range(
+    value: Any,
+    *,
+    extra_parameters: Mapping[str, Any] | None = None,
+    today: date | None = None,
+) -> DateRangeResolution:
+    current_date = today or date.today()
+    explicit_resolution = resolve_date_range(value, today=current_date)
+    if not explicit_resolution.used_default:
+        return explicit_resolution
+
+    date_range_intent = (
+        extra_parameters.get("date_range_intent")
+        if isinstance(extra_parameters, Mapping)
+        else None
+    )
+    intent_resolution = resolve_date_range_intent(
+        date_range_intent,
+        today=current_date,
+    )
+    if intent_resolution is not None:
+        start = _parse_date_token(
+            intent_resolution.payload.get("start"),
+            today=current_date,
+            endpoint="start",
+        )
+        end = _parse_date_token(
+            intent_resolution.payload.get("end"),
+            today=current_date,
+            endpoint="end",
+        )
+        if start is not None and end is not None:
+            return DateRangeResolution(
+                label=intent_resolution.label,
+                start=start,
+                end=end,
+            )
+
+    return explicit_resolution
 
 
 def normalize_date_range_candidate(

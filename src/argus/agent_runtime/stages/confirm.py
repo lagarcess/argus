@@ -15,7 +15,7 @@ from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState, StrategySummary
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
-    resolve_date_range,
+    resolve_executable_date_range,
 )
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
@@ -293,6 +293,11 @@ def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, A
     return dict(strategy)
 
 
+def _strategy_extra_parameters(strategy: dict[str, Any]) -> dict[str, Any] | None:
+    extra_parameters = strategy.get("extra_parameters")
+    return extra_parameters if isinstance(extra_parameters, dict) else None
+
+
 def _strategy_with_latest_complete_data_adjustment(
     strategy: dict[str, Any],
 ) -> dict[str, Any]:
@@ -302,7 +307,11 @@ def _strategy_with_latest_complete_data_adjustment(
         return strategy
     today = _today()
     try:
-        resolved = resolve_date_range(strategy.get("date_range"), today=today)
+        resolved = resolve_executable_date_range(
+            strategy.get("date_range"),
+            extra_parameters=_strategy_extra_parameters(strategy),
+            today=today,
+        )
     except (TypeError, ValueError):
         return strategy
     adjustment = latest_complete_data_adjustment(
@@ -397,7 +406,10 @@ def _date_limit_recovery_patch(
                 ],
             },
         )
-    resolved = resolve_date_range(raw_date_range)
+    resolved = resolve_executable_date_range(
+        raw_date_range,
+        extra_parameters=_strategy_extra_parameters(strategy),
+    )
     asset_class = _strategy_asset_class(strategy)
     timeframe = _strategy_timeframe(strategy)
     if asset_class is None:

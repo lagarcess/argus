@@ -14,6 +14,7 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type_from_extracted_fields,
     normalize_date_range_candidate,
     resolve_date_range,
+    resolve_executable_date_range,
     strategy_can_be_approved,
 )
 from argus.agent_runtime.turn_execution_evidence import (
@@ -272,6 +273,26 @@ def test_raw_semantic_date_windows_require_canonical_intent() -> None:
 
     assert rolling is not None
     assert rolling.payload == {"start": "2026-05-01", "end": "2026-06-01"}
+
+
+def test_executable_date_range_prefers_canonical_intent_over_raw_semantic_text() -> None:
+    resolved = resolve_executable_date_range(
+        "last month",
+        extra_parameters={
+            "date_range_intent": {
+                "kind": "rolling_window",
+                "count": 1,
+                "unit": "month",
+                "anchor": "today",
+                "confidence": 0.9,
+                "evidence": "last month",
+            }
+        },
+        today=date(2026, 6, 1),
+    )
+
+    assert resolved.used_default is False
+    assert resolved.payload == {"start": "2026-05-01", "end": "2026-06-01"}
 
 
 def test_spanish_month_year_spans_require_nlp_boundary() -> None:
