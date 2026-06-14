@@ -7734,6 +7734,12 @@ def _structured_interpretation_has_required_shape(
                 draft=draft,
             )
             if missing:
+                if _structured_strategy_missing_fields_can_clarify(
+                    response=response,
+                    draft=draft,
+                    missing=missing,
+                ):
+                    return True
                 return False
         if _llm_signal_strategy_is_underfilled(draft):
             return False
@@ -7749,6 +7755,40 @@ def _structured_interpretation_has_required_shape(
     }:
         return False
     return False
+
+
+def _structured_strategy_missing_fields_can_clarify(
+    *,
+    response: LLMInterpretationResponse,
+    draft: LLMStrategyDraft,
+    missing: list[str],
+) -> bool:
+    if not missing:
+        return False
+    if not response.requires_clarification:
+        return False
+    if not response.missing_required_fields:
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "result_followup",
+        "retry_failed_action",
+        "unsupported_request",
+    }:
+        return False
+    if response.unsupported_constraints:
+        return False
+    if "supported_strategy_capability_conflict_audit" in response.reason_codes:
+        return False
+    strategy_type = executable_strategy_type(draft.model_dump(mode="python"))
+    if strategy_type not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    declared_missing = {
+        _field_path_base(field) for field in response.missing_required_fields
+    }
+    return set(missing).issubset(
+        declared_missing
+    ) and _llm_strategy_draft_has_extractable_fields(draft)
 
 
 def _request_has_failed_action_launch_payload(request: InterpretationRequest) -> bool:
@@ -8233,6 +8273,15 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
     if evidence_spans:
         payload.setdefault("extra_parameters", {})["evidence_spans"] = evidence_spans
     _normalize_llm_domain_slots(payload)
+    field_provenance = _evidence_backed_field_provenance(
+        payload=payload,
+        field_provenance=field_provenance,
+        evidence_spans=evidence_spans,
+    )
+    if field_provenance:
+        payload.setdefault("extra_parameters", {})["field_provenance"] = dict(
+            field_provenance
+        )
     payload["date_range"] = normalize_date_range_candidate(
         payload.get("date_range"),
         raw_user_phrasing=payload.get("raw_user_phrasing"),
@@ -8255,6 +8304,29 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
     return StrategySummary.model_validate(payload)
 
 
+def _evidence_backed_field_provenance(
+    *,
+    payload: dict[str, Any],
+    field_provenance: dict[str, Any],
+    evidence_spans: dict[str, str],
+) -> dict[str, Any]:
+    updated = dict(field_provenance or {})
+    evidence_backed_fields = {
+        "cadence": "explicit_user",
+        "comparison_baseline": "explicit_user",
+        "timeframe": "explicit_user",
+    }
+    for field_name, source in evidence_backed_fields.items():
+        if field_name in updated:
+            continue
+        if field_name not in evidence_spans:
+            continue
+        if payload.get(field_name) in (None, "", [], {}):
+            continue
+        updated[field_name] = source
+    return updated
+
+
 def _normalize_llm_domain_slots(payload: dict[str, Any]) -> None:
     strategy_type = canonical_strategy_type(
         payload.get("strategy_type"),
@@ -8272,8 +8344,7 @@ def _normalize_llm_domain_slots(payload: dict[str, Any]) -> None:
         return
     payload["cadence"] = cadence
     extra_parameters = payload.setdefault("extra_parameters", {})
-    if extra_parameters.get("recurring_cadence") not in (None, "", [], {}):
-        extra_parameters["recurring_cadence"] = cadence
+    extra_parameters["recurring_cadence"] = cadence
 
 
 def _clean_optional_text(value: Any) -> str | None:

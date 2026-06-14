@@ -4,12 +4,14 @@ from dataclasses import dataclass
 
 import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.llm_interpreter import (
     LatestResultRoutingAudit,
     LLMInterpretationResponse,
     LLMStrategyDraft,
     OpenRouterStructuredInterpreter,
 )
+from argus.agent_runtime.runtime import run_agent_turn
 from argus.agent_runtime.stages.interpret import interpret_stage
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -18,6 +20,7 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
     UserState,
 )
+from langgraph.checkpoint.memory import MemorySaver
 
 
 @dataclass(frozen=True)
@@ -30,6 +33,23 @@ class ResolvedAssetStub:
 
 def _test_model_candidates(**_: object) -> list[str]:
     return ["test-model"]
+
+
+def _ethereum_asset_stub(symbol: str) -> ResolvedAssetStub:
+    normalized = str(symbol).strip().casefold()
+    if normalized not in {"eth", "ethereum"}:
+        raise ValueError(symbol)
+    return ResolvedAssetStub("ETH", "crypto", name="Ethereum", raw_symbol=symbol)
+
+
+class RecordingSpanishClarifier:
+    def __init__(self, question: str) -> None:
+        self.question = question
+        self.requests = []
+
+    async def ainvoke(self, request):
+        self.requests.append(request)
+        return self.question
 
 
 def _spanish_confirmation_snapshot(strategy: StrategySummary) -> TaskSnapshot:
@@ -156,6 +176,117 @@ def test_spanish_dca_runtime_canonicalizes_localized_llm_cadence(
     assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
     assert strategy.extra_parameters["language"] == "es-419"
     assert strategy.extra_parameters["evidence_spans"]["cadence"] == "semanalmente"
+
+
+@pytest.mark.asyncio
+async def test_spanish_dca_missing_amount_clarifies_through_workflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        _ethereum_asset_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        _ethereum_asset_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        _test_model_candidates,
+    )
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        if schema_model.__name__ != "LLMInterpretationResponse":
+            return None
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=True,
+            user_goal_summary=(
+                "El usuario quiere comprar ETH semanalmente desde 2022."
+            ),
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing="Compra Ethereum semanalmente desde 2022 hasta hoy",
+                language="es-419",
+                strategy_type="dca_accumulation",
+                strategy_thesis="Comprar ETH de forma recurrente.",
+                asset_universe=["Ethereum"],
+                asset_class="crypto",
+                cadence="weekly",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="since",
+                    start="2022-01-01",
+                    end="today",
+                    evidence="desde 2022 hasta hoy",
+                ),
+                evidence_spans={
+                    "asset_universe": "Ethereum",
+                    "cadence": "semanalmente",
+                    "date_range_intent": "desde 2022 hasta hoy",
+                },
+            ),
+            missing_required_fields=["capital_amount"],
+            semantic_turn_act="new_idea",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    clarifier = RecordingSpanishClarifier(
+        "¿Cuánto quieres comprar en cada compra recurrente?"
+    )
+    workflow = build_workflow(
+        structured_interpreter=OpenRouterStructuredInterpreter(
+            contract=build_default_capability_contract(),
+        ),
+        clarification_generator=clarifier,
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1", language_preference="es-419"),
+        thread_id="spanish-dca-missing-amount",
+        message="Compra Ethereum semanalmente desde 2022 hasta hoy",
+    )
+
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="since",
+            start="2022-01-01",
+            end="today",
+        )
+    )
+
+    assert expected_range is not None
+    assert result["stage_outcome"] == "await_user_reply"
+    assert result["assistant_prompt"] == (
+        "¿Cuánto quieres comprar en cada compra recurrente?"
+    )
+    assert clarifier.requests
+    assert clarifier.requests[0].language == "es-419"
+    assert clarifier.requests[0].response_intent["semantic_needs"] == [
+        "sizing_amount"
+    ]
+    pending = result["pending_strategy"]
+    assert pending["missing_required_fields"] == ["capital_amount"]
+    strategy = pending["strategy"]
+    assert strategy["strategy_type"] == "dca_accumulation"
+    assert strategy["asset_universe"] == ["ETH"]
+    assert strategy["asset_class"] == "crypto"
+    assert strategy["cadence"] == "weekly"
+    assert strategy["date_range"] == expected_range.payload
+    assert "confirmation_payload" not in result
 
 
 def test_spanish_buy_and_hold_runtime_uses_bounded_date_evidence(
@@ -571,6 +702,247 @@ def test_spanish_benchmark_comparison_keeps_benchmark_out_of_asset_universe(
     assert strategy.asset_class == "equity"
     assert strategy.comparison_baseline == "QQQ"
     assert "QQQ" not in strategy.asset_universe
+
+
+def test_spanish_rsi_threshold_relative_window_reaches_confirmation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity", name=symbol),
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity", name=symbol),
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        _test_model_candidates,
+    )
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        if schema_model.__name__ != "LLMInterpretationResponse":
+            return None
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="El usuario quiere probar GOOG con RSI.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=(
+                    "Prueba GOOG con RSI: compra debajo de 30 y vende arriba "
+                    "de 60 en los ultimos 6 meses"
+                ),
+                language="es-419",
+                strategy_type="indicator_threshold",
+                strategy_thesis="Comprar GOOG cuando RSI baja y salir cuando sube.",
+                asset_universe=["GOOG"],
+                asset_class="equity",
+                indicator="rsi",
+                indicator_period=14,
+                entry_threshold=30,
+                exit_threshold=60,
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=6,
+                    unit="month",
+                    anchor="today",
+                    evidence="ultimos 6 meses",
+                ),
+                evidence_spans={
+                    "asset_universe": "GOOG",
+                    "indicator": "RSI",
+                    "entry_threshold": "debajo de 30",
+                    "exit_threshold": "arriba de 60",
+                    "date_range_intent": "ultimos 6 meses",
+                },
+            ),
+            semantic_turn_act="new_idea",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "Prueba GOOG con RSI: compra debajo de 30 y vende arriba de 60 "
+                "en los ultimos 6 meses"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=OpenRouterStructuredInterpreter(
+            contract=build_default_capability_contract(),
+        ),
+    )
+
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=6,
+            unit="month",
+            anchor="today",
+        )
+    )
+
+    assert expected_range is not None
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "indicator_threshold"
+    assert strategy.asset_universe == ["GOOG"]
+    assert strategy.asset_class == "equity"
+    assert strategy.date_range == expected_range.payload
+    assert strategy.extra_parameters["indicator"] == "rsi"
+    assert strategy.extra_parameters["indicator_parameters"] == {
+        "indicator": "rsi",
+        "indicator_period": 14,
+        "entry_threshold": 30,
+        "exit_threshold": 60,
+    }
+    assert strategy.extra_parameters["evidence_spans"]["indicator"] == "RSI"
+
+
+def test_spanish_moving_average_crossover_reaches_confirmation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity", name=symbol),
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity", name=symbol),
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        _test_model_candidates,
+    )
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        if schema_model.__name__ != "LLMInterpretationResponse":
+            return None
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary=(
+                "El usuario quiere probar NVDA con cruce de medias moviles."
+            ),
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=(
+                    "Compra NVDA cuando la media movil de 50 dias cruza arriba "
+                    "de la de 200 dias, ultimo ano"
+                ),
+                language="es-419",
+                strategy_type="signal_strategy",
+                strategy_thesis="Comprar NVDA con cruce alcista de medias.",
+                asset_universe=["NVDA"],
+                asset_class="equity",
+                entry_logic="media movil de 50 dias cruza arriba de la de 200 dias",
+                entry_rule={
+                    "type": "moving_average_crossover",
+                    "fast_indicator": "sma",
+                    "fast_period": 50,
+                    "slow_indicator": "sma",
+                    "slow_period": 200,
+                    "direction": "bullish",
+                },
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=1,
+                    unit="year",
+                    anchor="today",
+                    evidence="ultimo ano",
+                ),
+                evidence_spans={
+                    "asset_universe": "NVDA",
+                    "entry_rule": (
+                        "media movil de 50 dias cruza arriba de la de 200 dias"
+                    ),
+                    "date_range_intent": "ultimo ano",
+                },
+            ),
+            semantic_turn_act="new_idea",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "Compra NVDA cuando la media movil de 50 dias cruza arriba de "
+                "la de 200 dias, ultimo ano"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=OpenRouterStructuredInterpreter(
+            contract=build_default_capability_contract(),
+        ),
+    )
+
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=1,
+            unit="year",
+            anchor="today",
+        )
+    )
+
+    assert expected_range is not None
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "signal_strategy"
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.asset_class == "equity"
+    assert strategy.date_range == expected_range.payload
+    assert strategy.entry_logic == "50-day SMA crosses above 200-day SMA"
+    assert strategy.entry_rule == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    assert strategy.exit_logic == "50-day SMA crosses below 200-day SMA"
+    assert strategy.exit_rule == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bearish",
+    }
 
 
 def test_spanish_currency_pair_timeframe_reaches_confirmation(
