@@ -86,6 +86,7 @@ class FakeStructuredModel:
         schema_name = getattr(self.schema, "__name__", "")
         if schema_name == "ResultBreakdownDraft":
             return self.schema(  # type: ignore[misc, operator]
+                language_quality="matches_prompt_language",
                 sections=[
                     {
                         "heading": "Reading the run",
@@ -150,6 +151,7 @@ class FakeBreakdownSchemaClient:
             return self.response
         schema = kwargs["schema_model"]
         return schema(
+            language_quality="matches_prompt_language",
             sections=[
                 {
                     "heading": "Reading the run",
@@ -221,12 +223,15 @@ def test_interpretation_profile_has_bounded_reasoning_for_semantic_repair() -> N
     assert profile.reasoning_effort == "medium"
 
 
-def test_interpretation_repair_uses_context_tier_high_reasoning() -> None:
+def test_interpretation_repair_uses_structured_tier_without_reasoning() -> None:
     profile = openrouter_profile_for_task("interpretation_repair")
 
-    assert openrouter.openrouter_model_tier_for_task("interpretation_repair") == "context"
+    assert (
+        openrouter.openrouter_model_tier_for_task("interpretation_repair")
+        == "structured"
+    )
     assert profile.temperature == 0
-    assert profile.reasoning_effort == "high"
+    assert profile.reasoning_effort == "none"
     assert profile.timeout_seconds == 20
 
 
@@ -413,6 +418,122 @@ def test_result_breakdown_uses_direct_json_schema_client(monkeypatch) -> None:
     assert fake_schema.calls[0]["schema_model"].__name__ == "ResultBreakdownDraft"
     assert fake_schema.calls[0]["schema_name"] == "ResultBreakdownDraft"
     assert fake_schema.calls[0]["context_packet_ids"] == ["packet-1"]
+
+
+def test_result_breakdown_prompt_carries_product_language_contract() -> None:
+    from argus.api.chat.breakdown import _result_breakdown_llm_messages
+
+    messages = _result_breakdown_llm_messages(
+        fact_bank={
+            "symbols": "AAPL",
+            "total_return": "+46.7%",
+            "benchmark_symbol": "SPY",
+            "caveat": "Evidencia historica, no asesoría.",
+        },
+        required_fact_ids={"symbols", "total_return", "caveat"},
+        language="es-419",
+    )
+
+    assert "product_language" in messages[0]["content"]
+    assert "language_quality" in messages[0]["content"]
+    assert "es-419" in messages[1]["content"]
+
+
+def test_spanish_result_breakdown_rejects_mixed_language_llm_output() -> None:
+    from argus.api.chat import breakdown as chat_service
+
+    fake_schema = FakeBreakdownSchemaClient(
+        {
+            "language_quality": "mixed_or_wrong_language",
+            "sections": [
+                {
+                    "heading": "Setup",
+                    "parts": [
+                        {"kind": "text", "text": "Here's the deeper read."},
+                        {"kind": "fact", "fact_id": "title"},
+                        {"kind": "fact", "fact_id": "symbols"},
+                        {"kind": "fact", "fact_id": "date_range"},
+                        {"kind": "fact", "fact_id": "total_return"},
+                        {"kind": "fact", "fact_id": "benchmark_symbol"},
+                        {"kind": "fact", "fact_id": "benchmark_return"},
+                        {"kind": "fact", "fact_id": "benchmark_comparison"},
+                        {"kind": "fact", "fact_id": "max_drawdown"},
+                        {"kind": "fact", "fact_id": "assumptions"},
+                        {"kind": "fact", "fact_id": "caveat"},
+                    ],
+                }
+            ],
+        }
+    )
+
+    text = chat_service.llm_result_breakdown_message(
+        {
+            "title": "AAPL Comprar y mantener",
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "date_range": "14 de junio de 2025 al 12 de junio de 2026",
+            "raw_metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 46.7,
+                        "benchmark_return_pct": 23.1,
+                        "delta_vs_benchmark_pct": 23.6,
+                        "max_drawdown_pct": -13.8,
+                    }
+                }
+            },
+            "assumptions": ["Solo largo.", "Referencia: SPY."],
+        },
+        language="es-419",
+        invoke_json_schema_func=fake_schema,
+    )
+
+    assert text is None
+
+
+def test_spanish_result_breakdown_fallback_is_localized_and_grounded() -> None:
+    from argus.api.chat import breakdown as chat_service
+
+    text = chat_service.fallback_result_breakdown_message(
+        {
+            "title": "AAPL Comprar y mantener",
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "date_range": "14 de junio de 2025 al 12 de junio de 2026",
+            "raw_metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 46.7,
+                        "benchmark_return_pct": 23.1,
+                        "delta_vs_benchmark_pct": 23.6,
+                        "max_drawdown_pct": -13.8,
+                    }
+                }
+            },
+            "assumptions": ["Solo largo.", "Referencia: SPY."],
+            "config_snapshot": {"template": "buy_and_hold"},
+            "rule_summary": (
+                "Entry rule: buy at the start of the period; exit rule: hold through the end."
+            ),
+        },
+        language="es-419",
+    )
+
+    assert "lectura más detallada" in text
+    assert "**Configuración.**" in text
+    assert "**Cómo leerlo.**" in text
+    assert "**Riesgo y supuestos.**" in text
+    assert "**Siguiente prueba útil.**" in text
+    assert "Regla: compra al inicio del periodo y mantén hasta el final." in text
+    assert "Superó por 23.6 puntos porcentuales" in text
+    assert "Entry rule" not in text
+    assert "exit rule" not in text
+    assert "Beat by" not in text
+    assert "percentage points" not in text
+    assert "Prueba siguiente: Prueba siguiente" not in text
+    assert "Here's the deeper read" not in text
+    assert "Setup" not in text
+    assert "How to read it" not in text
 
 
 def test_result_breakdown_llm_has_hard_action_budget() -> None:
@@ -2865,7 +2986,7 @@ def test_direct_json_schema_payload_uses_interpretation_profile_reasoning(
     assert receipt.failure_mode is None
 
 
-def test_field_fidelity_json_schema_uses_context_route_with_reasoning(
+def test_field_fidelity_json_schema_uses_structured_route_without_reasoning(
     monkeypatch,
 ) -> None:
     observed_payloads: list[dict[str, Any]] = []
@@ -2899,7 +3020,7 @@ def test_field_fidelity_json_schema_uses_context_route_with_reasoning(
             return FakeResponse()
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setenv("ARGUS_CONTEXT_MODEL", "openai/gpt-oss-120b")
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "qwen/qwen3.5-9b")
     monkeypatch.setattr(
         openrouter.httpx, "AsyncClient", lambda **_kwargs: FakeAsyncClient()
     )
@@ -2915,15 +3036,15 @@ def test_field_fidelity_json_schema_uses_context_route_with_reasoning(
 
     assert result is not None
     assert result.capital_amount == 100000
-    assert observed_payloads[0]["model"] == "openai/gpt-oss-120b"
-    assert observed_payloads[0]["reasoning"] == {"effort": "high"}
+    assert observed_payloads[0]["model"] == "qwen/qwen3.5-9b"
+    assert observed_payloads[0]["reasoning"] == {"effort": "none"}
     assert observed_payloads[0]["provider"] == {"require_parameters": True}
     receipts = openrouter.get_openrouter_route_receipts()
     assert len(receipts) == 1
     receipt = receipts[0]
     assert receipt.task == "field_fidelity"
-    assert receipt.tier == "context"
-    assert receipt.model == "openai/gpt-oss-120b"
+    assert receipt.tier == "structured"
+    assert receipt.model == "qwen/qwen3.5-9b"
     assert receipt.schema_name == "StatedRunFieldFidelityAudit"
     assert receipt.outcome == "succeeded"
 

@@ -28,6 +28,43 @@ STALE_CONFIRMATION_ACTION_MESSAGE = (
     "That confirmation was updated. Use the latest card action before continuing."
 )
 
+_ACTION_LABELS = {
+    "en": {
+        "chat.confirmation.actions.run_backtest": "Run backtest",
+        "chat.confirmation.actions.change_dates": "Change dates",
+        "chat.confirmation.actions.change_asset": "Change asset",
+        "chat.confirmation.actions.adjust_assumptions": "Adjust assumptions",
+        "chat.confirmation.actions.cancel": "Cancel",
+        "chat.result_card.explain_result": "Explain result",
+        "chat.result_card.refine_idea": "Refine idea",
+        "chat.result_card.save": "Save",
+        "common.retry": "Retry",
+    },
+    "es-419": {
+        "chat.confirmation.actions.run_backtest": "Ejecutar backtest",
+        "chat.confirmation.actions.change_dates": "Cambiar fechas",
+        "chat.confirmation.actions.change_asset": "Cambiar activo",
+        "chat.confirmation.actions.adjust_assumptions": "Ajustar supuestos",
+        "chat.confirmation.actions.cancel": "Cancelar",
+        "chat.result_card.explain_result": "Explicar resultado",
+        "chat.result_card.refine_idea": "Ajustar idea",
+        "chat.result_card.save": "Guardar",
+        "common.retry": "Reintentar",
+    },
+}
+
+_ACTION_TYPE_LABEL_KEYS = {
+    "run_backtest": "chat.confirmation.actions.run_backtest",
+    "change_dates": "chat.confirmation.actions.change_dates",
+    "change_asset": "chat.confirmation.actions.change_asset",
+    "adjust_assumptions": "chat.confirmation.actions.adjust_assumptions",
+    "cancel_confirmation": "chat.confirmation.actions.cancel",
+    "show_breakdown": "chat.result_card.explain_result",
+    "refine_strategy": "chat.result_card.refine_idea",
+    "save_strategy": "chat.result_card.save",
+    "retry_failed_action": "common.retry",
+}
+
 
 def chat_request_message(payload: ChatStreamRequest) -> str:
     if payload.action is None:
@@ -47,10 +84,26 @@ def chat_request_message(payload: ChatStreamRequest) -> str:
     return action_messages[action_type]
 
 
-def chat_display_message(payload: ChatStreamRequest) -> str:
+def chat_display_message(payload: ChatStreamRequest, *, language: str = "en") -> str:
     if payload.action is None:
         return payload.message or ""
+    label_key = payload.action.label_key or _ACTION_TYPE_LABEL_KEYS.get(
+        payload.action.type
+    )
+    if label_key:
+        localized = _localized_action_label(label_key, language=language)
+        if localized:
+            return localized
     return payload.action.label or chat_request_message(payload)
+
+
+def _localized_action_label(label_key: str, *, language: str) -> str | None:
+    labels = _ACTION_LABELS[_resolve_language(language)]
+    return labels.get(label_key)
+
+
+def _resolve_language(language: str | None) -> str:
+    return "es-419" if (language or "en").lower().startswith("es") else "en"
 
 
 def chat_action_run_id(payload: ChatStreamRequest) -> str | None:

@@ -233,8 +233,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(retry).not.toContain(".match(");
     expect(chat).toContain("const actionLabel = (action: ChatActionOption) =>");
     expect(chat).toContain("{actionLabel(action)}");
+    expect(chat).toContain("const actionDisplayLabel = useCallback");
+    expect(chat).toContain("content: action?.type ? actionDisplayLabel(action) : trimmed");
+    expect(chat).not.toContain("content: action?.label ?? trimmed");
     expect(chat).not.toContain("{action.label}\n                          </button>");
     expect(message).toContain("action.labelKey ? t(action.labelKey, action.label) : action.label");
+    expect(message).toContain(
+      '{displayContent || (message.selectedAction ? actionLabel(message.selectedAction) : "")}',
+    );
     expect(message).toContain("const retryAction = message.actions?.find");
     expect(message).toContain("message.actions?.find(isRetryAction)");
     expect(message).toContain("const footerMessageActions =");
@@ -291,9 +297,11 @@ describe("Argus Alpha frontend contract", () => {
     const css = readFileSync(join(root, "app/globals.css"), "utf-8");
 
     expect(message).toContain("function ResultBreakdown");
-    expect(message).toContain('aria-label="Result breakdown"');
+    expect(message).toContain('ariaLabel={t("chat.result_breakdown.aria_label", "Result breakdown")}');
+    expect(message).toContain('label={t("chat.result_breakdown.label", "Breakdown")}');
     expect(message).toContain("argus-result-section-label");
-    expect(message).toContain("Breakdown");
+    expect(message).toContain("{label}");
+    expect(message).not.toContain("<div className=\"argus-result-section-label\">Breakdown</div>");
     expect(message).toContain('message.contentPresentation === "result_breakdown" && displayContent.trim()');
     expect(chat).toContain('action?.type === "show_breakdown"');
     expect(chat).toContain('contentPresentation:');

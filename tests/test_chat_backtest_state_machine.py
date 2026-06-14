@@ -13,6 +13,28 @@ from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
 
 
+def test_chat_action_display_message_resolves_label_key_by_language() -> None:
+    from argus.api.chat.actions import chat_display_message
+    from argus.api.schemas import ChatStreamRequest
+
+    payload = ChatStreamRequest.model_validate(
+        {
+            "conversation_id": "conversation-1",
+            "language": "es-419",
+            "action": {
+                "type": "show_breakdown",
+                "label": "Explain result",
+                "labelKey": "chat.result_card.explain_result",
+                "presentation": "result",
+                "payload": {"run_id": "run-1"},
+            },
+        }
+    )
+
+    assert chat_display_message(payload, language="es-419") == "Explicar resultado"
+    assert chat_display_message(payload, language="en") == "Explain result"
+
+
 def _client() -> TestClient:
     client = TestClient(app)
     client.post("/api/v1/dev/reset")
@@ -849,6 +871,20 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
         runtime_calls += 1
         return _result_runtime_result()
 
+    breakdown_languages: list[str] = []
+
+    def _forced_breakdown(run: Any, *, language: str = "en") -> ResultBreakdownMessage:
+        breakdown_languages.append(language)
+        return ResultBreakdownMessage(
+            text=fallback_result_breakdown_message(
+                result_breakdown_context(run),
+                language=language,
+            ),
+            source="deterministic_fallback",
+            fallback_used=True,
+            failure_mode="test_forced_fallback",
+        )
+
     monkeypatch.setattr(
         agent_router,
         "stream_agent_turn_events",
@@ -857,12 +893,7 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     monkeypatch.setattr(
         agent_router,
         "result_breakdown_message_with_metadata",
-        lambda run: ResultBreakdownMessage(
-            text=fallback_result_breakdown_message(result_breakdown_context(run)),
-            source="deterministic_fallback",
-            fallback_used=True,
-            failure_mode="test_forced_fallback",
-        ),
+        _forced_breakdown,
     )
     client = _client()
     conversation = _conversation(client)
@@ -928,6 +959,7 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert assistant["metadata"]["result_fact_bank"]["run_id"] == run_id
     assert assistant["metadata"]["result_fact_bank"]["symbols"] == ["AAPL"]
     assert "result_card" not in assistant["metadata"]
+    assert breakdown_languages == ["en"]
 
 
 def test_breakdown_action_emits_working_stage_before_generating_text() -> None:

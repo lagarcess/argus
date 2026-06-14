@@ -1136,6 +1136,12 @@ export default function ChatInterface() {
     resetToEmptyChatSurface();
   }, [conversationId, refreshHistory, resetToEmptyChatSurface]);
 
+  const actionDisplayLabel = useCallback(
+    (action: ChatActionOption) =>
+      action.labelKey ? t(action.labelKey, action.label) : action.label,
+    [t],
+  );
+
   const handleTriggerPrompt = async (_type: 'strategy', customPrompt?: string) => {
     // 1. Switch view
     setCurrentView("chat");
@@ -1226,7 +1232,7 @@ export default function ChatInterface() {
       id: crypto.randomUUID(),
       role: "user",
       kind: action?.type ? "action" : "text",
-      content: action?.label ?? trimmed,
+      content: action?.type ? actionDisplayLabel(action) : trimmed,
       mentions,
       selectedAction: action,
     };

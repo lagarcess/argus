@@ -161,6 +161,10 @@
     "error_load": "No se pudo cargar esa conversación. Inténtalo de nuevo.",
     "error_backtest": "No pude terminar ese turno. Inténtalo otra vez o inicia un chat nuevo si esta conversación venía de una sesión local anterior.",
     "error_generic": "Algo salió mal. Inténtalo de nuevo.",
+    "result_breakdown": {
+      "aria_label": "Desglose del resultado",
+      "label": "Desglose"
+    },
     "result_trust_strip": "Simulación histórica · Sin comisiones/deslizamiento · No es asesoría",
     "result_trust_strip_label": "Contexto de confianza del resultado",
     "asset_class": {

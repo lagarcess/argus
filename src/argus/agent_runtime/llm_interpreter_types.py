@@ -313,14 +313,18 @@ class FocusedDateWindowExtraction(BaseModel):
         default=None,
         description=(
             "Canonical language-neutral temporal intent. Required for relative or "
-            "semantic windows. Do not calculate endpoint dates for relative windows."
+            "semantic windows. A present-anchored lookback duration is complete "
+            "without explicit calendar endpoints. Do not calculate endpoint dates "
+            "for relative windows."
         ),
     )
     date_range: dict[str, str] | None = Field(
         default=None,
         description=(
             "Use only when the user explicitly states calendar endpoints. Values "
-            "must be ISO dates or the canonical sentinel today/current_date."
+            "must be ISO dates or the canonical sentinel today/current_date. Never "
+            "put relative, shorthand, or prose windows in start/end; use "
+            "date_range_intent for those."
         ),
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)

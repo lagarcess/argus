@@ -161,6 +161,10 @@
     "error_load": "Could not load that conversation. Try again.",
     "error_backtest": "I couldn't finish that turn. Try once more, or start a fresh chat if this conversation was restored from an older local session.",
     "error_generic": "Something went wrong. Try again.",
+    "result_breakdown": {
+      "aria_label": "Result breakdown",
+      "label": "Breakdown"
+    },
     "result_trust_strip": "Historical simulation · No fees/slippage · Not advice",
     "result_trust_strip_label": "Result trust context",
     "asset_class": {

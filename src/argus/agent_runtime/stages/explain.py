@@ -46,6 +46,10 @@ QuickTakeEmphasis = Literal[
     "no_trade",
     "neutral",
 ]
+QuickTakeLanguageQuality = Literal[
+    "matches_prompt_language",
+    "mixed_or_wrong_language",
+]
 
 RESULT_READOUT_SOURCE_LLM = "llm_explain_stage"
 RESULT_READOUT_SOURCE_DETERMINISTIC_FALLBACK = "deterministic_fallback"
@@ -109,6 +113,17 @@ class QuickTakeDraft(BaseModel):
         default=None,
         description="Optional compact caveat bullet grounded in fact_bank.",
     )
+    language_quality: QuickTakeLanguageQuality = Field(
+        description=(
+            "Self-audit for every user-facing sentence in takeaway, tested_bullet, "
+            "meaning_bullet, assumption_bullet, and caveat_bullet. Use "
+            "matches_prompt_language only when the prose is fully written in "
+            "prompt_context.language, allowing unchanged symbols, tickers, currency "
+            "codes, numbers, and percentages. Use mixed_or_wrong_language if any "
+            "user-facing phrase remains in a different language or copies internal "
+            "schema/fact-id wording."
+        )
+    )
     next_experiment_option_kinds: list[str] = Field(
         default_factory=list,
         description=(
@@ -148,7 +163,12 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         explanation_context=explanation_context,
     )
     execution_note = result_execution_note(result_facts)
-    rule_summary = result_rule_summary(result_facts)
+    rule_summary = _display_rule_summary(
+        strategy=strategy,
+        result_facts=result_facts,
+        rule_summary=result_rule_summary(result_facts),
+        language=language,
+    )
 
     total_return, benchmark_return, same_period = _resolved_return_metrics(
         result_payload=result_payload,
@@ -284,7 +304,12 @@ async def _llm_explanation(
         language=language,
     )
     execution_note = result_execution_note(result_facts)
-    rule_summary = result_rule_summary(result_facts)
+    rule_summary = _display_rule_summary(
+        strategy=strategy,
+        result_facts=result_facts,
+        rule_summary=result_rule_summary(result_facts),
+        language=language,
+    )
     assumption_summary = _assumption_summary(
         optional_parameters=optional_parameters,
         explanation_context=explanation_context,
@@ -297,6 +322,21 @@ async def _llm_explanation(
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
+    total_return, benchmark_return, same_period = _resolved_return_metrics(
+        result_payload=result_payload,
+        explanation_context=explanation_context,
+    )
+    canonical_takeaway: str | None = None
+    if total_return is not None and benchmark_return is not None:
+        canonical_takeaway = _readout_takeaway(
+            total_return=total_return,
+            benchmark_return=benchmark_return,
+            benchmark_symbol=str(benchmark_contract.get("benchmark_symbol") or ""),
+            same_period=same_period,
+            delta=total_return - benchmark_return,
+            execution_note=execution_note,
+            language=language,
+        )
     fact_context = {
         "tested_summary": tested_summary,
         "execution_note": execution_note,
@@ -340,6 +380,11 @@ async def _llm_explanation(
                 "Benchmark returns belong only to benchmark_contract.benchmark_symbol. "
                 "Write every user-facing field in prompt_context.language. "
                 "If language starts with 'es', write user-facing fields in Spanish. "
+                "Symbols, tickers, currency codes, numbers, and percentages can stay "
+                "unchanged, but internal fact IDs and schema field names are never "
+                "user-facing copy. "
+                "Set language_quality to mixed_or_wrong_language if any rendered "
+                "sentence mixes languages or copies internal field wording. "
                 "Return structured fields so the runtime can validate fact usage; "
                 "do not invent facts or supported next experiment kinds."
                 " For user-facing beat/lagged wording, use the benchmark symbol "
@@ -373,6 +418,13 @@ async def _llm_explanation(
             required_fact_ids=required_fact_ids,
             allowed_next_experiments=allowed_next_experiments,
             relative_performance_truth=relative_performance_truth,
+            tested_line=_tested_readout_line(
+                tested_summary,
+                rule_summary,
+                language=language,
+            ),
+            canonical_takeaway=canonical_takeaway,
+            language=language,
         )
         if rendered is None:
             return _LLMExplanationResult(
@@ -502,9 +554,14 @@ def _render_quick_take_draft(
     required_fact_ids: set[str],
     allowed_next_experiments: Any,
     relative_performance_truth: QuickTakeRelativeClaim,
+    tested_line: str,
+    canonical_takeaway: str | None,
+    language: str,
 ) -> str | None:
     response = _coerce_quick_take_draft(draft)
     if response is None:
+        return None
+    if response.language_quality != "matches_prompt_language":
         return None
     truth = relative_performance_truth
     if truth != "unknown" and response.relative_performance_claim != truth:
@@ -528,9 +585,13 @@ def _render_quick_take_draft(
     ):
         return None
 
-    lines = [_clean_quick_take_line(response.takeaway), ""]
+    tested = _clean_quick_take_line(tested_line)
+    tested_label = "Probado:" if _is_spanish(language) else "Tested:"
+    takeaway = canonical_takeaway or response.takeaway
+    lines = [_clean_quick_take_line(takeaway), ""]
+    if tested:
+        lines.append(f"{tested_label} {tested}")
     for bullet in (
-        response.tested_bullet,
         response.meaning_bullet,
         response.assumption_bullet,
         response.caveat_bullet,
@@ -545,6 +606,8 @@ def _render_quick_take_draft(
 def _coerce_quick_take_draft(value: Any) -> QuickTakeDraft | None:
     if isinstance(value, QuickTakeDraft):
         return value
+    if isinstance(value, dict) and "language_quality" not in value:
+        value = {**value, "language_quality": "matches_prompt_language"}
     try:
         return QuickTakeDraft.model_validate(value)
     except (TypeError, ValidationError):
@@ -771,6 +834,82 @@ def _result_facts_for_explanation(
     ):
         facts["resolved_parameters"] = explanation_context["resolved_parameters"]
     return facts
+
+
+def _display_rule_summary(
+    *,
+    strategy: dict[str, Any],
+    result_facts: dict[str, Any],
+    rule_summary: str | None,
+    language: str,
+) -> str | None:
+    strategy_type = str(
+        strategy.get("strategy_type")
+        or _dict_value(result_facts.get("resolved_strategy"), "strategy_type")
+        or result_facts.get("strategy_type")
+        or ""
+    ).strip()
+    resolved_parameters = (
+        result_facts.get("resolved_parameters")
+        if isinstance(result_facts.get("resolved_parameters"), dict)
+        else {}
+    )
+    if strategy_type == "buy_and_hold":
+        if _is_spanish(language):
+            return "Regla: compra al inicio del periodo y mantén hasta el final."
+        return "Rule: buy at the start of the period and hold through the end."
+    if strategy_type == "dca_accumulation":
+        cadence = _cadence_display_label(
+            strategy.get("cadence") or resolved_parameters.get("cadence"),
+            language=language,
+        )
+        if _is_spanish(language):
+            cadence_phrase = f" con cadencia {cadence}" if cadence else ""
+            return f"Regla: compra de forma recurrente{cadence_phrase} y mantén."
+        cadence_phrase = f" on a {cadence} cadence" if cadence else ""
+        return f"Rule: buy recurring contributions{cadence_phrase} and hold."
+    if strategy_type == "indicator_threshold":
+        indicator = str(
+            resolved_parameters.get("indicator") or strategy.get("indicator") or ""
+        ).strip()
+        entry_threshold = resolved_parameters.get("entry_threshold")
+        exit_threshold = resolved_parameters.get("exit_threshold")
+        if indicator and entry_threshold is not None and exit_threshold is not None:
+            label = indicator.upper()
+            if _is_spanish(language):
+                return (
+                    f"Regla: compra cuando {label} esté en o por debajo de "
+                    f"{entry_threshold}; vende cuando esté en o por encima de "
+                    f"{exit_threshold}."
+                )
+            return (
+                f"Rule: buy when {label} is at or below {entry_threshold}; "
+                f"sell when it is at or above {exit_threshold}."
+            )
+    if _is_spanish(language):
+        return None
+    return rule_summary
+
+
+def _dict_value(value: Any, key: str) -> Any:
+    if isinstance(value, dict):
+        return value.get(key)
+    return None
+
+
+def _cadence_display_label(value: Any, *, language: str) -> str:
+    cadence = str(value or "").strip().lower().replace("-", "_")
+    if not cadence:
+        return ""
+    if _is_spanish(language):
+        return {
+            "daily": "diaria",
+            "weekly": "semanal",
+            "biweekly": "quincenal",
+            "monthly": "mensual",
+            "quarterly": "trimestral",
+        }.get(cadence, cadence.replace("_", " "))
+    return cadence.replace("_", " ")
 
 
 def _optional_parameters(state: RunState) -> dict[str, Any]:

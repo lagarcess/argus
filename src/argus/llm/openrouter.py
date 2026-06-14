@@ -102,14 +102,12 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
         temperature=0,
         max_tokens=2200,
         timeout_seconds=20,
-        reasoning_effort="high",
     ),
     "field_fidelity": OpenRouterProfile(
         "field_fidelity",
         temperature=0,
         max_tokens=900,
         timeout_seconds=20,
-        reasoning_effort="high",
     ),
     "capability_conflict": OpenRouterProfile(
         "capability_conflict",
@@ -137,8 +135,8 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
 
 OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
     "interpretation": "structured",
-    "interpretation_repair": "context",
-    "field_fidelity": "context",
+    "interpretation_repair": "structured",
+    "field_fidelity": "structured",
     "capability_conflict": "context",
     "clarification": "chat",
     "chat_composer": "chat",

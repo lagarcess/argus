@@ -218,20 +218,24 @@ def fallback_private_alpha_save_response() -> str:
     return _fallback_private_alpha_save_response()
 
 
-def result_breakdown_message(run: BacktestRun | None) -> str:
+def result_breakdown_message(run: BacktestRun | None, *, language: str = "en") -> str:
     from argus.api.chat.breakdown import (
         result_breakdown_message as _result_breakdown_message,
     )
 
-    return _result_breakdown_message(run)
+    return _result_breakdown_message(run, language=language)
 
 
-def result_breakdown_message_with_metadata(run: BacktestRun | None) -> Any:
+def result_breakdown_message_with_metadata(
+    run: BacktestRun | None,
+    *,
+    language: str = "en",
+) -> Any:
     from argus.api.chat.breakdown import (
         result_breakdown_message_with_metadata as _result_breakdown_message_with_metadata,
     )
 
-    return _result_breakdown_message_with_metadata(run)
+    return _result_breakdown_message_with_metadata(run, language=language)
 
 
 @router.get("/api/v1/chat/starter-prompts", response_model=StarterPromptsResponse)
@@ -301,8 +305,9 @@ async def chat_stream(
     if current_user_profile is None:
         current_user_profile = user
 
+    language = payload.language or current_user_profile.language or "en"
     request_message = chat_request_message(payload)
-    display_message = chat_display_message(payload)
+    display_message = chat_display_message(payload, language=language)
     onboarding_goal = parse_onboarding_control_message(request_message)
 
     conversation = None
@@ -816,8 +821,17 @@ async def chat_stream(
             )
             yield sse_data({"type": "stage_start", "stage": "explain"})
             receipt_token = begin_openrouter_route_receipt_capture()
+            language = (
+                payload.language
+                or conversation.language
+                or current_user_profile.language
+                or "en"
+            )
             try:
-                breakdown_message = result_breakdown_message_with_metadata(run)
+                breakdown_message = result_breakdown_message_with_metadata(
+                    run,
+                    language=language,
+                )
                 assistant_text = breakdown_message.text
             finally:
                 route_receipts = end_openrouter_route_receipt_capture(receipt_token)

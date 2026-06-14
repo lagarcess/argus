@@ -581,8 +581,11 @@ def test_build_result_card_actions_by_symbol_count() -> None:
     actions = [a["type"] for a in card["actions"]]
     assert actions == ["show_breakdown", "save_strategy", "refine_strategy"]
     assert card["actions"][0]["label"] == "Explain result"
+    assert card["actions"][0]["labelKey"] == "chat.result_card.explain_result"
     assert card["actions"][1]["label"] == "Save"
+    assert card["actions"][1]["labelKey"] == "chat.result_card.save"
     assert card["actions"][2]["label"] == "Refine idea"
+    assert card["actions"][2]["labelKey"] == "chat.result_card.refine_idea"
     labels = [row["label"] for row in card["rows"][:4]]
     assert labels == [
         "Ending value",
@@ -615,6 +618,7 @@ def test_build_result_card_actions_by_symbol_count() -> None:
     # Verify Spanish labels
     card = engine.build_result_card(config, metrics, language="es-419")
     assert card["actions"][1]["label"] == "Guardar"
+    assert card["actions"][1]["labelKey"] == "chat.result_card.save"
 
 
 def test_build_result_card_dca_assumptions_name_recurring_contribution() -> None:
