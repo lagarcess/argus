@@ -920,6 +920,41 @@ async def test_workflow_confirms_runnable_draft_instead_of_optional_settings_pro
 
 
 @pytest.mark.asyncio
+async def test_workflow_confirmation_assumption_action_stays_in_clarification() -> None:
+    workflow = build_workflow(
+        structured_interpreter=None,
+        checkpointer=MemorySaver(),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1", language_preference="es-419"),
+        thread_id="thread-confirmation-assumption-action",
+        message="adjust assumptions",
+        action_context={
+            "type": "adjust_assumptions",
+            "label": "Adjust assumptions",
+            "presentation": "confirmation",
+            "payload": {"confirmation_id": "confirmation-1"},
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert result["stage_outcome"] == "await_user_reply"
+    assert "supuesto" in result["assistant_response"].lower()
+    assert "confirmation_payload" not in result
+
+
+@pytest.mark.asyncio
 async def test_workflow_clears_requested_field_after_chip_answer_confirmation(
     monkeypatch,
 ) -> None:

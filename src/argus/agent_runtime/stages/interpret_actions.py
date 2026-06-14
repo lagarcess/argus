@@ -110,6 +110,7 @@ def structured_action_stage_result_if_applicable(
     state: RunState,
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
+    language: str = "en",
 ) -> StageResult | None:
     action = state.structured_action
     if action is None:
@@ -120,6 +121,7 @@ def structured_action_stage_result_if_applicable(
             snapshot=snapshot,
             requested_failed_action_id=action.failed_action_artifact_id,
             require_requested_failed_action_id=True,
+            language=language,
         )
     if action.presentation == "result":
         return result_action_stage_result_if_applicable(
@@ -178,7 +180,7 @@ def structured_action_stage_result_if_applicable(
     if action_type in CONFIRMATION_EDIT_ACTION_FIELDS:
         requested_field = CONFIRMATION_EDIT_ACTION_FIELDS[action_type]
         return StageResult(
-            outcome="await_user_reply",
+            outcome="needs_clarification",
             stage_patch={
                 "candidate_strategy_draft": pending.model_dump(mode="python"),
                 "assistant_prompt": None,
@@ -192,6 +194,7 @@ def structured_action_stage_result_if_applicable(
                         "strategy": pending.model_dump(mode="python"),
                         "current_user_message": state.current_user_message,
                         "structured_action": action.model_dump(mode="python"),
+                        "language": language,
                     },
                     "options": [],
                 },
@@ -530,6 +533,7 @@ def _retry_failed_action_stage_result(
     snapshot: TaskSnapshot | None,
     requested_failed_action_id: str | None = None,
     require_requested_failed_action_id: bool = False,
+    language: str = "en",
 ) -> StageResult:
     reference = (
         snapshot.latest_failed_action_reference if snapshot is not None else None
@@ -563,6 +567,7 @@ def _retry_failed_action_stage_result(
                     status=retry_status,
                     reference=reference,
                     requested_failed_action_id=requested_failed_action_id,
+                    language=language,
                 )
             },
         )
@@ -583,6 +588,7 @@ def _retry_failed_action_stage_result(
                     status="missing_payload",
                     reference=reference,
                     requested_failed_action_id=requested_failed_action_id,
+                    language=language,
                 )
             },
         )
@@ -602,6 +608,7 @@ def _retry_failed_action_stage_result(
                     status="non_retryable",
                     reference=reference,
                     requested_failed_action_id=requested_failed_action_id,
+                    language=language,
                 )
             },
         )
@@ -623,6 +630,7 @@ def _retry_failed_action_stage_result(
                 status="rebuilt_confirmation",
                 reference=reference,
                 requested_failed_action_id=requested_failed_action_id,
+                language=language,
             ),
         },
     )
@@ -633,6 +641,7 @@ def _retry_failed_action_response_intent(
     status: ArtifactActionRecoveryStatus,
     reference: ArtifactReference | None,
     requested_failed_action_id: str | None,
+    language: str = "en",
 ) -> dict[str, Any]:
     metadata = dict(reference.metadata) if reference is not None else {}
     raw_user_safe_message = metadata.get("user_safe_message") or metadata.get("error")
@@ -649,6 +658,7 @@ def _retry_failed_action_response_intent(
         user_safe_message=user_safe_message,
     )
     payload = facts.model_dump()
+    payload["language"] = language
     if facts.user_safe_message is None:
         payload.pop("user_safe_message", None)
     return {

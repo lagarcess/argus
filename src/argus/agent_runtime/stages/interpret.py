@@ -117,7 +117,6 @@ from argus.agent_runtime.strategy_contract import (
     display_strategy_type,
     executable_strategy_type,
     has_partial_explicit_date_range,
-    resolve_date_range,
 )
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
@@ -143,12 +142,12 @@ from argus.domain.indicators import (
     normalize_indicator_parameters,
 )
 from argus.domain.market_data import resolve_asset
+from argus.llm.openrouter import invoke_openrouter_chat_completion
 from argus.nlp.natural_time import (
     dateparser_languages_for_user_language,
     parse_explicit_date_text,
     resolve_date_range_intent,
 )
-from argus.llm.openrouter import invoke_openrouter_chat_completion
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 _STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
@@ -234,6 +233,7 @@ async def interpret_stage_async(
         state=state,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata or {},
+        language=user.language_preference,
     )
     if structured_action_result is not None:
         return structured_action_result

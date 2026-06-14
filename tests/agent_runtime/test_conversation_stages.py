@@ -56,6 +56,39 @@ def test_clarify_uses_generator_for_missing_required_fields() -> None:
     assert "asset_universe" not in result.patch["assistant_prompt"]
 
 
+def test_clarify_confirmation_action_period_uses_llm_voice_in_spanish() -> None:
+    state = RunState.new(current_user_message="Cambiar fechas", recent_thread_history=[])
+    state.intent = "strategy_drafting"
+    state.requested_field = "date_range"
+    state.missing_required_fields = ["date_range"]
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        capital_amount=100000,
+    )
+    clarifier = RecordingClarifier(
+        "Claro. ¿Qué nuevo rango quieres usar para AAPL?"
+    )
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+        language="es-419",
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == (
+        "Claro. ¿Qué nuevo rango quieres usar para AAPL?"
+    )
+    assert clarifier.requests[0].language == "es-419"
+    assert clarifier.requests[0].response_intent["semantic_needs"] == ["period"]
+    assert clarifier.requests[0].response_intent["facts"]["language"] == "es-419"
+    assert "Which date" not in result.patch["assistant_prompt"]
+
+
 def test_clarify_dca_total_budget_expands_to_execution_details() -> None:
     state = RunState.new(
         current_user_message=(
@@ -511,6 +544,56 @@ def test_multi_field_signal_clarification_uses_plain_language() -> None:
     assert "date window" in prompt
     assert "signal-rule" not in prompt
     assert "direction" not in prompt
+
+
+def test_confirmation_action_period_intent_composes_in_spanish() -> None:
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["period"],
+        requested_fields=["date_range"],
+        facts={
+            "language": "es-419",
+            "strategy": StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+                asset_class="equity",
+            ).model_dump(mode="python"),
+        },
+    )
+
+    prompt = compose_response_intent(state)
+
+    assert prompt is not None
+    assert "AAPL" in prompt
+    assert "Puedo probar comprar y mantener" in prompt
+    assert "rango de fechas" in prompt
+    assert "Which date" not in prompt
+    assert "buy-and-hold" not in prompt
+
+
+def test_confirmation_action_assumption_intent_composes_in_spanish() -> None:
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["assumption"],
+        requested_fields=["assumption"],
+        facts={
+            "language": "es-419",
+            "strategy": StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+                asset_class="equity",
+            ).model_dump(mode="python"),
+        },
+    )
+
+    prompt = compose_response_intent(state)
+
+    assert prompt is not None
+    assert "AAPL" in prompt
+    assert "supuesto" in prompt.lower()
+    assert "Which assumption" not in prompt
 
 
 def test_clarify_unsupported_recovery_uses_generator_over_prefilled_copy() -> None:

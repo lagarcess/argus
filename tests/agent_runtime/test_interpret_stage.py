@@ -2144,7 +2144,7 @@ def test_structured_confirmation_action_rejects_stale_artifact_identity() -> Non
         structured_interpreter=None,
     )
 
-    assert result.outcome == "await_user_reply"
+    assert result.outcome == "needs_clarification"
     assert "confirmation was updated" in result.patch["assistant_prompt"]
     assert "confirmation_payload" not in result.patch
 
@@ -2216,7 +2216,7 @@ def test_confirmation_edit_action_publishes_intent_without_backend_prompt() -> N
         structured_interpreter=None,
     )
 
-    assert result.outcome == "await_user_reply"
+    assert result.outcome == "needs_clarification"
     assert result.patch["assistant_prompt"] is None
     assert result.patch["requested_field"] == "assumption"
     assert result.patch["missing_required_fields"] == ["assumption"]
@@ -5624,6 +5624,7 @@ def test_retry_failed_action_rebuilds_confirmation_instead_of_auto_running() -> 
             "requested_failed_action_id": None,
             "latest_failed_action_id": "failed-action-1",
             "user_safe_message": "market_data_unavailable",
+            "language": "en",
         },
     }
 

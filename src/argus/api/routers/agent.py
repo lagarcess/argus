@@ -894,10 +894,23 @@ async def chat_stream(
                 conversation_id=conversation.id,
                 require_run_id=True,
             )
+            language = (
+                payload.language
+                or conversation.language
+                or current_user_profile.language
+                or "en"
+            )
             turn = (
-                missing_refine_strategy_action_turn(action=payload.action)
+                missing_refine_strategy_action_turn(
+                    action=payload.action,
+                    language=language,
+                )
                 if run is None
-                else refine_strategy_action_turn(run=run, action=payload.action)
+                else refine_strategy_action_turn(
+                    run=run,
+                    action=payload.action,
+                    language=language,
+                )
             )
             assistant_message = create_message(
                 user_id=user.id,

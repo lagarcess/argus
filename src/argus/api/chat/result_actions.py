@@ -14,6 +14,11 @@ MISSING_REFINEMENT_RESULT_MESSAGE = (
     "I could not find the completed backtest to refine. Use Refine strategy from "
     "the latest result card, or run the strategy again."
 )
+MISSING_REFINEMENT_RESULT_MESSAGE_ES = (
+    "No pude encontrar el backtest completado para ajustar la idea. Usa Ajustar "
+    "idea desde la tarjeta de resultado más reciente, o ejecuta la estrategia "
+    "de nuevo."
+)
 
 
 @dataclass(frozen=True)
@@ -28,6 +33,7 @@ def refine_strategy_action_turn(
     *,
     run: BacktestRun,
     action: ChatActionPayload,
+    language: str = "en",
 ) -> ResultActionTurn:
     reference = result_reference_from_run(run)
     strategy = draft_from_result_metadata(reference.metadata)
@@ -47,6 +53,7 @@ def refine_strategy_action_turn(
     )
     response_intent = _refinement_response_intent(
         action=action,
+        language=language,
         latest_run_id=latest_run_id,
         pending_strategy=pending_strategy,
         reference=reference,
@@ -82,7 +89,13 @@ def refine_strategy_action_turn(
 def missing_refine_strategy_action_turn(
     *,
     action: ChatActionPayload,
+    language: str = "en",
 ) -> ResultActionTurn:
+    assistant_text = (
+        MISSING_REFINEMENT_RESULT_MESSAGE_ES
+        if str(language or "").lower().startswith("es")
+        else MISSING_REFINEMENT_RESULT_MESSAGE
+    )
     metadata = {
         "conversation_mode": "result_review",
         "agent_runtime_stage_outcome": "ready_to_respond",
@@ -90,11 +103,11 @@ def missing_refine_strategy_action_turn(
     }
     final_payload = {
         "stage_outcome": "ready_to_respond",
-        "assistant_response": MISSING_REFINEMENT_RESULT_MESSAGE,
+        "assistant_response": assistant_text,
     }
     return ResultActionTurn(
         stage="interpret",
-        assistant_text=MISSING_REFINEMENT_RESULT_MESSAGE,
+        assistant_text=assistant_text,
         metadata=metadata,
         final_payload=final_payload,
     )
@@ -103,6 +116,7 @@ def missing_refine_strategy_action_turn(
 def _refinement_response_intent(
     *,
     action: ChatActionPayload,
+    language: str,
     latest_run_id: str | None,
     pending_strategy: dict[str, Any],
     reference: Any,
@@ -116,6 +130,7 @@ def _refinement_response_intent(
             "structured_action": action.model_dump(mode="python"),
             "latest_run_id": latest_run_id,
             "latest_result_reference": reference.model_dump(mode="python"),
+            "language": language,
         },
         "options": [],
     }

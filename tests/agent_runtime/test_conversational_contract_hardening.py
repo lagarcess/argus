@@ -725,7 +725,6 @@ def test_dca_recurring_amount_with_current_message_evidence_is_preserved(
     from argus.agent_runtime import llm_interpreter as llm_module
     from argus.agent_runtime.llm_interpreter import _validate_capability_boundaries
     from argus.agent_runtime.llm_interpreter_types import (
-        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -3178,7 +3177,7 @@ def test_change_asset_action_publishes_clarification_intent_without_llm() -> Non
     )
 
     assert interpreter.requests == []
-    assert result.outcome == "await_user_reply"
+    assert result.outcome == "needs_clarification"
     assert result.patch["requested_field"] == "asset_universe"
     assert result.patch["missing_required_fields"] == ["asset_universe"]
     assert result.patch["assistant_prompt"] is None
@@ -3230,7 +3229,7 @@ def test_change_dates_action_anchors_to_visible_confirmation_payload() -> None:
     )
 
     assert interpreter.requests == []
-    assert result.outcome == "await_user_reply"
+    assert result.outcome == "needs_clarification"
     assert result.patch["requested_field"] == "date_range"
     draft = result.patch["candidate_strategy_draft"]
     assert draft["strategy_type"] == "dca_accumulation"
@@ -3777,7 +3776,6 @@ def test_dca_contract_audit_skips_educational_turn_with_stale_strategy_baggage()
         _response_needs_dca_contract_audit,
     )
     from argus.agent_runtime.llm_interpreter_types import (
-        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -4286,6 +4284,7 @@ def test_structured_failed_action_retry_rebuilds_confirmation_without_llm() -> N
             "requested_failed_action_id": "failed-action-1",
             "latest_failed_action_id": "failed-action-1",
             "user_safe_message": "market_data_unavailable",
+            "language": "en",
         },
     }
     strategy = result.decision.candidate_strategy_draft
@@ -4342,6 +4341,7 @@ def test_structured_failed_action_recovery_does_not_retry_nonrerunnable_payload(
             "requested_failed_action_id": "failed-action-invalid-date",
             "latest_failed_action_id": "failed-action-invalid-date",
             "user_safe_message": "Date range is outside provider availability.",
+            "language": "en",
         },
     }
 
@@ -4671,7 +4671,6 @@ def test_stated_run_fidelity_removes_inferred_date_endpoint_and_restores_benchma
         _response_from_stated_run_field_fidelity_audit,
     )
     from argus.agent_runtime.llm_interpreter_types import (
-        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
