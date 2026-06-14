@@ -2,19 +2,28 @@ import {
   CalendarDays,
   CheckCircle2,
   CircleSlash2,
+  type LucideIcon,
   Loader2,
   PencilLine,
   Play,
+  PlayCircle,
   Search,
+  Send,
   SlidersHorizontal,
+  TriangleAlert,
 } from "lucide-react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
   artifactLifecycleTone,
   artifactStatusToneClassName,
   type ArtifactStatusTone,
 } from "@/lib/artifact-status-tones";
-import { type ChatActionOption, type StrategyConfirmationPayload } from "./types";
+import {
+  type ChatActionOption,
+  type StrategyConfirmationPayload,
+  type StrategyConfirmationStatus,
+} from "./types";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
 import {
   confirmationActionLabelKey,
@@ -32,6 +41,26 @@ type StrategyConfirmationCardProps = {
 
 const actionClassName =
   "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[12px] font-medium tracking-tight text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22";
+
+const CONFIRMATION_STATUS_ICONS = {
+  could_not_run: TriangleAlert,
+  draft_canceled: CircleSlash2,
+  editing: PencilLine,
+  needs_change: SlidersHorizontal,
+  not_completed: CircleSlash2,
+  ready_to_run: PlayCircle,
+  request_sent: Send,
+  run_complete: CheckCircle2,
+  running: Loader2,
+  updated: PencilLine,
+} satisfies Record<StrategyConfirmationStatus, LucideIcon>;
+
+const TERMINAL_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
+  "could_not_run",
+  "draft_canceled",
+  "not_completed",
+  "run_complete",
+]);
 
 export default function StrategyConfirmationCard({ confirmation, onAction }: StrategyConfirmationCardProps) {
   const { t } = useTranslation();
@@ -124,7 +153,7 @@ function ConfirmationValue({
   t,
 }: {
   row: StrategyConfirmationPayload["rows"][number];
-  t: any;
+  t: TFunction;
 }) {
   if (confirmationRowKey(row) === "assets") {
     return <AssetList symbols={splitSymbolList(row.value)} t={t} />;
@@ -149,7 +178,7 @@ function ConfirmationValue({
   );
 }
 
-function AssetList({ symbols, t }: { symbols: string[]; t: any }) {
+function AssetList({ symbols, t }: { symbols: string[]; t: TFunction }) {
   if (symbols.length === 0) {
     return (
       <dd className="mt-1 text-[15px] font-semibold leading-snug tracking-tight text-[#191c1f] dark:text-white">
@@ -171,43 +200,37 @@ function AssetList({ symbols, t }: { symbols: string[]; t: any }) {
   );
 }
 
-function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: any) {
+function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: TFunction) {
   const status = confirmationStatusFromPayload(confirmation);
   const statusLabel = t(
     confirmationStatusLabelKey(status),
     confirmation.statusLabel?.trim() || confirmationStatusLabel(status),
   );
-  if (status === "running") {
-    return { icon: Loader2, isSpinning: true, statusLabel, tone: artifactLifecycleTone(status) };
-  }
-  if (status === "run_complete") {
-    return { icon: CheckCircle2, isSpinning: false, statusLabel, tone: artifactLifecycleTone(status) };
-  }
-  if (status === "could_not_run") {
-    return { icon: CircleSlash2, isSpinning: false, statusLabel, tone: artifactLifecycleTone(status) };
-  }
-  if (status === "draft_canceled") {
-    return { icon: CircleSlash2, isSpinning: false, statusLabel, tone: artifactLifecycleTone(status) };
-  }
   const tone: ArtifactStatusTone =
-    confirmation.confirmation_state === "active" ? "info" : artifactLifecycleTone(status);
+    confirmation.confirmation_state === "active" && !TERMINAL_CONFIRMATION_STATUSES.has(status)
+      ? "info"
+      : artifactLifecycleTone(status);
   return {
-    icon: CheckCircle2,
-    isSpinning: false,
+    icon: confirmationStatusIcon(status),
+    isSpinning: status === "running",
     statusLabel,
     tone,
   };
 }
 
+function confirmationStatusIcon(status: StrategyConfirmationStatus): LucideIcon {
+  return CONFIRMATION_STATUS_ICONS[status];
+}
+
 function displayConfirmationRowLabel(
   row: StrategyConfirmationPayload["rows"][number],
-  t: any,
+  t: TFunction,
 ) {
   const key = confirmationRowLabelKey(row);
   return key ? t(key, row.label) : row.label;
 }
 
-function displayConfirmationActionLabel(action: ChatActionOption, t: any) {
+function displayConfirmationActionLabel(action: ChatActionOption, t: TFunction) {
   const key = confirmationActionLabelKey(action);
   return key ? t(key, action.label) : action.label;
 }

@@ -51,6 +51,26 @@ describe("chat turn artifact UX", () => {
     expect(card).not.toContain("opacity-70");
   });
 
+  test("confirmation status icons follow status semantics instead of localized labels", () => {
+    const card = readFileSync(
+      join(root, "components/chat/StrategyConfirmationCard.tsx"),
+      "utf-8",
+    );
+
+    expect(card).toContain("function confirmationStatusIcon");
+    expect(card).toContain("ready_to_run: PlayCircle");
+    expect(card).toContain("running: Loader2");
+    expect(card).toContain("request_sent: Send");
+    expect(card).toContain("run_complete: CheckCircle2");
+    expect(card).toContain("could_not_run: TriangleAlert");
+    expect(card).toContain("not_completed: CircleSlash2");
+    expect(card).toContain("editing: PencilLine");
+    expect(card).toContain("needs_change: SlidersHorizontal");
+    expect(card).toContain("draft_canceled: CircleSlash2");
+    expect(card).toContain("updated: PencilLine");
+    expect(card).toContain("icon: confirmationStatusIcon(status)");
+  });
+
   test("assistant turn controls render for artifact turns without duplicating card-scoped actions", () => {
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
