@@ -52,11 +52,28 @@ describe("chat turn artifact UX", () => {
     expect(card).toContain("confirmation.confirmation_state === \"active\"");
     expect(card).toContain("confirmationCardViewModel");
     expect(card).toContain("confirmationAssetTitle");
-    expect(card).toContain("assetClassDisplayLabel(confirmation.asset_class");
-    expect(card).toContain("displayAssumptions");
+    expect(card).toContain("confirmationAssumptionDisplay({");
+    expect(card).toContain("assetClass: confirmation.asset_class");
     expect(card).not.toContain("confirmation.rows.slice(0, 3)");
     expect(card).not.toContain("sm:grid-cols-3");
     expect(card).not.toContain("opacity-70");
+  });
+
+  test("confirmation status icons reflect status semantics, not localized labels", () => {
+    const card = readFileSync(
+      join(root, "components/chat/StrategyConfirmationCard.tsx"),
+      "utf-8",
+    );
+
+    expect(card).toContain("function confirmationStatusIcon(status: StrategyConfirmationStatus)");
+    expect(card).toContain('status === "editing"');
+    expect(card).toContain("icon: PencilLine");
+    expect(card).toContain('status === "ready_to_run"');
+    expect(card).toContain("icon: Play");
+    expect(card).toContain('status === "request_sent"');
+    expect(card).toContain("icon: Send");
+    expect(card).toContain('status === "could_not_run"');
+    expect(card).toContain("icon: TriangleAlert");
   });
 
   test("confirmation row identity uses structured keys instead of translated labels", () => {

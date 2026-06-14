@@ -6,7 +6,9 @@ import {
   PencilLine,
   Play,
   Search,
+  Send,
   SlidersHorizontal,
+  TriangleAlert,
 } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -26,6 +28,7 @@ import {
   type ChatActionOption,
   type StrategyConfirmationPayload,
   type StrategyConfirmationRowKey,
+  type StrategyConfirmationStatus,
 } from "./types";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
 import {
@@ -177,25 +180,43 @@ function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: 
     confirmationStatusLabelKey(status),
     confirmation.statusLabel?.trim() || confirmationStatusLabel(status),
   );
+  const statusIcon = confirmationStatusIcon(status);
+  const tone: ArtifactStatusTone =
+    confirmation.confirmation_state === "active" && status === "editing"
+      ? "info"
+      : artifactLifecycleTone(status);
+  return {
+    ...statusIcon,
+    statusLabel,
+    tone,
+  };
+}
+
+function confirmationStatusIcon(status: StrategyConfirmationStatus) {
   if (status === "running") {
-    return { icon: Loader2, isSpinning: true, statusLabel, tone: artifactLifecycleTone(status) };
+    return { icon: Loader2, isSpinning: true };
   }
-  if (status === "run_complete") {
-    return { icon: CheckCircle2, isSpinning: false, statusLabel, tone: artifactLifecycleTone(status) };
+  if (status === "ready_to_run") {
+    return { icon: Play, isSpinning: false };
+  }
+  if (status === "request_sent") {
+    return { icon: Send, isSpinning: false };
   }
   if (status === "could_not_run") {
-    return { icon: CircleSlash2, isSpinning: false, statusLabel, tone: artifactLifecycleTone(status) };
+    return { icon: TriangleAlert, isSpinning: false };
   }
-  if (status === "draft_canceled") {
-    return { icon: CircleSlash2, isSpinning: false, statusLabel, tone: artifactLifecycleTone(status) };
+  if (status === "draft_canceled" || status === "not_completed") {
+    return { icon: CircleSlash2, isSpinning: false };
   }
-  const tone: ArtifactStatusTone =
-    confirmation.confirmation_state === "active" ? "info" : artifactLifecycleTone(status);
+  if (status === "editing") {
+    return { icon: PencilLine, isSpinning: false };
+  }
+  if (status === "needs_change") {
+    return { icon: SlidersHorizontal, isSpinning: false };
+  }
   return {
     icon: CheckCircle2,
     isSpinning: false,
-    statusLabel,
-    tone,
   };
 }
 
