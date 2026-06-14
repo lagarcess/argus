@@ -2853,6 +2853,7 @@ def test_direct_json_schema_payload_uses_interpretation_profile_reasoning(
 
     assert result is not None
     assert observed_payloads[0]["reasoning"] == {"effort": "medium"}
+    assert observed_payloads[0]["provider"] == {"require_parameters": True}
     receipts = openrouter.get_openrouter_route_receipts()
     assert len(receipts) == 1
     receipt = receipts[0]
@@ -2916,6 +2917,7 @@ def test_field_fidelity_json_schema_uses_context_route_with_reasoning(
     assert result.capital_amount == 100000
     assert observed_payloads[0]["model"] == "openai/gpt-oss-120b"
     assert observed_payloads[0]["reasoning"] == {"effort": "high"}
+    assert observed_payloads[0]["provider"] == {"require_parameters": True}
     receipts = openrouter.get_openrouter_route_receipts()
     assert len(receipts) == 1
     receipt = receipts[0]
@@ -2978,6 +2980,7 @@ def test_capability_conflict_json_schema_uses_context_route_with_reasoning(
     assert result.drop_unsupported_strategy_logic is True
     assert observed_payloads[0]["model"] == "openai/gpt-oss-120b"
     assert observed_payloads[0]["reasoning"] == {"effort": "medium"}
+    assert observed_payloads[0]["provider"] == {"require_parameters": True}
     receipts = openrouter.get_openrouter_route_receipts()
     assert len(receipts) == 1
     receipt = receipts[0]

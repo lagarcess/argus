@@ -16,6 +16,7 @@ import {
   type ArtifactStatusTone,
 } from "@/lib/artifact-status-tones";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
+import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import {
   type ChatActionOption,
@@ -201,7 +202,7 @@ function confirmationCardViewModel(
 ) {
   const rows = confirmation.rows.map((row) => ({
     key: confirmationRowKey(row),
-    row,
+    row: displayConfirmationRowValue(row, t),
   }));
   const assetRow = rowForKey(rows, "assets");
   const strategyRow = rowForKey(rows, "strategy");
@@ -252,6 +253,19 @@ function confirmationCardViewModel(
       assetClassLabel,
     ),
   };
+}
+
+function displayConfirmationRowValue(
+  row: StrategyConfirmationPayload["rows"][number],
+  t: TFunction,
+): StrategyConfirmationPayload["rows"][number] {
+  if (confirmationRowKey(row) !== "cadence") {
+    return row;
+  }
+  const displayValue = cadenceDisplayLabel(row.value, t);
+  return displayValue && displayValue !== row.value
+    ? { ...row, value: displayValue }
+    : row;
 }
 
 function isConfirmationRow(

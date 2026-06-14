@@ -1,6 +1,7 @@
 import type { StrategyResultPayload } from "@/components/chat/types";
 import type { AssetClass } from "@/lib/argus-types";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
+import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 
 type MetricLike = {
@@ -44,6 +45,7 @@ export type ResultCardDisplayCopy = {
   allocationLabel: string;
   benchmarkLabel: string;
   cadenceLabel: string;
+  cadenceValueLabel: (cadence: string) => string;
   contributionLabel: string;
   entryRuleLabel: string;
   exitRuleLabel: string;
@@ -88,6 +90,7 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   allocationLabel: "Allocation",
   benchmarkLabel: "Benchmark",
   cadenceLabel: "Cadence",
+  cadenceValueLabel: (cadence) => cadenceDisplayLabel(cadence) ?? cadence,
   contributionLabel: "Contribution",
   entryRuleLabel: "Entry rule",
   exitRuleLabel: "Exit rule",
@@ -359,6 +362,7 @@ function executionFacts(
     resolvedParameters,
     parameters,
     locale,
+    copy,
   );
   const entryRule = assumptionValue(assumptions, "Entry");
   const exitRule = assumptionValue(assumptions, "Exit");
@@ -440,12 +444,13 @@ function contributionFromStructuredFacts(
   resolvedParameters?: Record<string, unknown>,
   parameters?: Record<string, unknown>,
   locale?: string,
+  copy = defaultResultCardDisplayCopy,
 ) {
   const rawCadence =
     stringValue(resolvedParameters?.cadence) ?? stringValue(parameters?.dca_cadence);
   if (!rawCadence) return undefined;
 
-  const cadence = sentenceCase(rawCadence.replace(/_/g, " "));
+  const cadence = copy.cadenceValueLabel(rawCadence);
   const amount = numberValue(resolvedParameters?.capital_amount);
   return {
     cadence,
@@ -488,12 +493,6 @@ function timeframeUnitLabel(unit: string) {
   if (unit === "d") return "day";
   if (unit === "w") return "week";
   return "period";
-}
-
-function sentenceCase(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return trimmed;
-  return `${trimmed[0].toUpperCase()}${trimmed.slice(1).toLowerCase()}`;
 }
 
 function benchmarkFromMetric(result: StrategyResultPayload) {

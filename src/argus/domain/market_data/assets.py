@@ -146,6 +146,9 @@ def _add_aliases(
         base_aliases.add(f"{canonical} USD")
         base_aliases.add(f"{canonical} dollar")
         if base_name:
+            base_aliases.update(
+                _crypto_base_name_aliases(base_name, raw_symbol=record.raw_symbol)
+            )
             base_aliases.add(f"{base_name} usd")
             base_aliases.add(f"{base_name}/usd")
             base_aliases.add(f"{base_name} dollar")
@@ -154,6 +157,31 @@ def _add_aliases(
 
     for alias in base_aliases:
         aliases[alias] = record
+
+
+def _crypto_base_name_aliases(name: str | None, *, raw_symbol: str) -> set[str]:
+    if not name:
+        return set()
+    normalized = name.lower().strip()
+    if not normalized:
+        return set()
+    aliases: set[str] = {normalized}
+    # Provider crypto names are often pair-shaped, for example "Bitcoin / USD".
+    # Only the primary USD quote owns the bare base alias; quote-specific pairs
+    # keep quote-specific aliases so "Bitcoin" does not resolve to BTC/USDC.
+    if "/" in normalized and _crypto_quote_symbol(raw_symbol) == "USD":
+        base, *_ = [part.strip() for part in normalized.split("/") if part.strip()]
+        if base:
+            aliases.add(base)
+    return aliases
+
+
+def _crypto_quote_symbol(raw_symbol: str) -> str | None:
+    normalized = _normalize_symbol(raw_symbol)
+    if "/" not in normalized:
+        return None
+    *_, quote = [part.strip().upper() for part in normalized.split("/") if part.strip()]
+    return quote or None
 
 
 def _load_assets_from_alpaca() -> dict[str, ResolvedAsset]:

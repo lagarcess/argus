@@ -119,6 +119,12 @@ from argus.nlp.natural_time import (
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 _INTERPRETATION_REPAIR_TASK: OpenRouterTask = "interpretation_repair"
+_DATE_EVIDENCE_SPAN_KEYS = (
+    "date_range",
+    "date_range_raw_text",
+    "date_range_intent",
+    "time_window",
+)
 
 
 def _selected_thread_metadata_context(metadata: dict[str, Any]) -> str:
@@ -2373,15 +2379,23 @@ def _dca_contract_missing_fields(
         for field in current_missing
         if str(field).split("[", 1)[0] not in stale_rule_fields
     ]
+    if _llm_value_is_empty(draft.date_range) or has_partial_explicit_date_range(
+        draft.date_range
+    ):
+        resolved_date_range = _date_range_from_intent_or_bounded_evidence(draft)
+        if resolved_date_range is not None:
+            draft.date_range = resolved_date_range
     present_fields: set[str] = set()
     if draft.asset_universe:
         present_fields.add("asset_universe")
     if draft.date_range not in (None, "", [], {}):
         present_fields.add("date_range")
-    if draft.capital_amount is not None:
+    if _dca_draft_has_recurring_amount(draft):
         present_fields.add("capital_amount")
     if draft.cadence not in (None, "", [], {}):
         present_fields.add("cadence")
+    required_fields = ["asset_universe", "date_range", "capital_amount", "cadence"]
+    missing = list(dict.fromkeys([*missing, *required_fields]))
     return [
         field
         for field in missing
@@ -2433,6 +2447,17 @@ def _supported_dca_cadence_value(value: Any) -> str | None:
         if normalized == candidate:
             return candidate
     return None
+
+
+def _dca_draft_has_recurring_amount(draft: LLMStrategyDraft) -> bool:
+    if draft.recurring_contribution is not None:
+        return True
+    if draft.capital_amount is None:
+        return False
+    return _capital_source(draft.field_provenance, "capital_amount") in {
+        "recurring_contribution",
+        "explicit_recurring_contribution",
+    }
 
 
 def _dca_total_budget_source(value: Any) -> str:
@@ -2506,8 +2531,10 @@ async def _dca_contribution_role_audited_response(
         return response
     if audit.recurring_contribution_explicit:
         draft = response.candidate_strategy_draft.model_copy(deep=True)
+        draft.recurring_contribution = draft.capital_amount
         if draft.field_provenance.get("capital_amount") != "recurring_contribution":
             draft.field_provenance["capital_amount"] = "recurring_contribution"
+        draft.field_provenance["recurring_contribution"] = "explicit_user"
         cadence = _supported_dca_cadence_value(draft.cadence)
         missing_required_fields = list(response.missing_required_fields)
         if cadence is not None:
@@ -3126,6 +3153,11 @@ async def _response_ready_for_runtime(
         request=request,
     )
     if conflict_response is not None:
+        conflict_response = await _underfilled_strategy_repaired_response(
+            response=conflict_response,
+            preferred_model=preferred_model,
+            request=request,
+        )
         return await _stated_run_field_audited_response(
             response=conflict_response,
             preferred_model=preferred_model,
@@ -3168,6 +3200,21 @@ async def _response_ready_for_runtime(
                 return context_response
         return response
     if _response_needs_material_evidence_strategy_repair(
+        response=response,
+        request=request,
+    ):
+        repaired_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if repaired_response is not None:
+            return await _stated_run_field_audited_response(
+                response=repaired_response,
+                preferred_model=preferred_model,
+                request=request,
+            )
+    if _response_needs_pre_guidance_focused_strategy_extraction(
         response=response,
         request=request,
     ):
@@ -3334,7 +3381,11 @@ async def _response_ready_for_runtime(
         request=request,
     )
     if conflict_response is not None:
-        response = conflict_response
+        response = await _underfilled_strategy_repaired_response(
+            response=conflict_response,
+            preferred_model=preferred_model,
+            request=request,
+        )
     grounded_response = await _audit_executable_strategy_grounding(
         response=response,
         preferred_model=preferred_model,
@@ -3432,10 +3483,31 @@ async def _stated_run_field_audited_response(
         preferred_model=preferred_model,
         request=request,
     )
-    response = conflict_response or response
+    if conflict_response is not None:
+        response = await _underfilled_strategy_repaired_response(
+            response=conflict_response,
+            preferred_model=preferred_model,
+            request=request,
+        )
     return _response_with_executable_fields_preferred_over_clarification_prose(
         response
     )
+
+
+async def _underfilled_strategy_repaired_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    if _structured_interpretation_has_required_shape(response, request=request):
+        return response
+    repaired_response = await _repair_incomplete_strategy_extraction(
+        failed_response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    return repaired_response or response
 
 
 async def _audit_stated_run_fields(
@@ -3731,7 +3803,7 @@ def _draft_has_semantic_date_window_evidence(draft: LLMStrategyDraft) -> bool:
     evidence_spans = _draft_semantic_evidence_spans(draft)
     return any(
         not _llm_value_is_empty(evidence_spans.get(key))
-        for key in ("date_range", "date_range_raw_text", "time_window")
+        for key in _DATE_EVIDENCE_SPAN_KEYS
     )
 
 
@@ -4667,6 +4739,16 @@ def _response_needs_testable_idea_repair(
         request=request,
     ):
         return True
+    if (
+        response.intent == "unsupported_or_out_of_scope"
+        and response.semantic_turn_act == "unsupported_request"
+        and any(
+            item.category == "unsupported_strategy_logic"
+            for item in response.unsupported_constraints
+        )
+        and bool(draft.raw_user_phrasing or draft.strategy_thesis)
+    ):
+        return True
     if _llm_strategy_draft_has_semantic_execution_anchor(draft):
         return False
     if (
@@ -4847,6 +4929,36 @@ def _response_needs_material_evidence_strategy_repair(
     if _llm_strategy_draft_has_semantic_execution_anchor(draft):
         return False
     return bool(draft.raw_user_phrasing or draft.strategy_thesis)
+
+
+def _response_needs_pre_guidance_focused_strategy_extraction(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if response.semantic_turn_act not in {None, "new_idea"}:
+        return False
+    if response.requires_clarification and response.assistant_response:
+        return False
+    if (
+        response.capability_question_focus is not None
+        or response.context_question_focus is not None
+        or response.unsupported_constraints
+        or response.ambiguous_fields
+    ):
+        return False
+    if not _request_current_turn_has_material_execution_evidence(request):
+        return False
+    draft = response.candidate_strategy_draft
+    if _llm_strategy_draft_has_semantic_execution_anchor(draft):
+        return False
+    return bool(
+        draft.raw_user_phrasing
+        or draft.strategy_thesis
+        or request.current_user_message.strip()
+    )
 
 
 def _vague_strategy_start_as_guidance(
@@ -5228,7 +5340,6 @@ async def _audit_supported_strategy_capability_conflict(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
-    del preferred_model
     if not _response_needs_supported_strategy_capability_conflict_audit(response):
         return None
     messages = _supported_strategy_capability_conflict_messages(
@@ -5258,9 +5369,14 @@ async def _audit_supported_strategy_capability_conflict(
             )
         if strategy_type not in {"buy_and_hold", "dca_accumulation"}:
             return None
-        return _response_with_supported_strategy_capability_conflict_removed(
+        repaired = _response_with_supported_strategy_capability_conflict_removed(
             response=response,
             strategy_type=strategy_type,
+        )
+        return await _dca_contribution_role_audited_response(
+            response=repaired,
+            preferred_model=preferred_model,
+            request=request,
         )
     return None
 
@@ -6617,8 +6733,11 @@ def _focused_strategy_extraction_has_material_fields(
             bool(extraction.asset_class),
             bool(extraction.timeframe),
             bool(extraction.date_range),
+            extraction.date_range_intent is not None,
             bool(extraction.comparison_baseline),
             extraction.capital_amount is not None,
+            extraction.recurring_contribution is not None,
+            bool(extraction.cadence),
             bool(extraction.entry_rule),
             bool(extraction.exit_rule),
             bool(extraction.rule_spec),
@@ -6714,12 +6833,17 @@ def _focused_strategy_extraction_messages(
                 "the message. Do not invent fees, slippage, position size, or provider "
                 "details. If the current message semantically gives a supported "
                 "strategy family, primary asset, benchmark/reference asset, relative "
-                "window, or capital amount, returning null or empty for that field is "
-                "an extraction failure. Do not ask the user to choose a supported "
-                "strategy when the current message already selected one semantically. "
+                "window, capital amount, recurring contribution, or recurring cadence, "
+                "returning null or empty for that field is an extraction failure. Do "
+                "not ask the user to choose a supported strategy when the current "
+                "message already selected one semantically. "
                 "Evidence spans are provenance only. Never put a supported "
                 "strategy, asset, benchmark, time window, or capital amount only "
                 "inside evidence_spans; populate the matching canonical field too. "
+                "date_range_intent is the canonical object field, not an "
+                "evidence_spans key; if a time window is visible, populate "
+                "date_range_raw_text with the exact bounded phrase and "
+                "date_range_intent with the canonical intent. "
                 "is_testable_strategy means the user is asking for a strategy "
                 "or backtest idea; it does not mean Argus can execute every part. For "
                 "clear sentiment, news, fundamental, external-data, or other draft-only "
@@ -6747,7 +6871,9 @@ def _focused_strategy_extraction_messages(
                 "comparison_baseline; it is not unsupported custom logic. Relative windows such as "
                 "'last 8 months' or equivalent phrases in any language must become "
                 "date_range_intent with kind=rolling_window, count, unit, "
-                "anchor=today, confidence, and evidence. Do not ask for exact "
+                "anchor=today, confidence, and evidence. Current-year-to-current-date "
+                "windows in any language must become date_range_intent with "
+                "kind=year_to_date, confidence, and evidence. Do not ask for exact "
                 "endpoint dates when the current message states a relative window. "
                 "Use date_range_raw_text only as bounded evidence for the same "
                 "window, not as the executable date contract. If the user gives a "
@@ -6786,7 +6912,11 @@ def _focused_strategy_extraction_messages(
                 "capital_amount, and date_range_intent when present. Do not ask the "
                 "user to choose buy-and-hold again when the current message already "
                 "semantically selected holding and did not state a separate entry or "
-                "exit rule."
+                "exit rule. A recurring fixed-amount purchase over a period is normal "
+                "user language for the supported dca_accumulation simulation. Preserve "
+                "the asset, recurring_contribution, cadence, capital_amount, and "
+                "date_range_intent when present. Do not route recurring fixed-amount "
+                "buys to unsupported recovery when those executable fields are stated."
             )
         ),
         HumanMessage(content=request.current_user_message),
@@ -6827,6 +6957,8 @@ def _response_from_focused_strategy_extraction(
                 date_range_intent=extraction.date_range_intent,
                 comparison_baseline=extraction.comparison_baseline,
                 capital_amount=extraction.capital_amount,
+                recurring_contribution=extraction.recurring_contribution,
+                cadence=extraction.cadence,
                 entry_logic=entry_logic,
                 exit_logic=exit_logic,
                 indicator=extraction.indicator,
@@ -6834,8 +6966,8 @@ def _response_from_focused_strategy_extraction(
                 entry_threshold=extraction.entry_threshold,
                 exit_threshold=extraction.exit_threshold,
                 evidence_spans=dict(extraction.evidence_spans or {}),
-                field_provenance=_comparison_baseline_provenance(
-                    extraction.comparison_baseline,
+                field_provenance=_focused_extraction_field_provenance(
+                    extraction=extraction,
                     current_message=request.current_user_message,
                 ),
                 extra_parameters={
@@ -6888,6 +7020,8 @@ def _response_from_focused_strategy_extraction(
             date_range_intent=extraction.date_range_intent,
             comparison_baseline=extraction.comparison_baseline,
             capital_amount=extraction.capital_amount,
+            recurring_contribution=extraction.recurring_contribution,
+            cadence=extraction.cadence,
             entry_logic=entry_logic,
             exit_logic=exit_logic,
             entry_rule=extraction.entry_rule,
@@ -6898,8 +7032,8 @@ def _response_from_focused_strategy_extraction(
             entry_threshold=extraction.entry_threshold,
             exit_threshold=extraction.exit_threshold,
             evidence_spans=dict(extraction.evidence_spans or {}),
-            field_provenance=_comparison_baseline_provenance(
-                extraction.comparison_baseline,
+            field_provenance=_focused_extraction_field_provenance(
+                extraction=extraction,
                 current_message=request.current_user_message,
             ),
         ),
@@ -6932,6 +7066,25 @@ def _comparison_baseline_provenance(
 ) -> dict[str, str]:
     del comparison_baseline, current_message
     return {}
+
+
+def _focused_extraction_field_provenance(
+    *,
+    extraction: FocusedStrategyExtraction,
+    current_message: str,
+) -> dict[str, str]:
+    provenance = _comparison_baseline_provenance(
+        extraction.comparison_baseline,
+        current_message=current_message,
+    )
+    if extraction.recurring_contribution is not None:
+        provenance["recurring_contribution"] = "explicit_user"
+        provenance["capital_amount"] = "recurring_contribution"
+    elif extraction.capital_amount is not None:
+        provenance["capital_amount"] = "explicit_user"
+    if extraction.cadence:
+        provenance["cadence"] = "explicit_user"
+    return provenance
 
 
 def _merge_focused_repair_with_base(
@@ -7131,6 +7284,13 @@ def _structured_interpretation_has_required_shape(
         return True
     draft = response.candidate_strategy_draft
     if _llm_strategy_draft_has_extractable_fields(draft):
+        if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
+            missing = _capability_required_missing_fields_for_canonical_strategy(
+                response.missing_required_fields,
+                draft=draft,
+            )
+            if missing:
+                return False
         if _llm_signal_strategy_is_underfilled(draft):
             return False
         if _response_replays_prior_strategy_without_current_turn_update(
@@ -7288,7 +7448,9 @@ def _llm_strategy_draft_has_executable_shape(draft: LLMStrategyDraft) -> bool:
     if strategy_type == "buy_and_hold":
         return bool(draft.asset_universe or draft.date_range)
     if strategy_type == "dca_accumulation":
-        return bool(draft.cadence)
+        return bool(_supported_dca_cadence_value(draft.cadence)) and (
+            _dca_draft_has_recurring_amount(draft)
+        )
     if strategy_type == "signal_strategy":
         return _llm_strategy_draft_has_structured_rule_or_indicator_fields(draft)
     return bool(
@@ -7738,7 +7900,7 @@ def _bounded_date_evidence_candidates(draft: LLMStrategyDraft) -> list[str]:
     if draft.date_range_raw_text:
         candidates.append(draft.date_range_raw_text)
     evidence_spans = draft.evidence_spans or {}
-    for key in ("date_range", "date_range_raw_text", "time_window"):
+    for key in _DATE_EVIDENCE_SPAN_KEYS:
         value = evidence_spans.get(key)
         if value:
             candidates.append(value)

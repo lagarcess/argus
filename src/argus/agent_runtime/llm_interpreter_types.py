@@ -189,11 +189,13 @@ class FocusedStrategyExtraction(BaseModel):
             "Canonical executable strategy family selected by the current user "
             "message. Use buy_and_hold when the user asks in any language to buy, "
             "hold, keep, compare performance, or test one asset over a period "
-            "without a separate entry rule. Use dca_accumulation for recurring "
-            "fixed-amount buys, indicator_threshold for supported indicator "
-            "threshold rules, and signal_strategy for supported signal/crossover "
-            "rules. Leave null only when no executable family is semantically "
-            "selected."
+            "without a separate entry rule, including counterfactual performance "
+            "questions such as what would have happened if the user bought or owned "
+            "the asset over a period. Use dca_accumulation for recurring "
+            "fixed-amount buys and populate cadence plus recurring_contribution. "
+            "Use indicator_threshold for supported indicator threshold rules, and "
+            "signal_strategy for supported signal/crossover rules. Leave null only "
+            "when no executable family is semantically selected."
         ),
     )
     strategy_thesis: str | None = None
@@ -232,7 +234,9 @@ class FocusedStrategyExtraction(BaseModel):
             "Canonical temporal intent for relative or semantic windows. For "
             "phrases equivalent to last/past/previous N days, weeks, months, "
             "quarters, or years in any language, return kind=rolling_window with "
-            "count, unit, anchor=today, confidence, and evidence."
+            "count, unit, anchor=today, confidence, and evidence. For current-year "
+            "to current-date windows in any language, return kind=year_to_date "
+            "with confidence and evidence."
         ),
     )
     comparison_baseline: str | None = Field(
@@ -247,6 +251,22 @@ class FocusedStrategyExtraction(BaseModel):
         description=(
             "User-stated starting capital or recurring contribution amount. "
             "Examples: $1k -> 1000, $500 -> 500."
+        ),
+    )
+    recurring_contribution: float | None = Field(
+        default=None,
+        description=(
+            "User-stated contribution for each recurring DCA buy. Populate this "
+            "for recurring fixed-amount purchases; keep capital_amount equal to "
+            "the same amount unless the user separately states a total budget."
+        ),
+    )
+    cadence: str | None = Field(
+        default=None,
+        description=(
+            "Canonical recurring-buy cadence for DCA, such as daily, weekly, "
+            "biweekly, monthly, or quarterly. Leave null when no recurring cadence "
+            "is stated."
         ),
     )
     entry_logic: str | None = None
@@ -267,8 +287,9 @@ class FocusedStrategyExtraction(BaseModel):
             "Bounded snippets from the current user message that support populated "
             "canonical fields. Evidence spans are provenance only and never replace "
             "strategy_type, asset_universe, comparison_baseline, date_range_intent, "
-            "or capital_amount. If evidence identifies a supported strategy, asset, "
-            "benchmark, or time window, the corresponding canonical field must also "
+            "capital_amount, recurring_contribution, or cadence. If evidence "
+            "identifies a supported strategy, asset, benchmark, time window, "
+            "contribution, or cadence, the corresponding canonical field must also "
             "be populated."
         ),
     )

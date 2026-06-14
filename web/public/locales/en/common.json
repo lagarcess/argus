@@ -168,6 +168,13 @@
       "crypto": "Crypto",
       "currency_pair": "Currency Pair"
     },
+    "cadence": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "biweekly": "Biweekly",
+      "monthly": "Monthly",
+      "quarterly": "Quarterly"
+    },
     "view_details": "View details",
     "new_chat_ready": "New chat ready. What idea should we test?",
     "resume_prompt": "Resuming \"{{title}}\". What would you like to explore next?",

@@ -134,6 +134,25 @@ describe("result card playground", () => {
     expect(dca.details).toContainEqual({ label: "Cadence", value: "Monthly" });
     expect(dca.details).toContainEqual({ label: "Contribution", value: "$250" });
 
+    const spanishDca = heroDeltaEvidenceView(
+      resultCardPlaygroundFixtures.find((fixture) => fixture.id === "dca-result")!.result,
+      {
+        copy: {
+          ...defaultResultCardDisplayCopy,
+          totalContributedLabel: "Total aportado",
+          cadenceLabel: "Cadencia",
+          cadenceValueLabel: (cadence) =>
+            cadence === "monthly" ? "Mensual" : cadence,
+          contributionLabel: "Contribución",
+        },
+        locale: "es-419",
+      },
+    );
+    expect(spanishDca.details).toContainEqual({
+      label: "Cadencia",
+      value: "Mensual",
+    });
+
     const compactProductionShape = heroDeltaEvidenceView({
       ...resultCardPlaygroundFixtures[0].result,
       metrics: [

@@ -7,6 +7,7 @@ import {
 } from "@/lib/result-card-display";
 import { artifactStatusToneClassName } from "@/lib/artifact-status-tones";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
+import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import { isVisibleResultAction } from "@/lib/chat-result-actions";
 import { strategiesEnabled } from "@/lib/private-alpha-flags";
@@ -341,6 +342,7 @@ function resultDisplayCopy(t: ReturnType<typeof useTranslation>["t"]): ResultCar
     allocationLabel: t("chat.result_card.details.allocation", "Allocation"),
     benchmarkLabel: t("chat.result_card.details.benchmark", "Benchmark"),
     cadenceLabel: t("chat.result_card.details.cadence", "Cadence"),
+    cadenceValueLabel: (cadence) => cadenceDisplayLabel(cadence, t) ?? cadence,
     contributionLabel: t(
       "chat.result_card.details.contribution",
       "Contribution",

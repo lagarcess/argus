@@ -526,14 +526,59 @@ async def test_stated_run_field_fidelity_audit_checks_dca_assumption_replies_wit
 
 
 def test_dca_executable_shape_uses_canonical_dca_contract() -> None:
-    assert _llm_strategy_draft_has_executable_shape(
+    assert not _llm_strategy_draft_has_executable_shape(
         LLMStrategyDraft(strategy_type="dca_accumulation", cadence="weekly")
+    )
+    assert _llm_strategy_draft_has_executable_shape(
+        LLMStrategyDraft(
+            strategy_type="dca_accumulation",
+            capital_amount=250,
+            recurring_contribution=250,
+            cadence="weekly",
+            field_provenance={
+                "capital_amount": "recurring_contribution",
+                "recurring_contribution": "explicit_user",
+                "cadence": "explicit_user",
+            },
+        )
     )
     assert not _llm_strategy_draft_has_executable_shape(
         LLMStrategyDraft(
             strategy_type="dca_accumulation",
             entry_rule={"type": "rsi_threshold", "threshold": 30},
         )
+    )
+
+
+def test_structured_interpretation_rejects_underfilled_dca_shape() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Test recurring NVDA buys.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy NVDA weekly over the last year.",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            date_range={"start": "2025-06-13", "end": "2026-06-13"},
+            missing_details=[],
+        ),
+        missing_required_fields=[],
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    assert not interpreter_module._structured_interpretation_has_required_shape(
+        response,
+        request=InterpretationRequest(
+            current_user_message="compraba nvidia cada semana ultimo año",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
     )
 
 
@@ -3436,7 +3481,7 @@ async def test_material_execution_evidence_routes_to_structured_repair_before_ca
         request=request,
     )
 
-    assert calls[0] == "FocusedStrategyExtraction"
+    assert "FocusedStrategyExtraction" in calls
     assert "CapabilitySideQuestionAudit" not in calls
     assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
@@ -3563,7 +3608,7 @@ async def test_anchored_supported_draft_without_date_evidence_gets_schema_repair
         ),
     )
 
-    assert calls[0] == "FocusedStrategyExtraction"
+    assert "FocusedStrategyExtraction" in calls
     assert "FocusedDateWindowExtraction" not in calls
     assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
@@ -6810,7 +6855,7 @@ async def test_underfilled_unsupported_strategy_draft_gets_structured_recovery(
         ),
     )
 
-    assert calls == ["FocusedStrategyExtraction"]
+    assert "FocusedStrategyExtraction" in calls
     assert repaired.intent == "unsupported_or_out_of_scope"
     assert repaired.semantic_turn_act == "unsupported_request"
     assert repaired.unsupported_constraints
@@ -7632,6 +7677,95 @@ async def test_supported_strategy_capability_audit_canonicalizes_raw_multilingua
     assert result.requires_clarification is False
     assert result.semantic_turn_act == "new_idea"
     assert "supported_strategy_capability_conflict_audit" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_supported_strategy_capability_audit_rechecks_dca_money_role(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, model_name
+        calls.append(schema_name)
+        if schema_name == "SupportedStrategyCapabilityConflictAudit":
+            return interpreter_module.SupportedStrategyCapabilityConflictAudit(
+                selected_strategy_type="dca_accumulation",
+                drop_unsupported_strategy_logic=True,
+                keep_unsupported_strategy_logic=False,
+                confidence=0.94,
+            )
+        if schema_name == "DcaContributionRoleAudit":
+            return interpreter_module.DcaContributionRoleAudit(
+                recurring_contribution_explicit=True,
+                total_budget_not_recurring=False,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    message = (
+        "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+    )
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary=message,
+        assistant_response="Las compras recurrentes no están disponibles.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            strategy_thesis=message,
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            capital_amount=250,
+            cadence="weekly",
+            date_range={"start": "2025-06-14", "end": "2026-06-14"},
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value=message,
+                explanation="The model over-routed a supported DCA request.",
+                simplification_labels=["Compare with buy and hold"],
+            )
+        ],
+        missing_required_fields=["entry_logic", "exit_logic"],
+        semantic_turn_act="unsupported_request",
+    )
+
+    audited = await interpreter_module._audit_supported_strategy_capability_conflict(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert audited is not None
+    assert calls == [
+        "SupportedStrategyCapabilityConflictAudit",
+        "DcaContributionRoleAudit",
+    ]
+    draft = audited.candidate_strategy_draft
+    assert draft.strategy_type == "dca_accumulation"
+    assert draft.capital_amount == 250
+    assert draft.recurring_contribution == 250
+    assert draft.field_provenance["capital_amount"] == "recurring_contribution"
+    assert draft.field_provenance["recurring_contribution"] == "explicit_user"
+    assert audited.unsupported_constraints == []
+    assert audited.requires_clarification is False
 
 
 @pytest.mark.asyncio
@@ -9994,7 +10128,7 @@ async def test_dca_contribution_role_audit_preserves_current_recurring_amount(
             asset_class="equity",
             date_range={"end": "2024-12-31"},
             capital_amount=250,
-            cadence=None,
+            cadence="weekly",
             field_provenance={"capital_amount": "starting_capital"},
         ),
         requires_clarification=True,
@@ -10015,6 +10149,7 @@ async def test_dca_contribution_role_audit_preserves_current_recurring_amount(
 
     draft = audited.candidate_strategy_draft
     assert draft.capital_amount == 250
+    assert draft.recurring_contribution == 250
     assert draft.cadence == "weekly"
     assert draft.field_provenance["capital_amount"] == "recurring_contribution"
     assert draft.field_provenance["cadence"] == "explicit_user"
@@ -11130,3 +11265,687 @@ def test_llm_interpreter_preserves_actual_user_phrasing_when_model_rewrites_it(
     assert strategy.raw_user_phrasing == user_message
     assert strategy.strategy_thesis == user_message
     assert strategy.date_range == {"start": "2025-01-01", "end": "today"}
+
+
+def test_focused_strategy_repair_prompt_covers_starter_capability_shapes() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    messages = interpreter_module._focused_strategy_extraction_messages(
+        InterpretationRequest(
+            current_user_message="What if I bought Bitcoin this year so far?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+    prompt = messages[0].content
+
+    assert "year_to_date" in prompt
+    assert "recurring_contribution" in prompt
+    assert "dca_accumulation" in prompt
+    assert "supported buy_and_hold simulation" in prompt
+    assert "recurring fixed-amount purchase" in prompt
+
+
+def test_dca_required_fields_accept_resolved_date_range_intent() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    draft = LLMStrategyDraft(
+        strategy_type="dca_accumulation",
+        asset_universe=["NVDA"],
+        asset_class="equity",
+        capital_amount=250,
+        recurring_contribution=250,
+        cadence="weekly",
+        date_range_intent=interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=1,
+            unit="year",
+            anchor="today",
+        ),
+    )
+
+    missing = interpreter_module._capability_required_missing_fields_for_canonical_strategy(
+        ["date_range"],
+        draft=draft,
+    )
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=1,
+            unit="year",
+            anchor="today",
+        )
+    )
+
+    assert expected_range is not None
+    assert missing == []
+    assert draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_dca_repair_uses_focused_date_audit_from_bounded_evidence_span(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Probar compras recurrentes de Nvidia.",
+                language="es-419",
+                strategy_type="dca_accumulation",
+                strategy_thesis="Comprar $250 de Nvidia cada semana.",
+                asset_universe=["NVDA"],
+                asset_class="equity",
+                capital_amount=250,
+                recurring_contribution=250,
+                cadence="weekly",
+                confidence=0.91,
+                evidence_spans={"date_range_intent": "durante el último año"},
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return interpreter_module.FocusedDateWindowExtraction(
+                has_date_window=True,
+                date_range_raw_text="durante el último año",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=1,
+                    unit="year",
+                    anchor="today",
+                    confidence=0.92,
+                    evidence="durante el último año",
+                ),
+                confidence=0.92,
+                evidence="durante el último año",
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    async def no_conflict_audit(**_kwargs):
+        return None
+
+    async def passthrough_response(**kwargs):
+        return kwargs["response"]
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_asset_grounding_audited_response",
+        passthrough_response,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_capability_side_question_audited_response",
+        passthrough_response,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_context_question_audited_response",
+        passthrough_response,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audit_supported_strategy_capability_conflict",
+        no_conflict_audit,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    message = (
+        "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+    )
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary=message,
+        assistant_response="Las compras recurrentes no están disponibles.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            strategy_thesis=message,
+            asset_universe=["NVDA"],
+            asset_class="equity",
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value=message,
+                explanation="The model over-routed a supported DCA request.",
+                simplification_labels=["Compare with buy and hold"],
+            )
+        ],
+        missing_required_fields=["entry_logic", "exit_logic", "date_range"],
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=1,
+            unit="year",
+            anchor="today",
+        )
+    )
+
+    assert calls[:2] == ["FocusedStrategyExtraction", "FocusedDateWindowExtraction"]
+    assert expected_range is not None
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.unsupported_constraints == []
+    assert ready_response.missing_required_fields == []
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+
+
+@pytest.mark.asyncio
+async def test_counterfactual_bitcoin_ytd_starter_gets_focused_repair(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized in {"BITCOIN", "BTC"}:
+            return ResolvedAssetStub(
+                "BTC",
+                "crypto",
+                name="Bitcoin",
+                raw_symbol=query,
+            )
+        raise ValueError("invalid_symbol")
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Probar Bitcoin en lo que va del año.",
+                language="es-419",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Comprar Bitcoin en lo que va del año.",
+                asset_universe=["Bitcoin"],
+                asset_class="crypto",
+                date_range_raw_text="en lo que va del año",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="year_to_date",
+                    confidence=0.93,
+                    evidence="en lo que va del año",
+                ),
+                confidence=0.91,
+                evidence_spans={
+                    "strategy_type": "compraba Bitcoin",
+                    "asset_universe": "Bitcoin",
+                    "date_range": "en lo que va del año",
+                },
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "_request_current_turn_has_material_execution_evidence",
+        lambda _request: False,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="¿Qué habría pasado si compraba Bitcoin en lo que va del año?",
+        assistant_response="Esa idea necesita una regla de entrada y salida.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "¿Qué habría pasado si compraba Bitcoin en lo que va del año?"
+            ),
+            strategy_thesis=(
+                "¿Qué habría pasado si compraba Bitcoin en lo que va del año?"
+            ),
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="¿Qué habría pasado si compraba Bitcoin en lo que va del año?",
+                explanation="The model over-routed a supported counterfactual purchase.",
+                simplification_labels=["Compare with buy and hold"],
+            )
+        ],
+        missing_required_fields=["entry_logic", "asset_universe", "exit_logic"],
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    request = InterpretationRequest(
+        current_user_message=(
+            "¿Qué habría pasado si compraba Bitcoin en lo que va del año?"
+        ),
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert "FocusedStrategyExtraction" in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.unsupported_constraints == []
+    draft = ready_response.candidate_strategy_draft
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(kind="year_to_date")
+    )
+    assert expected_range is not None
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.asset_universe == ["Bitcoin"]
+    assert draft.asset_class == "crypto"
+    assert draft.date_range == expected_range.payload
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter._to_runtime_interpretation(ready_response, request=request)
+    assert result.candidate_strategy_draft.asset_universe == ["BTC"]
+
+
+@pytest.mark.asyncio
+async def test_weekly_nvidia_dca_starter_gets_focused_repair(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized in {"NVIDIA", "NVDA"}:
+            return ResolvedAssetStub(
+                "NVDA",
+                "equity",
+                name="NVIDIA Corporation",
+                raw_symbol=query,
+            )
+        raise ValueError("invalid_symbol")
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Probar compras recurrentes de Nvidia.",
+                language="es-419",
+                strategy_type="dca_accumulation",
+                strategy_thesis="Comprar $250 de Nvidia cada semana.",
+                asset_universe=["NVDA"],
+                asset_class="equity",
+                capital_amount=250,
+                recurring_contribution=250,
+                cadence="weekly",
+                date_range_raw_text="durante el último año",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=1,
+                    unit="year",
+                    anchor="today",
+                    confidence=0.92,
+                    evidence="durante el último año",
+                ),
+                confidence=0.91,
+                evidence_spans={
+                    "asset_universe": "Nvidia",
+                    "recurring_contribution": "$250",
+                    "cadence": "cada semana",
+                    "date_range": "durante el último año",
+                },
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "_request_current_turn_has_material_execution_evidence",
+        lambda _request: False,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary=(
+            "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+        ),
+        assistant_response="Las compras recurrentes no están disponibles.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+            ),
+            strategy_thesis=(
+                "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+            ),
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            date_range={"start": "2025-06-13", "end": "2026-06-13"},
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value=(
+                    "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+                ),
+                explanation="The model over-routed a supported DCA request.",
+                simplification_labels=["Compare with buy and hold"],
+            )
+        ],
+        missing_required_fields=["entry_logic", "asset_universe", "exit_logic"],
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert "FocusedStrategyExtraction" in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.unsupported_constraints == []
+    draft = ready_response.candidate_strategy_draft
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=1,
+            unit="year",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert draft.strategy_type == "dca_accumulation"
+    assert draft.asset_universe == ["NVDA"]
+    assert draft.asset_class == "equity"
+    assert draft.recurring_contribution == 250
+    assert draft.capital_amount == 250
+    assert draft.cadence == "weekly"
+    assert draft.date_range == expected_range.payload
+    assert draft.field_provenance["capital_amount"] == "recurring_contribution"
+    assert draft.field_provenance["recurring_contribution"] == "explicit_user"
+    assert draft.field_provenance["cadence"] == "explicit_user"
+
+
+@pytest.mark.asyncio
+async def test_dca_capability_conflict_repair_does_not_stop_underfilled(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized in {"NVIDIA", "NVDA"}:
+            return ResolvedAssetStub(
+                "NVDA",
+                "equity",
+                name="NVIDIA Corporation",
+                raw_symbol=query,
+            )
+        raise ValueError("invalid_symbol")
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "SupportedStrategyCapabilityConflictAudit":
+            return interpreter_module.SupportedStrategyCapabilityConflictAudit(
+                selected_strategy_type="dca_accumulation",
+                drop_unsupported_strategy_logic=True,
+                keep_unsupported_strategy_logic=False,
+                confidence=0.92,
+            )
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Probar compras recurrentes de Nvidia.",
+                language="es-419",
+                strategy_type="dca_accumulation",
+                strategy_thesis="Comprar $250 de Nvidia cada semana.",
+                asset_universe=["NVDA"],
+                asset_class="equity",
+                capital_amount=250,
+                recurring_contribution=250,
+                cadence="weekly",
+                date_range_raw_text="durante el último año",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=1,
+                    unit="year",
+                    anchor="today",
+                    confidence=0.92,
+                    evidence="durante el último año",
+                ),
+                confidence=0.91,
+                evidence_spans={
+                    "asset_universe": "Nvidia",
+                    "recurring_contribution": "$250",
+                    "cadence": "cada semana",
+                    "date_range": "durante el último año",
+                },
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary=(
+            "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+        ),
+        assistant_response="Las compras recurrentes no están disponibles.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+            ),
+            strategy_thesis=(
+                "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+            ),
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            date_range={"start": "2025-06-13", "end": "2026-06-13"},
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value=(
+                    "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+                ),
+                explanation="The model over-routed a supported DCA request.",
+                simplification_labels=["dca_accumulation"],
+            )
+        ],
+        missing_required_fields=["entry_logic", "asset_universe", "exit_logic"],
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert calls[:2] == [
+        "SupportedStrategyCapabilityConflictAudit",
+        "FocusedStrategyExtraction",
+    ]
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.missing_required_fields == []
+    draft = ready_response.candidate_strategy_draft
+    assert draft.strategy_type == "dca_accumulation"
+    assert draft.asset_universe == ["NVDA"]
+    assert draft.recurring_contribution == 250
+    assert draft.capital_amount == 250
+    assert draft.cadence == "weekly"
+
+
+@pytest.mark.asyncio
+async def test_vague_guidance_does_not_preempt_focused_strategy_extraction(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized in {"NVIDIA", "NVDA"}:
+            return ResolvedAssetStub(
+                "NVDA",
+                "equity",
+                name="NVIDIA Corporation",
+                raw_symbol=query,
+            )
+        raise ValueError("invalid_symbol")
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Probar compras recurrentes de Nvidia.",
+                language="es-419",
+                strategy_type="dca_accumulation",
+                strategy_thesis="Comprar $250 de Nvidia cada semana.",
+                asset_universe=["NVDA"],
+                asset_class="equity",
+                capital_amount=250,
+                recurring_contribution=250,
+                cadence="weekly",
+                date_range_raw_text="durante el último año",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=1,
+                    unit="year",
+                    anchor="today",
+                    confidence=0.92,
+                    evidence="durante el último año",
+                ),
+                confidence=0.91,
+                evidence_spans={
+                    "asset_universe": "Nvidia",
+                    "recurring_contribution": "$250",
+                    "cadence": "cada semana",
+                    "date_range": "durante el último año",
+                },
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="El usuario quiere probar una idea de inversión.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+            ),
+            strategy_thesis=(
+                "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+            ),
+        ),
+        missing_required_fields=[],
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert "FocusedStrategyExtraction" in calls
+    assert "vague_strategy_start_guidance" not in ready_response.reason_codes
+    assert ready_response.intent == "backtest_execution"
+    draft = ready_response.candidate_strategy_draft
+    assert draft.strategy_type == "dca_accumulation"
+    assert draft.asset_universe == ["NVDA"]
+    assert draft.recurring_contribution == 250
+    assert draft.cadence == "weekly"

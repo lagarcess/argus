@@ -880,6 +880,7 @@ def _json_schema_payload(
                 "schema": schema_model.model_json_schema(),
             },
         },
+        "provider": {"require_parameters": True},
         "temperature": profile.temperature,
         "max_tokens": profile.max_tokens,
     }
