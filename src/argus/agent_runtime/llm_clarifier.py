@@ -318,14 +318,12 @@ def _render_clarification_response(
     request: ClarificationRequest,
 ) -> str:
     question = _collapse_adjacent_duplicate_sentences(response.question.strip())
-    contract_question = _contract_direct_question(request)
-    direct_question = contract_question or response.direct_question.strip()
+    direct_question = response.direct_question.strip()
     if direct_question:
         direct_words = _content_word_set(direct_question)
         sentences = _sentences(question)
         if (
-            not contract_question
-            and direct_words
+            direct_words
             and _is_embedded_direct_question(question, direct_words=direct_words)
             and (
                 not sentences
@@ -339,7 +337,6 @@ def _render_clarification_response(
         context = _clarification_context_without_embedded_question(
             question,
             direct_question=direct_question,
-            keep_first_sentence_only=bool(contract_question),
         )
         if context:
             return f"{context} {direct_question}".strip()
@@ -391,40 +388,11 @@ def _sentence_identity(sentence: str) -> str:
     )
 
 
-def _contract_direct_question(request: ClarificationRequest) -> str:
-    expected_detail_targets = _expected_detail_targets(request)
-    missing_fields = set(request.missing_required_fields)
-    if request.candidate_strategy_draft.strategy_type != "dca_accumulation":
-        return ""
-    if (
-        expected_detail_targets == {
-            "recurring_purchase_amount",
-            "purchase_cadence",
-        }
-        or (
-            {"capital_amount", "cadence"}.issubset(missing_fields)
-            and not {"asset_universe", "date_range"}.intersection(missing_fields)
-        )
-    ):
-        return (
-            "How much should each recurring purchase be, and how often should those "
-            "purchases happen?"
-        )
-    return ""
-
-
 def _clarification_context_without_embedded_question(
     question: str,
     *,
     direct_question: str,
-    keep_first_sentence_only: bool = False,
 ) -> str:
-    if keep_first_sentence_only:
-        context = _first_sentence(question)
-        direct_words = _content_word_set(direct_question)
-        if _is_embedded_direct_question(context, direct_words=direct_words):
-            return ""
-        return context if context != question else ""
     sentences = _sentences(question)
     if not sentences:
         return ""
@@ -531,17 +499,20 @@ def _content_word_set(text: str) -> set[str]:
     }
 
 
-def _first_sentence(question: str) -> str:
-    sentences = _sentences(question)
-    return sentences[0] if sentences else question.strip()
-
-
 def _expected_question_targets(request: ClarificationRequest) -> set[PendingNeedName]:
     raw_needs = request.response_intent.get("semantic_needs")
+    targets: set[PendingNeedName] = set()
     if not isinstance(raw_needs, list):
-        return set()
+        raw_needs = []
     valid_names = set(PendingNeedName.__args__)
-    return {value for value in raw_needs if value in valid_names}
+    targets.update(value for value in raw_needs if value in valid_names)
+    if request.candidate_strategy_draft.strategy_type == "dca_accumulation":
+        missing_fields = set(request.missing_required_fields)
+        if "capital_amount" in missing_fields:
+            targets.add("sizing_amount")
+        if "cadence" in missing_fields:
+            targets.add("schedule")
+    return targets
 
 
 def _expected_detail_targets(

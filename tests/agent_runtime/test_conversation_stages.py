@@ -1006,7 +1006,7 @@ def test_openrouter_clarifier_rejects_vague_dca_detail_response(
     assert receipts[-1].failure_mode == "contract_violation"
 
 
-def test_openrouter_clarifier_renders_dca_contract_question(monkeypatch) -> None:
+def test_openrouter_clarifier_renders_dca_model_direct_question(monkeypatch) -> None:
     async def fake_json_schema(
         *, task, messages, schema_model, schema_name, model_name=None
     ):
@@ -1014,9 +1014,12 @@ def test_openrouter_clarifier_renders_dca_contract_question(monkeypatch) -> None
         return ClarificationResponse(
             question=(
                 "Got it — LYFT, $200k total, from Feb 2020 to Feb 2025. "
-                "To set up the DCA, how often would you like to make purchases?"
+                "To set up the DCA, I need the recurring purchase amount and cadence."
             ),
-            direct_question="How often would you like to make purchases?",
+            direct_question=(
+                "How much should each recurring purchase be, and how often should "
+                "those purchases happen?"
+            ),
             question_targets=["sizing_amount", "schedule"],
             directly_asks_user=True,
             detail_targets=["recurring_purchase_amount", "purchase_cadence"],
@@ -1054,6 +1057,57 @@ def test_openrouter_clarifier_renders_dca_contract_question(monkeypatch) -> None
     assert "How much should each recurring purchase be" in question
     assert "how often should those purchases happen" in question
     assert question.lower().count("how often") == 1
+
+
+def test_openrouter_clarifier_preserves_localized_dca_detail_question(
+    monkeypatch,
+) -> None:
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=(
+                "Entiendo: DCA para ETH. Para hacerlo ejecutable, necesito el monto "
+                "de cada compra y la frecuencia."
+            ),
+            direct_question=(
+                "¿Cuánto quieres comprar en cada operación recurrente y con qué "
+                "frecuencia?"
+            ),
+            question_targets=["sizing_amount", "schedule"],
+            directly_asks_user=True,
+            detail_targets=["recurring_purchase_amount", "purchase_cadence"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message="Compra ETH de forma recurrente desde 2022",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["ETH"],
+                asset_class="crypto",
+                date_range={"start": "2022-01-01", "end": "today"},
+            ),
+            missing_required_fields=["capital_amount", "cadence"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["sizing_amount", "schedule"],
+            },
+            language="es-419",
+        )
+    )
+
+    assert question is not None
+    assert "¿Cuánto quieres comprar" in question
+    assert "con qué frecuencia" in question
+    assert "How much should each recurring purchase be" not in question
 
 
 def test_openrouter_clarifier_preserves_initial_dca_setup_question(
@@ -1385,7 +1439,10 @@ def test_openrouter_clarifier_keeps_decimal_and_abbreviation_in_contract_context
                 "Got it — LYFT with a $200.00 total budget, e.g., your planned "
                 "cap. I need one more detail before this is runnable."
             ),
-            direct_question="How often would you like to make purchases?",
+            direct_question=(
+                "How much should each recurring purchase be, and how often should "
+                "those purchases happen?"
+            ),
             question_targets=["sizing_amount", "schedule"],
             directly_asks_user=True,
             detail_targets=["recurring_purchase_amount", "purchase_cadence"],
@@ -1424,7 +1481,7 @@ def test_openrouter_clarifier_keeps_decimal_and_abbreviation_in_contract_context
     assert "How much should each recurring purchase be" in question
 
 
-def test_openrouter_clarifier_does_not_duplicate_contract_question_when_first(
+def test_openrouter_clarifier_does_not_duplicate_dca_direct_question_when_first(
     monkeypatch,
 ) -> None:
     async def fake_json_schema(
@@ -1479,19 +1536,38 @@ def test_openrouter_clarifier_does_not_duplicate_contract_question_when_first(
 def test_openrouter_clarifier_uses_missing_fields_for_dca_amount_and_cadence(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/primary")
+    monkeypatch.setenv("ARGUS_CHAT_FALLBACK_MODEL", "chat/fallback")
+    calls: list[str | None] = []
+
     async def fake_json_schema(
         *, task, messages, schema_model, schema_name, model_name=None
     ):
-        del task, messages, schema_model, schema_name, model_name
+        del task, messages, schema_model, schema_name
+        calls.append(model_name)
+        if model_name is None:
+            return ClarificationResponse(
+                question=(
+                    "Great, a 5-year DCA plan for LYFT. You mentioned a total budget. "
+                    "How often would you like to make purchases?"
+                ),
+                direct_question="How often would you like to make purchases?",
+                question_targets=["schedule"],
+                directly_asks_user=True,
+                detail_targets=["purchase_cadence"],
+            )
         return ClarificationResponse(
             question=(
                 "Great, a 5-year DCA plan for LYFT. You mentioned a total budget. "
-                "How often would you like to make purchases?"
+                "I need the recurring purchase amount and cadence."
             ),
-            direct_question="How often would you like to make purchases?",
-            question_targets=["schedule"],
+            direct_question=(
+                "How much should each recurring purchase be, and how often should "
+                "those purchases happen?"
+            ),
+            question_targets=["sizing_amount", "schedule"],
             directly_asks_user=True,
-            detail_targets=["purchase_cadence"],
+            detail_targets=["recurring_purchase_amount", "purchase_cadence"],
         )
 
     monkeypatch.setattr(
@@ -1523,6 +1599,7 @@ def test_openrouter_clarifier_uses_missing_fields_for_dca_amount_and_cadence(
     assert question is not None
     assert "How much should each recurring purchase be" in question
     assert "how often should those purchases happen" in question
+    assert calls == [None, "chat/fallback"]
 
 
 def test_openrouter_clarifier_renders_dca_direct_question_when_wrapper_is_vague(
