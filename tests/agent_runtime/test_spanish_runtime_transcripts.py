@@ -28,6 +28,10 @@ class ResolvedAssetStub:
     raw_symbol: str = ""
 
 
+def _test_model_candidates(**_: object) -> list[str]:
+    return ["test-model"]
+
+
 def _spanish_confirmation_snapshot(strategy: StrategySummary) -> TaskSnapshot:
     payload = {
         "strategy": strategy.model_dump(mode="python"),
@@ -79,7 +83,7 @@ def test_spanish_dca_runtime_canonicalizes_localized_llm_cadence(
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        _test_model_candidates,
     )
 
     async def invoke_stub(*, schema_model, **kwargs):
@@ -173,7 +177,7 @@ def test_spanish_buy_and_hold_runtime_uses_bounded_date_evidence(
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        _test_model_candidates,
     )
 
     async def invoke_stub(*, schema_model, **kwargs):
@@ -260,7 +264,7 @@ def test_spanish_mixed_asset_request_stays_blocked_by_guardrails(
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        _test_model_candidates,
     )
 
     async def invoke_stub(*, schema_model, **kwargs):
@@ -335,7 +339,7 @@ def test_spanish_approval_routes_by_llm_semantics_not_text_matching(
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        _test_model_candidates,
     )
 
     async def invoke_stub(*, schema_model, **kwargs):
@@ -396,7 +400,7 @@ def test_spanish_result_followup_anchors_to_latest_result(
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        _test_model_candidates,
     )
 
     async def invoke_stub(*, schema_model, **kwargs):
@@ -489,3 +493,327 @@ def test_spanish_result_followup_anchors_to_latest_result(
     assert followup_calls[0]["focus"] == "assumptions"
     assert followup_calls[0]["user_message"] == "explícame los supuestos del resultado"
     assert "capital inicial" in result.patch["assistant_response"]
+
+
+def test_spanish_benchmark_comparison_keeps_benchmark_out_of_asset_universe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.upper()
+        if normalized in {"APPLE", "AAPL"}:
+            return ResolvedAssetStub("AAPL", "equity", name="Apple")
+        if normalized == "QQQ":
+            return ResolvedAssetStub("QQQ", "equity", name="Invesco QQQ Trust")
+        return ResolvedAssetStub(normalized, "equity")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        _test_model_candidates,
+    )
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        if schema_model.__name__ != "LLMInterpretationResponse":
+            return None
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="El usuario quiere probar Apple contra QQQ.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing="Haz un backtest de Apple contra QQQ en 2023",
+                language="es-419",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Comprar y mantener Apple comparado con QQQ.",
+                asset_universe=["Apple"],
+                asset_class="equity",
+                comparison_baseline="QQQ",
+                date_range={"start": "2023-01-01", "end": "2023-12-31"},
+                field_provenance={"comparison_baseline": "explicit_user"},
+                evidence_spans={
+                    "asset_universe": "Apple",
+                    "comparison_baseline": "QQQ",
+                    "date_range": "en 2023",
+                },
+            ),
+            semantic_turn_act="new_idea",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Haz un backtest de Apple contra QQQ en 2023",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=OpenRouterStructuredInterpreter(
+            contract=build_default_capability_contract(),
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.asset_class == "equity"
+    assert strategy.comparison_baseline == "QQQ"
+    assert "QQQ" not in strategy.asset_universe
+
+
+def test_spanish_currency_pair_timeframe_reaches_confirmation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.upper().replace("/", "")
+        if normalized == "EURUSD":
+            return ResolvedAssetStub("EURUSD", "currency_pair", name="EUR/USD")
+        return ResolvedAssetStub(normalized, "currency_pair")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        _test_model_candidates,
+    )
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        if schema_model.__name__ != "LLMInterpretationResponse":
+            return None
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="El usuario quiere probar EUR/USD con velas de 1 hora.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=(
+                    "Usa velas de 1 hora para EUR/USD durante los ultimos 30 dias"
+                ),
+                language="es-419",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Comprar y mantener EUR/USD.",
+                asset_universe=["EUR/USD"],
+                asset_class="currency_pair",
+                timeframe="1h",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=30,
+                    unit="day",
+                    anchor="today",
+                    evidence="ultimos 30 dias",
+                ),
+                evidence_spans={
+                    "asset_universe": "EUR/USD",
+                    "timeframe": "velas de 1 hora",
+                    "date_range_intent": "ultimos 30 dias",
+                },
+            ),
+            semantic_turn_act="new_idea",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "Usa velas de 1 hora para EUR/USD durante los ultimos 30 dias"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=OpenRouterStructuredInterpreter(
+            contract=build_default_capability_contract(),
+        ),
+    )
+
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="rolling_window",
+            count=30,
+            unit="day",
+            anchor="today",
+        )
+    )
+
+    assert expected_range is not None
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["EURUSD"]
+    assert strategy.asset_class == "currency_pair"
+    assert strategy.timeframe == "1h"
+    assert strategy.date_range == expected_range.payload
+    assert result.patch["optional_parameter_status"]["timeframe"] == "1h"
+
+
+def test_spanish_pending_setup_asset_edit_preserves_existing_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.upper()
+        if normalized in {"NVIDIA", "NVDA"}:
+            return ResolvedAssetStub("NVDA", "equity", name="Nvidia")
+        if normalized in {"TESLA", "TSLA"}:
+            return ResolvedAssetStub("TSLA", "equity", name="Tesla")
+        return ResolvedAssetStub(normalized, "equity")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        _test_model_candidates,
+    )
+
+    pending = StrategySummary(
+        raw_user_phrasing="Compra 100 dólares de Tesla cada mes durante 2024",
+        strategy_type="dca_accumulation",
+        strategy_thesis="Comprar Tesla de forma recurrente.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        cadence="monthly",
+        capital_amount=100,
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+    )
+    snapshot = TaskSnapshot(pending_strategy_summary=pending)
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        if schema_model.__name__ != "LLMInterpretationResponse":
+            return None
+        return LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="refine",
+            requires_clarification=False,
+            user_goal_summary="El usuario quiere cambiar el activo a Nvidia.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing="Cambia el activo a Nvidia",
+                language="es-419",
+                asset_universe=["Nvidia"],
+                asset_class="equity",
+            ),
+            semantic_turn_act="refine_current_idea",
+            artifact_target="active_confirmation",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Cambia el activo a Nvidia",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={"last_stage_outcome": "await_user_reply"},
+        structured_interpreter=OpenRouterStructuredInterpreter(
+            contract=build_default_capability_contract(),
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.asset_class == "equity"
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.cadence == "monthly"
+    assert strategy.capital_amount == 100
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+
+
+def test_spanish_unsupported_valuation_request_stays_non_executable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        _test_model_candidates,
+    )
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        if schema_model.__name__ != "LLMInterpretationResponse":
+            return None
+        return LLMInterpretationResponse(
+            intent="unsupported_or_out_of_scope",
+            task_relation="new_task",
+            requires_clarification=True,
+            user_goal_summary="El usuario quiere comprar por valoración P/E.",
+            assistant_response=(
+                "P/E puede ser buen contexto, pero no es una regla ejecutable "
+                "en el motor actual. Puedo probar comprar y mantener, RSI, o un "
+                "cruce de medias móviles."
+            ),
+            unsupported_constraints=[
+                interpreter_module.LLMUnsupportedConstraint(
+                    category="unsupported_strategy_logic",
+                    raw_value="P/E",
+                    explanation="Valuation ratios are context, not executable rules.",
+                    simplification_labels=[
+                        "Probar comprar y mantener",
+                        "Usar una regla RSI",
+                    ],
+                )
+            ],
+            semantic_turn_act="unsupported_request",
+            artifact_target="none",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Compra cuando se vea barato por P/E",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=OpenRouterStructuredInterpreter(
+            contract=build_default_capability_contract(),
+        ),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision is not None
+    assert result.decision.semantic_turn_act == "unsupported_request"
+    assert result.decision.unsupported_constraints
+    assert "confirmation_payload" not in result.patch
+    assert "P/E puede ser buen contexto" in result.patch["assistant_response"]
