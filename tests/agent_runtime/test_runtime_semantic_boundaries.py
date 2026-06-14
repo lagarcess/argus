@@ -12,6 +12,8 @@ RUNTIME_INTENT_FILES = [
     "src/argus/agent_runtime/rule_specs.py",
 ]
 
+LEGACY_COMPOSER_PATH = Path("src/argus/agent_runtime/stages/compose.py")
+
 
 def test_runtime_intent_boundary_does_not_depend_on_regex_nlu() -> None:
     """Strategy/runtime semantics must come from typed interpretation, not regex gates."""
@@ -134,6 +136,36 @@ def test_runtime_contracts_do_not_own_human_language_date_tables() -> None:
     for relative_path, tokens in forbidden_by_file.items():
         source = Path(relative_path).read_text()
         for token in tokens:
+            if token in source:
+                violations.append(f"{relative_path}: {token}")
+
+    assert violations == []
+
+
+def test_legacy_response_composer_is_retired() -> None:
+    """Assistant voice belongs to LLM clarification or explicit recovery paths."""
+
+    assert not LEGACY_COMPOSER_PATH.exists()
+
+
+def test_production_paths_do_not_import_legacy_response_composer() -> None:
+    """Normal runtime paths must not revive compose.py as a shadow chat brain."""
+
+    forbidden_tokens = [
+        "argus.agent_runtime.stages.compose",
+        "compose_response_intent",
+        "should_prefer_composed_intent",
+    ]
+    production_files = [
+        "src/argus/agent_runtime/runtime.py",
+        "src/argus/agent_runtime/stages/clarify.py",
+        "src/argus/api/chat/result_actions.py",
+    ]
+    violations: list[str] = []
+
+    for relative_path in production_files:
+        source = Path(relative_path).read_text()
+        for token in forbidden_tokens:
             if token in source:
                 violations.append(f"{relative_path}: {token}")
 

@@ -3,9 +3,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
-from argus.agent_runtime.stages.compose import (
-    compose_response_intent,
-    should_prefer_composed_intent,
+from argus.agent_runtime.artifact_action_recovery import (
+    artifact_action_recovery_message,
 )
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -231,14 +230,15 @@ def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(assistant_response, str) or not assistant_response.strip():
             patched["assistant_response"] = explicit_prompt
         return patched
-    if not should_prefer_composed_intent(run_state):
+    intent = run_state.response_intent
+    if intent is None or intent.kind != "artifact_action_recovery":
         return result
-    composed = compose_response_intent(run_state)
-    if composed is None:
+    recovery = artifact_action_recovery_message(intent)
+    if recovery is None:
         return result
     patched = dict(result)
-    patched["assistant_prompt"] = composed
-    patched["assistant_response"] = composed
+    patched["assistant_prompt"] = recovery
+    patched["assistant_response"] = recovery
     return patched
 
 

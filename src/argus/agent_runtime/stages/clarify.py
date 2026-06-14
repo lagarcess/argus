@@ -7,10 +7,6 @@ from typing import Protocol
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.clarification_contract import offline_clarification_fallback
 from argus.agent_runtime.llm_clarifier import ClarificationRequest
-from argus.agent_runtime.stages.compose import (
-    compose_response_intent,
-    should_prefer_composed_intent,
-)
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
     PendingNeedName,
@@ -84,15 +80,10 @@ async def clarify_stage_async(
             options=options,
             language=language,
         )
-        assistant_prompt = _composed_prompt_for_response_intent(
-            state=state,
-            response_intent=response_intent,
-        )
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": assistant_prompt
-                or await _generate_clarifying_question(
+                "assistant_prompt": await _generate_clarifying_question(
                     state=state,
                     response_intent=response_intent,
                     missing_required_fields=[],
@@ -271,19 +262,6 @@ async def _generate_clarifying_question(
         result = clarification_generator(request)
         question = await result if inspect.isawaitable(result) else result
     return question or offline_clarification_fallback(language=language)
-
-
-def _composed_prompt_for_response_intent(
-    *,
-    state: RunState,
-    response_intent: dict[str, object],
-) -> str | None:
-    state_with_intent = state.model_copy(
-        update={"response_intent": ResponseIntent.model_validate(response_intent)}
-    )
-    if not should_prefer_composed_intent(state_with_intent):
-        return None
-    return compose_response_intent(state_with_intent)
 
 
 def _usable_prefilled_prompt(value: str | None) -> str | None:

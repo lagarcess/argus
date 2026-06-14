@@ -476,7 +476,7 @@ class IndicatorDateRepairInterpreter:
         )
 
 
-def test_runtime_preserves_explicit_stage_prompt_over_composed_intent() -> None:
+def test_runtime_preserves_explicit_stage_prompt_over_recovery_fallback() -> None:
     run_state = RunState.new(
         current_user_message="use a 20-day SMA crossing above the 50-day SMA",
         recent_thread_history=[],

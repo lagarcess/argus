@@ -63,7 +63,10 @@ The runtime rejects assistant responses that are:
 - raw internal names such as `asset_universe`, `not specified`, or `requested_field`
 - generic starter guidance after a thread already has context
 
-When a response fails this gate, the runtime composes a grounded natural response from the current act, state, and validation result. This keeps deterministic truth in the system without making deterministic scaffolding the product voice.
+When a response fails this gate, normal ambiguity is sent back through the
+structured LLM clarifier with bounded facts and requested fields. Deterministic
+user-facing copy is reserved for explicit artifact-action recovery, such as a
+stale or non-retryable failed-run action, where code owns the safety boundary.
 
 ## Active Layers
 

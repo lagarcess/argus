@@ -5027,7 +5027,7 @@ async def test_pending_supported_chip_shape_gets_focused_date_and_benchmark_audi
         task_relation="new_task",
         requires_clarification=True,
         user_goal_summary="AAPL buy-and-hold.",
-        assistant_response="I can test buy-and-hold for AAPL. Which date window should I use?",
+        assistant_response="Entendido. ¿Qué período quieres usar para AAPL?",
         candidate_strategy_draft=LLMStrategyDraft(
             raw_user_phrasing=(
                 "Compra y mantén AAPL durante los últimos 12 meses "

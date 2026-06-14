@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from argus.agent_runtime.artifact_action_recovery import artifact_action_recovery_message
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
-from argus.agent_runtime.stages.compose import compose_response_intent
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
@@ -2228,64 +2228,7 @@ def test_confirmation_edit_action_publishes_intent_without_backend_prompt() -> N
     ]
 
 
-def test_dca_assumption_clarification_composes_without_starting_capital_leak() -> None:
-    strategy = StrategySummary(
-        strategy_type="dca_accumulation",
-        strategy_thesis="Buy Apple weekly.",
-        asset_universe=["AAPL"],
-        asset_class="equity",
-        date_range={"start": "2024-03-01", "end": "2024-10-31"},
-        cadence="weekly",
-        capital_amount=250,
-        extra_parameters={
-            "field_provenance": {
-                "capital_amount": "recurring_contribution",
-                "cadence": "explicit_user",
-            },
-            "recurring_contribution": 250,
-            "recurring_cadence": "weekly",
-        },
-    )
-    state = RunState.new(current_user_message="", recent_thread_history=[])
-    state.response_intent = ResponseIntent(
-        kind="clarification",
-        semantic_needs=["assumption"],
-        requested_fields=["assumption"],
-        facts={"strategy": strategy.model_dump(mode="python")},
-    )
-
-    prompt = compose_response_intent(state)
-
-    assert prompt is not None
-    assert "recurring buys" in prompt
-    assert "assumption" in prompt
-    assert "starting capital" not in prompt.lower()
-
-
-def test_refinement_clarification_composes_from_response_intent() -> None:
-    strategy = StrategySummary(
-        strategy_type="buy_and_hold",
-        strategy_thesis="Buy and hold Apple.",
-        asset_universe=["AAPL"],
-        asset_class="equity",
-        date_range="past year",
-    )
-    state = RunState.new(current_user_message="", recent_thread_history=[])
-    state.response_intent = ResponseIntent(
-        kind="clarification",
-        semantic_needs=["refinement"],
-        requested_fields=["refinement"],
-        facts={"strategy": strategy.model_dump(mode="python")},
-    )
-
-    prompt = compose_response_intent(state)
-
-    assert prompt is not None
-    assert "AAPL" in prompt
-    assert "change" in prompt.lower()
-
-
-def test_failed_action_retry_recovery_composes_from_response_intent() -> None:
+def test_failed_action_retry_recovery_uses_explicit_recovery_message() -> None:
     state = RunState.new(current_user_message="", recent_thread_history=[])
     state.response_intent = ResponseIntent(
         kind="artifact_action_recovery",
@@ -2297,14 +2240,14 @@ def test_failed_action_retry_recovery_composes_from_response_intent() -> None:
         },
     )
 
-    prompt = compose_response_intent(state)
+    prompt = artifact_action_recovery_message(state.response_intent)
 
     assert prompt is not None
     assert "older failed run" in prompt
     assert "latest retry action" in prompt
 
 
-def test_failed_action_retry_rebuilt_confirmation_composes_from_response_intent() -> None:
+def test_failed_action_retry_rebuilt_confirmation_uses_explicit_recovery_message() -> None:
     state = RunState.new(current_user_message="", recent_thread_history=[])
     state.response_intent = ResponseIntent(
         kind="artifact_action_recovery",
@@ -2315,7 +2258,7 @@ def test_failed_action_retry_rebuilt_confirmation_composes_from_response_intent(
         },
     )
 
-    prompt = compose_response_intent(state)
+    prompt = artifact_action_recovery_message(state.response_intent)
 
     assert prompt is not None
     assert "rebuilt the draft" in prompt
@@ -2333,7 +2276,7 @@ def test_failed_action_retry_recovery_degrades_invalid_facts() -> None:
         },
     )
 
-    prompt = compose_response_intent(state)
+    prompt = artifact_action_recovery_message(state.response_intent)
 
     assert prompt is not None
     assert "current conversation state" in prompt
