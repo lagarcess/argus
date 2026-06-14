@@ -221,6 +221,15 @@ def test_interpretation_profile_has_bounded_reasoning_for_semantic_repair() -> N
     assert profile.reasoning_effort == "medium"
 
 
+def test_interpretation_repair_uses_context_tier_high_reasoning() -> None:
+    profile = openrouter_profile_for_task("interpretation_repair")
+
+    assert openrouter.openrouter_model_tier_for_task("interpretation_repair") == "context"
+    assert profile.temperature == 0
+    assert profile.reasoning_effort == "high"
+    assert profile.timeout_seconds == 20
+
+
 def test_result_summary_timeout_budget_is_safe_for_render_workflows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

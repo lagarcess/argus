@@ -103,6 +103,7 @@ from argus.domain.market_data import resolve_asset
 from argus.domain.slot_normalizer import normalize_parameter_value
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.llm.openrouter import (
+    OpenRouterTask,
     build_openrouter_model,
     invoke_openrouter_json_schema,
     log_openrouter_failure,
@@ -117,6 +118,7 @@ from argus.nlp.natural_time import (
 )
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
+_INTERPRETATION_REPAIR_TASK: OpenRouterTask = "interpretation_repair"
 
 
 def _selected_thread_metadata_context(metadata: dict[str, Any]) -> str:
@@ -770,10 +772,12 @@ class OpenRouterStructuredInterpreter:
             "framed as a benchmark, reference, comparison target, or market "
             "baseline, put it in comparison_baseline instead of asset_universe. "
             "A one-asset buy/hold request with a separate benchmark is executable "
-            "as the primary asset plus comparison_baseline; do not call that an "
+            "as the primary asset plus comparison_baseline; do not call this an "
             "unsupported direct comparison. Do not add benchmark symbols to "
             "asset_universe unless the user explicitly says to buy, hold, or test "
-            "both as traded assets. "
+            "both as traded assets. Examples: AAPL against SPY, AAPL with SPY "
+            "as the benchmark, and AAPL con SPY como referencia all mean "
+            "asset_universe=['AAPL'] and comparison_baseline='SPY'. "
             "Set field_provenance.comparison_baseline="
             "'explicit_user' only when the current user message explicitly names "
             "the comparison or benchmark. When the user gives exact start/end dates, "
@@ -3526,10 +3530,13 @@ async def _repair_incomplete_strategy_extraction(
     if not _strategy_extraction_repair_is_allowed(failed_response, request=request):
         return None
     messages = _focused_strategy_extraction_messages(request)
-    for model_name in _unique_repair_models(preferred_model):
+    for model_name in _unique_repair_models(
+        preferred_model,
+        task=_INTERPRETATION_REPAIR_TASK,
+    ):
         try:
             extraction = await invoke_openrouter_json_schema(
-                task="interpretation",
+                task=_INTERPRETATION_REPAIR_TASK,
                 messages=_openrouter_wire_messages(messages),
                 schema_model=FocusedStrategyExtraction,
                 schema_name="FocusedStrategyExtraction",
@@ -3552,6 +3559,13 @@ async def _repair_incomplete_strategy_extraction(
             preferred_model=model_name,
             request=request,
         )
+        conflict_response = await _audit_supported_strategy_capability_conflict(
+            response=response,
+            preferred_model=model_name,
+            request=request,
+        )
+        if conflict_response is not None:
+            response = conflict_response
         date_window_response = await _focused_date_window_audited_response(
             response=response,
             preferred_model=model_name,
@@ -3586,10 +3600,13 @@ async def _focused_date_window_audited_response(
         response=response,
         request=request,
     )
-    for model_name in _unique_repair_models(preferred_model):
+    for model_name in _unique_repair_models(
+        preferred_model,
+        task=_INTERPRETATION_REPAIR_TASK,
+    ):
         try:
             extraction = await invoke_openrouter_json_schema(
-                task="interpretation",
+                task=_INTERPRETATION_REPAIR_TASK,
                 messages=messages,
                 schema_model=FocusedDateWindowExtraction,
                 schema_name="FocusedDateWindowExtraction",
@@ -3597,7 +3614,7 @@ async def _focused_date_window_audited_response(
             )
         except Exception as exc:
             log_openrouter_failure(
-                task="interpretation",
+                task=_INTERPRETATION_REPAIR_TASK,
                 model_name=model_name,
                 exc=exc,
                 message="Focused date-window extraction failed; preserving draft dates",
@@ -3621,7 +3638,13 @@ def _response_needs_focused_date_window_intent_repair(
 ) -> bool:
     if response.intent not in {"strategy_drafting", "backtest_execution"}:
         return False
-    if response.task_relation != "new_task":
+    pending_supported_date_answer = (
+        _pending_supported_execution_date_answer_can_use_focused_audit(
+            response=response,
+            request=request,
+        )
+    )
+    if response.task_relation != "new_task" and not pending_supported_date_answer:
         return False
     if "focused_date_window_intent_repair" in response.reason_codes:
         return False
@@ -3632,8 +3655,11 @@ def _response_needs_focused_date_window_intent_repair(
     )
     has_semantic_date_evidence = _draft_has_semantic_date_window_evidence(draft)
     if response.semantic_turn_act == "answer_pending_need" and not (
-        has_material_evidence
-        and _response_has_pending_base_field(response, "date_range")
+        (
+            has_material_evidence
+            and _response_has_pending_base_field(response, "date_range")
+        )
+        or pending_supported_date_answer
     ):
         return False
     if response.semantic_turn_act in {
@@ -3674,6 +3700,29 @@ def _response_needs_focused_date_window_intent_repair(
     if has_semantic_date_evidence:
         return True
     return not _llm_value_is_empty(draft.date_range_raw_text)
+
+
+def _pending_supported_execution_date_answer_can_use_focused_audit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if response.semantic_turn_act != "answer_pending_need":
+        return False
+    if not _response_has_pending_base_field(response, "date_range"):
+        return False
+    if response.unsupported_constraints or response.ambiguous_fields:
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    if not _llm_strategy_draft_has_concrete_execution_target(draft):
+        return False
+    return bool(
+        request.current_user_message.strip()
+        or draft.raw_user_phrasing
+        or draft.strategy_thesis
+    )
 
 
 def _draft_has_semantic_date_window_evidence(draft: LLMStrategyDraft) -> bool:
@@ -4558,8 +4607,15 @@ def _prior_strategy_payload(
     return prior.model_dump(mode="json")
 
 
-def _unique_repair_models(preferred_model: str) -> list[str]:
-    candidates = [preferred_model, *openrouter_structured_model_candidates()]
+def _unique_repair_models(
+    preferred_model: str,
+    *,
+    task: OpenRouterTask = "interpretation",
+) -> list[str]:
+    candidates = [
+        preferred_model,
+        *openrouter_structured_model_candidates(task=task),
+    ]
     seen: set[str] = set()
     ordered: list[str] = []
     for model_name in candidates:
@@ -5533,9 +5589,21 @@ def _response_needs_stated_run_field_fidelity_audit(
         return True
     if response.semantic_turn_act == "answer_pending_need":
         if requested_field == "date_range":
-            return _draft_contains_structured_date_context(
-                draft,
-                current_message=current_message,
+            return any(
+                [
+                    _draft_contains_structured_date_context(
+                        draft,
+                        current_message=current_message,
+                    ),
+                    _draft_missing_comparison_baseline_needs_stated_run_field_audit(
+                        draft,
+                        current_message=current_message,
+                    ),
+                    _draft_capital_needs_stated_run_field_audit(
+                        draft,
+                        current_message=current_message,
+                    ),
+                ]
             )
         if requested_field == "assumption":
             return _draft_capital_needs_stated_run_field_audit(
@@ -6644,7 +6712,15 @@ def _focused_strategy_extraction_messages(
                 "Interpret only the current user message and return all fields needed "
                 "to draft an executable backtest. Do not omit a field that appears in "
                 "the message. Do not invent fees, slippage, position size, or provider "
-                "details. is_testable_strategy means the user is asking for a strategy "
+                "details. If the current message semantically gives a supported "
+                "strategy family, primary asset, benchmark/reference asset, relative "
+                "window, or capital amount, returning null or empty for that field is "
+                "an extraction failure. Do not ask the user to choose a supported "
+                "strategy when the current message already selected one semantically. "
+                "Evidence spans are provenance only. Never put a supported "
+                "strategy, asset, benchmark, time window, or capital amount only "
+                "inside evidence_spans; populate the matching canonical field too. "
+                "is_testable_strategy means the user is asking for a strategy "
                 "or backtest idea; it does not mean Argus can execute every part. For "
                 "clear sentiment, news, fundamental, external-data, or other draft-only "
                 "strategy requests, set is_testable_strategy=true, preserve the asset, "
@@ -6664,7 +6740,11 @@ def _focused_strategy_extraction_messages(
                 "in asset_universe; the provider-backed resolver will validate and "
                 "canonicalize assets after interpretation. Preserve user-stated "
                 "benchmark/comparison assets such as QQQ, SPY, BTC, or IWM in "
-                "comparison_baseline, not asset_universe. Relative windows such as "
+                "comparison_baseline, not asset_universe. In any language, a request "
+                "to buy, hold, or test one primary asset over a window with another "
+                "asset as a benchmark, reference, baseline, or comparison target is "
+                "an executable buy_and_hold setup with that other asset in "
+                "comparison_baseline; it is not unsupported custom logic. Relative windows such as "
                 "'last 8 months' or equivalent phrases in any language must become "
                 "date_range_intent with kind=rolling_window, count, unit, "
                 "anchor=today, confidence, and evidence. Do not ask for exact "
@@ -6829,6 +6909,16 @@ def _response_from_focused_strategy_extraction(
         reason_codes=["focused_strategy_extraction_repair"],
         semantic_turn_act="new_idea",
     )
+    response.missing_required_fields = (
+        _capability_required_missing_fields_for_canonical_strategy(
+            response.missing_required_fields,
+            draft=response.candidate_strategy_draft,
+        )
+    )
+    if response.missing_required_fields or response.ambiguous_fields:
+        response.intent = "strategy_drafting"
+        response.requires_clarification = True
+        response.assistant_response = None
     return _merge_focused_repair_with_base(
         response=response,
         base_response=base_response,

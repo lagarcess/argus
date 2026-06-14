@@ -183,9 +183,30 @@ class FocusedStrategyExtraction(BaseModel):
     requires_clarification: bool = False
     user_goal_summary: str
     language: str | None = None
-    strategy_type: str | None = None
+    strategy_type: str | None = Field(
+        default=None,
+        description=(
+            "Canonical executable strategy family selected by the current user "
+            "message. Use buy_and_hold when the user asks in any language to buy, "
+            "hold, keep, compare performance, or test one asset over a period "
+            "without a separate entry rule. Use dca_accumulation for recurring "
+            "fixed-amount buys, indicator_threshold for supported indicator "
+            "threshold rules, and signal_strategy for supported signal/crossover "
+            "rules. Leave null only when no executable family is semantically "
+            "selected."
+        ),
+    )
     strategy_thesis: str | None = None
-    asset_universe: list[str] = Field(default_factory=list)
+    asset_universe: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Primary traded/tested assets explicitly stated by the user. Include "
+            "ticker symbols or asset names in any language, such as AAPL, Apple, "
+            "ETH, or Bitcoin. Do not put benchmark/reference/comparison assets "
+            "here unless the user explicitly says to buy, hold, or test them as "
+            "traded assets."
+        ),
+    )
     asset_class: str | None = None
     timeframe: str | None = Field(
         default=None,
@@ -205,7 +226,15 @@ class FocusedStrategyExtraction(BaseModel):
         ),
     )
     date_range_raw_text: str | None = None
-    date_range_intent: LLMDateRangeIntent | None = None
+    date_range_intent: LLMDateRangeIntent | None = Field(
+        default=None,
+        description=(
+            "Canonical temporal intent for relative or semantic windows. For "
+            "phrases equivalent to last/past/previous N days, weeks, months, "
+            "quarters, or years in any language, return kind=rolling_window with "
+            "count, unit, anchor=today, confidence, and evidence."
+        ),
+    )
     comparison_baseline: str | None = Field(
         default=None,
         description=(
@@ -232,7 +261,17 @@ class FocusedStrategyExtraction(BaseModel):
     missing_required_fields: list[str] = Field(default_factory=list)
     assistant_response: str | None = None
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
-    evidence_spans: dict[str, str] = Field(default_factory=dict)
+    evidence_spans: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Bounded snippets from the current user message that support populated "
+            "canonical fields. Evidence spans are provenance only and never replace "
+            "strategy_type, asset_universe, comparison_baseline, date_range_intent, "
+            "or capital_amount. If evidence identifies a supported strategy, asset, "
+            "benchmark, or time window, the corresponding canonical field must also "
+            "be populated."
+        ),
+    )
 
 
 class FocusedDateWindowExtraction(BaseModel):

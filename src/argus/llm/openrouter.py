@@ -21,6 +21,7 @@ load_dotenv()
 
 OpenRouterTask = Literal[
     "interpretation",
+    "interpretation_repair",
     "field_fidelity",
     "capability_conflict",
     "clarification",
@@ -96,6 +97,13 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
         max_tokens=3200,
         reasoning_effort="medium",
     ),
+    "interpretation_repair": OpenRouterProfile(
+        "interpretation_repair",
+        temperature=0,
+        max_tokens=2200,
+        timeout_seconds=20,
+        reasoning_effort="high",
+    ),
     "field_fidelity": OpenRouterProfile(
         "field_fidelity",
         temperature=0,
@@ -129,6 +137,7 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
 
 OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
     "interpretation": "structured",
+    "interpretation_repair": "context",
     "field_fidelity": "context",
     "capability_conflict": "context",
     "clarification": "chat",
