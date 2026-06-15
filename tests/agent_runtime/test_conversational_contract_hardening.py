@@ -778,7 +778,6 @@ def test_dca_recurring_amount_with_current_message_evidence_is_preserved(
     from argus.agent_runtime import llm_interpreter as llm_module
     from argus.agent_runtime.llm_interpreter import _validate_capability_boundaries
     from argus.agent_runtime.llm_interpreter_types import (
-        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -1605,7 +1604,7 @@ def test_change_asset_answer_patches_requested_field_only(monkeypatch) -> None:
         ("the chipmaker", "NVDA", "MSFT"),
     ],
 )
-def test_requested_asset_answer_uses_llm_mapped_asset_after_raw_provider_miss(
+def test_requested_asset_answer_uses_llm_mapped_asset_before_raw_phrase(
     monkeypatch,
     answer: str,
     mapped_symbol: str,
@@ -1652,7 +1651,7 @@ def test_requested_asset_answer_uses_llm_mapped_asset_after_raw_provider_miss(
 
     assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
-    assert provider_queries[0] == answer
+    assert provider_queries[0] == mapped_symbol
     normalized_queries = [query.strip().upper() for query in provider_queries]
     assert mapped_symbol in normalized_queries
     mapped_index = normalized_queries.index(mapped_symbol)
@@ -3692,7 +3691,6 @@ def test_dca_contract_audit_skips_educational_turn_with_stale_strategy_baggage()
         _response_needs_dca_contract_audit,
     )
     from argus.agent_runtime.llm_interpreter_types import (
-        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -4501,7 +4499,6 @@ def test_stated_run_fidelity_removes_inferred_date_endpoint_and_restores_benchma
         _response_from_stated_run_field_fidelity_audit,
     )
     from argus.agent_runtime.llm_interpreter_types import (
-        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -4550,7 +4547,6 @@ def test_stated_run_fidelity_audit_rejects_localized_raw_cadence() -> None:
         _response_from_stated_run_field_fidelity_audit,
     )
     from argus.agent_runtime.llm_interpreter_types import (
-        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -4586,7 +4582,6 @@ def test_stated_run_fidelity_audit_uses_current_message_context() -> None:
         _response_needs_stated_run_field_fidelity_audit,
     )
     from argus.agent_runtime.llm_interpreter_types import (
-        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -4626,7 +4621,6 @@ def test_stated_run_fidelity_audit_skips_complete_aligned_comparison() -> None:
         _response_needs_stated_run_field_fidelity_audit,
     )
     from argus.agent_runtime.llm_interpreter_types import (
-        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -4673,7 +4667,6 @@ def test_stated_run_fidelity_audit_catches_repaired_default_window_and_benchmark
         _response_needs_stated_run_field_fidelity_audit,
     )
     from argus.agent_runtime.llm_interpreter_types import (
-        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -4722,7 +4715,6 @@ def test_stated_run_fidelity_audit_handles_retry_restatement_benchmark() -> None
         _response_needs_stated_run_field_fidelity_audit,
     )
     from argus.agent_runtime.llm_interpreter_types import (
-        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )

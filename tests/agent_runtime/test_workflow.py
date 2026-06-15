@@ -375,6 +375,27 @@ class SpanishAssumptionAnswerInterpreter:
         )
 
 
+class SpanishAssetAnswerInterpreter:
+    def __init__(self) -> None:
+        self.requests: list[InterpretationRequest] = []
+
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        self.requests.append(request)
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="El usuario dio un activo de reemplazo.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                asset_universe=["GOOGL"],
+                refinement_of="visible confirmation",
+            ),
+            confidence=0.94,
+            semantic_turn_act="answer_pending_need",
+        )
+
+
 class ConversationalInterpreter:
     async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
         return StructuredInterpretation(
@@ -1470,6 +1491,87 @@ async def test_workflow_spanish_adjust_assumptions_answer_reenters_interpreter()
         ]["value"]
         == 250000
     )
+    assert answer_result["pending_strategy"]["requested_field"] is None
+    assert answer_result["pending_strategy"]["missing_required_fields"] == []
+
+
+@pytest.mark.asyncio
+async def test_workflow_spanish_change_asset_answer_reenters_interpreter(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().casefold()
+        if normalized in {"google", "googl"}:
+            return ResolvedAssetStub("GOOGL", "equity")
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+
+    interpreter = SpanishAssetAnswerInterpreter()
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", language_preference="es-419")
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Comprar y mantener AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+    thread_id = "thread-spanish-change-asset-answer"
+
+    prompt_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="Cambiar activo",
+        action_context={
+            "type": "change_asset",
+            "label": "Cambiar activo",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert interpreter.requests == []
+    assert prompt_result["stage_outcome"] == "await_user_reply"
+    assert prompt_result["pending_strategy"]["requested_field"] == "asset_universe"
+    assert prompt_result["pending_strategy"]["missing_required_fields"] == [
+        "asset_universe"
+    ]
+
+    answer_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="ponlo con google mejor",
+    )
+
+    assert len(interpreter.requests) == 1
+    request = interpreter.requests[0]
+    assert request.user.language_preference == "es-419"
+    assert request.latest_task_snapshot is not None
+    assert request.latest_task_snapshot.pending_strategy_summary is not None
+    assert request.selected_thread_metadata["requested_field"] == "asset_universe"
+    assert answer_result["stage_outcome"] == "await_approval"
+    strategy = answer_result["confirmation_payload"]["strategy"]
+    assert strategy["strategy_type"] == "buy_and_hold"
+    assert strategy["asset_universe"] == ["GOOGL"]
+    assert strategy["asset_class"] == "equity"
+    assert strategy["date_range"] == {"start": "2025-06-14", "end": "2026-06-12"}
+    assert strategy["capital_amount"] == 100000
+    assert strategy["comparison_baseline"] == "SPY"
+    assert "assistant_response" not in answer_result
     assert answer_result["pending_strategy"]["requested_field"] is None
     assert answer_result["pending_strategy"]["missing_required_fields"] == []
 

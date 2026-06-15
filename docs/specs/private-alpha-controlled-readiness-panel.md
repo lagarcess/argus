@@ -97,8 +97,12 @@ The readiness slice should be sequenced like this:
      `Jan 1, 2024 -> Dec 31, 2024` instead of silently confirming the prior
      rolling range, and the Spanish `Cambiar fechas -> calendario 2024` path
      updates the active card to `1 ene 2024 -> 31 dic 2024` instead of leaking
-     macro-context prose. This is a local runtime-spine proof, not the full
-     Spanish release gate.
+     macro-context prose. The same browser pass now covers English
+     `Change asset -> make it google instead` and Spanish
+     `Cambiar activo -> ponlo con google mejor`, both updating the active card
+     to provider-canonical `GOOGL` while preserving capital, period, and
+     benchmark. This is a local runtime-spine proof, not the full Spanish
+     release gate.
 
 2. **Backtest trust hardening**
    - Provider-backed symbol validation even when `asset_class` is explicit.

@@ -121,7 +121,9 @@ Codex should own or closely supervise this:
      `Change dates -> calendar 2024` and Spanish
      `Cambiar fechas -> calendario 2024` flows update the active card instead
      of silently re-confirming the prior rolling range or leaking macro-context
-     prose.
+     prose. The English `Change asset -> make it google instead` and Spanish
+     `Cambiar activo -> ponlo con google mejor` flows now update the active
+     card to provider-canonical `GOOGL` while preserving the rest of the setup.
    - Remaining before merge/release readiness: broader Spanish prompt matrix,
      multi-turn clarification, result execution, retry/recovery, indicator/DCA
      coverage, production-parity Render canary, and the rest of the controlled

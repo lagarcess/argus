@@ -2576,6 +2576,12 @@ def _requested_asset_answer_candidates(
     current_user_message: str,
 ) -> list[_RequestedAssetCandidate]:
     candidates: list[_RequestedAssetCandidate] = []
+    for symbol in explicit_strategy.asset_universe:
+        candidate = str(symbol or "").strip()
+        if candidate:
+            candidates.append(
+                _RequestedAssetCandidate(text=candidate, source="llm_extraction")
+            )
     answer = current_user_message.strip()
     if answer:
         candidates.append(
@@ -2585,19 +2591,17 @@ def _requested_asset_answer_candidates(
                 from_user_answer=True,
             )
         )
-    for symbol in explicit_strategy.asset_universe:
-        candidate = str(symbol or "").strip()
-        if candidate:
-            candidates.append(
-                _RequestedAssetCandidate(text=candidate, source="llm_extraction")
-            )
     deduped: list[_RequestedAssetCandidate] = []
-    seen: set[str] = set()
+    seen: dict[str, int] = {}
     for candidate in candidates:
         key = candidate.text.casefold()
-        if key in seen:
+        existing_index = seen.get(key)
+        if existing_index is not None:
+            existing = deduped[existing_index]
+            if candidate.from_user_answer and not existing.from_user_answer:
+                deduped[existing_index] = candidate
             continue
-        seen.add(key)
+        seen[key] = len(deduped)
         deduped.append(candidate)
     return deduped
 
