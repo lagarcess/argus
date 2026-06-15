@@ -32,6 +32,7 @@ from argus.agent_runtime.stages.approval_guard import (
     decision_requests_confirmation_card_action,
 )
 from argus.agent_runtime.stages.artifact_context import (
+    LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED,
     active_confirmation_effective_strategy,
     confirmation_payload_dict,
     confirmation_payload_is_validated_executable,
@@ -777,6 +778,8 @@ def _result_artifact_patch_stage_result_if_applicable(
     decision: InterpretDecision,
     snapshot: TaskSnapshot | None,
 ) -> StageResult | None:
+    if _result_followup_target_was_inferred_non_patch(decision):
+        return None
     if not decision_allows_result_artifact_patch(decision=decision):
         return None
     reference = (
@@ -813,6 +816,8 @@ def _deterministic_result_artifact_patch_stage_result_if_applicable(
     if reference is None:
         return None
     del current_user_message
+    if _result_followup_target_was_inferred_non_patch(decision):
+        return None
     date_range = decision.candidate_strategy_draft.date_range
     if not isinstance(date_range, dict) or not (
         date_range.get("start") and date_range.get("end")
@@ -841,6 +846,17 @@ def _deterministic_result_artifact_patch_stage_result_if_applicable(
         patched=patched,
         reason_code="artifact_patch_from_latest_result",
         additional_reason_codes=("artifact_date_patch_from_current_message",),
+    )
+
+
+def _result_followup_target_was_inferred_non_patch(
+    decision: InterpretDecision,
+) -> bool:
+    if LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED not in decision.reason_codes:
+        return False
+    return _strategy_has_structured_non_patch_evidence(
+        strategy=decision.candidate_strategy_draft,
+        patch_fields=frozenset({"date_range", "strategy_type"}),
     )
 
 

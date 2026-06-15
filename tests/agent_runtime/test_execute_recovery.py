@@ -16,7 +16,6 @@ from argus.agent_runtime.state.models import (
     StrategySummary,
     UserState,
 )
-from argus.agent_runtime.strategy_contract import resolve_date_range
 from argus.agent_runtime.tools.backtest_stub import StubBacktestTool
 from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 from argus.domain.engine_launch.adapter import LaunchExecutionAdapterResult
@@ -934,16 +933,7 @@ def test_execute_stage_promotes_moving_average_crossover_to_signal_strategy() ->
     }
 
 
-def test_execute_stage_normalizes_dip_buying_and_machine_date_tokens(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.agent_runtime.stages import execute as execute_module
-
-    monkeypatch.setattr(
-        execute_module,
-        "resolve_date_range",
-        lambda value: resolve_date_range(value, today=date(2026, 5, 3)),
-    )
+def test_execute_stage_normalizes_dip_buying_and_canonical_date_range() -> None:
     tool = StubBacktestTool(
         responses=[
             {
@@ -962,7 +952,7 @@ def test_execute_stage_normalizes_dip_buying_and_machine_date_tokens(
             "strategy_type": "dip_buying",
             "strategy_thesis": "Buy Apple on RSI-defined dips.",
             "asset_universe": ["AAPL"],
-            "date_range": "last_3_months",
+            "date_range": {"start": "2026-02-03", "end": "2026-05-03"},
             "entry_logic": "Buy when RSI <= 30",
             "exit_logic": "Sell when RSI >= 55",
         },
@@ -980,15 +970,7 @@ def test_execute_stage_normalizes_dip_buying_and_machine_date_tokens(
 
 
 def test_execute_stage_resolves_structured_date_range_with_today(
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from argus.agent_runtime.stages import execute as execute_module
-
-    monkeypatch.setattr(
-        execute_module,
-        "resolve_date_range",
-        lambda value: resolve_date_range(value, today=date(2026, 5, 3)),
-    )
     tool = StubBacktestTool(
         responses=[
             {
@@ -1018,20 +1000,11 @@ def test_execute_stage_resolves_structured_date_range_with_today(
     assert result.outcome == "execution_succeeded"
     assert tool.calls[0]["date_range"] == {
         "start": "2025-01-01",
-        "end": "2026-05-03",
+        "end": date.today().isoformat(),
     }
 
 
-def test_execute_stage_uses_strategy_contribution_for_dca(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.agent_runtime.stages import execute as execute_module
-
-    monkeypatch.setattr(
-        execute_module,
-        "resolve_date_range",
-        lambda value: resolve_date_range(value, today=date(2026, 5, 3)),
-    )
+def test_execute_stage_uses_strategy_contribution_for_dca() -> None:
     tool = StubBacktestTool(
         responses=[
             {
@@ -1051,7 +1024,7 @@ def test_execute_stage_uses_strategy_contribution_for_dca(
             "strategy_thesis": "Invest $500 in Bitcoin every month since 2021.",
             "asset_universe": ["BTC"],
             "asset_class": "crypto",
-            "date_range": "since 2021",
+            "date_range": {"start": "2021-01-01", "end": date.today().isoformat()},
             "cadence": "monthly",
             "capital_amount": 500,
             "sizing_mode": "capital_amount",
@@ -1070,7 +1043,7 @@ def test_execute_stage_uses_strategy_contribution_for_dca(
     assert tool.calls[0]["cadence"] == "monthly"
     assert tool.calls[0]["date_range"] == {
         "start": "2021-01-01",
-        "end": "2026-05-03",
+        "end": date.today().isoformat(),
     }
 
 
@@ -2030,7 +2003,8 @@ async def test_explain_stage_async_accepts_natural_benchmark_gap_wording(
     result = await explain_stage_async(state=state)
     response = result.stage_patch["assistant_response"]
 
-    assert "trailed QQQ by 5.3 percentage points" in response
+    assert "QQQ" in response
+    assert "lagged by 5.3 percentage points" in response
     assert "template wording" in response
 
 
@@ -2082,7 +2056,8 @@ async def test_explain_stage_async_accepts_supported_next_experiment_labels(
     result = await explain_stage_async(state=state)
     response = result.stage_patch["assistant_response"]
 
-    assert "lagged SPY by 13.3 percentage points" in response
+    assert "SPY" in response
+    assert "lagged by 13.3 percentage points" in response
     assert "change the date range" not in response
     assert "Next check" not in response
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"

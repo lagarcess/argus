@@ -10,6 +10,8 @@ RUNTIME_INTENT_FILES = [
     "src/argus/agent_runtime/strategy_contract.py",
     "src/argus/agent_runtime/stages/execute.py",
     "src/argus/agent_runtime/rule_specs.py",
+    "src/argus/agent_runtime/signal_rule_repair.py",
+    "src/argus/agent_runtime/turn_execution_evidence.py",
 ]
 
 LEGACY_COMPOSER_PATH = Path("src/argus/agent_runtime/stages/compose.py")
@@ -50,6 +52,16 @@ def test_runtime_does_not_restore_raw_message_semantic_routers() -> None:
             "_typed_pending_need_fallback_stage_result_if_applicable",
             "typed_pending_need_validator_used",
             "summary = str(decision.user_goal_summary or \"\").lower()",
+            "_message_asks_for_runnable_prompt_example",
+            "runnable_prompt_example_route_suppressed",
+            "retry_failed_action_prompt_example_suppressed",
+            "_pending_date_endpoint_role",
+            "_parse_pending_date_endpoint_answer",
+            "deterministic_pending_date_answer_fallback",
+            "_misclassified_dca_education_has_strategy_baggage",
+            "_dca_education_answer_for_message",
+            "_message_asks_for_strategy_explanation",
+            "_message_mentions_dca_concept",
         ],
         "src/argus/agent_runtime/semantic_integrity.py": [
             "_current_turn_has_signal_rule_reference",
@@ -64,6 +76,14 @@ def test_runtime_does_not_restore_raw_message_semantic_routers() -> None:
             "_rule_tokens",
             "_moving_average_mentions",
         ],
+        "src/argus/agent_runtime/signal_rule_repair.py": [
+            "explicit_signal_rule_intent_from_text",
+            "moving_average_crossover_rules_from_text",
+        ],
+        "src/argus/agent_runtime/turn_execution_evidence.py": [
+            "explicit_signal_rule_intent_from_text",
+            "moving_average_crossover_rules_from_text",
+        ],
         "src/argus/agent_runtime/llm_interpreter.py": [
             "Nvidia to NVDA",
             "Apple to AAPL",
@@ -71,6 +91,13 @@ def test_runtime_does_not_restore_raw_message_semantic_routers() -> None:
             "Microsoft to MSFT",
             "_message_looks_like_investing_experiment",
             "_message_asks_for_capability_inventory",
+            "explicit_signal_rule_intent_from_text",
+            "_has_explicit_signal_rule_intent",
+            "_message_states_current_date_endpoint",
+            "_current_message_natural_date_range",
+            "_response_can_use_current_message_natural_time",
+            "_draft_contains_structured_date_context",
+            "_draft_contains_structured_timeframe_context",
         ],
         "src/argus/agent_runtime/stages/confirm.py": [
             "Ready to test",

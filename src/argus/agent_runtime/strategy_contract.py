@@ -467,7 +467,11 @@ def _parse_date_token(
     today: date,
     endpoint: str | None = None,
 ) -> date | None:
-    del today
+    if isinstance(value, str) and value.strip().casefold() in {
+        "today",
+        "current_date",
+    }:
+        return today
     parsed = _parse_iso_date(value)
     if parsed is not None:
         return parsed

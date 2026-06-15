@@ -4,7 +4,6 @@ import asyncio
 import inspect
 import os
 from dataclasses import dataclass
-from datetime import date, timedelta
 from typing import Any, cast, get_args
 
 from argus.agent_runtime.artifacts.patch_policy import (
@@ -65,7 +64,6 @@ from argus.agent_runtime.semantic_integrity import (
 from argus.agent_runtime.stages.artifact_context import (
     LEGACY_RESULT_EXPLANATION_TARGET_INFERRED,
     LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED,
-    launch_payload_from_failed_action,
 )
 from argus.agent_runtime.stages.artifact_context import (
     draft_assumptions_response as _draft_assumptions_response,
@@ -144,11 +142,7 @@ from argus.domain.indicators import (
 )
 from argus.domain.market_data import resolve_asset
 from argus.llm.openrouter import invoke_openrouter_chat_completion
-from argus.nlp.natural_time import (
-    dateparser_languages_for_user_language,
-    parse_explicit_date_text,
-    resolve_date_range_intent,
-)
+from argus.nlp.natural_time import resolve_date_range_intent
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 _STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
@@ -404,52 +398,8 @@ def _pending_date_answer_interpretation_when_unavailable(
         return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
-    endpoint_role = _pending_date_endpoint_role(snapshot.pending_strategy_summary)
-    endpoint = _parse_pending_date_endpoint_answer(
-        current_user_message,
-        endpoint_role=endpoint_role,
-        language=language,
-    )
-    if endpoint is None:
-        return None
-    return StructuredInterpretation(
-        intent="backtest_execution",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary="User supplied the requested date range detail.",
-        candidate_strategy_draft=StrategySummary(
-            date_range={endpoint_role: endpoint.isoformat()},
-        ),
-        missing_required_fields=[],
-        semantic_turn_act="answer_pending_need",
-        reason_codes=["deterministic_pending_date_answer_fallback"],
-    )
-
-
-def _pending_date_endpoint_role(strategy: StrategySummary) -> str:
-    date_range = strategy.date_range
-    if isinstance(date_range, dict):
-        has_start = bool(date_range.get("start") or date_range.get("from"))
-        has_end = bool(date_range.get("end") or date_range.get("to"))
-        if has_start and not has_end:
-            return "end"
-        if has_end and not has_start:
-            return "start"
-    return "end"
-
-
-def _parse_pending_date_endpoint_answer(
-    message: str,
-    *,
-    endpoint_role: str,
-    language: str | None,
-) -> date | None:
-    endpoint = "end" if endpoint_role == "end" else "start"
-    return parse_explicit_date_text(
-        message,
-        endpoint=endpoint,
-        languages=dateparser_languages_for_user_language(language),
-    )
+    del current_user_message, language
+    return None
 
 
 async def _call_structured_interpreter(
@@ -495,43 +445,24 @@ async def _stage_result_from_interpretation(
     ) or _candidate_strategy_has_backtest_shape(
         interpretation.candidate_strategy_draft
     )
-    dca_education_answer = _dca_education_answer_for_message(
-        state.current_user_message
-    )
     educational_turn_has_strategy_baggage = _educational_turn_has_strategy_baggage(
         interpretation=interpretation,
         expects_strategy_route=expects_strategy_route,
     )
-    misclassified_dca_education_has_strategy_baggage = (
-        _misclassified_dca_education_has_strategy_baggage(
-            interpretation=interpretation,
-            expects_strategy_route=expects_strategy_route,
-            dca_education_answer=dca_education_answer,
-        )
-    )
-    if (
-        educational_turn_has_strategy_baggage
-        or misclassified_dca_education_has_strategy_baggage
-    ):
+    if educational_turn_has_strategy_baggage:
         expects_strategy_route = False
         route_suppression_reason_codes.append("educational_strategy_route_suppressed")
-        update: dict[str, Any] = {
-            "intent": "conversation_followup",
-            "task_relation": "continue",
-            "requires_clarification": False,
-            "candidate_strategy_draft": StrategySummary(),
-            "missing_required_fields": [],
-            "ambiguous_fields": [],
-            "unsupported_constraints": [],
-            "semantic_turn_act": "educational_question",
-        }
-        if (
-            misclassified_dca_education_has_strategy_baggage
-            and dca_education_answer is not None
-        ):
-            update["assistant_response"] = dca_education_answer
         interpretation = interpretation.model_copy(
-            update=update,
+            update={
+                "intent": "conversation_followup",
+                "task_relation": "continue",
+                "requires_clarification": False,
+                "candidate_strategy_draft": StrategySummary(),
+                "missing_required_fields": [],
+                "ambiguous_fields": [],
+                "unsupported_constraints": [],
+                "semantic_turn_act": "educational_question",
+            },
         )
     incoming_strategy = _strategy_with_contextual_merge(
         strategy=interpretation.candidate_strategy_draft,
@@ -698,6 +629,7 @@ async def _stage_result_from_interpretation(
             interpretation=interpretation,
             current_user_message=state.current_user_message,
             supported_timeframes=_supported_timeframes(capability_contract),
+            language=user.language_preference,
         )
     shape_default_reason_codes: list[str] = []
     if expects_strategy_route:
@@ -933,13 +865,6 @@ async def _stage_result_from_interpretation(
     )
     if approval_result is not None:
         return approval_result
-    runnable_prompt_result = _runnable_prompt_example_result_if_applicable(
-        decision=decision,
-        snapshot=snapshot,
-        current_user_message=state.current_user_message,
-    )
-    if runnable_prompt_result is not None:
-        return runnable_prompt_result
     retry_result = _retry_failed_action_stage_result_if_applicable(
         decision=decision,
         snapshot=snapshot,
@@ -1115,7 +1040,9 @@ def _strategy_with_current_message_run_field_contract(
     interpretation: StructuredInterpretation,
     current_user_message: str,
     supported_timeframes: tuple[str, ...],
+    language: str,
 ) -> tuple[StrategySummary, StructuredInterpretation]:
+    del current_user_message, language
     raw_date_range = _explicit_date_range_from_strategy_for_repair(strategy)
     date_range, date_endpoint_patch_applied = (
         _complete_current_message_date_endpoint_patch(
@@ -1714,88 +1641,6 @@ async def _supported_strategy_education_repair_if_needed(
         capability_contract=capability_contract,
         language=language,
     )
-
-
-def _runnable_prompt_example_result_if_applicable(
-    *,
-    decision: InterpretDecision,
-    snapshot: TaskSnapshot | None,
-    current_user_message: str,
-) -> StageResult | None:
-    if not _message_asks_for_runnable_prompt_example(current_user_message):
-        return None
-    prompt = _runnable_prompt_example_from_failed_action(snapshot)
-    reason_code = (
-        "retry_failed_action_prompt_example_suppressed"
-        if decision.semantic_turn_act == "retry_failed_action"
-        else "runnable_prompt_example_route_suppressed"
-    )
-    return StageResult(
-        outcome="ready_to_respond",
-        decision=decision.model_copy(
-            update={
-                "intent": "conversation_followup",
-                "task_relation": "continue",
-                "requires_clarification": False,
-                "candidate_strategy_draft": StrategySummary(),
-                "missing_required_fields": [],
-                "reason_codes": [
-                    *decision.reason_codes,
-                    reason_code,
-                ],
-                "semantic_turn_act": "educational_question",
-                "capability_question_focus": "general",
-                "artifact_target": "none",
-            }
-        ),
-        stage_patch={"assistant_response": prompt},
-    )
-
-
-def _message_asks_for_runnable_prompt_example(message: str) -> bool:
-    tokens = set(_plain_word_tokens(message))
-    if "prompt" not in tokens and "example" not in tokens:
-        return False
-    if not tokens & {"run", "runnable", "errors", "error"}:
-        return False
-    return bool(
-        tokens
-        & {
-            "example",
-            "give",
-            "provide",
-            "show",
-            "suggest",
-            "try",
-            "what",
-            "which",
-            "write",
-        }
-    )
-
-
-def _runnable_prompt_example_from_failed_action(snapshot: TaskSnapshot | None) -> str:
-    payload = (
-        launch_payload_from_failed_action(snapshot.latest_failed_action_reference)
-        if snapshot is not None and snapshot.latest_failed_action_reference is not None
-        else None
-    )
-    symbol = "Amazon stock"
-    start = "January 1, 2026"
-    end = (date.today() - timedelta(days=1)).isoformat()
-    if isinstance(payload, dict):
-        raw_symbol = str(
-            (payload.get("symbols") or [payload.get("symbol") or ""])[0]
-            if isinstance(payload.get("symbols"), list)
-            else payload.get("symbol") or ""
-        ).strip()
-        if raw_symbol:
-            symbol = f"{raw_symbol.upper()} stock"
-        date_range = payload.get("date_range")
-        if isinstance(date_range, dict):
-            start = str(date_range.get("start") or start)
-            end = str(date_range.get("end") or end)
-    return f'Try: "Buy and hold {symbol} from {start} through {end}."'
 
 
 def _answer_contradicts_supported_strategy_families(answer: str) -> bool:
@@ -4942,72 +4787,6 @@ def _educational_turn_has_strategy_baggage(
         or interpretation.ambiguous_fields
         or interpretation.unsupported_constraints
     )
-
-
-def _misclassified_dca_education_has_strategy_baggage(
-    *,
-    interpretation: StructuredInterpretation,
-    expects_strategy_route: bool,
-    dca_education_answer: str | None,
-) -> bool:
-    if (
-        interpretation.semantic_turn_act == "educational_question"
-        or dca_education_answer is None
-    ):
-        return False
-    return bool(
-        expects_strategy_route
-        or _strategy_has_content(interpretation.candidate_strategy_draft)
-        or interpretation.requires_clarification
-        or interpretation.missing_required_fields
-        or interpretation.ambiguous_fields
-        or interpretation.unsupported_constraints
-    )
-
-
-def _dca_education_answer_for_message(message: str) -> str | None:
-    tokens = _plain_word_tokens(message)
-    if not tokens:
-        return None
-    if not _message_asks_for_strategy_explanation(tokens):
-        return None
-    if not _message_mentions_dca_concept(tokens):
-        return None
-    return (
-        "Dollar cost averaging means investing a set amount on a recurring "
-        "schedule instead of all at once. In Argus, the closest runnable version "
-        "is recurring buys/DCA: choose one asset, a date range, a cadence, and a "
-        "contribution amount, and I can simulate the historical result."
-    )
-
-
-def _message_asks_for_strategy_explanation(tokens: list[str]) -> bool:
-    if any(token in {"explain", "define", "meaning"} for token in tokens):
-        return True
-    if any(token in {"mean", "means"} for token in tokens) and "what" in tokens:
-        return True
-    explanation_starts = (
-        ("what", "is"),
-        ("what", "are"),
-        ("what", "does"),
-        ("tell", "me", "about"),
-    )
-    if any(
-        _token_sequence_spans(tokens, list(sequence))
-        for sequence in explanation_starts
-    ):
-        return True
-    return "how" in tokens and any(token in {"work", "works"} for token in tokens)
-
-
-def _message_mentions_dca_concept(tokens: list[str]) -> bool:
-    dca_terms = (
-        ("dca",),
-        ("dollar", "cost", "averaging"),
-        ("recurring", "buy"),
-        ("recurring", "buys"),
-    )
-    return any(_token_sequence_spans(tokens, list(term)) for term in dca_terms)
 
 
 def _candidate_strategy_has_backtest_shape(strategy: StrategySummary) -> bool:

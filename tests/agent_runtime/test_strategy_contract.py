@@ -350,6 +350,19 @@ def test_active_context_asset_mentions_need_requested_field_context() -> None:
     )
 
 
+def test_numeric_execution_facts_route_to_llm_repair_without_parsing_language() -> None:
+    assert current_turn_has_material_execution_evidence(
+        "compra y manten eth ultimos 8 meses 100k",
+        has_provider_asset_mention=False,
+        active_strategy_context=False,
+    )
+    assert current_turn_has_material_execution_evidence(
+        "RSI entry 20 exit 60",
+        has_provider_asset_mention=False,
+        active_strategy_context=True,
+    )
+
+
 def test_normalize_date_range_preserves_structured_month_name_ranges() -> None:
     normalized = normalize_date_range_candidate(
         {"start": "2020-02-07", "end": "2024-02-07"},

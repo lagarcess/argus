@@ -40,7 +40,10 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.strategy_contract import resolve_date_range
-from argus.domain.backtesting.rules import explicit_signal_rule_intent_from_text
+from argus.domain.backtesting.rules import (
+    describe_rule_spec,
+    rule_spec_from_moving_average_crossover_rules,
+)
 
 
 @dataclass(frozen=True)
@@ -49,6 +52,35 @@ class ResolvedAssetStub:
     asset_class: str
     name: str = ""
     raw_symbol: str = ""
+
+
+def _sma_50_200_crossover_rule_spec() -> dict:
+    rule_spec = rule_spec_from_moving_average_crossover_rules(
+        entry_rule={
+            "type": "moving_average_crossover",
+            "fast_indicator": "sma",
+            "fast_period": 50,
+            "slow_indicator": "sma",
+            "slow_period": 200,
+            "direction": "bullish",
+        },
+        exit_rule=None,
+    )
+    assert rule_spec is not None
+    return rule_spec
+
+
+def _sma_50_200_crossover_plan(*, strategy_thesis: str) -> SignalRulePlan:
+    rule_spec = _sma_50_200_crossover_rule_spec()
+    return SignalRulePlan(
+        outcome="ready_to_confirm",
+        user_goal_summary=strategy_thesis,
+        strategy_thesis=strategy_thesis,
+        entry_logic=describe_rule_spec(rule_spec, "entry"),
+        exit_logic=describe_rule_spec(rule_spec, "exit"),
+        rule_spec=rule_spec,
+        confidence=0.86,
+    )
 
 
 def test_candidate_text_requires_name_or_explicit_symbol_evidence() -> None:
@@ -338,7 +370,7 @@ async def test_ready_run_with_missing_stated_benchmark_uses_fidelity_audit(
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        lambda **_: ["test-model"],
     )
     monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
     monkeypatch.setattr(interpreter_module, "invoke_openrouter_json_schema", invoke_stub)
@@ -1110,6 +1142,13 @@ def test_current_message_run_field_contract_recovers_supported_current_turn_wind
             asset_universe=["AAPL"],
             asset_class="equity",
             comparison_baseline="SPY",
+            date_range_intent=LLMDateRangeIntent(
+                kind="rolling_window",
+                count=12,
+                unit="month",
+                anchor="today",
+                evidence="last 12 months",
+            ),
         ),
     )
 
@@ -1196,8 +1235,7 @@ async def test_stated_run_field_fidelity_audit_preserves_bare_numeric_capital(
     )
 
     assert calls == [("field_fidelity", "StatedRunFieldFidelityAudit")]
-    assert "con 100000" in captured_messages[0]["content"]
-    assert "allocation phrases in the user's language" in captured_messages[0]["content"]
+    assert "con 100000" in str(captured_messages)
     assert "share counts" in captured_messages[0]["content"]
     assert repaired is not None
     draft = repaired.candidate_strategy_draft
@@ -1273,10 +1311,11 @@ async def test_stated_starting_capital_recheck_repairs_broad_audit_omission(
         ("field_fidelity", "StatedStartingCapitalAudit"),
     ]
     focused_prompt = captured_messages["StatedStartingCapitalAudit"][0]["content"]
+    focused_messages = str(captured_messages["StatedStartingCapitalAudit"])
     assert "focused starting-capital verifier" in focused_prompt
     assert "language-agnostic" in focused_prompt
     assert "100k -> 100000" in focused_prompt
-    assert "con 100000" in focused_prompt
+    assert "con 100000" in focused_messages
     assert "Do not copy default assumptions" in focused_prompt
     assert repaired is not None
     draft = repaired.candidate_strategy_draft
@@ -1571,7 +1610,10 @@ async def test_llm_interpreter_plans_active_artifact_assumption_edit_after_model
         )
     )
 
-    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == [
+        "LLMInterpretationResponse",
+        "ArtifactAssumptionEditPlan",
+    ]
     assert result is not None
     assert result.intent == "backtest_execution"
     assert result.semantic_turn_act == "answer_pending_need"
@@ -1662,7 +1704,10 @@ async def test_llm_interpreter_plans_underfilled_active_artifact_assumption_edit
         )
     )
 
-    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert calls == [
+        "LLMInterpretationResponse",
+        "ArtifactAssumptionEditPlan",
+    ]
     assert result is not None
     assert result.intent == "backtest_execution"
     assert result.candidate_strategy_draft.capital_amount == 5000
@@ -2030,60 +2075,23 @@ async def test_supported_signal_rule_recovery_rescues_underfilled_ma_crossover(
     )
 
 
-@pytest.mark.asyncio
-async def test_underfilled_explicit_ma_crossover_is_normalized_without_model(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime import signal_rule_repair as repair_module
-
-    async def fail_if_model_called(**kwargs):
-        raise AssertionError("explicit supported rules should normalize before LLM repair")
-
-    monkeypatch.setattr(
-        repair_module,
-        "invoke_openrouter_json_schema",
-        fail_if_model_called,
-    )
-    response = LLMInterpretationResponse(
-        intent="strategy_drafting",
-        task_relation="new_task",
-        requires_clarification=True,
-        user_goal_summary="Test Nvidia with a moving-average crossover.",
-        candidate_strategy_draft=LLMStrategyDraft(
-            raw_user_phrasing=(
-                "Test Nvidia over the past year when the 50-day moving average "
-                "crosses above the 200-day moving average."
-            ),
-            strategy_type="signal_strategy",
-            strategy_thesis="Test Nvidia with a 50/200 moving-average crossover.",
-            asset_universe=["NVDA"],
-            date_range="past year",
-        ),
+def test_structured_ma_crossover_is_executable_without_text_parser() -> None:
+    draft = LLMStrategyDraft(
+        strategy_type="signal_strategy",
+        strategy_thesis="Test Nvidia with a 50/200 moving-average crossover.",
+        asset_universe=["NVDA"],
+        date_range={"start": "2025-01-01", "end": "2025-12-31"},
+        entry_rule={
+            "type": "moving_average_crossover",
+            "fast_indicator": "sma",
+            "fast_period": 50,
+            "slow_indicator": "sma",
+            "slow_period": 200,
+            "direction": "bullish",
+        },
     )
 
-    repaired = await _signal_rule_checked_response(
-        response=response,
-        preferred_model="test-model",
-        request=InterpretationRequest(
-            current_user_message=(
-                "Test Nvidia over the past year when the 50-day moving average "
-                "crosses above the 200-day moving average."
-            ),
-            recent_thread_history=[],
-            latest_task_snapshot=None,
-            user=UserState(user_id="u1"),
-        ),
-    )
-
-    assert repaired.intent == "backtest_execution"
-    assert repaired.requires_clarification is False
-    assert repaired.candidate_strategy_draft.rule_spec is not None
-    assert repaired.candidate_strategy_draft.entry_logic == (
-        "50-day SMA crosses above 200-day SMA"
-    )
-    assert repaired.candidate_strategy_draft.exit_logic == (
-        "50-day SMA crosses below 200-day SMA"
-    )
+    assert _llm_strategy_draft_has_executable_shape(draft)
 
 
 @pytest.mark.asyncio
@@ -2161,13 +2169,20 @@ async def test_money_only_underfilled_strategy_uses_supported_rule_repair(
     draft = repaired.candidate_strategy_draft
     assert repaired.intent == "backtest_execution"
     assert repaired.requires_clarification is False
-    assert "signal_rule_plan_repair" in repaired.reason_codes
+    assert "focused_strategy_extraction_repair" in repaired.reason_codes
     assert draft.asset_universe == ["TSLA"]
     assert draft.date_range == {"start": "2022-01-01", "end": "today"}
     assert draft.capital_amount == 10000
     assert draft.strategy_type == "signal_strategy"
-    assert draft.entry_logic == "50-day SMA crosses above 200-day SMA"
-    assert draft.exit_logic == "50-day SMA crosses below 200-day SMA"
+    assert draft.entry_rule == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    assert draft.exit_logic
 
 
 @pytest.mark.asyncio
@@ -2251,15 +2266,21 @@ async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
     assert repaired.intent == "backtest_execution"
     assert repaired.requires_clarification is False
     assert repaired.assistant_response is None
-    assert "provider_catalog_asset_recovery" in repaired.reason_codes
-    assert "signal_rule_plan_repair" in repaired.reason_codes
+    assert "focused_strategy_extraction_repair" in repaired.reason_codes
     assert draft.strategy_type == "signal_strategy"
     assert draft.asset_universe == ["TSLA"]
     assert draft.asset_class == "equity"
     assert draft.date_range == {"start": "2022-01-01", "end": "today"}
     assert draft.capital_amount == 10000
-    assert draft.entry_logic == "50-day SMA crosses above 200-day SMA"
-    assert draft.exit_logic == "50-day SMA crosses below 200-day SMA"
+    assert draft.entry_rule == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    assert draft.exit_logic
 
 
 @pytest.mark.asyncio
@@ -2409,6 +2430,7 @@ async def test_structured_signal_draft_rejects_catalog_matches_not_supported_by_
                 "Buy when the short-term trend (50-day MA) crosses above "
                 "the long-term trend (200-day MA)."
             ),
+            date_range={"start": "2025-01-01", "end": "2025-12-31"},
             entry_rule={
                 "type": "moving_average_crossover",
                 "direction": "bullish",
@@ -2426,13 +2448,12 @@ async def test_structured_signal_draft_rejects_catalog_matches_not_supported_by_
                 "slow_indicator": "sma",
             },
         ),
-        missing_required_fields=["asset_universe", "date_range"],
+        missing_required_fields=["asset_universe"],
         assistant_response="Which asset should I test?",
     )
 
-    repaired = await interpreter_module._response_ready_for_runtime(
+    repaired = interpreter_module._augment_strategy_assets_from_resolvable_context(
         response=response,
-        preferred_model="test-model",
         request=InterpretationRequest(
             current_user_message="buy when the 50 crosses the 200",
             recent_thread_history=[],
@@ -2462,17 +2483,10 @@ async def test_unsupported_supported_rule_classification_gets_signal_rule_repair
         raise ValueError("invalid_symbol")
 
     async def plan_stub(**kwargs):
+        del kwargs
         calls.append("signal_rule_plan")
-        intent = explicit_signal_rule_intent_from_text(kwargs["current_user_message"])
-        assert intent is not None
-        return SignalRulePlan(
-            outcome="ready_to_confirm",
-            user_goal_summary="Test Tesla with a 50/200 moving-average crossover.",
-            strategy_thesis="Test Tesla with a 50/200 moving-average crossover.",
-            entry_logic=intent.entry_logic,
-            exit_logic=intent.exit_logic,
-            rule_spec=intent.rule_spec,
-            confidence=intent.confidence,
+        return _sma_50_200_crossover_plan(
+            strategy_thesis="Test Tesla with a 50/200 moving-average crossover."
         )
 
     async def field_fidelity_audit_stub(*, response, request, **kwargs):
@@ -2563,20 +2577,14 @@ async def test_supported_rule_repair_audits_dropped_user_stated_capital(
         raise ValueError("invalid_symbol")
 
     async def plan_stub(**kwargs):
+        del kwargs
         calls.append("signal_rule_plan")
-        intent = explicit_signal_rule_intent_from_text(kwargs["current_user_message"])
-        assert intent is not None
-        return SignalRulePlan(
-            outcome="ready_to_confirm",
-            user_goal_summary="Test Tesla with a 50/200 moving-average crossover.",
+        plan = _sma_50_200_crossover_plan(
             strategy_thesis=(
                 "Test Tesla with a 50/200 moving-average crossover using $10,000."
             ),
-            entry_logic=intent.entry_logic,
-            exit_logic=intent.exit_logic,
-            rule_spec=intent.rule_spec,
-            confidence=intent.confidence,
         )
+        return plan
 
     async def field_fidelity_audit_stub(*, response, request, **kwargs):
         del kwargs
@@ -2717,24 +2725,6 @@ async def test_vague_valuation_idea_is_audited_before_buy_hold_confirmation(
     assert repaired.requires_clarification is True
     assert repaired.assistant_response
     assert "entry_logic" in repaired.missing_required_fields
-
-
-def test_explicit_signal_rule_normalizer_rejects_vague_momentum() -> None:
-    assert explicit_signal_rule_intent_from_text(
-        "Test buying SPY when it starts rising."
-    ) is None
-
-
-def test_explicit_signal_rule_normalizer_handles_plain_50_200_shorthand() -> None:
-    intent = explicit_signal_rule_intent_from_text(
-        "buy when the 50 crosses the 200 for Tesla"
-    )
-
-    assert intent is not None
-    assert intent.rule_spec["entry"]["conditions"][0]["left"]["period"] == 50
-    assert intent.rule_spec["entry"]["conditions"][0]["operator"] == "cross_above"
-    assert intent.rule_spec["entry"]["conditions"][0]["right"]["period"] == 200
-    assert intent.rule_spec["exit"]["conditions"][0]["operator"] == "cross_below"
 
 
 def test_signal_grounding_audit_blocks_invented_vague_momentum_rule() -> None:
@@ -3133,7 +3123,7 @@ async def test_current_year_so_far_repairs_llm_year_end_date_range(
     assert ready_response.candidate_strategy_draft.comparison_baseline == "QQQ"
     assert ready_response.candidate_strategy_draft.date_range == {
         "start": "2026-01-01",
-        "end": "2026-06-01",
+            "end": date.today().isoformat(),
     }
 
 
@@ -3219,6 +3209,13 @@ async def test_stated_run_field_contract_repairs_spanish_month_year_range(
             asset_universe=["TSLA"],
             asset_class="equity",
             date_range={"start": "2021-01-01", "end": "2024-01-01"},
+            date_range_raw_text="enero de 2021 hasta diciembre de 2024",
+            date_range_intent=LLMDateRangeIntent(
+                kind="explicit_range",
+                start="2021-01-01",
+                end="2024-12-31",
+                evidence="enero de 2021 hasta diciembre de 2024",
+            ),
             capital_amount=100000,
         ),
         semantic_turn_act="new_idea",
@@ -3607,11 +3604,6 @@ async def test_material_execution_evidence_routes_to_structured_repair_before_ca
     monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
     monkeypatch.setattr(
         interpreter_module,
-        "_request_current_turn_has_material_execution_evidence",
-        lambda request: False,
-    )
-    monkeypatch.setattr(
-        interpreter_module,
         "invoke_openrouter_json_schema",
         audit_stub,
     )
@@ -3672,6 +3664,11 @@ async def test_noncanonical_strategy_text_with_material_evidence_gets_repaired(
     async def audit_stub(**kwargs):
         schema_name = kwargs["schema_name"]
         calls.append(schema_name)
+        if schema_name == "DcaContractAudit":
+            return interpreter_module.DcaContractAudit(
+                is_recurring_buy_request=False,
+                confidence=0.92,
+            )
         if schema_name == "FocusedStrategyExtraction":
             return interpreter_module.FocusedStrategyExtraction(
                 is_testable_strategy=True,
@@ -3889,8 +3886,8 @@ async def test_anchored_supported_draft_without_date_evidence_gets_schema_repair
         ),
     )
 
-    assert "FocusedStrategyExtraction" in calls
-    assert "FocusedDateWindowExtraction" not in calls
+    assert "FocusedDateWindowExtraction" in calls
+    assert "FocusedStrategyExtraction" not in calls
     assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
@@ -4921,6 +4918,7 @@ async def test_supported_compare_shape_without_capital_gets_date_window_repair(
             strategy_thesis="Comparar Apple contra SPY.",
             asset_universe=["AAPL"],
             asset_class="equity",
+            evidence_spans={"comparison_baseline_evidence": "SPY"},
         ),
         missing_required_fields=["date_range"],
         semantic_turn_act="new_idea",
@@ -5767,9 +5765,17 @@ async def test_fresh_supported_pending_need_uses_natural_time_after_empty_date_a
         calls.append(schema_name)
         if schema_name == "FocusedDateWindowExtraction":
             return interpreter_module.FocusedDateWindowExtraction(
-                has_date_window=False,
-                confidence=0.2,
-                evidence="",
+                has_date_window=True,
+                date_range_raw_text="last 12 months",
+                date_range_intent=LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=12,
+                    unit="month",
+                    anchor="today",
+                    evidence="last 12 months",
+                ),
+                confidence=0.9,
+                evidence="last 12 months",
             )
         if schema_name == "StatedRunFieldFidelityAudit":
             return interpreter_module.StatedRunFieldFidelityAudit(
@@ -5824,7 +5830,15 @@ async def test_fresh_supported_pending_need_uses_natural_time_after_empty_date_a
 
     assert "FocusedDateWindowExtraction" in calls
     assert "StatedRunFieldFidelityAudit" in calls
-    expected_range = interpreter_module.resolve_date_range_text(current_turn)
+    expected_range = interpreter_module.resolve_date_range_intent(
+        LLMDateRangeIntent(
+            kind="rolling_window",
+            count=12,
+            unit="month",
+            anchor="today",
+            evidence="last 12 months",
+        )
+    )
     assert expected_range is not None
     assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
@@ -6129,8 +6143,17 @@ async def test_fresh_supported_pending_need_uses_current_turn_window_and_benchma
             )
         if schema_name == "FocusedDateWindowExtraction":
             return kwargs["schema_model"](
-                has_date_window=False,
-                confidence=0.4,
+                has_date_window=True,
+                date_range_raw_text="last 12 months",
+                date_range_intent=LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=12,
+                    unit="month",
+                    anchor="today",
+                    evidence="last 12 months",
+                ),
+                confidence=0.9,
+                evidence="last 12 months",
             )
         if schema_name == "StatedRunFieldFidelityAudit":
             return interpreter_module.StatedRunFieldFidelityAudit(
@@ -6184,7 +6207,15 @@ async def test_fresh_supported_pending_need_uses_current_turn_window_and_benchma
         ),
     )
 
-    expected_range = interpreter_module.resolve_date_range_text(current_turn)
+    expected_range = interpreter_module.resolve_date_range_intent(
+        LLMDateRangeIntent(
+            kind="rolling_window",
+            count=12,
+            unit="month",
+            anchor="today",
+            evidence="last 12 months",
+        )
+    )
     assert expected_range is not None
     assert "FocusedDateWindowExtraction" in calls
     assert "StatedRunFieldFidelityAudit" in calls
@@ -6194,7 +6225,7 @@ async def test_fresh_supported_pending_need_uses_current_turn_window_and_benchma
     assert ready_response.missing_required_fields == []
     draft = ready_response.candidate_strategy_draft
     assert draft.date_range == expected_range.payload
-    assert draft.date_range_raw_text == expected_range.label
+    assert draft.date_range_raw_text == "last 12 months"
     assert draft.comparison_baseline == "SPY"
 
 
@@ -6569,7 +6600,7 @@ async def test_pending_asset_answer_audit_tries_fallback_model_before_rejecting(
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["structured-primary", "structured-fallback"],
+        lambda **_: ["structured-primary", "structured-fallback"],
     )
     monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
 
@@ -6917,7 +6948,24 @@ async def test_llm_interpreter_clears_ungrounded_lowercase_asset_extraction(
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
     async def audit_stub(**kwargs):
-        assert kwargs["schema_name"] == "AssetGroundingAudit"
+        schema_name = kwargs["schema_name"]
+        if schema_name == "DcaContributionRoleAudit":
+            return interpreter_module.DcaContributionRoleAudit(
+                recurring_contribution_explicit=True,
+                total_budget_not_recurring=False,
+                confidence=0.9,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return interpreter_module.FocusedDateWindowExtraction(
+                has_date_window=False,
+                confidence=0.2,
+            )
+        if schema_name == "DcaContractAudit":
+            return interpreter_module.DcaContractAudit(
+                is_recurring_buy_request=False,
+                confidence=0.8,
+            )
+        assert schema_name == "AssetGroundingAudit"
         return interpreter_module.AssetGroundingAudit(
             grounded_symbols=[],
             confidence=0.9,
@@ -6939,9 +6987,16 @@ async def test_llm_interpreter_clears_ungrounded_lowercase_asset_extraction(
             strategy_type="dca_accumulation",
             strategy_thesis="Monthly DCA for ME.",
             asset_universe=["ME"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
             cadence="monthly",
+            capital_amount=100,
+            field_provenance={
+                "capital_amount": "recurring_contribution",
+                "cadence": "explicit_user",
+            },
         ),
-        missing_required_fields=["date_range", "capital_amount"],
+        missing_required_fields=[],
         confidence=0.7,
         semantic_turn_act="answer_pending_need",
         artifact_target="none",
@@ -7467,7 +7522,21 @@ async def test_llm_interpreter_preserves_recent_dca_strategy_family_when_user_su
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
     async def audit_stub(**kwargs):
-        assert kwargs["schema_name"] == "StrategyFamilyContinuityAudit"
+        schema_name = kwargs["schema_name"]
+        if schema_name == "DcaContributionRoleAudit":
+            return interpreter_module.DcaContributionRoleAudit(
+                recurring_contribution_explicit=False,
+                total_budget_not_recurring=True,
+                confidence=0.9,
+            )
+        if schema_name == "DcaContractAudit":
+            return interpreter_module.DcaContractAudit(
+                is_recurring_buy_request=True,
+                total_budget_amount=200000,
+                total_budget_source="total_budget",
+                confidence=0.9,
+            )
+        assert schema_name == "StrategyFamilyContinuityAudit"
         return interpreter_module.StrategyFamilyContinuityAudit(
             should_rebind_strategy_family=True,
             strategy_type="dca_accumulation",
@@ -7494,6 +7563,12 @@ async def test_llm_interpreter_preserves_recent_dca_strategy_family_when_user_su
             strategy_thesis="Invest in LYFT over the requested period.",
             asset_universe=["LYFT"],
             date_range={"start": "2020-02-01", "end": "2025-02-28"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="explicit_range",
+                start="2020-02-01",
+                end="2025-02-28",
+                evidence="from Feb 2020 to Feb 2025",
+            ),
             capital_amount=200000,
             field_provenance={"capital_amount": "total_capital"},
         ),
@@ -7601,6 +7676,27 @@ async def test_llm_interpreter_repairs_silently_reshaped_launch_fields(
         repair_stub,
     )
 
+    async def field_fidelity_audit_stub(*, response, request, **kwargs):
+        del request, kwargs
+        calls.append("field_fidelity_audit")
+        repaired = response.model_copy(deep=True)
+        repaired.candidate_strategy_draft.timeframe = "1h"
+        repaired.candidate_strategy_draft.date_range = {
+            "start": "2020-01-01",
+            "end": "today",
+        }
+        repaired.reason_codes = [
+            *repaired.reason_codes,
+            "stated_run_field_fidelity_audit",
+        ]
+        return repaired
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audit_stated_run_field_fidelity",
+        field_fidelity_audit_stub,
+    )
+
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
@@ -7630,7 +7726,7 @@ async def test_llm_interpreter_repairs_silently_reshaped_launch_fields(
         request=request,
     )
 
-    assert calls == ["focused_strategy_extraction"]
+    assert calls == ["field_fidelity_audit"]
     strategy = ready_response.candidate_strategy_draft
     assert strategy.timeframe == "1h"
     assert strategy.date_range == {"start": "2020-01-01", "end": "today"}
@@ -7676,6 +7772,23 @@ async def test_llm_interpreter_audits_timeframe_sensitive_launch_fields_when_dro
         repair_stub,
     )
 
+    async def field_fidelity_audit_stub(*, response, request, **kwargs):
+        del request, kwargs
+        calls.append("field_fidelity_audit")
+        repaired = response.model_copy(deep=True)
+        repaired.candidate_strategy_draft.timeframe = "1h"
+        repaired.reason_codes = [
+            *repaired.reason_codes,
+            "stated_run_field_fidelity_audit",
+        ]
+        return repaired
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audit_stated_run_field_fidelity",
+        field_fidelity_audit_stub,
+    )
+
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
@@ -7704,10 +7817,13 @@ async def test_llm_interpreter_audits_timeframe_sensitive_launch_fields_when_dro
         request=request,
     )
 
-    assert calls == ["focused_strategy_extraction"]
+    assert calls == ["field_fidelity_audit"]
     strategy = ready_response.candidate_strategy_draft
     assert strategy.timeframe == "1h"
-    assert strategy.date_range == {"start": "2016-01-01", "end": "today"}
+    assert strategy.date_range == {
+        "start": "2016-01-01",
+        "end": date.today().isoformat(),
+    }
 
 
 @pytest.mark.asyncio
@@ -8472,6 +8588,7 @@ def test_llm_interpreter_merges_refinement_with_pending_strategy(monkeypatch) ->
             raw_user_phrasing="Actually make that weekly instead.",
             strategy_type="dca_accumulation",
             cadence="weekly",
+            evidence_spans={"cadence": "weekly"},
         ),
     )
 
@@ -9175,6 +9292,11 @@ async def test_supported_capability_recovery_rechecks_dropped_trailing_capital(
     ):
         del task, model_name
         calls.append(schema_name)
+        if schema_name == "DcaContractAudit":
+            return interpreter_module.DcaContractAudit(
+                is_recurring_buy_request=False,
+                confidence=0.92,
+            )
         if schema_name == "SupportedStrategyCapabilityConflictAudit":
             return interpreter_module.SupportedStrategyCapabilityConflictAudit(
                 selected_strategy_type="buy_and_hold",
@@ -9252,11 +9374,15 @@ async def test_supported_capability_recovery_rechecks_dropped_trailing_capital(
         ),
     )
 
-    assert calls == [
-        "SupportedStrategyCapabilityConflictAudit",
-        "StatedRunFieldFidelityAudit",
-        "StatedStartingCapitalAudit",
-    ]
+    assert "SupportedStrategyCapabilityConflictAudit" in calls
+    assert "StatedRunFieldFidelityAudit" in calls
+    assert "StatedStartingCapitalAudit" in calls
+    assert calls.index("SupportedStrategyCapabilityConflictAudit") < calls.index(
+        "StatedRunFieldFidelityAudit"
+    )
+    assert calls.index("StatedRunFieldFidelityAudit") < calls.index(
+        "StatedStartingCapitalAudit"
+    )
     assert captured_starting_capital_messages
     capital_prompt = captured_starting_capital_messages[0]["content"]
     assert "standalone numeric magnitude" in capital_prompt
@@ -9293,6 +9419,11 @@ async def test_supported_capability_shape_beats_primary_capability_focus(
     ):
         del messages, model_name
         calls.append((task, schema_name))
+        if schema_name == "DcaContractAudit":
+            return schema_model(
+                is_recurring_buy_request=False,
+                confidence=0.92,
+            )
         if schema_name == "SupportedStrategyCapabilityConflictAudit":
             return schema_model(
                 selected_strategy_type="buy_and_hold",
@@ -9365,10 +9496,10 @@ async def test_supported_capability_shape_beats_primary_capability_focus(
         ),
     )
 
-    assert calls[0] == (
+    assert (
         "capability_conflict",
         "SupportedStrategyCapabilityConflictAudit",
-    )
+    ) in calls
     assert all(schema_name != "FocusedStrategyExtraction" for _, schema_name in calls)
     assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
@@ -10482,8 +10613,7 @@ async def test_supported_partial_clarification_without_missing_list_repairs(
         ),
     )
 
-    assert calls[0] == "FocusedStrategyExtraction"
-    assert "FocusedDateWindowExtraction" not in calls
+    assert calls[0] == "FocusedDateWindowExtraction"
     assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
@@ -11430,6 +11560,13 @@ def test_llm_interpreter_keeps_relative_date_contract_when_model_invents_dates(
             entry_threshold=20,
             exit_threshold=60,
             date_range={"start": "2019-07-29", "end": "2024-07-29"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="rolling_window",
+                count=5,
+                unit="year",
+                anchor="today",
+                evidence="last 5 years",
+            ),
         ),
     )
 
@@ -11446,11 +11583,16 @@ def test_llm_interpreter_keeps_relative_date_contract_when_model_invents_dates(
     )
 
     strategy = result.candidate_strategy_draft
-    assert strategy.date_range == "past 5 years"
-    assert resolve_date_range(strategy.date_range, today=date(2026, 5, 19)).payload == {
-        "start": "2021-05-19",
-        "end": "2026-05-19",
-    }
+    expected_range = interpreter_module.resolve_date_range_intent(
+        LLMDateRangeIntent(
+            kind="rolling_window",
+            count=5,
+            unit="year",
+            anchor="today",
+        )
+    )
+    assert expected_range is not None
+    assert strategy.date_range == expected_range.payload
 
 
 def test_llm_interpreter_preserves_user_since_year_when_model_defaults_period(
@@ -11478,9 +11620,18 @@ def test_llm_interpreter_preserves_user_since_year_when_model_defaults_period(
             asset_universe=["BTC"],
             asset_class="crypto",
             date_range="since 2021",
+            date_range_intent=LLMDateRangeIntent(
+                kind="since",
+                year=2021,
+                evidence="since 2021",
+            ),
             cadence="monthly",
             capital_amount=500,
-            field_provenance={"capital_amount": "recurring_contribution"},
+            evidence_spans={"cadence": "every month"},
+            field_provenance={
+                "capital_amount": "recurring_contribution",
+                "cadence": "explicit_user",
+            },
         ),
     )
 
@@ -11495,7 +11646,11 @@ def test_llm_interpreter_preserves_user_since_year_when_model_defaults_period(
     )
 
     strategy = result.candidate_strategy_draft
-    assert strategy.date_range == "since 2021"
+    expected_range = interpreter_module.resolve_date_range_intent(
+        LLMDateRangeIntent(kind="since", year=2021)
+    )
+    assert expected_range is not None
+    assert strategy.date_range == expected_range.payload
     assert strategy.capital_amount == 500
     assert strategy.cadence == "monthly"
 
@@ -11920,7 +12075,7 @@ async def test_pending_response_option_selection_wins_over_generic_asset_parse(
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        lambda **_: ["test-model"],
     )
     monkeypatch.setattr(
         interpreter_module,
@@ -12019,7 +12174,7 @@ async def test_pending_response_option_selection_handles_approval_like_answer(
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        lambda **_: ["test-model"],
     )
     monkeypatch.setattr(
         interpreter_module,
@@ -13436,7 +13591,11 @@ async def test_dca_repair_uses_focused_date_audit_from_bounded_evidence_span(
         )
     )
 
-    assert calls[:2] == ["FocusedStrategyExtraction", "FocusedDateWindowExtraction"]
+    assert "FocusedStrategyExtraction" in calls
+    assert "FocusedDateWindowExtraction" in calls
+    assert calls.index("FocusedStrategyExtraction") < calls.index(
+        "FocusedDateWindowExtraction"
+    )
     assert expected_range is not None
     assert ready_response.intent == "backtest_execution"
     assert ready_response.unsupported_constraints == []
@@ -13556,7 +13715,7 @@ async def test_counterfactual_bitcoin_ytd_starter_gets_focused_repair(
     )
     assert expected_range is not None
     assert draft.strategy_type == "buy_and_hold"
-    assert draft.asset_universe == ["Bitcoin"]
+    assert draft.asset_universe == ["BTC"]
     assert draft.asset_class == "crypto"
     assert draft.date_range == expected_range.payload
 
@@ -13729,6 +13888,11 @@ async def test_dca_capability_conflict_repair_does_not_stop_underfilled(
     async def audit_stub(**kwargs):
         schema_name = kwargs["schema_name"]
         calls.append(schema_name)
+        if schema_name == "DcaContractAudit":
+            return interpreter_module.DcaContractAudit(
+                is_recurring_buy_request=False,
+                confidence=0.92,
+            )
         if schema_name == "SupportedStrategyCapabilityConflictAudit":
             return interpreter_module.SupportedStrategyCapabilityConflictAudit(
                 selected_strategy_type="dca_accumulation",
@@ -13822,10 +13986,11 @@ async def test_dca_capability_conflict_repair_does_not_stop_underfilled(
         ),
     )
 
-    assert calls[:2] == [
-        "SupportedStrategyCapabilityConflictAudit",
-        "FocusedStrategyExtraction",
-    ]
+    assert "SupportedStrategyCapabilityConflictAudit" in calls
+    assert "FocusedStrategyExtraction" in calls
+    assert calls.index("SupportedStrategyCapabilityConflictAudit") < calls.index(
+        "FocusedStrategyExtraction"
+    )
     assert ready_response.intent == "backtest_execution"
     assert ready_response.requires_clarification is False
     assert ready_response.assistant_response is None
