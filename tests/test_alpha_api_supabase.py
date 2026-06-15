@@ -1064,7 +1064,26 @@ def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(
     ]
 
 
-def test_login_blocks_email_when_private_alpha_access_is_disabled(
+def test_signup_sanitizes_provider_errors(mock_gateway, monkeypatch):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.signup.side_effect = RuntimeError(
+        "Supabase provider leaked an internal auth reason"
+    )
+
+    response = client.post(
+        "/api/v1/auth/signup",
+        json={"email": "alpha@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "auth_signup_failed"
+    assert response.json()["detail"] == "Signup failed. Please try again."
+    assert "Supabase provider" not in response.text
+
+
+def test_login_normalizes_private_alpha_access_failures(
     mock_gateway,
     monkeypatch,
 ):
@@ -1077,8 +1096,9 @@ def test_login_blocks_email_when_private_alpha_access_is_disabled(
         json={"email": "disabled@example.com", "password": "password123"},
     )
 
-    assert response.status_code == 403
-    assert response.json()["code"] == "private_alpha_access_required"
+    assert response.status_code == 401
+    assert response.json()["code"] == "unauthorized"
+    assert response.json()["detail"] == "Invalid email or password."
     mock_gateway.login.assert_not_called()
     mock_gateway.private_alpha_email_allowed.assert_called_once_with(
         "disabled@example.com"
@@ -1086,6 +1106,26 @@ def test_login_blocks_email_when_private_alpha_access_is_disabled(
     assert "mark_private_alpha_login" not in [
         call[0] for call in mock_gateway.method_calls
     ]
+
+
+def test_login_normalizes_provider_auth_failures(mock_gateway, monkeypatch):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.login.side_effect = RuntimeError("invalid provider password")
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "alpha@example.com", "password": "wrong-password"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "unauthorized"
+    assert response.json()["detail"] == "Invalid email or password."
+    mock_gateway.login.assert_called_once_with(
+        email="alpha@example.com",
+        password="wrong-password",
+    )
 
 
 def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):

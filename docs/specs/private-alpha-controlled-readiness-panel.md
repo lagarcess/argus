@@ -126,7 +126,8 @@ The readiness slice should be sequenced like this:
      browser-session cookies now force `Secure` when the request is HTTPS, when
      `x-forwarded-proto` is HTTPS, or when `APP_ENV`/related backend env marks a
      production-like deployment.
-   - Allowlist/auth response normalization.
+   - Allowlist/auth response normalization. Closed locally for public login
+     failures and raw signup provider errors; auth throttling remains open.
    - Short-window quotas and accurate rate-limit behavior. Closed locally for
      authenticated chat, backtest, and feedback paths; auth throttling remains
      open because unauthenticated login/signup limits need an IP/edge or
@@ -513,13 +514,20 @@ Relevant code:
 
 #### Private-Alpha Allowlist Enumeration
 
-Login/signup can reveal differences between unlisted emails and listed emails
-with wrong passwords. Signup may also return raw provider exception text.
+Login/signup could reveal differences between unlisted emails and listed emails
+with wrong passwords. Signup could also return raw provider exception text.
 
 Action:
 
-- Normalize public auth errors.
-- Add auth endpoint throttling.
+- Closed locally: login returns the same generic `401 unauthorized` response for
+  unlisted/disabled private-alpha emails and listed emails with wrong
+  passwords, while still avoiding Supabase Auth calls for unlisted/disabled
+  emails.
+- Closed locally: signup provider failures return sanitized product-safe copy
+  instead of raw provider exception text.
+- Still open: add auth endpoint throttling through a real IP/edge or
+  identity-keyed limiter. Do not use the authenticated per-user
+  `usage_counters` model for unauthenticated auth attempts.
 - Keep detailed reasons in logs only.
 
 Relevant code:
@@ -857,6 +865,9 @@ Latest local verification on 2026-06-15:
 - Workflow/readiness matrix: import boundary, backtest infra, async job,
   Render workflow proof/execution, canary script, private-alpha readiness, and
   runtime compatibility tests passed.
+- Security/API matrix: alpha Supabase API, Supabase gateway, context-packet
+  runtime attachment, context packets, backtest job shadow, and async job tests
+  passed after auth normalization, quota, ownership, and feedback hardening.
 - Web cold-start/card smoke: `alpha-frontend`, Spanish UI smoke,
   date-range-display, confirmation-display, and result-card playground tests
   passed.
@@ -1338,7 +1349,8 @@ surfaces.
 ### Slice 3: Security And Feedback Hardening
 
 - Force secure cookies in production.
-- Normalize allowlist auth errors.
+- Normalize allowlist auth errors. Closed locally for login enumeration and
+  signup provider error sanitization; auth throttling remains open.
 - Add short-window quotas. Closed locally for authenticated chat, direct
   backtest, and feedback paths; auth throttling remains a follow-up because it
   needs a non-user-id keyed limiter.

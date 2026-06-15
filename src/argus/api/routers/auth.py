@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from argus.api import state as api_state
@@ -29,6 +29,16 @@ def _require_private_alpha_access(request: Request, email: str) -> None:
     raise private_alpha_access_problem(request)
 
 
+def _login_auth_problem(request: Request) -> HTTPException:
+    return problem(
+        request,
+        status_code=401,
+        code="unauthorized",
+        title="Unauthorized",
+        detail="Invalid email or password.",
+    )
+
+
 @router.get("/auth/session")
 def auth_session(user: User = Depends(current_user)) -> dict[str, object]:  # noqa: B008
     return {"authenticated": True, "user": user.model_dump(mode="json")}
@@ -53,13 +63,13 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
             username=body.username,
         )
         return auth_response(request, result)
-    except Exception as exc:
+    except Exception:
         raise problem(
             request,
             status_code=400,
             code="auth_signup_failed",
             title="Signup Failed",
-            detail=str(exc),
+            detail="Signup failed. Please try again.",
         ) from None
 
 
@@ -73,20 +83,15 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
             title="Internal Error",
             detail="Supabase persistence is required for authentication.",
         )
-    _require_private_alpha_access(request, body.email)
+    if not api_state.supabase_gateway.private_alpha_email_allowed(body.email):
+        raise _login_auth_problem(request)
     try:
         result = api_state.supabase_gateway.login(
             email=body.email, password=body.password
         )
         return auth_response(request, result)
     except Exception:
-        raise problem(
-            request,
-            status_code=401,
-            code="unauthorized",
-            title="Unauthorized",
-            detail="Invalid email or password.",
-        ) from None
+        raise _login_auth_problem(request) from None
 
 
 @router.post("/auth/logout")

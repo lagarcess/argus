@@ -885,7 +885,21 @@ Create account.
 }
 ```
 
-**Private-alpha blocked response:** same `403 private_alpha_access_required` shape as signup.
+**Private-alpha blocked response:** login intentionally returns the same generic
+`401 unauthorized` shape used for invalid credentials, so public login attempts
+cannot distinguish unlisted/disabled private-alpha emails from listed emails
+with wrong passwords.
+
+```json
+{
+  "type": "https://api.argus.app/problems/unauthorized",
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "Invalid email or password.",
+  "code": "unauthorized",
+  "request_id": "uuid"
+}
+```
 
 ## `POST /auth/logout`
 
