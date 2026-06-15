@@ -78,13 +78,14 @@ describe("chat turn artifact UX", () => {
     expect(card).toContain("CONFIRMATION_STATUS_ICON_STATE");
     expect(card).toContain("satisfies Record<StrategyConfirmationStatus, ConfirmationStatusIconState>");
     expect(card).toContain("function confirmationStatusIcon(");
+    expect(card).toContain("data-confirmation-status={displayState.status}");
     expect(card).not.toContain('if (status === "editing")');
-    expect(card).toContain("editing: { icon: PencilLine, isSpinning: false }");
+    expect(card).toContain("editing: { icon: Pencil, isSpinning: false }");
     expect(card).toContain("ready_to_run: { icon: Play, isSpinning: false }");
     expect(card).toContain("request_sent: { icon: Send, isSpinning: false }");
     expect(card).toContain("could_not_run: { icon: TriangleAlert, isSpinning: false }");
     expect(card).toContain("run_complete: { icon: CheckCircle2, isSpinning: false }");
-    expect(card).toContain("updated: { icon: PencilLine, isSpinning: false }");
+    expect(card).toContain("updated: { icon: RefreshCw, isSpinning: false }");
   });
 
   test("confirmation row identity uses structured keys instead of translated labels", () => {

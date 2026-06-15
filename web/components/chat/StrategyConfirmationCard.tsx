@@ -3,8 +3,10 @@ import {
   CheckCircle2,
   CircleSlash2,
   Loader2,
+  Pencil,
   PencilLine,
   Play,
+  RefreshCw,
   Search,
   Send,
   SlidersHorizontal,
@@ -58,14 +60,14 @@ type ConfirmationStatusIconState = {
 const CONFIRMATION_STATUS_ICON_STATE = {
   could_not_run: { icon: TriangleAlert, isSpinning: false },
   draft_canceled: { icon: CircleSlash2, isSpinning: false },
-  editing: { icon: PencilLine, isSpinning: false },
+  editing: { icon: Pencil, isSpinning: false },
   needs_change: { icon: SlidersHorizontal, isSpinning: false },
   not_completed: { icon: CircleSlash2, isSpinning: false },
   ready_to_run: { icon: Play, isSpinning: false },
   request_sent: { icon: Send, isSpinning: false },
   run_complete: { icon: CheckCircle2, isSpinning: false },
   running: { icon: Loader2, isSpinning: true },
-  updated: { icon: PencilLine, isSpinning: false },
+  updated: { icon: RefreshCw, isSpinning: false },
 } satisfies Record<StrategyConfirmationStatus, ConfirmationStatusIconState>;
 
 const actionClassName =
@@ -94,8 +96,14 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
             </h3>
           </div>
         </div>
-        <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${artifactStatusToneClassName(displayState.tone)}`}>
-          <StatusIcon className={`h-3.5 w-3.5 ${displayState.isSpinning ? "animate-spin" : ""}`} />
+        <span
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${artifactStatusToneClassName(displayState.tone)}`}
+          data-confirmation-status={displayState.status}
+        >
+          <StatusIcon
+            aria-hidden="true"
+            className={`h-3.5 w-3.5 ${displayState.isSpinning ? "animate-spin" : ""}`}
+          />
           {displayState.statusLabel}
         </span>
       </div>
@@ -206,6 +214,7 @@ function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: 
       : artifactLifecycleTone(status);
   return {
     ...statusIcon,
+    status,
     statusLabel,
     tone,
   };
