@@ -116,11 +116,12 @@ Codex should own or closely supervise this:
      `codex/private-alpha-next` after review.
    - Current local checkpoint: the language-agnostic runtime spine has focused
      backend tests for messy English/Spanish buy-and-hold prompts with shorthand
-     capital (`100k`) and Codex browser QA for the English confirmation-card
-     edit path. The latest browser pass proved `Change dates -> calendar 2024`
-     updates the card instead of silently re-confirming the prior rolling range.
-     Spanish browser QA still has an open over-clarification gap for messy
-     rolling-window phrasing such as `ultimos 12 meses`.
+     capital (`100k`) and Codex browser QA for the English and Spanish
+     confirmation-card edit paths. The latest browser pass proved the English
+     `Change dates -> calendar 2024` and Spanish
+     `Cambiar fechas -> calendario 2024` flows update the active card instead
+     of silently re-confirming the prior rolling range or leaking macro-context
+     prose.
    - Remaining before merge/release readiness: broader Spanish prompt matrix,
      multi-turn clarification, result execution, retry/recovery, indicator/DCA
      coverage, production-parity Render canary, and the rest of the controlled

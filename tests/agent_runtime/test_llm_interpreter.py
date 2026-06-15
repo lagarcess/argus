@@ -20,7 +20,6 @@ from argus.agent_runtime.llm_interpreter import (
     _response_from_current_message_run_field_contract,
     _response_from_signal_grounding_audit,
     _response_from_signal_rule_plan,
-    _signal_rule_checked_response,
     _strategy_from_llm,
 )
 from argus.agent_runtime.resolution import AssetResolution
@@ -3903,7 +3902,10 @@ async def test_anchored_supported_draft_without_date_evidence_gets_schema_repair
         )
     )
     assert expected_range is not None
-    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+    assert (
+        ready_response.candidate_strategy_draft.date_range
+        == expected_range.payload
+    )
 
 
 @pytest.mark.asyncio
@@ -11223,6 +11225,101 @@ async def test_supported_date_gap_escalates_before_unrelated_audits(
     draft = ready_response.candidate_strategy_draft
     assert draft.date_range == expected_range.payload
     assert draft.comparison_baseline == "SPY"
+
+
+@pytest.mark.asyncio
+async def test_pending_date_answer_overrides_macro_context_interpretation(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="calendario 2024",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="calendar_year",
+                    year=2024,
+                    confidence=0.91,
+                    evidence="calendario 2024",
+                ),
+                confidence=0.91,
+                evidence="calendario 2024",
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(confidence=0.9)
+        if schema_name == "StatedStartingCapitalAudit":
+            return interpreter_module.StatedStartingCapitalAudit(
+                starting_capital=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Comprar y mantener AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-15", "end": "2026-06-12"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="El usuario pregunta por el contexto macro de 2024.",
+        assistant_response=(
+            "Para entender cómo se comportaron los mercados en 2024, el "
+            "contexto macro fue clave."
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="calendario 2024",
+        ),
+        semantic_turn_act="educational_question",
+        context_question_focus="macro_context",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="calendario 2024",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "requested_field": "date_range",
+            },
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert calls[0] == "FocusedDateWindowExtraction"
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(kind="calendar_year", year=2024)
+    )
+    assert expected_range is not None
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.task_relation == "continue"
+    assert ready_response.semantic_turn_act == "answer_pending_need"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.missing_required_fields == []
+    assert ready_response.context_question_focus is None
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
 
 
 @pytest.mark.asyncio

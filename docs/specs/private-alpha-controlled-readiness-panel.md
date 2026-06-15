@@ -95,10 +95,10 @@ The readiness slice should be sequenced like this:
      ranges, and no hard recovery. Latest Codex browser QA also proved the
      English `Change dates -> calendar 2024` path updates the active card to
      `Jan 1, 2024 -> Dec 31, 2024` instead of silently confirming the prior
-     rolling range. Spanish browser QA still has an open over-clarification gap:
-     a messy `ultimos 12 meses` answer can ask the user to restate the rolling
-     window instead of accepting it as canonical temporal intent. This is a
-     local runtime-spine proof, not the full Spanish release gate.
+     rolling range, and the Spanish `Cambiar fechas -> calendario 2024` path
+     updates the active card to `1 ene 2024 -> 31 dic 2024` instead of leaking
+     macro-context prose. This is a local runtime-spine proof, not the full
+     Spanish release gate.
 
 2. **Backtest trust hardening**
    - Provider-backed symbol validation even when `asset_class` is explicit.

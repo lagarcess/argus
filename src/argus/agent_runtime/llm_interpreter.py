@@ -3755,6 +3755,7 @@ async def _focused_date_window_audited_response(
         repaired = _response_from_focused_date_window_extraction(
             response=response,
             extraction=extraction,
+            request=request,
         )
         if repaired is not None:
             return repaired
@@ -3766,7 +3767,11 @@ def _response_needs_focused_date_window_intent_repair(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
-    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+    pending_date_answer = _request_has_pending_date_answer_context(request)
+    if (
+        response.intent not in {"strategy_drafting", "backtest_execution"}
+        and not pending_date_answer
+    ):
         return False
     pending_supported_date_answer = (
         _pending_supported_execution_date_answer_can_use_focused_audit(
@@ -3784,12 +3789,15 @@ def _response_needs_focused_date_window_intent_repair(
         )
     )
     if response.task_relation != "new_task" and not (
-        pending_supported_date_answer or has_repairable_current_turn_date_gap
+        pending_date_answer
+        or pending_supported_date_answer
+        or has_repairable_current_turn_date_gap
     ):
         return False
     has_material_evidence = (
         _request_current_turn_has_material_execution_evidence(request)
         or _draft_has_supported_capability_shape_for_date_repair(draft)
+        or pending_date_answer
     )
     has_semantic_date_evidence = _draft_has_semantic_date_window_evidence(draft)
     if response.semantic_turn_act == "answer_pending_need" and not (
@@ -3803,15 +3811,18 @@ def _response_needs_focused_date_window_intent_repair(
         return False
     if response.semantic_turn_act in {
         "approval",
-        "educational_question",
         "refine_current_idea",
         "result_followup",
         "retry_failed_action",
         "unsupported_request",
     }:
         return False
-    if not has_material_evidence and not _supported_partial_draft_has_repairable_shape(
-        draft
+    if response.semantic_turn_act == "educational_question" and not pending_date_answer:
+        return False
+    if (
+        not pending_date_answer
+        and not has_material_evidence
+        and not _supported_partial_draft_has_repairable_shape(draft)
     ):
         return False
     if resolve_date_range_intent(draft.date_range_intent) is not None:
@@ -3833,7 +3844,11 @@ def _response_needs_focused_date_window_intent_repair(
             or _supported_partial_draft_has_repairable_shape(draft)
         )
     if _llm_value_is_empty(draft.date_range):
-        return has_semantic_date_evidence or has_repairable_current_turn_date_gap
+        return (
+            pending_date_answer
+            or has_semantic_date_evidence
+            or has_repairable_current_turn_date_gap
+        )
     if has_partial_explicit_date_range(draft.date_range):
         return True
     if has_semantic_date_evidence:
@@ -3847,6 +3862,23 @@ def _response_needs_focused_date_window_intent_repair(
     if not _llm_value_is_empty(draft.date_range_raw_text):
         return True
     return has_repairable_current_turn_date_gap
+
+
+def _request_has_pending_date_answer_context(
+    request: InterpretationRequest,
+) -> bool:
+    if request.selected_thread_metadata.get("last_stage_outcome") != (
+        "await_user_reply"
+    ):
+        return False
+    requested_field = _field_path_base(
+        str(request.selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "date_range":
+        return False
+    if not request.current_user_message.strip():
+        return False
+    return _request_has_active_strategy_context(request)
 
 
 def _complete_date_range_needs_current_turn_date_audit(
@@ -4026,6 +4058,7 @@ def _response_from_focused_date_window_extraction(
     *,
     response: LLMInterpretationResponse,
     extraction: FocusedDateWindowExtraction,
+    request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
     if not extraction.has_date_window or extraction.confidence < 0.65:
         return None
@@ -4057,6 +4090,7 @@ def _response_from_focused_date_window_extraction(
         changed = True
     if not changed:
         return None
+    pending_date_answer = _request_has_pending_date_answer_context(request)
     if raw_text:
         draft.date_range_raw_text = raw_text
         draft.evidence_spans = {
@@ -4075,6 +4109,21 @@ def _response_from_focused_date_window_extraction(
             if _field_path_base(field.field_name) != "date_range"
         ]
     if (
+        pending_date_answer
+        and not repaired.missing_required_fields
+        and not repaired.ambiguous_fields
+        and not repaired.unsupported_constraints
+    ):
+        repaired.requires_clarification = False
+        repaired.assistant_response = None
+        repaired.intent = "backtest_execution"
+        repaired.task_relation = "continue"
+        repaired.semantic_turn_act = "answer_pending_need"
+        repaired.result_followup_focus = None
+        repaired.capability_question_focus = None
+        repaired.context_question_focus = None
+        repaired.artifact_target = "active_confirmation"
+    elif (
         repaired.requires_clarification
         and not repaired.missing_required_fields
         and not repaired.ambiguous_fields
@@ -4089,6 +4138,11 @@ def _response_from_focused_date_window_extraction(
             [
                 *repaired.reason_codes,
                 "focused_date_window_intent_repair",
+                *(
+                    ["pending_date_answer_focused_window_repair"]
+                    if pending_date_answer
+                    else []
+                ),
             ]
         )
     )
