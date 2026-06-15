@@ -17,8 +17,7 @@ from argus.agent_runtime.asset_text_grounding import (
 )
 from argus.agent_runtime.capabilities.answers import (
     EXECUTABLE_STRATEGY_FAMILIES,
-    compose_capability_answer,
-    compose_capability_recovery_answer,
+    capability_fact_packet,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.extraction import detect_unsupported_constraints
@@ -43,7 +42,6 @@ from argus.agent_runtime.result_followups import (
     compose_private_alpha_save_response,
     compose_result_followup_response,
     fallback_private_alpha_save_response,
-    fallback_result_followup_response,
 )
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
@@ -62,8 +60,8 @@ from argus.agent_runtime.semantic_integrity import (
     filter_unsubstantiated_timeframe_constraints,
 )
 from argus.agent_runtime.stages.artifact_context import (
-    LEGACY_RESULT_EXPLANATION_TARGET_INFERRED,
-    LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED,
+    RESULT_EXPLANATION_TARGET_INFERRED,
+    RESULT_FOLLOWUP_TARGET_INFERRED,
 )
 from argus.agent_runtime.stages.artifact_context import (
     draft_assumptions_response as _draft_assumptions_response,
@@ -886,6 +884,7 @@ async def _stage_result_from_interpretation(
     if pending_refinement_result is not None:
         return pending_refinement_result
     private_alpha_save_result = await _private_alpha_save_request_result_if_applicable(
+        user=user,
         decision=decision,
         snapshot=snapshot,
         current_user_message=state.current_user_message,
@@ -896,6 +895,7 @@ async def _stage_result_from_interpretation(
         decision=decision,
         snapshot=snapshot,
         current_user_message=state.current_user_message,
+        language=user.language_preference,
     )
     if followup_result is not None:
         return followup_result
@@ -1345,14 +1345,14 @@ def _validated_artifact_target(
         and snapshot is not None
         and snapshot.latest_backtest_result_reference is not None
     ):
-        reason_codes.append(LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED)
+        reason_codes.append(RESULT_FOLLOWUP_TARGET_INFERRED)
         return "latest_result", reason_codes
     if (
         interpretation.intent == "results_explanation"
         and snapshot is not None
         and snapshot.latest_backtest_result_reference is not None
     ):
-        reason_codes.append(LEGACY_RESULT_EXPLANATION_TARGET_INFERRED)
+        reason_codes.append(RESULT_EXPLANATION_TARGET_INFERRED)
         return "latest_result", reason_codes
     return proposed, reason_codes
 
@@ -1513,7 +1513,7 @@ async def _capability_answer_if_applicable(
     )
     if composed:
         return composed
-    return compose_capability_answer(focus=focus, contract=capability_contract)
+    return recovery_message("capability_answer_unavailable", language=language)
 
 
 async def _context_curiosity_answer_if_applicable(
@@ -1555,7 +1555,7 @@ async def _compose_natural_capability_answer(
     capability_contract: Any,
     language: str = "en",
 ) -> str | None:
-    fact_packet = compose_capability_answer(
+    fact_packet = capability_fact_packet(
         focus=focus,
         contract=capability_contract,
     )
@@ -1589,20 +1589,9 @@ async def _compose_natural_capability_answer(
             focus=focus,
         ):
             return answer
-        return compose_capability_answer(
-            focus=focus,
-            contract=capability_contract,
-        )
+        return None
     except Exception:
-        if focus == "supported_indicators":
-            return compose_capability_answer(
-                focus=focus,
-                contract=capability_contract,
-            )
-        return compose_capability_recovery_answer(
-            focus=focus,
-            contract=capability_contract,
-        )
+        return None
 
 
 def _capability_answer_respects_contract(
@@ -1635,12 +1624,13 @@ async def _supported_strategy_education_repair_if_needed(
         or not _answer_contradicts_supported_strategy_families(assistant_response)
     ):
         return None
-    return await _compose_natural_capability_answer(
+    composed = await _compose_natural_capability_answer(
         focus="supported_strategies",
         current_user_message=current_user_message,
         capability_contract=capability_contract,
         language=language,
     )
+    return composed or recovery_message("capability_answer_unavailable", language=language)
 
 
 def _answer_contradicts_supported_strategy_families(answer: str) -> bool:
@@ -2166,7 +2156,7 @@ async def _compose_unanchored_strategy_recovery_answer(
     capability_contract: Any,
     language: str = "en",
 ) -> str | None:
-    fact_packet = compose_capability_answer(
+    fact_packet = capability_fact_packet(
         focus="supported_strategies",
         contract=capability_contract,
     )
@@ -2943,14 +2933,14 @@ async def _latest_result_followup_when_interpreter_unavailable(
         metadata=metadata,
         focus="general",
         user_message=current_user_message,
+        language=user.language_preference,
     )
+    used_recovery = response is None
     if response is None:
-        response = fallback_result_followup_response(
-            metadata=metadata,
-            focus="general",
+        response = recovery_message(
+            "latest_result_followup_unavailable",
+            language=user.language_preference,
         )
-    if response is None:
-        return None
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -2981,9 +2971,21 @@ async def _latest_result_followup_when_interpreter_unavailable(
         decision=decision,
         stage_patch={
             "assistant_response": with_response_heading(
-                heading=result_followup_heading("general"),
+                heading=result_followup_heading(
+                    "general",
+                    language=user.language_preference,
+                ),
                 body=response,
-            )
+            ),
+            **(
+                recovery_state_stage_patch(
+                    "latest_result_followup_unavailable",
+                    language=user.language_preference,
+                    retryable=True,
+                )
+                if used_recovery
+                else {}
+            ),
         },
     )
 
@@ -3017,22 +3019,27 @@ async def _latest_result_followup_recovery_if_applicable(
         response = await compose_private_alpha_save_response(
             metadata=metadata,
             user_message=current_user_message,
+            language=user.language_preference,
         )
         if response is None:
-            response = fallback_private_alpha_save_response()
+            response = fallback_private_alpha_save_response(
+                language=user.language_preference
+            )
     else:
         response = await compose_result_followup_response(
             metadata=metadata,
             focus=focus,
             user_message=current_user_message,
+            language=user.language_preference,
         )
+        used_recovery = response is None
         if response is None:
-            response = fallback_result_followup_response(
-                metadata=metadata,
-                focus=focus,
+            response = recovery_message(
+                "latest_result_followup_unavailable",
+                language=user.language_preference,
             )
-        if response is None:
-            return None
+    if save_requested and not _strategies_enabled():
+        used_recovery = False
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -3062,16 +3069,29 @@ async def _latest_result_followup_recovery_if_applicable(
                 response
                 if save_requested and not _strategies_enabled()
                 else with_response_heading(
-                    heading=result_followup_heading(focus),
+                    heading=result_followup_heading(
+                        focus,
+                        language=user.language_preference,
+                    ),
                     body=response,
                 )
-            )
+            ),
+            **(
+                recovery_state_stage_patch(
+                    "latest_result_followup_unavailable",
+                    language=user.language_preference,
+                    retryable=True,
+                )
+                if used_recovery
+                else {}
+            ),
         },
     )
 
 
 async def _private_alpha_save_request_result_if_applicable(
     *,
+    user: UserState,
     decision: InterpretDecision,
     snapshot: TaskSnapshot | None,
     current_user_message: str,
@@ -3087,9 +3107,12 @@ async def _private_alpha_save_request_result_if_applicable(
     response = await compose_private_alpha_save_response(
         metadata=dict(snapshot.latest_backtest_result_reference.metadata),
         user_message=current_user_message,
+        language=user.language_preference,
     )
     if response is None:
-        response = fallback_private_alpha_save_response()
+        response = fallback_private_alpha_save_response(
+            language=user.language_preference
+        )
     return StageResult(
         outcome="ready_to_respond",
         decision=decision.model_copy(

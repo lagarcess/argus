@@ -684,7 +684,7 @@ def test_capability_question_answer_uses_indicator_registry_not_llm_copy(
     )
 
 
-def test_supported_indicator_capability_composer_failure_uses_registry_fallback(
+def test_supported_indicator_capability_composer_failure_uses_locale_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _failing_chat_completion(**_: Any) -> str:
@@ -705,18 +705,22 @@ def test_supported_indicator_capability_composer_failure_uses_registry_fallback(
     )
 
     result, _interpreter = run_interpret_with_llm(
-        message="Can I use Bollinger Bands?",
+        message="¿puedo usar bandas bollinger?",
         response=response,
+        user=UserState(user_id="u1", language_preference="es-419"),
     )
 
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
     assert "I only support RSI" not in answer
+    assert "No pude formular" in answer
+    assert "intenta de nuevo" in answer
+    assert "Executable indicators" not in answer
     for spec in EXECUTABLE_INDICATORS.values():
-        assert spec.label in answer
+        assert spec.label not in answer
 
 
-def test_supported_indicator_capability_contradiction_uses_registry_fallback(
+def test_supported_indicator_capability_contradiction_uses_locale_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _contradictory_chat_completion(**_: Any) -> str:
@@ -736,15 +740,19 @@ def test_supported_indicator_capability_contradiction_uses_registry_fallback(
     )
 
     result, _interpreter = run_interpret_with_llm(
-        message="Can I use Bollinger Bands?",
+        message="¿puedo usar bandas bollinger?",
         response=response,
+        user=UserState(user_id="u1", language_preference="es-419"),
     )
 
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
+    assert "No pude formular" in answer
+    assert "intenta de nuevo" in answer
+    assert "Executable indicators" not in answer
     assert "not supported" not in answer.lower()
     for spec in EXECUTABLE_INDICATORS.values():
-        assert spec.label in answer
+        assert spec.label not in answer
 
 
 def test_strategy_family_education_keeps_llm_language_over_registry_copy() -> None:
@@ -1239,9 +1247,8 @@ def test_supported_strategy_capability_composer_failure_stays_human(
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
     assert "Executable strategy families" not in answer
-    assert "configuration" not in answer.lower()
-    assert "historical" in answer.lower()
-    assert "not investment advice" in answer.lower()
+    assert "could not phrase that capability answer" in answer
+    assert "supported rule" in answer
 
 
 def test_interpret_social_opener_uses_llm_response() -> None:
@@ -2234,7 +2241,19 @@ def test_interpret_answers_pending_draft_assumption_followup_without_approval() 
     assert result.decision.semantic_turn_act == "result_followup"
 
 
-def test_result_followup_uses_latest_result_fact_bank() -> None:
+def test_result_followup_uses_latest_result_fact_bank(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_compose_result_followup_response(**kwargs: Any) -> str:
+        assert kwargs["focus"] == "max_drawdown"
+        assert kwargs["metadata"]["symbols"] == ["MSFT"]
+        assert kwargs["language"] == "en"
+        return "MSFT's max drawdown was 34.2% in the latest run."
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
+        fake_compose_result_followup_response,
+    )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
             artifact_kind="backtest_result",
@@ -2345,7 +2364,63 @@ def test_result_followup_uses_latest_result_when_interpreter_unavailable(
     assert captured["user_message"] == "Why did this happen?"
 
 
-def test_result_followup_uses_llm_composer_before_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_result_followup_heading_uses_user_language_when_interpreter_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_compose_result_followup_response(**kwargs: Any) -> str:
+        del kwargs
+        return "Respuesta fundamentada en el resultado más reciente."
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
+        fake_compose_result_followup_response,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-interpreter-down-es",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["AAPL"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 41.1,
+                            "benchmark_return_pct": 26.7,
+                            "delta_vs_benchmark_pct": 14.4,
+                        }
+                    }
+                },
+                "config_snapshot": {
+                    "template": "buy_and_hold",
+                    "symbols": ["AAPL"],
+                    "date_range": {"start": "2025-05-15", "end": "2026-05-15"},
+                },
+            },
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="¿por qué pasó esto?",
+            recent_thread_history=[],
+        ),
+        user=UserState(
+            user_id="u1",
+            expertise_level="advanced",
+            language_preference="es-419",
+        ),
+        latest_task_snapshot=snapshot,
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.patch["assistant_response"].startswith("**Qué pasó**")
+    assert "Respuesta fundamentada" in result.patch["assistant_response"]
+
+
+def test_result_followup_uses_llm_composer_before_recovery(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, Any] = {}
 
     async def fake_compose_result_followup_response(**kwargs: Any) -> str:
@@ -2402,7 +2477,7 @@ def test_result_followup_uses_llm_composer_before_fallback(monkeypatch: pytest.M
     assert captured["user_message"] == "Why did this happen?"
 
 
-def test_empty_non_strategy_turn_after_result_falls_back_to_next_tests(
+def test_empty_non_strategy_turn_after_result_uses_followup_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def empty_compose_result_followup_response(**kwargs: Any) -> None:
@@ -2456,12 +2531,8 @@ def test_empty_non_strategy_turn_after_result_falls_back_to_next_tests(
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
     answer_lower = answer.lower()
-    assert "latest run" in answer_lower
-    assert "next" in answer_lower
-    assert any(
-        option in answer_lower
-        for option in ("date range", "indicator period", "threshold")
-    )
+    assert "latest result" in answer_lower
+    assert "could not safely answer that follow-up" in answer_lower
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "general"
     assert result.decision.artifact_target == "latest_result"
@@ -2477,7 +2548,7 @@ def test_latest_result_recovery_preserves_next_experiment_focus(
         return None
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
+        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
         empty_compose_result_followup_response,
     )
     snapshot = TaskSnapshot(
@@ -2525,9 +2596,12 @@ def test_latest_result_recovery_preserves_next_experiment_focus(
     answer = result.patch["assistant_response"]
     answer_lower = answer.lower()
     assert answer.startswith("**Try next**")
-    assert "A good next move is to isolate one assumption." in answer
-    assert "change the date range" in answer_lower
-    assert "try a supported rsi threshold on btc" in answer_lower
+    assert "could not safely answer that follow-up" in answer_lower
+    assert result.patch["recovery"] == {
+        "code": "latest_result_followup_unavailable",
+        "retryable": True,
+        "language": "en",
+    }
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "next_experiment"
     assert result.decision.artifact_target == "latest_result"
@@ -2594,11 +2668,12 @@ def test_latest_result_save_request_is_history_preserved_when_strategies_disable
     assert "Saved" not in answer
     assert "Strategy was saved" not in answer
     assert composed_save_response["user_message"] == "save this"
+    assert composed_save_response["language"] == "en"
     assert composed_save_response["metadata"]["symbols"] == ["AAPL"]
     assert "latest_result_save_requested" in result.decision.reason_codes
 
 
-def test_unanchored_clarification_after_result_falls_back_to_next_tests(
+def test_unanchored_clarification_after_result_uses_followup_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def empty_compose_result_followup_response(**kwargs: Any) -> None:
@@ -2657,15 +2732,15 @@ def test_unanchored_clarification_after_result_falls_back_to_next_tests(
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
     answer_lower = answer.lower()
-    assert "latest run" in answer_lower
-    assert "next" in answer_lower
+    assert "latest result" in answer_lower
+    assert "could not safely answer that follow-up" in answer_lower
     assert "one more detail" not in answer
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.requires_clarification is False
     assert result.decision.artifact_target == "latest_result"
 
 
-def test_result_followup_timeout_falls_back_to_grounded_facts(
+def test_result_followup_timeout_uses_localized_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import asyncio
@@ -2732,9 +2807,8 @@ def test_result_followup_timeout_falls_back_to_grounded_facts(
 
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
-    assert "TSLA" in answer
-    assert "27.5%" in answer
-    assert "historical simulation evidence" in answer.lower()
+    assert answer.startswith("**What happened**")
+    assert "could not safely answer that follow-up" in answer
     receipts = openrouter.get_openrouter_route_receipts()
     assert receipts[-1].task == "result_summary"
     assert receipts[-1].failure_mode == "result_followup_timeout"
@@ -2806,16 +2880,20 @@ def test_results_explanation_intent_uses_result_artifact_even_if_turn_act_drifts
     assert result.decision.semantic_turn_act == "result_followup"
 
 
-async def _force_result_followup_fallback(**kwargs: Any) -> None:
-    return None
-
-
 def test_underperformance_followup_corrects_false_premise_when_run_outperformed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    async def fake_compose_result_followup_response(**kwargs: Any) -> str:
+        assert kwargs["focus"] == "why_underperformed"
+        assert kwargs["metadata"]["symbols"] == ["TSLA"]
+        return (
+            "TSLA beat SPY in this run: the strategy returned +33.4%, "
+            "while SPY returned +26.5%."
+        )
+
     monkeypatch.setattr(
         "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        _force_result_followup_fallback,
+        fake_compose_result_followup_response,
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -2865,9 +2943,17 @@ def test_underperformance_followup_corrects_false_premise_when_run_outperformed(
 def test_zero_return_followup_uses_result_reason_without_repeating_readout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    async def fake_compose_result_followup_response(**kwargs: Any) -> str:
+        assert kwargs["focus"] == "general"
+        assert kwargs["metadata"]["symbols"] == ["TSLA"]
+        return (
+            "The strategy returned 0.0% while SPY returned +8.9%. "
+            "No entry trades were executed."
+        )
+
     monkeypatch.setattr(
         "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        _force_result_followup_fallback,
+        fake_compose_result_followup_response,
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -2926,9 +3012,17 @@ def test_zero_return_followup_uses_result_reason_without_repeating_readout(
 def test_result_followup_summarizes_what_was_tested_from_fact_bank(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    async def fake_compose_result_followup_response(**kwargs: Any) -> str:
+        assert kwargs["focus"] == "what_tested"
+        assert kwargs["metadata"]["symbols"] == ["MSFT"]
+        return (
+            "I tested MSFT with buy and hold over May 13, 2025 to May 13, 2026. "
+            "Assumptions: Long-only; Equal weight; No fees/slippage; Benchmark: SPY."
+        )
+
     monkeypatch.setattr(
         "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        _force_result_followup_fallback,
+        fake_compose_result_followup_response,
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
@@ -3064,9 +3158,18 @@ def test_result_followup_uses_composer_question_when_llm_focus_is_wrong(
 def test_result_followup_names_indicator_rules_and_no_trade_outcome(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    async def fake_compose_result_followup_response(**kwargs: Any) -> str:
+        assert kwargs["focus"] == "what_tested"
+        assert kwargs["metadata"]["symbols"] == ["TSLA"]
+        return (
+            "I tested TSLA with an RSI mean reversion strategy: enter when "
+            "RSI(14) falls below 20 and exit when RSI(14) rises above 60. "
+            "No entry trades were executed, so the run stayed in cash."
+        )
+
     monkeypatch.setattr(
         "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
-        _force_result_followup_fallback,
+        fake_compose_result_followup_response,
     )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(

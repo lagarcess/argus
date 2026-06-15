@@ -16,12 +16,12 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
 )
 
-LEGACY_RESULT_EXPLANATION_TARGET_INFERRED = "legacy_result_explanation_target_inferred"
-LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED = "legacy_result_followup_target_inferred"
-LEGACY_RESULT_TARGET_INFERENCE_CODES = frozenset(
+RESULT_EXPLANATION_TARGET_INFERRED = "result_explanation_target_inferred"
+RESULT_FOLLOWUP_TARGET_INFERRED = "result_followup_target_inferred"
+RESULT_TARGET_INFERENCE_CODES = frozenset(
     {
-        LEGACY_RESULT_EXPLANATION_TARGET_INFERRED,
-        LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED,
+        RESULT_EXPLANATION_TARGET_INFERRED,
+        RESULT_FOLLOWUP_TARGET_INFERRED,
     }
 )
 
@@ -46,7 +46,7 @@ def decision_allows_result_artifact_patch(
 ) -> bool:
     if decision.artifact_target != "latest_result":
         return False
-    return not bool(set(decision.reason_codes) & LEGACY_RESULT_TARGET_INFERENCE_CODES)
+    return not bool(set(decision.reason_codes) & RESULT_TARGET_INFERENCE_CODES)
 
 
 def stale_confirmation_action_response(

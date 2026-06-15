@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 import pytest
@@ -35,6 +36,7 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
 )
+from argus.nlp.natural_time import resolve_date_range_intent
 from langgraph.checkpoint.memory import MemorySaver
 
 
@@ -1307,11 +1309,17 @@ async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import resolution as resolution_module
+    from argus.agent_runtime.stages import interpret as interpret_module
 
     monkeypatch.setattr(
         resolution_module,
         "resolve_market_asset",
         lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_date_range_intent",
+        lambda value: resolve_date_range_intent(value, today=date(2026, 6, 15)),
     )
 
     interpreter = SpanishDateAnswerInterpreter()
@@ -1377,7 +1385,20 @@ async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
     assert strategy["asset_universe"] == ["AAPL"]
     assert strategy["capital_amount"] == 100000
     assert strategy["comparison_baseline"] == "SPY"
-    assert strategy["date_range"] == {"start": "2025-12-14", "end": "2026-06-12"}
+    expected_range = resolve_date_range_intent(
+        {
+            "kind": "rolling_window",
+            "count": 6,
+            "unit": "month",
+            "anchor": "today",
+        },
+        today=date(2026, 6, 15),
+    )
+    assert expected_range is not None
+    assert strategy["date_range"] == {
+        **expected_range.payload,
+        "end": "2026-06-12",
+    }
     assert answer_result["pending_strategy"]["requested_field"] is None
     assert answer_result["pending_strategy"]["missing_required_fields"] == []
 

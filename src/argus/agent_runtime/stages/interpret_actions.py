@@ -14,6 +14,10 @@ from argus.agent_runtime.artifacts.patch_policy import (
 )
 from argus.agent_runtime.artifacts.patches import ArtifactPatch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.recovery_messages import (
+    recovery_message,
+    recovery_state_stage_patch,
+)
 from argus.agent_runtime.response_style import (
     result_followup_heading,
     with_response_heading,
@@ -21,8 +25,7 @@ from argus.agent_runtime.response_style import (
 from argus.agent_runtime.result_followups import (
     compose_result_followup_response,
     context_packet_ids_from_fact_bank,
-    fallback_result_followup_response,
-    record_result_followup_fallback_receipt,
+    record_result_followup_recovery_receipt,
     result_followup_fact_bank,
     result_followup_llm_task,
 )
@@ -32,7 +35,7 @@ from argus.agent_runtime.stages.approval_guard import (
     decision_requests_confirmation_card_action,
 )
 from argus.agent_runtime.stages.artifact_context import (
-    LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED,
+    RESULT_FOLLOWUP_TARGET_INFERRED,
     active_confirmation_effective_strategy,
     confirmation_payload_dict,
     confirmation_payload_is_validated_executable,
@@ -716,6 +719,7 @@ async def artifact_followup_stage_result_if_applicable(
     decision: InterpretDecision,
     snapshot: TaskSnapshot | None,
     current_user_message: str,
+    language: str = "en",
 ) -> StageResult | None:
     deterministic_patch_result = (
         _deterministic_result_artifact_patch_stage_result_if_applicable(
@@ -753,22 +757,31 @@ async def artifact_followup_stage_result_if_applicable(
         metadata=metadata,
         focus=focus,
         user_message=current_user_message,
+        language=language,
     )
+    used_recovery = response is None
     if response is None:
-        response = fallback_result_followup_response(
-            metadata=metadata,
-            focus=focus,
+        response = recovery_message(
+            "latest_result_followup_unavailable",
+            language=language,
         )
-    if response is None:
-        return None
     return StageResult(
         outcome="ready_to_respond",
         decision=_result_followup_decision(decision, focus=focus),
         stage_patch={
             "assistant_response": with_response_heading(
-                heading=result_followup_heading(focus),
+                heading=result_followup_heading(focus, language=language),
                 body=response,
-            )
+            ),
+            **(
+                recovery_state_stage_patch(
+                    "latest_result_followup_unavailable",
+                    language=language,
+                    retryable=True,
+                )
+                if used_recovery
+                else {}
+            ),
         },
     )
 
@@ -852,7 +865,7 @@ def _deterministic_result_artifact_patch_stage_result_if_applicable(
 def _result_followup_target_was_inferred_non_patch(
     decision: InterpretDecision,
 ) -> bool:
-    if LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED not in decision.reason_codes:
+    if RESULT_FOLLOWUP_TARGET_INFERRED not in decision.reason_codes:
         return False
     return _strategy_has_structured_non_patch_evidence(
         strategy=decision.candidate_strategy_draft,
@@ -980,6 +993,7 @@ async def _compose_result_followup_with_timeout(
     metadata: dict[str, Any],
     focus: str,
     user_message: str,
+    language: str = "en",
 ) -> str | None:
     try:
         return await asyncio.wait_for(
@@ -987,12 +1001,13 @@ async def _compose_result_followup_with_timeout(
                 metadata=metadata,
                 focus=focus,
                 user_message=user_message,
+                language=language,
             ),
             timeout=RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS,
         )
     except TimeoutError:
         fact_bank = result_followup_fact_bank(metadata)
-        record_result_followup_fallback_receipt(
+        record_result_followup_recovery_receipt(
             task=result_followup_llm_task(fact_bank=fact_bank, focus=focus),
             failure_mode="result_followup_timeout",
             context_packet_ids=context_packet_ids_from_fact_bank(fact_bank),

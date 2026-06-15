@@ -9,12 +9,14 @@ RecoveryMessageCode = Literal[
     "setup_change_unapplied",
     "confirmation_change_unapplied",
     "latest_result_followup_unavailable",
+    "private_alpha_save_unavailable",
     "confirmation_action_guidance",
     "clarification_generation_unavailable",
     "context_macro_recovery",
     "context_corporate_events_recovery",
     "context_market_movers_recovery",
     "context_market_movers_seed_recovery",
+    "capability_answer_unavailable",
     "runtime_failure",
 ]
 
@@ -71,6 +73,19 @@ RECOVERY_MESSAGES: dict[RecoveryMessageCode, dict[Language, str]] = {
             "Todavía tengo el resultado más reciente en este chat, pero no "
             "pude responder ese seguimiento con confianza. Intenta de nuevo en "
             "un momento."
+        ),
+    },
+    "private_alpha_save_unavailable": {
+        "en": (
+            "I cannot move this into Strategies while that surface is off for "
+            "private alpha, but the completed run is still part of this chat "
+            "and can be reopened from the conversation or Recents."
+        ),
+        "es-419": (
+            "No puedo mover esto a Estrategias mientras esa superficie está "
+            "desactivada para la alfa privada, pero la ejecución completa "
+            "sigue en este chat y puedes volver a abrirla desde la conversación "
+            "o Recientes."
         ),
     },
     "confirmation_action_guidance": {
@@ -144,6 +159,18 @@ RECOVERY_MESSAGES: dict[RecoveryMessageCode, dict[Language, str]] = {
             "para un experimento: {seeds}. Trátalas como símbolos por validar, "
             "no como recomendaciones ni como un ranking en vivo. Elige uno y "
             "puedo plantear una prueba histórica compatible."
+        ),
+    },
+    "capability_answer_unavailable": {
+        "en": (
+            "I could not phrase that capability answer clearly just now. Tell me "
+            "the asset, period, or supported rule you want to test, or try again "
+            "in a moment."
+        ),
+        "es-419": (
+            "No pude formular esa respuesta de capacidades con claridad en este "
+            "momento. Dime el activo, periodo o regla compatible que quieres "
+            "probar, o intenta de nuevo en un momento."
         ),
     },
     "runtime_failure": {

@@ -3706,7 +3706,7 @@ def test_dca_education_answer_cannot_claim_recurring_buys_unsupported(monkeypatc
 
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
-    assert "Recurring buys support" in answer
+    assert "could not phrase that capability answer" in answer
     assert "can't run" not in answer
     assert "not runnable" not in answer
 
@@ -3801,12 +3801,12 @@ def test_new_strategy_keeps_explicit_cashtag_symbol_context(monkeypatch) -> None
 
 
 def test_supported_bollinger_capability_is_not_recovered_as_unsupported() -> None:
-    from argus.agent_runtime.capabilities.answers import compose_capability_answer
+    from argus.agent_runtime.capabilities.answers import capability_fact_packet
     from argus.agent_runtime.capabilities.contract import (
         build_default_capability_contract,
     )
 
-    answer = compose_capability_answer(
+    answer = capability_fact_packet(
         focus="supported_indicators",
         contract=build_default_capability_contract(),
     )

@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from argus.agent_runtime.recovery_messages import recovery_message
+from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
 from argus.agent_runtime.stages.interpret_types import ResultFollowupFocus
 from argus.context.rendering import context_packet_fact_summary
@@ -134,6 +136,7 @@ async def compose_result_followup_response(
     metadata: dict[str, Any],
     focus: ResultFollowupFocus,
     user_message: str,
+    language: str = "en",
     invoke_json_schema_func=invoke_openrouter_json_schema,
     log_openrouter_failure_func=log_openrouter_failure,
 ) -> str | None:
@@ -162,6 +165,7 @@ async def compose_result_followup_response(
                 focus=focus,
                 user_message=user_message,
                 required_fact_ids=required_fact_ids,
+                language=language,
             ),
             schema_model=ResultFollowupDraft,
             schema_name="ResultFollowupDraft",
@@ -174,25 +178,25 @@ async def compose_result_followup_response(
             task=llm_task,
             model_name=None,
             exc=exc,
-            message="LLM result follow-up failed; using grounded fallback",
+            message="LLM result follow-up failed; deferring to localized recovery",
         )
         return None
 
     draft = coerce_result_followup_draft(raw_response)
     if draft is None:
-        record_result_followup_fallback_receipt(
+        record_result_followup_recovery_receipt(
             task=llm_task,
             failure_mode="invalid_result_followup_draft",
             context_packet_ids=context_packet_ids,
         )
         return None
     if draft.causal_attribution_claim == "unsupported":
-        record_result_followup_fallback_receipt(
+        record_result_followup_recovery_receipt(
             task=llm_task,
             failure_mode="unsupported_causal_attribution_claim",
             context_packet_ids=context_packet_ids,
         )
-        return fallback_result_followup_response(metadata=metadata, focus=focus)
+        return None
     rendered = render_result_followup_draft(
         draft=draft,
         fact_bank=fact_bank,
@@ -200,7 +204,7 @@ async def compose_result_followup_response(
         focus=focus,
     )
     if rendered is None:
-        record_result_followup_fallback_receipt(
+        record_result_followup_recovery_receipt(
             task=llm_task,
             failure_mode="result_followup_draft_rejected",
             context_packet_ids=context_packet_ids,
@@ -212,12 +216,12 @@ async def compose_result_followup_response(
         focus=focus,
     )
     if claim_failure:
-        record_result_followup_fallback_receipt(
+        record_result_followup_recovery_receipt(
             task=llm_task,
             failure_mode=claim_failure,
             context_packet_ids=context_packet_ids,
         )
-        return fallback_result_followup_response(metadata=metadata, focus=focus)
+        return None
     return rendered
 
 
@@ -225,6 +229,7 @@ async def compose_private_alpha_save_response(
     *,
     metadata: dict[str, Any],
     user_message: str,
+    language: str = "en",
     invoke_json_schema_func=invoke_openrouter_json_schema,
     log_openrouter_failure_func=log_openrouter_failure,
 ) -> str | None:
@@ -245,6 +250,7 @@ async def compose_private_alpha_save_response(
                 fact_bank=fact_bank,
                 user_message=user_message,
                 required_fact_ids=required_fact_ids,
+                language=language,
             ),
             schema_model=PrivateAlphaSaveDraft,
             schema_name="PrivateAlphaSaveDraft",
@@ -276,12 +282,15 @@ def private_alpha_save_llm_messages(
     fact_bank: dict[str, str],
     user_message: str,
     required_fact_ids: set[str],
+    language: str = "en",
 ) -> list[dict[str, str]]:
+    language_instruction = response_language_instruction(language)
     return [
         {
             "role": "system",
             "content": (
                 f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
+                f"{language_instruction}\n\n"
                 "The user is asking to save, bookmark, or keep the latest completed "
                 "backtest result. In private alpha, Strategies and Save are not "
                 "exposed as a user-facing destination, so do not claim a Strategy "
@@ -340,11 +349,10 @@ def render_private_alpha_save_draft(
     return body
 
 
-def fallback_private_alpha_save_response() -> str:
-    return (
-        "I cannot promote this into Strategies while that surface is off for private "
-        "alpha, but the completed run is still part of this chat and can be reopened "
-        "from the conversation or Recents."
+def fallback_private_alpha_save_response(*, language: str | None = None) -> str:
+    return recovery_message(
+        "private_alpha_save_unavailable",
+        language=language,
     )
 
 
@@ -369,7 +377,7 @@ def result_followup_uses_context_route(
     )
 
 
-def record_result_followup_fallback_receipt(
+def record_result_followup_recovery_receipt(
     *,
     task: OpenRouterTask,
     failure_mode: str,
@@ -393,15 +401,18 @@ def result_followup_llm_messages(
     focus: ResultFollowupFocus,
     user_message: str,
     required_fact_ids: set[str],
+    language: str = "en",
 ) -> list[dict[str, str]]:
     public_fact_bank = public_result_followup_fact_bank(fact_bank)
+    language_instruction = response_language_instruction(language)
     return [
         {
             "role": "system",
             "content": (
                 f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
                 "You are Argus, a chat-first investing backtest copilot. Answer the "
-                "user's follow-up using only the supplied fact_bank. Be conversational, "
+                "user's follow-up using only the supplied fact_bank. "
+                f"{language_instruction} Be conversational, "
                 "specific, and useful; do not sound like a fixed template. Return a "
                 "short natural-language answer plus fact_ids. The answer should use "
                 "the supplied facts naturally, while answer_blocks gives the renderer "
@@ -892,46 +903,6 @@ def _context_packets_from_metadata(metadata: dict[str, Any]) -> list[dict[str, A
     return [packet for packet in packets if isinstance(packet, dict)]
 
 
-def fallback_result_followup_response(
-    *,
-    metadata: dict[str, Any],
-    focus: ResultFollowupFocus,
-) -> str | None:
-    fact_bank = result_followup_fact_bank(metadata)
-    if not fact_bank:
-        return None
-    fact_bank = result_followup_fact_bank_for_focus(
-        fact_bank=fact_bank,
-        focus=focus,
-    )
-    if focus == "max_drawdown" and "max_drawdown" in fact_bank:
-        return (
-            f"The max drawdown was {fact_bank['max_drawdown']} for "
-            f"{fact_bank.get('symbols', 'this run')}."
-        )
-    if focus == "what_tested":
-        return fallback_what_tested_response(fact_bank)
-    if focus == "next_experiment":
-        return fallback_next_experiment_response(fact_bank)
-    if focus == "assumptions" and "assumptions" in fact_bank:
-        return "The run used: " + fact_bank["assumptions"] + "."
-    if focus == "why_underperformed":
-        return fallback_performance_response(fact_bank)
-    if focus == "general":
-        return fallback_general_result_followup_response(fact_bank)
-    return fallback_performance_response(fact_bank)
-
-
-def fallback_next_experiment_response(fact_bank: dict[str, str]) -> str:
-    options = structured_next_experiment_labels(fact_bank)
-    if options:
-        bullets = "\n".join(
-            f"- {_ensure_sentence(_sentence_case(option))}" for option in options[:3]
-        )
-        return "A good next move is to isolate one assumption.\n\n" + bullets
-    return _ensure_sentence(clean_fragment(fact_bank["runnable_next_tests"]))
-
-
 def render_next_experiment_followup(
     *,
     draft: ResultFollowupDraft,
@@ -1002,275 +973,6 @@ def structured_next_experiment_options(
             }
         )
     return options
-
-
-def structured_next_experiment_labels(fact_bank: dict[str, str]) -> list[str]:
-    labels: list[str] = []
-    for option in structured_next_experiment_options(fact_bank):
-        label = clean_fragment(option.get("label"))
-        if label and label not in labels:
-            labels.append(label)
-    return labels
-
-
-def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
-    if not any(
-        fact_bank.get(key)
-        for key in (
-            "total_return",
-            "benchmark_return",
-            "benchmark_comparison",
-            "benchmark_delta",
-        )
-    ):
-        return None
-    symbols = fact_bank.get("symbols") or "the strategy"
-    strategy = fact_bank.get("strategy") or "strategy"
-    date_range = fact_bank.get("date_range")
-    total_return = fact_bank.get("total_return")
-    benchmark = fact_bank.get("benchmark_symbol")
-    benchmark_return = fact_bank.get("benchmark_return")
-    benchmark_delta = fact_bank.get("benchmark_delta")
-    benchmark_comparison = fact_bank.get("benchmark_comparison")
-    relative_truth = relative_performance_truth(fact_bank)
-    relative_performance = fact_bank.get("relative_performance")
-    if relative_performance:
-        intro = _ensure_sentence(relative_performance)
-    elif relative_truth == "beat_benchmark":
-        if benchmark:
-            intro = f"{symbols} beat {benchmark} in this run."
-        else:
-            intro = f"{symbols} beat the benchmark in this run."
-    elif relative_truth == "lagged_benchmark":
-        if benchmark:
-            intro = f"{symbols} lagged {benchmark} in this run."
-        else:
-            intro = f"{symbols} lagged the benchmark in this run."
-    else:
-        intro = "This run mostly tells us how the confirmed setup behaved."
-    detail_lines: list[str] = []
-    strategy_phrase = strategy_run_phrase(strategy)
-    context_parts = [f"{article_for(strategy_phrase)} {strategy_phrase} on {symbols}"]
-    if date_range:
-        context_parts.append(f"over {date_range}")
-    detail_lines.append("Setup: " + " ".join(context_parts) + ".")
-    same_asset_benchmark = symbols_match_benchmark(symbols, benchmark)
-    if same_asset_benchmark and strategy == "buy and hold" and benchmark:
-        if total_return:
-            detail_lines.append(f"Result: It returned {total_return}.")
-        detail_lines.append(
-            f"Because the benchmark was also {benchmark}, this is mainly the "
-            "asset's move over the window, not a separate strategy edge."
-        )
-    else:
-        result_parts: list[str] = []
-        if total_return:
-            result_parts.append(f"the strategy returned {total_return}")
-        if benchmark and benchmark_return:
-            result_parts.append(f"{benchmark} returned {benchmark_return}")
-        elif benchmark:
-            result_parts.append(f"the benchmark was {benchmark}")
-        if benchmark_comparison:
-            result_parts.append(
-                "the benchmark comparison was "
-                + clean_fragment(benchmark_comparison).lower()
-            )
-        elif benchmark_delta:
-            result_parts.append(f"the gap versus the benchmark was {benchmark_delta}")
-        if result_parts:
-            detail_lines.append("Result: " + "; ".join(result_parts) + ".")
-    if fact_bank.get("max_drawdown"):
-        detail_lines.append(f"Risk: max drawdown was {fact_bank['max_drawdown']}.")
-    caveat_lines: list[str] = []
-    if relative_truth == "lagged_benchmark":
-        caveat_lines.append(
-            "The useful read is that this confirmed rule did not keep up over that "
-            "window; the run does not prove why."
-        )
-    elif relative_truth == "beat_benchmark":
-        caveat_lines.append(
-            "That is a relative-performance fact from the run, not proof the same "
-            "edge would persist."
-        )
-    if fact_bank.get("execution_note"):
-        detail_lines.append(clean_fragment(fact_bank["execution_note"]) + ".")
-    context_sentence = context_backdrop_sentence(fact_bank)
-    if context_sentence:
-        caveat_lines.append(context_sentence)
-    if fact_bank.get("caveat"):
-        caveat_lines.append(
-            "Use it as historical simulation evidence, not a prediction or recommendation."
-        )
-    detail_block = "\n".join(f"- {line}" for line in detail_lines if line.strip())
-    caveat_block = " ".join(line.strip() for line in caveat_lines if line.strip())
-    return "\n\n".join(
-        block
-        for block in (
-            intro,
-            detail_block,
-            caveat_block,
-        )
-        if block
-    )
-
-
-def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str | None:
-    symbols = fact_bank.get("symbols") or "the latest run"
-    strategy = fact_bank.get("strategy") or "strategy"
-    strategy_phrase = strategy_run_phrase(strategy)
-    pieces = [
-        f"I’ve got the latest run: {symbols} with {article_for(strategy_phrase)} {strategy_phrase}.",
-    ]
-    if fact_bank.get("date_range"):
-        pieces.append(f"Period: {fact_bank['date_range']}.")
-    if fact_bank.get("total_return"):
-        pieces.append(f"The strategy returned {fact_bank['total_return']}.")
-    if fact_bank.get("benchmark_symbol") and fact_bank.get("benchmark_return"):
-        pieces.append(
-            f"{fact_bank['benchmark_symbol']} returned {fact_bank['benchmark_return']}."
-        )
-    elif fact_bank.get("benchmark_symbol"):
-        pieces.append(f"Benchmark: {fact_bank['benchmark_symbol']}.")
-    if fact_bank.get("benchmark_comparison"):
-        pieces.append(
-            f"Benchmark comparison: {fact_bank['benchmark_comparison']}."
-        )
-    elif fact_bank.get("benchmark_delta"):
-        pieces.append(f"The gap versus the benchmark was {fact_bank['benchmark_delta']}.")
-    if fact_bank.get("max_drawdown"):
-        pieces.append(f"The max drawdown was {fact_bank['max_drawdown']}.")
-    if fact_bank.get("execution_note"):
-        pieces.append(clean_fragment(fact_bank["execution_note"]) + ".")
-    append_context_backdrop(pieces, fact_bank)
-    labels = structured_next_experiment_labels(fact_bank)
-    if labels:
-        pieces.append(
-            "A useful next step would be to "
-            + clean_fragment(labels[0]).lower()
-            + "."
-        )
-    elif fact_bank.get("runnable_next_tests"):
-        pieces.append(_ensure_sentence(clean_fragment(fact_bank["runnable_next_tests"])))
-    if fact_bank.get("caveat"):
-        pieces.append("Use it as historical simulation evidence, not a prediction or recommendation.")
-    response = " ".join(piece.strip() for piece in pieces if piece.strip())
-    return normalize_text(response) or None
-
-
-def append_context_backdrop(pieces: list[str], fact_bank: dict[str, str]) -> None:
-    backdrop = context_backdrop_sentence(fact_bank)
-    if backdrop:
-        pieces.append(backdrop)
-
-
-def context_backdrop_sentence(fact_bank: dict[str, str]) -> str:
-    if fact_bank.get("context_packet_facts"):
-        return (
-            "Careful backdrop: "
-            + first_context_fragment(fact_bank["context_packet_facts"])
-            + ". It can frame a follow-up question, but it does not prove "
-            "causality or change the simulated trades."
-        )
-    if fact_bank.get("context_packet_limitations"):
-        return clean_fragment(fact_bank["context_packet_limitations"]) + "."
-    return ""
-
-
-def symbols_match_benchmark(symbols: str, benchmark: str | None) -> bool:
-    if not symbols or not benchmark:
-        return False
-    normalized_symbols = symbols.replace(" ", "").upper()
-    normalized_benchmark = benchmark.strip().upper()
-    return normalized_symbols == normalized_benchmark
-
-
-def first_context_fragment(value: str) -> str:
-    text = clean_fragment(value)
-    if "; " in text:
-        text = text.split("; ", 1)[0]
-    return text
-
-
-def fallback_what_tested_response(fact_bank: dict[str, str]) -> str:
-    symbols = fact_bank.get("symbols") or "the selected asset"
-    strategy = fact_bank.get("strategy") or "strategy"
-    strategy_phrase = strategy_run_phrase(strategy)
-    parts = [
-        f"I tested {symbols} with {article_for(strategy_phrase)} {strategy_phrase}",
-    ]
-    if fact_bank.get("date_range"):
-        parts.append(f"over {fact_bank['date_range']}")
-    if fact_bank.get("benchmark_symbol"):
-        parts.append(f"against {fact_bank['benchmark_symbol']}")
-    sentence = " ".join(parts).strip() + "."
-    extras = [
-        fact_bank.get("rule_summary"),
-        fact_bank.get("execution_note"),
-    ]
-    if fact_bank.get("total_return"):
-        extras.append(f"The strategy returned {fact_bank['total_return']}")
-    if fact_bank.get("benchmark_symbol") and fact_bank.get("benchmark_return"):
-        extras.append(
-            f"{fact_bank['benchmark_symbol']} returned {fact_bank['benchmark_return']}"
-        )
-    elif fact_bank.get("benchmark_symbol"):
-        extras.append(f"The benchmark was {fact_bank['benchmark_symbol']}")
-    if fact_bank.get("benchmark_comparison"):
-        extras.append(f"Benchmark comparison: {fact_bank['benchmark_comparison']}")
-    elif fact_bank.get("benchmark_delta"):
-        extras.append(f"The gap versus the benchmark was {fact_bank['benchmark_delta']}")
-    if fact_bank.get("assumptions"):
-        extras.append(f"Assumptions: {fact_bank['assumptions']}")
-    extra_text = " ".join(clean_fragment(item) + "." for item in extras if item)
-    return (sentence + " " + extra_text).strip()
-
-
-def article_for(label: str) -> str:
-    stripped = label.strip()
-    if not stripped:
-        return "a"
-    first_word = stripped.split()[0]
-    if first_word.isupper() and first_word[0] in {
-        "A",
-        "E",
-        "F",
-        "H",
-        "I",
-        "L",
-        "M",
-        "N",
-        "O",
-        "R",
-        "S",
-        "X",
-    }:
-        return "an"
-    return "an" if stripped[0].lower() in {"a", "e", "i", "o", "u"} else "a"
-
-
-def strategy_run_phrase(label: str) -> str:
-    phrase = _humanized_strategy_phrase(label)
-    if not phrase:
-        return "strategy"
-    if phrase.endswith("strategy"):
-        return phrase
-    if phrase == "buy and hold":
-        return "buy and hold strategy"
-    return f"{phrase} strategy"
-
-
-def _humanized_strategy_phrase(label: str) -> str:
-    phrase = normalize_text(label).lower().replace("buy-and-hold", "buy and hold")
-    if not phrase:
-        return ""
-    words = phrase.split()
-    acronym_replacements = {
-        "rsi": "RSI",
-        "sma": "SMA",
-        "ema": "EMA",
-        "macd": "MACD",
-    }
-    return " ".join(acronym_replacements.get(word, word) for word in words)
 
 
 def _ensure_sentence(value: str) -> str:
