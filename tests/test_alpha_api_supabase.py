@@ -503,6 +503,28 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock
     assert called_run.config_snapshot["starting_capital"] == 1000
 
 
+def test_run_backtest_rejects_unowned_parent_conversation(mock_gateway):
+    mock_gateway.get_conversation.return_value = None
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "conversation_id": "conversation-other",
+            "template": "rsi_mean_reversion",
+            "symbols": ["AAPL"],
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+    mock_gateway.create_backtest_run.assert_not_called()
+    mock_gateway.get_conversation.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        conversation_id="conversation-other",
+    )
+
+
 def test_get_backtest_supabase_reads_from_gateway(mock_gateway):
     mock_gateway.create_backtest_run.side_effect = lambda *, user_id, run: run
     create = client.post(

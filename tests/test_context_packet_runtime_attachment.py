@@ -227,10 +227,9 @@ def test_enriched_run_replays_attached_context_packet_facts() -> None:
 def test_checkpoint_context_detection_prefers_enriched_result_reference() -> None:
     from argus.agent_runtime.state.models import ArtifactReference, TaskSnapshot
     from argus.api.chat.recovery import (
-        RuntimeFallbackContext,
         checkpoint_latest_result_has_context_packets,
+        result_reference_has_context_packets,
     )
-    from argus.api.routers.agent import _fallback_latest_result_has_context_packets
 
     stale_values = {
         "latest_task_snapshot": TaskSnapshot(
@@ -254,18 +253,7 @@ def test_checkpoint_context_detection_prefers_enriched_result_reference() -> Non
     )
 
     assert checkpoint_latest_result_has_context_packets(stale_values) is False
-    assert (
-        _fallback_latest_result_has_context_packets(
-            RuntimeFallbackContext(
-                latest_task_snapshot=TaskSnapshot(
-                    latest_task_type="results_explanation",
-                    completed=True,
-                    latest_backtest_result_reference=enriched_reference,
-                )
-            )
-        )
-        is True
-    )
+    assert result_reference_has_context_packets(enriched_reference) is True
 
 
 def test_persist_runtime_backtest_run_attaches_immutable_context_packets(

@@ -469,6 +469,14 @@ class SupabaseGateway:
         return Message.model_validate(_row_one(created))
 
     def create_backtest_run(self, *, user_id: str, run: BacktestRun) -> BacktestRun:
+        self._require_owned_conversation(
+            user_id=user_id,
+            conversation_id=run.conversation_id,
+        )
+        self._require_owned_strategy(
+            user_id=user_id,
+            strategy_id=run.strategy_id,
+        )
         payload = run.model_dump(mode="json")
         payload["user_id"] = user_id
         created = self.client.table("backtest_runs").insert(payload).execute()
@@ -503,6 +511,11 @@ class SupabaseGateway:
             existing_row = _row_one(existing)
             if existing_row is not None:
                 return dict(existing_row)
+
+        self._require_owned_conversation(
+            user_id=user_id,
+            conversation_id=conversation_id,
+        )
 
         payload = {
             "user_id": user_id,
@@ -703,16 +716,65 @@ class SupabaseGateway:
         user_id: str,
         attachment: dict[str, Any],
     ) -> dict[str, Any]:
+        run_id = str(attachment["run_id"])
+        packet_id = str(attachment["packet_id"])
+        self._require_owned_backtest_run(user_id=user_id, run_id=run_id)
+        if not self._context_packet_owned_by_user(
+            user_id=user_id,
+            packet_id=packet_id,
+        ):
+            raise ValueError("Context packet not found or not owned by user.")
+
         payload = {
             "user_id": user_id,
-            "run_id": attachment["run_id"],
-            "context_packet_id": attachment["packet_id"],
+            "run_id": run_id,
+            "context_packet_id": packet_id,
             "explanation_id": attachment.get("explanation_id"),
             "attached_at": attachment.get("attached_at") or _now_iso(),
             "immutable_snapshot": bool(attachment.get("immutable_snapshot", True)),
         }
         created = self.client.table("run_context_packets").insert(payload).execute()
         return dict(_row_one(created) or {})
+
+    def _require_owned_conversation(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str | None,
+    ) -> None:
+        if conversation_id is None:
+            return
+        if self.get_conversation(user_id=user_id, conversation_id=conversation_id):
+            return
+        raise ValueError("Conversation not found or not owned by user.")
+
+    def _require_owned_strategy(
+        self,
+        *,
+        user_id: str,
+        strategy_id: str | None,
+    ) -> None:
+        if strategy_id is None:
+            return
+        if self.get_strategy(user_id=user_id, strategy_id=strategy_id):
+            return
+        raise ValueError("Strategy not found or not owned by user.")
+
+    def _require_owned_backtest_run(self, *, user_id: str, run_id: str) -> None:
+        if self.get_backtest_run(user_id=user_id, run_id=run_id):
+            return
+        raise ValueError("Backtest run not found or not owned by user.")
+
+    def _context_packet_owned_by_user(self, *, user_id: str, packet_id: str) -> bool:
+        rows = (
+            self.client.table("context_packets")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("id", packet_id)
+            .limit(1)
+            .execute()
+        )
+        return _row_one(rows) is not None
 
     def create_route_receipt(
         self,
@@ -1172,6 +1234,10 @@ class SupabaseGateway:
     def attach_strategies(
         self, *, user_id: str, collection_id: str, strategy_ids: list[str]
     ) -> Collection | None:
+        collection = self.get_collection(user_id=user_id, collection_id=collection_id)
+        if collection is None:
+            return None
+
         if strategy_ids:
             valid_strategies = (
                 self.client.table("strategies")

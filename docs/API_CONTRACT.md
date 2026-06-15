@@ -443,6 +443,17 @@ A lightweight grouping of related strategies.
 
 Immutable simulation result.
 
+Ownership hardening:
+
+- Because the backend uses a Supabase service-role client, any supplied
+  `conversation_id` or `strategy_id` parent reference must be checked against
+  the current authenticated user before a `backtest_runs` row is inserted.
+- Direct `/backtests/run` requests with an explicit unowned or missing
+  `conversation_id` return `404 not_found` rather than creating an orphaned or
+  cross-tenant child row.
+- Durable `backtest_jobs` and run context-packet attachments follow the same
+  service-role parent ownership rule before inserting child rows.
+
 ```json
 {
   "id": "uuid",
@@ -1534,6 +1545,9 @@ Soft delete.
 ## `POST /collections/{id}/strategies`
 
 Attach strategies.
+
+Ownership hardening: the collection parent and every attached strategy must be
+owned by the current user before any `collection_strategies` upsert occurs.
 
 **Request:**
 ```json

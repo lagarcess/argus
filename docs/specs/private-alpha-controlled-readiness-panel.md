@@ -122,13 +122,16 @@ The readiness slice should be sequenced like this:
    - Benchmark coverage and missing-data tests.
 
 3. **Security and tenant hardening**
-  - Production secure cookies. Closed locally in the readiness branch:
-    browser-session cookies now force `Secure` when the request is HTTPS, when
-    `x-forwarded-proto` is HTTPS, or when `APP_ENV`/related backend env marks a
-    production-like deployment.
+   - Production secure cookies. Closed locally in the readiness branch:
+     browser-session cookies now force `Secure` when the request is HTTPS, when
+     `x-forwarded-proto` is HTTPS, or when `APP_ENV`/related backend env marks a
+     production-like deployment.
    - Allowlist/auth response normalization.
    - Short-window quotas and accurate rate-limit behavior.
-   - Parent ownership checks for service-role write paths.
+   - Parent ownership checks for service-role write paths. Closed locally in
+     the readiness branch for direct backtest parent conversations, gateway
+     backtest run parents, durable job conversations, collection-strategy
+     parents, and context-packet run attachments.
    - Feedback caps and context schema.
 
 4. **Legal/privacy/consent**
@@ -545,14 +548,17 @@ application ownership checks critical for write paths that accept parent IDs.
 Action:
 
 - Validate conversation ownership before backtest or strategy writes that attach
-  to a conversation.
-- Validate collection ownership before collection-strategy upserts.
-- Add cross-user IDOR tests.
+  to a conversation. Closed locally for direct backtest execution and gateway
+  backtest run/job inserts.
+- Validate collection ownership before collection-strategy upserts. Closed
+  locally in the gateway before any upsert.
+- Add cross-user IDOR tests. Closed locally for the gateway service-role parent
+  boundary and direct backtest route.
 
 Relevant code:
 
 - `src/argus/api/routers/backtest.py`
-- `src/argus/api/routers/strategies.py`
+- `src/argus/api/routers/collections.py`
 - `src/argus/domain/supabase_gateway.py`
 
 #### Feedback Payload Caps And Scrubbing
@@ -1292,7 +1298,10 @@ surfaces.
 - Force secure cookies in production.
 - Normalize allowlist auth errors.
 - Add short-window quotas.
-- Add parent ownership checks.
+- Add parent ownership checks. Closed locally in the readiness branch: service
+  role writes now validate owned parent conversations/strategies/runs/context
+  packets before inserting or upserting child records; direct `/backtests/run`
+  returns `404` for an explicit unowned conversation parent.
 - Add feedback caps/context allowlist/url redaction. Closed locally in the
   readiness branch: `/feedback` now caps messages at 5,000 characters, keeps
   only known feedback context keys, converts browser URL/legacy path context to
