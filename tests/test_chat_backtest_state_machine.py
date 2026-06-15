@@ -740,6 +740,92 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
         assert action["payload"]["conversation_id"] == conversation["id"]
 
 
+@pytest.mark.parametrize(
+    ("action_type", "localized_label"),
+    [
+        ("change_dates", "Cambiar fechas"),
+        ("change_asset", "Cambiar activo"),
+        ("adjust_assumptions", "Ajustar supuestos"),
+    ],
+)
+def test_confirmation_edit_actions_reenter_runtime_with_structured_context(
+    monkeypatch: pytest.MonkeyPatch,
+    action_type: str,
+    localized_label: str,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    seen_turns: list[dict[str, Any]] = []
+
+    def _runtime(**kwargs: Any) -> dict[str, Any]:
+        seen_turns.append(
+            {
+                "message": kwargs["message"],
+                "action_context": kwargs["action_context"],
+            }
+        )
+        if len(seen_turns) == 1:
+            return _confirmation_runtime_result()
+        return _pending_runtime_result()
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(_runtime),
+    )
+    client = _client()
+    conversation = _conversation(client)
+    create_confirmation = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Compra y manten AAPL ultimos 12 meses",
+            "language": "es-419",
+        },
+    )
+    assert create_confirmation.status_code == 200
+    confirmation = _stream_payloads(create_confirmation.text, "confirmation")[0][
+        "confirmation"
+    ]
+    action = next(
+        item for item in confirmation["actions"] if item["type"] == action_type
+    )
+    action["label"] = localized_label
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": action,
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert seen_turns[1]["message"] == localized_label
+    assert seen_turns[1]["message"] != "yes"
+    action_context = seen_turns[1]["action_context"]
+    assert action_context["type"] == action_type
+    assert action_context["presentation"] == "confirmation"
+    assert action_context["payload"]["confirmation_id"] == (
+        confirmation["confirmation_id"]
+    )
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    assert final["pending_strategy"]["requested_field"] == "asset_universe"
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant = messages[-1]
+    assert assistant["role"] == "assistant"
+    assert assistant["metadata"]["chat_action"]["type"] == action_type
+    assert assistant["metadata"]["pending_strategy"]["strategy"]["asset_universe"] == [
+        "AAPL"
+    ]
+    assert assistant["metadata"]["pending_strategy"]["requested_field"] == (
+        "asset_universe"
+    )
+
+
 def test_chat_stream_passes_and_persists_composer_mention_provenance(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -66,7 +66,7 @@ _ACTION_TYPE_LABEL_KEYS = {
 }
 
 
-def chat_request_message(payload: ChatStreamRequest) -> str:
+def chat_request_message(payload: ChatStreamRequest, *, language: str = "en") -> str:
     if payload.action is None:
         return payload.message or ""
     action_type = payload.action.type
@@ -81,6 +81,14 @@ def chat_request_message(payload: ChatStreamRequest) -> str:
         "save_strategy": "save this strategy",
         "retry_failed_action": "retry failed action",
     }
+    if _resolve_language(language) != "en":
+        label_key = payload.action.label_key or _ACTION_TYPE_LABEL_KEYS.get(action_type)
+        if label_key:
+            localized = _localized_action_label(label_key, language=language)
+            if localized:
+                return localized
+        if payload.action.label:
+            return payload.action.label
     return action_messages[action_type]
 
 
@@ -94,7 +102,7 @@ def chat_display_message(payload: ChatStreamRequest, *, language: str = "en") ->
         localized = _localized_action_label(label_key, language=language)
         if localized:
             return localized
-    return payload.action.label or chat_request_message(payload)
+    return payload.action.label or chat_request_message(payload, language=language)
 
 
 def _localized_action_label(label_key: str, *, language: str) -> str | None:

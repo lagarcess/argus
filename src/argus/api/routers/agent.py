@@ -306,7 +306,7 @@ async def chat_stream(
         current_user_profile = user
 
     language = payload.language or current_user_profile.language or "en"
-    request_message = chat_request_message(payload)
+    request_message = chat_request_message(payload, language=language)
     display_message = chat_display_message(payload, language=language)
     onboarding_goal = parse_onboarding_control_message(request_message)
 
@@ -768,7 +768,7 @@ async def chat_stream(
                 metadata["result_strategy_id"] = run.strategy_id
                 assistant_text = await compose_private_alpha_save_response(
                     metadata=result_followup_metadata_from_run(run),
-                    user_message=chat_request_message(payload),
+                    user_message=request_message,
                 )
                 if assistant_text is None:
                     assistant_text = fallback_private_alpha_save_response()

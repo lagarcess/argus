@@ -10,6 +10,7 @@ import {
   SlidersHorizontal,
   TriangleAlert,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
@@ -48,6 +49,24 @@ type StrategyConfirmationCardProps = {
 type ConfirmationCardRow = StrategyConfirmationPayload["rows"][number] & {
   fullValue?: string;
 };
+
+type ConfirmationStatusIconState = {
+  icon: LucideIcon;
+  isSpinning: boolean;
+};
+
+const CONFIRMATION_STATUS_ICON_STATE = {
+  could_not_run: { icon: TriangleAlert, isSpinning: false },
+  draft_canceled: { icon: CircleSlash2, isSpinning: false },
+  editing: { icon: PencilLine, isSpinning: false },
+  needs_change: { icon: SlidersHorizontal, isSpinning: false },
+  not_completed: { icon: CircleSlash2, isSpinning: false },
+  ready_to_run: { icon: Play, isSpinning: false },
+  request_sent: { icon: Send, isSpinning: false },
+  run_complete: { icon: CheckCircle2, isSpinning: false },
+  running: { icon: Loader2, isSpinning: true },
+  updated: { icon: PencilLine, isSpinning: false },
+} satisfies Record<StrategyConfirmationStatus, ConfirmationStatusIconState>;
 
 const actionClassName =
   "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[12px] font-medium tracking-tight text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22";
@@ -192,32 +211,10 @@ function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: 
   };
 }
 
-function confirmationStatusIcon(status: StrategyConfirmationStatus) {
-  if (status === "running") {
-    return { icon: Loader2, isSpinning: true };
-  }
-  if (status === "ready_to_run") {
-    return { icon: Play, isSpinning: false };
-  }
-  if (status === "request_sent") {
-    return { icon: Send, isSpinning: false };
-  }
-  if (status === "could_not_run") {
-    return { icon: TriangleAlert, isSpinning: false };
-  }
-  if (status === "draft_canceled" || status === "not_completed") {
-    return { icon: CircleSlash2, isSpinning: false };
-  }
-  if (status === "editing") {
-    return { icon: PencilLine, isSpinning: false };
-  }
-  if (status === "needs_change") {
-    return { icon: SlidersHorizontal, isSpinning: false };
-  }
-  return {
-    icon: CheckCircle2,
-    isSpinning: false,
-  };
+function confirmationStatusIcon(
+  status: StrategyConfirmationStatus,
+): ConfirmationStatusIconState {
+  return CONFIRMATION_STATUS_ICON_STATE[status];
 }
 
 function confirmationCardViewModel(

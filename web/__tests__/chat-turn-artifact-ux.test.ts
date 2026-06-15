@@ -15,7 +15,12 @@ describe("chat turn artifact UX", () => {
   test("shared action ownership keeps card actions out of composer and footer surfaces", () => {
     const actions: ChatActionOption[] = [
       { type: "run_backtest", label: "Run backtest", presentation: "confirmation" },
+      { type: "change_dates", label: "Change dates", presentation: "confirmation" },
+      { type: "change_asset", label: "Change asset", presentation: "confirmation" },
+      { type: "adjust_assumptions", label: "Adjust assumptions", presentation: "confirmation" },
+      { type: "cancel_confirmation", label: "Cancel", presentation: "confirmation" },
       { type: "show_breakdown", label: "Explain result", presentation: "result" },
+      { type: "refine_strategy", label: "Refine idea", presentation: "result" },
       { type: "retry_failed_action", label: "Try again" },
       { type: "save_strategy", label: "Save", presentation: "result" },
       { id: "ask-follow-up", label: "Ask follow-up" },
@@ -25,7 +30,12 @@ describe("chat turn artifact UX", () => {
 
     expect(actions.filter(actionHasCardScopedOwnership).map((action) => action.label)).toEqual([
       "Run backtest",
+      "Change dates",
+      "Change asset",
+      "Adjust assumptions",
+      "Cancel",
       "Explain result",
+      "Refine idea",
       "Save",
       "Presentation confirmation",
       "Presentation result",
@@ -65,15 +75,16 @@ describe("chat turn artifact UX", () => {
       "utf-8",
     );
 
-    expect(card).toContain("function confirmationStatusIcon(status: StrategyConfirmationStatus)");
-    expect(card).toContain('status === "editing"');
-    expect(card).toContain("icon: PencilLine");
-    expect(card).toContain('status === "ready_to_run"');
-    expect(card).toContain("icon: Play");
-    expect(card).toContain('status === "request_sent"');
-    expect(card).toContain("icon: Send");
-    expect(card).toContain('status === "could_not_run"');
-    expect(card).toContain("icon: TriangleAlert");
+    expect(card).toContain("CONFIRMATION_STATUS_ICON_STATE");
+    expect(card).toContain("satisfies Record<StrategyConfirmationStatus, ConfirmationStatusIconState>");
+    expect(card).toContain("function confirmationStatusIcon(");
+    expect(card).not.toContain('if (status === "editing")');
+    expect(card).toContain("editing: { icon: PencilLine, isSpinning: false }");
+    expect(card).toContain("ready_to_run: { icon: Play, isSpinning: false }");
+    expect(card).toContain("request_sent: { icon: Send, isSpinning: false }");
+    expect(card).toContain("could_not_run: { icon: TriangleAlert, isSpinning: false }");
+    expect(card).toContain("run_complete: { icon: CheckCircle2, isSpinning: false }");
+    expect(card).toContain("updated: { icon: PencilLine, isSpinning: false }");
   });
 
   test("confirmation row identity uses structured keys instead of translated labels", () => {
