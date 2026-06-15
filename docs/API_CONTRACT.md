@@ -111,6 +111,10 @@ not emit static placeholder quota values on successful responses.
 When a request exceeds a quota or short-window limit, the API returns `429`
 Problem Details and includes `Retry-After`.
 
+Unauthenticated `/auth/login` and `/auth/signup` attempts are also protected by
+short-window alpha throttles before allowlist or provider calls. These limits
+return the same `429` Problem Details shape with `code: "too_many_requests"`.
+
 Supported rate-limit headers where applicable:
 - `X-RateLimit-Limit`
 - `X-RateLimit-Remaining`

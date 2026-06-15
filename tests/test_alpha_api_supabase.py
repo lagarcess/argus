@@ -1128,6 +1128,74 @@ def test_login_normalizes_provider_auth_failures(mock_gateway, monkeypatch):
     )
 
 
+def test_login_rate_limit_blocks_extra_attempt_before_provider(
+    mock_gateway,
+    monkeypatch,
+):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.login.side_effect = RuntimeError("invalid provider password")
+    headers = {"X-Forwarded-For": "203.0.113.10"}
+
+    for _ in range(auth_router.AUTH_LOGIN_ATTEMPT_LIMIT):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "alpha@example.com", "password": "wrong-password"},
+            headers=headers,
+        )
+        assert response.status_code == 401
+
+    blocked = client.post(
+        "/api/v1/auth/login",
+        json={"email": "alpha@example.com", "password": "wrong-password"},
+        headers=headers,
+    )
+
+    assert blocked.status_code == 429
+    assert blocked.json()["code"] == "too_many_requests"
+    assert blocked.headers.get("Retry-After")
+    assert mock_gateway.login.call_count == auth_router.AUTH_LOGIN_ATTEMPT_LIMIT
+
+
+def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
+    mock_gateway,
+    monkeypatch,
+):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = False
+    headers = {"X-Forwarded-For": "203.0.113.11"}
+
+    for _ in range(auth_router.AUTH_SIGNUP_ATTEMPT_LIMIT):
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={"email": "stranger@example.com", "password": "password123"},
+            headers=headers,
+        )
+        assert response.status_code == 403
+
+    blocked = client.post(
+        "/api/v1/auth/signup",
+        json={"email": "stranger@example.com", "password": "password123"},
+        headers=headers,
+    )
+
+    assert blocked.status_code == 429
+    assert blocked.json()["code"] == "too_many_requests"
+    assert blocked.headers.get("Retry-After")
+    assert mock_gateway.private_alpha_email_allowed.call_count == (
+        auth_router.AUTH_SIGNUP_ATTEMPT_LIMIT
+    )
+    mock_gateway.signup.assert_not_called()
+
+
 def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
     now = utcnow()
     mock_gateway.search_rows.return_value = {

@@ -604,6 +604,7 @@ Short-window protection against abuse or runaway UI loops.
 - **Backtests**: Max 10 per hour.
 - **Chat**: Max 60 messages per hour.
 - **Feedback**: Max 20 submissions per hour.
+- **Unauthenticated auth attempts**: Login max 8 attempts and signup max 5 attempts per 10 minutes, keyed by endpoint plus client IP/email. This is an alpha abuse guard before provider calls, not a replacement for Supabase Auth protections.
 - **Mechanism**: Enforced via standard `Retry-After` headers.
 
 ### Layer 2.5: Backtest Concurrency
