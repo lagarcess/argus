@@ -130,10 +130,11 @@ Codex should own or closely supervise this:
      structured cancellation. The local Spanish transcript matrix now passes
      for DCA, missing DCA amount clarification, mixed-asset clarification,
      currency pairs, unsupported valuation recovery, setup edits, approval, and
-     result follow-ups.
-   - Remaining before merge/release readiness: browser recovery proof,
-     production-parity Render canary, and the rest of the controlled readiness
-     slices in
+     result follow-ups. A Spanish browser recovery pass now proves unsupported
+     valuation (`P/E`) clarifies into supported proxies, then a messy
+     buy-and-hold follow-up re-enters the normal confirmation funnel.
+   - Remaining before merge/release readiness: production-parity Render canary
+     and the rest of the controlled readiness slices in
      `docs/specs/private-alpha-controlled-readiness-panel.md`.
 
 2. **Research Lab product spec**
