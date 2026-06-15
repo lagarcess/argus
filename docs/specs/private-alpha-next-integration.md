@@ -127,9 +127,11 @@ Codex should own or closely supervise this:
      A Spanish local browser pass also proved the full happy-path action chain:
      confirmation, run, result card, Quick take, Explain result, Refine idea,
      messy refinement into a new `GOOGL`/`$50,000`/six-month confirmation, and
-     structured cancellation.
-   - Remaining before merge/release readiness: broader Spanish prompt matrix,
-     multi-turn clarification, retry/recovery, indicator/DCA coverage,
+     structured cancellation. The local Spanish transcript matrix now passes
+     for DCA, missing DCA amount clarification, mixed-asset clarification,
+     currency pairs, unsupported valuation recovery, setup edits, approval, and
+     result follow-ups.
+   - Remaining before merge/release readiness: browser recovery proof,
      production-parity Render canary, and the rest of the controlled readiness
      slices in
      `docs/specs/private-alpha-controlled-readiness-panel.md`.

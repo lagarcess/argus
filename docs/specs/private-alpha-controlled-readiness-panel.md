@@ -106,8 +106,11 @@ The readiness slice should be sequenced like this:
      Refine idea -> messy refinement -> new confirmation -> cancel. That pass
      preserved Spanish runtime voice, canonical `GOOGL`, `$50,000`, a rolling
      six-month window, compact localized date ranges, and structured
-     cancellation. This is a local runtime-spine proof, not the full Spanish
-     release gate.
+     cancellation. The broader Spanish transcript matrix also passes locally
+     for DCA, missing DCA amount clarification, mixed-asset clarification,
+     currency-pair confirmation, unsupported valuation recovery, and localized
+     artifacts. This is local runtime-spine proof, not the full Spanish release
+     gate.
 
 2. **Backtest trust hardening**
    - Provider-backed symbol validation even when `asset_class` is explicit.
@@ -1262,11 +1265,12 @@ surfaces.
 - Keep structured localized recovery as the fallback contract. Closed locally in
   the readiness worktree for interpreter-unavailable, runtime-failure, and
   pre-stream initialization failure paths.
-- Add or finish Spanish prompt matrix coverage for indicator/signal-rule
-  prompts, currency pairs, unsupported valuation requests, setup edits, approval
-  turns, and result follow-ups.
-- Local QA with Spanish prompts across the whole matrix, including at least one
-  error/recovery path.
+- Spanish prompt matrix coverage now passes locally for DCA, missing DCA amount
+  clarification, mixed-asset clarification, currency pairs, unsupported
+  valuation requests, setup edits, approval turns, and result follow-ups.
+- Local browser QA now covers the main Spanish confirmation/run/result/refine/
+  cancel action chain; add at least one browser recovery path before release
+  signoff.
 - Live QA with at least one Spanish prompt in Render staging.
 
 ### Slice 2: Alpha Trust And Legal Shell
