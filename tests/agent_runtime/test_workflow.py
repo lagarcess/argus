@@ -352,6 +352,27 @@ class SpanishDateAnswerInterpreter:
         )
 
 
+class SpanishAssumptionAnswerInterpreter:
+    def __init__(self) -> None:
+        self.requests: list[InterpretationRequest] = []
+
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        self.requests.append(request)
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="El usuario ajustó el capital inicial.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                capital_amount=250000,
+                refinement_of="visible confirmation",
+            ),
+            confidence=0.94,
+            semantic_turn_act="answer_pending_need",
+        )
+
+
 class ConversationalInterpreter:
     async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
         return StructuredInterpretation(
@@ -576,10 +597,23 @@ def test_next_step_preserves_completed_result_answer() -> None:
     assert updated["stage_outcome"] == WorkflowStageOutcome.END_RUN
     assert updated["assistant_response"] == "Grounded result readout."
     assert updated["next_actions"] == [
+        "show_breakdown",
         "refine_strategy",
-        "compare_benchmark",
         "save_strategy",
     ]
+    assert "compare_benchmark" not in updated["next_actions"]
+
+
+def test_next_step_without_completed_result_does_not_emit_legacy_actions() -> None:
+    run_state = RunState.new(
+        current_user_message="",
+        recent_thread_history=[],
+    )
+
+    result = next_step_stage(state=run_state)
+
+    assert result.outcome == "end_run"
+    assert result.patch["next_actions"] == []
 
 
 def test_runtime_preserves_offline_clarifier_as_recovery() -> None:
@@ -1344,6 +1378,77 @@ async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
     assert strategy["capital_amount"] == 100000
     assert strategy["comparison_baseline"] == "SPY"
     assert strategy["date_range"] == {"start": "2025-12-14", "end": "2026-06-12"}
+    assert answer_result["pending_strategy"]["requested_field"] is None
+    assert answer_result["pending_strategy"]["missing_required_fields"] == []
+
+
+@pytest.mark.asyncio
+async def test_workflow_spanish_adjust_assumptions_answer_reenters_interpreter() -> None:
+    interpreter = SpanishAssumptionAnswerInterpreter()
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", language_preference="es-419")
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Comprar y mantener AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        comparison_baseline="SPY",
+    )
+    thread_id = "thread-spanish-adjust-assumptions-answer"
+
+    prompt_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="Ajustar supuestos",
+        action_context={
+            "type": "adjust_assumptions",
+            "label": "Ajustar supuestos",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert interpreter.requests == []
+    assert prompt_result["stage_outcome"] == "await_user_reply"
+    assert prompt_result["pending_strategy"]["requested_field"] == "assumption"
+    assert prompt_result["pending_strategy"]["missing_required_fields"] == [
+        "assumption"
+    ]
+
+    answer_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="ponle como doscientos cincuenta mil",
+    )
+
+    assert len(interpreter.requests) == 1
+    request = interpreter.requests[0]
+    assert request.user.language_preference == "es-419"
+    assert request.latest_task_snapshot is not None
+    assert request.latest_task_snapshot.pending_strategy_summary is not None
+    assert request.selected_thread_metadata["requested_field"] == "assumption"
+    assert answer_result["stage_outcome"] == "await_approval"
+    strategy = answer_result["confirmation_payload"]["strategy"]
+    assert strategy["asset_universe"] == ["AAPL"]
+    assert strategy["date_range"] == {"start": "2025-06-14", "end": "2026-06-12"}
+    assert strategy["comparison_baseline"] == "SPY"
+    assert strategy.get("capital_amount") is None
+    assert (
+        answer_result["confirmation_payload"]["optional_parameters"][
+            "initial_capital"
+        ]["value"]
+        == 250000
+    )
     assert answer_result["pending_strategy"]["requested_field"] is None
     assert answer_result["pending_strategy"]["missing_required_fields"] == []
 

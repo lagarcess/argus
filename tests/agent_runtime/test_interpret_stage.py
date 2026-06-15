@@ -5780,10 +5780,7 @@ def test_interpret_stage_has_no_regex_nlu_imports() -> None:
 
 
 def test_symbol_alias_dictionaries_are_deleted() -> None:
-    paths = [
-        Path("src/argus/agent_runtime/signals/task_relation.py"),
-        Path("src/argus/agent_runtime/stages/interpret.py"),
-    ]
+    paths = [Path("src/argus/agent_runtime/stages/interpret.py")]
     source = "\n".join(path.read_text() for path in paths)
     for token in ["SYMBOL_ALIASES", "COMMON_NAMES", "NON_SYMBOLS"]:
         assert token not in source

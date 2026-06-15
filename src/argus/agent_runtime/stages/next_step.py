@@ -3,20 +3,10 @@ from __future__ import annotations
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState
 
-SUCCESS_NEXT_ACTIONS = [
+RESULT_NEXT_ACTIONS = [
+    "show_breakdown",
     "refine_strategy",
-    "compare_benchmark",
     "save_strategy",
-]
-FAILURE_NEXT_ACTIONS = [
-    "provide_missing_details",
-    "simplify_strategy",
-    "ask_for_example",
-]
-BEGINNER_NEXT_ACTIONS = [
-    "share_example_strategy",
-    "explain_backtests",
-    "start_simple",
 ]
 
 
@@ -36,13 +26,9 @@ async def next_step_stage_async(*, state: RunState) -> StageResult:
 
 
 def _resolve_next_actions(state: RunState) -> list[str]:
-    if state.intent == "beginner_guidance":
-        return list(BEGINNER_NEXT_ACTIONS)
-    if state.failure_classification or state.requires_clarification:
-        return list(FAILURE_NEXT_ACTIONS)
     if _has_result_or_summary(state):
-        return list(SUCCESS_NEXT_ACTIONS)
-    return list(SUCCESS_NEXT_ACTIONS)
+        return list(RESULT_NEXT_ACTIONS)
+    return []
 
 
 def _has_result_or_summary(state: RunState) -> bool:
