@@ -758,6 +758,23 @@ async def _stage_result_from_interpretation(
         strategy=strategy,
         constraints=unsupported_constraints,
     )
+    pending_date_edit_reason_codes: list[str] = []
+    if _pending_date_edit_reuses_prior_date_range(
+        strategy=strategy,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+        semantic_turn_act=interpretation.semantic_turn_act,
+    ):
+        missing_required_fields = list(
+            dict.fromkeys([*missing_required_fields, "date_range"])
+        )
+        pending_date_edit_reason_codes.append("pending_date_edit_noop_rejected")
+        interpretation = interpretation.model_copy(
+            update={
+                "requires_clarification": True,
+                "assistant_response": None,
+            }
+        )
     response_overrides = interpretation.response_profile_overrides
     effective_profile = resolve_effective_response_profile(
         user=user,
@@ -825,6 +842,7 @@ async def _stage_result_from_interpretation(
             *ambiguity_filter_reason_codes,
             *artifact_target_reason_codes,
             *hidden_context_guard_reason_codes,
+            *pending_date_edit_reason_codes,
             *post_validation_reason_codes,
             *interpretation.reason_codes,
         ],
@@ -1185,6 +1203,31 @@ def _strategy_date_range_needs_current_message_repair(
         field.field_name.split("[", 1)[0] == "date_range"
         for field in interpretation.ambiguous_fields
     )
+
+
+def _pending_date_edit_reuses_prior_date_range(
+    *,
+    strategy: StrategySummary,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+    semantic_turn_act: SemanticTurnAct | None,
+) -> bool:
+    if semantic_turn_act != "answer_pending_need":
+        return False
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return False
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "date_range":
+        return False
+    prior = _active_strategy_from_snapshot(snapshot)
+    if prior is None:
+        return False
+    prior_endpoints = _date_range_endpoints(prior.date_range)
+    if prior_endpoints is None or not all(prior_endpoints):
+        return False
+    return _date_range_endpoints(strategy.date_range) == prior_endpoints
 
 
 def _date_range_endpoints(value: Any) -> tuple[str | None, str | None] | None:

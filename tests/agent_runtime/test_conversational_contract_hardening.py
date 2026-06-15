@@ -341,6 +341,58 @@ def test_active_confirmation_date_edit_refreshes_confirmation_card(
     )
 
 
+def test_pending_date_edit_rejects_noop_inherited_date_range(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple over the last 12 months.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-15", "end": "2026-06-12"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User answered the visible card's date-range edit.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2025-06-15", "end": "2026-06-12"},
+            capital_amount=100000,
+            comparison_baseline="SPY",
+        ),
+        missing_required_fields=[],
+        semantic_turn_act="answer_pending_need",
+        artifact_target="active_confirmation",
+    )
+
+    result, _ = _interpret(
+        message="calendar 2024",
+        response=response,
+        snapshot=_task_snapshot_with_confirmation(pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "date_range",
+        },
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.missing_required_fields == ["date_range"]
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == {"start": "2025-06-15", "end": "2026-06-12"}
+    assert "pending_date_edit_noop_rejected" in result.decision.reason_codes
+
+
 def test_non_dca_capital_answer_updates_initial_capital_assumption(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
