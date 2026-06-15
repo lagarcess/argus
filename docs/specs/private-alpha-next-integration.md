@@ -124,10 +124,14 @@ Codex should own or closely supervise this:
      prose. The English `Change asset -> make it google instead` and Spanish
      `Cambiar activo -> ponlo con google mejor` flows now update the active
      card to provider-canonical `GOOGL` while preserving the rest of the setup.
+     A Spanish local browser pass also proved the full happy-path action chain:
+     confirmation, run, result card, Quick take, Explain result, Refine idea,
+     messy refinement into a new `GOOGL`/`$50,000`/six-month confirmation, and
+     structured cancellation.
    - Remaining before merge/release readiness: broader Spanish prompt matrix,
-     multi-turn clarification, result execution, retry/recovery, indicator/DCA
-     coverage, production-parity Render canary, and the rest of the controlled
-     readiness slices in
+     multi-turn clarification, retry/recovery, indicator/DCA coverage,
+     production-parity Render canary, and the rest of the controlled readiness
+     slices in
      `docs/specs/private-alpha-controlled-readiness-panel.md`.
 
 2. **Research Lab product spec**

@@ -101,7 +101,12 @@ The readiness slice should be sequenced like this:
      `Change asset -> make it google instead` and Spanish
      `Cambiar activo -> ponlo con google mejor`, both updating the active card
      to provider-canonical `GOOGL` while preserving capital, period, and
-     benchmark. This is a local runtime-spine proof, not the full Spanish
+     benchmark. A follow-up Spanish browser pass also proved
+     confirmation -> run -> result card -> Quick take -> Explain result ->
+     Refine idea -> messy refinement -> new confirmation -> cancel. That pass
+     preserved Spanish runtime voice, canonical `GOOGL`, `$50,000`, a rolling
+     six-month window, compact localized date ranges, and structured
+     cancellation. This is a local runtime-spine proof, not the full Spanish
      release gate.
 
 2. **Backtest trust hardening**
@@ -1234,6 +1239,8 @@ The current Codex-owned readiness pass must not implement or configure:
   gate work.
 - PostHog instrumentation, session replay, event capture, or product analytics
   activation.
+- New analytics vendor wiring of any kind, including use of available
+  `POSTHOG_*` environment variables.
 
 Those remain founder-gated follow-up slices. This pass may keep documentation
 accurate, verify existing feedback paths, and preserve privacy-safe route
