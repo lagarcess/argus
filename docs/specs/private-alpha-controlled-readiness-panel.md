@@ -122,7 +122,10 @@ The readiness slice should be sequenced like this:
    - Benchmark coverage and missing-data tests.
 
 3. **Security and tenant hardening**
-   - Production secure cookies.
+  - Production secure cookies. Closed locally in the readiness branch:
+    browser-session cookies now force `Secure` when the request is HTTPS, when
+    `x-forwarded-proto` is HTTPS, or when `APP_ENV`/related backend env marks a
+    production-like deployment.
    - Allowlist/auth response normalization.
    - Short-window quotas and accurate rate-limit behavior.
    - Parent ownership checks for service-role write paths.
@@ -493,7 +496,7 @@ headers are trusted or production forces secure cookies.
 
 Action:
 
-- Force secure cookies in production.
+- Force secure cookies in production. Closed locally in the readiness branch.
 - Verify deployed `Set-Cookie` contains `HttpOnly`, `Secure`, and `SameSite=Lax`.
 
 Relevant code:

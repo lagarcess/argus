@@ -71,7 +71,7 @@ def auth_response(request: Request, payload: dict[str, Any]) -> JSONResponse:
         "httponly": True,
         "path": "/",
         "samesite": "lax",
-        "secure": request.url.scheme == "https",
+        "secure": _session_cookie_secure(request),
     }
     if isinstance(max_age, int):
         cookie_kwargs["max_age"] = max_age
@@ -81,6 +81,24 @@ def auth_response(request: Request, payload: dict[str, Any]) -> JSONResponse:
     if isinstance(refresh_token, str) and refresh_token:
         response.set_cookie("sb-refresh-token", refresh_token, **cookie_kwargs)
     return response
+
+
+def _session_cookie_secure(request: Request) -> bool:
+    forwarded_proto = request.headers.get("x-forwarded-proto", "")
+    forwarded_scheme = forwarded_proto.split(",", 1)[0].strip().lower()
+    return (
+        request.url.scheme == "https"
+        or forwarded_scheme == "https"
+        or _production_like_environment()
+    )
+
+
+def _production_like_environment() -> bool:
+    for name in ("APP_ENV", "ENVIRONMENT", "ARGUS_ENV", "ARGUS_APP_ENV"):
+        value = os.getenv(name, "").strip().lower()
+        if value in {"production", "prod", "staging"}:
+            return True
+    return False
 
 
 def dev_memory_fallback_enabled() -> bool:

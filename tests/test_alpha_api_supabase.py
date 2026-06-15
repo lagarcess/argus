@@ -788,6 +788,32 @@ def test_login_sets_session_cookie_for_browser_auth(mock_gateway):
     assert response.cookies.get("sb-refresh-token") == "refresh-token-123"
 
 
+def test_login_forces_secure_session_cookies_in_production(
+    mock_gateway, monkeypatch
+):
+    monkeypatch.setenv("APP_ENV", "production")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.login.return_value = {
+        "session": {
+            "access_token": "access-token-123",
+            "refresh_token": "refresh-token-123",
+            "expires_in": 3600,
+        },
+        "user": {"id": "user-1", "email": "beta@example.com"},
+    }
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "beta@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 200
+    set_cookie = response.headers.get("set-cookie", "").lower()
+    assert "sb-auth-token" in set_cookie
+    assert "sb-refresh-token" in set_cookie
+    assert "secure" in set_cookie
+
+
 def test_feedback_submission_persists_with_user_ownership(mock_gateway):
     profile = _mock_profile()
     mock_gateway.get_or_create_mock_user.return_value = profile

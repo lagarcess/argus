@@ -803,6 +803,12 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - The allowlist is intentionally minimal: `email`, `role`, `disabled_at`, `created_at`, and `updated_at`. Real invite email tracking is deferred until there is an invite workflow.
 - Access is not controlled by a frontend flag or comma-separated deployed env var.
 
+**Browser session cookies:**
+- Auth cookies are `HttpOnly`, `SameSite=Lax`, and path-scoped to `/`.
+- Cookies must be `Secure` for HTTPS requests, trusted `x-forwarded-proto:
+  https` requests, and production-like backend environments such as
+  `APP_ENV=production`.
+
 **Potential later modes:**
 - username + password mapped to email-backed identity
 - OAuth
