@@ -16,6 +16,7 @@ from argus.domain.backtesting.execution import (
 from argus.domain.backtesting.metrics import (
     _compute_metrics,
     _compute_metrics_from_equity,
+    portfolio_value_summary,
 )
 from argus.domain.backtesting.signals import _build_signals
 from argus.domain.market_data import fetch_ohlcv, fetch_price_series
@@ -165,6 +166,11 @@ def compute_alpha_metrics(
             periods_per_year=periods_per_year,
             trade_count=trade_count,
         )
+    value_summary = portfolio_value_summary(aggregate_strategy_equity)
+    if value_summary is not None:
+        aggregate_metrics.setdefault("performance", {})[
+            "portfolio_value_range"
+        ] = value_summary
 
     return {
         "aggregate": aggregate_metrics,

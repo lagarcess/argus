@@ -259,6 +259,8 @@
       "lagged_by": "Quedó por debajo por {{value}}",
       "details": {
         "starting_capital": "Capital inicial",
+        "peak_value": "Valor máximo",
+        "lowest_value": "Valor mínimo",
         "date_range": "Rango de fechas",
         "timeframe": "Temporalidad",
         "side": "Dirección",

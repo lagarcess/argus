@@ -320,6 +320,31 @@ describe("result card playground", () => {
     expect(structured.details).not.toContainEqual({ label: "Benchmark", value: "SPY" });
   });
 
+  test("shows backend portfolio value range in expanded details", () => {
+    const structured = heroDeltaEvidenceView({
+      ...resultCardPlaygroundFixtures[0].result,
+      chart: {
+        kind: "portfolio_equity",
+        series: [],
+        currency: "USD",
+        base_value: 10000,
+        value_summary: {
+          peak_value: 20000,
+          lowest_value: 5000,
+          currency: "USD",
+          source: "strategy_portfolio_equity_close",
+        },
+      },
+    });
+
+    expect(structured.details.slice(0, 4)).toEqual([
+      { label: "Starting capital", value: "$1,000" },
+      { label: "Peak value", value: "$20,000" },
+      { label: "Lowest value", value: "$5,000" },
+      { label: "Date range", value: "January 4, 2021 to December 31, 2025" },
+    ]);
+  });
+
   test("keeps result card display copy configurable while Spanish is disabled", () => {
     const spanish = heroDeltaEvidenceView(
       {
@@ -329,6 +354,18 @@ describe("result card playground", () => {
           start: "2024-01-01",
           end: "2024-03-31",
           display: "1 de enero de 2024 al 31 de marzo de 2024",
+        },
+        chart: {
+          ...(resultCardPlaygroundFixtures[0].result.chart ?? {
+            kind: "portfolio_equity" as const,
+            series: [],
+          }),
+          value_summary: {
+            peak_value: 1560,
+            lowest_value: 1000,
+            currency: "USD",
+            source: "strategy_portfolio_equity_close",
+          },
         },
       },
       {
@@ -344,6 +381,8 @@ describe("result card playground", () => {
           assetClassLabel: (assetClass) =>
             assetClass === "crypto" ? "Cripto" : assetClass,
           startingCapitalLabel: "Capital inicial",
+          peakValueLabel: "Valor máximo",
+          lowestValueLabel: "Valor mínimo",
           dateRangeLabel: "Rango de fechas",
           timeframeLabel: "Temporalidad",
           benchmarkLabel: "Referencia",
@@ -367,6 +406,14 @@ describe("result card playground", () => {
     ]);
     expect(spanish.details).toContainEqual({
       label: "Capital inicial",
+      value: "$1,000",
+    });
+    expect(spanish.details).toContainEqual({
+      label: "Valor máximo",
+      value: "$1,560",
+    });
+    expect(spanish.details).toContainEqual({
+      label: "Valor mínimo",
       value: "$1,000",
     });
     expect(spanish.details).toContainEqual({

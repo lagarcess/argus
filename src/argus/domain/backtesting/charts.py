@@ -14,6 +14,7 @@ from argus.domain.backtesting.execution import (
     _dca_equity_curve,
     _execution_realism_settings,
 )
+from argus.domain.backtesting.metrics import portfolio_value_summary
 from argus.domain.backtesting.signals import _build_signals
 from argus.domain.market_data import fetch_ohlcv
 
@@ -83,7 +84,7 @@ def build_result_chart(
         for ts, value in aggregate_equity.items()
     ]
     markers = _thin_chart_markers(_chart_markers_from_events(events), limit=80)
-    return {
+    chart = {
         "kind": "portfolio_equity",
         "series": series,
         "markers": markers,
@@ -91,6 +92,10 @@ def build_result_chart(
         "base_value": series[0]["value"] if series else None,
         "attribution": "TradingView Lightweight Charts",
     }
+    value_summary = portfolio_value_summary(aggregate_equity)
+    if value_summary is not None:
+        chart["value_summary"] = value_summary
+    return chart
 
 
 def _collect_execution_fill_events(

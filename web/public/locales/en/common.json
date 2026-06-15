@@ -259,6 +259,8 @@
       "lagged_by": "Lagged by {{value}}",
       "details": {
         "starting_capital": "Starting capital",
+        "peak_value": "Peak value",
+        "lowest_value": "Lowest value",
         "date_range": "Date range",
         "timeframe": "Timeframe",
         "side": "Side",

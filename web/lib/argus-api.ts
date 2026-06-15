@@ -57,6 +57,12 @@ export type ResultChartPayload = {
   }>;
   currency?: string;
   base_value?: number | null;
+  value_summary?: {
+    peak_value?: number | null;
+    lowest_value?: number | null;
+    currency?: string | null;
+    source?: "strategy_portfolio_equity_close" | string;
+  } | null;
   attribution?: string;
 };
 

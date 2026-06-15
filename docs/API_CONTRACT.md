@@ -585,6 +585,12 @@ Ownership hardening:
       ],
       "currency": "USD",
       "base_value": 10000.0,
+      "value_summary": {
+        "peak_value": 12042.5,
+        "lowest_value": 9875.0,
+        "currency": "USD",
+        "source": "strategy_portfolio_equity_close"
+      },
       "attribution": "TradingView Lightweight Charts"
     }
   },
@@ -603,6 +609,7 @@ Ownership hardening:
 **Result chart contract:**
 - `chart.kind` is currently `portfolio_equity`.
 - `chart.series` is the aggregate portfolio equity curve. Multi-symbol runs must use the equal-weight portfolio curve, not a symbol comparison chart.
+- `chart.value_summary` mirrors aggregate strategy portfolio equity close values for result-card details. It is not an asset OHLC high/low and does not describe the benchmark.
 - `chart.markers` contains capped entry/exit events derived from executed fills only. Raw strategy signals, blocked exits while flat, and duplicate blocked entries must not appear as chart markers.
 - The frontend must keep TradingView attribution visible when rendering Lightweight Charts.
 
@@ -711,6 +718,7 @@ Metrics are grouped into categories.
 - `_pct` means percent value (e.g., `18.4` = 18.4%).
 - Ratio fields are decimal ratios (e.g., `win_rate: 0.57`).
 - Currency-like `profit` depends on configured starting capital.
+- `metrics.aggregate.performance.portfolio_value_range` stores the aggregate strategy portfolio equity close peak/lowest values during the run period. These values must match `chart.value_summary` when chart data is available.
 - Conversation result cards use fixed beginner-friendly defaults.
 - All supported engine metrics are persisted in `metrics`.
 - AI may answer follow-up questions using `metrics.aggregate` and `metrics.by_symbol`.

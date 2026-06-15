@@ -19,12 +19,20 @@ export type ResultChartMarker = {
   symbols?: string[];
 };
 
+export type ResultChartValueSummary = {
+  peak_value?: number | null;
+  lowest_value?: number | null;
+  currency?: string | null;
+  source?: "strategy_portfolio_equity_close" | string;
+};
+
 export type ResultChartPayload = {
   kind: "portfolio_equity";
   series: ResultChartPoint[];
   markers?: ResultChartMarker[];
   currency?: string;
   base_value?: number | null;
+  value_summary?: ResultChartValueSummary | null;
   attribution?: string;
 };
 

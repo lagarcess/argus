@@ -39,6 +39,8 @@ export type ResultCardDisplayCopy = {
   trustStrip: string;
   startingCapitalLabel: string;
   totalContributedLabel: string;
+  peakValueLabel: string;
+  lowestValueLabel: string;
   dateRangeLabel: string;
   timeframeLabel: string;
   sideLabel: string;
@@ -84,6 +86,8 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   trustStrip: "Historical simulation · No fees/slippage · Not advice",
   startingCapitalLabel: "Starting capital",
   totalContributedLabel: "Total contributed",
+  peakValueLabel: "Peak value",
+  lowestValueLabel: "Lowest value",
   dateRangeLabel: "Date range",
   timeframeLabel: "Timeframe",
   sideLabel: "Side",
@@ -380,10 +384,12 @@ function executionFacts(
   )
     ? copy.totalContributedLabel
     : copy.startingCapitalLabel;
+  const valueSummaryDetails = portfolioValueSummaryDetails(result, copy, locale);
   const details: EvidenceMetric[] = [
     startingCapital == null
       ? undefined
       : { label: capitalBasisLabel, value: formatCurrency(startingCapital, locale) },
+    ...valueSummaryDetails,
     { label: copy.dateRangeLabel, value: dateRangeDisplay },
     timeframe ? { label: copy.timeframeLabel, value: timeframe } : undefined,
     side ? { label: copy.sideLabel, value: side } : undefined,
@@ -400,6 +406,31 @@ function executionFacts(
     benchmark,
     details,
   };
+}
+
+function portfolioValueSummaryDetails(
+  result: StrategyResultPayload,
+  copy: ResultCardDisplayCopy,
+  locale?: string,
+) {
+  const summary = recordValue(result.chart?.value_summary);
+  if (!summary) {
+    return [];
+  }
+  const source = stringValue(summary.source);
+  if (source && source !== "strategy_portfolio_equity_close") {
+    return [];
+  }
+  const peakValue = numberValue(summary.peak_value);
+  const lowestValue = numberValue(summary.lowest_value);
+  return [
+    peakValue == null
+      ? undefined
+      : { label: copy.peakValueLabel, value: formatCurrency(peakValue, locale) },
+    lowestValue == null
+      ? undefined
+      : { label: copy.lowestValueLabel, value: formatCurrency(lowestValue, locale) },
+  ].filter((detail): detail is EvidenceMetric => Boolean(detail));
 }
 
 function isRecurringContributionResult(
