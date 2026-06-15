@@ -861,6 +861,19 @@ Latest local verification on 2026-06-15:
   date-range-display, confirmation-display, and result-card playground tests
   passed.
 
+Latest Render verification on 2026-06-15:
+
+- `.github/render-env-sync.sh api-status` reported real-workflow mode:
+  dispatch/shadow enabled, `ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true`,
+  real task `argus-backtests/run_backtest_job`, proof task
+  `argus-backtests/workflow_proof`, backpressure limits present, and Render API
+  key redacted-present.
+- `.github/warmup-render.sh --expect-mode real-workflow` passed after normal
+  cold-start retries for API health, product readiness, and frontend.
+- `.github/canary-render.sh` was not run because this worktree environment is
+  missing `ARGUS_CANARY_EMAIL` and `ARGUS_CANARY_PASSWORD`. The authenticated
+  canary remains the next deployed proof gate.
+
 ### Daily Automation Candidates
 
 For controlled alpha:
