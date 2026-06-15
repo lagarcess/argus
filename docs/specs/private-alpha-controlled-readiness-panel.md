@@ -167,7 +167,7 @@ The readiness slice should be sequenced like this:
 
 | Area | Must fix | Why it matters |
 | --- | --- | --- |
-| Spanish execution | Spanish natural language must reach the same executable interpreter and backtest path as English. Focused local proof now exists for messy buy-and-hold prompts with shorthand capital; the broader Spanish matrix still must pass. | Most controlled users prefer Spanish; static UI translation without execution breaks the core promise. |
+| Spanish execution | Spanish natural language must reach the same executable interpreter and backtest path as English. Focused local proof exists for messy buy-and-hold prompts with shorthand capital, and the broader Spanish/runtime matrix passed locally on 2026-06-15. | Most controlled users prefer Spanish; static UI translation without execution breaks the core promise. |
 | LLM runtime | Interpreter prompt/schema must state: any input language in, canonical machine values out, user-facing prose in resolved language. The current readiness work keeps user phrasing as evidence and asks focused audits to reconcile canonical fields when the primary pass preserved meaning only in prose. | Prevents Spanish values like `mensual`, `acciones`, or `comprar_y_mantener` from leaking into executable fields while also preventing lost user-stated facts such as `100k`. |
 | Dates/timeframes | Date/window handling should use canonical `date_range_intent` and bounded evidence spans after LLM interpretation, not runtime-owned language tables. | Date and timeframe repair must scale beyond English/Spanish without adding phrase gates before the interpreter. |
 | Backtest symbols | Explicit `asset_class` must narrow validation, not bypass provider-backed canonical asset resolution. | Prevents invalid or misclassified symbols from entering a run. |
@@ -222,17 +222,18 @@ The readiness slice should be sequenced like this:
 
 ### Verdict
 
-Argus is not ready for Spanish-first controlled-alpha execution yet, but the
-main runtime gap has moved from architecture risk to matrix coverage risk for
-the first supported shape. The runtime shape is correct: LangGraph is the
+Argus now has local Spanish-first runtime proof, but it still needs deployed
+Render canary proof before first tester sessions. The main runtime gap has moved
+from architecture risk to deployment/live-provider verification risk. The
+runtime shape is correct: LangGraph is the
 conversational spine, normal language reaches structured interpretation first,
 and deterministic validation comes afterward. The readiness branch now has
 local work for canonical interpreter metadata, natural-time normalization,
 registry-backed strategy aliases, localized artifacts, structured recovery, and
 a focused capital-fidelity audit that catches when the LLM preserves `100k`
-only in draft prose instead of the canonical field. The remaining gap is proving
-that those pieces hold across the full Spanish execution matrix and live
-production-like Render canary.
+only in draft prose instead of the canonical field. The local Spanish/runtime
+matrix passed on 2026-06-15; the remaining gap is proving the same shape against
+live provider/auth/browser conditions in the production-like Render canary.
 
 ### Evidence
 
@@ -266,8 +267,8 @@ production-like Render canary.
   write localized cadence prose into executable state. Indicator and signal-rule
   interpretation remains the biggest Spanish-language execution risk.
 - Result/card copy, compact dates, asset-class labels, and recoverable runtime
-  fallback copy have local Spanish coverage, but the full chat flow still needs
-  live provider/auth/browser proof.
+  fallback copy have local Spanish coverage. The full chat flow still needs
+  live provider/auth/browser proof in the deployed Render environment.
 
 Relevant code:
 
@@ -843,6 +844,22 @@ poetry run python scripts/benchmarks/backtest_infra_benchmark.py
 .github/canary-render.sh
 poetry run python scripts/benchmarks/render_internet_benchmark.py --repeat 1
 ```
+
+Latest local verification on 2026-06-15:
+
+- Spanish/runtime matrix: `tests/agent_runtime/test_spanish_runtime_transcripts.py`,
+  `tests/test_natural_time.py`, `tests/test_strategy_capabilities.py`,
+  `tests/test_strategy_registry_i18n.py`, and
+  `tests/agent_runtime/test_llm_interpreter.py` passed.
+- Backtest trust matrix: engine launch/display, execution ledger, benchmark
+  comparison, execute launch/recovery, and runtime confirmation-card tests
+  passed.
+- Workflow/readiness matrix: import boundary, backtest infra, async job,
+  Render workflow proof/execution, canary script, private-alpha readiness, and
+  runtime compatibility tests passed.
+- Web cold-start/card smoke: `alpha-frontend`, Spanish UI smoke,
+  date-range-display, confirmation-display, and result-card playground tests
+  passed.
 
 ### Daily Automation Candidates
 

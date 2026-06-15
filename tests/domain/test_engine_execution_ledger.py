@@ -142,7 +142,7 @@ def test_metrics_trade_count_uses_executed_fills(
     monkeypatch.setattr(
         engine,
         "build_benchmark_curve",
-        lambda *_: {"equity_curve": [1.0, 1.0, 1.0, 1.0, 1.0]},
+        lambda *_, **__: {"equity_curve": [1.0, 1.0, 1.0, 1.0, 1.0]},
     )
 
     metrics = engine.compute_alpha_metrics(
