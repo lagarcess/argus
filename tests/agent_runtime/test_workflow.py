@@ -44,6 +44,16 @@ class ResolvedAssetStub:
         self.asset_class = asset_class
 
 
+class RecordingClarifier:
+    def __init__(self, response: str) -> None:
+        self.response = response
+        self.requests: list[Any] = []
+
+    def __call__(self, request: Any) -> str:
+        self.requests.append(request)
+        return self.response
+
+
 def test_task_snapshot_clears_failed_action_after_new_confirmation() -> None:
     prior_failed = ArtifactReference(
         artifact_kind="failed_action",
@@ -366,6 +376,15 @@ class ShortWindowCrossoverInterpreter:
                 asset_universe=["SPY"],
                 asset_class="equity",
                 date_range="past month",
+                extra_parameters={
+                    "date_range_intent": {
+                        "kind": "rolling_window",
+                        "count": 1,
+                        "unit": "month",
+                        "anchor": "today",
+                        "evidence": "last month",
+                    }
+                },
                 entry_logic="20-day SMA crosses above 50-day SMA",
                 exit_logic="20-day SMA crosses below 50-day SMA",
                 entry_rule={
@@ -837,8 +856,12 @@ async def test_workflow_preserves_confirmation_validation_prompt(monkeypatch) ->
 
     monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
 
+    clarifier = RecordingClarifier(
+        "Use a longer date range, or choose a shorter indicator period."
+    )
     workflow = build_workflow(
         structured_interpreter=ShortWindowCrossoverInterpreter(),
+        clarification_generator=clarifier,
         checkpointer=MemorySaver(),
     )
 
@@ -850,9 +873,21 @@ async def test_workflow_preserves_confirmation_validation_prompt(monkeypatch) ->
     )
 
     assert result["stage_outcome"] == "await_user_reply"
-    assert "enough bars" in result["assistant_prompt"]
-    assert "longer date range" in result["assistant_prompt"]
+    assert result["assistant_prompt"] == (
+        "Use a longer date range, or choose a shorter indicator period."
+    )
     assert result["pending_strategy"]["requested_field"] == "date_range"
+    response_intent = result["pending_strategy"]["response_intent"]
+    assert response_intent["kind"] == "unsupported_recovery"
+    assert clarifier.requests
+    assert clarifier.requests[0].response_intent["facts"][
+        "unsupported_constraints"
+    ][0]["category"] == "data_window_too_short_for_rule"
+    assert clarifier.requests[0].response_intent["options"] == [
+        {"label": "Use a longer date range"},
+        {"label": "Use a shorter indicator period"},
+        {"label": "Choose a simpler supported rule"},
+    ]
     assert "confirmation_payload" not in result
 
 
