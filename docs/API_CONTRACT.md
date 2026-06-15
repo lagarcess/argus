@@ -104,7 +104,14 @@ All list endpoints must use cursor-based pagination.
 
 ## Rate Limiting
 
-Every API response should include rate-limit headers where applicable:
+Every API response must include `X-Request-Id`. Rate-limit headers are emitted
+only when they are backed by an active limiter for that response; the API must
+not emit static placeholder quota values on successful responses.
+
+When a request exceeds a quota or short-window limit, the API returns `429`
+Problem Details and includes `Retry-After`.
+
+Supported rate-limit headers where applicable:
 - `X-RateLimit-Limit`
 - `X-RateLimit-Remaining`
 - `X-RateLimit-Reset`
@@ -1896,6 +1903,10 @@ Search is limited to:
 - `account_deletion_request`
 
 `message` is capped at 5,000 characters.
+
+Authenticated feedback submissions are quota protected through Supabase usage
+counters: 50 submissions per day and 20 submissions per hour. Exceeding either
+limit returns `429` with `code: "too_many_requests"` and `Retry-After`.
 
 Feedback context is privacy-sanitized by the backend before persistence. The
 backend keeps only known scalar artifact/app keys such as `source`, `surface`,

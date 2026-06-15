@@ -127,7 +127,10 @@ The readiness slice should be sequenced like this:
      `x-forwarded-proto` is HTTPS, or when `APP_ENV`/related backend env marks a
      production-like deployment.
    - Allowlist/auth response normalization.
-   - Short-window quotas and accurate rate-limit behavior.
+   - Short-window quotas and accurate rate-limit behavior. Closed locally for
+     authenticated chat, backtest, and feedback paths; auth throttling remains
+     open because unauthenticated login/signup limits need an IP/edge or
+     identity-keyed design outside the current `usage_counters.user_id` model.
    - Parent ownership checks for service-role write paths. Closed locally in
      the readiness branch for direct backtest parent conversations, gateway
      backtest run parents, durable job conversations, collection-strategy
@@ -522,22 +525,30 @@ Relevant code:
 
 - `src/argus/api/routers/auth.py`
 
-#### Incomplete Rate Limits
+#### Rate Limits
 
-The API emits static rate-limit headers, while chat primarily enforces a daily
-quota. The documented short-window limits are not clearly enforced on every
-expensive path.
+The readiness branch now removes misleading static rate-limit headers and
+enforces short-window plus daily Supabase usage counters for authenticated chat,
+backtest, and feedback paths. `429` responses include `Retry-After`.
 
 Action:
 
-- Add short-window limits for chat, auth, backtests, and feedback.
-- Ensure `429` responses include accurate `Retry-After`.
-- Avoid misleading `X-RateLimit-*` headers.
+- Closed locally: chat messages enforce 200/day and 60/hour.
+- Closed locally: direct backtests enforce 50/day and 10/hour.
+- Closed locally: feedback submissions enforce 50/day and 20/hour before
+  persistence.
+- Closed locally: success responses no longer emit placeholder
+  `X-RateLimit-*` values.
+- Still open: auth throttling/normalization needs a separate design because
+  unauthenticated login/signup attempts cannot use the current per-user
+  `usage_counters` model without first resolving a user.
 
 Relevant code:
 
 - `src/argus/api/dependencies.py`
 - `src/argus/api/routers/agent.py`
+- `src/argus/api/routers/backtest.py`
+- `src/argus/api/routers/feedback.py`
 - `src/argus/domain/supabase_gateway.py`
 
 #### Service-Role Parent Ownership
@@ -1252,7 +1263,8 @@ The current Codex-owned readiness pass must not implement or configure:
 - Governance, legal, privacy-policy, Terms, consent, company-operator, or safety
   gate work.
 - PostHog instrumentation, session replay, event capture, or product analytics
-  activation.
+  activation; this includes the currently available PostHog environment
+  variables.
 - New analytics vendor wiring of any kind, including use of available
   `POSTHOG_*` environment variables.
 
@@ -1297,7 +1309,9 @@ surfaces.
 
 - Force secure cookies in production.
 - Normalize allowlist auth errors.
-- Add short-window quotas.
+- Add short-window quotas. Closed locally for authenticated chat, direct
+  backtest, and feedback paths; auth throttling remains a follow-up because it
+  needs a non-user-id keyed limiter.
 - Add parent ownership checks. Closed locally in the readiness branch: service
   role writes now validate owned parent conversations/strategies/runs/context
   packets before inserting or upserting child records; direct `/backtests/run`

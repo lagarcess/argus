@@ -16,9 +16,6 @@ async def request_id_middleware(request: Request, call_next):  # type: ignore[no
     request.state.request_id = request_id
     response = await call_next(request)
     response.headers["X-Request-Id"] = request_id
-    response.headers.setdefault("X-RateLimit-Limit", "200")
-    response.headers.setdefault("X-RateLimit-Remaining", "199")
-    response.headers.setdefault("X-RateLimit-Reset", "3600")
     return response
 
 

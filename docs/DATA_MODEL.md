@@ -463,7 +463,7 @@ Tracks resource consumption for quotas and limits.
 - **Cleanup Index**: `(period_end)`
 
 ### Alpha Enums
-- **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`
+- **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`, `feedback`
 - **Period**: `hour`, `day`
 
 ### Notes
@@ -601,7 +601,8 @@ Hard-coded technical limits in the backtesting logic.
 ### Layer 2: Rate Limits
 Short-window protection against abuse or runaway UI loops.
 - **Backtests**: Max 10 per hour.
-- **Chat**: Max 10 messages per minute.
+- **Chat**: Max 60 messages per hour.
+- **Feedback**: Max 20 submissions per hour.
 - **Mechanism**: Enforced via standard `Retry-After` headers.
 
 ### Layer 2.5: Backtest Concurrency
@@ -615,6 +616,7 @@ Durable job backpressure protects the chat API from compute spikes.
 Generous usage boundaries tracked via the `usage_counters` table.
 - **Backtest Runs**: 50 per day.
 - **Chat Messages**: 200 per day.
+- **Feedback**: 50 submissions per day.
 
 ---
 
@@ -633,7 +635,9 @@ Generous usage boundaries tracked via the `usage_counters` table.
      response instead of starting unbounded compute.
 6. **Execute**: Create a durable job and trigger workflow execution.
 7. **Increment**: Update/Insert the `usage_counters` row.
-8. **Response**: Return result or job state with rate-limit headers.
+8. **Response**: Return result or job state. Include rate-limit headers only
+   when they are backed by an active limiter; do not emit placeholder quota
+   values.
 
 ### Admin Bypass
 Users with `profiles.is_admin = true` may have quota and rate-limit checks bypassed by backend logic.

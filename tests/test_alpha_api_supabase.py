@@ -358,6 +358,63 @@ def test_chat_stream_quota_exceeded(mock_gateway):
     assert response.headers.get("Retry-After") == "60"
 
 
+def test_chat_stream_checks_daily_and_hourly_quotas(mock_gateway):
+    now = utcnow()
+    conversation = Conversation(
+        id="conv-1",
+        title="New conversation",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview=None,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.create_backtest_run.side_effect = lambda *, user_id, run: run
+    mock_gateway.create_message.side_effect = lambda **kwargs: Message(
+        id="msg-1",
+        conversation_id=kwargs["conversation_id"],
+        role=kwargs["role"],  # type: ignore[arg-type]
+        content=kwargs["content"],
+        created_at=utcnow(),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={"conversation_id": "conv-1", "message": "Test TSLA dip idea"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    quota_calls = [
+        call.kwargs for call in mock_gateway.check_and_increment_usage.call_args_list
+    ]
+    assert {
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "resource": "chat_messages",
+        "period": "day",
+        "limit_count": 200,
+    } in quota_calls
+    assert {
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "resource": "chat_messages",
+        "period": "hour",
+        "limit_count": 60,
+    } in quota_calls
+
+
+def test_successful_api_response_omits_static_rate_limit_headers(mock_gateway):
+    response = client.get("/api/v1/me", headers={"Authorization": "Bearer test-token"})
+
+    assert response.status_code == 200
+    assert "X-RateLimit-Limit" not in response.headers
+    assert "X-RateLimit-Remaining" not in response.headers
+    assert "X-RateLimit-Reset" not in response.headers
+
+
 def test_me_reads_profile_from_supabase_gateway(mock_gateway):
     profile = _mock_profile(language="es-419")
     mock_gateway.get_user.return_value = profile
@@ -851,6 +908,18 @@ def test_feedback_submission_persists_with_user_ownership(mock_gateway):
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
+    assert {
+        "user_id": profile.id,
+        "resource": "feedback",
+        "period": "day",
+        "limit_count": 50,
+    } in [call.kwargs for call in mock_gateway.check_and_increment_usage.call_args_list]
+    assert {
+        "user_id": profile.id,
+        "resource": "feedback",
+        "period": "hour",
+        "limit_count": 20,
+    } in [call.kwargs for call in mock_gateway.check_and_increment_usage.call_args_list]
     mock_gateway.create_feedback.assert_called_once_with(
         user_id=profile.id,
         feedback_type="general",
@@ -918,6 +987,26 @@ def test_feedback_rejects_oversized_message(mock_gateway):
     )
 
     assert response.status_code == 422
+    mock_gateway.create_feedback.assert_not_called()
+
+
+def test_feedback_quota_exceeded_returns_retry_after(mock_gateway):
+    mock_gateway.check_and_increment_usage.side_effect = QuotaExceededError(
+        "Quota exceeded for feedback (hour)"
+    )
+
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "general",
+            "message": "The private alpha flow feels clear.",
+            "context": {"surface": "settings"},
+        },
+    )
+
+    assert response.status_code == 429
+    assert response.json()["code"] == "too_many_requests"
+    assert response.headers.get("Retry-After") == "60"
     mock_gateway.create_feedback.assert_not_called()
 
 

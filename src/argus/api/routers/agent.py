@@ -256,9 +256,6 @@ async def chat_stream(
     clean_idempotency_key = _clean_optional_header(idempotency_key)
     headers = {
         "X-Request-Id": request.state.request_id,
-        "X-RateLimit-Limit": "200",
-        "X-RateLimit-Remaining": "199",
-        "X-RateLimit-Reset": "3600",
         "X-Accel-Buffering": "no",
     }
     if api_state.supabase_gateway is not None:
@@ -268,6 +265,12 @@ async def chat_stream(
                 resource="chat_messages",
                 period="day",
                 limit_count=200,
+            )
+            api_state.supabase_gateway.check_and_increment_usage(
+                user_id=user.id,
+                resource="chat_messages",
+                period="hour",
+                limit_count=60,
             )
         except QuotaExceededError as exc:
             raise problem(
