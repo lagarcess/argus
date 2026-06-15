@@ -249,15 +249,6 @@ async def interpret_stage_async(
         )
         if pending_date_result is not None:
             return pending_date_result
-        pending_asset_result = await _pending_asset_answer_result_when_interpreter_unavailable(
-            state=state,
-            user=user,
-            snapshot=snapshot,
-            capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata,
-        )
-        if pending_asset_result is not None:
-            return pending_asset_result
         return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
@@ -285,15 +276,6 @@ async def interpret_stage_async(
         )
         if pending_date_result is not None:
             return pending_date_result
-        pending_asset_result = await _pending_asset_answer_result_when_interpreter_unavailable(
-            state=state,
-            user=user,
-            snapshot=snapshot,
-            capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata,
-        )
-        if pending_asset_result is not None:
-            return pending_asset_result
         return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
@@ -337,65 +319,17 @@ async def _pending_date_answer_result_when_interpreter_unavailable(
     )
 
 
-async def _pending_asset_answer_result_when_interpreter_unavailable(
-    *,
-    state: RunState,
-    user: UserState,
-    snapshot: TaskSnapshot | None,
-    capability_contract: Any,
-    selected_thread_metadata: dict[str, Any],
-) -> StageResult | None:
-    interpretation = _pending_asset_answer_interpretation_when_unavailable(
-        current_user_message=state.current_user_message,
-        snapshot=snapshot,
-        selected_thread_metadata=selected_thread_metadata,
-    )
-    if interpretation is None:
-        return None
-    return await _stage_result_from_interpretation(
-        state=state,
-        user=user,
-        snapshot=snapshot,
-        interpretation=interpretation,
-        capability_contract=capability_contract,
-        selected_thread_metadata=selected_thread_metadata,
-    )
-
-
-def _pending_asset_answer_interpretation_when_unavailable(
-    *,
-    current_user_message: str,
-    snapshot: TaskSnapshot | None,
-    selected_thread_metadata: dict[str, Any],
-) -> StructuredInterpretation | None:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field != "asset_universe":
-        return None
-    if snapshot is None or snapshot.pending_strategy_summary is None:
-        return None
-    asset_answer = current_user_message.strip()
-    if not asset_answer:
-        return None
-    return StructuredInterpretation(
-        intent="backtest_execution",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary="User supplied the requested replacement asset.",
-        candidate_strategy_draft=StrategySummary(asset_universe=[asset_answer]),
-        missing_required_fields=[],
-        semantic_turn_act="answer_pending_need",
-        reason_codes=["deterministic_pending_asset_answer_fallback"],
-    )
-
-
 def _pending_date_answer_interpretation_when_unavailable(
     *,
     current_user_message: str,
     language: str | None,
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
+    reason_code: str = "deterministic_pending_date_answer_fallback",
+    user_goal_summary: str = (
+        "User supplied the requested date range while structured "
+        "interpretation was unavailable."
+    ),
 ) -> StructuredInterpretation | None:
     requested_field = _field_base(
         str(selected_thread_metadata.get("requested_field") or "")
@@ -454,10 +388,7 @@ def _pending_date_answer_interpretation_when_unavailable(
                 "base_intent": prior_intent,
             }
         else:
-            date_range = _concrete_range_span_from_endpoint_patch(
-                prior=prior.date_range,
-                date_range_patch={"end": endpoint.isoformat()},
-            )
+            date_range = {"end": endpoint.isoformat()}
             date_range_intent = endpoint_patch
     if date_range is None:
         return None
@@ -471,17 +402,14 @@ def _pending_date_answer_interpretation_when_unavailable(
         intent="backtest_execution",
         task_relation="continue",
         requires_clarification=False,
-        user_goal_summary=(
-            "User supplied the requested date range while structured "
-            "interpretation was unavailable."
-        ),
+        user_goal_summary=user_goal_summary,
         candidate_strategy_draft=StrategySummary(
             date_range=date_range,
             extra_parameters=extra_parameters,
         ),
         missing_required_fields=[],
         semantic_turn_act="answer_pending_need",
-        reason_codes=["deterministic_pending_date_answer_fallback"],
+        reason_codes=[reason_code],
     )
 
 
@@ -527,6 +455,13 @@ async def _stage_result_from_interpretation(
     )
     interpretation = _repair_fresh_restatement_route_when_pending_need_is_active(
         interpretation=interpretation,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    interpretation = _repair_pending_date_answer_route_when_pending_need_is_active(
+        interpretation=interpretation,
+        current_user_message=state.current_user_message,
+        language=user.language_preference,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
     )
@@ -974,6 +909,7 @@ async def _stage_result_from_interpretation(
         state=state,
         selected_thread_metadata=selected_thread_metadata,
         interpretation=interpretation,
+        language=user.language_preference,
     )
     if approval_result is not None:
         return approval_result
@@ -1157,7 +1093,7 @@ def _strategy_with_current_message_run_field_contract(
     supported_timeframes: tuple[str, ...],
     language: str,
 ) -> tuple[StrategySummary, StructuredInterpretation]:
-    del current_user_message, language
+    del current_user_message
     raw_date_range = _explicit_date_range_from_strategy_for_repair(strategy)
     date_range, date_endpoint_patch_applied = (
         _complete_current_message_date_endpoint_patch(
@@ -1166,6 +1102,7 @@ def _strategy_with_current_message_run_field_contract(
             prior_date_range=(
                 prior_strategy.date_range if prior_strategy is not None else None
             ),
+            language=language,
         )
     )
     updated = strategy.model_copy(deep=True)
@@ -1242,20 +1179,21 @@ def _complete_current_message_date_endpoint_patch(
     strategy: StrategySummary,
     date_range: dict[str, str] | None,
     prior_date_range: Any = None,
+    language: str | None = None,
 ) -> tuple[dict[str, str] | None, bool]:
-    if date_range is None or not has_partial_explicit_date_range(date_range):
+    if date_range is None:
         return date_range, False
     rolling_patch = _rolling_window_range_from_endpoint_patch(
         strategy.extra_parameters.get("date_range_intent"),
+        date_range=date_range,
+        prior_date_range=prior_date_range,
+        date_range_raw_text=strategy.extra_parameters.get("date_range_raw_text"),
+        language=language,
     )
     if rolling_patch is not None:
         return rolling_patch, True
-    span_patch = _concrete_range_span_from_endpoint_patch(
-        prior=prior_date_range if prior_date_range is not None else strategy.date_range,
-        date_range_patch=date_range,
-    )
-    if span_patch is not None:
-        return span_patch, True
+    if not has_partial_explicit_date_range(date_range):
+        return date_range, False
     prior = strategy.date_range
     if not isinstance(prior, dict):
         return date_range, False
@@ -1264,34 +1202,6 @@ def _complete_current_message_date_endpoint_patch(
     if not start or not end:
         return date_range, False
     return {"start": str(start), "end": str(end)}, True
-
-
-def _concrete_range_span_from_endpoint_patch(
-    *,
-    prior: Any,
-    date_range_patch: dict[str, Any],
-) -> dict[str, str] | None:
-    if not isinstance(prior, dict):
-        return None
-    prior_start = _iso_date_value(prior.get("start") or prior.get("from"))
-    prior_end = _iso_date_value(prior.get("end") or prior.get("to"))
-    if prior_start is None or prior_end is None or prior_end < prior_start:
-        return None
-
-    patch_start = _iso_date_value(date_range_patch.get("start"))
-    patch_end = _iso_date_value(date_range_patch.get("end"))
-    prior_span = prior_end - prior_start
-    if patch_end is not None and patch_start is None:
-        return {
-            "start": (patch_end - prior_span).isoformat(),
-            "end": patch_end.isoformat(),
-        }
-    if patch_start is not None and patch_end is None:
-        return {
-            "start": patch_start.isoformat(),
-            "end": (patch_start + prior_span).isoformat(),
-        }
-    return None
 
 
 def _iso_date_value(value: Any) -> date | None:
@@ -1305,17 +1215,105 @@ def _iso_date_value(value: Any) -> date | None:
 
 def _rolling_window_range_from_endpoint_patch(
     date_range_intent: Any,
+    *,
+    date_range: dict[str, str] | None = None,
+    prior_date_range: Any = None,
+    date_range_raw_text: Any = None,
+    language: str | None = None,
 ) -> dict[str, str] | None:
     if not isinstance(date_range_intent, dict):
         return None
     base_intent = date_range_intent.get("base_intent")
     if not isinstance(base_intent, dict):
         return None
+    endpoint_patch = _endpoint_patch_with_inferred_endpoint(
+        date_range_intent,
+        date_range=date_range,
+        prior_date_range=prior_date_range,
+        date_range_raw_text=date_range_raw_text,
+        language=language,
+    )
     resolved = resolve_date_range_endpoint_patch(
         base_intent,
-        date_range_intent,
+        endpoint_patch,
     )
     return resolved.payload if resolved is not None else None
+
+
+def _endpoint_patch_with_inferred_endpoint(
+    date_range_intent: dict[str, Any],
+    *,
+    date_range: dict[str, str] | None,
+    prior_date_range: Any,
+    date_range_raw_text: Any,
+    language: str | None,
+) -> dict[str, Any]:
+    endpoint = str(date_range_intent.get("endpoint") or "").strip()
+    if endpoint in {"start", "end"}:
+        if date_range_intent.get(endpoint) not in (None, "", [], {}):
+            return date_range_intent
+        endpoint_value = _endpoint_date_from_bounded_text(
+            date_range_raw_text,
+            language=language,
+        )
+        if endpoint_value is None:
+            return date_range_intent
+        patch = dict(date_range_intent)
+        patch[endpoint] = endpoint_value
+        return patch
+    inferred = _changed_date_endpoint(
+        date_range=date_range,
+        prior_date_range=prior_date_range,
+    )
+    if inferred is None:
+        return date_range_intent
+    endpoint, value = inferred
+    patch = dict(date_range_intent)
+    patch["endpoint"] = endpoint
+    patch[endpoint] = value
+    return patch
+
+
+def _endpoint_date_from_bounded_text(
+    value: Any,
+    *,
+    language: str | None,
+) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    parsed = parse_date_text(
+        text,
+        languages=dateparser_languages_for_user_language(language),
+    )
+    return parsed.isoformat() if parsed is not None else None
+
+
+def _changed_date_endpoint(
+    *,
+    date_range: dict[str, str] | None,
+    prior_date_range: Any,
+) -> tuple[str, str] | None:
+    if not isinstance(date_range, dict):
+        return None
+    start = date_range.get("start") or date_range.get("from")
+    end = date_range.get("end") or date_range.get("to")
+    start_value = str(start).strip() if start not in (None, "", [], {}) else None
+    end_value = str(end).strip() if end not in (None, "", [], {}) else None
+    if bool(start_value) != bool(end_value):
+        endpoint = "start" if start_value else "end"
+        value = start_value or end_value
+        return (endpoint, value) if value else None
+
+    prior_endpoints = _date_range_endpoints(prior_date_range)
+    if prior_endpoints is None or start_value is None or end_value is None:
+        return None
+    prior_start, prior_end = prior_endpoints
+    start_changed = prior_start is not None and start_value != prior_start
+    end_changed = prior_end is not None and end_value != prior_end
+    if start_changed == end_changed:
+        return None
+    return ("start", start_value) if start_changed else ("end", end_value)
 
 
 def _explicit_date_range_from_strategy_for_repair(
@@ -1517,6 +1515,41 @@ def _repair_fresh_restatement_route_when_pending_need_is_active(
             ),
         }
     )
+
+
+def _repair_pending_date_answer_route_when_pending_need_is_active(
+    *,
+    interpretation: StructuredInterpretation,
+    current_user_message: str,
+    language: str | None,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+) -> StructuredInterpretation:
+    if interpretation.semantic_turn_act == "answer_pending_need":
+        return interpretation
+    if _candidate_strategy_has_backtest_shape(interpretation.candidate_strategy_draft):
+        return interpretation
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "date_range":
+        return interpretation
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return interpretation
+    repaired = _pending_date_answer_interpretation_when_unavailable(
+        current_user_message=current_user_message,
+        language=language,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+        reason_code="pending_date_answer_route_repaired",
+        user_goal_summary=(
+            "User supplied the requested date range after the interpreter "
+            "misrouted the pending-field answer."
+        ),
+    )
+    if repaired is None:
+        return interpretation
+    return repaired
 
 
 def _validated_artifact_target(
@@ -3084,9 +3117,9 @@ async def _active_confirmation_followup_when_interpreter_unavailable(
     strategy = snapshot.pending_strategy_summary
     setup_phrase = _current_setup_phrase(strategy)
     assumptions_response = _draft_assumptions_response(snapshot)
-    action_guidance = (
-        "The visible confirmation is still ready. Use the card to start the "
-        "simulation, or use the card controls to change it."
+    action_guidance = recovery_message(
+        "confirmation_action_guidance",
+        language=user.language_preference,
     )
     response = await compose_active_confirmation_interpreter_recovery(
         current_user_message=current_user_message,
@@ -3629,16 +3662,6 @@ def _contextual_date_range_value(
     if _has_complete_date_range(incoming):
         return incoming
     del current_user_message
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field == "date_range":
-        span_patch = _concrete_range_span_from_endpoint_patch(
-            prior=base,
-            date_range_patch=incoming,
-        )
-        if span_patch is not None:
-            return span_patch
     return _merged_contextual_date_range(
         base=base,
         incoming=incoming,

@@ -11,7 +11,12 @@ RecoveryMessageCode = Literal[
     "latest_result_followup_unavailable",
     "private_alpha_save_unavailable",
     "confirmation_action_guidance",
+    "confirmation_action_missing_context",
+    "confirmation_action_stale_card",
+    "confirmation_action_stale_payload",
+    "confirmation_cancelled",
     "clarification_generation_unavailable",
+    "result_refine_missing",
     "context_macro_recovery",
     "context_corporate_events_recovery",
     "context_market_movers_recovery",
@@ -98,6 +103,41 @@ RECOVERY_MESSAGES: dict[RecoveryMessageCode, dict[Language, str]] = {
             "la simulación, o usa sus controles para cambiarla."
         ),
     },
+    "confirmation_action_missing_context": {
+        "en": (
+            "I do not have an active confirmation to change. Describe the "
+            "investing idea again and I will prepare a fresh draft."
+        ),
+        "es-419": (
+            "No tengo una confirmación activa para cambiar. Describe la idea "
+            "de inversión otra vez y prepararé un borrador nuevo."
+        ),
+    },
+    "confirmation_action_stale_card": {
+        "en": (
+            "That confirmation was updated. Use the latest visible card and I "
+            "will keep the current confirmation intact."
+        ),
+        "es-419": (
+            "Esa confirmación ya se actualizó. Usa la tarjeta visible más "
+            "reciente y mantendré intacta la confirmación actual."
+        ),
+    },
+    "confirmation_action_stale_payload": {
+        "en": (
+            "That confirmation payload is stale. Use the latest visible card "
+            "and I will keep the current confirmation intact."
+        ),
+        "es-419": (
+            "Ese contenido de confirmación ya quedó desactualizado. Usa la "
+            "tarjeta visible más reciente y mantendré intacta la confirmación "
+            "actual."
+        ),
+    },
+    "confirmation_cancelled": {
+        "en": "No problem. I will leave that draft unrun.",
+        "es-419": "Sin problema. Dejaré ese borrador sin ejecutar.",
+    },
     "clarification_generation_unavailable": {
         "en": (
             "I could not phrase the follow-up clearly just now. Your draft is "
@@ -108,6 +148,17 @@ RECOVERY_MESSAGES: dict[RecoveryMessageCode, dict[Language, str]] = {
             "No pude formular bien el seguimiento en este momento. Tu borrador "
             "sigue aquí; dime el detalle que quieres cambiar, o intenta de "
             "nuevo en un momento."
+        ),
+    },
+    "result_refine_missing": {
+        "en": (
+            "I do not have a completed result to refine. Run a strategy first, "
+            "then use Refine idea from the result card."
+        ),
+        "es-419": (
+            "No tengo un resultado completo para ajustar. Ejecuta una "
+            "estrategia primero y luego usa Ajustar idea desde la tarjeta de "
+            "resultado."
         ),
     },
     "context_macro_recovery": {

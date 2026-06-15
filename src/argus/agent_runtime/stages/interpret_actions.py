@@ -77,10 +77,6 @@ CONFIRMATION_EDIT_ACTION_FIELDS = {
     "adjust_assumptions": "assumption",
 }
 
-TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE = (
-    "That strategy is ready on the visible card. Use the card action when you "
-    "want to start the simulation."
-)
 RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS = 10.0
 
 
@@ -131,12 +127,14 @@ def structured_action_stage_result_if_applicable(
         return result_action_stage_result_if_applicable(
             state=state,
             snapshot=snapshot,
+            language=language,
         )
     if action.presentation != "confirmation":
         return None
     stale_action_response = stale_confirmation_action_response(
         action=action,
         snapshot=snapshot,
+        language=language,
     )
     if stale_action_response is not None:
         return StageResult(
@@ -161,9 +159,9 @@ def structured_action_stage_result_if_applicable(
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": (
-                    "I do not have an active confirmation to change. "
-                    "Describe the investing idea again and I will prepare a fresh draft."
+                "assistant_prompt": recovery_message(
+                    "confirmation_action_missing_context",
+                    language=language,
                 ),
                 "requested_field": None,
                 "missing_required_fields": [],
@@ -210,7 +208,10 @@ def structured_action_stage_result_if_applicable(
             outcome="ready_to_respond",
             stage_patch={
                 "candidate_strategy_draft": StrategySummary().model_dump(mode="python"),
-                "assistant_response": "No problem. I will leave that draft unrun.",
+                "assistant_response": recovery_message(
+                    "confirmation_cancelled",
+                    language=language,
+                ),
             },
         )
     return None
@@ -265,6 +266,7 @@ def result_action_stage_result_if_applicable(
     *,
     state: RunState,
     snapshot: TaskSnapshot | None,
+    language: str = "en",
 ) -> StageResult | None:
     action = state.structured_action
     if action is None or action.type != "refine_strategy":
@@ -276,9 +278,9 @@ def result_action_stage_result_if_applicable(
         return StageResult(
             outcome="ready_to_respond",
             stage_patch={
-                "assistant_response": (
-                    "I do not have a completed result to refine. Run a strategy "
-                    "first, then use Refine strategy from the result card."
+                "assistant_response": recovery_message(
+                    "result_refine_missing",
+                    language=language,
                 ),
             },
         )
@@ -322,6 +324,7 @@ def approval_stage_result_if_applicable(
     state: RunState,
     selected_thread_metadata: dict[str, Any],
     interpretation: StructuredInterpretation | None = None,
+    language: str = "en",
 ) -> StageResult | None:
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
@@ -361,7 +364,7 @@ def approval_stage_result_if_applicable(
                 }
             ),
             stage_patch={
-                "assistant_response": TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE,
+                "assistant_response": _confirmation_action_guidance(language),
             },
         )
     if decision.semantic_turn_act != "approval":
@@ -382,7 +385,7 @@ def approval_stage_result_if_applicable(
                 }
             ),
             stage_patch={
-                "assistant_response": TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE,
+                "assistant_response": _confirmation_action_guidance(language),
             },
         )
     if snapshot.active_confirmation_reference is not None and (
@@ -410,7 +413,7 @@ def approval_stage_result_if_applicable(
                 }
             ),
             stage_patch={
-                "assistant_response": TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE,
+                "assistant_response": _confirmation_action_guidance(language),
             },
         )
     if not decision_is_pure_approval(
@@ -438,7 +441,7 @@ def approval_stage_result_if_applicable(
                 }
             ),
             stage_patch={
-                "assistant_response": TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE,
+                "assistant_response": _confirmation_action_guidance(language),
             },
         )
     confirmation_payload = validated_approval_confirmation_payload_from_state(
@@ -487,9 +490,13 @@ def approval_stage_result_if_applicable(
             }
         ),
         stage_patch={
-            "assistant_response": TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE,
+            "assistant_response": _confirmation_action_guidance(language),
         },
     )
+
+
+def _confirmation_action_guidance(language: str | None) -> str:
+    return recovery_message("confirmation_action_guidance", language=language)
 
 
 def _active_confirmation_is_valid(snapshot: TaskSnapshot) -> bool:

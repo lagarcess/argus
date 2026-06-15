@@ -2731,7 +2731,7 @@ def test_support_field_answer_does_not_replace_prior_asset_with_provider_name_no
         ("ethereum", "ETH", "crypto"),
     ],
 )
-def test_requested_asset_answer_uses_provider_path_when_interpreter_unavailable(
+def test_requested_asset_answer_recovers_when_interpreter_unavailable(
     monkeypatch,
     answer: str,
     expected_symbol: str,
@@ -2771,15 +2771,12 @@ def test_requested_asset_answer_uses_provider_path_when_interpreter_unavailable(
     )
 
     assert len(interpreter.requests) == 1
-    assert result.outcome == "ready_for_confirmation"
-    strategy = result.decision.candidate_strategy_draft
-    assert provider_queries[0] == answer
-    assert "AAPL" not in provider_queries
-    assert strategy.asset_universe == [expected_symbol]
-    assert strategy.asset_class == expected_class
-    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
-    assert strategy.capital_amount == 10000
-    assert "assistant_response" not in result.patch
+    del expected_symbol, expected_class
+    assert result.outcome == "ready_to_respond"
+    assert provider_queries == []
+    assert "AAPL buy and hold setup" in result.patch["assistant_response"]
+    assert "could not safely apply that change" in result.patch["assistant_response"]
+    assert "confirmation_payload" not in result.patch
 
 
 def test_requested_asset_answer_does_not_hide_interpreter_exception(
@@ -2964,7 +2961,7 @@ def test_natural_language_approval_executes_only_after_confirmation_card(
 
     assert result.outcome == "ready_to_respond"
     response_text = result.patch["assistant_response"].lower()
-    assert "visible card" in response_text
+    assert "visible confirmation" in response_text
     assert "simulation" in response_text
     assert "confirmation_payload" not in result.patch
 
@@ -3008,7 +3005,7 @@ def test_confirmation_replay_without_material_change_defers_to_card_action(
 
     assert result.outcome == "ready_to_respond"
     response_text = result.patch["assistant_response"].lower()
-    assert "visible card" in response_text
+    assert "visible confirmation" in response_text
     assert "simulation" in response_text
     assert "confirmation_payload" not in result.patch
     assert "text_action_deferred_to_confirmation_card" in result.decision.reason_codes

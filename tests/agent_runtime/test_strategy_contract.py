@@ -20,7 +20,10 @@ from argus.agent_runtime.strategy_contract import (
 from argus.agent_runtime.turn_execution_evidence import (
     current_turn_has_material_execution_evidence,
 )
-from argus.nlp.natural_time import resolve_date_range_intent
+from argus.nlp.natural_time import (
+    resolve_date_range_intent,
+    resolve_rolling_window_intent_text,
+)
 
 
 def test_resolve_date_range_requires_canonical_state_for_month_name_ranges() -> None:
@@ -93,6 +96,23 @@ def test_month_span_with_shared_year_requires_canonical_intent() -> None:
 
     assert canonical is not None
     assert canonical.payload == {"start": "2024-03-01", "end": "2024-10-31"}
+
+
+def test_bounded_evidence_can_recover_rolling_window_intent() -> None:
+    intent = resolve_rolling_window_intent_text(
+        "last 12 months",
+        today=date(2026, 6, 15),
+        languages=("en",),
+    )
+
+    assert intent == {
+        "kind": "rolling_window",
+        "count": 12,
+        "unit": "month",
+        "anchor": "today",
+        "confidence": 0.65,
+        "evidence": "last 12 months",
+    }
 
 
 def test_current_message_contract_preserves_canonical_explicit_day_ranges() -> None:

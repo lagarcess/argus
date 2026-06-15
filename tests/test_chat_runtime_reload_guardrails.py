@@ -1810,7 +1810,7 @@ def test_refine_strategy_action_uses_card_run_before_runtime_memory(
                 "stage_outcome": "ready_to_respond",
                 "assistant_response": (
                     "I do not have a completed result to refine. Run a strategy "
-                    "first, then use Refine strategy from the result card."
+                    "first, then use Refine idea from the result card."
                 ),
             },
         }

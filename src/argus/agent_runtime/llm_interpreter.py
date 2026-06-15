@@ -115,6 +115,7 @@ from argus.nlp.natural_time import (
     dateparser_languages_for_user_language,
     resolve_date_range_intent,
     resolve_date_range_text,
+    resolve_rolling_window_intent_text,
 )
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
@@ -8282,6 +8283,8 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload.pop("date_range_intent", None)
     )
     evidence_spans = _clean_evidence_spans(payload.pop("evidence_spans", {}) or {})
+    if not date_range_intent:
+        date_range_intent = _date_range_intent_from_bounded_evidence(draft)
     initial_capital = payload.pop("initial_capital", None)
     total_capital = payload.pop("total_capital", None)
     recurring_contribution = payload.pop("recurring_contribution", None)
@@ -8498,6 +8501,29 @@ def _date_range_from_bounded_evidence(
             if resolved is not None:
                 return resolved.payload
     return None
+
+
+def _date_range_intent_from_bounded_evidence(
+    draft: LLMStrategyDraft,
+    *,
+    language: str | None = None,
+) -> dict[str, Any]:
+    evidence_candidates = _bounded_date_evidence_candidates(draft)
+    if not evidence_candidates:
+        return {}
+    language_candidates = _natural_time_language_candidates_from_hints(
+        draft.language,
+        language,
+    )
+    for candidate in evidence_candidates:
+        for languages in language_candidates:
+            intent = resolve_rolling_window_intent_text(
+                candidate,
+                languages=languages,
+            )
+            if intent is not None:
+                return intent
+    return {}
 
 
 def _bounded_date_evidence_candidates(draft: LLMStrategyDraft) -> list[str]:

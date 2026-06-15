@@ -166,7 +166,9 @@ def test_change_asset_action_uses_structured_runtime_context() -> None:
     assert response.status_code == 200
     final = _stream_payloads(response.text, "final")[0]
     text = final["assistant_response"] or final.get("assistant_prompt") or ""
-    assert "asset" in text.lower()
+    lowered = text.lower()
+    assert "which" in lowered
+    assert any(term in lowered for term in ("asset", "stock", "etf", "ticker", "symbol"))
     assert final["stage_outcome"] == "await_user_reply"
     assert final["pending_strategy"]["requested_field"] == "asset_universe"
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
@@ -181,4 +183,89 @@ def test_change_asset_action_uses_structured_runtime_context() -> None:
     )
     assert assistant_message["metadata"]["pending_strategy"]["requested_field"] == (
         "asset_universe"
+    )
+
+
+def test_change_dates_action_asks_natural_date_window_question() -> None:
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata={
+            "conversation_mode": "confirm",
+            "agent_runtime_stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold Apple.",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": {
+                        "start": "2025-06-15",
+                        "end": "2026-06-15",
+                    },
+                    "capital_amount": 100000,
+                    "comparison_baseline": "SPY",
+                },
+                "optional_parameters": {},
+            },
+            "confirmation_card": {
+                "title": "AAPL",
+                "statusLabel": "Ready to run",
+                "summary": "I read this as AAPL using a buy and hold approach.",
+                "rows": [],
+                "assumptions": ["Benchmark: SPY"],
+                "actions": [
+                    {
+                        "id": "change-dates",
+                        "type": "change_dates",
+                        "label": "Change dates",
+                        "labelKey": "chat.confirmation.actions.change_dates",
+                        "presentation": "confirmation",
+                        "payload": {},
+                    }
+                ],
+            },
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "change_dates",
+                "label": "Change dates",
+                "labelKey": "chat.confirmation.actions.change_dates",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]
+    text = final["assistant_response"] or final.get("assistant_prompt") or ""
+    assert final["stage_outcome"] == "await_user_reply"
+    assert final["pending_strategy"]["requested_field"] == "date_range"
+    assert final["pending_strategy"]["strategy"]["asset_universe"] == ["AAPL"]
+    assert any(term in text.lower() for term in ("date", "window", "period", "range"))
+    assert "could not phrase" not in text.lower()
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    user_message = messages[-2]
+    assistant_message = messages[-1]
+    assert user_message["metadata"]["chat_action"]["type"] == "change_dates"
+    assert (
+        user_message["metadata"]["chat_action"]["labelKey"]
+        == "chat.confirmation.actions.change_dates"
+    )
+    assert assistant_message["metadata"]["pending_strategy"]["requested_field"] == (
+        "date_range"
     )

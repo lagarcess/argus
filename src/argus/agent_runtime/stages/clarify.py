@@ -242,7 +242,11 @@ async def _generate_clarifying_question(
     language: str,
 ) -> str:
     if clarification_generator is None:
-        return offline_clarification_fallback(language=language)
+        return offline_clarification_fallback(
+            language=language,
+            response_intent=response_intent,
+            strategy=state.candidate_strategy_draft,
+        )
     request = ClarificationRequest(
         current_user_message=state.current_user_message,
         recent_thread_history=state.recent_thread_history,
@@ -261,7 +265,11 @@ async def _generate_clarifying_question(
     else:
         result = clarification_generator(request)
         question = await result if inspect.isawaitable(result) else result
-    return question or offline_clarification_fallback(language=language)
+    return question or offline_clarification_fallback(
+        language=language,
+        response_intent=response_intent,
+        strategy=state.candidate_strategy_draft,
+    )
 
 
 def _usable_prefilled_prompt(value: str | None) -> str | None:

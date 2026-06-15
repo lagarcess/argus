@@ -1048,6 +1048,39 @@ def test_llm_strategy_draft_resolves_canonical_date_range_intent() -> None:
     }
 
 
+def test_llm_strategy_draft_recovers_rolling_intent_from_bounded_evidence() -> None:
+    draft = LLMStrategyDraft(
+        raw_user_phrasing=(
+            "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
+        ),
+        language="en",
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        comparison_baseline="SPY",
+        date_range={"start": "2025-06-15", "end": "2026-06-15"},
+        evidence_spans={
+            "asset_universe": "AAPL",
+            "comparison_baseline": "SPY",
+            "window": "last 12 months",
+        },
+    )
+
+    strategy = _strategy_from_llm(draft)
+
+    assert strategy.extra_parameters["date_range_intent"] == {
+        "kind": "rolling_window",
+        "count": 12,
+        "unit": "month",
+        "anchor": "today",
+        "confidence": 0.65,
+        "evidence": "last 12 months",
+    }
+    assert strategy.date_range == {
+        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
+        "end": date.today().isoformat(),
+    }
+
+
 def test_current_message_run_field_contract_prefers_bounded_date_evidence_span() -> None:
     response = LLMInterpretationResponse(
         intent="backtest_execution",

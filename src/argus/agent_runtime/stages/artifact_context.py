@@ -6,6 +6,7 @@ from argus.agent_runtime.artifacts.drafts import draft_from_confirmation_payload
 from argus.agent_runtime.confirmation_artifacts import (
     validate_confirmation_execution_payload,
 )
+from argus.agent_runtime.recovery_messages import recovery_message
 from argus.agent_runtime.stages.interpret_types import InterpretDecision
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -53,6 +54,7 @@ def stale_confirmation_action_response(
     *,
     action: StructuredActionContext,
     snapshot: TaskSnapshot | None,
+    language: str | None = None,
 ) -> str | None:
     reference = (
         snapshot.active_confirmation_reference if snapshot is not None else None
@@ -67,17 +69,11 @@ def stale_confirmation_action_response(
         reference.metadata.get("confirmation_id") or reference.artifact_id
     ).strip()
     if clicked_id and active_id and clicked_id != active_id:
-        return (
-            "That confirmation was updated. Use the latest visible card and I will "
-            "keep the current confirmation intact."
-        )
+        return recovery_message("confirmation_action_stale_card", language=language)
     clicked_hash = str(payload.get("launch_payload_hash") or "").strip()
     active_hash = str(reference.metadata.get("launch_payload_hash") or "").strip()
     if clicked_hash and active_hash and clicked_hash != active_hash:
-        return (
-            "That confirmation payload is stale. Use the latest visible card and I "
-            "will keep the current confirmation intact."
-        )
+        return recovery_message("confirmation_action_stale_payload", language=language)
     return None
 
 

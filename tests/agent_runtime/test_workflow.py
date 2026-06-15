@@ -1103,7 +1103,7 @@ async def test_workflow_confirmation_assumption_action_stays_in_clarification() 
     )
 
     assert result["stage_outcome"] == "await_user_reply"
-    assert result["assistant_response"].startswith("No pude formular")
+    assert result["assistant_response"] == "¿Qué supuesto quieres ajustar para AAPL?"
     assert "I can test" not in result["assistant_response"]
     assert "confirmation_payload" not in result
 
@@ -1320,7 +1320,7 @@ async def test_workflow_typed_approval_after_card_edit_defers_to_card_action(
     )
 
     assert approval_result["stage_outcome"] == "ready_to_respond"
-    assert "visible card" in approval_result["assistant_response"]
+    assert "visible confirmation" in approval_result["assistant_response"]
     assert "simulation" in approval_result["assistant_response"]
     assert "confirmation_payload" not in approval_result
 
@@ -1416,10 +1416,7 @@ async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
         today=date(2026, 6, 15),
     )
     assert expected_range is not None
-    assert strategy["date_range"] == {
-        **expected_range.payload,
-        "end": "2026-06-12",
-    }
+    assert strategy["date_range"] == expected_range.payload
     assert answer_result["pending_strategy"]["requested_field"] is None
     assert answer_result["pending_strategy"]["missing_required_fields"] == []
 
@@ -1696,6 +1693,6 @@ async def test_workflow_uses_checkpointer_for_thread_state(monkeypatch) -> None:
     assert snapshot.pending_strategy_summary is not None
     assert snapshot.pending_strategy_summary.asset_universe == ["BTC"]
     assert second["stage_outcome"] == "ready_to_respond"
-    assert "visible card" in second["assistant_response"]
+    assert "visible confirmation" in second["assistant_response"]
     assert "simulation" in second["assistant_response"]
     assert "run" not in second

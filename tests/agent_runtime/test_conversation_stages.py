@@ -106,9 +106,39 @@ def test_clarify_offline_fallback_uses_product_language() -> None:
     )
 
     assert result.outcome == "await_user_reply"
-    assert result.patch["assistant_prompt"].startswith("No pude formular")
+    assert result.patch["assistant_prompt"] == (
+        "¿Qué periodo quieres usar para AAPL?"
+    )
+    assert "No pude formular" not in result.patch["assistant_prompt"]
     assert "I could not" not in result.patch["assistant_prompt"]
     assert "Which date" not in result.patch["assistant_prompt"]
+
+
+def test_clarify_empty_llm_response_uses_intent_fallback() -> None:
+    state = RunState.new(current_user_message="Change dates", recent_thread_history=[])
+    state.intent = "strategy_drafting"
+    state.requested_field = "date_range"
+    state.missing_required_fields = ["date_range"]
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        capital_amount=100000,
+    )
+    clarifier = RecordingClarifier(None)
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+        language="en",
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == "What date window should I use for AAPL?"
+    assert clarifier.requests
+    assert "I could not phrase" not in result.patch["assistant_prompt"]
 
 
 def test_clarify_dca_total_budget_expands_to_execution_details() -> None:

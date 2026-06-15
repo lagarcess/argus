@@ -102,6 +102,47 @@ def resolve_date_range_text(
     )
 
 
+def resolve_rolling_window_intent_text(
+    text: str,
+    *,
+    today: date | None = None,
+    languages: tuple[str, ...] | None = None,
+    confidence: float = 0.65,
+) -> dict[str, Any] | None:
+    """Recover a canonical rolling-window intent from bounded date evidence.
+
+    This is intentionally a repair path for short LLM-provided evidence spans, not
+    a chat-message parser. The language-specific work stays inside dateparser;
+    Argus only converts a resolved relative range into language-neutral intent.
+    """
+
+    raw = str(text or "").strip()
+    if not raw:
+        return None
+    current_date = today or date.today()
+    resolved = resolve_date_range_text(
+        raw,
+        today=current_date,
+        languages=languages,
+    )
+    if resolved is None:
+        return None
+    window = _rolling_window_fields_from_range(
+        start=resolved.start,
+        end=resolved.end,
+        today=current_date,
+    )
+    if window is None:
+        return None
+    return {
+        "kind": "rolling_window",
+        **window,
+        "anchor": "today",
+        "confidence": confidence,
+        "evidence": raw,
+    }
+
+
 def resolve_date_range_intent(
     intent: Mapping[str, Any] | object | None,
     *,
@@ -211,6 +252,27 @@ def resolve_date_range_intent(
             evidence_spans=evidence,
         )
     return None
+
+
+def _rolling_window_fields_from_range(
+    *,
+    start: date,
+    end: date,
+    today: date,
+) -> dict[str, Any] | None:
+    if end < start or end != today:
+        return None
+    month_delta = (end.year - start.year) * 12 + (end.month - start.month)
+    if month_delta > 0 and start.day == end.day:
+        return {"count": month_delta, "unit": "month"}
+    day_delta = end.toordinal() - start.toordinal()
+    if day_delta <= 0:
+        return None
+    if day_delta % 365 == 0:
+        return {"count": day_delta // 365, "unit": "year"}
+    if day_delta % 7 == 0:
+        return {"count": day_delta // 7, "unit": "week"}
+    return {"count": day_delta, "unit": "day"}
 
 
 def resolve_date_range_endpoint_patch(
