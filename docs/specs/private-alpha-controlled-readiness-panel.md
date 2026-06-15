@@ -1290,7 +1290,10 @@ surfaces.
 - Normalize allowlist auth errors.
 - Add short-window quotas.
 - Add parent ownership checks.
-- Add feedback caps/context allowlist/url redaction.
+- Add feedback caps/context allowlist/url redaction. Closed locally in the
+  readiness branch: `/feedback` now caps messages at 5,000 characters, keeps
+  only known feedback context keys, converts browser URL/legacy path context to
+  safe `page_path`, and drops arbitrary nested browser blobs.
 - Add focused tests for each.
 
 ### Slice 4: Backtest Trust Hardening

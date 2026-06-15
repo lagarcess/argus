@@ -807,8 +807,70 @@ def test_feedback_submission_persists_with_user_ownership(mock_gateway):
         user_id=profile.id,
         feedback_type="general",
         message="The private alpha flow feels clear.",
-        context={"surface": "settings", "metadata": {"path": "/chat"}},
+        context={"surface": "settings", "page_path": "/chat"},
     )
+
+
+def test_feedback_submission_sanitizes_browser_context(mock_gateway):
+    profile = _mock_profile()
+    mock_gateway.get_or_create_mock_user.return_value = profile
+
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "bug",
+            "message": "The result card copy action felt broken.",
+            "context": {
+                "source": "message_more_menu",
+                "surface": "chat",
+                "message_id": "msg-1",
+                "conversation_id": "conv-1",
+                "artifact_type": "result_card",
+                "url": (
+                    "https://argus.example/chat?conversation=conv-1&auth=secret"
+                    "#private"
+                ),
+                "timestamp": "2026-06-15T08:00:00.000Z",
+                "rating": "negative",
+                "tags": ["incorrect", "slow"],
+                "hasAttachments": False,
+                "attachmentCount": 0,
+                "metadata": {"path": "/chat?conversation=conv-1", "token": "secret"},
+                "raw_prompt": "buy AAPL with my personal note",
+                "email": "person@example.com",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    context = mock_gateway.create_feedback.call_args.kwargs["context"]
+    assert context == {
+        "source": "message_more_menu",
+        "surface": "chat",
+        "message_id": "msg-1",
+        "conversation_id": "conv-1",
+        "artifact_type": "result_card",
+        "page_path": "/chat",
+        "timestamp": "2026-06-15T08:00:00.000Z",
+        "rating": "negative",
+        "tags": ["incorrect", "slow"],
+        "has_attachments": False,
+        "attachment_count": 0,
+    }
+
+
+def test_feedback_rejects_oversized_message(mock_gateway):
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "general",
+            "message": "x" * 5001,
+            "context": {"surface": "settings"},
+        },
+    )
+
+    assert response.status_code == 422
+    mock_gateway.create_feedback.assert_not_called()
 
 
 def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatch):

@@ -5,6 +5,7 @@ from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user
+from argus.api.feedback_context import sanitize_feedback_context
 from argus.api.schemas import FeedbackRequest, SuccessResponse, User
 from argus.domain.store import utcnow
 
@@ -16,7 +17,7 @@ def feedback(
     payload: FeedbackRequest,
     user: User = Depends(current_user),  # noqa: B008
 ) -> SuccessResponse:
-    context = dict(payload.context)
+    context = sanitize_feedback_context(payload.context)
     if payload.type == "account_deletion_request":
         context.update(
             {

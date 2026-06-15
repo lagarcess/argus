@@ -1875,6 +1875,17 @@ Search is limited to:
 - `general`
 - `account_deletion_request`
 
+`message` is capped at 5,000 characters.
+
+Feedback context is privacy-sanitized by the backend before persistence. The
+backend keeps only known scalar artifact/app keys such as `source`, `surface`,
+`message_id`, `conversation_id`, `artifact_id`, `artifact_type`, result,
+confirmation, backtest-job, rating, tag, timestamp, and attachment-count
+metadata. Raw browser URLs are not persisted; when a URL or legacy
+`metadata.path` is provided, the backend stores only a queryless `page_path`
+with UUID-like path segments redacted. Unknown nested blobs, prompts, emails,
+tokens, and arbitrary browser metadata are dropped.
+
 For `account_deletion_request`, clients send a one-click support request from
 the account surface. The backend enriches `context` with authenticated account
 metadata such as account email, profile language, request user id, and request

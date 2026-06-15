@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from argus.api.feedback_context import MAX_FEEDBACK_MESSAGE_LENGTH
+
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
 Theme = Literal["dark", "light", "system"]
@@ -371,7 +373,7 @@ class DiscoveryResponse(BaseModel):
 
 class FeedbackRequest(BaseModel):
     type: Literal["bug", "feature", "general", "account_deletion_request"]
-    message: str = Field(min_length=1)
+    message: str = Field(min_length=1, max_length=MAX_FEEDBACK_MESSAGE_LENGTH)
     context: dict[str, Any] = Field(default_factory=dict)
 
 
