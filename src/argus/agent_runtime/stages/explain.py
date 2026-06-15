@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from argus.agent_runtime.presentation_i18n import optional_parameter_display_label
 from argus.agent_runtime.response_style import (
     ARGUS_RESPONSE_STYLE_CONTRACT,
     with_response_heading,
@@ -1032,10 +1033,14 @@ def _assumption_summary(
     user_labels: list[str] = []
     assumptions = explanation_context.get("assumptions", [])
 
-    for value in optional_parameters.values():
+    for field_name, value in optional_parameters.items():
         if not isinstance(value, dict):
             continue
-        label = str(value.get("label") or "Unnamed setting")
+        label = optional_parameter_display_label(
+            field_name,
+            value.get("label"),
+            language=language,
+        )
         source = str(value.get("source") or "")
         if source == "default":
             defaulted_labels.append(label)

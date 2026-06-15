@@ -9,6 +9,7 @@ from argus.agent_runtime.confirmation_artifacts import (
     stable_payload_hash,
     validate_confirmation_execution_payload,
 )
+from argus.agent_runtime.presentation_i18n import confirmation_rule_display_value
 from argus.agent_runtime.strategy_contract import (
     display_strategy_slug,
     display_strategy_type,
@@ -85,7 +86,12 @@ def runtime_confirmation_card(
             _confirmation_row(
                 "buy_rule",
                 "Buy rule",
-                _format_confirmation_value(strategy["entry_logic"]),
+                _format_confirmation_rule_value(
+                    strategy,
+                    side="entry",
+                    value=strategy["entry_logic"],
+                    language=language,
+                ),
             )
         )
     if strategy.get("exit_logic"):
@@ -93,7 +99,12 @@ def runtime_confirmation_card(
             _confirmation_row(
                 "exit_rule",
                 "Exit rule",
-                _format_confirmation_value(strategy["exit_logic"]),
+                _format_confirmation_rule_value(
+                    strategy,
+                    side="exit",
+                    value=strategy["exit_logic"],
+                    language=language,
+                ),
             )
         )
     display_capital = _confirmation_display_capital(
@@ -528,6 +539,21 @@ def _format_confirmation_value(value: Any) -> str:
     if value is None or value == "":
         return "Default period"
     return str(value)
+
+
+def _format_confirmation_rule_value(
+    strategy: dict[str, Any],
+    *,
+    side: str,
+    value: Any,
+    language: str,
+) -> str:
+    return confirmation_rule_display_value(
+        strategy,
+        side=side,
+        fallback_value=value,
+        language=language,
+    ) or _format_confirmation_value(value)
 
 
 def _format_confirmation_period(value: Any, *, language: str = "en") -> str:

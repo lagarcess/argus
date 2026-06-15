@@ -106,13 +106,17 @@ The readiness slice should be sequenced like this:
      Refine idea -> messy refinement -> new confirmation -> cancel. That pass
      preserved Spanish runtime voice, canonical `GOOGL`, `$50,000`, a rolling
      six-month window, compact localized date ranges, and structured
-     cancellation. The broader Spanish transcript matrix also passes locally
-     for DCA, missing DCA amount clarification, mixed-asset clarification,
-     currency-pair confirmation, unsupported valuation recovery, and localized
-     artifacts. Browser recovery proof now covers Spanish unsupported valuation
-     (`P/E`) -> supported proxy clarification -> messy buy-and-hold follow-up
-     -> executable AAPL confirmation. This is local runtime-spine proof, not
-     the full Spanish release gate.
+     cancellation. A final local browser QA pass found and fixed two artifact
+     locale leaks: Spanish quick takes no longer expose English optional-field
+     labels such as `Initial capital` / `Timeframe`, and Spanish RSI
+     confirmation cards render structured buy/sell rules in Spanish instead of
+     raw internal English rule prose. The broader Spanish transcript matrix
+     also passes locally for DCA, missing DCA amount clarification, mixed-asset
+     clarification, currency-pair confirmation, unsupported valuation recovery,
+     and localized artifacts. Browser recovery proof now covers Spanish
+     unsupported valuation (`P/E`) -> supported proxy clarification -> messy
+     RSI follow-up -> executable ETH confirmation. This is local runtime-spine
+     proof, not the full Spanish release gate.
 
 2. **Backtest trust hardening**
    - Provider-backed symbol validation even when `asset_class` is explicit.
@@ -1334,7 +1338,9 @@ surfaces.
   valuation requests, setup edits, approval turns, and result follow-ups.
 - Local browser QA now covers the main Spanish confirmation/run/result/refine/
   cancel action chain and one unsupported-valuation recovery path that re-enters
-  the normal confirmation funnel.
+  the normal confirmation funnel. The latest pass also covers localized
+  quick-take optional-field labels and Spanish structured RSI rule rendering in
+  confirmation cards.
 - Live QA with at least one Spanish prompt in Render staging.
 
 ### Slice 2: Alpha Trust And Legal Shell

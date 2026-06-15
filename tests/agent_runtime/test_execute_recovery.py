@@ -1452,6 +1452,10 @@ def test_explain_stage_localizes_spanish_quick_take_heading() -> None:
             "asset_universe": ["ETH"],
             "date_range": {"start": "2024-01-01", "end": "2024-03-31"},
         },
+        "optional_parameters": {
+            "initial_capital": {"label": "Initial capital", "source": "default"},
+            "timeframe": {"label": "Timeframe", "source": "user"},
+        },
     }
     state.final_response_payload = {
         "result": {
@@ -1469,6 +1473,12 @@ def test_explain_stage_localizes_spanish_quick_take_heading() -> None:
     assert "1 de enero de 2024 al 31 de marzo de 2024" in result.patch[
         "assistant_response"
     ]
+    assert "Valores predeterminados: capital inicial." in result.patch[
+        "assistant_response"
+    ]
+    assert "Opciones elegidas: temporalidad." in result.patch["assistant_response"]
+    assert "Initial capital" not in result.patch["assistant_response"]
+    assert "Timeframe" not in result.patch["assistant_response"]
     assert "- Tested:" not in result.patch["assistant_response"]
 
 
