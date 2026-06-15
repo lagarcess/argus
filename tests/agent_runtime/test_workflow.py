@@ -319,6 +319,39 @@ class AssetAnswerThenApprovalInterpreter:
         )
 
 
+class SpanishDateAnswerInterpreter:
+    def __init__(self) -> None:
+        self.requests: list[InterpretationRequest] = []
+
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        self.requests.append(request)
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="El usuario dio una nueva ventana de fechas.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                date_range={"start": "2025-12-14", "end": "2026-06-12"},
+                extra_parameters={
+                    "date_range_intent": {
+                        "kind": "rolling_window",
+                        "count": 6,
+                        "unit": "month",
+                        "anchor": "today",
+                        "evidence": "ultimos 6 meses",
+                    },
+                    "evidence_spans": {
+                        "date_range_intent": "ultimos 6 meses",
+                    },
+                },
+                refinement_of="visible confirmation",
+            ),
+            confidence=0.94,
+            semantic_turn_act="answer_pending_need",
+        )
+
+
 class ConversationalInterpreter:
     async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
         return StructuredInterpretation(
@@ -1233,6 +1266,86 @@ async def test_workflow_typed_approval_after_card_edit_defers_to_card_action(
     assert "visible card" in approval_result["assistant_response"]
     assert "simulation" in approval_result["assistant_response"]
     assert "confirmation_payload" not in approval_result
+
+
+@pytest.mark.asyncio
+async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    monkeypatch.setattr(
+        resolution_module,
+        "resolve_market_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = SpanishDateAnswerInterpreter()
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", language_preference="es-419")
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Comprar y mantener AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+    thread_id = "thread-spanish-change-dates-answer"
+
+    prompt_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="Cambiar fechas",
+        action_context={
+            "type": "change_dates",
+            "label": "Cambiar fechas",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert interpreter.requests == []
+    assert prompt_result["stage_outcome"] == "await_user_reply"
+    assert prompt_result["pending_strategy"]["requested_field"] == "date_range"
+    assert prompt_result["pending_strategy"]["missing_required_fields"] == [
+        "date_range"
+    ]
+
+    answer_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="ultimos 6 meses",
+    )
+
+    assert len(interpreter.requests) == 1
+    assert interpreter.requests[0].user.language_preference == "es-419"
+    assert interpreter.requests[0].latest_task_snapshot is not None
+    assert (
+        interpreter.requests[0].latest_task_snapshot.pending_strategy_summary
+        is not None
+    )
+    assert interpreter.requests[0].selected_thread_metadata["requested_field"] == (
+        "date_range"
+    )
+    assert answer_result["stage_outcome"] == "await_approval"
+    strategy = answer_result["confirmation_payload"]["strategy"]
+    assert strategy["asset_universe"] == ["AAPL"]
+    assert strategy["capital_amount"] == 100000
+    assert strategy["comparison_baseline"] == "SPY"
+    assert strategy["date_range"] == {"start": "2025-12-14", "end": "2026-06-12"}
+    assert answer_result["pending_strategy"]["requested_field"] is None
+    assert answer_result["pending_strategy"]["missing_required_fields"] == []
 
 
 @pytest.mark.asyncio
