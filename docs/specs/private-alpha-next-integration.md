@@ -115,10 +115,12 @@ Codex should own or closely supervise this:
    - Active worker branch: `codex/private-alpha-readiness`, targeting
      `codex/private-alpha-next` after review.
    - Current local checkpoint: the language-agnostic runtime spine has focused
-     backend tests and Codex browser QA for messy English/Spanish buy-and-hold
-     prompts with shorthand capital (`100k`). This proves the first supported
-     shape can reach the canonical confirmation-card state in the selected
-     product locale without phrase gates or chip-specific shortcuts.
+     backend tests for messy English/Spanish buy-and-hold prompts with shorthand
+     capital (`100k`) and Codex browser QA for the English confirmation-card
+     edit path. The latest browser pass proved `Change dates -> calendar 2024`
+     updates the card instead of silently re-confirming the prior rolling range.
+     Spanish browser QA still has an open over-clarification gap for messy
+     rolling-window phrasing such as `ultimos 12 meses`.
    - Remaining before merge/release readiness: broader Spanish prompt matrix,
      multi-turn clarification, result execution, retry/recovery, indicator/DCA
      coverage, production-parity Render canary, and the rest of the controlled

@@ -89,11 +89,16 @@ The readiness slice should be sequenced like this:
    - Spanish date/timeframe/indicator normalization after LLM interpretation.
    - Spanish result, clarification, unsupported-boundary, and follow-up voice.
    - Current checkpoint: the readiness worktree now has focused backend tests
-     and Codex browser QA proving the messy English/Spanish buy-and-hold shape
-     with shorthand capital (`100k`) reaches a confirmation card with canonical
+     proving the messy English/Spanish buy-and-hold shape with shorthand
+     capital (`100k`) can reach a confirmation card with canonical
      `capital_amount=100000`, localized shell/card copy, compact localized date
-     ranges, and no hard recovery. This is a local runtime-spine proof, not the
-     full Spanish release gate.
+     ranges, and no hard recovery. Latest Codex browser QA also proved the
+     English `Change dates -> calendar 2024` path updates the active card to
+     `Jan 1, 2024 -> Dec 31, 2024` instead of silently confirming the prior
+     rolling range. Spanish browser QA still has an open over-clarification gap:
+     a messy `ultimos 12 meses` answer can ask the user to restate the rolling
+     window instead of accepting it as canonical temporal intent. This is a
+     local runtime-spine proof, not the full Spanish release gate.
 
 2. **Backtest trust hardening**
    - Provider-backed symbol validation even when `asset_class` is explicit.
@@ -125,7 +130,8 @@ The readiness slice should be sequenced like this:
 
 6. **Analytics/feedback**
    - Supabase feedback verification.
-   - Privacy-first PostHog event plan, still disabled until configured.
+   - Privacy-first PostHog event plan, postponed for this solo readiness pass
+     and still disabled until founder-approved configuration.
    - Minimal loop metrics for the controlled study.
 
 7. **UX research readiness**
@@ -1216,6 +1222,20 @@ Before implementing the readiness slice, lock these:
    - Recommended answer: tell testers backtests may take around a minute during
      alpha.
 
+## No-Touch Boundaries For Current Solo Execution
+
+The current Codex-owned readiness pass must not implement or configure:
+
+- Governance, legal, privacy-policy, Terms, consent, company-operator, or safety
+  gate work.
+- PostHog instrumentation, session replay, event capture, or product analytics
+  activation.
+
+Those remain founder-gated follow-up slices. This pass may keep documentation
+accurate, verify existing feedback paths, and preserve privacy-safe route
+receipts, but it should not add new analytics vendors or legal/consent
+surfaces.
+
 ## Proposed Implementation Backlog
 
 ### Slice 1: Spanish Backend Execution
@@ -1279,8 +1299,10 @@ Before implementing the readiness slice, lock these:
 
 ### Slice 6: Product Analytics Plan
 
-- Keep PostHog disabled until event taxonomy and redaction land.
-- Implement consent-aware product analytics only if needed after first sessions.
+- Postpone PostHog for the current solo readiness pass. Keep it disabled until
+  event taxonomy, redaction, consent posture, and founder approval land.
+- Implement consent-aware product analytics only if needed after first sessions
+  and after the no-touch boundary is lifted.
 - Use Supabase feedback, route receipts, and founder notes for the first
   observed alpha cohort.
 
