@@ -617,6 +617,18 @@ Ownership hardening:
 - `chart.markers` contains capped entry/exit events derived from executed fills only. Raw strategy signals, blocked exits while flat, and duplicate blocked entries must not appear as chart markers.
 - The frontend must keep TradingView attribution visible when rendering Lightweight Charts.
 
+**Reproducibility contract:**
+- Direct `/backtests/run` records store the normalized engine config directly in
+  `config_snapshot`.
+- Chat-launched runtime runs may also include
+  `config_snapshot.engine_config`, which is the exact normalized engine config
+  executed by the launch adapter. Readers should prefer this replay payload when
+  present and must not reconstruct run inputs from result-card display copy.
+- Benchmark comparisons require sufficient benchmark observations over the
+  selected window. If the benchmark starts late, ends early, or is too sparse to
+  support a trustworthy aligned curve, the backend returns
+  `503 benchmark_data_unavailable` instead of silently backfilling a comparison.
+
 ## Backtest Job
 
 Durable asynchronous execution state for a chat-confirmed backtest. A job is not
@@ -765,6 +777,8 @@ The canonical backtest config used by the engine for execution and reproducibili
 - `allocation_method`: "equal_weight"
 - `benchmark_symbol`: `SPY` (equity), `BTC` (crypto), tested pair (`currency_pair`)
 - `parameters`: Template-specific defaults
+- Benchmark data must cover the selected comparison window with enough
+  observations to avoid future-looking backfill or sparse synthetic comparisons.
 
 ## Constraints & Validation (Alpha MVP)
 

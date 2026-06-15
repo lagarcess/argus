@@ -113,6 +113,7 @@ import {
   hiddenSaveActionMessageIdsFromApi,
   isBreakdownActionMetadata,
   normalizeConfirmationHistory,
+  settleConfirmationAfterActionTransportError,
   resultActionRunId,
   settleOpenConfirmationsAfterStreamError,
   settleOpenConfirmationsAfterTextFinal,
@@ -1510,16 +1511,21 @@ export default function ChatInterface() {
           ? err.message
           : t('chat.error_backtest');
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? {
-                ...m,
-                content: isRateLimit
-                  ? t('chat.rate_limit_error')
-                  : fallbackMessage,
-                actions: retryLastTurnAction ? [retryLastTurnAction] : m.actions,
-              }
-            : m,
+        normalizeRetryActionHistory(
+          settleConfirmationAfterActionTransportError(
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    content: isRateLimit
+                      ? t('chat.rate_limit_error')
+                      : fallbackMessage,
+                    actions: retryLastTurnAction ? [retryLastTurnAction] : m.actions,
+                  }
+                : m,
+            ),
+            action,
+          ),
         ),
       );
       markConversationAttentionIfOutOfFocus(targetConversationId);

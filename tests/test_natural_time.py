@@ -3,6 +3,7 @@ from datetime import date
 from argus.nlp.natural_time import (
     contains_named_date_evidence,
     dateparser_languages_for_user_language,
+    parse_date_text,
     parse_explicit_date_text,
     parse_relative_endpoint_text,
     resolve_date_range_endpoint_patch,
@@ -190,6 +191,29 @@ def test_relative_endpoint_parser_rejects_calendar_name_false_positive() -> None
 
     assert parse_relative_endpoint_text("yesterday", today=today) == date(2026, 5, 31)
     assert parse_relative_endpoint_text("march", today=today) is None
+
+
+def test_date_parser_resolves_library_weekday_evidence_without_phrase_tables() -> None:
+    today = date(2026, 6, 15)
+
+    assert (
+        parse_date_text(
+            "last friday",
+            today=today,
+            endpoint="end",
+            languages=dateparser_languages_for_user_language("en"),
+        )
+        == date(2026, 6, 12)
+    )
+    assert (
+        parse_date_text(
+            "el viernes pasado",
+            today=today,
+            endpoint="end",
+            languages=dateparser_languages_for_user_language("es-419"),
+        )
+        == date(2026, 6, 12)
+    )
 
 
 def test_explicit_date_parser_uses_language_hint_without_locale_phrase_tables() -> None:

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
+import { useTranslation } from "react-i18next";
 import {
   BaselineSeries,
   ColorType,
@@ -54,12 +55,18 @@ export default function ResultEquityChart({
 }: ResultEquityChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
+  const { i18n } = useTranslation();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const isDark = appearanceOverride
     ? appearanceOverride === "dark"
     : resolvedTheme === "dark";
+  const chartLocale = resolveChartLocale(i18n.language);
   const isHeroDeltaEvidence = presentation === "heroDeltaEvidence";
   const chartHeight = isHeroDeltaEvidence ? 164 : 168;
+  const currencyFormatter = useMemo(
+    () => chartCurrencyFormatter(chart.currency, chartLocale),
+    [chart.currency, chartLocale],
+  );
   const data = useMemo<BaselineData<Time>[]>(
     () =>
       chart.series.map((point) => ({
@@ -137,12 +144,11 @@ export default function ResultEquityChart({
         },
       },
       localization: {
-        priceFormatter: (price: number) =>
-          new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency: chart.currency ?? "USD",
-            maximumFractionDigits: 0,
-          }).format(price),
+        locale: chartLocale,
+        dateFormat: "dd MMM yyyy",
+        timeFormatter: (time: Time) =>
+          formatChartDateLabel(time, chartLocale, "short"),
+        priceFormatter: (price: number) => currencyFormatter.format(price),
       },
     });
 
@@ -211,11 +217,11 @@ export default function ResultEquityChart({
         setTooltip(null);
         return;
       }
-      const time = String(param.time);
+      const time = normalizeChartTimeValue(param.time);
       setTooltip({
         x: param.point.x,
         y: param.point.y,
-        time,
+        time: formatChartDateLabel(param.time, chartLocale),
         value: datum.value,
         event: eventByTime.get(time)?.join(", "),
       });
@@ -226,7 +232,17 @@ export default function ResultEquityChart({
       chartApi.timeScale().unsubscribeVisibleLogicalRangeChange(updateVisibleMarkers);
       chartApi.remove();
     };
-  }, [chart, chartHeight, data, dataIndexByTime, eventByTime, isDark, isHeroDeltaEvidence]);
+  }, [
+    chart,
+    chartHeight,
+    chartLocale,
+    currencyFormatter,
+    data,
+    dataIndexByTime,
+    eventByTime,
+    isDark,
+    isHeroDeltaEvidence,
+  ]);
 
   if (data.length === 0) return null;
 
@@ -253,13 +269,7 @@ export default function ResultEquityChart({
           }}
         >
           <div className="font-medium text-black dark:text-white">{tooltip.time}</div>
-          <div>
-            {new Intl.NumberFormat("en-US", {
-              style: "currency",
-              currency: chart.currency ?? "USD",
-              maximumFractionDigits: 0,
-            }).format(tooltip.value)}
-          </div>
+          <div>{currencyFormatter.format(tooltip.value)}</div>
           {tooltip.event && <div className="mt-1 text-black/45 dark:text-white/45">{tooltip.event}</div>}
         </div>
       )}
@@ -269,10 +279,106 @@ export default function ResultEquityChart({
 
 function normalizeChartTime(value: string) {
   const trimmed = value.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-  const dateOnly = trimmed.match(/^(\d{4}-\d{2}-\d{2})T/);
-  if (dateOnly) return dateOnly[1];
+  if (isIsoDateOnly(trimmed)) return trimmed;
+  if (isIsoDateOnly(trimmed.slice(0, 10)) && trimmed[10] === "T") {
+    return trimmed.slice(0, 10);
+  }
   return trimmed;
+}
+
+function isIsoDateOnly(value: string) {
+  if (value.length !== 10) return false;
+  if (value[4] !== "-" || value[7] !== "-") return false;
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(5, 7));
+  const day = Number(value.slice(8, 10));
+  return (
+    Number.isInteger(year) &&
+    Number.isInteger(month) &&
+    Number.isInteger(day) &&
+    month >= 1 &&
+    month <= 12 &&
+    day >= 1 &&
+    day <= 31
+  );
+}
+
+function normalizeChartTimeValue(value: Time | string) {
+  if (typeof value === "string") return normalizeChartTime(value);
+  if (typeof value === "number") {
+    return new Date(value * 1000).toISOString().slice(0, 10);
+  }
+  return `${value.year}-${pad2(value.month)}-${pad2(value.day)}`;
+}
+
+function chartTimeToUtcDate(value: Time | string) {
+  if (typeof value === "number") {
+    return new Date(value * 1000);
+  }
+  if (typeof value !== "string") {
+    return new Date(Date.UTC(value.year, value.month - 1, value.day));
+  }
+
+  const normalized = normalizeChartTime(value);
+  const datePart = normalized.slice(0, 10);
+  if (isIsoDateOnly(datePart)) {
+    return new Date(
+      Date.UTC(
+        Number(datePart.slice(0, 4)),
+        Number(datePart.slice(5, 7)) - 1,
+        Number(datePart.slice(8, 10)),
+      ),
+    );
+  }
+
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function resolveChartLocale(locale?: string | null) {
+  const normalized = locale?.trim();
+  if (!normalized) return "en-US";
+  const language = normalized.split("-")[0]?.toLowerCase();
+  if (language === "es") return "es-419";
+  if (language === "en") return "en-US";
+  return normalized;
+}
+
+function chartCurrencyFormatter(currency: string | undefined, locale: string) {
+  return new Intl.NumberFormat(resolveChartLocale(locale), {
+    style: "currency",
+    currency: currency ?? "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
+export function formatChartCurrency(
+  value: number,
+  currency = "USD",
+  locale = "en-US",
+) {
+  return chartCurrencyFormatter(currency, locale).format(value);
+}
+
+export function formatChartDateLabel(
+  value: Time | string,
+  locale = "en-US",
+  month: "short" | "long" = "long",
+) {
+  const date = chartTimeToUtcDate(value);
+  if (!date) return String(value);
+
+  return new Intl.DateTimeFormat(resolveChartLocale(locale), {
+    month,
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 type MarkerViewportInput = {

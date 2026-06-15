@@ -113,6 +113,9 @@ def build_backtest_run_from_result(
         "resolved_strategy": resolved_strategy,
         "resolved_parameters": resolved_parameters_dict,
     }
+    engine_config = resolved_parameters_dict.get("engine_config")
+    if isinstance(engine_config, dict):
+        config_snapshot["engine_config"] = dict(engine_config)
     if isinstance(provider_metadata, dict):
         config_snapshot["provider_metadata"] = dict(provider_metadata)
     enriched_result_card = enrich_result_card_actions(

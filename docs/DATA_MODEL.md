@@ -333,6 +333,13 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 - `benchmark_symbol` is derived from `asset_class` defaults in Alpha (`SPY` for equities, `BTC` for crypto, tested pair for currency pairs).
 - `metrics.aggregate.performance.portfolio_value_range` stores aggregate strategy portfolio equity close peak/lowest values for the run period.
 - `chart` stores the aggregate portfolio equity curve, its matching `value_summary`, and capped executed-fill markers used by the result card. Multi-symbol runs store the portfolio curve, not separate comparison series.
+- Direct run rows store the normalized engine config directly in
+  `config_snapshot`; chat-launched rows may include
+  `config_snapshot.engine_config` with the exact normalized engine config
+  executed by the launch adapter. This replay payload is canonical when present.
+- Benchmark comparisons are persisted only when benchmark observations cover the
+  selected window sufficiently; late, early-ending, or sparse benchmark data
+  should fail as data unavailable rather than being silently backfilled.
 - `trades` may mirror chart event markers for lightweight UI hydration. Detailed execution ledgers can preserve signals, order intents, fills, ignored signals, and position snapshots, but list endpoints must expose only lightweight result metadata.
 - Saved strategies must be created from completed run state or an equivalent canonical result snapshot, not reconstructed from frontend display text.
 - Follow-up refinements from a result card must be seeded from

@@ -15,10 +15,7 @@ export type ConfirmationDisplayFacts = {
   timeframe?: string | null;
 };
 
-type Translate = (
-  key: string,
-  defaultValueOrOptions?: string | Record<string, unknown>,
-) => string;
+type Translate = TFunction;
 
 export function confirmationAssumptionDisplay({
   assetClass,

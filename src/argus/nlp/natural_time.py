@@ -346,14 +346,21 @@ def parse_date_text(
     endpoint: Literal["start", "end"] = "start",
     languages: tuple[str, ...] | None = None,
 ) -> date | None:
+    current_date = today or date.today()
     parsed = _parse_date_span(
         str(text or ""),
-        today=today or date.today(),
+        today=current_date,
         languages=languages,
     )
     if parsed is None:
+        parsed = _single_searched_date_span(
+            str(text or ""),
+            today=current_date,
+            languages=languages,
+        )
+    if parsed is None:
         return None
-    return _endpoint_date(parsed, endpoint=endpoint, today=today or date.today())
+    return _endpoint_date(parsed, endpoint=endpoint, today=current_date)
 
 
 def parse_explicit_date_text(
@@ -506,6 +513,31 @@ def _parse_date_span(
         value=data.date_obj.date(),
         period=cast(DatePeriod, period),
         span=_strip_time_span_suffix(span),
+    )
+
+
+def _single_searched_date_span(
+    text: str,
+    *,
+    today: date,
+    languages: tuple[str, ...] | None,
+) -> _ParsedDate | None:
+    matches = _search_date_spans(
+        text,
+        today=today,
+        languages=languages,
+        return_time_span=False,
+    )
+    if len(matches) != 1:
+        return None
+    span, value = matches[0]
+    parsed = _parse_date_span(span, today=today, languages=languages)
+    if parsed is not None:
+        return parsed
+    return _ParsedDate(
+        value=value.date(),
+        period="day",
+        span=span,
     )
 
 

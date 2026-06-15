@@ -31,6 +31,12 @@ const IN_PROGRESS_RUN_STATUSES = new Set<StrategyConfirmationStatus>([
   "running",
   "request_sent",
 ]);
+const IN_FLIGHT_ACTION_STATUSES = new Set<StrategyConfirmationStatus>([
+  "draft_canceled",
+  "editing",
+  "request_sent",
+  "running",
+]);
 
 export function confirmationActionStatusLabel(
   actionOrType: ChatActionOption | NonNullable<ChatActionOption["type"]> | undefined,
@@ -384,6 +390,36 @@ export function settleOpenConfirmationsAfterStreamError(
     return messages;
   }
   return supersedeOpenConfirmations(messages, "could_not_run");
+}
+
+export function settleConfirmationAfterActionTransportError(
+  messages: Message[],
+  action: ChatActionOption | undefined,
+): Message[] {
+  const effect = confirmationActionEffectFromAction(action);
+  if (!effect) {
+    return messages;
+  }
+  const failedEffect: ConfirmationActionEffect = {
+    ...effect,
+    status: "could_not_run",
+    statusLabel: confirmationStatusLabel("could_not_run"),
+  };
+  return messages.map((message) => {
+    if (message.kind !== "strategy_confirmation" || !message.confirmation) {
+      return message;
+    }
+    const confirmationId = message.confirmation.confirmation_id;
+    const ownsAction =
+      !effect.confirmationId ||
+      !confirmationId ||
+      effect.confirmationId === confirmationId;
+    const status = confirmationStatusFromPayload(message.confirmation);
+    if (!ownsAction || !IN_FLIGHT_ACTION_STATUSES.has(status)) {
+      return message;
+    }
+    return closeConfirmationForAction(message, failedEffect);
+  });
 }
 
 function closeConfirmationForAction(

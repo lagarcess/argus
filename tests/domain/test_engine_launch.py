@@ -484,6 +484,74 @@ def test_buy_and_hold_adapter_propagates_explicit_benchmark_to_card_and_context(
     assert result.explanation_context["benchmark_symbol"] == "QQQ"
 
 
+def test_launch_envelope_carries_replayable_engine_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="AAPL",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=1000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="QQQ",
+    )
+    seen_configs: list[dict[str, Any]] = []
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+
+    def fake_compute_alpha_metrics(config: dict[str, Any], **_: Any) -> dict[str, Any]:
+        seen_configs.append(dict(config))
+        return {
+            "aggregate": {
+                "performance": {
+                    "profit": 350.0,
+                    "total_return_pct": 35.0,
+                    "benchmark_return_pct": 26.9,
+                    "delta_vs_benchmark_pct": 8.1,
+                },
+                "risk": {"max_drawdown_pct": -15.5},
+                "efficiency": {"total_trades": 1, "win_rate": 1.0},
+            },
+            "by_symbol": {
+                "AAPL": {
+                    "performance": {
+                        "total_return_pct": 35.0,
+                        "benchmark_return_pct": 26.9,
+                    }
+                }
+            },
+        }
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        fake_compute_alpha_metrics,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_chart",
+        lambda config: None,
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    assert seen_configs
+    assert result.envelope.resolved_parameters["engine_config"] == seen_configs[0]
+
+
 def test_buy_and_hold_adapter_uses_canonical_benchmark_for_all_result_facts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

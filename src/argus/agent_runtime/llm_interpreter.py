@@ -123,7 +123,19 @@ _DATE_EVIDENCE_SPAN_KEYS = (
     "date_range",
     "date_range_raw_text",
     "date_range_intent",
+    "date_window",
+    "period",
+    "temporal_window",
     "time_window",
+    "window",
+)
+_COMPARISON_BASELINE_EVIDENCE_KEYS = (
+    "baseline",
+    "benchmark",
+    "comparison_baseline",
+    "comparison_baseline_evidence",
+    "comparison_target",
+    "reference",
 )
 
 
@@ -3547,6 +3559,18 @@ async def _stated_run_field_audited_response(
             preferred_model=preferred_model,
             request=request,
         )
+    if (
+        _response_needs_supported_signal_rule_recovery(
+            response,
+            current_user_message=request.current_user_message,
+        )
+        or _llm_signal_strategy_is_underfilled(response.candidate_strategy_draft)
+    ):
+        response = await _signal_rule_checked_response(
+            response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
     return _response_with_executable_fields_preferred_over_clarification_prose(
         response
     )
@@ -3961,7 +3985,7 @@ def _draft_has_comparison_baseline_evidence(draft: LLMStrategyDraft) -> bool:
     evidence_spans = _draft_semantic_evidence_spans(draft)
     return any(
         not _llm_value_is_empty(evidence_spans.get(key))
-        for key in ("comparison_baseline", "comparison_baseline_evidence")
+        for key in _COMPARISON_BASELINE_EVIDENCE_KEYS
     )
 
 
@@ -5605,9 +5629,13 @@ async def _audit_supported_strategy_capability_conflict(
             schema_name="SupportedStrategyCapabilityConflictAudit",
         )
     except Exception:
-        return None
+        return _structured_supported_strategy_capability_conflict_fallback(
+            response
+        )
     if not isinstance(audit, SupportedStrategyCapabilityConflictAudit):
-        return None
+        return _structured_supported_strategy_capability_conflict_fallback(
+            response
+        )
     if (
         audit.drop_unsupported_strategy_logic
         and not audit.keep_unsupported_strategy_logic
@@ -5629,7 +5657,59 @@ async def _audit_supported_strategy_capability_conflict(
             preferred_model=preferred_model,
             request=request,
         )
+    if audit.confidence < 0.7:
+        return _structured_supported_strategy_capability_conflict_fallback(
+            response
+        )
     return None
+
+
+def _structured_supported_strategy_capability_conflict_fallback(
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse | None:
+    if not _response_needs_supported_strategy_capability_conflict_audit(response):
+        return None
+    if any(
+        item.category != "unsupported_strategy_logic"
+        for item in response.unsupported_constraints
+    ):
+        return None
+    draft = response.candidate_strategy_draft
+    strategy_type = canonical_strategy_type(draft.strategy_type)
+    if strategy_type not in {"buy_and_hold", "dca_accumulation"}:
+        return None
+    if _llm_strategy_draft_has_rule_or_indicator_fields(draft):
+        return None
+    if not (draft.asset_universe or draft.asset_class):
+        return None
+    if strategy_type == "buy_and_hold" and not (
+        draft.date_range
+        or _draft_has_semantic_date_window_evidence(draft)
+        or resolve_date_range_intent(draft.date_range_intent) is not None
+    ):
+        return None
+    if strategy_type == "dca_accumulation" and not (
+        draft.recurring_contribution is not None
+        or draft.capital_amount is not None
+        or draft.total_capital is not None
+        or draft.initial_capital is not None
+    ):
+        return None
+    repaired = _response_with_supported_strategy_capability_conflict_removed(
+        response=response,
+        strategy_type=strategy_type,
+    )
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                code
+                for code in repaired.reason_codes
+                if code != "supported_strategy_capability_conflict_audit"
+            ]
+            + ["supported_strategy_capability_structured_fallback"]
+        )
+    )
+    return repaired
 
 
 def _response_needs_supported_strategy_capability_conflict_audit(
@@ -8424,7 +8504,7 @@ def _bounded_date_evidence_candidates(draft: LLMStrategyDraft) -> list[str]:
     candidates: list[str] = []
     if draft.date_range_raw_text:
         candidates.append(draft.date_range_raw_text)
-    evidence_spans = draft.evidence_spans or {}
+    evidence_spans = _draft_semantic_evidence_spans(draft)
     for key in _DATE_EVIDENCE_SPAN_KEYS:
         value = evidence_spans.get(key)
         if value:

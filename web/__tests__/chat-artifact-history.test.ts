@@ -4,6 +4,7 @@ import {
   applyConfirmationActionEffects,
   confirmationActionEffectsFromApi,
   normalizeConfirmationHistory,
+  settleConfirmationAfterActionTransportError,
   settleOpenConfirmationsAfterStreamError,
   settleOpenConfirmationsAfterTextFinal,
 } from "../components/chat/artifact-history";
@@ -137,6 +138,47 @@ describe("chat artifact history", () => {
     expect(settled.confirmation?.statusLabel).toBe("Could not run");
     expect(settled.confirmation?.actions).toEqual([]);
     expect(settled.actions).toEqual([]);
+  });
+
+  test("action transport errors settle only the action-owned confirmation", () => {
+    const previousCard: Message = {
+      ...confirmationMessage(),
+      id: "previous-confirmation",
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_id: "confirm-previous-aapl",
+        confirmation_state: "superseded",
+        status: "updated",
+        statusLabel: "Updated",
+        actions: [],
+      },
+      actions: [],
+    };
+    const [running] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "run_backtest",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Running",
+      },
+    ]);
+
+    const messages = settleConfirmationAfterActionTransportError(
+      [previousCard, running],
+      {
+        type: "run_backtest",
+        label: "Run backtest",
+        presentation: "confirmation",
+        payload: { confirmation_id: "confirm-aapl" },
+      },
+    );
+
+    expect(messages[0].confirmation?.confirmation_state).toBe("superseded");
+    expect(messages[0].confirmation?.statusLabel).toBe("Updated");
+    expect(messages[1].confirmation?.confirmation_state).toBe("superseded");
+    expect(messages[1].confirmation?.status).toBe("could_not_run");
+    expect(messages[1].confirmation?.statusLabel).toBe("Could not run");
+    expect(messages[1].confirmation?.actions).toEqual([]);
+    expect(messages[1].actions).toEqual([]);
   });
 
   test("cancel action tombstones hide action transcript noise on reload", () => {

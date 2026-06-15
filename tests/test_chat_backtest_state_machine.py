@@ -276,6 +276,19 @@ def test_runtime_backtest_run_persists_explicit_benchmark_from_envelope(
 ) -> None:
     from argus.api.chat.persistence import build_runtime_backtest_run
 
+    engine_config = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "side": "long",
+        "starting_capital": 1000.0,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": benchmark_symbol,
+        "parameters": {},
+    }
     run = build_runtime_backtest_run(
         user_id="user-1",
         conversation_id="conversation-1",
@@ -296,6 +309,7 @@ def test_runtime_backtest_run_persists_explicit_benchmark_from_envelope(
                 "timeframe": "1D",
                 "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
                 "benchmark_symbol": benchmark_symbol,
+                "engine_config": engine_config,
             },
             "metrics": {"aggregate": {"performance": {"total_return_pct": 12.4}}},
             "benchmark_metrics": {
@@ -315,6 +329,7 @@ def test_runtime_backtest_run_persists_explicit_benchmark_from_envelope(
     assert run.config_snapshot["resolved_parameters"]["benchmark_symbol"] == (
         benchmark_symbol
     )
+    assert run.config_snapshot["engine_config"] == engine_config
 
 
 def test_chat_stream_final_payload_uses_engine_result_card_benchmark_contract(
@@ -1058,7 +1073,7 @@ def test_breakdown_action_emits_working_stage_before_generating_text() -> None:
 
     assert action_block.index(
         'yield sse_data({"type": "stage_start", "stage": "explain"})'
-    ) < action_block.index("breakdown_message = result_breakdown_message_with_metadata(run)")
+    ) < action_block.index("breakdown_message = result_breakdown_message_with_metadata")
 
 
 def test_result_action_with_run_from_another_conversation_does_not_fallback() -> None:

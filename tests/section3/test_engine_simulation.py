@@ -374,6 +374,52 @@ def test_build_benchmark_curve_aligns_and_normalizes() -> None:
     assert curve["equity_curve"][0] == pytest.approx(1.0, abs=1e-6)
 
 
+def test_build_benchmark_curve_rejects_late_start_without_future_backfill() -> None:
+    target_index = pd.date_range("2025-01-01", periods=7, freq="D", tz="UTC")
+    late_benchmark = pd.Series(
+        [100.0, 101.0, 102.0],
+        index=pd.date_range("2025-01-03", periods=3, freq="D", tz="UTC"),
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        engine.build_benchmark_curve(
+            {
+                "asset_class": "equity",
+                "benchmark_symbol": "SPY",
+                "start_date": "2025-01-01",
+                "end_date": "2025-01-07",
+                "timeframe": "1D",
+            },
+            target_index,
+            fetch_price_series_func=lambda **_: late_benchmark,
+        )
+
+    assert str(excinfo.value) == "benchmark_data_unavailable"
+
+
+def test_build_benchmark_curve_rejects_sparse_benchmark_observations() -> None:
+    target_index = pd.date_range("2025-01-01", periods=10, freq="D", tz="UTC")
+    sparse_benchmark = pd.Series(
+        [100.0, 102.0],
+        index=pd.DatetimeIndex([target_index[0], target_index[-1]]),
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        engine.build_benchmark_curve(
+            {
+                "asset_class": "equity",
+                "benchmark_symbol": "SPY",
+                "start_date": "2025-01-01",
+                "end_date": "2025-01-10",
+                "timeframe": "1D",
+            },
+            target_index,
+            fetch_price_series_func=lambda **_: sparse_benchmark,
+        )
+
+    assert str(excinfo.value) == "benchmark_data_unavailable"
+
+
 def test_buy_and_hold_metrics_match_total_return_benchmark_and_profit() -> None:
     config = engine.normalize_backtest_config(
         {

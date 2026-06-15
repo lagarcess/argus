@@ -4,6 +4,7 @@ import asyncio
 import inspect
 import os
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, cast, get_args
 
 from argus.agent_runtime.artifacts.patch_policy import (
@@ -114,6 +115,7 @@ from argus.agent_runtime.strategy_contract import (
     display_strategy_type,
     executable_strategy_type,
     has_partial_explicit_date_range,
+    strategy_can_be_approved,
 )
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
@@ -141,8 +143,11 @@ from argus.domain.indicators import (
 from argus.domain.market_data import resolve_asset
 from argus.llm.openrouter import invoke_openrouter_chat_completion
 from argus.nlp.natural_time import (
+    dateparser_languages_for_user_language,
+    parse_date_text,
     resolve_date_range_endpoint_patch,
     resolve_date_range_intent,
+    resolve_date_range_text,
 )
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
@@ -399,8 +404,94 @@ def _pending_date_answer_interpretation_when_unavailable(
         return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
-    del current_user_message, language
-    return None
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return None
+    prior = _active_strategy_from_snapshot(snapshot)
+    if prior is None:
+        return None
+    if not _prior_strategy_allows_pending_date_answer_fallback(prior):
+        return None
+    current_date = date.today()
+    text = current_user_message.strip()
+    if not text:
+        return None
+    languages = dateparser_languages_for_user_language(language)
+    resolved_range = resolve_date_range_text(
+        text,
+        today=current_date,
+        languages=languages,
+    )
+    date_range: dict[str, str] | None = None
+    date_range_intent: dict[str, Any] | None = None
+    if resolved_range is not None:
+        date_range = resolved_range.payload
+    else:
+        endpoint = parse_date_text(
+            text,
+            today=current_date,
+            endpoint="end",
+            languages=languages,
+        )
+        if endpoint is None:
+            return None
+        endpoint_patch = {
+            "kind": "endpoint_patch",
+            "endpoint": "end",
+            "end": endpoint.isoformat(),
+            "confidence": 0.8,
+            "evidence": text,
+        }
+        prior_intent = prior.extra_parameters.get("date_range_intent")
+        resolved_patch = resolve_date_range_endpoint_patch(
+            prior_intent,
+            endpoint_patch,
+            today=current_date,
+        )
+        if resolved_patch is not None:
+            date_range = resolved_patch.payload
+            date_range_intent = {
+                **endpoint_patch,
+                "base_intent": prior_intent,
+            }
+        else:
+            date_range = _concrete_range_span_from_endpoint_patch(
+                prior=prior.date_range,
+                date_range_patch={"end": endpoint.isoformat()},
+            )
+            date_range_intent = endpoint_patch
+    if date_range is None:
+        return None
+    extra_parameters: dict[str, Any] = {
+        "date_range_raw_text": text,
+        "evidence_spans": {"date_range": text},
+    }
+    if date_range_intent is not None:
+        extra_parameters["date_range_intent"] = date_range_intent
+    return StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary=(
+            "User supplied the requested date range while structured "
+            "interpretation was unavailable."
+        ),
+        candidate_strategy_draft=StrategySummary(
+            date_range=date_range,
+            extra_parameters=extra_parameters,
+        ),
+        missing_required_fields=[],
+        semantic_turn_act="answer_pending_need",
+        reason_codes=["deterministic_pending_date_answer_fallback"],
+    )
+
+
+def _prior_strategy_allows_pending_date_answer_fallback(
+    prior: StrategySummary,
+) -> bool:
+    if not strategy_can_be_approved(prior):
+        return False
+    endpoints = _date_range_endpoints(prior.date_range)
+    return endpoints is not None and all(endpoints)
 
 
 async def _call_structured_interpreter(
@@ -625,9 +716,11 @@ async def _stage_result_from_interpretation(
             )
         )
     if expects_strategy_route:
+        prior_strategy = _active_strategy_from_snapshot(snapshot)
         strategy, interpretation = _strategy_with_current_message_run_field_contract(
             strategy=strategy,
             interpretation=interpretation,
+            prior_strategy=prior_strategy,
             current_user_message=state.current_user_message,
             supported_timeframes=_supported_timeframes(capability_contract),
             language=user.language_preference,
@@ -1059,6 +1152,7 @@ def _strategy_with_current_message_run_field_contract(
     *,
     strategy: StrategySummary,
     interpretation: StructuredInterpretation,
+    prior_strategy: StrategySummary | None,
     current_user_message: str,
     supported_timeframes: tuple[str, ...],
     language: str,
@@ -1069,6 +1163,9 @@ def _strategy_with_current_message_run_field_contract(
         _complete_current_message_date_endpoint_patch(
             strategy=strategy,
             date_range=raw_date_range,
+            prior_date_range=(
+                prior_strategy.date_range if prior_strategy is not None else None
+            ),
         )
     )
     updated = strategy.model_copy(deep=True)
@@ -1144,6 +1241,7 @@ def _complete_current_message_date_endpoint_patch(
     *,
     strategy: StrategySummary,
     date_range: dict[str, str] | None,
+    prior_date_range: Any = None,
 ) -> tuple[dict[str, str] | None, bool]:
     if date_range is None or not has_partial_explicit_date_range(date_range):
         return date_range, False
@@ -1152,6 +1250,12 @@ def _complete_current_message_date_endpoint_patch(
     )
     if rolling_patch is not None:
         return rolling_patch, True
+    span_patch = _concrete_range_span_from_endpoint_patch(
+        prior=prior_date_range if prior_date_range is not None else strategy.date_range,
+        date_range_patch=date_range,
+    )
+    if span_patch is not None:
+        return span_patch, True
     prior = strategy.date_range
     if not isinstance(prior, dict):
         return date_range, False
@@ -1160,6 +1264,43 @@ def _complete_current_message_date_endpoint_patch(
     if not start or not end:
         return date_range, False
     return {"start": str(start), "end": str(end)}, True
+
+
+def _concrete_range_span_from_endpoint_patch(
+    *,
+    prior: Any,
+    date_range_patch: dict[str, Any],
+) -> dict[str, str] | None:
+    if not isinstance(prior, dict):
+        return None
+    prior_start = _iso_date_value(prior.get("start") or prior.get("from"))
+    prior_end = _iso_date_value(prior.get("end") or prior.get("to"))
+    if prior_start is None or prior_end is None or prior_end < prior_start:
+        return None
+
+    patch_start = _iso_date_value(date_range_patch.get("start"))
+    patch_end = _iso_date_value(date_range_patch.get("end"))
+    prior_span = prior_end - prior_start
+    if patch_end is not None and patch_start is None:
+        return {
+            "start": (patch_end - prior_span).isoformat(),
+            "end": patch_end.isoformat(),
+        }
+    if patch_start is not None and patch_end is None:
+        return {
+            "start": patch_start.isoformat(),
+            "end": (patch_start + prior_span).isoformat(),
+        }
+    return None
+
+
+def _iso_date_value(value: Any) -> date | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return date.fromisoformat(value.strip())
+    except ValueError:
+        return None
 
 
 def _rolling_window_range_from_endpoint_patch(
@@ -3487,7 +3628,17 @@ def _contextual_date_range_value(
 ) -> dict[str, Any]:
     if _has_complete_date_range(incoming):
         return incoming
-    del current_user_message, selected_thread_metadata
+    del current_user_message
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field == "date_range":
+        span_patch = _concrete_range_span_from_endpoint_patch(
+            prior=base,
+            date_range_patch=incoming,
+        )
+        if span_patch is not None:
+            return span_patch
     return _merged_contextual_date_range(
         base=base,
         incoming=incoming,
