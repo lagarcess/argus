@@ -1187,6 +1187,20 @@ async def chat_stream(
                 persisted_text = (
                     confirmation_anchor_text or assistant_text or streamed_text
                 )
+                if not (
+                    persisted_text
+                    or confirmation_card is not None
+                    or run is not None
+                    or backtest_job is not None
+                ):
+                    logger.warning(
+                        "Agent runtime returned no visible terminal state",
+                        conversation_id=conversation.id,
+                        request_id=request.state.request_id,
+                        stage_outcome=stage_status,
+                        final_payload_keys=sorted(runtime_result.keys()),
+                    )
+                    raise RuntimeError("agent_runtime_empty_final")
                 assistant_message = None
                 if persisted_text:
                     assistant_message = create_message(

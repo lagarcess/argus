@@ -140,7 +140,10 @@ from argus.domain.indicators import (
 )
 from argus.domain.market_data import resolve_asset
 from argus.llm.openrouter import invoke_openrouter_chat_completion
-from argus.nlp.natural_time import resolve_date_range_intent
+from argus.nlp.natural_time import (
+    resolve_date_range_endpoint_patch,
+    resolve_date_range_intent,
+)
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 _STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
@@ -1144,6 +1147,11 @@ def _complete_current_message_date_endpoint_patch(
 ) -> tuple[dict[str, str] | None, bool]:
     if date_range is None or not has_partial_explicit_date_range(date_range):
         return date_range, False
+    rolling_patch = _rolling_window_range_from_endpoint_patch(
+        strategy.extra_parameters.get("date_range_intent"),
+    )
+    if rolling_patch is not None:
+        return rolling_patch, True
     prior = strategy.date_range
     if not isinstance(prior, dict):
         return date_range, False
@@ -1152,6 +1160,21 @@ def _complete_current_message_date_endpoint_patch(
     if not start or not end:
         return date_range, False
     return {"start": str(start), "end": str(end)}, True
+
+
+def _rolling_window_range_from_endpoint_patch(
+    date_range_intent: Any,
+) -> dict[str, str] | None:
+    if not isinstance(date_range_intent, dict):
+        return None
+    base_intent = date_range_intent.get("base_intent")
+    if not isinstance(base_intent, dict):
+        return None
+    resolved = resolve_date_range_endpoint_patch(
+        base_intent,
+        date_range_intent,
+    )
+    return resolved.payload if resolved is not None else None
 
 
 def _explicit_date_range_from_strategy_for_repair(
@@ -3640,6 +3663,20 @@ def _merge_contextual_extra_parameters(
                 nested[nested_key] = nested_value
             merged[key] = nested
             continue
+        if (
+            key == "date_range_intent"
+            and isinstance(value, dict)
+            and isinstance(merged.get(key), dict)
+        ):
+            base_intent = dict(merged[key])
+            if (
+                str(value.get("kind") or "").strip() == "endpoint_patch"
+                and str(base_intent.get("kind") or "").strip() == "rolling_window"
+            ):
+                nested = dict(value)
+                nested["base_intent"] = base_intent
+                merged[key] = nested
+                continue
         merged[key] = value
     return merged
 

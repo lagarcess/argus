@@ -764,6 +764,61 @@ def test_chat_stream_final_persists_retry_last_turn_metadata(
     assert assistant_message["metadata"]["recovery"] == final_payload["recovery"]
 
 
+def test_chat_stream_empty_final_persists_visible_recovery_for_user_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": None,
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+    message = "What if I bought Bitcoin this year so far?"
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": message,
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    events = _data_events(response.text)
+    assert events[-1]["type"] == "error"
+    assert events[-1]["message"]
+    assert events[-1]["retry_last_turn"] == {"message": message}
+    assert events[-1]["recovery"] == {
+        "code": "runtime_failure",
+        "retryable": True,
+        "language": "en",
+    }
+    assert response.text.count("data: [DONE]") == 1
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assert [message["role"] for message in messages[-2:]] == ["user", "assistant"]
+    assistant_message = messages[-1]
+    assert assistant_message["content"] == events[-1]["message"]
+    assert assistant_message["metadata"]["conversation_mode"] == "recovery"
+    assert assistant_message["metadata"]["retry_last_turn"] == {"message": message}
+    assert assistant_message["metadata"]["recovery"] == events[-1]["recovery"]
+
+
 def test_chat_stream_persists_runtime_start_marker_on_user_message(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -4397,6 +4397,77 @@ def test_pending_date_answer_removes_mislabeled_timeframe_constraint(
     )
 
 
+def test_pending_rolling_window_endpoint_patch_preserves_duration(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    rolling_intent = {
+        "kind": "rolling_window",
+        "count": 12,
+        "unit": "month",
+        "anchor": "today",
+        "confidence": 0.94,
+        "evidence": "last 12 months",
+    }
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold AAPL over the last 12 months.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2025-06-15", "end": "2026-06-15"},
+            capital_amount=100000,
+            comparison_baseline="SPY",
+            extra_parameters={"date_range_intent": rolling_intent},
+        )
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied a new end date for the rolling window.",
+        candidate_strategy_draft=StrategySummary(
+            date_range={"end": "2026-06-12"},
+            extra_parameters={
+                "date_range_intent": {
+                    "kind": "endpoint_patch",
+                    "endpoint": "end",
+                    "end": "2026-06-12",
+                    "confidence": 0.9,
+                    "evidence": "last friday",
+                }
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="last friday",
+        response=response,
+        snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.comparison_baseline == "SPY"
+    assert strategy.capital_amount == 100000
+    assert strategy.date_range == {"start": "2025-06-12", "end": "2026-06-12"}
+    assert "assistant_response" not in result.stage_patch
+
+
 def test_contextual_asset_edit_preserves_existing_signal_rule_without_restatement(
     monkeypatch,
 ) -> None:

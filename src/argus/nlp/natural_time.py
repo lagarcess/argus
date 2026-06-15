@@ -213,6 +213,60 @@ def resolve_date_range_intent(
     return None
 
 
+def resolve_date_range_endpoint_patch(
+    base_intent: Mapping[str, Any] | object | None,
+    endpoint_patch: Mapping[str, Any] | object | None,
+    *,
+    today: date | None = None,
+) -> DateRangeIntentResolution | None:
+    """Resolve an endpoint edit against a prior canonical date-range intent."""
+
+    base = _intent_payload(base_intent)
+    patch = _intent_payload(endpoint_patch)
+    if not base or not patch:
+        return None
+    if str(base.get("kind") or "").strip() != "rolling_window":
+        return None
+    if str(patch.get("kind") or "").strip() != "endpoint_patch":
+        return None
+    if not _intent_confidence_is_usable(base) or not _intent_confidence_is_usable(
+        patch
+    ):
+        return None
+
+    count = _positive_int(base.get("count"))
+    unit = _intent_unit(base.get("unit"))
+    endpoint = str(patch.get("endpoint") or "").strip()
+    if count is None or unit is None or endpoint not in {"start", "end"}:
+        return None
+
+    current_date = today or date.today()
+    start = _intent_date(patch.get("start"), today=current_date)
+    end = _intent_date(patch.get("end"), today=current_date)
+    offset_date = _intent_day_offset_date(patch, today=current_date)
+    endpoint_value = (start if endpoint == "start" else end) or offset_date
+    if endpoint_value is None:
+        return None
+
+    if endpoint == "start":
+        start_date = endpoint_value
+        end_date = _add_period(endpoint_value, count=count, unit=unit)
+    else:
+        end_date = endpoint_value
+        start_date = _subtract_period(endpoint_value, count=count, unit=unit)
+    if end_date < start_date:
+        return None
+
+    evidence = tuple(
+        dict.fromkeys([*_intent_evidence_spans(base), *_intent_evidence_spans(patch)])
+    )
+    return DateRangeIntentResolution(
+        label=_relative_label(count=count, unit=unit),
+        payload={"start": start_date.isoformat(), "end": end_date.isoformat()},
+        evidence_spans=evidence,
+    )
+
+
 def _intent_payload(intent: Mapping[str, Any] | object | None) -> dict[str, Any]:
     if intent is None:
         return {}
@@ -616,3 +670,15 @@ def _subtract_period(today: date, *, count: int, unit: str) -> date:
     if unit in {"q", "quarter", "quarters"}:
         return shift_months(today, -(count * 3))
     return shift_months(today, -(count * 12))
+
+
+def _add_period(value: date, *, count: int, unit: str) -> date:
+    if unit in {"d", "day", "days"}:
+        return value + timedelta(days=count)
+    if unit in {"w", "week", "weeks"}:
+        return value + timedelta(days=count * 7)
+    if unit in {"m", "mo", "month", "months"}:
+        return shift_months(value, count)
+    if unit in {"q", "quarter", "quarters"}:
+        return shift_months(value, count * 3)
+    return shift_months(value, count * 12)

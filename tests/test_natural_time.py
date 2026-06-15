@@ -5,6 +5,7 @@ from argus.nlp.natural_time import (
     dateparser_languages_for_user_language,
     parse_explicit_date_text,
     parse_relative_endpoint_text,
+    resolve_date_range_endpoint_patch,
     resolve_date_range_intent,
     resolve_date_range_text,
 )
@@ -94,6 +95,30 @@ def test_resolves_canonical_rolling_window_intent_without_language_tokens() -> N
     assert resolved is not None
     assert resolved.payload == {"start": "2025-06-12", "end": "2026-06-12"}
     assert resolved.evidence_spans == ("durante los últimos 12 meses",)
+
+
+def test_resolves_endpoint_patch_against_prior_rolling_intent() -> None:
+    resolved = resolve_date_range_endpoint_patch(
+        {
+            "kind": "rolling_window",
+            "count": 12,
+            "unit": "month",
+            "anchor": "today",
+            "evidence": "last 12 months",
+        },
+        {
+            "kind": "endpoint_patch",
+            "endpoint": "end",
+            "end": "2026-06-12",
+            "confidence": 0.9,
+            "evidence": "last friday",
+        },
+        today=date(2026, 6, 15),
+    )
+
+    assert resolved is not None
+    assert resolved.payload == {"start": "2025-06-12", "end": "2026-06-12"}
+    assert resolved.evidence_spans == ("last 12 months", "last friday")
 
 
 def test_resolves_canonical_year_to_date_intent_without_language_tokens() -> None:
