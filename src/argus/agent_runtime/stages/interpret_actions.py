@@ -14,6 +14,7 @@ from argus.agent_runtime.artifacts.patch_policy import (
 )
 from argus.agent_runtime.artifacts.patches import ArtifactPatch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.clarification_contract import offline_clarification_fallback
 from argus.agent_runtime.recovery_messages import (
     recovery_message,
     recovery_state_stage_patch,
@@ -293,26 +294,31 @@ def result_action_stage_result_if_applicable(
         action_payload=action.payload,
         reference=reference,
     )
+    response_intent = {
+        "kind": "clarification",
+        "semantic_needs": ["refinement"],
+        "requested_fields": ["refinement"],
+        "facts": {
+            "strategy": strategy.model_dump(mode="python"),
+            "current_user_message": state.current_user_message,
+            "structured_action": action.model_dump(mode="python"),
+            "latest_run_id": latest_run_id,
+            "latest_result_reference": reference.model_dump(mode="python"),
+        },
+        "options": [],
+    }
     return StageResult(
         outcome="await_user_reply",
         stage_patch={
             "candidate_strategy_draft": strategy.model_dump(mode="python"),
-            "assistant_prompt": None,
+            "assistant_prompt": offline_clarification_fallback(
+                language=language,
+                response_intent=response_intent,
+                strategy=strategy,
+            ),
             "requested_field": "refinement",
             "missing_required_fields": ["refinement"],
-            "response_intent": {
-                "kind": "clarification",
-                "semantic_needs": ["refinement"],
-                "requested_fields": ["refinement"],
-                "facts": {
-                    "strategy": strategy.model_dump(mode="python"),
-                    "current_user_message": state.current_user_message,
-                    "structured_action": action.model_dump(mode="python"),
-                    "latest_run_id": latest_run_id,
-                    "latest_result_reference": reference.model_dump(mode="python"),
-                },
-                "options": [],
-            },
+            "response_intent": response_intent,
         },
     )
 

@@ -23,6 +23,7 @@ from argus.api.chat.actions import (
     is_cancel_confirmation_action,
     is_confirmation_action,
     is_result_action,
+    recent_metadata_invalidates_confirmation,
     run_for_result_action,
     stale_confirmation_action_message,
 )
@@ -481,6 +482,19 @@ async def chat_stream(
                     "Describe the idea again and I will prepare a fresh confirmation."
                 ),
             )
+        if metadata_fallback is None and recent_metadata_invalidates_confirmation(
+            confirmation_action_messages
+        ):
+            raise problem(
+                request,
+                status_code=409,
+                code="confirmation_required",
+                title="Confirmation Required",
+                detail=(
+                    "That confirmation is no longer active. Describe the idea again "
+                    "and I will prepare a fresh confirmation."
+                ),
+            )
         if metadata_fallback is not None:
             runtime_fallback = metadata_fallback
     elif is_result_action(payload):
@@ -490,6 +504,13 @@ async def chat_stream(
         )
         if result_fallback is not None:
             runtime_fallback = result_fallback
+    elif payload.action is not None and payload.action.type == "retry_failed_action":
+        failed_fallback = failed_action_metadata_fallback_context(
+            user_id=user.id,
+            conversation_id=conversation.id,
+        )
+        if failed_fallback is not None:
+            runtime_fallback = failed_fallback
     elif payload.action is None:
         failed_fallback = failed_action_metadata_fallback_context(
             user_id=user.id,
@@ -821,6 +842,7 @@ async def chat_stream(
                 payload=payload,
                 user=user,
                 conversation_id=conversation.id,
+                require_run_id=True,
             )
             yield sse_data({"type": "stage_start", "stage": "explain"})
             receipt_token = begin_openrouter_route_receipt_capture()
@@ -880,56 +902,6 @@ async def chat_stream(
             yield sse_done()
             schedule_artifact_naming(
                 assistant_message=assistant_text,
-                current_run=run,
-                message_id=assistant_message.id,
-            )
-            return
-
-        if payload.action is not None and payload.action.type == "refine_strategy":
-            from argus.api.chat.result_actions import (
-                missing_refine_strategy_action_turn,
-                refine_strategy_action_turn,
-            )
-
-            run = run_for_result_action(
-                payload=payload,
-                user=user,
-                conversation_id=conversation.id,
-                require_run_id=True,
-            )
-            language = (
-                payload.language
-                or conversation.language
-                or current_user_profile.language
-                or "en"
-            )
-            turn = (
-                missing_refine_strategy_action_turn(
-                    action=payload.action,
-                    language=language,
-                )
-                if run is None
-                else refine_strategy_action_turn(
-                    run=run,
-                    action=payload.action,
-                    language=language,
-                )
-            )
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=turn.assistant_text,
-                metadata=turn.metadata,
-            )
-            final_payload = dict(turn.final_payload)
-            final_payload["message_id"] = assistant_message.id
-            yield sse_data({"type": "stage_start", "stage": turn.stage})
-            yield sse_data({"type": "token", "content": turn.assistant_text})
-            yield sse_data({"type": "final", "payload": final_payload})
-            yield sse_done()
-            schedule_artifact_naming(
-                assistant_message=turn.assistant_text,
                 current_run=run,
                 message_id=assistant_message.id,
             )

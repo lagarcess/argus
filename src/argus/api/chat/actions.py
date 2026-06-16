@@ -168,6 +168,21 @@ def pending_confirmation_exists(*, user_id: str, conversation_id: str) -> bool:
     return False
 
 
+def recent_metadata_invalidates_confirmation(
+    recent_messages: list[Message] | None,
+) -> bool:
+    if not recent_messages:
+        return False
+    for message in reversed(recent_messages):
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        if _metadata_invalidates_confirmation(message.metadata):
+            return True
+        if message.metadata.get("confirmation_card"):
+            return False
+    return False
+
+
 def stale_confirmation_action_message(
     *,
     payload: ChatStreamRequest,

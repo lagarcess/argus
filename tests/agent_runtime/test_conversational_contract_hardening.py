@@ -3286,7 +3286,7 @@ def test_refine_strategy_result_action_publishes_clarification_intent_without_ll
     assert interpreter.requests == []
     assert result.outcome == "await_user_reply"
     assert result.patch["requested_field"] == "refinement"
-    assert result.patch["assistant_prompt"] is None
+    assert result.patch["assistant_prompt"] == "What would you like to change?"
     assert result.patch["response_intent"]["kind"] == "clarification"
     assert result.patch["response_intent"]["semantic_needs"] == ["refinement"]
     assert result.patch["response_intent"]["requested_fields"] == ["refinement"]

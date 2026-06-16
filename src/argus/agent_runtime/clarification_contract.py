@@ -77,7 +77,7 @@ def intent_clarification_fallback(
     if "refinement" in needs:
         if locale == "es-419":
             return "¿Qué quieres ajustar de esta idea?"
-        return "What would you like to adjust?"
+        return "What would you like to change?"
     return None
 
 
