@@ -82,11 +82,14 @@ spec against the local app/API environment:
 cd web && bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium
 ```
 
-Only send the app URL to testers after both scripts pass. If warmup fails, do
-not invite testers yet. Check Render service status and redeploy only if the
-service is stuck. If warmup passes but the canary fails, treat it as an Argus
-product-path regression and inspect API logs, Supabase messages, backtest runs,
-and route receipts for the canary conversation id.
+Only send the app URL to testers after deploy-status, warmup, English canary,
+and Spanish canary all pass against the intended readiness commit. If
+deploy-status reports a different commit, deploy the readiness branch before
+continuing. If warmup fails, do not invite testers yet. Check Render service
+status and redeploy only if the service is stuck. If warmup passes but a canary
+fails, treat it as an Argus product-path regression and inspect API logs,
+Supabase messages, backtest runs, and route receipts for the canary conversation
+id.
 
 For the daily automated gate, configure GitHub repository secrets with the same
 canary variables above plus `RENDER_API_KEY`, then use the scheduled or manually

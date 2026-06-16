@@ -1735,7 +1735,8 @@ surfaces.
 - Verify deployed API commit before strict canaries. Closed locally:
   `.github/render-env-sync.sh api-deploy-status` prints the latest `argus-api`
   deploy id/status/commit/timestamps without mutating Render, and the launch
-  runbook now requires this check before warmup/canary.
+  runbook now requires deploy-status, warmup, English canary, and Spanish canary
+  to pass against the intended readiness commit before tester invites.
 - Run warmup/canary. Closed live on 2026-06-16: warmup passed with API health,
   `/internal/readiness?force=true`, stale-job scan, frontend, and real-workflow
   mode verification; the authenticated canary then passed confirmation,

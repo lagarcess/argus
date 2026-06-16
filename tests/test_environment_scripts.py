@@ -564,11 +564,17 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     before_sessions = runbook.split("## Before Tester Sessions", maxsplit=1)[
         1
     ].split("## Backtest Workflow Modes", maxsplit=1)[0]
+    normalized_before_sessions = " ".join(before_sessions.split())
 
     assert ".github/render-env-sync.sh api-real-workflow-on" in before_sessions
     assert ".github/render-env-sync.sh api-deploy-status" in before_sessions
     assert ".github/warmup-render.sh --expect-mode real-workflow" in before_sessions
     assert ".github/canary-render.sh" in before_sessions
+    assert (
+        "deploy-status, warmup, English canary, and Spanish canary"
+        in normalized_before_sessions
+    )
+    assert "both scripts pass" not in before_sessions
     assert ".github/stale-backtest-jobs.sh" in runbook
     assert "api-safe-off` is the default private-alpha tester mode" not in runbook
     assert "NEXT_PUBLIC_POSTHOG_KEY" in runbook
