@@ -4736,11 +4736,20 @@ def test_pending_concrete_date_endpoint_patch_preserves_existing_start(
     assert "assistant_response" not in result.stage_patch
 
 
-def test_interpreter_unavailable_date_answer_patches_active_confirmation_window(
+def test_interpreter_unavailable_date_answer_preserves_active_confirmation(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
+    async def unavailable_active_confirmation_recovery(**kwargs: Any) -> None:
+        del kwargs
+        return None
+
+    monkeypatch.setattr(
+        interpret_module,
+        "compose_active_confirmation_interpreter_recovery",
+        unavailable_active_confirmation_recovery,
+    )
     monkeypatch.setattr(
         interpret_module,
         "resolve_asset",
@@ -4788,14 +4797,17 @@ def test_interpreter_unavailable_date_answer_patches_active_confirmation_window(
         structured_interpreter=RecordingInterpreter(None),
     )
 
-    assert result.outcome == "ready_for_confirmation"
+    assert result.outcome == "ready_to_respond"
     assert result.decision is not None
-    assert result.decision.candidate_strategy_draft.date_range == {
-        "start": "2025-06-12",
-        "end": "2026-06-12",
+    assert result.decision.reason_codes == ["llm_interpreter_unavailable"]
+    assert result.decision.candidate_strategy_draft.date_range is None
+    assert result.stage_patch["retry_last_turn"] == {"message": "last friday"}
+    assert result.stage_patch["recovery"] == {
+        "code": "interpreter_unavailable",
+        "retryable": True,
+        "language": "en",
     }
-    assert "deterministic_pending_date_answer_fallback" in result.decision.reason_codes
-    assert "assistant_response" not in result.stage_patch
+    assert "visible confirmation" in result.stage_patch["assistant_response"]
 
 
 def test_contextual_asset_edit_preserves_existing_signal_rule_without_restatement(

@@ -240,15 +240,6 @@ async def interpret_stage_async(
         return structured_action_result
     selected_metadata = dict(selected_thread_metadata or {})
     if structured_interpreter is None:
-        pending_date_result = await _pending_date_answer_result_when_interpreter_unavailable(
-            state=state,
-            user=user,
-            snapshot=snapshot,
-            capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata,
-        )
-        if pending_date_result is not None:
-            return pending_date_result
         return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
@@ -267,15 +258,6 @@ async def interpret_stage_async(
         ),
     )
     if interpretation is None:
-        pending_date_result = await _pending_date_answer_result_when_interpreter_unavailable(
-            state=state,
-            user=user,
-            snapshot=snapshot,
-            capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata,
-        )
-        if pending_date_result is not None:
-            return pending_date_result
         return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
@@ -293,42 +275,16 @@ async def interpret_stage_async(
     )
 
 
-async def _pending_date_answer_result_when_interpreter_unavailable(
-    *,
-    state: RunState,
-    user: UserState,
-    snapshot: TaskSnapshot | None,
-    capability_contract: Any,
-    selected_thread_metadata: dict[str, Any],
-) -> StageResult | None:
-    interpretation = _pending_date_answer_interpretation_when_unavailable(
-        current_user_message=state.current_user_message,
-        language=user.language_preference,
-        snapshot=snapshot,
-        selected_thread_metadata=selected_thread_metadata,
-    )
-    if interpretation is None:
-        return None
-    return await _stage_result_from_interpretation(
-        state=state,
-        user=user,
-        snapshot=snapshot,
-        interpretation=interpretation,
-        capability_contract=capability_contract,
-        selected_thread_metadata=selected_thread_metadata,
-    )
-
-
-def _pending_date_answer_interpretation_when_unavailable(
+def _pending_date_answer_route_repair_interpretation(
     *,
     current_user_message: str,
     language: str | None,
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
-    reason_code: str = "deterministic_pending_date_answer_fallback",
+    reason_code: str = "pending_date_answer_route_repaired",
     user_goal_summary: str = (
-        "User supplied the requested date range while structured "
-        "interpretation was unavailable."
+        "User supplied the requested date range after structured interpretation "
+        "misrouted the pending-field answer."
     ),
 ) -> StructuredInterpretation | None:
     requested_field = _field_base(
@@ -1536,16 +1492,11 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
         return interpretation
     if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
         return interpretation
-    repaired = _pending_date_answer_interpretation_when_unavailable(
+    repaired = _pending_date_answer_route_repair_interpretation(
         current_user_message=current_user_message,
         language=language,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
-        reason_code="pending_date_answer_route_repaired",
-        user_goal_summary=(
-            "User supplied the requested date range after the interpreter "
-            "misrouted the pending-field answer."
-        ),
     )
     if repaired is None:
         return interpretation
