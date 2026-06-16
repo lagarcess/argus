@@ -1094,6 +1094,19 @@ Production-parity browser QA refresh on 2026-06-16:
   OpenRouter clarification-profile timeout/provider failures and did not reach a
   confirmation card, reinforcing that the deployed strict canary/no-fallback
   gate remains mandatory before tester sessions.
+- Additional QA-mode browser smoke after the action-identity/refine-action
+  checkpoints (`e5b95b3`, `6e97e2f`, `a2aa10f`, `889d6e9`) used the root
+  `.env` and `web/.env.local` with `.github/qa.sh` plus
+  `cd web && bun run dev`.
+  The live local flow reached an AAPL buy-and-hold confirmation for `$10,000`
+  over Jun 16, 2025-Jun 16, 2026, clicked the card-scoped `Run backtest`
+  action, transitioned through `Running`, and rendered a completed result with
+  Quick take, `Explain result`, and `Refine idea`. Clicking `Refine idea`
+  consumed only that result action immediately (`Refine idea` button count
+  1 -> 0), returned the backend refinement prompt, and a reload of the persisted
+  conversation kept Quick take and the prompt hydrated with `Explain result`
+  still available and `Refine idea` still consumed. In-app browser console
+  inspection during the smoke returned no warnings or errors.
 
 ### Daily Automation Candidates
 
