@@ -366,6 +366,140 @@ def test_execute_recovers_visible_confirmation_when_benchmark_data_is_unavailabl
     assert failed_reference["metadata"]["launch_payload"]["symbol"] == "TSLA"
 
 
+def test_execute_localizes_market_data_recovery_for_spanish_confirmation() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "market_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {"failure_detail": "market_data_issue"},
+            },
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "market_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {"failure_detail": "market_data_issue"},
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="Ejecutar backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Comprar y mantener AAPL.",
+            "asset_universe": ["AAPL"],
+            "asset_class": "equity",
+            "date_range": {"start": "2025-01-01", "end": "2025-06-01"},
+            "capital_amount": 10000,
+            "sizing_mode": "capital_amount",
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "benchmark_symbol": {"value": "SPY", "source": "default"},
+        },
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=2, language="es-419")
+
+    assert result.outcome == "execution_failed_recoverably"
+    prompt = result.patch["assistant_prompt"]
+    assert "La configuracion de AAPL comprar y mantener sigue aqui" in prompt
+    assert "datos de mercado" in prompt
+    assert "Intentalo de nuevo" in prompt
+    assert "market_data_unavailable" not in prompt
+
+
+def test_execute_localizes_benchmark_data_recovery_for_spanish_confirmation() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "benchmark_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {"failure_detail": "benchmark_data_issue"},
+            },
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "benchmark_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {"failure_detail": "benchmark_data_issue"},
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="Ejecutar backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Comprar y mantener TSLA.",
+            "asset_universe": ["TSLA"],
+            "asset_class": "equity",
+            "date_range": {"start": "2025-01-01", "end": "2025-06-01"},
+            "capital_amount": 10000,
+            "sizing_mode": "capital_amount",
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "benchmark_symbol": {"value": "SPY", "source": "default"},
+        },
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=2, language="es-419")
+
+    assert result.outcome == "execution_failed_recoverably"
+    prompt = result.patch["assistant_prompt"]
+    assert "La configuracion de TSLA comprar y mantener sigue aqui" in prompt
+    assert "datos de referencia" in prompt
+    assert "Intentalo de nuevo" in prompt
+    assert "benchmark_data_unavailable" not in prompt
+
+
+def test_execute_does_not_classify_unavailable_data_from_prose_only() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "Benchmark data was unavailable for that run.",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {},
+            }
+        ]
+    )
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Buy and hold TSLA.",
+            "asset_universe": ["TSLA"],
+            "asset_class": "equity",
+            "date_range": {"start": "2025-01-01", "end": "2025-06-01"},
+            "capital_amount": 10000,
+            "sizing_mode": "capital_amount",
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "benchmark_symbol": {"value": "SPY", "source": "default"},
+        },
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_failed_terminally"
+    prompt = result.patch["assistant_prompt"]
+    assert "temporary data or service issue" in prompt
+    assert "could not get benchmark data" not in prompt
+
+
 def test_execute_missing_required_input_returns_to_conversation() -> None:
     tool = StubBacktestTool(
         responses=[
