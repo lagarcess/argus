@@ -539,3 +539,17 @@ def test_warmup_script_runs_stale_job_scan_when_supabase_verifier_env_exists() -
     assert "ARGUS_STALE_JOBS_SUPABASE_SERVICE_ROLE_KEY" in warmup
     assert "Skipping stale backtest job scan" in warmup
     assert "set -x" not in warmup
+
+
+def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    before_sessions = runbook.split("## Before Tester Sessions", maxsplit=1)[
+        1
+    ].split("## Backtest Workflow Modes", maxsplit=1)[0]
+
+    assert ".github/render-env-sync.sh api-real-workflow-on" in before_sessions
+    assert ".github/warmup-render.sh --expect-mode real-workflow" in before_sessions
+    assert ".github/canary-render.sh" in before_sessions
+    assert ".github/stale-backtest-jobs.sh" in runbook
+    assert "api-safe-off` is the default private-alpha tester mode" not in runbook
+    assert "NEXT_PUBLIC_POSTHOG_KEY" in runbook

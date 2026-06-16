@@ -6,10 +6,15 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci.yml"
+CANARY_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-canary.yml"
 
 
 def _workflow() -> dict:
     return yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+
+
+def _canary_workflow() -> dict:
+    return yaml.safe_load(CANARY_WORKFLOW_PATH.read_text(encoding="utf-8"))
 
 
 def test_ci_runs_on_main_codex_and_jules_without_deploying() -> None:
@@ -77,3 +82,27 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
         "backend-checks",
         "frontend-checks",
     ]
+
+
+def test_private_alpha_canary_workflow_is_manual_and_scheduled_only() -> None:
+    workflow = _canary_workflow()
+
+    assert workflow["name"] == "Private Alpha Canary"
+    assert set(workflow["on"]) == {"workflow_dispatch", "schedule"}
+    assert workflow["on"]["schedule"] == [{"cron": "30 14 * * *"}]
+    assert workflow["permissions"] == {"contents": "read"}
+    assert "deploy" not in workflow["jobs"]
+
+
+def test_private_alpha_canary_workflow_runs_real_workflow_gate() -> None:
+    workflow = _canary_workflow()
+    job = workflow["jobs"]["canary"]
+
+    assert job["timeout-minutes"] == 15
+    joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
+    assert ".github/warmup-render.sh --expect-mode real-workflow" in joined_steps
+    assert ".github/canary-render.sh" in joined_steps
+    assert "ARGUS_WARMUP_EXPECT_MODE: real-workflow" in CANARY_WORKFLOW_PATH.read_text(
+        encoding="utf-8"
+    )
+    assert "POSTHOG" not in CANARY_WORKFLOW_PATH.read_text(encoding="utf-8")
