@@ -810,17 +810,15 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
         assert action["presentation"] == "confirmation"
         assert action["payload"]["confirmation_id"] == confirmation["confirmation_id"]
         assert action["payload"]["conversation_id"] == conversation["id"]
+    run_action = next(
+        action for action in confirmation["actions"] if action["type"] == "run_backtest"
+    )
 
     response = client.post(
         "/api/v1/chat/stream",
         json={
             "conversation_id": conversation["id"],
-            "action": {
-                "type": "run_backtest",
-                "label": "Run backtest",
-                "presentation": "confirmation",
-                "payload": {},
-            },
+            "action": run_action,
             "language": "en",
         },
     )
@@ -1111,17 +1109,20 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
         },
     )
     assert confirmation.status_code == 200
+    confirmation_payload = _stream_payloads(confirmation.text, "confirmation")[0][
+        "confirmation"
+    ]
+    run_action = next(
+        action
+        for action in confirmation_payload["actions"]
+        if action["type"] == "run_backtest"
+    )
 
     first = client.post(
         "/api/v1/chat/stream",
         json={
             "conversation_id": conversation["id"],
-            "action": {
-                "type": "run_backtest",
-                "label": "Run backtest",
-                "presentation": "confirmation",
-                "payload": {},
-            },
+            "action": run_action,
             "language": "en",
         },
     )
