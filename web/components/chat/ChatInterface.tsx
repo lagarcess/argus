@@ -80,7 +80,10 @@ import {
   hydrateResultActions,
   hydrateResultActionsForRun,
 } from "@/lib/chat-result-actions";
-import { appendOrReplacePendingAssistantMessage } from "@/lib/chat-send-state";
+import {
+  appendOrReplacePendingAssistantMessage,
+  replaceOrAppendFinalAssistantMessage,
+} from "@/lib/chat-send-state";
 import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
@@ -1358,26 +1361,29 @@ export default function ChatInterface() {
         }
         if (event.data.confirmation) {
           const confirmation = event.data.confirmation as StrategyConfirmationPayload;
+          const finalAssistantId = finalMessageId ?? assistantId;
           setInputActions([]);
           setMessages((prev) =>
             normalizeRetryActionHistory(
               normalizeConfirmationHistory(
-                prev.map((m) =>
-                  m.id === assistantId
-                    ? {
-                        ...m,
-                        kind: "strategy_confirmation",
-                        content: undefined,
-                        confirmation,
-                        actions: confirmation.actions ?? [],
-                      }
-                    : m,
+                replaceOrAppendFinalAssistantMessage(
+                  prev,
+                  assistantId,
+                  {
+                    id: finalAssistantId,
+                    role: "ai",
+                    kind: "strategy_confirmation",
+                    content: undefined,
+                    confirmation,
+                    actions: confirmation.actions ?? [],
+                  },
                 ),
               ),
             ),
           );
         } else if (event.data.run) {
           const run = event.data.run as BacktestRun;
+          const finalAssistantId = finalMessageId ?? assistantId;
           const baseCard = resultCardFromRun(run);
           const resultActions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
           const card = {
@@ -1389,40 +1395,43 @@ export default function ChatInterface() {
           setMessages((prev) =>
             normalizeRetryActionHistory(
               normalizeConfirmationHistory(
-                prev.map((m) =>
-                  m.id === assistantId
-                    ? {
-                        ...m,
-                        kind: "strategy_result",
-                        content: m.content || finalText || undefined,
-                        result: card,
-                        actions: resultActions,
-                        savedStrategyId: card.savedStrategyId,
-                      }
-                    : m,
+                replaceOrAppendFinalAssistantMessage(
+                  prev,
+                  assistantId,
+                  {
+                    id: finalAssistantId,
+                    role: "ai",
+                    kind: "strategy_result",
+                    content: finalText || undefined,
+                    result: card,
+                    actions: resultActions,
+                    savedStrategyId: card.savedStrategyId,
+                  },
                 ),
               ),
             ),
           );
         } else if (finalBacktestJob) {
+          const finalAssistantId = finalMessageId ?? assistantId;
           setInputActions([]);
           setMessages((prev) =>
             normalizeRetryActionHistory(
               normalizeConfirmationHistory(
                 applyBacktestJobUpdate(
-                  prev.map((m) =>
-                    m.id === assistantId
-                      ? {
-                          ...m,
-                          kind: "backtest_job",
-                          content: finalText || m.content || undefined,
-                          backtestJob: finalBacktestJob,
-                          artifactId: finalBacktestJob.id,
-                          artifactType: "backtest_job",
-                          artifactStatus: finalBacktestJob.status,
-                          actions: undefined,
-                        }
-                      : m,
+                  replaceOrAppendFinalAssistantMessage(
+                    prev,
+                    assistantId,
+                    {
+                      id: finalAssistantId,
+                      role: "ai",
+                      kind: "backtest_job",
+                      content: finalText || undefined,
+                      backtestJob: finalBacktestJob,
+                      artifactId: finalBacktestJob.id,
+                      artifactType: "backtest_job",
+                      artifactStatus: finalBacktestJob.status,
+                      actions: undefined,
+                    },
                   ),
                   { job: finalBacktestJob, run: null },
                 ),
@@ -1431,16 +1440,31 @@ export default function ChatInterface() {
           );
         } else if (finalText) {
           setMessages((prev) => {
-            const nextMessages = prev.map((m) =>
-              mergeFinalTextMessage(m, {
-                assistantId,
-                finalText,
-                finalActions: finalRetryActions,
+            const finalAssistantId = finalMessageId ?? assistantId;
+            const nextMessages = replaceOrAppendFinalAssistantMessage(
+              prev.map((m) =>
+                mergeFinalTextMessage(m, {
+                  assistantId,
+                  finalText,
+                  finalActions: finalRetryActions,
+                  contentPresentation:
+                    action?.type === "show_breakdown"
+                      ? "result_breakdown"
+                      : undefined,
+                }),
+              ),
+              assistantId,
+              {
+                id: finalAssistantId,
+                role: "ai",
+                kind: "text",
+                content: finalText,
+                actions: finalRetryActions.length > 0 ? finalRetryActions : undefined,
                 contentPresentation:
                   action?.type === "show_breakdown"
                     ? "result_breakdown"
                     : undefined,
-              }),
+              },
             );
             if (
               isConfirmationAction(action) ||
