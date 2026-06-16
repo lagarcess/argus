@@ -130,12 +130,13 @@ The readiness slice should be sequenced like this:
      browser-session cookies now force `Secure` when the request is HTTPS, when
      `x-forwarded-proto` is HTTPS, or when `APP_ENV`/related backend env marks a
      production-like deployment.
-   - Allowlist/auth response normalization. Closed locally for public login
-     failures and raw signup provider errors; auth throttling remains open.
+   - Allowlist/auth response normalization and throttling. Closed locally for
+     public login failures, raw signup provider errors, and short-window
+     login/signup attempt limits keyed by IP and normalized email.
    - Short-window quotas and accurate rate-limit behavior. Closed locally for
-     authenticated chat, backtest, and feedback paths; auth throttling remains
-     open because unauthenticated login/signup limits need an IP/edge or
-     identity-keyed design outside the current `usage_counters.user_id` model.
+     authenticated chat, backtest, and feedback paths. Auth attempts use a
+     separate in-process limiter because unauthenticated login/signup attempts
+     cannot use the current `usage_counters.user_id` model before a user exists.
    - Parent ownership checks for service-role write paths. Closed locally in
      the readiness branch for direct backtest parent conversations, gateway
      backtest run parents, durable job conversations, collection-strategy
@@ -529,9 +530,9 @@ Action:
   emails.
 - Closed locally: signup provider failures return sanitized product-safe copy
   instead of raw provider exception text.
-- Still open: add auth endpoint throttling through a real IP/edge or
-  identity-keyed limiter. Do not use the authenticated per-user
-  `usage_counters` model for unauthenticated auth attempts.
+- Closed locally: login/signup attempts now use a separate short-window limiter
+  keyed by client IP and normalized email, with `429` and `Retry-After` before
+  provider or allowlist work after repeated attempts.
 - Keep detailed reasons in logs only.
 
 Relevant code:
@@ -552,9 +553,8 @@ Action:
   persistence.
 - Closed locally: success responses no longer emit placeholder
   `X-RateLimit-*` values.
-- Still open: auth throttling/normalization needs a separate design because
-  unauthenticated login/signup attempts cannot use the current per-user
-  `usage_counters` model without first resolving a user.
+- Closed locally: login/signup attempts use a separate in-process limiter rather
+  than the authenticated per-user `usage_counters` model.
 
 Relevant code:
 
@@ -1452,11 +1452,11 @@ surfaces.
 ### Slice 3: Security And Feedback Hardening
 
 - Force secure cookies in production.
-- Normalize allowlist auth errors. Closed locally for login enumeration and
-  signup provider error sanitization; auth throttling remains open.
+- Normalize allowlist auth errors. Closed locally for login enumeration, signup
+  provider error sanitization, and login/signup attempt throttling.
 - Add short-window quotas. Closed locally for authenticated chat, direct
-  backtest, and feedback paths; auth throttling remains a follow-up because it
-  needs a non-user-id keyed limiter.
+  backtest, and feedback paths; auth attempts use their own non-user-id keyed
+  limiter.
 - Add parent ownership checks. Closed locally in the readiness branch: service
   role writes now validate owned parent conversations/strategies/runs/context
   packets before inserting or upserting child records; direct `/backtests/run`
