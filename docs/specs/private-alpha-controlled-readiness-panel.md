@@ -906,12 +906,14 @@ Latest local verification on 2026-06-15:
   `web/e2e/chat-action-recovery.spec.ts::private-alpha readiness smoke covers starter, Spanish edit, result, reload, retry, and feedback`,
   which exercises Spanish starter chips, the normal chat runtime, confirmation
   date edit, run/result, Quick take, reload hydration, feedback, Explain
-  result, and localized retry in one deterministic Playwright path.
+  result, and localized retry in one deterministic Playwright path. The
+  onboarding browser smoke also proves mock-auth login form submission enters
+  the private-alpha chat shell.
 
 Latest local verification on 2026-06-16:
 
 - `cd web && bun run test:e2e chat-action-recovery.spec.ts onboarding.spec.ts --project=chromium`
-  returned 11 passed for the affected browser recovery, readiness-smoke, and
+  returned 12 passed for the affected browser recovery, readiness-smoke, and
   private-alpha onboarding specs. The auth form render test still logs expected
   unreachable-API noise because that specific page-render test does not mock
   `/me`.

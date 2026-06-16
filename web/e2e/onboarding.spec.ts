@@ -207,3 +207,15 @@ test("signup and login expose persisted account entry", async ({ page }) => {
   await expect(page.getByPlaceholder("Password")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
 });
+
+test("mock-auth login submits into the private-alpha chat", async ({ page }) => {
+  await mockChatBoot(page, "completed");
+  await page.goto("/?auth=login", { waitUntil: "networkidle" });
+
+  await page.getByPlaceholder("Email address").fill("dev@example.com");
+  await page.getByPlaceholder("Password").fill("local-password");
+  await page.getByRole("button", { name: "Sign In" }).click();
+
+  await expect(page).toHaveURL(/\/chat$/);
+  await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 15_000 });
+});
