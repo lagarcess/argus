@@ -1185,6 +1185,26 @@ Production-parity browser QA refresh on 2026-06-16:
   reload-thinned metadata shapes, and the final in-app browser pass regenerated
   the Spanish AAPL confirmation with `1 feb 2025 -> 1 may 2025` plus localized
   card actions, then hydrated that corrected card after reload.
+- Additional QA-mode Spanish browser smoke after confirming root `.env` and
+  `web/.env.local` found a provider-grounding trust regression: `Prueba comprar
+  y mantener Apple con 100k durante el ultimo ano` produced Spanish copy that
+  recognized `Apple (AAPL)` while also saying `APPLE` was unavailable. Closed
+  locally by clearing stale invalid-symbol metadata when post-LLM provider
+  grounding replaces an LLM pseudo-ticker with the provider-backed symbol from
+  the current user message. Focused tests now cover this repair while preserving
+  forged selected-asset rejection. Post-fix local QA against the real-auth QA
+  stack reached an `AAPL` confirmation with `Ejecutar backtest`,
+  `Cambiar fechas`, `Cambiar activo`, `Ajustar supuestos`, and `Cancelar`
+  without unsupported `APPLE` copy.
+- Follow-up Playwright QA fallback was used because the in-app Browser session
+  could inspect/click but could not type into the rich composer without its
+  virtual clipboard. The fallback used the same local QA backend/frontend and
+  real auth. Conversation `d38a21fb-1729-4cbb-9263-3a310d9e0ac1` completed the
+  `Ejecutar backtest` action and rendered an `AAPL` result with Spanish
+  `Resumen rapido`, `Explicar resultado`, and `Ajustar idea`. A subsequent
+  clean-console rerun timed out waiting for confirmation after live OpenRouter
+  interpretation fallback/timeout warnings, so provider health remains covered
+  by the deployed canary gate rather than treated as solved by this local pass.
 - QA observation from the adjust-assumptions smoke: a separate natural
   `past year` prompt first asked for an exact date range, then a date answer hit
   the existing strict interpreter-unavailable recovery after live OpenRouter
@@ -1686,6 +1706,10 @@ surfaces.
   edit regression: a starter flow followed by `Use Jan 1 2025 to Apr 1 2025`
   now regenerates the confirmation and completed result with the explicit
   Jan 1-Apr 1, 2025 window instead of reusing the prior rolling default.
+- Local QA on 2026-06-16 caught and closed a Spanish company-name grounding
+  regression: `Apple` can now repair an LLM pseudo-ticker `APPLE` into provider
+  `AAPL` without leaving stale unsupported-symbol metadata that blocks the
+  confirmation.
 - Spanish live QA is now scriptable through
   `ARGUS_CANARY_LANGUAGE=es-419 .github/canary-render.sh`, but the live Render
   API must first move past deployed commit

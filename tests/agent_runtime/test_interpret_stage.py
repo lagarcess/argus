@@ -3612,6 +3612,114 @@ def test_llm_extracted_company_name_resolves_through_provider_catalog(monkeypatc
     assert "assistant_response" not in result.patch
 
 
+def test_current_message_asset_grounding_clears_stale_invalid_llm_symbol(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    provider_queries: list[tuple[str, str]] = []
+
+    def _resolution(
+        query: str,
+        *,
+        field: str,
+        source: str,
+    ) -> AssetResolution:
+        provider_queries.append((query, source))
+        raw = query.strip()
+        if raw == "APPLE" and source == "llm_extraction":
+            return AssetResolution(
+                status="unsupported",
+                raw_text=query,
+                asset=None,
+                candidates=(),
+                provenance=ResolutionProvenance(
+                    field=field,
+                    raw_text=query,
+                    source=source,
+                    candidate_kind="asset",
+                    resolution_status="unsupported",
+                    canonical_symbol=None,
+                    asset_class=None,
+                    validated_by="provider_catalog",
+                    confidence="high",
+                ),
+            )
+        if raw.casefold() == "apple" and source == "user_mention":
+            asset = ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+            return AssetResolution(
+                status="resolved",
+                raw_text=query,
+                asset=asset,
+                candidates=(asset,),
+                provenance=ResolutionProvenance(
+                    field=field,
+                    raw_text=query,
+                    source=source,
+                    candidate_kind="asset",
+                    resolution_status="resolved",
+                    canonical_symbol="AAPL",
+                    asset_class="equity",
+                    validated_by="provider_catalog",
+                    confidence="medium",
+                ),
+            )
+        return AssetResolution(
+            status="unsupported",
+            raw_text=query,
+            asset=None,
+            candidates=(),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="unsupported",
+                canonical_symbol=None,
+                asset_class=None,
+                validated_by="provider_catalog",
+                confidence="low",
+            ),
+        )
+
+    monkeypatch.setattr(interpret_module, "runtime_resolve_asset_candidate", _resolution)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="El usuario quiere comprar y mantener Apple.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Comprar y mantener Apple.",
+            asset_universe=["APPLE"],
+            date_range="past year",
+            capital_amount=100000,
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="Prueba comprar y mantener Apple con 100k durante el ultimo ano",
+        response=response,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    assert ("APPLE", "llm_extraction") in provider_queries
+    assert ("Apple", "user_mention") in provider_queries
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.asset_class == "equity"
+    assert "invalid_symbols" not in strategy.extra_parameters
+    assert all(
+        item.resolution_status != "unsupported"
+        for item in strategy.resolution_provenance
+        if item.field.startswith("asset_universe")
+    )
+    assert "assistant_response" not in result.patch
+
+
 def test_explicit_buy_and_hold_overrides_spurious_rule_clarification(
     monkeypatch,
 ) -> None:

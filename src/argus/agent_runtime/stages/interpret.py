@@ -4110,6 +4110,7 @@ def _strategy_with_current_message_asset_grounding(
         if repaired_symbols != current_symbols:
             updated = strategy.model_copy(deep=True)
             updated.asset_universe = repaired_symbols
+            updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
             return updated, ["current_message_asset_grounding_repaired"]
         return strategy, []
 
@@ -4134,6 +4135,7 @@ def _strategy_with_current_message_asset_grounding(
         if repaired_symbols != current_symbols:
             updated = strategy.model_copy(deep=True)
             updated.asset_universe = repaired_symbols
+            updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
             return updated, ["current_message_asset_grounding_repaired"]
         return strategy, []
 
@@ -4199,6 +4201,7 @@ def _strategy_with_current_message_asset_grounding(
         updated.asset_class = next(iter(asset_classes))
     elif len(asset_classes) > 1:
         updated.asset_class = "mixed"
+    updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
     updated.resolution_provenance = _dedupe_resolution_provenance(
         [
             item
@@ -4341,6 +4344,7 @@ def _strategy_with_missing_asset_grounded_from_current_message(
     updated.asset_universe = grounded_symbols
     if asset_class:
         updated.asset_class = asset_class
+    updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
     updated.resolution_provenance = _dedupe_resolution_provenance(
         [
             item
@@ -4410,7 +4414,7 @@ def _strategy_with_missing_asset_from_misplaced_benchmark(
         updated.comparison_baseline = None
     updated.strategy_thesis = None
     updated.extra_parameters = _without_field_provenance_keys(
-        updated.extra_parameters,
+        _without_invalid_symbols(updated.extra_parameters),
         {"comparison_baseline"},
     )
     updated.resolution_provenance = _dedupe_resolution_provenance(
@@ -4455,6 +4459,14 @@ def _without_field_provenance_keys(
             updated["field_provenance"] = remaining
         else:
             updated.pop("field_provenance", None)
+    return updated
+
+
+def _without_invalid_symbols(extra_parameters: dict[str, Any]) -> dict[str, Any]:
+    if not extra_parameters:
+        return {}
+    updated = dict(extra_parameters)
+    updated.pop("invalid_symbols", None)
     return updated
 
 
