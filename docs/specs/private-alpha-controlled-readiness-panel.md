@@ -907,8 +907,13 @@ Latest local verification on 2026-06-15:
   which exercises Spanish starter chips, the normal chat runtime, confirmation
   date edit, run/result, Quick take, reload hydration, feedback, Explain
   result, and localized retry in one deterministic Playwright path. The
-  onboarding browser smoke also proves mock-auth login form submission enters
-  the private-alpha chat shell.
+  companion
+  `web/e2e/chat-action-recovery.spec.ts::Spanish confirmation edit actions preserve context through asset, assumptions, and cancel`
+  path proves Spanish `Cambiar activo` and `Ajustar supuestos` follow-up turns
+  are sent as normal user messages without action payloads while backend-shaped
+  artifacts preserve period/context, and `Cancelar` transitions the card to
+  `Borrador cancelado`. The onboarding browser smoke also proves mock-auth
+  login form submission enters the private-alpha chat shell.
 
 Latest local verification on 2026-06-16:
 
@@ -921,10 +926,10 @@ Latest local verification on 2026-06-16:
   follow-up answer still updated the active confirmation and result to
   `1 feb 2025 -> 1 may 2025`.
 - `cd web && bun run test:e2e chat-action-recovery.spec.ts onboarding.spec.ts --project=chromium`
-  returned 12 passed for the affected browser recovery, readiness-smoke, and
-  private-alpha onboarding specs. The auth form render test still logs expected
-  unreachable-API noise because that specific page-render test does not mock
-  `/me`.
+  returned 13 passed for the affected browser recovery, readiness-smoke,
+  Spanish edit-loop, and private-alpha onboarding specs. The auth form render
+  test still logs expected unreachable-API noise because that specific
+  page-render test does not mock `/me`.
 - `poetry run ruff check src tests workflows scripts` passed.
 - Focused Supabase security/API verification passed:
   `poetry run pytest tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py -q --no-cov`

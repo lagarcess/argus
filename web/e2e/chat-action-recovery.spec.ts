@@ -42,6 +42,8 @@ type MockDateRange = {
   display: string;
 };
 
+type PendingConfirmationEdit = "date" | "asset" | "assumption" | null;
+
 const DEFAULT_DATE_RANGE: MockDateRange = {
   start: "2025-01-01",
   end: "2025-04-01",
@@ -53,6 +55,10 @@ const UPDATED_DATE_RANGE: MockDateRange = {
   end: "2025-05-01",
   display: "February 1, 2025 to May 1, 2025",
 };
+
+function formatCurrency(amount: number) {
+  return `$${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
 
 function baseConversation(language = "en") {
   return {
@@ -98,12 +104,18 @@ function confirmationAction(type: string, label: string) {
   };
 }
 
-function confirmationCard(dateRange: MockDateRange = DEFAULT_DATE_RANGE) {
+function confirmationCard(
+  dateRange: MockDateRange = DEFAULT_DATE_RANGE,
+  assetSymbol = "AAPL",
+  initialCapital = 10000,
+) {
+  const formattedCapital = formatCurrency(initialCapital);
+
   return {
     confirmation_id: CONFIRMATION_ID,
     confirmation_state: "active",
-    title: "AAPL buy and hold",
-    summary: "Buy and hold AAPL with SPY as the comparison benchmark.",
+    title: `${assetSymbol} buy and hold`,
+    summary: `Buy and hold ${assetSymbol} with SPY as the comparison benchmark.`,
     status: "ready_to_run",
     statusLabel: "Ready to run",
     strategy_type: "buy_and_hold",
@@ -111,7 +123,8 @@ function confirmationCard(dateRange: MockDateRange = DEFAULT_DATE_RANGE) {
     date_range: dateRange,
     rows: [
       { key: "strategy", label: "Strategy", value: "Buy and hold" },
-      { key: "asset", label: "Asset", value: "AAPL" },
+      { key: "assets", label: "Assets", value: assetSymbol },
+      { key: "starting_capital", label: "Starting capital", value: formattedCapital },
       {
         key: "period",
         label: "Period",
@@ -120,7 +133,6 @@ function confirmationCard(dateRange: MockDateRange = DEFAULT_DATE_RANGE) {
       { key: "benchmark", label: "Benchmark", value: "SPY" },
     ],
     assumptions: [
-      "$10,000 starting capital",
       "Long-only, daily close data",
       "No fees or slippage",
     ],
@@ -134,7 +146,7 @@ function confirmationCard(dateRange: MockDateRange = DEFAULT_DATE_RANGE) {
   };
 }
 
-function resultAction(type: string, label: string) {
+function resultAction(type: string, label: string, assetSymbol = "AAPL") {
   return {
     id: `${type}-${RUN_ID}`,
     type,
@@ -143,18 +155,22 @@ function resultAction(type: string, label: string) {
     payload: {
       run_id: RUN_ID,
       conversation_id: CONVERSATION_ID,
-      strategy_name: "AAPL buy and hold",
-      symbols: ["AAPL"],
+      strategy_name: `${assetSymbol} buy and hold`,
+      symbols: [assetSymbol],
       asset_class: "equity",
       template: "buy_and_hold",
     },
   };
 }
 
-function resultCard(dateRange: MockDateRange = DEFAULT_DATE_RANGE) {
+function resultCard(
+  dateRange: MockDateRange = DEFAULT_DATE_RANGE,
+  assetSymbol = "AAPL",
+  initialCapital = 10000,
+) {
   return {
-    title: "AAPL buy and hold",
-    symbols: ["AAPL"],
+    title: `${assetSymbol} buy and hold`,
+    symbols: [assetSymbol],
     strategy_label: "Buy and hold",
     asset_class: "equity",
     date_range: dateRange,
@@ -165,28 +181,32 @@ function resultCard(dateRange: MockDateRange = DEFAULT_DATE_RANGE) {
       { key: "benchmark_delta_pct", label: "Vs benchmark", value: "-4.4 pts" },
       { key: "max_drawdown_pct", label: "Max drawdown", value: "-12.0%" },
     ],
-    benchmark_note: "AAPL lagged SPY by 4.4 percentage points.",
+    benchmark_note: `${assetSymbol} lagged SPY by 4.4 percentage points.`,
     assumptions: [
-      "$10,000 starting capital",
+      `${formatCurrency(initialCapital)} starting capital`,
       "Long-only, equal-weight run",
       "Benchmark: SPY",
     ],
     actions: [
-      resultAction("show_breakdown", "Explain result"),
-      resultAction("refine_strategy", "Refine idea"),
+      resultAction("show_breakdown", "Explain result", assetSymbol),
+      resultAction("refine_strategy", "Refine idea", assetSymbol),
     ],
     chart: null,
   };
 }
 
-function completedRun(dateRange: MockDateRange = DEFAULT_DATE_RANGE) {
+function completedRun(
+  dateRange: MockDateRange = DEFAULT_DATE_RANGE,
+  assetSymbol = "AAPL",
+  initialCapital = 10000,
+) {
   return {
     id: RUN_ID,
     conversation_id: CONVERSATION_ID,
     strategy_id: null,
     status: "completed",
     asset_class: "equity",
-    symbols: ["AAPL"],
+    symbols: [assetSymbol],
     allocation_method: "equal_weight",
     benchmark_symbol: "SPY",
     metrics: {
@@ -200,16 +220,16 @@ function completedRun(dateRange: MockDateRange = DEFAULT_DATE_RANGE) {
     },
     config_snapshot: {
       template: "buy_and_hold",
-      symbols: ["AAPL"],
+      symbols: [assetSymbol],
       asset_class: "equity",
       benchmark_symbol: "SPY",
-      initial_capital: 10000,
+      initial_capital: initialCapital,
       date_range: {
         start: dateRange.start,
         end: dateRange.end,
       },
     },
-    conversation_result_card: resultCard(dateRange),
+    conversation_result_card: resultCard(dateRange, assetSymbol, initialCapital),
     created_at: CREATED_AT,
   };
 }
@@ -280,18 +300,30 @@ async function mockChatApi(
   const messages: ApiMessage[] = [];
   let retryAttempts = 0;
   let activeDateRange = DEFAULT_DATE_RANGE;
-  let pendingDateEdit = false;
+  let activeAssetSymbol = "AAPL";
+  let activeInitialCapital = 10000;
+  let pendingConfirmationEdit: PendingConfirmationEdit = null;
+  let confirmationRevision = 0;
+
+  const nextConfirmationMessageId = (reason: string) => {
+    confirmationRevision += 1;
+    return `msg-confirmation-${reason}-${confirmationRevision}`;
+  };
 
   const upsertConfirmationMessages = (
     prompt: string,
-    messageId = "msg-confirmation",
+    messageId = nextConfirmationMessageId("draft"),
   ) => {
     messages.splice(
       0,
       messages.length,
       persistedUserMessage("msg-user-confirm", prompt),
       persistedAssistantMessage(messageId, "", {
-        confirmation_card: confirmationCard(activeDateRange),
+        confirmation_card: confirmationCard(
+          activeDateRange,
+          activeAssetSymbol,
+          activeInitialCapital,
+        ),
       }),
     );
   };
@@ -303,7 +335,11 @@ async function mockChatApi(
       persistedUserMessage("msg-user-confirm", "Buy and hold AAPL with SPY in early 2025."),
       persistedAssistantMessage("msg-confirmation", "", {
         confirmation_card: {
-          ...confirmationCard(activeDateRange),
+          ...confirmationCard(
+            activeDateRange,
+            activeAssetSymbol,
+            activeInitialCapital,
+          ),
           confirmation_state: "superseded",
           status: "run_complete",
           statusLabel: "Run complete",
@@ -317,15 +353,23 @@ async function mockChatApi(
         "msg-result",
         "Quick take: AAPL finished below the starting value and lagged SPY.",
         {
-          result_card: resultCard(activeDateRange),
+          result_card: resultCard(
+            activeDateRange,
+            activeAssetSymbol,
+            activeInitialCapital,
+          ),
           result_run_id: RUN_ID,
           latest_run_id: RUN_ID,
           result_conversation_id: CONVERSATION_ID,
           result_fact_bank: {
-            symbols: ["AAPL"],
+            symbols: [activeAssetSymbol],
             asset_class: "equity",
             benchmark_symbol: "SPY",
-            config_snapshot: completedRun(activeDateRange).config_snapshot,
+            config_snapshot: completedRun(
+              activeDateRange,
+              activeAssetSymbol,
+              activeInitialCapital,
+            ).config_snapshot,
           },
         },
       ),
@@ -480,7 +524,11 @@ async function mockChatApi(
             stage_outcome: "completed",
             assistant_response:
               "Quick take: AAPL finished below the starting value and lagged SPY.",
-            run: completedRun(activeDateRange),
+            run: completedRun(
+              activeDateRange,
+              activeAssetSymbol,
+              activeInitialCapital,
+            ),
             message_id: "msg-result",
           },
         },
@@ -518,13 +566,15 @@ async function mockChatApi(
     }
 
     if (body.action?.type === "cancel_confirmation") {
+      const cancelMessage =
+        language === "es-419" ? "Cancelé este borrador." : "Canceled this draft.";
       return fulfillSse(route, [
         {
           type: "final",
           payload: {
             stage_outcome: "ready_to_respond",
             confirmation_cancelled: { confirmation_id: CONFIRMATION_ID },
-            assistant_response: "Canceled this draft.",
+            assistant_response: cancelMessage,
             message_id: "msg-cancel",
           },
         },
@@ -538,7 +588,11 @@ async function mockChatApi(
       body.action?.type === "adjust_assumptions"
     ) {
       if (body.action?.type === "change_dates") {
-        pendingDateEdit = true;
+        pendingConfirmationEdit = "date";
+      } else if (body.action?.type === "change_asset") {
+        pendingConfirmationEdit = "asset";
+      } else if (body.action?.type === "adjust_assumptions") {
+        pendingConfirmationEdit = "assumption";
       }
       const actionPrompt =
         language === "es-419"
@@ -558,13 +612,16 @@ async function mockChatApi(
     }
 
     const prompt = body.message ?? "Buy and hold AAPL with SPY in early 2025.";
-    const confirmationMessageId = pendingDateEdit
-      ? "msg-confirmation-updated-dates"
-      : "msg-confirmation";
-    if (pendingDateEdit) {
+    const editReason = pendingConfirmationEdit ?? "draft";
+    const confirmationMessageId = nextConfirmationMessageId(editReason);
+    if (pendingConfirmationEdit === "date") {
       activeDateRange = UPDATED_DATE_RANGE;
-      pendingDateEdit = false;
+    } else if (pendingConfirmationEdit === "asset") {
+      activeAssetSymbol = "GOOGL";
+    } else if (pendingConfirmationEdit === "assumption") {
+      activeInitialCapital = 250000;
     }
+    pendingConfirmationEdit = null;
     upsertConfirmationMessages(prompt, confirmationMessageId);
     return fulfillSse(route, [
       { type: "stage_start", stage: "confirm" },
@@ -572,7 +629,11 @@ async function mockChatApi(
         type: "final",
         payload: {
           stage_outcome: "ready_for_confirmation",
-          confirmation: confirmationCard(activeDateRange),
+          confirmation: confirmationCard(
+            activeDateRange,
+            activeAssetSymbol,
+            activeInitialCapital,
+          ),
           message_id: confirmationMessageId,
         },
       },
@@ -744,6 +805,48 @@ test("private-alpha readiness smoke covers starter, Spanish edit, result, reload
   await expect(page.getByText("Los datos de mercado tardaron demasiado")).toBeVisible();
   await page.getByRole("button", { name: "Reintentar" }).click();
   await expect(page.getByText("Recuperado despues de reintentar.")).toBeVisible();
+});
+
+test("Spanish confirmation edit actions preserve context through asset, assumptions, and cancel", async ({
+  page,
+}) => {
+  const api = await mockChatApi(page, { language: "es-419" });
+  await startConfirmation(
+    page,
+    "Compra y conserva AAPL con SPY al inicio de 2025.",
+    "Ejecutar backtest",
+  );
+
+  await page.getByRole("button", { name: "Cambiar activo" }).click();
+  await expect(page.getByText("Claro, dime el cambio que quieres hacer.")).toHaveCount(1);
+  expect(api.streamRequests.at(-1)?.language).toBe("es-419");
+  expect(api.streamRequests.at(-1)?.action?.type).toBe("change_asset");
+
+  await page.getByTestId("chat-input").fill("ponlo con google mejor");
+  await page.getByTestId("chat-send").click();
+  await expect(page.getByText("GOOGL").first()).toBeVisible();
+  await expect(page.getByText("1 ene 2025 → 1 abr 2025").first()).toBeVisible();
+  expect(api.streamRequests.at(-1)?.message).toBe("ponlo con google mejor");
+  expect(api.streamRequests.at(-1)?.action).toBeUndefined();
+
+  await page.getByRole("button", { name: "Ajustar supuestos" }).click();
+  await expect(page.getByText("Claro, dime el cambio que quieres hacer.")).toHaveCount(2);
+  expect(api.streamRequests.at(-1)?.action?.type).toBe("adjust_assumptions");
+
+  await page.getByTestId("chat-input").fill("ponle como doscientos cincuenta mil");
+  await page.getByTestId("chat-send").click();
+  await expect(page.getByText("$250,000").first()).toBeVisible();
+  await expect(page.getByText("GOOGL").first()).toBeVisible();
+  await expect(page.getByText("1 ene 2025 → 1 abr 2025").first()).toBeVisible();
+  expect(api.streamRequests.at(-1)?.message).toBe(
+    "ponle como doscientos cincuenta mil",
+  );
+  expect(api.streamRequests.at(-1)?.action).toBeUndefined();
+
+  await page.getByRole("button", { name: "Cancelar" }).click();
+  await expect(page.getByText("Borrador cancelado")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ejecutar backtest" })).toHaveCount(0);
+  expect(api.streamRequests.at(-1)?.action?.type).toBe("cancel_confirmation");
 });
 
 test("retry action recovers a failed stream without duplicating user input", async ({ page }) => {
