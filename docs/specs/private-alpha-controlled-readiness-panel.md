@@ -1107,6 +1107,25 @@ Production-parity browser QA refresh on 2026-06-16:
   conversation kept Quick take and the prompt hydrated with `Explain result`
   still available and `Refine idea` still consumed. In-app browser console
   inspection during the smoke returned no warnings or errors.
+- Additional QA-mode browser smoke after the adjust-assumptions reload
+  regression used the same root `.env` and `web/.env.local` stack. A fresh exact
+  AAPL buy-and-hold prompt for `$10,000` over Jun 16, 2025-Jun 16, 2026 reached
+  confirmation with `Run backtest`, `Change dates`, `Change asset`,
+  `Adjust assumptions`, and `Cancel` scoped to the card. Clicking
+  `Adjust assumptions` moved the card to `Editing`, consumed the card actions,
+  and returned `Which assumption would you like to adjust?`. Reload preserved
+  the editing card and prompt. Answering `use 5000 dollars starting capital
+  instead` produced a new `Ready to run` confirmation with `$5,000`, restored
+  card actions, and a final reload hydrated the old card as `Updated` plus the
+  new `$5,000` confirmation. In-app browser console inspection returned no
+  warnings or errors.
+- QA observation from the same run: a separate natural `past year` prompt first
+  asked for an exact date range, then a date answer hit the existing strict
+  interpreter-unavailable recovery after live OpenRouter interpretation
+  fallbacks failed. This was not patched in this action-ownership slice because
+  the current runtime tests intentionally refuse deterministic date parsing when
+  the structured interpreter is unavailable; keep the deployed strict canary and
+  provider-health gate as the release authority for that path.
 
 ### Daily Automation Candidates
 

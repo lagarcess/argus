@@ -502,6 +502,122 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
     assert captured["thread_id"] == conversation["id"]
 
 
+def test_adjust_assumptions_action_round_trips_pending_edit_after_reload(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured_calls: list[dict[str, Any]] = []
+
+    async def _runtime(**kwargs: Any):
+        captured_calls.append(kwargs)
+        if kwargs["action_context"] is not None:
+            assert kwargs["action_context"]["type"] == "adjust_assumptions"
+            assert kwargs["fallback_confirmation_payload"]["strategy"][
+                "asset_universe"
+            ] == ["AAPL"]
+            snapshot = kwargs["fallback_latest_task_snapshot"]
+            assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
+            yield {"type": "stage_start", "stage": "interpret"}
+            yield {
+                "type": "final",
+                "payload": {
+                    "stage_outcome": "await_user_reply",
+                    "assistant_response": "What assumption should I adjust for AAPL?",
+                    "pending_strategy": {
+                        "strategy": snapshot.pending_strategy_summary.model_dump(
+                            mode="python"
+                        ),
+                        "requested_field": "assumption",
+                        "missing_required_fields": ["assumption"],
+                        "response_intent": {
+                            "kind": "clarification",
+                            "requested_fields": ["assumption"],
+                            "facts": {
+                                "structured_action": kwargs["action_context"],
+                            },
+                        },
+                    },
+                },
+            }
+            return
+
+        fallback_metadata = kwargs["fallback_selected_thread_metadata"]
+        assert fallback_metadata["fallback_source"] == "pending_strategy_metadata"
+        assert fallback_metadata["requested_field"] == "assumption"
+        snapshot = kwargs["fallback_latest_task_snapshot"]
+        assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Got it. I will use that assumption.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    metadata = _confirmation_metadata()
+    metadata["confirmation_card"]["actions"].append(
+        {
+            "id": "adjust-assumptions",
+            "type": "adjust_assumptions",
+            "label": "Adjust assumptions",
+            "presentation": "confirmation",
+            "payload": {"confirmation_id": "confirm-aapl"},
+        }
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=metadata,
+    )
+
+    action_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "adjust_assumptions",
+                "label": "Adjust assumptions",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-aapl"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert action_response.status_code == 200
+    final = _stream_payloads(action_response.text, "final")[0]
+    assert final["stage_outcome"] == "await_user_reply"
+    messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    latest_assistant = messages[-1]
+    assert latest_assistant["role"] == "assistant"
+    assert latest_assistant["metadata"]["chat_action"]["type"] == "adjust_assumptions"
+    assert latest_assistant["metadata"]["pending_strategy"]["requested_field"] == (
+        "assumption"
+    )
+
+    reply_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Use a 5000 dollar starting amount.",
+            "language": "en",
+        },
+    )
+
+    assert reply_response.status_code == 200
+    assert len(captured_calls) == 2
+
+
 def test_pending_strategy_metadata_fallback_is_used_even_when_checkpoint_has_pending(
     monkeypatch,
 ) -> None:
