@@ -134,9 +134,16 @@ Use an allowlisted account and verify:
 
 - Login succeeds.
 - A new conversation can be created.
-- A messy investing idea reaches the chat runtime.
+- Cold-start starter chips are visible, feel current, and do not reference 2024
+  by default.
+- Clicking a cold-start starter chip submits a natural-language prompt into the
+  normal chat runtime.
+- A Spanish prompt reaches confirmation without coaching or manual translation.
 - A supported backtest completes and shows a result card.
-- Reloading the page preserves the conversation and result.
+- The result includes a readable Quick take.
+- Explain result opens a deeper card-scoped explanation without replacing the
+  Quick take.
+- Reloading the page preserves the conversation, job state, and result.
 - Feedback can be submitted.
 
 ## Supabase Persistence Check

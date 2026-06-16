@@ -553,3 +553,22 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     assert ".github/stale-backtest-jobs.sh" in runbook
     assert "api-safe-off` is the default private-alpha tester mode" not in runbook
     assert "NEXT_PUBLIC_POSTHOG_KEY" in runbook
+
+
+def test_private_launch_runbook_smoke_covers_final_readiness_path() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    smoke_test = runbook.split("## Smoke Test", maxsplit=1)[1].split(
+        "## Supabase Persistence Check",
+        maxsplit=1,
+    )[0]
+
+    for expected in (
+        "Cold-start starter chips are visible",
+        "do not reference 2024",
+        "Spanish prompt",
+        "Quick take",
+        "Explain result",
+        "Reloading the page preserves the conversation, job state, and result",
+        "Feedback can be submitted",
+    ):
+        assert expected in smoke_test

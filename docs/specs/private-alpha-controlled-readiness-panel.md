@@ -1202,6 +1202,8 @@ Capture:
 - user language;
 - prompt text category, not raw text if avoiding sensitive notes;
 - whether prompt was Spanish;
+- whether a cold-start starter chip was clicked;
+- whether the starter slate felt current, approachable, or syntax-bound;
 - strategy family;
 - asset class;
 - first failure point;
@@ -1461,9 +1463,12 @@ surfaces.
 - Verify clicked starter chips still enter the normal interpreter path. Covered
   by backend natural-time regression tests; live browser QA remains in the final
   readiness batch.
-- Add cold-start prompt slate to the browser QA checklist.
+- Add cold-start prompt slate to the browser QA checklist. Closed locally in the
+  launch runbook smoke test: the final checklist now requires visible current
+  starter chips, no default 2024 references, and a clicked starter entering the
+  normal chat runtime.
 - Update founder observation sheet to track whether starters feel current and
-  approachable.
+  approachable. Closed locally in this readiness panel.
 
 ## Readiness Exit Criteria
 
