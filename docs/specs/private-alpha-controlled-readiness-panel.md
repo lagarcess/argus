@@ -900,6 +900,16 @@ Latest local verification on 2026-06-15:
   date-range-display, confirmation-display, and result-card playground tests
   passed.
 
+Latest local verification on 2026-06-16:
+
+- `poetry run ruff check src tests workflows scripts` passed.
+- Focused Supabase security/API verification passed:
+  `poetry run pytest tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py -q --no-cov`
+  returned 64 passed.
+- Broader readiness regression matrix passed:
+  `poetry run pytest tests/test_environment_scripts.py tests/test_api_import_boundary.py tests/test_render_canary_script.py tests/test_render_runtime_compatibility.py tests/test_private_launch_hardening.py tests/test_checkpoint_rls_migration.py tests/test_ci_workflow.py tests/test_legacy_orchestrator_retirement.py tests/test_chat_backtest_state_machine.py tests/test_openrouter_policy.py tests/agent_runtime/test_execute_recovery.py tests/agent_runtime/test_spanish_runtime_transcripts.py tests/test_chat_runtime_reload_guardrails.py tests/section3/test_market_data_provider.py tests/test_alpha_artifacts.py tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py -q --no-cov`
+  returned 341 passed.
+
 Latest Render verification on 2026-06-16:
 
 - `.github/render-env-sync.sh api-status` reported real-workflow mode:
@@ -1022,6 +1032,36 @@ Production-parity local QA addendum on 2026-06-16:
   with `unexpected_responses=0` and `console_errors=0`. Reloading the already
   completed AAPL result reached `CHECKPOINT patched_result_reload_visible` with
   `unexpected_responses=0`.
+
+Production-parity browser QA refresh on 2026-06-16:
+
+- Confirmed root `.env` and `web/.env.local` are present and used by QA mode:
+  backend from `.github/qa.sh` on `http://127.0.0.1:8000` with Supabase
+  persistence, live provider, strict fallback, and Postgres checkpoints;
+  frontend from `web/.env.local` on `http://localhost:3000` with real auth.
+- Real-auth login succeeded with the configured mock private-alpha tester
+  credentials. The authenticated cold-start slate rendered current English and
+  Spanish starter prompts without stale 2024 defaults.
+- Spanish prompt proof: `Prueba comprar y mantener Apple con 100k durante el
+  ultimo ano contra SPY` reached confirmation, preserved AAPL, SPY, `$100,000`,
+  the rolling `Jun 16, 2025 -> Jun 16, 2026` window, stocks, daily data, no
+  fees, and no slippage.
+- `Run backtest` completed and rendered the result card, chart, Quick take, and
+  `Explain result`. The result showed ending value `$149,977`, `+50.0%` total
+  return, SPY comparison `+24.9%`, beat by `25.1` percentage points, and
+  max drawdown `-13.8%`.
+- Reloading the conversation preserved the Spanish prompt, completed
+  confirmation/result card, Quick take, breakdown, and feedback controls.
+- Feedback initially exposed remote schema drift: `/feedback` returned 500
+  because live Supabase still had the old
+  `usage_counters_resource_check` constraint with only `chat_messages` and
+  `backtest_runs`. The existing local migration
+  `20260616091955_expand_usage_counter_resources.sql` was applied to the QA
+  database as two direct `supabase db query` statements because `db push` is
+  blocked by older remote migration-history naming drift. Read-back confirmed
+  `chat_messages`, `backtest_runs`, `backtest_jobs`, and `feedback`; retrying
+  the same feedback path closed the dialog and backend logs showed
+  `POST /api/v1/feedback` 200.
 
 ### Daily Automation Candidates
 
@@ -1526,11 +1566,14 @@ surfaces.
 - Add parent ownership checks. Closed locally in the readiness branch: service
   role writes now validate owned parent conversations/strategies/runs/context
   packets before inserting or upserting child records; direct `/backtests/run`
-  returns `404` for an explicit unowned conversation parent.
+  and `/strategies` return `404` for an explicit unowned conversation parent.
 - Add feedback caps/context allowlist/url redaction. Closed locally in the
   readiness branch: `/feedback` now caps messages at 5,000 characters, keeps
   only known feedback context keys, converts browser URL/legacy path context to
   safe `page_path`, and drops arbitrary nested browser blobs.
+- Verify Supabase feedback persistence. Closed for the QA database on
+  2026-06-16 after syncing the existing `usage_counters` resource constraint to
+  include `feedback`; production-parity browser retry returned `/feedback` 200.
 - Add focused tests for each.
 
 ### Slice 4: Backtest Trust Hardening
