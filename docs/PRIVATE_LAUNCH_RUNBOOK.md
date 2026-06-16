@@ -45,15 +45,16 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-8. Confirm the live `argus-api` deploy commit matches the readiness commit you
-   intend to test:
+8. Confirm the live `argus-api` and `argus-app` deploy commits match the
+   readiness commit you intend to test:
 
 ```bash
 .github/render-env-sync.sh api-deploy-status
+.github/render-env-sync.sh web-deploy-status
 ```
 
-If the commit is not the readiness branch commit, stop and deploy `argus-api`
-before running the strict canaries.
+If either commit is not the readiness branch commit, stop and deploy the stale
+service before running the strict canaries.
 
 9. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
@@ -82,14 +83,14 @@ spec against the local app/API environment:
 cd web && bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium
 ```
 
-Only send the app URL to testers after deploy-status, warmup, English canary,
-and Spanish canary all pass against the intended readiness commit. If
-deploy-status reports a different commit, deploy the readiness branch before
-continuing. If warmup fails, do not invite testers yet. Check Render service
-status and redeploy only if the service is stuck. If warmup passes but a canary
-fails, treat it as an Argus product-path regression and inspect API logs,
-Supabase messages, backtest runs, and route receipts for the canary conversation
-id.
+Only send the app URL to testers after API deploy-status, app deploy-status,
+warmup, English canary, and Spanish canary all pass against the intended
+readiness commit. If either deploy-status reports a different commit, deploy the
+readiness branch before continuing. If warmup fails, do not invite testers yet.
+Check Render service status and redeploy only if the service is stuck. If
+warmup passes but a canary fails, treat it as an Argus product-path regression
+and inspect API logs, Supabase messages, backtest runs, and route receipts for
+the canary conversation id.
 
 For the daily automated gate, configure GitHub repository secrets with the same
 canary variables above plus `RENDER_API_KEY`, then use the scheduled or manually

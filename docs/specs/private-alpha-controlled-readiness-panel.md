@@ -1047,6 +1047,13 @@ Latest Render verification on 2026-06-16:
   24-hour aggregate still includes the earlier Spanish canary on the older
   deployed API. Strict Spanish canary remains intentionally blocked until the
   founder-directed deploy moves Render to the readiness branch.
+- Closed locally in the readiness worktree: `.github/render-env-sync.sh`
+  now includes `web-deploy-status`, so the private launch runbook checks both
+  `argus-api` and `argus-app` deploy ids/statuses/commits/timestamps before
+  strict canaries. Live 2026-06-16 checks showed both services still on
+  deployed commit `f335d7814335f8b1b330d3ee37e7125cafdbc478`, so the
+  release gate remains blocked on founder-directed deployment of the readiness
+  branch before English/Spanish strict canaries.
 - Closed locally in the readiness worktree: `.github/workflows/private-alpha-canary.yml`
   adds a manual and daily GitHub Actions gate that requires canary secrets, runs
   `.github/warmup-render.sh --expect-mode real-workflow`, then runs
@@ -1884,11 +1891,12 @@ surfaces.
   2026-06-16: `api-status` reported real-workflow mode with dispatch/execution
   enabled, proof and real task IDs configured, backpressure limits present, and
   Render API key redacted-present.
-- Verify deployed API commit before strict canaries. Closed locally:
-  `.github/render-env-sync.sh api-deploy-status` prints the latest `argus-api`
-  deploy id/status/commit/timestamps without mutating Render, and the launch
-  runbook now requires deploy-status, warmup, English canary, and Spanish canary
-  to pass against the intended readiness commit before tester invites.
+- Verify deployed API/app commits before strict canaries. Closed locally:
+  `.github/render-env-sync.sh api-deploy-status` and `web-deploy-status` print
+  the latest `argus-api` and `argus-app` deploy ids/statuses/commits/timestamps
+  without mutating Render, and the launch runbook now requires API deploy-status,
+  app deploy-status, warmup, English canary, and Spanish canary to pass against
+  the intended readiness commit before tester invites.
 - Run warmup/canary. Closed live on 2026-06-16: warmup passed with API health,
   `/internal/readiness?force=true`, stale-job scan, frontend, and real-workflow
   mode verification; the authenticated canary then passed confirmation,

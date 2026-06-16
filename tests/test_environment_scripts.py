@@ -380,12 +380,35 @@ def test_render_env_sync_prints_api_deploy_status_without_mutation() -> None:
 
     assert ".github/render-env-sync.sh api-deploy-status" in source
     assert "print_api_deploy_status()" in source
-    assert "/v1/services/${API_SERVICE_ID}/deploys?limit=1" in source
+    assert "/v1/services/${service_id}/deploys?limit=1" in source
+    assert 'print_deploy_status "$API_SERVICE_ID" "argus-api"' in source
     assert "commit_short" in source
     assert "deploy_id" in source
 
     deploy_status_block = source.split(
         "print_api_deploy_status() {",
+        maxsplit=1,
+    )[1].split("\n}", maxsplit=1)[0]
+
+    assert "put_render_env" not in deploy_status_block
+    assert "delete_render_env" not in deploy_status_block
+
+
+def test_render_env_sync_prints_web_deploy_status_without_mutation() -> None:
+    env_contract = ENV_CONTRACT.read_text()
+    source = _source(".github/render-env-sync.sh")
+
+    assert 'ARGUS_PRIVATE_LAUNCH_WEB_SERVICE_ID="srv-d7ap6bmslomc73eqp8m0"' in (
+        env_contract
+    )
+    assert ".github/render-env-sync.sh web-deploy-status" in source
+    assert "WEB_SERVICE_ID" in source
+    assert "print_web_deploy_status()" in source
+    assert "/v1/services/${service_id}/deploys?limit=1" in source
+    assert 'print_deploy_status "$WEB_SERVICE_ID" "argus-app"' in source
+
+    deploy_status_block = source.split(
+        "print_web_deploy_status() {",
         maxsplit=1,
     )[1].split("\n}", maxsplit=1)[0]
 
@@ -568,10 +591,11 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
 
     assert ".github/render-env-sync.sh api-real-workflow-on" in before_sessions
     assert ".github/render-env-sync.sh api-deploy-status" in before_sessions
+    assert ".github/render-env-sync.sh web-deploy-status" in before_sessions
     assert ".github/warmup-render.sh --expect-mode real-workflow" in before_sessions
     assert ".github/canary-render.sh" in before_sessions
     assert (
-        "deploy-status, warmup, English canary, and Spanish canary"
+        "API deploy-status, app deploy-status, warmup, English canary, and Spanish canary"
         in normalized_before_sessions
     )
     assert "both scripts pass" not in before_sessions

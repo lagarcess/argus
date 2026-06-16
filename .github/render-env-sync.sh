@@ -12,6 +12,7 @@ source "$SCRIPT_DIR/argus-env.sh"
 argus_load_root_env >/dev/null || true
 
 API_SERVICE_ID="${ARGUS_RENDER_API_SERVICE_ID:-$ARGUS_PRIVATE_LAUNCH_API_SERVICE_ID}"
+WEB_SERVICE_ID="${ARGUS_RENDER_WEB_SERVICE_ID:-$ARGUS_PRIVATE_LAUNCH_WEB_SERVICE_ID}"
 WORKFLOW_SERVICE_ID="${ARGUS_RENDER_WORKFLOW_SERVICE_ID:-$ARGUS_RENDER_BACKTESTS_WORKFLOW_ID}"
 
 usage() {
@@ -19,6 +20,7 @@ usage() {
 Usage:
   .github/render-env-sync.sh api-status
   .github/render-env-sync.sh api-deploy-status
+  .github/render-env-sync.sh web-deploy-status
   .github/render-env-sync.sh api-safe-off
   .github/render-env-sync.sh api-proof-shadow-on
   .github/render-env-sync.sh api-real-workflow-on
@@ -30,6 +32,7 @@ Usage:
 Commands:
   api-status              Print redacted API workflow env status for argus-api.
   api-deploy-status       Print latest argus-api deploy status and commit.
+  web-deploy-status       Print latest argus-app deploy status and commit.
   api-safe-off            Disable API job dispatch/execution and blank its Render key.
   api-proof-shadow-on     Enable proof-only shadow dispatch to workflow_proof.
   api-real-workflow-on    Enable real async dispatch to run_backtest_job.
@@ -130,10 +133,12 @@ render_workflow_json() {
     --header "Accept: application/json"
 }
 
-render_api_deploy_json() {
+render_service_deploy_json() {
+  local service_id="$1"
+
   curl -fsS \
     --request GET \
-    --url "https://api.render.com/v1/services/${API_SERVICE_ID}/deploys?limit=1" \
+    --url "https://api.render.com/v1/services/${service_id}/deploys?limit=1" \
     --header "Authorization: Bearer ${RENDER_API_KEY}" \
     --header "Accept: application/json"
 }
@@ -165,18 +170,22 @@ print_api_status() {
   ' | sort
 }
 
-print_api_deploy_status() {
-  require_local_env RENDER_API_KEY
-  render_api_deploy_json | jq -r '
+print_deploy_status() {
+  local service_id="$1"
+  local service_name="$2"
+
+  render_service_deploy_json "$service_id" | jq -r --arg service_name "$service_name" '
     .[0].deploy as $deploy
     | if $deploy == null then
+        "service=\($service_name)",
         "deploy_id=<missing>",
         "status=<missing>",
         "commit=<missing>",
         "commit_short=<missing>"
       else
         ($deploy.commit.id // "") as $commit
-        | "deploy_id=\($deploy.id // "<missing>")",
+        | "service=\($service_name)",
+          "deploy_id=\($deploy.id // "<missing>")",
           "status=\($deploy.status // "<missing>")",
           "commit=\(if $commit == "" then "<missing>" else $commit end)",
           "commit_short=\(if $commit == "" then "<missing>" else $commit[0:7] end)",
@@ -184,6 +193,16 @@ print_api_deploy_status() {
           "finished_at=\($deploy.finishedAt // "<missing>")"
       end
   '
+}
+
+print_api_deploy_status() {
+  require_local_env RENDER_API_KEY
+  print_deploy_status "$API_SERVICE_ID" "argus-api"
+}
+
+print_web_deploy_status() {
+  require_local_env RENDER_API_KEY
+  print_deploy_status "$WEB_SERVICE_ID" "argus-app"
 }
 
 sync_api_proof_shadow_on() {
@@ -347,6 +366,9 @@ case "$command" in
     ;;
   api-deploy-status)
     print_api_deploy_status
+    ;;
+  web-deploy-status)
+    print_web_deploy_status
     ;;
   api-safe-off)
     sync_api_safe_off
