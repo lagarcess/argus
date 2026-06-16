@@ -955,6 +955,12 @@ Latest local browser QA on 2026-06-16:
   `Good response` control, opened the feedback dialog, submitted text, and
   verified `Feedback submitted.` with no console issues. The direct local API
   feedback smoke also returned `{"success":true}`.
+- Scripted browser action proof: `bun run test:e2e
+  e2e/chat-action-recovery.spec.ts --project=chromium` now covers confirmation
+  actions (`Change dates`, `Change asset`, `Adjust assumptions`, `Cancel`),
+  structured `Run backtest`, result-card reload hydration, `Explain result`,
+  `Refine idea`, more-menu `Report issue` feedback submission, and retry
+  recovery from a failed stream.
 - Console health: in-app Browser console inspection after the run returned no
   `error` or `warn` entries and no framework overlay text.
 
@@ -1549,6 +1555,7 @@ Argus is ready for the first controlled alpha tester when:
   bilingual, and free of stale default 2024 examples.
 - Active confirmation edits preserve explicit user date changes before
   execution.
-- A manual smoke test verifies login, chat, Spanish prompt, confirmation, run,
-  result, Quick take, Explain result, reload, and feedback.
+- Manual/live smoke plus scripted Playwright verify login, chat, Spanish prompt,
+  confirmation actions, run, result, Quick take, Explain result, reload, retry,
+  and feedback.
 - Known caveats are written in founder-facing tester notes.
