@@ -22,6 +22,7 @@ from argus.agent_runtime.llm_interpreter import (
     _response_from_signal_rule_plan,
     _strategy_from_llm,
 )
+from argus.agent_runtime.llm_interpreter_types import FocusedStrategyExtraction
 from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.signal_rule_repair import (
     SignalRuleGroundingAudit,
@@ -79,6 +80,39 @@ def _sma_50_200_crossover_plan(*, strategy_thesis: str) -> SignalRulePlan:
         exit_logic=describe_rule_spec(rule_spec, "exit"),
         rule_spec=rule_spec,
         confidence=0.86,
+    )
+
+
+def _tsla_50_200_focused_extraction() -> FocusedStrategyExtraction:
+    return FocusedStrategyExtraction(
+        is_testable_strategy=True,
+        requires_clarification=False,
+        user_goal_summary="User asked for a 50/200 crossover test on Tesla.",
+        language="en",
+        strategy_type="signal_strategy",
+        strategy_thesis=(
+            "Backtest a bullish SMA 50/200 crossover on Tesla from January "
+            "2022 to today with $10,000 capital."
+        ),
+        asset_universe=["Tesla"],
+        asset_class="equity",
+        date_range={"start": "2022-01-01", "end": "today"},
+        capital_amount=10000,
+        entry_rule={
+            "type": "moving_average_crossover",
+            "fast_indicator": "sma",
+            "fast_period": 50,
+            "slow_indicator": "sma",
+            "slow_period": 200,
+            "direction": "bullish",
+        },
+        evidence_spans={
+            "asset_universe": "Tesla",
+            "date_range": "from January 2022 to today",
+            "capital_amount": "10k",
+            "entry_rule": "the 50 crosses the 200",
+        },
+        confidence=0.91,
     )
 
 
@@ -2151,10 +2185,20 @@ async def test_money_only_underfilled_strategy_uses_supported_rule_repair(
         ]
         return repaired
 
+    async def focused_extraction_stub(**kwargs):
+        assert kwargs["schema_model"] is FocusedStrategyExtraction
+        assert kwargs["schema_name"] == "FocusedStrategyExtraction"
+        return _tsla_50_200_focused_extraction()
+
     monkeypatch.setattr(
         interpreter_module,
         "resolve_asset",
         resolve_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        focused_extraction_stub,
     )
     monkeypatch.setattr(
         interpreter_module,
@@ -2227,6 +2271,11 @@ async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
     async def fail_if_model_called(**kwargs):
         raise AssertionError("plain 50/200 crossover should use supported rule grammar")
 
+    async def focused_extraction_stub(**kwargs):
+        assert kwargs["schema_model"] is FocusedStrategyExtraction
+        assert kwargs["schema_name"] == "FocusedStrategyExtraction"
+        return _tsla_50_200_focused_extraction()
+
     def resolve_stub(symbol: str) -> ResolvedAssetStub:
         if symbol.lower() == "tesla":
             return ResolvedAssetStub("TSLA", "equity", "Tesla Inc.", "TSLA")
@@ -2250,6 +2299,11 @@ async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
         repair_module,
         "invoke_openrouter_json_schema",
         fail_if_model_called,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        focused_extraction_stub,
     )
     monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
     monkeypatch.setattr(
