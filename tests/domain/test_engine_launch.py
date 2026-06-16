@@ -1367,6 +1367,47 @@ def test_adapter_maps_market_data_failure_to_upstream_dependency(
     assert result.envelope.failure_category == "upstream_dependency_error"
 
 
+def test_adapter_maps_benchmark_coverage_failure_to_upstream_dependency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="TSLA",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=10000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        lambda config, **_: (_ for _ in ()).throw(
+            ValueError("benchmark_data_unavailable")
+        ),
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "failed_upstream"
+    assert result.envelope.failure_category == "upstream_dependency_error"
+    assert result.envelope.failure_reason == "benchmark_data_unavailable"
+
+
 def test_dca_adapter_returns_envelope_card_and_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

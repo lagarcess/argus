@@ -470,6 +470,12 @@ Action:
   benchmark starts, sparse benchmark observations, and uncovered aligned
   points instead of silently future/back-filling missing benchmark coverage.
   The coverage tests live in `tests/section3/test_engine_simulation.py`.
+- Closed locally on 2026-06-16: chat launch now maps
+  `benchmark_data_unavailable` to the same retryable upstream dependency family
+  as market-data coverage failures. `RealBacktestTool` returns a user-safe
+  benchmark-data message/detail, and execute recovery preserves the visible
+  setup while offering retry/date/benchmark adjustment instead of surfacing an
+  internal failure.
 
 ### Archive v0.1 Findings
 
@@ -1492,6 +1498,8 @@ surfaces.
 - Add execution/chart/metric parity tests. Closed locally in the readiness
   branch.
 - Add benchmark sparse coverage tests. Closed locally in the readiness branch.
+- Add chat launch/recovery mapping for benchmark coverage failures. Closed
+  locally in the readiness branch.
 - Add config snapshot reproducibility tests. Closed locally in the readiness
   branch.
 - Clarify DCA result assumptions. Closed locally in the readiness branch.

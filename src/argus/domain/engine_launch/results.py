@@ -45,6 +45,10 @@ USER_SAFE_FAILURE_MESSAGES = {
         "Market data was unavailable for that run. Try again, change the dates, "
         "or choose a different supported asset."
     ),
+    "benchmark_data_unavailable": (
+        "Benchmark data was unavailable for that run. Try again, change the dates, "
+        "or choose a different supported benchmark."
+    ),
     "invalid_date_range": (
         "That date range is not valid for a backtest. Choose a start and end date "
         "in chronological order and I will keep the strategy intact."
@@ -70,6 +74,7 @@ USER_SAFE_FAILURE_DETAILS = {
     "indicator_period_out_of_bounds": "invalid_parameter",
     "indicator_threshold_out_of_bounds": "invalid_parameter",
     "market_data_unavailable": "market_data_issue",
+    "benchmark_data_unavailable": "benchmark_data_issue",
     "invalid_date_range": "invalid_date_window",
     "invalid_chronological_date_range": "invalid_date_window",
     "future_end_date": "future_date_window",

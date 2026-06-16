@@ -784,7 +784,7 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "unsupported_rule_operator",
         "provider_timeframe_unavailable",
     }
-    if error_code == "market_data_unavailable":
+    if error_code in {"market_data_unavailable", "benchmark_data_unavailable"}:
         return "upstream_dependency_error", "failed_upstream"
     if error_code in invalid_inputs:
         return "parameter_validation_error", "blocked_invalid_input"

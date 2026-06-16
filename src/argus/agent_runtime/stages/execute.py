@@ -561,25 +561,31 @@ def _recoverable_execution_prompt(
 ) -> str | None:
     if error_type != "upstream_dependency_error":
         return None
-    if not _is_market_data_unavailable_error(
+    unavailable_data_kind = _unavailable_data_kind(
         error_message=error_message,
         records=records,
-    ):
+    )
+    if unavailable_data_kind is None:
         return None
 
     draft_label = _draft_label_from_payload(payload)
+    data_label = (
+        "benchmark data"
+        if unavailable_data_kind == "benchmark"
+        else "market data"
+    )
     return (
-        f"The {draft_label} setup is still here, but I could not get market data "
+        f"The {draft_label} setup is still here, but I could not get {data_label} "
         "for that run right now. Try again, change the dates, or choose a different "
         "supported asset."
     )
 
 
-def _is_market_data_unavailable_error(
+def _unavailable_data_kind(
     *,
     error_message: str | None,
     records: list[dict[str, Any]],
-) -> bool:
+) -> str | None:
     values = [error_message or ""]
     values.extend(
         str(record.get("error_message") or "")
@@ -591,7 +597,12 @@ def _is_market_data_unavailable_error(
         for record in records
         if isinstance(record, dict) and isinstance(record.get("capability_context"), dict)
     )
-    return any("market_data" in value for value in values)
+    normalized = [value.lower().replace("-", "_") for value in values]
+    if any("benchmark_data" in value or "benchmark data" in value for value in normalized):
+        return "benchmark"
+    if any("market_data" in value or "market data" in value for value in normalized):
+        return "market"
+    return None
 
 
 def _draft_label_from_payload(payload: dict[str, Any]) -> str:

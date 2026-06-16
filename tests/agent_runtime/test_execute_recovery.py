@@ -308,6 +308,64 @@ def test_execute_recovers_visible_dca_confirmation_when_market_data_is_unavailab
     assert failed_reference["metadata"]["launch_payload"]["symbol"] == "BTC"
 
 
+def test_execute_recovers_visible_confirmation_when_benchmark_data_is_unavailable() -> (
+    None
+):
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "benchmark_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {"failure_detail": "benchmark_data_issue"},
+            },
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "benchmark_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {"failure_detail": "benchmark_data_issue"},
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Buy and hold TSLA in 2024.",
+            "asset_universe": ["TSLA"],
+            "asset_class": "equity",
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            "capital_amount": 10000,
+            "sizing_mode": "capital_amount",
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "benchmark_symbol": {"value": "SPY", "source": "default"},
+        },
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=2)
+
+    assert result.outcome == "execution_failed_recoverably"
+    assert result.patch["failure_classification"] == "upstream_dependency_error"
+    prompt = result.patch["assistant_prompt"]
+    assert "TSLA buy-and-hold draft" in prompt
+    assert "benchmark data" in prompt
+    assert "try again" in prompt.lower()
+    assert "benchmark_data_unavailable" not in prompt
+    assert result.patch["final_response_payload"]["error"] == prompt
+    failed_reference = result.patch["latest_failed_action_reference"]
+    assert failed_reference["metadata"]["action_type"] == "run_backtest"
+    assert failed_reference["metadata"]["failure_classification"] == (
+        "upstream_dependency_error"
+    )
+    assert failed_reference["metadata"]["launch_payload"]["symbol"] == "TSLA"
+
+
 def test_execute_missing_required_input_returns_to_conversation() -> None:
     tool = StubBacktestTool(
         responses=[
