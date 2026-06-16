@@ -888,9 +888,14 @@ Latest Render verification on 2026-06-16:
   cold-start retries for API health, product readiness, and frontend. During the
   same run, the stale queued/running backtest job scan returned
   `status=ready`, `scanned_count=0`, `stale_count=0`, and `unresolved_count=0`.
-- `.github/canary-render.sh` was not run because this worktree environment is
-  missing `ARGUS_CANARY_EMAIL` and `ARGUS_CANARY_PASSWORD`. The authenticated
-  canary remains the next deployed proof gate.
+- `.github/canary-render.sh` passed against the deployed Render app/API using
+  the root `.env` local aliases (`MOCK_USER_EMAIL` / `MOCK_USER_PASSWORD` plus
+  Supabase verifier credentials). Canary conversation
+  `b20da5d4-ba0e-404c-b275-8a4813812c0b` created async job
+  `b03db203-850a-4dd3-a51d-b313b0b9b5ea`, which completed with run
+  `0ca6b215-5dcb-44db-a014-48722c478311`. The script verified confirmation,
+  the structured `run_backtest` action, async workflow completion, persisted
+  messages, Supabase rows, result-summary route receipt, and LLM readout voice.
 - Closed locally in the readiness worktree: `.github/workflows/private-alpha-canary.yml`
   adds a manual and daily GitHub Actions gate that requires canary secrets, runs
   `.github/warmup-render.sh --expect-mode real-workflow`, then runs
@@ -899,9 +904,10 @@ Latest Render verification on 2026-06-16:
 - Closed locally in the readiness worktree:
   `scripts/ops/alpha_readiness_metrics.py` summarizes aggregate
   `backtest_jobs.execution_metadata` signals without emitting user ids,
-  conversation ids, prompts, or analytics events. A live 2026-06-16 run over the
-  last 24 hours returned `job_count=0`, `active_jobs=0`,
-  `deterministic_readout_fallbacks=0`, and `terminal_failures=0`.
+  conversation ids, prompts, or analytics events. A live 2026-06-16 run after
+  the authenticated canary returned `job_count=1`, `status_counts.succeeded=1`,
+  `active_jobs=0`, `deterministic_readout_fallbacks=0`,
+  `terminal_failures=0`, and `readout.llm_explain_stage_count=1`.
 - Closed locally in the readiness worktree: `.github/stale-backtest-jobs.sh`
   scans stale queued/running backtest jobs, reconciles terminal Render task runs
   through the existing backtest-job helper, and is invoked by
@@ -1458,10 +1464,11 @@ surfaces.
   2026-06-16: `api-status` reported real-workflow mode with dispatch/execution
   enabled, proof and real task IDs configured, backpressure limits present, and
   Render API key redacted-present.
-- Run warmup/canary. Warmup passed live on 2026-06-16 with API health,
+- Run warmup/canary. Closed live on 2026-06-16: warmup passed with API health,
   `/internal/readiness?force=true`, stale-job scan, frontend, and real-workflow
-  mode verification. Authenticated canary remains gated on
-  `ARGUS_CANARY_EMAIL` and `ARGUS_CANARY_PASSWORD`.
+  mode verification; the authenticated canary then passed confirmation,
+  structured `run_backtest`, async workflow completion, persisted messages,
+  Supabase verifier checks, result-summary route receipt, and LLM readout voice.
 - Keep issue 112 duplicate-read regression tests green until merge.
 - Add or document daily canary automation. Closed locally:
   `.github/workflows/private-alpha-canary.yml` runs the real-workflow warmup and

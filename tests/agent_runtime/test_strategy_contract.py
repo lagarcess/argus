@@ -273,6 +273,7 @@ def test_raw_semantic_date_windows_require_canonical_intent() -> None:
 
     for phrase in (
         "last month",
+        "last 3 months",
         "over 2024 and 2025",
         "in 2026 so far",
         "use the past year instead",
@@ -293,6 +294,20 @@ def test_raw_semantic_date_windows_require_canonical_intent() -> None:
 
     assert rolling is not None
     assert rolling.payload == {"start": "2026-05-01", "end": "2026-06-01"}
+
+
+def test_resolve_date_range_accepts_canonical_machine_tokens_only() -> None:
+    today = date(2026, 5, 3)
+
+    last_three_months = resolve_date_range("last_3_months", today=today)
+    ytd = resolve_date_range("year_to_date", today=today)
+
+    assert last_three_months.used_default is False
+    assert last_three_months.display == (
+        "past 3 months (February 3, 2026 - May 3, 2026)"
+    )
+    assert ytd.used_default is False
+    assert ytd.display == "year to date (January 1, 2026 - May 3, 2026)"
 
 
 def test_executable_date_range_prefers_canonical_intent_over_raw_semantic_text() -> None:

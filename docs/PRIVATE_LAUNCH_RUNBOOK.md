@@ -31,6 +31,11 @@ export ARGUS_CANARY_SUPABASE_URL="https://lgdhvepyrzbnscqssgqq.supabase.co"
 export ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="..."
 ```
 
+For local founder/operator runs, `.github/canary-render.sh` also accepts
+`MOCK_USER_EMAIL` / `MOCK_USER_PASSWORD` and `SUPABASE_URL` /
+`SUPABASE_SERVICE_ROLE_KEY` from the root `.env`. The `ARGUS_CANARY_*` names
+remain the preferred GitHub Actions secret names.
+
 7. Confirm the API is in real workflow tester mode. This mode keeps the API
    lean and sends `Run backtest` through the durable Render Workflow job path:
 

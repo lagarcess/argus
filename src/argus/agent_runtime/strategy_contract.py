@@ -217,6 +217,15 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
                 start=date(1900, 1, 1),
                 end=current_date,
             )
+        machine_resolution = _date_range_resolution_from_intent(
+            resolve_date_range_intent(
+                _canonical_machine_date_range_intent(value),
+                today=current_date,
+            ),
+            today=current_date,
+        )
+        if machine_resolution is not None:
+            return machine_resolution
     start = shift_months(current_date, -12)
     return DateRangeResolution(
         label="past year",
@@ -246,23 +255,12 @@ def resolve_executable_date_range(
         date_range_intent,
         today=current_date,
     )
-    if intent_resolution is not None:
-        start = _parse_date_token(
-            intent_resolution.payload.get("start"),
-            today=current_date,
-            endpoint="start",
-        )
-        end = _parse_date_token(
-            intent_resolution.payload.get("end"),
-            today=current_date,
-            endpoint="end",
-        )
-        if start is not None and end is not None:
-            return DateRangeResolution(
-                label=intent_resolution.label,
-                start=start,
-                end=end,
-            )
+    resolved_intent = _date_range_resolution_from_intent(
+        intent_resolution,
+        today=current_date,
+    )
+    if resolved_intent is not None:
+        return resolved_intent
 
     return explicit_resolution
 
@@ -291,6 +289,56 @@ def has_partial_explicit_date_range(value: Any) -> bool:
     start = _first_present_endpoint(value, "start", "from")
     end = _first_present_endpoint(value, "end", "to")
     return (start is not None) != (end is not None)
+
+
+def _canonical_machine_date_range_intent(value: str) -> dict[str, Any] | None:
+    raw = value.strip().lower()
+    if raw == "year_to_date":
+        return {"kind": "year_to_date", "anchor": "today", "confidence": 1.0}
+    if " " in raw:
+        return None
+    parts = raw.split("_")
+    if len(parts) != 3 or parts[0] not in {"last", "past"}:
+        return None
+    count = _int_or_none(parts[1])
+    if count is None or count <= 0:
+        return None
+    unit = parts[2][:-1] if parts[2].endswith("s") else parts[2]
+    if unit not in {"day", "week", "month", "quarter", "year"}:
+        return None
+    return {
+        "kind": "rolling_window",
+        "count": count,
+        "unit": unit,
+        "anchor": "today",
+        "confidence": 1.0,
+    }
+
+
+def _date_range_resolution_from_intent(
+    intent_resolution: Any,
+    *,
+    today: date,
+) -> DateRangeResolution | None:
+    if intent_resolution is None:
+        return None
+    start = _parse_date_token(
+        intent_resolution.payload.get("start"),
+        today=today,
+        endpoint="start",
+    )
+    end = _parse_date_token(
+        intent_resolution.payload.get("end"),
+        today=today,
+        endpoint="end",
+    )
+    if start is None or end is None:
+        return None
+    return DateRangeResolution(
+        label=intent_resolution.label,
+        start=start,
+        end=end,
+    )
 
 
 def _first_present_endpoint(value: dict[Any, Any], *keys: str) -> Any | None:
