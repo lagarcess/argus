@@ -1042,6 +1042,15 @@ Production-parity browser QA refresh on 2026-06-16:
   backend from `.github/qa.sh` on `http://127.0.0.1:8000` with Supabase
   persistence, live provider, strict fallback, and Postgres checkpoints;
   frontend from `web/.env.local` on `http://localhost:3000` with real auth.
+- Local API auth smoke after `a9bb9a2` confirmed an unlisted signup returns the
+  generic `400 auth_signup_failed` shape without private-alpha allowlist copy.
+  The matching test coverage still proves Supabase Auth signup is not called for
+  that blocked email.
+- Local proxy-header cookie smoke with the configured private-alpha tester
+  confirmed login sets redacted `sb-auth-token` and `sb-refresh-token` cookies
+  with `HttpOnly`, `Path=/`, `SameSite=lax`, and `Secure` when
+  `x-forwarded-proto: https` is present. Deployed cookie capture is still the
+  final gate after the readiness branch is deployed.
 - Real-auth login succeeded with the configured mock private-alpha tester
   credentials. The authenticated cold-start slate rendered current English and
   Spanish starter prompts without stale 2024 defaults.
