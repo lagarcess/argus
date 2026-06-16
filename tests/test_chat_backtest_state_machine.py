@@ -332,6 +332,100 @@ def test_runtime_backtest_run_persists_explicit_benchmark_from_envelope(
     assert run.config_snapshot["engine_config"] == engine_config
 
 
+def test_runtime_backtest_run_freezes_replay_snapshot_and_chart_payload() -> None:
+    from argus.api.chat.persistence import build_runtime_backtest_run
+
+    engine_config = {
+        "template": "rsi_mean_reversion",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2024-01-01",
+        "end_date": "2024-01-31",
+        "side": "long",
+        "starting_capital": 1000.0,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {"rsi_window": 14},
+    }
+    result_card = {
+        "title": "AAPL RSI",
+        "rows": [],
+        "metrics": [],
+        "assumptions": ["Benchmark: SPY"],
+        "chart": {
+            "kind": "portfolio_equity",
+            "series": [{"time": "2024-01-02", "value": 1000.0}],
+            "markers": [
+                {
+                    "time": "2024-01-02",
+                    "type": "entry",
+                    "label": "Buy AAPL",
+                    "symbols": ["AAPL"],
+                }
+            ],
+            "value_summary": {
+                "peak_value": 1000.0,
+                "lowest_value": 1000.0,
+                "currency": "USD",
+                "source": "strategy_portfolio_equity_close",
+            },
+        },
+        "actions": [
+            {
+                "type": "show_breakdown",
+                "payload": {"nested": {"source": "engine"}},
+            }
+        ],
+    }
+    envelope = {
+        "resolved_strategy": {
+            "strategy_type": "rsi_mean_reversion",
+            "symbol": "AAPL",
+            "asset_universe": ["AAPL"],
+        },
+        "resolved_parameters": {
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-01", "end": "2024-01-31"},
+            "benchmark_symbol": "SPY",
+            "engine_config": engine_config,
+        },
+        "metrics": {"aggregate": {"performance": {"total_return_pct": 4.2}}},
+        "benchmark_metrics": {"symbol": "SPY"},
+        "provider_metadata": {"provider": "alpaca", "coverage": {"bars": 21}},
+    }
+
+    run = build_runtime_backtest_run(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        result_card=result_card,
+        envelope=envelope,
+        classify_symbol_func=lambda symbol: SymbolAsset(
+            symbol=symbol.strip().upper(), asset_class="equity"
+        ),
+        default_benchmark_func=lambda _asset_class, _symbols: "SPY",
+    )
+    assert run is not None
+
+    engine_config["parameters"]["rsi_window"] = 21
+    envelope["resolved_parameters"]["date_range"]["start"] = "2023-01-01"
+    envelope["provider_metadata"]["coverage"]["bars"] = 0
+    result_card["chart"]["markers"][0]["label"] = "Mutated"
+    result_card["actions"][0]["payload"]["nested"]["source"] = "mutated"
+
+    assert run.config_snapshot["engine_config"]["parameters"]["rsi_window"] == 14
+    assert run.config_snapshot["resolved_parameters"]["date_range"]["start"] == (
+        "2024-01-01"
+    )
+    assert run.config_snapshot["provider_metadata"]["coverage"]["bars"] == 21
+    assert run.chart["markers"][0]["label"] == "Buy AAPL"
+    assert run.trades[0]["label"] == "Buy AAPL"
+    assert (
+        run.conversation_result_card["actions"][0]["payload"]["nested"]["source"]
+        == "engine"
+    )
+
+
 def test_chat_stream_final_payload_uses_engine_result_card_benchmark_contract(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

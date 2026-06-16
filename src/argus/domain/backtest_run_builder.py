@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -35,8 +36,8 @@ def enrich_result_card_actions(
     strategy_id: str | None,
     conversation_id: str,
 ) -> dict[str, Any]:
-    enriched = dict(result_card)
-    actions = result_card.get("actions")
+    enriched = deepcopy(result_card)
+    actions = enriched.get("actions")
     if not isinstance(actions, list):
         return enriched
 
@@ -92,11 +93,12 @@ def build_backtest_run_from_result(
     except Exception:
         asset_class = "equity"
 
+    resolved_strategy_snapshot = deepcopy(resolved_strategy)
     resolved_parameters_dict = (
-        dict(resolved_parameters) if isinstance(resolved_parameters, dict) else {}
+        deepcopy(resolved_parameters) if isinstance(resolved_parameters, dict) else {}
     )
     benchmark_metrics_dict = (
-        benchmark_metrics if isinstance(benchmark_metrics, dict) else None
+        deepcopy(benchmark_metrics) if isinstance(benchmark_metrics, dict) else None
     )
     benchmark_symbol = _explicit_benchmark_symbol(
         resolved_parameters=resolved_parameters_dict,
@@ -105,19 +107,19 @@ def build_backtest_run_from_result(
     resolved_parameters_dict.setdefault("benchmark_symbol", benchmark_symbol)
     provider_metadata = envelope.get("provider_metadata")
     config_snapshot = {
-        "template": resolved_strategy.get("strategy_type", "strategy"),
+        "template": resolved_strategy_snapshot.get("strategy_type", "strategy"),
         "symbols": symbols,
         "timeframe": resolved_parameters_dict.get("timeframe", "1D"),
         "date_range": resolved_parameters_dict.get("date_range"),
         "benchmark_symbol": benchmark_symbol,
-        "resolved_strategy": resolved_strategy,
+        "resolved_strategy": resolved_strategy_snapshot,
         "resolved_parameters": resolved_parameters_dict,
     }
     engine_config = resolved_parameters_dict.get("engine_config")
     if isinstance(engine_config, dict):
-        config_snapshot["engine_config"] = dict(engine_config)
+        config_snapshot["engine_config"] = deepcopy(engine_config)
     if isinstance(provider_metadata, dict):
-        config_snapshot["provider_metadata"] = dict(provider_metadata)
+        config_snapshot["provider_metadata"] = deepcopy(provider_metadata)
     enriched_result_card = enrich_result_card_actions(
         result_card=result_card,
         run_id=run_id,
@@ -126,10 +128,14 @@ def build_backtest_run_from_result(
     )
 
     chart = (
-        enriched_result_card.get("chart")
+        deepcopy(enriched_result_card.get("chart"))
         if isinstance(enriched_result_card.get("chart"), dict)
         else None
     )
+    if chart is not None:
+        enriched_result_card["chart"] = deepcopy(chart)
+    markers = chart.get("markers", []) if isinstance(chart, dict) else []
+    trades = deepcopy(markers) if isinstance(markers, list) else []
 
     return BacktestRun(
         id=run_id,
@@ -145,7 +151,7 @@ def build_backtest_run_from_result(
         conversation_result_card=enriched_result_card,
         created_at=(now_func or (lambda: datetime.now(timezone.utc)))(),
         chart=chart,
-        trades=list(chart.get("markers", [])) if isinstance(chart, dict) else [],
+        trades=trades,
     )
 
 

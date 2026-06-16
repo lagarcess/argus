@@ -56,6 +56,28 @@ def test_chart_markers_use_executed_fills_not_raw_signals() -> None:
     assert markers[0]["label"] == "Buy AAPL"
 
 
+def test_chart_markers_preserve_same_bar_fill_order_after_reentry() -> None:
+    index = pd.date_range("2024-01-01", periods=3, freq="D")
+    entries = pd.Series([True, True, False], index=index)
+    exits = pd.Series([False, True, False], index=index)
+    ledger = _build_long_only_execution_ledger(
+        symbol="AAPL",
+        entries=entries,
+        exits=exits,
+        allow_accumulation=False,
+    )
+    events: dict[str, dict[str, set[str]]] = {}
+
+    _collect_execution_fill_events(events, symbol="AAPL", execution_events=ledger)
+    markers = _chart_markers_from_events(events)
+
+    assert [(marker["time"], marker["type"]) for marker in markers] == [
+        ("2024-01-01", "entry"),
+        ("2024-01-02", "exit"),
+        ("2024-01-02", "entry"),
+    ]
+
+
 def test_long_only_ledger_blocks_duplicate_full_position_buys() -> None:
     index = pd.date_range("2024-01-01", periods=4, freq="D")
     entries = pd.Series([True, True, True, False], index=index)
