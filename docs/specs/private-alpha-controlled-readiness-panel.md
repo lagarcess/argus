@@ -906,10 +906,10 @@ Latest local verification on 2026-06-16:
 - `poetry run ruff check src tests workflows scripts` passed.
 - Focused Supabase security/API verification passed:
   `poetry run pytest tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py -q --no-cov`
-  returned 64 passed.
+  returned 67 passed after adding feedback raw-context bounds.
 - Broader readiness regression matrix passed:
   `poetry run pytest tests/test_environment_scripts.py tests/test_api_import_boundary.py tests/test_render_canary_script.py tests/test_render_runtime_compatibility.py tests/test_private_launch_hardening.py tests/test_checkpoint_rls_migration.py tests/test_ci_workflow.py tests/test_legacy_orchestrator_retirement.py tests/test_chat_backtest_state_machine.py tests/test_openrouter_policy.py tests/agent_runtime/test_execute_recovery.py tests/agent_runtime/test_spanish_runtime_transcripts.py tests/test_chat_runtime_reload_guardrails.py tests/section3/test_market_data_provider.py tests/test_alpha_artifacts.py tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py -q --no-cov`
-  returned 341 passed.
+  returned 344 passed.
 
 Latest Render verification on 2026-06-16:
 
@@ -1571,7 +1571,9 @@ surfaces.
 - Add feedback caps/context allowlist/url redaction. Closed locally in the
   readiness branch: `/feedback` now caps messages at 5,000 characters, keeps
   only known feedback context keys, converts browser URL/legacy path context to
-  safe `page_path`, and drops arbitrary nested browser blobs.
+  safe `page_path`, drops arbitrary nested browser blobs, and rejects raw
+  context payloads with too many top-level keys, excessive serialized size, or
+  deep nesting before quota checks or persistence.
 - Verify Supabase feedback persistence. Closed for the QA database on
   2026-06-16 after syncing the existing `usage_counters` resource constraint to
   include `feedback`; production-parity browser retry returned `/feedback` 200.

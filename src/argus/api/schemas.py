@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from argus.api.feedback_context import MAX_FEEDBACK_MESSAGE_LENGTH
+from argus.api.feedback_context import (
+    MAX_FEEDBACK_CONTEXT_DEPTH,
+    MAX_FEEDBACK_CONTEXT_KEYS,
+    MAX_FEEDBACK_CONTEXT_SERIALIZED_LENGTH,
+    MAX_FEEDBACK_MESSAGE_LENGTH,
+)
 
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
@@ -375,6 +381,30 @@ class FeedbackRequest(BaseModel):
     type: Literal["bug", "feature", "general", "account_deletion_request"]
     message: str = Field(min_length=1, max_length=MAX_FEEDBACK_MESSAGE_LENGTH)
     context: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("context")
+    @classmethod
+    def validate_context_bounds(cls, context: dict[str, Any]) -> dict[str, Any]:
+        if len(context) > MAX_FEEDBACK_CONTEXT_KEYS:
+            raise ValueError("feedback_context_too_many_keys")
+        if _context_depth(context) > MAX_FEEDBACK_CONTEXT_DEPTH:
+            raise ValueError("feedback_context_too_deep")
+        encoded = json.dumps(context, ensure_ascii=False, separators=(",", ":"))
+        if len(encoded.encode("utf-8")) > MAX_FEEDBACK_CONTEXT_SERIALIZED_LENGTH:
+            raise ValueError("feedback_context_too_large")
+        return context
+
+
+def _context_depth(value: Any) -> int:
+    if isinstance(value, dict):
+        if not value:
+            return 1
+        return 1 + max(_context_depth(item) for item in value.values())
+    if isinstance(value, list):
+        if not value:
+            return 1
+        return 1 + max(_context_depth(item) for item in value)
+    return 1
 
 
 class SignupRequest(BaseModel):

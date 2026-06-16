@@ -1015,6 +1015,51 @@ def test_feedback_rejects_oversized_message(mock_gateway):
     mock_gateway.create_feedback.assert_not_called()
 
 
+def test_feedback_rejects_oversized_context(mock_gateway):
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "general",
+            "message": "The private alpha flow feels clear.",
+            "context": {f"extra_{index}": "x" for index in range(40)},
+        },
+    )
+
+    assert response.status_code == 422
+    mock_gateway.create_feedback.assert_not_called()
+
+
+def test_feedback_rejects_deep_context(mock_gateway):
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "general",
+            "message": "The private alpha flow feels clear.",
+            "context": {"metadata": {"a": {"b": {"c": {"d": "too deep"}}}}},
+        },
+    )
+
+    assert response.status_code == 422
+    mock_gateway.create_feedback.assert_not_called()
+
+
+def test_feedback_rejects_large_serialized_context(mock_gateway):
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "general",
+            "message": "The private alpha flow feels clear.",
+            "context": {
+                "surface": "settings",
+                "metadata": {"path": "/chat", "blob": "x" * 9000},
+            },
+        },
+    )
+
+    assert response.status_code == 422
+    mock_gateway.create_feedback.assert_not_called()
+
+
 def test_feedback_quota_exceeded_returns_retry_after(mock_gateway):
     mock_gateway.check_and_increment_usage.side_effect = QuotaExceededError(
         "Quota exceeded for feedback (hour)"
