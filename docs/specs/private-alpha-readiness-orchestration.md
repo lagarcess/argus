@@ -3,7 +3,7 @@
 Status: Active coordination note
 Date: 2026-06-16
 Branch: `codex/private-alpha-readiness-clean`
-Checkpoint: `b606429 docs(readiness): record production parity feedback proof`
+Checkpoint: `ba62439 docs(readiness): record auth smoke evidence`
 Audience: Codex release captain, bounded subagents, reviewers
 
 ## Mission
