@@ -876,7 +876,7 @@ Latest local verification on 2026-06-15:
   date-range-display, confirmation-display, and result-card playground tests
   passed.
 
-Latest Render verification on 2026-06-15:
+Latest Render verification on 2026-06-16:
 
 - `.github/render-env-sync.sh api-status` reported real-workflow mode:
   dispatch/shadow enabled, `ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true`,
@@ -884,7 +884,9 @@ Latest Render verification on 2026-06-15:
   `argus-backtests/workflow_proof`, backpressure limits present, and Render API
   key redacted-present.
 - `.github/warmup-render.sh --expect-mode real-workflow` passed after normal
-  cold-start retries for API health, product readiness, and frontend.
+  cold-start retries for API health, product readiness, and frontend. During the
+  same run, the stale queued/running backtest job scan returned
+  `status=ready`, `scanned_count=0`, `stale_count=0`, and `unresolved_count=0`.
 - `.github/canary-render.sh` was not run because this worktree environment is
   missing `ARGUS_CANARY_EMAIL` and `ARGUS_CANARY_PASSWORD`. The authenticated
   canary remains the next deployed proof gate.
@@ -1406,8 +1408,14 @@ surfaces.
 
 ### Slice 5: Workflow And Observability Gate
 
-- Verify Render env status command.
-- Run warmup/canary.
+- Verify Render env status command. Closed for the current deployed config on
+  2026-06-16: `api-status` reported real-workflow mode with dispatch/execution
+  enabled, proof and real task IDs configured, backpressure limits present, and
+  Render API key redacted-present.
+- Run warmup/canary. Warmup passed live on 2026-06-16 with API health,
+  `/internal/readiness?force=true`, stale-job scan, frontend, and real-workflow
+  mode verification. Authenticated canary remains gated on
+  `ARGUS_CANARY_EMAIL` and `ARGUS_CANARY_PASSWORD`.
 - Keep issue 112 duplicate-read regression tests green until merge.
 - Add or document daily canary automation.
 - Add stale job scan. Closed locally in the readiness branch:
