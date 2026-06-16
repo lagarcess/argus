@@ -1325,6 +1325,23 @@ Production-parity browser QA refresh on 2026-06-16:
   the user-facing breakdown still rendered. Browser CDP screenshot capture
   timed out on the chart page, so this pass is recorded from DOM state, browser
   logs, and backend logs rather than a fresh screenshot artifact.
+- Fresh in-app Browser QA after confirming the root `.env` and `web/.env.local`
+  files are present restarted `.github/qa.sh` and `cd web && bun run dev` on the
+  default QA ports. The real-auth browser session reached Spanish `/chat` and
+  conversation `d4c4c1b8-a6a0-4f11-a881-5b48d0558af8` with no Browser console
+  warnings or errors. The prompt `Prueba una estrategia de comprar y mantener
+  AAPL y MSFT con pesos iguales desde el 1 de enero de 2025 hasta el 5 de junio
+  de 2026 con 10000 dolares` produced a Spanish confirmation with `AAPL`,
+  `MSFT`, `$10,000`, `1 ene 2025 -> 5 jun 2026`, `SPY`, `Ejecutar backtest`,
+  and localized edit/cancel actions. Clicking `Ejecutar backtest` transitioned
+  through `Ejecutando` to `Ejecucion completa` and rendered the result card,
+  TradingView chart attribution, final value `$11,284`, `+12.8%` total return,
+  SPY `+26.1%`, underperformance by `13.3` points, max drawdown `-23.8%`,
+  confidence context, `Explicar resultado`, `Ajustar idea`, and Spanish
+  `Resumen rapido`. Backend logs showed OpenRouter route receipts plus one
+  `result_summary` primary-model timeout that recovered through the configured
+  fallback model. Browser CDP screenshot capture still timed out, so this pass
+  is recorded from DOM state, Browser console logs, and backend logs.
 - QA observation from the adjust-assumptions smoke: a separate natural
   `past year` prompt first asked for an exact date range, then a date answer hit
   the existing strict interpreter-unavailable recovery after live OpenRouter
