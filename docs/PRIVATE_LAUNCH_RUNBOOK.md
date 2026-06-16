@@ -65,6 +65,13 @@ After the readiness branch is deployed, rerun the same strict canary in Spanish:
 ARGUS_CANARY_LANGUAGE=es-419 ARGUS_CANARY_PROMPT='Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 con 10000 dolares' .github/canary-render.sh
 ```
 
+Before treating local UI changes as launch-ready, also run the browser recovery
+spec against the local app/API environment:
+
+```bash
+cd web && bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium
+```
+
 Only send the app URL to testers after both scripts pass. If warmup fails, do
 not invite testers yet. Check Render service status and redeploy only if the
 service is stuck. If warmup passes but the canary fails, treat it as an Argus
@@ -158,6 +165,22 @@ Use an allowlisted account and verify:
   Quick take.
 - Reloading the page preserves the conversation, job state, and result.
 - Feedback can be submitted.
+
+## Founder-Facing Tester Notes
+
+Before sending the URL, make sure tester instructions say:
+
+- Argus Alpha provides educational historical simulations only, not investment,
+  tax, legal, brokerage, or execution advice.
+- Alpha backtests are intentionally narrow: same-asset runs only, long-only,
+  equal-weight multi-symbol logic, max 5 symbols, and daily bars.
+- Market or benchmark data can be unavailable. If that happens, retry the same
+  setup, change the dates, or choose a different supported asset/benchmark.
+- Feedback buttons and the feedback dialog are the primary first-session
+  listening channel. PostHog/product analytics stay disabled until the
+  privacy-safe event taxonomy, redaction, and consent posture are approved.
+- Terms, Privacy Policy, and explicit alpha consent remain a founder-owned gate
+  before inviting users outside the private circle.
 
 ## Supabase Persistence Check
 
