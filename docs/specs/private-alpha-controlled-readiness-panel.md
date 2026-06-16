@@ -1745,6 +1745,10 @@ surfaces.
   launch runbook smoke test: the final checklist now requires visible current
   starter chips, no default 2024 references, and a clicked starter entering the
   normal chat runtime.
+- Tighten the founder/operator smoke checklist for exposed artifact actions.
+  Closed locally: the private launch runbook now requires `Run backtest`,
+  `Change dates`, `Change asset`, `Adjust assumptions`, `Cancel`, result
+  `Quick take`, `Explain result`, structured retry, reload, and feedback checks.
 - Update founder observation sheet to track whether starters feel current and
   approachable. Closed locally in this readiness panel.
 

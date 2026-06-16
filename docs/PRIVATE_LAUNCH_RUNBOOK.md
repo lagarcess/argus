@@ -157,12 +157,21 @@ Use an allowlisted account and verify:
 - Clicking a cold-start starter chip submits a natural-language prompt into the
   normal chat runtime.
 - A Spanish prompt reaches confirmation without coaching or manual translation.
-- A date edit from an active confirmation updates the confirmation/result period
-  before execution, for example Jan 1, 2025 to Apr 1, 2025.
+- Confirmation actions stay card-scoped and structured:
+  - `Run backtest` starts the supported job path.
+  - `Change dates` updates the confirmation/result period before execution, for
+    example Jan 1, 2025 to Apr 1, 2025.
+  - `Change asset` preserves the explicit period, capital, and benchmark while
+    changing the symbol.
+  - `Adjust assumptions` preserves the explicit period, symbol, and benchmark
+    while changing the assumption being edited.
+  - `Cancel` marks the draft canceled and removes the executable action.
 - A supported backtest completes and shows a result card.
 - The result includes a readable Quick take.
 - Explain result opens a deeper card-scoped explanation without replacing the
   Quick take.
+- Retry preserves the failed setup and recovers through a structured action, not
+  duplicated user text.
 - Reloading the page preserves the conversation, job state, and result.
 - Feedback can be submitted.
 
