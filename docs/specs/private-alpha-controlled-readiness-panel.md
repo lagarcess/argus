@@ -1252,33 +1252,48 @@ Relevant code:
 - `web/components/feedback/FeedbackDialog.tsx`
 - `web/lib/chat-message-feedback-context.ts`
 
-### Gaps
+### Closed Locally For Readiness Branch
 
-- Feedback payload lacks hard backend length caps.
-- Feedback context accepts arbitrary client keys.
-- Frontend sends full `window.location.href`, including query/hash.
-- "Learn more" in the feedback footer is not wired to the Privacy Policy.
+- Feedback messages are capped at 5,000 characters and oversized messages are
+  rejected before persistence.
+- Feedback context is bounded by known keys, nesting depth, serialized size,
+  and raw top-level key count.
+- Browser URL/path context is reduced to origin plus pathname; query and hash
+  values are dropped before persistence.
+- Feedback submissions are quota-protected with daily/hourly limits and a
+  `Retry-After` response when exhausted.
+- Supabase feedback persistence, user ownership, URL redaction, quota handling,
+  and context/message caps are covered by local API tests and QA-mode smoke
+  evidence.
+
+### Remaining Founder-Gated Gaps
+
+- "Learn more" in the feedback footer is not wired to the Privacy Policy; this
+  stays blocked by the no-touch legal/privacy slice.
 - Account deletion request enriches context with email/user id, so this path
-  needs privacy disclosure and access discipline.
+  still needs privacy disclosure and access discipline before broader use.
 - No attachment upload exists, which is good for alpha, but UI wording should
-  not imply attachments are stored if they are only counted.
+  remain honest that attachments are counted rather than stored.
+- PostHog remains disabled until consent/privacy event taxonomy is approved.
 
 ### Controlled Alpha Feedback Plan
 
 Before users:
 
-- Add backend caps:
-  - message length;
-  - context JSON byte size;
-  - context key allowlist;
-  - per-user feedback rate limit.
-- Redact feedback URLs:
-  - origin + pathname is enough;
-  - drop query and hash.
 - Keep file uploads disabled.
-- Make feedback footer "Learn more" link to Privacy Policy.
 - Verify Supabase persistence with the launch runbook count query before and
   after a feedback submission.
+- Confirm founder-facing tester notes tell users the feedback dialog and thumbs
+  are the primary listening channel.
+- Do not enable PostHog or any product analytics capture during the readiness
+  launch gate.
+
+Founder-gated follow-up:
+
+- Make feedback footer "Learn more" link to Privacy Policy once legal/privacy
+  pages are approved.
+- Decide the account deletion request disclosure and access process with the
+  legal/privacy slice.
 
 During alpha:
 
