@@ -245,7 +245,9 @@ async def _generate_clarifying_question(
         return offline_clarification_fallback(
             language=language,
             response_intent=response_intent,
-            strategy=state.candidate_strategy_draft,
+            strategy=state.candidate_strategy_draft
+            if state.candidate_strategy_draft is not None
+            else None,
         )
     request = ClarificationRequest(
         current_user_message=state.current_user_message,
@@ -268,7 +270,9 @@ async def _generate_clarifying_question(
     return question or offline_clarification_fallback(
         language=language,
         response_intent=response_intent,
-        strategy=state.candidate_strategy_draft,
+        strategy=state.candidate_strategy_draft
+        if state.candidate_strategy_draft is not None
+        else None,
     )
 
 
