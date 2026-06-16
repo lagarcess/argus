@@ -1119,13 +1119,25 @@ Production-parity browser QA refresh on 2026-06-16:
   card actions, and a final reload hydrated the old card as `Updated` plus the
   new `$5,000` confirmation. In-app browser console inspection returned no
   warnings or errors.
-- QA observation from the same run: a separate natural `past year` prompt first
-  asked for an exact date range, then a date answer hit the existing strict
-  interpreter-unavailable recovery after live OpenRouter interpretation
-  fallbacks failed. This was not patched in this action-ownership slice because
-  the current runtime tests intentionally refuse deterministic date parsing when
-  the structured interpreter is unavailable; keep the deployed strict canary and
-  provider-health gate as the release authority for that path.
+- Additional QA-mode Spanish browser smoke after the date-edit recovery
+  checkpoint used the same root `.env` and `web/.env.local` stack. Live QA
+  initially reproduced a Spanish `Cambiar fechas` regression where answering
+  `Usa del 1 de febrero de 2025 al 1 de mayo de 2025` after reload either
+  regenerated the stale Jan-Apr confirmation or asked an unrelated follow-up.
+  The runtime now repairs only active pending date answers after LLM
+  interpretation, using the current message's parsed date range when the LLM
+  omits or echoes the stale date. Focused regressions cover stale, missing, and
+  reload-thinned metadata shapes, and the final in-app browser pass regenerated
+  the Spanish AAPL confirmation with `1 feb 2025 -> 1 may 2025` plus localized
+  card actions, then hydrated that corrected card after reload.
+- QA observation from the adjust-assumptions smoke: a separate natural
+  `past year` prompt first asked for an exact date range, then a date answer hit
+  the existing strict interpreter-unavailable recovery after live OpenRouter
+  interpretation fallbacks failed. This was not patched in that
+  action-ownership slice because the current runtime tests intentionally refuse
+  deterministic date parsing when the structured interpreter is unavailable;
+  keep the deployed strict canary and provider-health gate as the release
+  authority for that path.
 
 ### Daily Automation Candidates
 

@@ -4140,6 +4140,190 @@ def test_pending_date_edit_uses_full_current_message_month_span(
     assert strategy.cadence == "weekly"
 
 
+def test_pending_spanish_date_answer_repairs_stale_llm_noop_date_range(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior_date_range = {"start": "2025-01-01", "end": "2025-04-01"}
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Compra y conserva AAPL.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range=prior_date_range,
+            capital_amount=10000,
+            comparison_baseline="SPY",
+        )
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User answered the pending date question.",
+            candidate_strategy_draft=StrategySummary(
+                date_range=prior_date_range,
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "Usa del 1 de febrero de 2025 al 1 de mayo de 2025"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == {"start": "2025-02-01", "end": "2025-05-01"}
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.capital_amount == 10000
+    assert strategy.comparison_baseline == "SPY"
+    assert "pending_date_answer_current_message_repaired" in (
+        result.decision.reason_codes
+    )
+    assert "pending_date_edit_noop_rejected" not in result.decision.reason_codes
+
+
+def test_pending_spanish_date_answer_repairs_missing_llm_date_range(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior_date_range = {"start": "2025-01-01", "end": "2025-04-01"}
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Compra y conserva AAPL.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range=prior_date_range,
+            capital_amount=10000,
+            comparison_baseline="SPY",
+        )
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User answered the pending date question.",
+            candidate_strategy_draft=StrategySummary(),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "Usa del 1 de febrero de 2025 al 1 de mayo de 2025"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == {"start": "2025-02-01", "end": "2025-05-01"}
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.capital_amount == 10000
+    assert strategy.comparison_baseline == "SPY"
+    assert "pending_date_answer_current_message_repaired" in (
+        result.decision.reason_codes
+    )
+    assert "pending_date_edit_noop_rejected" not in result.decision.reason_codes
+
+
+def test_pending_spanish_date_answer_repairs_reload_thinned_metadata(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior_date_range = {"start": "2025-01-01", "end": "2025-04-01"}
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Compra y conserva AAPL.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range=prior_date_range,
+            capital_amount=10000,
+            comparison_baseline="SPY",
+        )
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="conversation_followup",
+            task_relation="continue",
+            requires_clarification=True,
+            assistant_response=(
+                "¿Quieres comparar este periodo con una estrategia de compra "
+                "y mantenimiento simple?"
+            ),
+            user_goal_summary="User answered with a date range.",
+            candidate_strategy_draft=StrategySummary(),
+            semantic_turn_act="educational_question",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "Usa del 1 de febrero de 2025 al 1 de mayo de 2025"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={"requested_field": "date_range"},
+        structured_interpreter=interpreter,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == {"start": "2025-02-01", "end": "2025-05-01"}
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.capital_amount == 10000
+    assert strategy.comparison_baseline == "SPY"
+    assert "pending_date_answer_route_repaired" in result.decision.reason_codes
+    assert "pending_date_edit_noop_rejected" not in result.decision.reason_codes
+
+
 def test_pending_date_edit_preserves_dca_recurring_contribution_role(
     monkeypatch,
 ) -> None:

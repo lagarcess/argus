@@ -2727,6 +2727,98 @@ def test_structured_retry_action_after_reload_carries_failed_action_reference(
     assert reference.metadata["launch_payload"] == launch_payload
 
 
+def test_spanish_structured_retry_prefers_failed_action_over_stale_confirmation(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Recupere la prueba fallida.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "AAPL",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "date_range": {"start": "2025-01-01", "end": "2025-04-01"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 10000,
+        "benchmark_symbol": "SPY",
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Tengo una confirmacion anterior para AAPL.",
+        metadata=_confirmation_metadata(),
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="La ejecucion fallo, pero puedes reintentarla.",
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "failed_action": {
+                "artifact_id": "failed-aapl-es",
+                "action_type": "run_backtest",
+                "launch_payload": launch_payload,
+                "failure_classification": "upstream_dependency_error",
+                "error": "market_data_unavailable",
+                "retryable": True,
+            },
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "retry_failed_action",
+                "label": "Reintentar",
+                "labelKey": "common.retry",
+                "payload": {"failed_action_id": "failed-aapl-es"},
+            },
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["user"].language_preference == "es-419"
+    assert captured["action_context"]["type"] == "retry_failed_action"
+    assert captured["action_context"]["payload"] == {
+        "failed_action_id": "failed-aapl-es"
+    }
+    assert captured["fallback_selected_thread_metadata"] == {
+        "latest_task_type": "backtest_execution",
+        "last_stage_outcome": "execution_failed_recoverably",
+        "fallback_source": "failed_action_metadata",
+    }
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.pending_strategy_summary is None
+    assert snapshot.active_confirmation_reference is None
+    reference = snapshot.latest_failed_action_reference
+    assert reference is not None
+    assert reference.artifact_id == "failed-aapl-es"
+    assert reference.metadata["launch_payload"] == launch_payload
+
+
 def test_failed_action_fallback_is_superseded_by_newer_completed_result() -> None:
     from argus.api import state as api_state
     from argus.api.chat.recovery import failed_action_metadata_fallback_context

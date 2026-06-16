@@ -8,9 +8,11 @@ const CREATED_AT = "2026-06-16T12:00:00Z";
 type StreamRequest = {
   conversation_id: string;
   message?: string;
+  language?: string;
   action?: {
     type: string;
     label?: string;
+    labelKey?: string;
     payload?: Record<string, unknown>;
     presentation?: string;
   };
@@ -30,7 +32,11 @@ type MockChatApi = {
   feedbackRequests: Array<Record<string, unknown>>;
 };
 
-function baseConversation() {
+type MockChatApiOptions = {
+  language?: "en" | "es-419";
+};
+
+function baseConversation(language = "en") {
   return {
     id: CONVERSATION_ID,
     title: "AAPL readiness",
@@ -39,7 +45,24 @@ function baseConversation() {
     archived: false,
     created_at: CREATED_AT,
     updated_at: CREATED_AT,
-    language: "en",
+    language,
+  };
+}
+
+function mockUser(language = "en") {
+  return {
+    id: "dev-user",
+    email: "dev@example.com",
+    username: "dev",
+    display_name: "Mock Developer",
+    language,
+    locale: language === "es-419" ? "es-419" : "en-US",
+    onboarding: {
+      completed: true,
+      stage: "completed",
+      language_confirmed: true,
+      primary_goal: "test_stock_idea",
+    },
   };
 }
 
@@ -227,7 +250,21 @@ function persistedAssistantMessage(
   };
 }
 
-async function mockChatApi(page: Page): Promise<MockChatApi> {
+async function mockChatApi(
+  page: Page,
+  options: MockChatApiOptions = {},
+): Promise<MockChatApi> {
+  const language = options.language ?? "en";
+  const retryPrompt =
+    language === "es-419" ? "Provocar reintento" : "Trigger retry case";
+  const retryErrorMessage =
+    language === "es-419"
+      ? "Los datos de mercado tardaron demasiado"
+      : "Market data timed out";
+  const retrySuccessMessage =
+    language === "es-419"
+      ? "Recuperado despues de reintentar."
+      : "Recovered after retry.";
   const streamRequests: StreamRequest[] = [];
   const feedbackRequests: Array<Record<string, unknown>> = [];
   const messages: ApiMessage[] = [];
@@ -286,20 +323,7 @@ async function mockChatApi(page: Page): Promise<MockChatApi> {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          user: {
-            id: "dev-user",
-            email: "dev@example.com",
-            username: "dev",
-            display_name: "Mock Developer",
-            language: "en",
-            locale: "en-US",
-            onboarding: {
-              completed: true,
-              stage: "completed",
-              language_confirmed: true,
-              primary_goal: "test_stock_idea",
-            },
-          },
+          user: mockUser(language),
         }),
       });
     }
@@ -307,20 +331,7 @@ async function mockChatApi(page: Page): Promise<MockChatApi> {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        user: {
-          id: "dev-user",
-          email: "dev@example.com",
-          username: "dev",
-          display_name: "Mock Developer",
-          language: "en",
-          locale: "en-US",
-          onboarding: {
-            completed: true,
-            stage: "completed",
-            language_confirmed: true,
-            primary_goal: "test_stock_idea",
-          },
-        },
+        user: mockUser(language),
       }),
     });
   });
@@ -338,13 +349,13 @@ async function mockChatApi(page: Page): Promise<MockChatApi> {
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ conversation: baseConversation() }),
+        body: JSON.stringify({ conversation: baseConversation(language) }),
       });
     }
     return route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ items: [baseConversation()], next_cursor: null }),
+      body: JSON.stringify({ items: [baseConversation(language)], next_cursor: null }),
     });
   });
 
@@ -390,25 +401,49 @@ async function mockChatApi(page: Page): Promise<MockChatApi> {
     const body = route.request().postDataJSON() as StreamRequest;
     streamRequests.push(body);
 
-    if (body.message === "Trigger retry case") {
+    if (body.message === retryPrompt) {
       retryAttempts += 1;
       if (retryAttempts === 1) {
+        messages.splice(
+          0,
+          messages.length,
+          persistedUserMessage("msg-user-retry", retryPrompt),
+          persistedAssistantMessage("msg-retry-error", retryErrorMessage, {
+            retry_last_turn: { message: retryPrompt },
+            recovery: {
+              code: "runtime_failure",
+              retryable: true,
+              language,
+            },
+          }),
+        );
         return fulfillSse(route, [
           {
             type: "error",
             code: "market_data_timeout",
-            message: "Market data timed out",
+            message: retryErrorMessage,
             message_id: "msg-retry-error",
-            retry_last_turn: { message: "Trigger retry case" },
+            retry_last_turn: { message: retryPrompt },
+            recovery: {
+              code: "runtime_failure",
+              retryable: true,
+              language,
+            },
           },
         ]);
       }
+      messages.splice(
+        0,
+        messages.length,
+        persistedUserMessage("msg-user-retry", retryPrompt),
+        persistedAssistantMessage("msg-retry-success", retrySuccessMessage),
+      );
       return fulfillSse(route, [
         {
           type: "final",
           payload: {
             stage_outcome: "ready_to_respond",
-            assistant_response: "Recovered after retry.",
+            assistant_response: retrySuccessMessage,
             message_id: "msg-retry-success",
           },
         },
@@ -487,12 +522,16 @@ async function mockChatApi(page: Page): Promise<MockChatApi> {
       body.action?.type === "change_asset" ||
       body.action?.type === "adjust_assumptions"
     ) {
+      const actionPrompt =
+        language === "es-419"
+          ? "Claro, dime el cambio que quieres hacer."
+          : `Sure, tell me the ${body.action.type.replace("_", " ")} update.`;
       return fulfillSse(route, [
         {
           type: "final",
           payload: {
             stage_outcome: "await_user_reply",
-            assistant_response: `Sure, tell me the ${body.action.type.replace("_", " ")} update.`,
+            assistant_response: actionPrompt,
             message_id: `msg-${body.action.type}`,
           },
         },
@@ -519,12 +558,16 @@ async function mockChatApi(page: Page): Promise<MockChatApi> {
   return { streamRequests, feedbackRequests };
 }
 
-async function startConfirmation(page: Page, prompt: string) {
+async function startConfirmation(
+  page: Page,
+  prompt: string,
+  runLabel = "Run backtest",
+) {
   await page.goto("/chat", { waitUntil: "networkidle" });
   await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 15_000 });
   await page.getByTestId("chat-input").fill(prompt);
   await page.getByTestId("chat-send").click();
-  await expect(page.getByRole("button", { name: "Run backtest" })).toBeVisible();
+  await expect(page.getByRole("button", { name: runLabel })).toBeVisible();
 }
 
 test("confirmation actions stream structured action payloads from the browser", async ({ page }) => {
@@ -616,4 +659,52 @@ test("retry action recovers a failed stream without duplicating user input", asy
     "Trigger retry case",
     "Trigger retry case",
   ]);
+});
+
+test("Spanish action recovery localizes retry after reload and feedback controls", async ({
+  page,
+}) => {
+  const api = await mockChatApi(page, { language: "es-419" });
+  await startConfirmation(
+    page,
+    "Compra y conserva AAPL con SPY al inicio de 2025.",
+    "Ejecutar backtest",
+  );
+
+  await expect(page.getByRole("button", { name: "Cambiar fechas" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cambiar activo" })).toBeVisible();
+
+  const previousRequestCount = api.streamRequests.length;
+  await page.getByRole("button", { name: "Cambiar fechas" }).click();
+  await expect.poll(() => api.streamRequests.length).toBe(previousRequestCount + 1);
+  expect(api.streamRequests.at(-1)?.language).toBe("es-419");
+  expect(api.streamRequests.at(-1)?.action?.type).toBe("change_dates");
+  await expect(page.getByText("Claro, dime el cambio que quieres hacer.")).toBeVisible();
+
+  await page.getByTestId("chat-input").fill("Provocar reintento");
+  await page.getByTestId("chat-send").click();
+  await expect(page.getByText("Los datos de mercado tardaron demasiado")).toBeVisible();
+  await page.getByRole("button", { name: "Reintentar" }).click();
+  await expect(page.getByText("Recuperado despues de reintentar.")).toBeVisible();
+
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByText("Recuperado despues de reintentar.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reintentar" })).toHaveCount(0);
+
+  await page.getByLabel(/acciones/i).last().click();
+  const reportIssue = page.getByRole("menuitem", { name: "Reportar problema" });
+  await expect(reportIssue).toBeVisible();
+  await reportIssue.click();
+  await expect(
+    page.getByRole("heading", { name: "Enviar comentarios" }),
+  ).toBeVisible();
+  await page.getByPlaceholder(/problema/i).fill("QA de recuperacion en espanol");
+  await page
+    .getByPlaceholder(/1\. Ve a/)
+    .fill("1. Provocar un reintento\n2. Reintentar\n3. Recargar el chat");
+  await page.getByLabel(/Autorizo al equipo/).check();
+  await page.getByRole("button", { name: "Enviar comentarios" }).click();
+  await expect(page.getByText("Comentarios enviados.")).toBeVisible();
+  await expect.poll(() => api.feedbackRequests.length).toBe(1);
+  expect(api.feedbackRequests[0].type).toBe("bug");
 });

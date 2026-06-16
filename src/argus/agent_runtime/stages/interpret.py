@@ -286,7 +286,10 @@ def _pending_date_answer_route_repair_interpretation(
         return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
-    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+    if snapshot.latest_backtest_result_reference is not None:
+        return None
+    last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
+    if last_stage_outcome and last_stage_outcome != "await_user_reply":
         return None
     prior = _active_strategy_from_snapshot(snapshot)
     if prior is None:
@@ -407,6 +410,13 @@ async def _stage_result_from_interpretation(
         selected_thread_metadata=selected_thread_metadata,
     )
     interpretation = _repair_pending_date_answer_route_when_pending_need_is_active(
+        interpretation=interpretation,
+        current_user_message=state.current_user_message,
+        language=user.language_preference,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    interpretation = _repair_pending_date_answer_noop_from_current_message(
         interpretation=interpretation,
         current_user_message=state.current_user_message,
         language=user.language_preference,
@@ -1473,7 +1483,10 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
 ) -> StructuredInterpretation:
-    if interpretation.semantic_turn_act == "answer_pending_need":
+    if (
+        interpretation.semantic_turn_act == "answer_pending_need"
+        and not interpretation.requires_clarification
+    ):
         return interpretation
     if _candidate_strategy_has_backtest_shape(interpretation.candidate_strategy_draft):
         return interpretation
@@ -1482,7 +1495,8 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     )
     if requested_field != "date_range":
         return interpretation
-    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+    last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
+    if last_stage_outcome and last_stage_outcome != "await_user_reply":
         return interpretation
     repaired = _pending_date_answer_route_repair_interpretation(
         current_user_message=current_user_message,
@@ -1493,6 +1507,85 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     if repaired is None:
         return interpretation
     return repaired
+
+
+def _repair_pending_date_answer_noop_from_current_message(
+    *,
+    interpretation: StructuredInterpretation,
+    current_user_message: str,
+    language: str | None,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+) -> StructuredInterpretation:
+    if interpretation.semantic_turn_act != "answer_pending_need":
+        return interpretation
+    if interpretation.requires_clarification:
+        return interpretation
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "date_range":
+        return interpretation
+    last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
+    if last_stage_outcome and last_stage_outcome != "await_user_reply":
+        return interpretation
+    prior = _active_strategy_from_snapshot(snapshot)
+    if prior is None:
+        return interpretation
+    prior_endpoints = _date_range_endpoints(prior.date_range)
+    if prior_endpoints is None or not all(prior_endpoints):
+        return interpretation
+    candidate = interpretation.candidate_strategy_draft
+    candidate_endpoints = _date_range_endpoints(candidate.date_range)
+    if candidate_endpoints is not None and candidate_endpoints != prior_endpoints:
+        return interpretation
+    text = current_user_message.strip()
+    if not text:
+        return interpretation
+    resolved_range = resolve_date_range_text(
+        text,
+        today=date.today(),
+        languages=dateparser_languages_for_user_language(language),
+    )
+    if resolved_range is None:
+        return interpretation
+    repaired_date_range = resolved_range.payload
+    if _date_range_endpoints(repaired_date_range) == prior_endpoints:
+        return interpretation
+    extra_parameters = dict(candidate.extra_parameters)
+    evidence_spans = extra_parameters.get("evidence_spans")
+    if not isinstance(evidence_spans, dict):
+        evidence_spans = {}
+    extra_parameters.update(
+        {
+            "date_range_raw_text": text,
+            "date_range_intent": {
+                "kind": "explicit_range",
+                "start": repaired_date_range["start"],
+                "end": repaired_date_range["end"],
+                "confidence": 0.9,
+                "evidence": text,
+            },
+            "evidence_spans": {
+                **evidence_spans,
+                "date_range": text,
+            },
+        }
+    )
+    return interpretation.model_copy(
+        update={
+            "candidate_strategy_draft": candidate.model_copy(
+                update={
+                    "date_range": repaired_date_range,
+                    "extra_parameters": extra_parameters,
+                }
+            ),
+            "reason_codes": [
+                *interpretation.reason_codes,
+                "pending_date_answer_current_message_repaired",
+            ],
+        }
+    )
 
 
 def _validated_artifact_target(
