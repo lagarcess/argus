@@ -902,9 +902,19 @@ Latest local verification on 2026-06-15:
 - Web cold-start/card smoke: `alpha-frontend`, Spanish UI smoke,
   date-range-display, confirmation-display, and result-card playground tests
   passed.
+- Browser launch-smoke coverage now includes
+  `web/e2e/chat-action-recovery.spec.ts::private-alpha readiness smoke covers starter, Spanish edit, result, reload, retry, and feedback`,
+  which exercises Spanish starter chips, the normal chat runtime, confirmation
+  date edit, run/result, Quick take, reload hydration, feedback, Explain
+  result, and localized retry in one deterministic Playwright path.
 
 Latest local verification on 2026-06-16:
 
+- `cd web && bun run test:e2e chat-action-recovery.spec.ts onboarding.spec.ts --project=chromium`
+  returned 11 passed for the affected browser recovery, readiness-smoke, and
+  private-alpha onboarding specs. The auth form render test still logs expected
+  unreachable-API noise because that specific page-render test does not mock
+  `/me`.
 - `poetry run ruff check src tests workflows scripts` passed.
 - Focused Supabase security/API verification passed:
   `poetry run pytest tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py -q --no-cov`

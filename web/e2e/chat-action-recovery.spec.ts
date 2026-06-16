@@ -36,6 +36,24 @@ type MockChatApiOptions = {
   language?: "en" | "es-419";
 };
 
+type MockDateRange = {
+  start: string;
+  end: string;
+  display: string;
+};
+
+const DEFAULT_DATE_RANGE: MockDateRange = {
+  start: "2025-01-01",
+  end: "2025-04-01",
+  display: "January 1, 2025 to April 1, 2025",
+};
+
+const UPDATED_DATE_RANGE: MockDateRange = {
+  start: "2025-02-01",
+  end: "2025-05-01",
+  display: "February 1, 2025 to May 1, 2025",
+};
+
 function baseConversation(language = "en") {
   return {
     id: CONVERSATION_ID,
@@ -80,7 +98,7 @@ function confirmationAction(type: string, label: string) {
   };
 }
 
-function confirmationCard() {
+function confirmationCard(dateRange: MockDateRange = DEFAULT_DATE_RANGE) {
   return {
     confirmation_id: CONFIRMATION_ID,
     confirmation_state: "active",
@@ -90,18 +108,14 @@ function confirmationCard() {
     statusLabel: "Ready to run",
     strategy_type: "buy_and_hold",
     asset_class: "equity",
-    date_range: {
-      start: "2025-01-01",
-      end: "2025-04-01",
-      display: "January 1, 2025 to April 1, 2025",
-    },
+    date_range: dateRange,
     rows: [
       { key: "strategy", label: "Strategy", value: "Buy and hold" },
       { key: "asset", label: "Asset", value: "AAPL" },
       {
         key: "period",
         label: "Period",
-        value: "January 1, 2025 to April 1, 2025",
+        value: dateRange.display,
       },
       { key: "benchmark", label: "Benchmark", value: "SPY" },
     ],
@@ -137,17 +151,13 @@ function resultAction(type: string, label: string) {
   };
 }
 
-function resultCard() {
+function resultCard(dateRange: MockDateRange = DEFAULT_DATE_RANGE) {
   return {
     title: "AAPL buy and hold",
     symbols: ["AAPL"],
     strategy_label: "Buy and hold",
     asset_class: "equity",
-    date_range: {
-      start: "2025-01-01",
-      end: "2025-04-01",
-      display: "January 1, 2025 to April 1, 2025",
-    },
+    date_range: dateRange,
     status_label: "Simulation Complete",
     rows: [
       { key: "ending_value", label: "Ending value", value: "$9,150" },
@@ -169,7 +179,7 @@ function resultCard() {
   };
 }
 
-function completedRun() {
+function completedRun(dateRange: MockDateRange = DEFAULT_DATE_RANGE) {
   return {
     id: RUN_ID,
     conversation_id: CONVERSATION_ID,
@@ -195,11 +205,11 @@ function completedRun() {
       benchmark_symbol: "SPY",
       initial_capital: 10000,
       date_range: {
-        start: "2025-01-01",
-        end: "2025-04-01",
+        start: dateRange.start,
+        end: dateRange.end,
       },
     },
-    conversation_result_card: resultCard(),
+    conversation_result_card: resultCard(dateRange),
     created_at: CREATED_AT,
   };
 }
@@ -269,14 +279,19 @@ async function mockChatApi(
   const feedbackRequests: Array<Record<string, unknown>> = [];
   const messages: ApiMessage[] = [];
   let retryAttempts = 0;
+  let activeDateRange = DEFAULT_DATE_RANGE;
+  let pendingDateEdit = false;
 
-  const upsertConfirmationMessages = (prompt: string) => {
+  const upsertConfirmationMessages = (
+    prompt: string,
+    messageId = "msg-confirmation",
+  ) => {
     messages.splice(
       0,
       messages.length,
       persistedUserMessage("msg-user-confirm", prompt),
-      persistedAssistantMessage("msg-confirmation", "", {
-        confirmation_card: confirmationCard(),
+      persistedAssistantMessage(messageId, "", {
+        confirmation_card: confirmationCard(activeDateRange),
       }),
     );
   };
@@ -288,7 +303,7 @@ async function mockChatApi(
       persistedUserMessage("msg-user-confirm", "Buy and hold AAPL with SPY in early 2025."),
       persistedAssistantMessage("msg-confirmation", "", {
         confirmation_card: {
-          ...confirmationCard(),
+          ...confirmationCard(activeDateRange),
           confirmation_state: "superseded",
           status: "run_complete",
           statusLabel: "Run complete",
@@ -302,7 +317,7 @@ async function mockChatApi(
         "msg-result",
         "Quick take: AAPL finished below the starting value and lagged SPY.",
         {
-          result_card: resultCard(),
+          result_card: resultCard(activeDateRange),
           result_run_id: RUN_ID,
           latest_run_id: RUN_ID,
           result_conversation_id: CONVERSATION_ID,
@@ -310,7 +325,7 @@ async function mockChatApi(
             symbols: ["AAPL"],
             asset_class: "equity",
             benchmark_symbol: "SPY",
-            config_snapshot: completedRun().config_snapshot,
+            config_snapshot: completedRun(activeDateRange).config_snapshot,
           },
         },
       ),
@@ -465,7 +480,7 @@ async function mockChatApi(
             stage_outcome: "completed",
             assistant_response:
               "Quick take: AAPL finished below the starting value and lagged SPY.",
-            run: completedRun(),
+            run: completedRun(activeDateRange),
             message_id: "msg-result",
           },
         },
@@ -522,6 +537,9 @@ async function mockChatApi(
       body.action?.type === "change_asset" ||
       body.action?.type === "adjust_assumptions"
     ) {
+      if (body.action?.type === "change_dates") {
+        pendingDateEdit = true;
+      }
       const actionPrompt =
         language === "es-419"
           ? "Claro, dime el cambio que quieres hacer."
@@ -540,15 +558,22 @@ async function mockChatApi(
     }
 
     const prompt = body.message ?? "Buy and hold AAPL with SPY in early 2025.";
-    upsertConfirmationMessages(prompt);
+    const confirmationMessageId = pendingDateEdit
+      ? "msg-confirmation-updated-dates"
+      : "msg-confirmation";
+    if (pendingDateEdit) {
+      activeDateRange = UPDATED_DATE_RANGE;
+      pendingDateEdit = false;
+    }
+    upsertConfirmationMessages(prompt, confirmationMessageId);
     return fulfillSse(route, [
       { type: "stage_start", stage: "confirm" },
       {
         type: "final",
         payload: {
           stage_outcome: "ready_for_confirmation",
-          confirmation: confirmationCard(),
-          message_id: "msg-confirmation",
+          confirmation: confirmationCard(activeDateRange),
+          message_id: confirmationMessageId,
         },
       },
       "[DONE]",
@@ -641,6 +666,84 @@ test("run result actions hydrate after reload and submit feedback from more menu
   await page.getByRole("button", { name: "Refine idea" }).click();
   await expect(page.getByText("Tell me what you want to refine next.")).toBeVisible();
   expect(api.streamRequests.at(-1)?.action?.type).toBe("refine_strategy");
+});
+
+test("private-alpha readiness smoke covers starter, Spanish edit, result, reload, retry, and feedback", async ({
+  page,
+}) => {
+  const api = await mockChatApi(page, { language: "es-419" });
+  await page.goto("/chat", { waitUntil: "networkidle" });
+  await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 15_000 });
+
+  await expect(page.getByRole("button", { name: "Prueba Apple vs SPY" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Prueba mantener Bitcoin (BTC)" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Prueba compras semanales de Nvidia" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Prueba Apple vs SPY" }).click();
+  await expect(page.getByRole("button", { name: "Ejecutar backtest" })).toBeVisible();
+  expect(api.streamRequests.at(-1)?.message).toBe(
+    "Compra y mantén AAPL durante los últimos 12 meses con SPY como referencia.",
+  );
+  expect(api.streamRequests.at(-1)?.message).not.toContain("2024");
+
+  await page.getByRole("button", { name: "Cambiar fechas" }).click();
+  await expect(page.getByText("Claro, dime el cambio que quieres hacer.")).toBeVisible();
+  await page
+    .getByTestId("chat-input")
+    .fill("Usa del 1 de febrero de 2025 al 1 de mayo de 2025");
+  await page.getByTestId("chat-send").click();
+  await expect(
+    page.getByText("1 feb 2025 → 1 may 2025").first(),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Ejecutar backtest" }).click();
+  await expect(page.getByText("Simulación completa")).toBeVisible();
+  await expect(page.getByText("Quick take: AAPL finished below")).toBeVisible();
+  await expect(
+    page.getByText("1 feb 2025 → 1 may 2025").first(),
+  ).toBeVisible();
+
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByText("Simulación completa")).toBeVisible();
+  await expect(page.getByText("Quick take: AAPL finished below")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Explicar resultado" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Más acciones" }).nth(1).click();
+  const reportIssue = page.getByRole("menuitem", { name: "Reportar problema" });
+  await expect(reportIssue).toBeVisible();
+  await reportIssue.click();
+  await expect(
+    page.getByRole("heading", { name: "Enviar comentarios" }),
+  ).toBeVisible();
+  await page
+    .getByPlaceholder(/problema/i)
+    .fill("QA readiness smoke de resultado y recarga");
+  await page
+    .getByPlaceholder(/1\. Ve a/)
+    .fill("1. Ejecuta el smoke\n2. Recarga el resultado\n3. Envia comentarios");
+  await page.getByLabel(/Autorizo al equipo/).check();
+  await page.getByRole("button", { name: "Enviar comentarios" }).click();
+  await expect(page.getByText("Comentarios enviados.")).toBeVisible();
+  await expect.poll(() => api.feedbackRequests.length).toBe(1);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { name: "Enviar comentarios" })).toHaveCount(
+    0,
+  );
+
+  await page.getByRole("button", { name: "Explicar resultado" }).click();
+  await expect(page.getByLabel("Desglose del resultado")).toContainText(
+    "most of the shortfall",
+  );
+
+  await page.getByTestId("chat-input").fill("Provocar reintento");
+  await page.getByTestId("chat-send").click();
+  await expect(page.getByText("Los datos de mercado tardaron demasiado")).toBeVisible();
+  await page.getByRole("button", { name: "Reintentar" }).click();
+  await expect(page.getByText("Recuperado despues de reintentar.")).toBeVisible();
 });
 
 test("retry action recovers a failed stream without duplicating user input", async ({ page }) => {
