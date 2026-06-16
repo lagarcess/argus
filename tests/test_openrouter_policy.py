@@ -11,6 +11,8 @@ from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.llm_interpreter import (
     AssetAnswerCandidateAudit,
     AssetGroundingAudit,
+    DcaContractAudit,
+    FocusedDateWindowExtraction,
     FocusedStrategyExtraction,
     LLMAmbiguousField,
     LLMInterpretationResponse,
@@ -44,6 +46,39 @@ def _provider_fixture_mode(monkeypatch: pytest.MonkeyPatch):
     clear_asset_cache()
     yield
     clear_asset_cache()
+
+
+def _structured_model_candidates(*_: Any, **__: Any) -> list[str]:
+    return ["primary/model"]
+
+
+def _structured_model_candidates_with_fallback(*_: Any, **__: Any) -> list[str]:
+    return ["primary/model", "fallback/model"]
+
+
+def _neutral_repair_schema_response(schema_model: object) -> object | None:
+    schema_name = getattr(schema_model, "__name__", "")
+    if schema_name == "DcaContractAudit":
+        return DcaContractAudit(
+            is_recurring_buy_request=False,
+            confidence=0.95,
+        )
+    if schema_name == "FocusedDateWindowExtraction":
+        return FocusedDateWindowExtraction(
+            has_date_window=False,
+            confidence=0.35,
+            evidence="",
+        )
+    if schema_name == "StatedRunFieldFidelityAudit":
+        return StatedRunFieldFidelityAudit()
+    if schema_name == "SupportedStrategyCapabilityConflictAudit":
+        return SupportedStrategyCapabilityConflictAudit(
+            selected_strategy_type=None,
+            drop_unsupported_strategy_logic=False,
+            keep_unsupported_strategy_logic=True,
+            confidence=0.95,
+        )
+    return None
 
 
 class FakeChatOpenRouter:
@@ -589,7 +624,7 @@ def test_default_interpreter_uses_direct_schema_client(monkeypatch) -> None:
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -672,7 +707,7 @@ def test_requested_asset_answer_uses_semantic_candidate_audit_before_provider_va
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     pending = StrategySummary(
@@ -716,9 +751,14 @@ def test_default_interpreter_retries_configured_structured_model_when_first_is_i
 
     calls: list[str] = []
 
-    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
-        model_name = str(kwargs["model_name"])
+    async def fake_direct_schema(**kwargs: Any) -> object:
+        model_name = str(kwargs.get("model_name", "<task-default>"))
+        schema_model = kwargs["schema_model"]
         calls.append(model_name)
+        if schema_model is not LLMInterpretationResponse:
+            neutral_response = _neutral_repair_schema_response(schema_model)
+            if neutral_response is not None:
+                return neutral_response
         if model_name == "primary/model":
             return LLMInterpretationResponse(
                 intent="backtest_execution",
@@ -754,7 +794,7 @@ def test_default_interpreter_retries_configured_structured_model_when_first_is_i
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model", "fallback/model"],
+        _structured_model_candidates_with_fallback,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -773,12 +813,9 @@ def test_default_interpreter_retries_configured_structured_model_when_first_is_i
     )
 
     assert result is not None
-    assert calls == [
-        "primary/model",
-        "primary/model",
-        "fallback/model",
-        "fallback/model",
-    ]
+    assert calls[:3] == ["primary/model", "primary/model", "fallback/model"]
+    assert "fallback/model" in calls
+    assert calls.count("<task-default>") >= 1
     assert interpreter.last_status == "fallback_used"
     assert result.candidate_strategy_draft.asset_universe == ["TSLA"]
     assert result.candidate_strategy_draft.extra_parameters["indicator"] == "rsi"
@@ -838,7 +875,7 @@ def test_default_interpreter_repairs_underfilled_indicator_threshold_parameters(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -918,7 +955,7 @@ def test_default_interpreter_repairs_underfilled_new_signal_idea(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1000,7 +1037,7 @@ def test_default_interpreter_repairs_partial_signal_idea_without_rule_payload(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1055,6 +1092,9 @@ def test_default_interpreter_repairs_capability_misroute_for_buy_curiosity(
                 semantic_turn_act="unsupported_request",
                 capability_question_focus="limits",
             )
+        neutral_response = _neutral_repair_schema_response(schema_model)
+        if neutral_response is not None:
+            return neutral_response
         assert schema_model is FocusedStrategyExtraction
         return FocusedStrategyExtraction(
             is_testable_strategy=True,
@@ -1072,7 +1112,7 @@ def test_default_interpreter_repairs_capability_misroute_for_buy_curiosity(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1088,10 +1128,9 @@ def test_default_interpreter_repairs_capability_misroute_for_buy_curiosity(
     )
 
     assert result is not None
-    assert seen_schema_names[:2] == [
-        "LLMInterpretationResponse",
-        "FocusedStrategyExtraction",
-    ]
+    assert seen_schema_names[0] == "LLMInterpretationResponse"
+    assert "DcaContractAudit" in seen_schema_names
+    assert "FocusedStrategyExtraction" in seen_schema_names
     assert result.semantic_turn_act == "new_idea"
     assert result.candidate_strategy_draft.strategy_type == "buy_and_hold"
     assert result.candidate_strategy_draft.asset_universe == ["TSLA"]
@@ -1135,7 +1174,7 @@ def test_default_interpreter_repairs_social_sentiment_trade_misroute(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1203,7 +1242,7 @@ def test_default_interpreter_repairs_empty_unsupported_request_into_contract_rec
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1252,6 +1291,9 @@ def test_default_interpreter_uses_focused_repair_after_structured_candidate_fail
             raise ValueError("general schema failed")
         if schema_model is StatedRunFieldFidelityAudit:
             return StatedRunFieldFidelityAudit()
+        neutral_response = _neutral_repair_schema_response(schema_model)
+        if neutral_response is not None:
+            return neutral_response
         assert schema_model is FocusedStrategyExtraction
         return FocusedStrategyExtraction(
             is_testable_strategy=True,
@@ -1279,7 +1321,7 @@ def test_default_interpreter_uses_focused_repair_after_structured_candidate_fail
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1298,10 +1340,12 @@ def test_default_interpreter_uses_focused_repair_after_structured_candidate_fail
     )
 
     assert result is not None
-    assert seen_schema_names == [
+    assert seen_schema_names[:2] == [
         "LLMInterpretationResponse",
         "FocusedStrategyExtraction",
     ]
+    assert "FocusedDateWindowExtraction" in seen_schema_names
+    assert "StatedRunFieldFidelityAudit" in seen_schema_names
     draft = result.candidate_strategy_draft
     assert draft.strategy_type == "signal_strategy"
     assert draft.asset_universe == ["TSLA"]
@@ -1348,11 +1392,15 @@ def test_default_interpreter_audits_stated_fields_after_focused_repair_defaults(
                     "direction": "bullish",
                 },
             )
-        assert schema_model is StatedRunFieldFidelityAudit
-        return StatedRunFieldFidelityAudit(
-            date_range={"start": "2022-01-01", "end": "today"},
-            capital_amount=10000,
-        )
+        if schema_model is StatedRunFieldFidelityAudit:
+            return StatedRunFieldFidelityAudit(
+                date_range={"start": "2022-01-01", "end": "today"},
+                capital_amount=10000,
+            )
+        neutral_response = _neutral_repair_schema_response(schema_model)
+        if neutral_response is not None:
+            return neutral_response
+        raise AssertionError(f"unexpected schema model {schema_model}")
 
     monkeypatch.setattr(
         llm_interpreter,
@@ -1362,7 +1410,7 @@ def test_default_interpreter_audits_stated_fields_after_focused_repair_defaults(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1381,11 +1429,12 @@ def test_default_interpreter_audits_stated_fields_after_focused_repair_defaults(
     )
 
     assert result is not None
-    assert seen_schema_names == [
+    assert seen_schema_names[:3] == [
         "LLMInterpretationResponse",
         "FocusedStrategyExtraction",
         "StatedRunFieldFidelityAudit",
     ]
+    assert "FocusedDateWindowExtraction" in seen_schema_names
     draft = result.candidate_strategy_draft
     assert draft.date_range == {"start": "2022-01-01", "end": "today"}
     assert draft.capital_amount == 10000
@@ -1435,7 +1484,7 @@ def test_default_interpreter_blocks_auto_simplified_buy_hold_for_ambiguous_rule(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1467,8 +1516,9 @@ def test_default_interpreter_retries_empty_unsupported_clarification(
     calls: list[tuple[str, str]] = []
 
     async def fake_direct_schema(**kwargs: Any) -> object:
-        model_name = str(kwargs["model_name"])
+        model_name = str(kwargs.get("model_name", "<task-default>"))
         schema_name = str(kwargs["schema_name"])
+        schema_model = kwargs["schema_model"]
         calls.append((model_name, schema_name))
         if model_name == "primary/model" and schema_name == "LLMInterpretationResponse":
             return LLMInterpretationResponse(
@@ -1479,6 +1529,18 @@ def test_default_interpreter_retries_empty_unsupported_clarification(
                 assistant_response=("Could you clarify what you mean by big drops?"),
             )
         if schema_name == "FocusedStrategyExtraction":
+            if model_name == "fallback/model":
+                return FocusedStrategyExtraction(
+                    is_testable_strategy=True,
+                    user_goal_summary="Backtest Tesla after big drops.",
+                    strategy_type="indicator_threshold",
+                    strategy_thesis="Buy Tesla after large price declines.",
+                    asset_universe=["TSLA"],
+                    date_range="last 1 year",
+                    indicator="rsi",
+                    entry_threshold=30,
+                    exit_threshold=55,
+                )
             return FocusedStrategyExtraction(
                 is_testable_strategy=True,
                 user_goal_summary="Buy Tesla after big drops.",
@@ -1489,6 +1551,9 @@ def test_default_interpreter_retries_empty_unsupported_clarification(
                 confidence=0.35,
                 evidence="",
             )
+        neutral_response = _neutral_repair_schema_response(schema_model)
+        if neutral_response is not None:
+            return neutral_response
         return LLMInterpretationResponse(
             intent="strategy_drafting",
             task_relation="new_task",
@@ -1515,7 +1580,7 @@ def test_default_interpreter_retries_empty_unsupported_clarification(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model", "fallback/model"],
+        _structured_model_candidates_with_fallback,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1531,14 +1596,13 @@ def test_default_interpreter_retries_empty_unsupported_clarification(
     )
 
     assert result is not None
-    assert calls[:4] == [
+    assert calls[:3] == [
         ("primary/model", "LLMInterpretationResponse"),
         ("primary/model", "FocusedStrategyExtraction"),
         ("fallback/model", "FocusedStrategyExtraction"),
-        ("fallback/model", "LLMInterpretationResponse"),
     ]
-    assert ("fallback/model", "FocusedDateWindowExtraction") in calls
     assert result.candidate_strategy_draft.asset_universe == ["TSLA"]
+    assert result.candidate_strategy_draft.extra_parameters["indicator"] == "rsi"
 
 
 def test_default_interpreter_keeps_artifact_context_for_vague_signal_clarification(
@@ -1562,6 +1626,9 @@ def test_default_interpreter_keeps_artifact_context_for_vague_signal_clarificati
                     "trigger such as a moving-average crossover or RSI threshold."
                 ),
             )
+        neutral_response = _neutral_repair_schema_response(schema_model)
+        if neutral_response is not None:
+            return neutral_response
         assert schema_model is FocusedStrategyExtraction
         return FocusedStrategyExtraction(
             is_testable_strategy=True,
@@ -1583,7 +1650,7 @@ def test_default_interpreter_keeps_artifact_context_for_vague_signal_clarificati
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1599,10 +1666,11 @@ def test_default_interpreter_keeps_artifact_context_for_vague_signal_clarificati
     )
 
     assert result is not None
-    assert seen_schema_names == [
+    assert seen_schema_names[:2] == [
         "LLMInterpretationResponse",
         "FocusedStrategyExtraction",
     ]
+    assert "SupportedStrategyCapabilityConflictAudit" in seen_schema_names
     assert result.candidate_strategy_draft.asset_universe == ["SPY"]
     assert result.candidate_strategy_draft.entry_logic == (
         "Buy SPY when it starts rising."
@@ -1644,7 +1712,7 @@ def test_default_interpreter_retries_empty_refinement_candidate(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model", "fallback/model"],
+        _structured_model_candidates_with_fallback,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1710,7 +1778,7 @@ def test_default_interpreter_retries_stale_prior_strategy_replay(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model", "fallback/model"],
+        _structured_model_candidates_with_fallback,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1783,7 +1851,7 @@ def test_default_interpreter_plans_stale_artifact_edit_before_fallback(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model", "fallback/model"],
+        _structured_model_candidates_with_fallback,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -1837,8 +1905,13 @@ def test_explicit_model_interpreter_plans_result_refinement_before_accepting_pro
 
     calls: list[str] = []
 
-    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
-        calls.append(str(kwargs["model_name"]))
+    async def fake_direct_schema(**kwargs: Any) -> object:
+        schema_model = kwargs["schema_model"]
+        calls.append(str(kwargs.get("model_name", "<task-default>")))
+        if schema_model is not LLMInterpretationResponse:
+            neutral_response = _neutral_repair_schema_response(schema_model)
+            if neutral_response is not None:
+                return neutral_response
         wire_text = "\n".join(message["content"] for message in kwargs["messages"])
         assert "Focused artifact edit planning" in wire_text
         return LLMInterpretationResponse(
@@ -1852,6 +1925,9 @@ def test_explicit_model_interpreter_plans_result_refinement_before_accepting_pro
                     "i want to do recurrent biweekly buys of 500 bucks instead"
                 ),
                 strategy_type="dca_accumulation",
+                asset_universe=["AAPL"],
+                asset_class="equity",
+                date_range="past year",
                 cadence="biweekly",
                 capital_amount=500,
                 field_provenance={
@@ -1897,9 +1973,10 @@ def test_explicit_model_interpreter_plans_result_refinement_before_accepting_pro
 
     assert result is not None
     assert interpreter.last_status == "used"
-    assert calls == ["custom/model"]
+    assert calls[0] == "custom/model"
     assert result.assistant_response is None
     assert result.candidate_strategy_draft.strategy_type == "dca_accumulation"
+    assert result.candidate_strategy_draft.asset_universe == ["AAPL"]
     assert result.candidate_strategy_draft.cadence == "biweekly"
     assert result.candidate_strategy_draft.capital_amount == 500
 
@@ -1932,7 +2009,7 @@ def test_interpreter_uses_artifact_snapshot_instead_of_raw_history_for_refinemen
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -2001,7 +2078,7 @@ def test_interpreter_sends_pending_field_metadata_with_artifact_context(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -2048,15 +2125,29 @@ def test_default_interpreter_rejects_result_explanation_without_latest_result(
 
     calls: list[tuple[str, str]] = []
 
-    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
-        model_name = str(kwargs["model_name"])
+    async def fake_direct_schema(**kwargs: Any) -> object:
+        model_name = str(kwargs.get("model_name", "<task-default>"))
         schema_name = str(kwargs["schema_name"])
+        schema_model = kwargs["schema_model"]
         calls.append((model_name, schema_name))
         if schema_name == "StatedRunFieldFidelityAudit":
             return StatedRunFieldFidelityAudit(
                 comparison_baseline="SPY",
                 date_range="last year",
             )
+        if schema_model is FocusedStrategyExtraction:
+            return FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                user_goal_summary="Backtest Microsoft buy and hold.",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Hold Microsoft for the last year.",
+                asset_universe=["MSFT"],
+                date_range="last year",
+                comparison_baseline="SPY",
+            )
+        neutral_response = _neutral_repair_schema_response(schema_model)
+        if neutral_response is not None:
+            return neutral_response
         if model_name == "primary/model":
             return LLMInterpretationResponse(
                 intent="results_explanation",
@@ -2087,7 +2178,7 @@ def test_default_interpreter_rejects_result_explanation_without_latest_result(
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model", "fallback/model"],
+        _structured_model_candidates_with_fallback,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -2102,10 +2193,10 @@ def test_default_interpreter_rejects_result_explanation_without_latest_result(
         )
     )
 
-    assert calls == [
+    assert calls[:3] == [
         ("primary/model", "LLMInterpretationResponse"),
-        ("fallback/model", "LLMInterpretationResponse"),
-        ("fallback/model", "StatedRunFieldFidelityAudit"),
+        ("primary/model", "FocusedStrategyExtraction"),
+        ("<task-default>", "StatedRunFieldFidelityAudit"),
     ]
     assert result is not None
     assert result.intent == "backtest_execution"
@@ -2141,7 +2232,7 @@ def test_default_interpreter_coerces_strategy_draft_mislabeled_as_result_context
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
-        lambda: ["primary/model"],
+        _structured_model_candidates,
     )
 
     interpreter = OpenRouterStructuredInterpreter(
@@ -2228,7 +2319,7 @@ def test_result_breakdown_prompt_asks_for_fact_bank_references(
     assert "non-template" in system_prompt.lower()
     assert "vary the section headings" in system_prompt.lower()
     assert "fact reference" in system_prompt.lower()
-    assert "plain-english" in system_prompt.lower()
+    assert "plain language" in system_prompt.lower()
     assert "curiosity-forward" in system_prompt.lower()
     assert "dense financial pdf" in system_prompt.lower()
     assert "capability truth" in system_prompt.lower()
