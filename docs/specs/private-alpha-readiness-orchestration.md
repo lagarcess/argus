@@ -3,7 +3,7 @@
 Status: Active coordination note
 Date: 2026-06-16
 Branch: `codex/private-alpha-readiness-clean`
-Checkpoint: `ba62439 docs(readiness): record auth smoke evidence`
+Checkpoint: `dca0d30 docs(readiness): record provider date QA proof`
 Audience: Codex release captain, bounded subagents, reviewers
 
 ## Mission
@@ -14,6 +14,9 @@ handed to two trusted private-circle users.
 Use `docs/specs/private-alpha-controlled-readiness-panel.md` as the active
 sprint source of truth. Use this note as the broadcast packet for subagents so
 all work starts from the same checkpoint, boundaries, and verification posture.
+Later docs-only evidence commits may advance the branch, but bounded agents
+should treat `dca0d30` as the latest verified implementation checkpoint unless
+the release captain explicitly provides a newer verification bundle.
 
 The release captain owns prioritization, sequencing, architecture tradeoffs,
 merge/deploy readiness, final browser QA, and all commits. Subagents may scout,

@@ -957,6 +957,19 @@ Latest local verification on 2026-06-16:
   `poetry run pytest tests/test_environment_scripts.py tests/test_api_import_boundary.py tests/test_render_canary_script.py tests/test_render_runtime_compatibility.py tests/test_private_launch_hardening.py tests/test_checkpoint_rls_migration.py tests/test_ci_workflow.py tests/test_legacy_orchestrator_retirement.py tests/test_chat_backtest_state_machine.py tests/test_openrouter_policy.py tests/agent_runtime/test_execute_recovery.py tests/agent_runtime/test_spanish_runtime_transcripts.py tests/test_chat_runtime_reload_guardrails.py tests/section3/test_market_data_provider.py tests/test_alpha_artifacts.py tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py tests/test_chat_stream_contract.py tests/agent_runtime/test_workflow.py -q --no-cov`
   returned 403 passed on the latest refresh after the result-action runtime
   ownership repair.
+- Completion-audit refresh at branch HEAD `dca0d30` passed:
+  `poetry run pytest tests/test_api_import_boundary.py tests/perf/test_backtest_infra_benchmark.py -q --no-cov`
+  returned 9 passed;
+  `poetry run pytest tests/test_backtest_jobs_async.py tests/test_backtest_jobs_shadow.py tests/test_render_workflow_execution.py tests/test_render_workflow_proof.py tests/test_render_canary_script.py tests/test_private_alpha_readiness.py tests/test_render_runtime_compatibility.py -q --no-cov`
+  returned 59 passed;
+  `poetry run pytest tests/test_environment_scripts.py tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py tests/test_chat_runtime_reload_guardrails.py tests/test_chat_stream_contract.py tests/agent_runtime/test_spanish_runtime_transcripts.py tests/agent_runtime/test_interpret_stage.py::test_current_message_asset_grounding_clears_stale_invalid_llm_symbol -q --no-cov`
+  returned 172 passed; `cd web && PLAYWRIGHT_PORT=3121 bun run test:e2e e2e/onboarding.spec.ts --project=chromium`
+  returned 7 passed and 1 real-auth-only skip; and
+  `cd web && NEXT_PUBLIC_MOCK_AUTH=false PLAYWRIGHT_PORT=3122 bun run test:e2e e2e/onboarding.spec.ts --project=chromium --grep "real-auth signup"`
+  returned 1 passed.
+- The same completion-audit refresh passed
+  `poetry run ruff check src tests workflows scripts` and
+  `cd web && bun run lint e2e/onboarding.spec.ts playwright.config.ts`.
 
 Latest Render verification on 2026-06-16:
 
@@ -1019,6 +1032,21 @@ Latest Render verification on 2026-06-16:
   persisted messages. This refresh validates the live deployed path, not a
   readiness-branch deployment; strict Spanish canary remains blocked until the
   readiness branch is merged/deployed.
+- Live gate refresh after pushing readiness branch HEAD `dca0d30` on
+  2026-06-16: `.github/render-env-sync.sh api-status` still reported
+  real-workflow mode with dispatch/execution enabled and `RENDER_API_KEY`
+  redacted-present; `.github/render-env-sync.sh api-deploy-status` still showed
+  live deploy commit `f335d7814335f8b1b330d3ee37e7125cafdbc478`, not the
+  readiness branch. `.github/warmup-render.sh --expect-mode real-workflow`
+  passed after normal Render cold-start retries; the stale queued/running job
+  scan returned `status=ready`, `scanned_count=0`, `stale_count=0`, and
+  `unresolved_count=0`. `poetry run python scripts/ops/alpha_readiness_metrics.py --json`
+  returned `job_count=4`, `status_counts.succeeded=4`, `active_jobs=0`,
+  `terminal_failures=0`, `readout.llm_explain_stage_count=3`, and
+  `deterministic_readout_fallbacks=1`; the fallback remains visible because the
+  24-hour aggregate still includes the earlier Spanish canary on the older
+  deployed API. Strict Spanish canary remains intentionally blocked until the
+  founder-directed deploy moves Render to the readiness branch.
 - Closed locally in the readiness worktree: `.github/workflows/private-alpha-canary.yml`
   adds a manual and daily GitHub Actions gate that requires canary secrets, runs
   `.github/warmup-render.sh --expect-mode real-workflow`, then runs
