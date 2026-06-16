@@ -1074,6 +1074,19 @@ Production-parity browser QA refresh on 2026-06-16:
   `chat_messages`, `backtest_runs`, `backtest_jobs`, and `feedback`; retrying
   the same feedback path closed the dialog and backend logs showed
   `POST /api/v1/feedback` 200.
+- Additional local Playwright browser smoke after the auth-hardening checkpoint
+  confirmed the same QA-mode stack can log in, render the current starter slate,
+  submit the Spanish AAPL/SPY prompt, reach confirmation with AAPL/SPY/100k
+  preserved, run the backtest, render Quick take and `Explain result`, click
+  `Explain result`, reload the conversation, and hydrate the prompt, Quick
+  take, persisted breakdown, and feedback controls. After reload, feedback on
+  the hydrated result/breakdown returned `/api/v1/feedback` 200.
+- Debug note from that smoke: after `Explain result` is clicked, reload
+  correctly hydrates the persisted breakdown while the consumed result action no
+  longer needs to remain a visible button. A repeat prompt attempt later hit
+  OpenRouter clarification-profile timeout/provider failures and did not reach a
+  confirmation card, reinforcing that the deployed strict canary/no-fallback
+  gate remains mandatory before tester sessions.
 
 ### Daily Automation Candidates
 
