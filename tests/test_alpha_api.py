@@ -295,6 +295,18 @@ def test_patch_me_merges_nested_onboarding_state() -> None:
     }
 
 
+def test_patch_me_rejects_invalid_nested_onboarding_state() -> None:
+    client = _client()
+
+    response = client.patch(
+        "/api/v1/me",
+        json={"onboarding": {"stage": "complete"}},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "invalid_profile_patch"
+
+
 def test_conversation_messages_and_patch_follow_contract() -> None:
     client = _client()
 
