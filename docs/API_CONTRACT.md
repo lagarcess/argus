@@ -880,14 +880,19 @@ Create account.
 }
 ```
 
-**Private-alpha blocked response:**
+**Private-alpha blocked response:** signup intentionally returns the same
+generic `400 auth_signup_failed` shape used for provider signup failures, while
+still checking the allowlist before calling Supabase Auth signup. Public signup
+attempts must not distinguish unlisted/disabled private-alpha emails from
+listed emails that fail provider signup.
+
 ```json
 {
-  "type": "https://api.argus.app/problems/private-alpha-access-required",
-  "title": "Private Alpha Access",
-  "status": 403,
-  "detail": "Argus is in private alpha right now. Use the email that was invited, or ask the Argus team for access.",
-  "code": "private_alpha_access_required",
+  "type": "https://api.argus.app/problems/auth-signup-failed",
+  "title": "Signup Failed",
+  "status": 400,
+  "detail": "Signup failed. Please try again.",
+  "code": "auth_signup_failed",
   "request_id": "uuid"
 }
 ```

@@ -160,8 +160,11 @@ and login; it should not be exposed as a frontend product surface.
 - Add a new private-alpha user with only an `email`; set `role` only for
   `admin` or `developer` access. Use `disabled_at` to revoke access.
 - If an email is missing or `disabled_at` is set, `/auth/signup` and
-  `/auth/login` return `403 private_alpha_access_required`; authenticated API
-  requests must also reject disabled/unlisted emails after token validation.
+  `/auth/login` still check the allowlist before provider signup/session work,
+  but public auth responses are normalized to reduce invite enumeration:
+  signup returns `400 auth_signup_failed`, login returns `401 unauthorized`,
+  and authenticated API requests reject disabled/unlisted emails after token
+  validation with `403 private_alpha_access_required`.
 - The table may contain emails for existing Supabase Auth users; seeding the
   allowlist must not create auth users by itself.
 ---

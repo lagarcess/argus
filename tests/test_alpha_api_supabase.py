@@ -1122,9 +1122,10 @@ def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(
         json={"email": "stranger@example.com", "password": "password123"},
     )
 
-    assert response.status_code == 403
-    assert response.json()["code"] == "private_alpha_access_required"
-    assert "private alpha" in response.json()["detail"].lower()
+    assert response.status_code == 400
+    assert response.json()["code"] == "auth_signup_failed"
+    assert response.json()["detail"] == "Signup failed. Please try again."
+    assert "private alpha" not in response.text.lower()
     mock_gateway.signup.assert_not_called()
     mock_gateway.private_alpha_email_allowed.assert_called_once_with(
         "stranger@example.com"
@@ -1249,7 +1250,8 @@ def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
             json={"email": "stranger@example.com", "password": "password123"},
             headers=headers,
         )
-        assert response.status_code == 403
+        assert response.status_code == 400
+        assert response.json()["code"] == "auth_signup_failed"
 
     blocked = client.post(
         "/api/v1/auth/signup",

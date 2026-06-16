@@ -546,8 +546,10 @@ Action:
   unlisted/disabled private-alpha emails and listed emails with wrong
   passwords, while still avoiding Supabase Auth calls for unlisted/disabled
   emails.
-- Closed locally: signup provider failures return sanitized product-safe copy
-  instead of raw provider exception text.
+- Closed locally: signup returns the same generic `400 auth_signup_failed`
+  response for unlisted/disabled private-alpha emails and provider signup
+  failures, while still avoiding Supabase Auth calls for unlisted/disabled
+  emails and never returning raw provider exception text.
 - Closed locally: login/signup attempts now use a separate short-window limiter
   keyed by client IP and normalized email, with `429` and `Retry-After` before
   provider or allowlist work after repeated attempts.
@@ -1560,7 +1562,8 @@ surfaces.
 
 - Force secure cookies in production.
 - Normalize allowlist auth errors. Closed locally for login enumeration, signup
-  provider error sanitization, and login/signup attempt throttling.
+  allowlist/provider response normalization, and login/signup attempt
+  throttling.
 - Add short-window quotas. Closed locally for authenticated chat, direct
   backtest, and feedback paths; auth attempts use their own non-user-id keyed
   limiter.

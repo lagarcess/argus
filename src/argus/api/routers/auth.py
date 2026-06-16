@@ -12,7 +12,6 @@ from argus.api import state as api_state
 from argus.api.dependencies import (
     auth_response,
     current_user,
-    private_alpha_access_problem,
     problem,
 )
 from argus.api.schemas import LoginRequest, SignupRequest, User
@@ -77,20 +76,6 @@ def reset_auth_attempt_limiter_for_tests() -> None:
     _AUTH_ATTEMPT_LIMITER.reset()
 
 
-def _require_private_alpha_access(request: Request, email: str) -> None:
-    if api_state.supabase_gateway is None:
-        raise problem(
-            request,
-            status_code=500,
-            code="internal_error",
-            title="Internal Error",
-            detail="Supabase persistence is required for authentication.",
-        )
-    if api_state.supabase_gateway.private_alpha_email_allowed(email):
-        return
-    raise private_alpha_access_problem(request)
-
-
 def _login_auth_problem(request: Request) -> HTTPException:
     return problem(
         request,
@@ -98,6 +83,16 @@ def _login_auth_problem(request: Request) -> HTTPException:
         code="unauthorized",
         title="Unauthorized",
         detail="Invalid email or password.",
+    )
+
+
+def _signup_auth_problem(request: Request) -> HTTPException:
+    return problem(
+        request,
+        status_code=400,
+        code="auth_signup_failed",
+        title="Signup Failed",
+        detail="Signup failed. Please try again.",
     )
 
 
@@ -161,7 +156,8 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
             detail="Supabase persistence is required for authentication.",
         )
     _enforce_auth_attempt_limit(request, action="signup", email=body.email)
-    _require_private_alpha_access(request, body.email)
+    if not api_state.supabase_gateway.private_alpha_email_allowed(body.email):
+        raise _signup_auth_problem(request)
     try:
         result = api_state.supabase_gateway.signup(
             email=body.email,
@@ -171,13 +167,7 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
         )
         return auth_response(request, result)
     except Exception:
-        raise problem(
-            request,
-            status_code=400,
-            code="auth_signup_failed",
-            title="Signup Failed",
-            detail="Signup failed. Please try again.",
-        ) from None
+        raise _signup_auth_problem(request) from None
 
 
 @router.post("/auth/login")
