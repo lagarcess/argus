@@ -3,7 +3,7 @@
 Status: Active coordination note
 Date: 2026-06-16
 Branch: `codex/private-alpha-readiness-clean`
-Checkpoint: `f291320 docs(readiness): sync agent guidance and decision memo`
+Checkpoint: `b606429 docs(readiness): record production parity feedback proof`
 Audience: Codex release captain, bounded subagents, reviewers
 
 ## Mission

@@ -139,8 +139,9 @@ The readiness slice should be sequenced like this:
      cannot use the current `usage_counters.user_id` model before a user exists.
    - Parent ownership checks for service-role write paths. Closed locally in
      the readiness branch for direct backtest parent conversations, gateway
-     backtest run parents, durable job conversations, collection-strategy
-     parents, and context-packet run attachments.
+     backtest run parents, direct strategy parent conversations, durable job
+     conversations, collection-strategy parents, and context-packet run
+     attachments.
    - Feedback caps and context schema.
 
 4. **Legal/privacy/consent**
