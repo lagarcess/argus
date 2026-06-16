@@ -417,9 +417,15 @@ from one coherent execution model.
 
 Action:
 
-- Add parity tests for duplicate entries, exits while flat, same-bar entry/exit,
-  and DCA accumulation.
-- Assert metrics, chart markers, and stored trades agree.
+- Closed locally in the readiness branch: `tests/domain/test_engine_execution_ledger.py`
+  proves exits while flat are ignored, duplicate full-position entries are not
+  double-counted, same-bar exit/reentry marker order is deterministic, DCA
+  accumulation records repeated buy fills, chart markers come from executed
+  fills rather than raw signals, and metrics trade counts use the execution
+  ledger.
+- Closed locally in the readiness branch: persisted run snapshots deep-copy
+  chart markers into stored `trades`, keeping stored trade facts aligned with
+  the executed-fill chart payload.
 
 #### DCA Semantics Are Overloaded
 
@@ -446,9 +452,12 @@ full execution ledger.
 
 Action:
 
-- Persist enough normalized config and data assumptions to reproduce the run.
-- Add a persistence test that rebuilds a run from `config_snapshot` and gets the
-  same key metrics.
+- Closed locally in the readiness branch: launch envelopes carry the normalized
+  engine config used for metrics, runtime persistence freezes that
+  `engine_config`, and
+  `test_persisted_config_snapshot_replays_key_metrics` now proves a persisted
+  run can replay key aggregate metrics from `config_snapshot.engine_config`
+  against the same deterministic data.
 
 #### Benchmark Alignment
 
@@ -457,8 +466,10 @@ coverage at the start of a period.
 
 Action:
 
-- Add tests where the benchmark starts late or has sparse data.
-- Reject or disclose missing benchmark coverage instead of silent backfill.
+- Closed locally in the readiness branch: `build_benchmark_curve` rejects late
+  benchmark starts, sparse benchmark observations, and uncovered aligned
+  points instead of silently future/back-filling missing benchmark coverage.
+  The coverage tests live in `tests/section3/test_engine_simulation.py`.
 
 ### Archive v0.1 Findings
 
@@ -1478,9 +1489,11 @@ surfaces.
 
 - Fix explicit asset class resolution bypass. Closed locally in the readiness
   branch.
-- Add execution/chart/metric parity tests.
-- Add benchmark sparse coverage tests.
-- Add config snapshot reproducibility tests.
+- Add execution/chart/metric parity tests. Closed locally in the readiness
+  branch.
+- Add benchmark sparse coverage tests. Closed locally in the readiness branch.
+- Add config snapshot reproducibility tests. Closed locally in the readiness
+  branch.
 - Clarify DCA result assumptions. Closed locally in the readiness branch.
 - Gate unsupported DCA total-budget/starting-principal requests where the
   interpreter has not already done so. Covered locally by the existing DCA

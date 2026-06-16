@@ -552,6 +552,111 @@ def test_launch_envelope_carries_replayable_engine_config(
     assert result.envelope.resolved_parameters["engine_config"] == seen_configs[0]
 
 
+def test_persisted_config_snapshot_replays_key_metrics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import datetime, timezone
+
+    from argus.domain.backtest_run_builder import build_backtest_run_from_result
+    from argus.domain.engine import compute_alpha_metrics
+
+    index = pd.date_range("2025-01-01", periods=7, freq="D", tz="UTC")
+    bars_by_symbol = {
+        "AAPL": pd.DataFrame(
+            {"close": [100.0, 102.0, 104.0, 103.0, 106.0, 109.0, 111.0]},
+            index=index,
+        ),
+        "SPY": pd.DataFrame(
+            {"close": [100.0, 101.0, 102.0, 102.5, 103.0, 104.0, 105.0]},
+            index=index,
+        ),
+    }
+
+    def fake_fetch_ohlcv(**kwargs: Any) -> pd.DataFrame:
+        symbol = str(kwargs["symbol"]).strip().upper()
+        return bars_by_symbol[symbol].copy(deep=True)
+
+    def fake_fetch_price_series(**kwargs: Any) -> pd.Series:
+        symbol = str(kwargs["symbol"]).strip().upper()
+        return bars_by_symbol[symbol]["close"].copy(deep=True)
+
+    def fake_classify_symbol(symbol: str):
+        normalized = symbol.strip().upper()
+        return type(
+            "ResolvedAsset",
+            (),
+            {
+                "canonical_symbol": normalized,
+                "asset_class": "equity",
+                "symbol": normalized,
+            },
+        )()
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        fake_classify_symbol,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.fetch_ohlcv",
+        fake_fetch_ohlcv,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.fetch_price_series",
+        fake_fetch_price_series,
+    )
+
+    result = run_launch_backtest(
+        LaunchBacktestRequest(
+            strategy_type="buy_and_hold",
+            symbol="AAPL",
+            timeframe="1D",
+            date_range={"start": "2025-01-01", "end": "2025-01-07"},
+            entry_rule=None,
+            exit_rule=None,
+            sizing_mode="capital_amount",
+            capital_amount=1000.0,
+            position_size=None,
+            cadence=None,
+            parameters={},
+            risk_rules=[],
+            benchmark_symbol="SPY",
+        )
+    )
+
+    assert result.envelope.execution_status == "succeeded"
+    assert result.result_card is not None
+    run = build_backtest_run_from_result(
+        conversation_id="conversation-replay",
+        result_card=result.result_card,
+        envelope=result.envelope.model_dump(mode="python"),
+        run_id_factory=lambda: "run-replay",
+        now_func=lambda: datetime(2026, 6, 16, tzinfo=timezone.utc),
+        classify_symbol_func=fake_classify_symbol,
+        default_benchmark_func=lambda _asset_class, _symbols: "SPY",
+    )
+    assert run is not None
+
+    replayed = compute_alpha_metrics(
+        run.config_snapshot["engine_config"],
+        fetch_ohlcv_func=fake_fetch_ohlcv,
+        fetch_price_series_func=fake_fetch_price_series,
+    )
+
+    original_performance = run.metrics["aggregate"]["performance"]
+    replayed_performance = replayed["aggregate"]["performance"]
+    for metric_key in (
+        "total_return_pct",
+        "benchmark_return_pct",
+        "delta_vs_benchmark_pct",
+    ):
+        assert replayed_performance[metric_key] == pytest.approx(
+            original_performance[metric_key],
+        )
+    assert replayed["aggregate"]["efficiency"]["total_trades"] == (
+        run.metrics["aggregate"]["efficiency"]["total_trades"]
+    )
+
+
 def test_buy_and_hold_adapter_uses_canonical_benchmark_for_all_result_facts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
