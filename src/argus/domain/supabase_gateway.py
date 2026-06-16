@@ -1095,6 +1095,10 @@ class SupabaseGateway:
         }
 
     def create_strategy(self, *, user_id: str, payload: dict[str, Any]) -> Strategy:
+        self._require_owned_conversation(
+            user_id=user_id,
+            conversation_id=payload.get("conversation_id"),
+        )
         created = (
             self.client.table("strategies")
             .insert({"user_id": user_id, **payload})
