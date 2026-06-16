@@ -1417,6 +1417,10 @@ surfaces.
   the normal confirmation funnel. The latest pass also covers localized
   quick-take optional-field labels and Spanish structured RSI rule rendering in
   confirmation cards.
+- Local browser QA on 2026-06-16 caught and closed an active-confirmation date
+  edit regression: a starter flow followed by `Use Jan 1 2025 to Apr 1 2025`
+  now regenerates the confirmation and completed result with the explicit
+  Jan 1-Apr 1, 2025 window instead of reusing the prior rolling default.
 - Live QA with at least one Spanish prompt in Render staging.
 
 ### Slice 2: Alpha Trust And Legal Shell
@@ -1525,6 +1529,8 @@ Argus is ready for the first controlled alpha tester when:
   and stale-confirmation guardrail coverage.
 - Cold-start starter actions and placeholder prompts are natural, current,
   bilingual, and free of stale default 2024 examples.
+- Active confirmation edits preserve explicit user date changes before
+  execution.
 - A manual smoke test verifies login, chat, Spanish prompt, confirmation, run,
   result, Quick take, Explain result, reload, and feedback.
 - Known caveats are written in founder-facing tester notes.

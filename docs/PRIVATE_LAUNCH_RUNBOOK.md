@@ -144,6 +144,8 @@ Use an allowlisted account and verify:
 - Clicking a cold-start starter chip submits a natural-language prompt into the
   normal chat runtime.
 - A Spanish prompt reaches confirmation without coaching or manual translation.
+- A date edit from an active confirmation updates the confirmation/result period
+  before execution, for example Jan 1, 2025 to Apr 1, 2025.
 - A supported backtest completes and shows a result card.
 - The result includes a readable Quick take.
 - Explain result opens a deeper card-scoped explanation without replacing the
