@@ -18,8 +18,10 @@ from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
 from argus.api.chat.actions import (
+    MISSING_RUN_CONFIRMATION_ACTION_ID_MESSAGE,
     chat_display_message,
     chat_request_message,
+    confirmation_action_id,
     is_cancel_confirmation_action,
     is_confirmation_action,
     is_result_action,
@@ -469,7 +471,14 @@ async def chat_stream(
             conversation_id=conversation.id,
             recent_messages=confirmation_action_messages,
         )
-        if metadata_fallback is None and not checkpoint_has_pending_confirmation(
+        missing_run_confirmation_action_id = (
+            payload.action is not None
+            and payload.action.type == "run_backtest"
+            and confirmation_action_id(payload) is None
+        )
+        if metadata_fallback is not None and metadata_fallback.recovery_message:
+            runtime_fallback = metadata_fallback
+        elif metadata_fallback is None and not checkpoint_has_pending_confirmation(
             checkpoint_values
         ):
             raise problem(
@@ -482,7 +491,7 @@ async def chat_stream(
                     "Describe the idea again and I will prepare a fresh confirmation."
                 ),
             )
-        if metadata_fallback is None and recent_metadata_invalidates_confirmation(
+        elif metadata_fallback is None and recent_metadata_invalidates_confirmation(
             confirmation_action_messages
         ):
             raise problem(
@@ -495,7 +504,11 @@ async def chat_stream(
                     "and I will prepare a fresh confirmation."
                 ),
             )
-        if metadata_fallback is not None:
+        elif missing_run_confirmation_action_id:
+            runtime_fallback = RuntimeFallbackContext(
+                recovery_message=MISSING_RUN_CONFIRMATION_ACTION_ID_MESSAGE
+            )
+        elif metadata_fallback is not None:
             runtime_fallback = metadata_fallback
     elif is_result_action(payload):
         result_fallback = latest_result_fallback_context(

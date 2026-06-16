@@ -27,6 +27,10 @@ RESULT_ACTION_TYPES = {
 STALE_CONFIRMATION_ACTION_MESSAGE = (
     "That confirmation was updated. Use the latest card action before continuing."
 )
+MISSING_RUN_CONFIRMATION_ACTION_ID_MESSAGE = (
+    "That confirmation action is missing its card identity. Use the latest card "
+    "action before continuing."
+)
 
 _ACTION_LABELS = {
     "en": {
@@ -205,6 +209,12 @@ def stale_confirmation_action_message(
     if latest_confirmation_id is None or latest_confirmation_id == action_confirmation_id:
         return None
     return STALE_CONFIRMATION_ACTION_MESSAGE
+
+
+def confirmation_action_id(payload: ChatStreamRequest) -> str | None:
+    if payload.action is None:
+        return None
+    return _confirmation_id_from_action_payload(payload.action.payload)
 
 
 def latest_active_confirmation_id(
