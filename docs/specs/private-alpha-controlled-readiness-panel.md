@@ -1017,6 +1017,15 @@ Latest Render verification on 2026-06-16:
   `deterministic_readout_fallbacks=1`. The current English canary passed the
   strict LLM readout voice gate; the aggregate fallback remains visible because
   the 24-hour window still includes earlier deployed-path canary history.
+- Independent read-only QA sidecar on 2026-06-16 audited the allowed readiness
+  lanes only, excluding legal/consent implementation and PostHog analytics
+  implementation. It reported `469 passed` across the Spanish/runtime,
+  backtest trust, security/feedback, workflow, Supabase, and reload-guardrail
+  backend matrix; `143 passed` across focused web chat/artifact/result,
+  hydration, playground, and Spanish UI unit tests; and `6 passed` for
+  `web/e2e/chat-action-recovery.spec.ts`. That sidecar observed an interrupted
+  canary attempt, but the main-thread `.github/canary-render.sh` run completed
+  afterward with the passing live result documented above.
 - Closed locally in the readiness worktree: `.github/stale-backtest-jobs.sh`
   scans stale queued/running backtest jobs, reconciles terminal Render task runs
   through the existing backtest-job helper, and is invoked by
