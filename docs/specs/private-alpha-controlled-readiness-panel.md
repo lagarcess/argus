@@ -912,6 +912,14 @@ Latest local verification on 2026-06-15:
 
 Latest local verification on 2026-06-16:
 
+- Local QA-mode Browser smoke using the root `.env` and `web/.env.local`
+  real-auth configuration passed for login -> Spanish prompt -> confirmation ->
+  `Cambiar fechas` -> Spanish fallback clarification -> date answer -> updated
+  confirmation -> run -> result card/readout -> Explain result -> reload
+  hydration. The live edit prompt path logged upstream LLM clarification
+  fallbacks before recovering with `¿Qué periodo quieres usar para AAPL?`; the
+  follow-up answer still updated the active confirmation and result to
+  `1 feb 2025 -> 1 may 2025`.
 - `cd web && bun run test:e2e chat-action-recovery.spec.ts onboarding.spec.ts --project=chromium`
   returned 12 passed for the affected browser recovery, readiness-smoke, and
   private-alpha onboarding specs. The auth form render test still logs expected
