@@ -984,6 +984,21 @@ Latest Render verification on 2026-06-16:
   live deploy remains commit `f335d7814335f8b1b330d3ee37e7125cafdbc478`.
   The strict Spanish canary remains intentionally blocked until the readiness
   branch is merged/deployed by the founder-directed release step.
+- Live gate refresh after pushing readiness branch HEAD `1e54bba` on
+  2026-06-16: `.github/render-env-sync.sh api-status` still reported
+  real-workflow mode with dispatch/execution enabled and `RENDER_API_KEY`
+  redacted-present. `.github/warmup-render.sh --expect-mode real-workflow`
+  passed after normal cold-start retries; the stale queued/running job scan
+  returned `status=ready`, `scanned_count=0`, `stale_count=0`, and
+  `unresolved_count=0`. `.github/canary-render.sh` passed against the currently
+  deployed Render app/API: canary conversation
+  `ee936843-ba95-49e1-9a03-7b10546b4416` created async job
+  `e2a51251-4d58-4af1-8546-89320900a333`, which completed with run
+  `4a0d75b5-4f72-4e17-8735-aa8172c18e63`; the script verified confirmation,
+  structured `run_backtest`, async job/run result, LLM readout voice, and
+  persisted messages. This refresh validates the live deployed path, not a
+  readiness-branch deployment; strict Spanish canary remains blocked until the
+  readiness branch is merged/deployed.
 - Closed locally in the readiness worktree: `.github/workflows/private-alpha-canary.yml`
   adds a manual and daily GitHub Actions gate that requires canary secrets, runs
   `.github/warmup-render.sh --expect-mode real-workflow`, then runs
@@ -996,6 +1011,12 @@ Latest Render verification on 2026-06-16:
   the authenticated canary returned `job_count=1`, `status_counts.succeeded=1`,
   `active_jobs=0`, `deterministic_readout_fallbacks=0`,
   `terminal_failures=0`, and `readout.llm_explain_stage_count=1`.
+- Live metrics refresh after the 2026-06-16 canary returned `job_count=3`,
+  `status_counts.succeeded=3`, `active_jobs=0`, `terminal_failures=0`,
+  `readout.llm_explain_stage_count=2`, and
+  `deterministic_readout_fallbacks=1`. The current English canary passed the
+  strict LLM readout voice gate; the aggregate fallback remains visible because
+  the 24-hour window still includes earlier deployed-path canary history.
 - Closed locally in the readiness worktree: `.github/stale-backtest-jobs.sh`
   scans stale queued/running backtest jobs, reconciles terminal Render task runs
   through the existing backtest-job helper, and is invoked by
