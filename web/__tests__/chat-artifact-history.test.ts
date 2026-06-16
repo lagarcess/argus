@@ -93,6 +93,37 @@ function resultMessage(runId: string): Message {
   };
 }
 
+function resultMessageWithResultActions(runId: string): Message {
+  const actions = [
+    {
+      type: "show_breakdown",
+      label: "Explain result",
+      presentation: "result",
+      payload: { run_id: runId, conversation_id: "conversation-1" },
+    },
+    {
+      type: "refine_strategy",
+      label: "Refine idea",
+      presentation: "result",
+      payload: { run_id: runId, conversation_id: "conversation-1" },
+    },
+  ] satisfies Message["actions"];
+
+  return {
+    id: `assistant-result-actions-${runId}`,
+    role: "ai",
+    kind: "strategy_result",
+    result: {
+      strategyName: "AAPL buy and hold",
+      period: "past year",
+      runId,
+      metrics: [],
+      actions,
+    },
+    actions,
+  };
+}
+
 describe("chat artifact history", () => {
   test.each([
     ["run_backtest", "Running", "superseded"],
@@ -570,6 +601,73 @@ describe("chat artifact history", () => {
     ]);
     expect(messages[1].result?.actions?.map((action) => action.type)).toEqual([
       "show_breakdown",
+    ]);
+  });
+
+  test("refine action metadata consumes only the source result refine action", () => {
+    const items: ApiMessage[] = [
+      {
+        id: "assistant-refine",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "What would you like to change next for AAPL?",
+        created_at: "2026-05-15T00:00:01Z",
+        metadata: {
+          chat_action: {
+            type: "refine_strategy",
+            label: "Refine idea",
+            presentation: "result",
+            payload: { run_id: "run-a", conversation_id: "conversation-1" },
+          },
+          pending_strategy: {
+            requested_field: "refinement",
+            source_result: {
+              run_id: "run-a",
+              conversation_id: "conversation-1",
+            },
+          },
+          source_result_run_id: "run-a",
+        },
+      },
+    ];
+
+    const messages = applyConsumedResultActions(
+      [
+        resultMessageWithResultActions("run-a"),
+        resultMessageWithResultActions("run-b"),
+      ],
+      consumedResultActionsFromApi(items),
+    );
+
+    expect(messages[0].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+    ]);
+    expect(messages[1].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+      "refine_strategy",
+    ]);
+  });
+
+  test("optimistic refine action consumes only the matching result refine action", () => {
+    const messages = consumeResultActionOnMessages(
+      [
+        resultMessageWithResultActions("run-a"),
+        resultMessageWithResultActions("run-b"),
+      ],
+      {
+        type: "refine_strategy",
+        label: "Refine idea",
+        presentation: "result",
+        payload: { run_id: "run-a", conversation_id: "conversation-1" },
+      },
+    );
+
+    expect(messages[0].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+    ]);
+    expect(messages[1].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+      "refine_strategy",
     ]);
   });
 });

@@ -15,7 +15,7 @@ export type ConfirmationActionEffect = {
 };
 
 export type ConsumedResultAction = {
-  type: "show_breakdown" | "save_strategy";
+  type: "show_breakdown" | "refine_strategy" | "save_strategy";
   runId?: string;
   savedStrategyId?: string | null;
 };
@@ -124,6 +124,16 @@ export function isSaveActionMetadata(metadata: Record<string, unknown>) {
   );
 }
 
+export function isRefineActionMetadata(metadata: Record<string, unknown>) {
+  const chatAction = metadata.chat_action;
+  return (
+    typeof chatAction === "object" &&
+    chatAction !== null &&
+    "type" in chatAction &&
+    chatAction.type === "refine_strategy"
+  );
+}
+
 export function resultActionRunId(action: ChatActionOption | undefined) {
   const rawRunId = action?.payload?.run_id ?? action?.payload?.runId;
   return typeof rawRunId === "string" && rawRunId.trim() ? rawRunId.trim() : undefined;
@@ -136,6 +146,10 @@ export function consumedResultActionsFromApi(items: ApiMessage[]): ConsumedResul
     if (isBreakdownActionMetadata(metadata)) {
       const runId = resultActionRunId(action);
       return runId ? [{ type: "show_breakdown", runId }] : [];
+    }
+    if (message.role === "assistant" && isRefineActionMetadata(metadata)) {
+      const runId = sourceResultRunIdFromMetadata(metadata) ?? resultActionRunId(action);
+      return runId ? [{ type: "refine_strategy", runId }] : [];
     }
     if (message.role === "assistant" && isSaveActionMetadata(metadata)) {
       const savedStrategyId = savedStrategyIdFromMetadata(metadata);
@@ -260,7 +274,7 @@ export function consumeResultActionOnMessages(
   messages: Message[],
   action: ChatActionOption | undefined,
 ): Message[] {
-  if (action?.type !== "show_breakdown") {
+  if (action?.type !== "show_breakdown" && action?.type !== "refine_strategy") {
     return messages;
   }
   const runId = resultActionRunId(action);
@@ -268,7 +282,7 @@ export function consumeResultActionOnMessages(
     return messages;
   }
   return applyConsumedResultActions(messages, [
-    { type: "show_breakdown", runId },
+    { type: action.type, runId },
   ]);
 }
 
@@ -532,9 +546,25 @@ function savedStrategyIdFromMetadata(metadata: Record<string, unknown>) {
   return stringOrNull(metadata.saved_strategy_id);
 }
 
+function sourceResultRunIdFromMetadata(metadata: Record<string, unknown>) {
+  const sourceResultRunId = stringOrNull(metadata.source_result_run_id);
+  if (sourceResultRunId) {
+    return sourceResultRunId;
+  }
+  const pendingStrategy = recordOrNull(metadata.pending_strategy);
+  const sourceResult = recordOrNull(pendingStrategy?.source_result);
+  return stringOrNull(sourceResult?.run_id) ?? stringOrNull(sourceResult?.runId);
+}
+
 function confirmationIdFromAction(action: ChatActionOption) {
   const rawValue = action.payload?.confirmation_id ?? action.payload?.confirmationId;
   return typeof rawValue === "string" && rawValue.trim() ? rawValue.trim() : undefined;
+}
+
+function recordOrNull(value: unknown) {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function stringOrNull(value: unknown) {
