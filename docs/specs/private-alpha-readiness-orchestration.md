@@ -3,7 +3,8 @@
 Status: Active coordination note
 Date: 2026-06-16
 Branch: `codex/private-alpha-readiness-clean`
-Checkpoint: `dca0d30 docs(readiness): record provider date QA proof`
+Checkpoint: current branch tip; latest named browser-QA evidence bundle is
+`2e35785 docs(readiness): record local browser QA refresh`
 Audience: Codex release captain, bounded subagents, reviewers
 
 ## Mission
@@ -14,13 +15,31 @@ handed to two trusted private-circle users.
 Use `docs/specs/private-alpha-controlled-readiness-panel.md` as the active
 sprint source of truth. Use this note as the broadcast packet for subagents so
 all work starts from the same checkpoint, boundaries, and verification posture.
-Later docs-only evidence commits may advance the branch, but bounded agents
-should treat `dca0d30` as the latest verified implementation checkpoint unless
-the release captain explicitly provides a newer verification bundle.
+Bounded agents should inspect the current branch tip first, then use
+`2e35785` as the latest named release-captain local browser QA evidence bundle.
+Code-bearing readiness work is verified through `728aa79`. If this note and the
+branch tip diverge after later docs-only or verification commits, report that
+drift instead of assuming older checkpoint state.
 
 The release captain owns prioritization, sequencing, architecture tradeoffs,
 merge/deploy readiness, final browser QA, and all commits. Subagents may scout,
 test, implement bounded slices, or review, but they do not own the final gate.
+
+## Current Gate Posture
+
+Local readiness work is in release-candidate posture for the five allowed
+slices, excluding the no-touch Legal/privacy/consent and Analytics/PostHog
+implementation slices. The current hard gate is founder-directed deployment:
+`argus-api` and `argus-app` must both report deploy commits matching the
+readiness branch before strict English and Spanish canaries can prove the live
+tester path.
+
+Current read-only deploy-status evidence from 2026-06-16 showed both Render
+services still live on `f335d7814335f8b1b330d3ee37e7125cafdbc478`, while the
+readiness branch tip at the time of that check was
+`2e35785a514e3143445dd8561b8923fe294067c1`. After later local commits, compare
+Render against the current branch tip. Do not run strict live canaries as
+release proof until deploy drift is closed.
 
 ## No-Touch Boundaries
 

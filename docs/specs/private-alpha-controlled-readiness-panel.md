@@ -1342,6 +1342,13 @@ Production-parity browser QA refresh on 2026-06-16:
   `result_summary` primary-model timeout that recovered through the configured
   fallback model. Browser CDP screenshot capture still timed out, so this pass
   is recorded from DOM state, Browser console logs, and backend logs.
+- Narrow read-only sidecar audit on 2026-06-16 inspected this readiness panel,
+  the orchestration note, and the private launch runbook. It found no remaining
+  local implementation gaps in the five allowed slices and separated the only
+  high-severity blocker as deploy-gated: both Render services must match the
+  readiness branch before strict English/Spanish canaries become release proof.
+  It also confirmed Legal/privacy/consent and PostHog analytics implementation
+  remain excluded-by-design until the founder-gated phase.
 - QA observation from the adjust-assumptions smoke: a separate natural
   `past year` prompt first asked for an exact date range, then a date answer hit
   the existing strict interpreter-unavailable recovery after live OpenRouter
@@ -1966,7 +1973,9 @@ surfaces.
 
 ## Readiness Exit Criteria
 
-Argus is ready for the first controlled alpha tester when:
+Within the current Codex-owned readiness scope, excluding founder-gated
+Legal/privacy/consent and Analytics/PostHog implementation, Argus is ready for
+the first private-circle readiness handoff when:
 
 - Spanish direct backtest, DCA, approval, mixed-asset clarification, and result
   follow-up tests pass locally.
@@ -1974,7 +1983,9 @@ Argus is ready for the first controlled alpha tester when:
   metadata, not prose matching.
 - Focused backtest trust tests pass.
 - Focused security tests pass.
-- Terms/Privacy/consent are live and linked.
+- The founder-owned Terms/Privacy/consent gate is either satisfied externally or
+  explicitly deferred for the private-circle handoff; do not implement it inside
+  this Codex readiness slice.
 - Feedback submission persists to Supabase with redacted context.
 - Render env check, warmup, and canary pass.
 - Issue 112 has merged or remains explicitly tracked with passing duplicate-read
