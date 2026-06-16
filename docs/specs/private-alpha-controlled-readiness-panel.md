@@ -952,6 +952,13 @@ Latest Render verification on 2026-06-16:
   still showed live commit `f335d7814335f8b1b330d3ee37e7125cafdbc478`.
   The strict Spanish canary was intentionally not rerun because it would test
   the older deployed API rather than the readiness branch.
+- Live gate refresh after pushing readiness branch HEAD `2434b98` on
+  2026-06-16: `.github/render-env-sync.sh api-status` still reported
+  real-workflow mode with dispatch and execution enabled. Render API service
+  metadata showed `argus-api` deploys from `main`, auto-deploy is off, and the
+  live deploy remains commit `f335d7814335f8b1b330d3ee37e7125cafdbc478`.
+  The strict Spanish canary remains intentionally blocked until the readiness
+  branch is merged/deployed by the founder-directed release step.
 - Closed locally in the readiness worktree: `.github/workflows/private-alpha-canary.yml`
   adds a manual and daily GitHub Actions gate that requires canary secrets, runs
   `.github/warmup-render.sh --expect-mode real-workflow`, then runs
