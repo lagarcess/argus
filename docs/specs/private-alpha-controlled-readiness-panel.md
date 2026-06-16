@@ -1194,8 +1194,9 @@ Readiness implementation status:
 - Backend regression coverage asserts the submitted starter prompts resolve
   through the shared natural-time parser, keeping frontend copy out of date
   math.
-- Browser QA remains part of the final readiness batch because the copy change
-  is only locally verified in this slice.
+- Local browser QA on 2026-06-16 now covers the cold-start slate: current
+  starter chips render without default 2024 references, and clicking
+  `Test Apple vs SPY` submits a normal user turn into the chat runtime.
 
 The desired model:
 
@@ -1520,8 +1521,8 @@ surfaces.
 - Update English and Spanish placeholder prompts together. Closed locally in
   the readiness branch.
 - Verify clicked starter chips still enter the normal interpreter path. Covered
-  by backend natural-time regression tests; live browser QA remains in the final
-  readiness batch.
+  by backend natural-time regression tests and the 2026-06-16 local browser QA
+  pass.
 - Add cold-start prompt slate to the browser QA checklist. Closed locally in the
   launch runbook smoke test: the final checklist now requires visible current
   starter chips, no default 2024 references, and a clicked starter entering the
