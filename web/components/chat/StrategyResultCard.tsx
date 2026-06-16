@@ -344,8 +344,6 @@ function resultDisplayCopy(t: ReturnType<typeof useTranslation>["t"]): ResultCar
     peakValueLabel: t("chat.result_card.details.peak_value", "Peak value"),
     lowestValueLabel: t("chat.result_card.details.lowest_value", "Lowest value"),
     dateRangeLabel: t("chat.result_card.details.date_range", "Date range"),
-    peakValueLabel: t("chat.result_card.details.peak_value", "Peak value"),
-    lowestValueLabel: t("chat.result_card.details.lowest_value", "Lowest value"),
     timeframeLabel: t("chat.result_card.details.timeframe", "Timeframe"),
     sideLabel: t("chat.result_card.details.side", "Side"),
     allocationLabel: t("chat.result_card.details.allocation", "Allocation"),
