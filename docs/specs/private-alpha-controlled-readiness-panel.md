@@ -913,7 +913,10 @@ Latest local verification on 2026-06-15:
   are sent as normal user messages without action payloads while backend-shaped
   artifacts preserve period/context, and `Cancelar` transitions the card to
   `Borrador cancelado`. The onboarding browser smoke also proves mock-auth
-  login form submission enters the private-alpha chat shell.
+  login form submission enters the private-alpha chat shell, and the
+  real-auth-only onboarding smoke now proves the signup form posts the entered
+  invite identity to `/auth/signup` while rendering only sanitized rejection
+  copy when the backend blocks the signup.
 
 Latest local verification on 2026-06-16:
 
@@ -927,9 +930,16 @@ Latest local verification on 2026-06-16:
   `1 feb 2025 -> 1 may 2025`.
 - `cd web && bun run test:e2e chat-action-recovery.spec.ts onboarding.spec.ts --project=chromium`
   returned 13 passed for the affected browser recovery, readiness-smoke,
-  Spanish edit-loop, and private-alpha onboarding specs. The auth form render
-  test still logs expected unreachable-API noise because that specific
-  page-render test does not mock `/me`.
+  Spanish edit-loop, and private-alpha onboarding specs.
+- `cd web && PLAYWRIGHT_PORT=3112 bun run test:e2e e2e/onboarding.spec.ts --project=chromium`
+  returned 7 passed and 1 skipped, with the skipped test explicitly reserved
+  for real-auth mode.
+- `cd web && NEXT_PUBLIC_MOCK_AUTH=false PLAYWRIGHT_PORT=3111 bun run test:e2e e2e/onboarding.spec.ts --project=chromium --grep "real-auth signup"`
+  returned 1 passed, proving browser signup reaches `/auth/signup` with the
+  entered display name, email, and password, then shows the sanitized
+  `Signup failed. Please try again.` rejection without allowlist, invite, or
+  Supabase leak copy.
+- `cd web && bun run lint e2e/onboarding.spec.ts playwright.config.ts` passed.
 - `poetry run ruff check src tests workflows scripts` passed.
 - Focused Supabase security/API verification passed:
   `poetry run pytest tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py -q --no-cov`
