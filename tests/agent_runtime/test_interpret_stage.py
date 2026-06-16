@@ -1815,6 +1815,50 @@ def test_interpret_approval_does_not_run_when_turn_contains_date_refinement(
     assert result.decision.task_relation == "refine"
 
 
+def test_active_confirmation_date_refinement_is_material_even_when_labeled_approval(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-16", "end": "2026-06-15"},
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User changed the active confirmation date range.",
+        candidate_strategy_draft=StrategySummary(
+            date_range={"start": "2025-01-01", "end": "2025-04-01"},
+        ),
+        semantic_turn_act="approval",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="Use Jan 1 2025 to Apr 1 2025",
+        response=response,
+        snapshot=task_snapshot_with_confirmation(pending),
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        confirmation_payload=validated_confirmation_payload(pending),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.date_range == {
+        "start": "2025-01-01",
+        "end": "2025-04-01",
+    }
+    assert result.decision.candidate_strategy_draft.asset_universe == ["AAPL"]
+
+
 def test_interpret_approval_does_not_run_when_turn_contains_asset_refinement(
     monkeypatch,
 ) -> None:

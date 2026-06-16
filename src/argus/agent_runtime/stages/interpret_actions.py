@@ -31,6 +31,7 @@ from argus.agent_runtime.result_followups import (
     result_followup_llm_task,
 )
 from argus.agent_runtime.stages.approval_guard import (
+    decision_contains_material_strategy_patch,
     decision_is_pure_approval,
     decision_replays_visible_confirmation_without_material_change,
     decision_requests_confirmation_card_action,
@@ -375,8 +376,19 @@ def approval_stage_result_if_applicable(
         )
     if decision.semantic_turn_act != "approval":
         return None
-    if snapshot.active_confirmation_reference is not None and _active_confirmation_is_valid(
-        snapshot
+    if (
+        snapshot.active_confirmation_reference is not None
+        and _active_confirmation_is_valid(snapshot)
+        and not decision_contains_material_strategy_patch(
+            decision=decision,
+            visible_strategy=approved_strategy,
+            interpretation=interpretation,
+            interpreted_candidate_strategy=(
+                interpretation.candidate_strategy_draft
+                if interpretation is not None
+                else None
+            ),
+        )
     ):
         return StageResult(
             outcome="ready_to_respond",
@@ -397,7 +409,7 @@ def approval_stage_result_if_applicable(
     if snapshot.active_confirmation_reference is not None and (
         decision_requests_confirmation_card_action(
             decision=decision,
-            visible_strategy=approved_strategy,
+            visible_strategy=visible_confirmation_strategy,
             interpretation=interpretation,
             interpreted_candidate_strategy=(
                 interpretation.candidate_strategy_draft
