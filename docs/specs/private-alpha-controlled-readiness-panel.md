@@ -1301,6 +1301,23 @@ Before implementing the readiness slice, lock these:
    - Recommended answer: tell testers backtests may take around a minute during
      alpha.
 
+## Recovery Checkpoint And Operating Boundary
+
+The active recovery checkpoint for this readiness sprint is
+`02da456 fix(runtime): harden localized action recovery` on
+`codex/private-alpha-readiness-clean`. Continue readiness work from this clean
+worktree only.
+
+The original `codex/private-alpha-readiness` worktree is quarantined after dirty
+cross-slice WIP and should be treated as read-only evidence, not as a source of
+implementation truth. Do not salvage code or docs from that worktree without a
+fresh, focused review against this clean branch.
+
+`docs/specs/private-alpha-next-decision-memo.md` is future-context for the next
+horizon. It can inform sequencing after readiness exits, but it must not start
+Idea/Evidence/Decision memory, broker/export, voice, PostHog, iOS, or engine
+abstraction implementation inside this readiness sprint.
+
 ## No-Touch Boundaries For Current Solo Execution
 
 The current Codex-owned readiness pass must not implement or configure:
