@@ -8,6 +8,13 @@ from argus.domain.market_data import assets, provider
 from argus.domain.market_data.assets import ResolvedAsset
 
 
+@pytest.fixture(autouse=True)
+def clear_asset_cache_between_tests():
+    assets.clear_asset_cache()
+    yield
+    assets.clear_asset_cache()
+
+
 def test_normalize_df_enforces_utc_sorted_lowercase_ohlcv() -> None:
     frame = pd.DataFrame(
         {

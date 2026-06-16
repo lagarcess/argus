@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from argus.agent_runtime.recovery_messages import recovery_message
 from argus.api.chat.recovery import (
     _metadata_invalidates_confirmation,
     _recent_messages_for_conversation,
@@ -23,14 +24,6 @@ RESULT_ACTION_TYPES = {
     "refine_strategy",
     "save_strategy",
 }
-
-STALE_CONFIRMATION_ACTION_MESSAGE = (
-    "That confirmation was updated. Use the latest card action before continuing."
-)
-MISSING_RUN_CONFIRMATION_ACTION_ID_MESSAGE = (
-    "That confirmation action is missing its card identity. Use the latest card "
-    "action before continuing."
-)
 
 _ACTION_LABELS = {
     "en": {
@@ -193,6 +186,7 @@ def stale_confirmation_action_message(
     user_id: str,
     conversation_id: str,
     recent_messages: list[Message] | None = None,
+    language: str | None = None,
 ) -> str | None:
     if payload.action is None or payload.action.presentation != "confirmation":
         return None
@@ -208,7 +202,11 @@ def stale_confirmation_action_message(
     )
     if latest_confirmation_id is None or latest_confirmation_id == action_confirmation_id:
         return None
-    return STALE_CONFIRMATION_ACTION_MESSAGE
+    return recovery_message("confirmation_action_stale_card", language=language)
+
+
+def missing_run_confirmation_action_id_message(language: str | None = None) -> str:
+    return recovery_message("confirmation_action_missing_identity", language=language)
 
 
 def confirmation_action_id(payload: ChatStreamRequest) -> str | None:

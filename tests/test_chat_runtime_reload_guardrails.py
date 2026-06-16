@@ -954,6 +954,55 @@ def test_stale_confirmation_card_without_structured_payload_returns_recovery(
     assert "confirm it again" in text
 
 
+def test_stale_confirmation_card_without_structured_payload_returns_spanish_recovery(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "final", "payload": {"stage_outcome": "ready_to_respond"}}
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    metadata = _confirmation_metadata()
+    metadata.pop("confirmation_payload")
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Entendí esto como AAPL con comprar y mantener.",
+        metadata=metadata,
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Ejecutar backtest",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 0
+    text = _stream_payloads(response.text, "token")[0]["content"]
+    lowered = text.lower()
+    assert "confirmación" in lowered
+    assert "guardada" in lowered
+    assert "lost the active confirmation state" not in lowered
+
+
 def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
     from argus.api.routers import agent as agent_router
 
@@ -1018,6 +1067,72 @@ def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
     assert "latest" in text.lower()
 
 
+def test_stale_confirmation_action_id_returns_spanish_recovery(monkeypatch) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "final", "payload": {"stage_outcome": "approved_for_execution"}}
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    old_metadata = _confirmation_metadata()
+    old_metadata["confirmation_card"]["confirmation_id"] = "confirm-old"
+    old_metadata["confirmation_card"]["confirmation_state"] = "active"
+    old_metadata["confirmation_card"]["actions"][0]["payload"] = {
+        "confirmation_id": "confirm-old"
+    }
+    new_metadata = _confirmation_metadata()
+    new_metadata["confirmation_card"]["confirmation_id"] = "confirm-new"
+    new_metadata["confirmation_card"]["confirmation_state"] = "active"
+    new_metadata["confirmation_card"]["title"] = "NVDA comprar y mantener"
+    new_metadata["confirmation_card"]["actions"][0]["payload"] = {
+        "confirmation_id": "confirm-new"
+    }
+    new_metadata["confirmation_payload"]["strategy"]["asset_universe"] = ["NVDA"]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Entendí esto como AAPL con comprar y mantener.",
+        metadata=old_metadata,
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Entendí esto como NVDA con comprar y mantener.",
+        metadata=new_metadata,
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Ejecutar backtest",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-old"},
+            },
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 0
+    text = _stream_payloads(response.text, "token")[0]["content"]
+    lowered = text.lower()
+    assert "confirmación" in lowered
+    assert "tarjeta" in lowered
+    assert "confirmation was updated" not in lowered
+
+
 def test_run_confirmation_action_without_confirmation_id_does_not_execute(
     monkeypatch,
 ) -> None:
@@ -1062,6 +1177,53 @@ def test_run_confirmation_action_without_confirmation_id_does_not_execute(
     lowered = text.lower()
     assert "confirmation action" in lowered
     assert "latest card action" in lowered
+
+
+def test_run_confirmation_action_without_confirmation_id_returns_spanish_recovery(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "final", "payload": {"stage_outcome": "approved_for_execution"}}
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Entendí esto como AAPL con comprar y mantener.",
+        metadata=_confirmation_metadata(),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Ejecutar backtest",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 0
+    text = _stream_payloads(response.text, "token")[0]["content"]
+    lowered = text.lower()
+    assert "identidad" in lowered
+    assert "tarjeta" in lowered
+    assert "confirmation action" not in lowered
 
 
 def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:

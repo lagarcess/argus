@@ -12,8 +12,10 @@ RecoveryMessageCode = Literal[
     "private_alpha_save_unavailable",
     "confirmation_action_guidance",
     "confirmation_action_missing_context",
+    "confirmation_action_missing_identity",
     "confirmation_action_stale_card",
     "confirmation_action_stale_payload",
+    "confirmation_state_lost",
     "confirmation_cancelled",
     "clarification_generation_unavailable",
     "result_refine_missing",
@@ -113,6 +115,16 @@ RECOVERY_MESSAGES: dict[RecoveryMessageCode, dict[Language, str]] = {
             "de inversión otra vez y prepararé un borrador nuevo."
         ),
     },
+    "confirmation_action_missing_identity": {
+        "en": (
+            "That confirmation action is missing its card identity. Use the "
+            "latest card action before continuing."
+        ),
+        "es-419": (
+            "A esa acción de confirmación le falta la identidad de la tarjeta. "
+            "Usa la acción de la tarjeta más reciente antes de continuar."
+        ),
+    },
     "confirmation_action_stale_card": {
         "en": (
             "That confirmation was updated. Use the latest visible card and I "
@@ -121,6 +133,17 @@ RECOVERY_MESSAGES: dict[RecoveryMessageCode, dict[Language, str]] = {
         "es-419": (
             "Esa confirmación ya se actualizó. Usa la tarjeta visible más "
             "reciente y mantendré intacta la confirmación actual."
+        ),
+    },
+    "confirmation_state_lost": {
+        "en": (
+            "I lost the active confirmation state, but your conversation is "
+            "saved. I can restate the strategy so you can confirm it again."
+        ),
+        "es-419": (
+            "Perdí el estado activo de confirmación, pero tu conversación está "
+            "guardada. Puedo volver a plantear la estrategia para que la "
+            "confirmes otra vez."
         ),
     },
     "confirmation_action_stale_payload": {

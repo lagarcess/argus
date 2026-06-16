@@ -259,6 +259,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "artifact_references",
         "latest_failed_action_reference",
         "result_fact_bank",
+        "result_action_request",
         "retry_last_turn",
         "recovery",
     }

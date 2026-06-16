@@ -935,9 +935,9 @@ Latest local verification on 2026-06-16:
   `poetry run pytest tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py -q --no-cov`
   returned 67 passed after adding feedback raw-context bounds.
 - Broader readiness regression matrix passed:
-  `poetry run pytest tests/test_environment_scripts.py tests/test_api_import_boundary.py tests/test_render_canary_script.py tests/test_render_runtime_compatibility.py tests/test_private_launch_hardening.py tests/test_checkpoint_rls_migration.py tests/test_ci_workflow.py tests/test_legacy_orchestrator_retirement.py tests/test_chat_backtest_state_machine.py tests/test_openrouter_policy.py tests/agent_runtime/test_execute_recovery.py tests/agent_runtime/test_spanish_runtime_transcripts.py tests/test_chat_runtime_reload_guardrails.py tests/section3/test_market_data_provider.py tests/test_alpha_artifacts.py tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py -q --no-cov`
-  returned 348 passed on the latest refresh after the stale invalid-symbol
-  repair.
+  `poetry run pytest tests/test_environment_scripts.py tests/test_api_import_boundary.py tests/test_render_canary_script.py tests/test_render_runtime_compatibility.py tests/test_private_launch_hardening.py tests/test_checkpoint_rls_migration.py tests/test_ci_workflow.py tests/test_legacy_orchestrator_retirement.py tests/test_chat_backtest_state_machine.py tests/test_openrouter_policy.py tests/agent_runtime/test_execute_recovery.py tests/agent_runtime/test_spanish_runtime_transcripts.py tests/test_chat_runtime_reload_guardrails.py tests/section3/test_market_data_provider.py tests/test_alpha_artifacts.py tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py tests/test_chat_stream_contract.py tests/agent_runtime/test_workflow.py -q --no-cov`
+  returned 403 passed on the latest refresh after the result-action runtime
+  ownership repair.
 
 Latest Render verification on 2026-06-16:
 
@@ -1229,6 +1229,34 @@ Production-parity browser QA refresh on 2026-06-16:
   return, SPY `+24.8%`, beat by `25.9` points, and max drawdown `-13.8%`.
   Browser console inspection returned no `error` or `warn` entries for the
   live confirmation/result path.
+- Result-action ownership refresh on 2026-06-16 closed the remaining
+  LangGraph-boundary gap from the runtime guardian audit: `show_breakdown` and
+  `save_strategy` now enter runtime as turn-scoped result-action requests before
+  API transport performs canonical run lookup, breakdown composition, strategy
+  saving, metadata persistence, and SSE finalization. The same slice localized
+  stale/missing/lost confirmation recovery messages and added regression
+  coverage that result actions enter runtime before transport handling. During
+  full-matrix verification, a market-data provider test-order leak left a
+  mocked asset alias cache warm for later workflow tests; the provider test file
+  now clears the asset cache before and after each test. Fresh verification
+  returned `403 passed` for the backend readiness matrix that includes
+  `tests/test_chat_stream_contract.py`, `tests/test_chat_backtest_state_machine.py`,
+  `tests/test_chat_runtime_reload_guardrails.py`, `tests/section3/test_market_data_provider.py`,
+  and `tests/agent_runtime/test_workflow.py`; `poetry run ruff check src tests workflows scripts`
+  and `git diff --check` also passed.
+- Fresh in-app Browser QA after the result-action refresh restarted
+  `.github/qa.sh` against the updated tree and reused the real-auth frontend.
+  Login reached `/chat` with no console warnings. The same Spanish Apple prompt
+  reached the corrected `AAPL` confirmation, clicking `Ejecutar backtest`
+  completed an `AAPL` result with `Explicar resultado` and `Ajustar idea`, and
+  clicking `Explicar resultado` rendered a Spanish `DESGLOSE` grounded in the
+  stored run: AAPL buy-and-hold, SPY comparison, +50.9% return, +24.8% SPY,
+  +26.1 points, -13.8% drawdown, assumptions, and supported next tests. Browser
+  console inspection returned no `error` or `warn` entries. The backend logged
+  an expected result-breakdown LLM timeout followed by deterministic fallback;
+  the user-facing breakdown still rendered. Browser CDP screenshot capture
+  timed out on the chart page, so this pass is recorded from DOM state, browser
+  logs, and backend logs rather than a fresh screenshot artifact.
 - QA observation from the adjust-assumptions smoke: a separate natural
   `past year` prompt first asked for an exact date range, then a date answer hit
   the existing strict interpreter-unavailable recovery after live OpenRouter

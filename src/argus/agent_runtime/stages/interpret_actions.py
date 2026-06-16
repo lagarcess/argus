@@ -78,6 +78,7 @@ CONFIRMATION_EDIT_ACTION_FIELDS = {
     "change_dates": "date_range",
     "adjust_assumptions": "assumption",
 }
+TRANSPORT_RESULT_ACTION_TYPES = {"show_breakdown", "save_strategy"}
 
 RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS = 10.0
 
@@ -271,7 +272,28 @@ def result_action_stage_result_if_applicable(
     language: str = "en",
 ) -> StageResult | None:
     action = state.structured_action
-    if action is None or action.type != "refine_strategy":
+    if action is None:
+        return None
+    if action.type in TRANSPORT_RESULT_ACTION_TYPES:
+        reference = (
+            snapshot.latest_backtest_result_reference if snapshot is not None else None
+        )
+        return StageResult(
+            outcome="ready_to_respond",
+            stage_patch={
+                "assistant_response": None,
+                "result_action_request": {
+                    "type": action.type,
+                    "action": action.model_dump(mode="python"),
+                    "latest_result_reference": (
+                        reference.model_dump(mode="python")
+                        if reference is not None
+                        else None
+                    ),
+                },
+            },
+        )
+    if action.type != "refine_strategy":
         return None
     reference = (
         snapshot.latest_backtest_result_reference if snapshot is not None else None

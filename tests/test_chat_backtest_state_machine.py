@@ -1172,13 +1172,10 @@ def test_breakdown_action_emits_working_stage_before_generating_text() -> None:
     from pathlib import Path
 
     source = Path("src/argus/api/routers/agent.py").read_text()
-    action_block = source.split('payload.action.type == "show_breakdown"', 1)[1].split(
-        "runtime_user = UserState", 1
-    )[0]
 
-    assert action_block.index(
+    assert source.index(
         'yield sse_data({"type": "stage_start", "stage": "explain"})'
-    ) < action_block.index("breakdown_message = result_breakdown_message_with_metadata")
+    ) < source.index("breakdown_message = result_breakdown_message_with_metadata")
 
 
 def test_result_action_with_run_from_another_conversation_does_not_fallback() -> None:

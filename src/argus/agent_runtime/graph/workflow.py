@@ -81,6 +81,7 @@ class WorkflowState(TypedDict, total=False):
     final_response_payload: dict[str, Any]
     latest_failed_action_reference: ArtifactReference | dict[str, Any]
     next_actions: list[str]
+    result_action_request: dict[str, Any]
 
 
 RUN_STATE_FIELD_NAMES = frozenset(RunState.model_fields)
@@ -96,6 +97,7 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
         "latest_failed_action_reference",
         "next_actions",
         "result_fact_bank",
+        "result_action_request",
     }
 )
 

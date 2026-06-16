@@ -366,6 +366,56 @@ def test_chat_stream_result_uses_final_payload_run_without_named_events(
     assert messages[-1]["content"] == "Short grounded summary."
 
 
+@pytest.mark.parametrize("action_type", ["show_breakdown", "save_strategy"])
+def test_result_actions_enter_runtime_before_transport_handling(
+    monkeypatch: pytest.MonkeyPatch,
+    action_type: str,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured_action_contexts: list[dict[str, Any] | None] = []
+
+    async def _fake_stream_agent_turn_events(**kwargs: Any):
+        captured_action_contexts.append(kwargs.get("action_context"))
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Runtime handled the result action.",
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "language": "en",
+            "action": {
+                "type": action_type,
+                "label": action_type.replace("_", " "),
+                "presentation": "result",
+                "payload": {"run_id": "run-from-card"},
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured_action_contexts
+    assert captured_action_contexts[0]["type"] == action_type
+    assert _final_payload(response.text)["assistant_response"] == (
+        "Runtime handled the result action."
+    )
+
+
 def test_chat_stream_artifact_naming_scheduler_failure_does_not_block_done(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

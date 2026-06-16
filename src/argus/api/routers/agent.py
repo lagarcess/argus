@@ -18,13 +18,13 @@ from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
 from argus.api.chat.actions import (
-    MISSING_RUN_CONFIRMATION_ACTION_ID_MESSAGE,
     chat_display_message,
     chat_request_message,
     confirmation_action_id,
     is_cancel_confirmation_action,
     is_confirmation_action,
     is_result_action,
+    missing_run_confirmation_action_id_message,
     recent_metadata_invalidates_confirmation,
     run_for_result_action,
     stale_confirmation_action_message,
@@ -213,12 +213,12 @@ async def compose_private_alpha_save_response(**kwargs: Any) -> str | None:
     return await _compose_private_alpha_save_response(**kwargs)
 
 
-def fallback_private_alpha_save_response() -> str:
+def fallback_private_alpha_save_response(language: str | None = None) -> str:
     from argus.agent_runtime.result_followups import (
         fallback_private_alpha_save_response as _fallback_private_alpha_save_response,
     )
 
-    return _fallback_private_alpha_save_response()
+    return _fallback_private_alpha_save_response(language=language)
 
 
 def result_breakdown_message(run: BacktestRun | None, *, language: str = "en") -> str:
@@ -239,6 +239,45 @@ def result_breakdown_message_with_metadata(
     )
 
     return _result_breakdown_message_with_metadata(run, language=language)
+
+
+def _result_action_request_type(runtime_result: dict[str, Any]) -> str | None:
+    request = runtime_result.get("result_action_request")
+    if not isinstance(request, dict):
+        return None
+    action_type = request.get("type")
+    if action_type in {"show_breakdown", "save_strategy"}:
+        return str(action_type)
+    return None
+
+
+def _missing_result_action_run_message(
+    *,
+    action_type: str,
+    language: str | None,
+) -> str:
+    is_es = str(language or "").lower().startswith("es")
+    if action_type == "save_strategy":
+        if is_es:
+            return (
+                "No pude encontrar el backtest completado para guardarlo. "
+                "Ejecuta la estrategia de nuevo y luego guárdala desde la "
+                "tarjeta de resultado."
+            )
+        return (
+            "I could not find the completed backtest to save. Run the strategy "
+            "again, then save it from the result card."
+        )
+    if is_es:
+        return (
+            "No pude encontrar el backtest completado para explicarlo. Ejecuta "
+            "la estrategia de nuevo y luego usa Explicar resultado desde la "
+            "tarjeta de resultado."
+        )
+    return (
+        "I could not find the completed backtest to explain. Run the strategy "
+        "again, then explain it from the result card."
+    )
 
 
 @router.get("/api/v1/chat/starter-prompts", response_model=StarterPromptsResponse)
@@ -460,6 +499,7 @@ async def chat_stream(
         user_id=user.id,
         conversation_id=conversation.id,
         recent_messages=confirmation_action_messages,
+        language=language,
     )
     if stale_confirmation_message is not None:
         runtime_fallback = RuntimeFallbackContext(
@@ -470,6 +510,7 @@ async def chat_stream(
             user_id=user.id,
             conversation_id=conversation.id,
             recent_messages=confirmation_action_messages,
+            language=language,
         )
         missing_run_confirmation_action_id = (
             payload.action is not None
@@ -506,7 +547,7 @@ async def chat_stream(
             )
         elif missing_run_confirmation_action_id:
             runtime_fallback = RuntimeFallbackContext(
-                recovery_message=MISSING_RUN_CONFIRMATION_ACTION_ID_MESSAGE
+                recovery_message=missing_run_confirmation_action_id_message(language)
             )
         elif metadata_fallback is not None:
             runtime_fallback = metadata_fallback
@@ -535,6 +576,7 @@ async def chat_stream(
             confirmation_fallback = confirmation_metadata_fallback_context(
                 user_id=user.id,
                 conversation_id=conversation.id,
+                language=language,
             )
             if confirmation_fallback is not None:
                 runtime_fallback = confirmation_fallback
@@ -781,145 +823,6 @@ async def chat_stream(
             yield sse_done()
             return
 
-        if payload.action is not None and payload.action.type == "save_strategy":
-            run = run_for_result_action(
-                payload=payload,
-                user=user,
-                conversation_id=conversation.id,
-                require_run_id=True,
-            )
-            metadata: dict[str, Any] = {
-                "conversation_mode": "result_review",
-                "chat_action": payload.action.model_dump(mode="python"),
-            }
-            if run is None:
-                assistant_text = (
-                    "I could not find the completed backtest to save. Run the "
-                    "strategy again, then save it from the result card."
-                )
-            elif not _strategies_enabled():
-                run_fact_bank = result_fact_bank(run)
-                metadata["result_fact_bank"] = run_fact_bank
-                metadata["latest_run_id"] = run.id
-                metadata["result_run_id"] = run.id
-                metadata["result_strategy_id"] = run.strategy_id
-                assistant_text = await compose_private_alpha_save_response(
-                    metadata=result_followup_metadata_from_run(run),
-                    user_message=request_message,
-                )
-                if assistant_text is None:
-                    assistant_text = fallback_private_alpha_save_response()
-            else:
-                strategy = save_strategy_from_run(user=user, run=run)
-                metadata.update(saved_strategy_metadata(run, strategy.id))
-                metadata["result_fact_bank"] = result_fact_bank(run)
-                assistant_text = f"Saved {strategy.name} to Strategies."
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=assistant_text,
-                metadata=metadata,
-            )
-            yield sse_data({"type": "stage_start", "stage": "next_step"})
-            yield sse_data({"type": "token", "content": assistant_text})
-            yield sse_data(
-                {
-                    "type": "final",
-                    "payload": {
-                        "stage_outcome": "ready_to_respond",
-                        "assistant_response": assistant_text,
-                        "message_id": assistant_message.id,
-                        "latest_run_id": metadata.get("latest_run_id"),
-                        "result_run_id": metadata.get("result_run_id"),
-                        "result_strategy_id": metadata.get("result_strategy_id"),
-                        "saved_strategy_id": metadata.get("saved_strategy_id"),
-                    },
-                }
-            )
-            yield sse_done()
-            schedule_artifact_naming(
-                assistant_message=assistant_text,
-                current_run=run,
-                saved_strategy_id=(
-                    str(metadata["saved_strategy_id"])
-                    if metadata.get("saved_strategy_id")
-                    else None
-                ),
-                message_id=assistant_message.id,
-            )
-            return
-
-        if payload.action is not None and payload.action.type == "show_breakdown":
-            run = run_for_result_action(
-                payload=payload,
-                user=user,
-                conversation_id=conversation.id,
-                require_run_id=True,
-            )
-            yield sse_data({"type": "stage_start", "stage": "explain"})
-            receipt_token = begin_openrouter_route_receipt_capture()
-            language = (
-                payload.language
-                or conversation.language
-                or current_user_profile.language
-                or "en"
-            )
-            try:
-                breakdown_message = result_breakdown_message_with_metadata(
-                    run,
-                    language=language,
-                )
-                assistant_text = breakdown_message.text
-            finally:
-                route_receipts = end_openrouter_route_receipt_capture(receipt_token)
-            metadata = {
-                "conversation_mode": "result_review",
-                "chat_action": payload.action.model_dump(mode="python"),
-                "result_breakdown_source": breakdown_message.source,
-                "result_breakdown_fallback_used": breakdown_message.fallback_used,
-            }
-            if breakdown_message.failure_mode is not None:
-                metadata["result_breakdown_failure_mode"] = breakdown_message.failure_mode
-            if run is not None:
-                metadata["latest_run_id"] = run.id
-                metadata["result_run_id"] = run.id
-                metadata["result_strategy_id"] = run.strategy_id
-                metadata["result_fact_bank"] = result_fact_bank(run)
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=assistant_text,
-                metadata=metadata,
-            )
-            persist_route_receipts(
-                receipts=route_receipts,
-                user_id=user.id,
-                conversation_id=conversation.id,
-                run_id=run.id if run is not None else None,
-                message_id=assistant_message.id,
-                metadata={"chat_action": payload.action.type},
-            )
-            yield sse_data({"type": "token", "content": assistant_text})
-            yield sse_data(
-                {
-                    "type": "final",
-                    "payload": {
-                        "stage_outcome": "ready_to_respond",
-                        "assistant_response": assistant_text,
-                        "message_id": assistant_message.id,
-                    },
-                }
-            )
-            yield sse_done()
-            schedule_artifact_naming(
-                assistant_message=assistant_text,
-                current_run=run,
-                message_id=assistant_message.id,
-            )
-            return
-
         runtime_user = UserState(
             user_id=user.id,
             display_name=current_user_profile.display_name,
@@ -1036,6 +939,17 @@ async def chat_stream(
                 ):
                     backtest_job = dict(final_response_payload["backtest_job"])
                 run = None
+                result_action_run = None
+                saved_strategy_id_for_naming: str | None = None
+                result_action_type = _result_action_request_type(runtime_result)
+                if (
+                    result_action_type is None
+                    and payload.action is not None
+                    and payload.action.presentation == "result"
+                    and payload.action.type in {"show_breakdown", "save_strategy"}
+                    and (not assistant_text or stage_status == "await_approval")
+                ):
+                    result_action_type = payload.action.type
 
                 if result_card is not None:
                     from argus.api.chat.persistence import persist_runtime_backtest_run
@@ -1062,7 +976,7 @@ async def chat_stream(
                 metadata = {
                     "conversation_mode": (
                         "result_review"
-                        if result_card is not None
+                        if result_card is not None or result_action_type is not None
                         else "confirm"
                         if stage_status == "await_approval"
                         else "setup"
@@ -1073,6 +987,81 @@ async def chat_stream(
                 }
                 if payload.action is not None:
                     metadata["chat_action"] = payload.action.model_dump(mode="python")
+                if result_action_type is not None and payload.action is not None:
+                    confirmation_card = None
+                    confirmation_anchor_text = None
+                    runtime_result.pop("confirmation", None)
+                    runtime_result.pop("confirmation_payload", None)
+                    runtime_result.pop("active_confirmation_reference", None)
+                    result_action_run = run_for_result_action(
+                        payload=payload,
+                        user=user,
+                        conversation_id=conversation.id,
+                        require_run_id=True,
+                    )
+                    if result_action_type == "show_breakdown":
+                        yield sse_data({"type": "stage_start", "stage": "explain"})
+                        breakdown_message = result_breakdown_message_with_metadata(
+                            result_action_run,
+                            language=runtime_user.language_preference,
+                        )
+                        assistant_text = breakdown_message.text
+                        metadata["result_breakdown_source"] = breakdown_message.source
+                        metadata["result_breakdown_fallback_used"] = (
+                            breakdown_message.fallback_used
+                        )
+                        if breakdown_message.failure_mode is not None:
+                            metadata["result_breakdown_failure_mode"] = (
+                                breakdown_message.failure_mode
+                            )
+                    elif result_action_type == "save_strategy":
+                        yield sse_data({"type": "stage_start", "stage": "next_step"})
+                        if result_action_run is None:
+                            assistant_text = _missing_result_action_run_message(
+                                action_type=result_action_type,
+                                language=runtime_user.language_preference,
+                            )
+                        elif not _strategies_enabled():
+                            assistant_text = await compose_private_alpha_save_response(
+                                metadata=result_followup_metadata_from_run(
+                                    result_action_run
+                                ),
+                                user_message=request_message,
+                            )
+                            if assistant_text is None:
+                                assistant_text = fallback_private_alpha_save_response(
+                                    language=runtime_user.language_preference
+                                )
+                        else:
+                            strategy = save_strategy_from_run(
+                                user=user,
+                                run=result_action_run,
+                            )
+                            saved_strategy_id_for_naming = strategy.id
+                            metadata.update(
+                                saved_strategy_metadata(result_action_run, strategy.id)
+                            )
+                            assistant_text = f"Saved {strategy.name} to Strategies."
+                    if assistant_text:
+                        runtime_result["assistant_response"] = assistant_text
+                    if result_action_run is not None:
+                        receipt_run_id = result_action_run.id
+                        metadata["latest_run_id"] = result_action_run.id
+                        metadata["result_run_id"] = result_action_run.id
+                        metadata["result_strategy_id"] = result_action_run.strategy_id
+                        metadata["result_fact_bank"] = result_fact_bank(result_action_run)
+                        runtime_result["latest_run_id"] = result_action_run.id
+                        runtime_result["result_run_id"] = result_action_run.id
+                        runtime_result["result_strategy_id"] = (
+                            result_action_run.strategy_id
+                        )
+                        if saved_strategy_id_for_naming is not None:
+                            runtime_result["saved_strategy_id"] = (
+                                saved_strategy_id_for_naming
+                            )
+                            runtime_result["result_strategy_id"] = (
+                                saved_strategy_id_for_naming
+                            )
                 if runtime_result.get("resolution_provenance"):
                     metadata["resolution_provenance"] = runtime_result[
                         "resolution_provenance"
@@ -1200,6 +1189,8 @@ async def chat_stream(
                     "stage_outcome": stage_status,
                     "conversation_mode": metadata.get("conversation_mode"),
                 }
+                if result_action_type is not None:
+                    receipt_metadata["chat_action"] = result_action_type
 
                 runtime_result["message_id"] = (
                     assistant_message.id if assistant_message is not None else None
@@ -1217,7 +1208,8 @@ async def chat_stream(
                 yield sse_done()
                 schedule_artifact_naming(
                     assistant_message=persisted_text,
-                    current_run=run,
+                    current_run=result_action_run or run,
+                    saved_strategy_id=saved_strategy_id_for_naming,
                     message_id=(
                         assistant_message.id if assistant_message is not None else None
                     ),
