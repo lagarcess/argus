@@ -994,6 +994,35 @@ Latest local browser QA on 2026-06-16:
 - Console health: in-app Browser console inspection after the run returned no
   `error` or `warn` entries and no framework overlay text.
 
+Production-parity local QA addendum on 2026-06-16:
+
+- Root `.env` and `web/.env.local` are present. For QA-mode browser work, the
+  ignored frontend env was corrected locally from `8010`/mock auth to
+  `NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1` and
+  `NEXT_PUBLIC_MOCK_AUTH=false`, matching `.github/qa.sh`.
+- `.github/qa.sh` started the backend with Supabase persistence, live provider
+  catalog resolution, strict fallback, and Postgres checkpoints. The frontend
+  started from `web/.env.local`.
+- Live browser QA initially found a real stream/render race: a first AAPL
+  prompt persisted the user message and assistant confirmation metadata, and
+  reload hydration showed the `Run backtest` card, but the in-session browser
+  view did not render the final assistant artifact before reload.
+- Closed in `fe50e1c fix(chat): render final artifacts after hydration races`.
+  The frontend final-stream reducer now replaces the pending assistant when it
+  exists and appends the finalized assistant artifact when route hydration has
+  raced the pending placeholder away.
+- Focused verification after the fix:
+  `bun test __tests__/chat-send-state.test.ts`;
+  `bun test __tests__/chat-send-state.test.ts __tests__/chat-final-message.test.ts __tests__/chat-artifact-history.test.ts __tests__/chat-backtest-jobs.test.ts`;
+  `bun test __tests__/alpha-frontend.test.ts __tests__/chat-turn-artifact-ux.test.ts __tests__/chat-message-hydration.test.ts`;
+  `bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium`;
+  `bun run lint`.
+- Live QA after the fix: real-auth browser login, QA backend/frontend, and a
+  fresh GOOGL prompt reached `CHECKPOINT repaired_live_confirmation_visible`
+  with `unexpected_responses=0` and `console_errors=0`. Reloading the already
+  completed AAPL result reached `CHECKPOINT patched_result_reload_visible` with
+  `unexpected_responses=0`.
+
 ### Daily Automation Candidates
 
 For controlled alpha:
