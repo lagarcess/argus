@@ -979,6 +979,7 @@ def test_chat_stream_passes_and_persists_composer_mention_provenance(
     assert seen["context_hints"][0]["source"] == "user_mention"
     assert seen["context_hints"][0]["canonical_symbol"] == "BTC"
     assert seen["context_hints"][0]["asset_class"] == "crypto"
+    assert seen["context_hints"][0]["validated_by"] == "client_mention"
 
     user_message = client.get(
         f"/api/v1/conversations/{conversation['id']}/messages"
@@ -989,6 +990,10 @@ def test_chat_stream_passes_and_persists_composer_mention_provenance(
         "user_mention"
     )
     assert user_message["metadata"]["resolution_provenance"][0]["raw_text"] == "BTC"
+    assert (
+        user_message["metadata"]["resolution_provenance"][0]["validated_by"]
+        == "client_mention"
+    )
 
 
 def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
@@ -1036,6 +1041,7 @@ def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
     assert seen["context_hints"][0]["source"] == "user_mention"
     assert seen["context_hints"][0]["canonical_symbol"] == "CVX"
     assert seen["context_hints"][0]["asset_class"] == "equity"
+    assert seen["context_hints"][0]["validated_by"] == "client_mention"
 
     user_message = client.get(
         f"/api/v1/conversations/{conversation['id']}/messages"
@@ -1044,6 +1050,10 @@ def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
     assert user_message["metadata"]["mentions"][0]["provider"] == "alpaca"
     assert (
         user_message["metadata"]["resolution_provenance"][0]["asset_class"] == "equity"
+    )
+    assert (
+        user_message["metadata"]["resolution_provenance"][0]["validated_by"]
+        == "client_mention"
     )
 
 

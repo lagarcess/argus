@@ -179,14 +179,6 @@ class _LiveContextCuriosityFacts:
     packet_symbols: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True)
-class _ProvenanceAsset:
-    canonical_symbol: str
-    asset_class: str
-    raw_symbol: str = ""
-    name: str = ""
-
-
 STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
     "new_idea",
     "answer_pending_need",
@@ -3941,11 +3933,7 @@ def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
     provenance: list[ResolutionProvenance] = []
 
     for index, symbol in enumerate(updated.asset_universe):
-        resolution = _trusted_user_mention_resolution(
-            updated,
-            index=index,
-            symbol=symbol,
-        ) or _resolve_asset_candidate(
+        resolution = _resolve_asset_candidate(
             symbol,
             field=f"asset_universe[{index}]",
             source=_asset_resolution_source_for_canonicalization(
@@ -3977,54 +3965,6 @@ def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
         [*updated.resolution_provenance, *provenance]
     )
     return updated
-
-
-def _trusted_user_mention_resolution(
-    strategy: StrategySummary,
-    *,
-    index: int,
-    symbol: str,
-) -> AssetResolution | None:
-    field = f"asset_universe[{index}]"
-    normalized_symbol = str(symbol or "").strip().upper()
-    for raw_item in strategy.resolution_provenance:
-        if isinstance(raw_item, ResolutionProvenance):
-            item = raw_item
-        else:
-            try:
-                item = ResolutionProvenance.model_validate(raw_item)
-            except (TypeError, ValueError):
-                continue
-        if item.source != "user_mention":
-            continue
-        if item.candidate_kind != "asset" or item.resolution_status != "resolved":
-            continue
-        if item.validated_by != "provider_catalog":
-            continue
-        if _field_base(item.field) != "asset_universe":
-            continue
-        if item.field != field and len(strategy.asset_universe) > 1:
-            continue
-        canonical = str(item.canonical_symbol or "").strip().upper()
-        raw_text = str(item.raw_text or "").strip().upper()
-        asset_class = str(item.asset_class or "").strip()
-        if asset_class not in _BACKTEST_ASSET_CLASSES:
-            continue
-        if normalized_symbol not in {canonical, raw_text}:
-            continue
-        asset = _ProvenanceAsset(
-            canonical_symbol=canonical or normalized_symbol,
-            asset_class=asset_class,
-            raw_symbol=canonical or normalized_symbol,
-        )
-        return AssetResolution(
-            status="resolved",
-            raw_text=item.raw_text,
-            asset=asset,
-            candidates=(asset,),
-            provenance=item,
-        )
-    return None
 
 
 def _strategy_with_current_message_asset_grounding(

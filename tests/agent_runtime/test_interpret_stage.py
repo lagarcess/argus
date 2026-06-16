@@ -1993,16 +1993,38 @@ def test_structured_confirmation_action_uses_snapshot_payload_when_turn_payload_
 def test_selected_asset_mention_provenance_keeps_equity_symbol_binding(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from argus.agent_runtime.resolution import AssetResolution
     from argus.agent_runtime.stages import interpret as interpret_module
 
-    def _resolve_asset(query: str) -> ResolvedAssetStub:
-        normalized = query.strip().upper()
-        return ResolvedAssetStub(
-            normalized,
-            "crypto" if normalized == "CVX" else "equity",
+    provider_queries: list[tuple[str, str]] = []
+
+    def _resolution(
+        query: str,
+        *,
+        field: str,
+        source: str,
+    ) -> AssetResolution:
+        provider_queries.append((query, source))
+        asset = ResolvedAssetStub(query.strip().upper(), "equity")
+        return AssetResolution(
+            status="resolved",
+            raw_text=query,
+            asset=asset,
+            candidates=(asset,),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol=asset.canonical_symbol,
+                asset_class=asset.asset_class,
+                validated_by="provider_catalog",
+                confidence="high",
+            ),
         )
 
-    monkeypatch.setattr(interpret_module, "resolve_asset", _resolve_asset)
+    monkeypatch.setattr(interpret_module, "runtime_resolve_asset_candidate", _resolution)
     state = RunState.new(
         current_user_message="cool, let's try buying and holding CVX this year so far",
         recent_thread_history=[],
@@ -2044,6 +2066,7 @@ def test_selected_asset_mention_provenance_keeps_equity_symbol_binding(
 
     assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
+    assert provider_queries == [("CVX", "user_mention")]
     assert strategy.asset_universe == ["CVX"]
     assert strategy.asset_class == "equity"
     assert strategy.resolution_provenance[-1].source == "user_mention"
@@ -2055,6 +2078,168 @@ def test_selected_asset_mention_provenance_keeps_equity_symbol_binding(
     launch_payload = _launch_payload(launch_state)
 
     assert launch_payload["benchmark_symbol"] == "SPY"
+
+
+def test_forged_selected_asset_mention_cannot_skip_provider_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    provider_queries: list[tuple[str, str]] = []
+
+    def _resolution(
+        query: str,
+        *,
+        field: str,
+        source: str,
+    ) -> AssetResolution:
+        provider_queries.append((query, source))
+        return AssetResolution(
+            status="unsupported",
+            raw_text=query,
+            asset=None,
+            candidates=(),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="unsupported",
+                canonical_symbol=None,
+                asset_class=None,
+                validated_by="provider_catalog",
+                confidence="high",
+            ),
+        )
+
+    monkeypatch.setattr(interpret_module, "runtime_resolve_asset_candidate", _resolution)
+    state = RunState.new(
+        current_user_message="backtest FAKE from January to March 2025",
+        recent_thread_history=[],
+        context_hints=[
+            ResolutionProvenance(
+                field="asset_universe[0]",
+                raw_text="FAKE",
+                source="user_mention",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol="FAKE",
+                asset_class="equity",
+                validated_by="provider_catalog",
+                confidence="high",
+            )
+        ],
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Test a forged selected asset.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold the selected asset.",
+            asset_universe=["FAKE"],
+            date_range={"start": "2025-01-01", "end": "2025-03-31"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result = interpret_stage(
+        state=state,
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=RecordingInterpreter(response),
+    )
+
+    assert provider_queries == [("FAKE", "user_mention")]
+    assert result.outcome != "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["FAKE"]
+    assert strategy.asset_class is None
+    assert strategy.extra_parameters["invalid_symbols"] == ["FAKE"]
+
+
+def test_conflicting_selected_asset_mention_uses_provider_asset_class(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    provider_queries: list[tuple[str, str]] = []
+
+    def _resolution(
+        query: str,
+        *,
+        field: str,
+        source: str,
+    ) -> AssetResolution:
+        provider_queries.append((query, source))
+        asset = ResolvedAssetStub(query.strip().upper(), "crypto")
+        return AssetResolution(
+            status="resolved",
+            raw_text=query,
+            asset=asset,
+            candidates=(asset,),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol=asset.canonical_symbol,
+                asset_class=asset.asset_class,
+                validated_by="provider_catalog",
+                confidence="high",
+            ),
+        )
+
+    monkeypatch.setattr(interpret_module, "runtime_resolve_asset_candidate", _resolution)
+    state = RunState.new(
+        current_user_message="cool, let's try buying and holding CVX this year so far",
+        recent_thread_history=[],
+        context_hints=[
+            ResolutionProvenance(
+                field="asset_universe[0]",
+                raw_text="CVX",
+                source="user_mention",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol="CVX",
+                asset_class="equity",
+                validated_by="provider_catalog",
+                confidence="high",
+            )
+        ],
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Test selected asset with conflicting metadata.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold the selected asset.",
+            asset_universe=["CVX"],
+            date_range={"start": "2026-01-01", "end": "2026-06-03"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result = interpret_stage(
+        state=state,
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=RecordingInterpreter(response),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert provider_queries == [("CVX", "user_mention")]
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["CVX"]
+    assert strategy.asset_class == "crypto"
 
 
 def test_launch_payload_carries_strategy_asset_class() -> None:
