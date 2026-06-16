@@ -283,6 +283,152 @@ def test_chat_stream_confirmation_uses_final_payload_without_named_events(
     assert "run" not in payload
 
 
+def test_chat_stream_persists_repaired_current_message_asset_grounding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.graph.workflow import build_workflow
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+    from argus.agent_runtime.state.models import ResolutionProvenance, StrategySummary
+    from argus.api import state as api_state
+    from argus.domain.market_data.assets import ResolvedAsset
+
+    class ApplePseudoTickerInterpreter:
+        async def ainvoke(self, request: Any) -> StructuredInterpretation:
+            return StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="new_task",
+                requires_clarification=False,
+                user_goal_summary="El usuario quiere comprar y mantener Apple.",
+                candidate_strategy_draft=StrategySummary(
+                    raw_user_phrasing=request.current_user_message,
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Comprar y mantener Apple.",
+                    asset_universe=["APPLE"],
+                    date_range={"start": "2025-06-16", "end": "2026-06-16"},
+                    capital_amount=100000,
+                ),
+                semantic_turn_act="new_idea",
+            )
+
+    provider_queries: list[tuple[str, str]] = []
+
+    def _resolution(query: str, *, field: str, source: str) -> AssetResolution:
+        provider_queries.append((query, source))
+        raw = query.strip()
+        if raw == "APPLE" and source == "llm_extraction":
+            return AssetResolution(
+                status="unsupported",
+                raw_text=query,
+                asset=None,
+                candidates=(),
+                provenance=ResolutionProvenance(
+                    field=field,
+                    raw_text=query,
+                    source=source,
+                    candidate_kind="asset",
+                    resolution_status="unsupported",
+                    canonical_symbol=None,
+                    asset_class=None,
+                    validated_by="provider_catalog",
+                    confidence="high",
+                ),
+            )
+        if raw.casefold() == "apple" and source == "user_mention":
+            asset = ResolvedAsset(
+                canonical_symbol="AAPL",
+                asset_class="equity",
+                name="Apple Inc.",
+                raw_symbol="AAPL",
+            )
+            return AssetResolution(
+                status="resolved",
+                raw_text=query,
+                asset=asset,
+                candidates=(asset,),
+                provenance=ResolutionProvenance(
+                    field=field,
+                    raw_text=query,
+                    source=source,
+                    candidate_kind="asset",
+                    resolution_status="resolved",
+                    canonical_symbol="AAPL",
+                    asset_class="equity",
+                    validated_by="provider_catalog",
+                    confidence="medium",
+                ),
+            )
+        return AssetResolution(
+            status="unsupported",
+            raw_text=query,
+            asset=None,
+            candidates=(),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="unsupported",
+                canonical_symbol=None,
+                asset_class=None,
+                validated_by="provider_catalog",
+                confidence="low",
+            ),
+        )
+
+    monkeypatch.setattr(interpret_module, "runtime_resolve_asset_candidate", _resolution)
+    client = _client()
+    checkpointer = api_state.build_agent_runtime_checkpointer()
+    workflow = build_workflow(
+        contract=build_default_capability_contract(),
+        structured_interpreter=ApplePseudoTickerInterpreter(),
+        checkpointer=checkpointer,
+    )
+    monkeypatch.setattr(
+        app.state,
+        "agent_runtime_checkpointer",
+        checkpointer,
+        raising=False,
+    )
+    monkeypatch.setattr(app.state, "agent_runtime_workflow", workflow, raising=False)
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Prueba comprar y mantener Apple con 100k durante el ultimo ano",
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert ("APPLE", "llm_extraction") in provider_queries
+    assert ("Apple", "user_mention") in provider_queries
+    payload = _final_payload(response.text)
+    confirmation_payload = payload["confirmation_payload"]
+    strategy = confirmation_payload["strategy"]
+    assert strategy["asset_universe"] == ["AAPL"]
+    assert strategy["asset_class"] == "equity"
+    assert "invalid_symbols" not in strategy.get("extra_parameters", {})
+    assert confirmation_payload["launch_payload"]["symbol"] == "AAPL"
+    assert confirmation_payload["launch_payload"]["symbols"] == ["AAPL"]
+    assert payload["confirmation"]["title"] == "AAPL: Comprar y mantener"
+
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    metadata = messages[-1]["metadata"]
+    persisted_strategy = metadata["confirmation_payload"]["strategy"]
+    assert persisted_strategy["asset_universe"] == ["AAPL"]
+    assert "invalid_symbols" not in persisted_strategy.get("extra_parameters", {})
+    assert metadata["confirmation_payload"]["launch_payload"]["symbols"] == ["AAPL"]
+
+
 def test_chat_stream_result_uses_final_payload_run_without_named_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

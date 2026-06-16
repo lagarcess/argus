@@ -1244,6 +1244,14 @@ Production-parity browser QA refresh on 2026-06-16:
   `tests/test_chat_runtime_reload_guardrails.py`, `tests/section3/test_market_data_provider.py`,
   and `tests/agent_runtime/test_workflow.py`; `poetry run ruff check src tests workflows scripts`
   and `git diff --check` also passed.
+- Follow-up public-stream coverage now proves the recent `APPLE` to `AAPL`
+  repair survives beyond the internal interpretation stage: the stream test
+  installs a real in-memory runtime with a fake interpreter that emits
+  `APPLE`, a provider resolver that rejects that LLM pseudo-ticker while
+  resolving the current-message `Apple` mention to `AAPL`, then asserts the
+  final SSE confirmation payload and persisted assistant metadata contain
+  `AAPL` with no stale `invalid_symbols`. The focused stream-contract file
+  returned `24 passed`.
 - Fresh in-app Browser QA after the result-action refresh restarted
   `.github/qa.sh` against the updated tree and reused the real-auth frontend.
   Login reached `/chat` with no console warnings. The same Spanish Apple prompt
