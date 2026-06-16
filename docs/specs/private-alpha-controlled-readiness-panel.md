@@ -936,7 +936,8 @@ Latest local verification on 2026-06-16:
   returned 67 passed after adding feedback raw-context bounds.
 - Broader readiness regression matrix passed:
   `poetry run pytest tests/test_environment_scripts.py tests/test_api_import_boundary.py tests/test_render_canary_script.py tests/test_render_runtime_compatibility.py tests/test_private_launch_hardening.py tests/test_checkpoint_rls_migration.py tests/test_ci_workflow.py tests/test_legacy_orchestrator_retirement.py tests/test_chat_backtest_state_machine.py tests/test_openrouter_policy.py tests/agent_runtime/test_execute_recovery.py tests/agent_runtime/test_spanish_runtime_transcripts.py tests/test_chat_runtime_reload_guardrails.py tests/section3/test_market_data_provider.py tests/test_alpha_artifacts.py tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py -q --no-cov`
-  returned 344 passed.
+  returned 348 passed on the latest refresh after the stale invalid-symbol
+  repair.
 
 Latest Render verification on 2026-06-16:
 
@@ -1205,6 +1206,29 @@ Production-parity browser QA refresh on 2026-06-16:
   clean-console rerun timed out waiting for confirmation after live OpenRouter
   interpretation fallback/timeout warnings, so provider health remains covered
   by the deployed canary gate rather than treated as solved by this local pass.
+- Fresh local readiness refresh after the same repair kept the QA backend
+  running from `.github/qa.sh` and restarted the frontend from `web/.env.local`.
+  The broad backend matrix above returned `348 passed` in 48.17s. The full
+  frontend unit suite returned `254 pass` across 36 files. The focused
+  Playwright action-recovery slice returned 4 passed after the existing dev
+  server on `3000` was stopped so Playwright could own its configured `3100`
+  test server:
+  `bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium --grep "private-alpha readiness smoke|Spanish confirmation edit actions|retry action recovers|Spanish action recovery"`.
+  Those browser tests cover readiness smoke, Spanish edit actions, retry
+  recovery without duplicate user input, and localized Spanish recovery
+  controls.
+- Fresh in-app Browser QA then used the same root `.env` and `web/.env.local`
+  stack without Playwright fallback. Browser login reached `/chat` with Spanish
+  UI and no console warnings. The prompt `Prueba comprar y mantener Apple con
+  100k durante el ultimo ano` reached an `AAPL` confirmation with `$100,000`,
+  `16 jun 2025 -> 16 jun 2026`, `Ejecutar backtest`, `Cambiar fechas`,
+  `Cambiar activo`, `Ajustar supuestos`, and `Cancelar`; it did not show stale
+  unsupported `APPLE` copy. Clicking `Ejecutar backtest` completed the result
+  path with chart, `Explicar resultado`, `Ajustar idea`, and Spanish
+  `Resumen rapido`. The result showed ending value `$150,685`, `+50.7%` total
+  return, SPY `+24.8%`, beat by `25.9` points, and max drawdown `-13.8%`.
+  Browser console inspection returned no `error` or `warn` entries for the
+  live confirmation/result path.
 - QA observation from the adjust-assumptions smoke: a separate natural
   `past year` prompt first asked for an exact date range, then a date answer hit
   the existing strict interpreter-unavailable recovery after live OpenRouter
