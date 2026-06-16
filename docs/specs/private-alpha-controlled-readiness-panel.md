@@ -932,6 +932,13 @@ Latest Render verification on 2026-06-16:
   `result_readout_source=deterministic_fallback` and
   `result_readout_failure_mode=quick_take_draft_rejected`. Rerun this Spanish
   canary only after the readiness branch is deployed.
+- Live gate refresh after pushing readiness branch HEAD `4867be1` on
+  2026-06-16: `.github/render-env-sync.sh api-status` still reported
+  real-workflow mode, `.github/warmup-render.sh --expect-mode real-workflow`
+  passed with stale job scan `status=ready`, and Render API deploy metadata
+  still showed live commit `f335d7814335f8b1b330d3ee37e7125cafdbc478`.
+  The strict Spanish canary was intentionally not rerun because it would test
+  the older deployed API rather than the readiness branch.
 - Closed locally in the readiness worktree: `.github/workflows/private-alpha-canary.yml`
   adds a manual and daily GitHub Actions gate that requires canary secrets, runs
   `.github/warmup-render.sh --expect-mode real-workflow`, then runs
