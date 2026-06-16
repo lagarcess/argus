@@ -554,6 +554,10 @@ Immutable simulation result.
       ],
       "currency": "USD",
       "base_value": 10000.0,
+      "value_extrema": {
+        "peak": { "time": "2022-01-04", "value": 10042.5 },
+        "lowest": { "time": "2022-01-03", "value": 10000.0 }
+      },
       "attribution": "TradingView Lightweight Charts"
     }
   },
@@ -572,6 +576,7 @@ Immutable simulation result.
 **Result chart contract:**
 - `chart.kind` is currently `portfolio_equity`.
 - `chart.series` is the aggregate portfolio equity curve. Multi-symbol runs must use the equal-weight portfolio curve, not a symbol comparison chart.
+- `chart.value_extrema` contains display-ready aggregate portfolio value extrema for the same series: `peak` and `lowest` each include the point `time` and rounded portfolio `value`.
 - `chart.markers` contains capped entry/exit events derived from executed fills only. Raw strategy signals, blocked exits while flat, and duplicate blocked entries must not appear as chart markers.
 - The frontend must keep TradingView attribution visible when rendering Lightweight Charts.
 

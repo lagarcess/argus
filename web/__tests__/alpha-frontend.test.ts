@@ -309,7 +309,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(chart).not.toContain("#315d97");
     expect(chart).not.toContain("#a98b2d");
     expect(chart).toContain('data-testid="result-equity-chart"');
-    expect(chart).toContain("normalizeChartTime");
+    expect(chart).toContain("chartTimeLookupKey");
   });
 
   test("chat renders structured confirmation cards with card-scoped actions only", () => {

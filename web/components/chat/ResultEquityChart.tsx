@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
+import { useTranslation } from "react-i18next";
 import {
   BaselineSeries,
   ColorType,
@@ -54,16 +55,22 @@ export default function ResultEquityChart({
 }: ResultEquityChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
+  const { i18n } = useTranslation();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const isDark = appearanceOverride
     ? appearanceOverride === "dark"
     : resolvedTheme === "dark";
+  const chartLocale = resolveChartLocale(i18n.language);
   const isHeroDeltaEvidence = presentation === "heroDeltaEvidence";
   const chartHeight = isHeroDeltaEvidence ? 164 : 168;
+  const currencyFormatter = useMemo(
+    () => chartCurrencyFormatter(chart.currency, chartLocale),
+    [chart.currency, chartLocale],
+  );
   const data = useMemo<BaselineData<Time>[]>(
     () =>
       chart.series.map((point) => ({
-        time: normalizeChartTime(point.time) as Time,
+        time: chartTimeFromString(point.time),
         value: point.value,
       })),
     [chart.series],
@@ -71,7 +78,7 @@ export default function ResultEquityChart({
   const eventByTime = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const marker of chart.markers ?? []) {
-      const time = normalizeChartTime(marker.time);
+      const time = chartTimeLookupKey(marker.time);
       const existing = map.get(time) ?? [];
       map.set(time, [...existing, marker.label]);
     }
@@ -79,11 +86,11 @@ export default function ResultEquityChart({
   }, [chart.markers]);
   const dataIndexByTime = useMemo(() => {
     const map = new Map<string, number>();
-    data.forEach((point, index) => {
-      map.set(String(point.time), index);
+    chart.series.forEach((point, index) => {
+      map.set(chartTimeLookupKey(point.time), index);
     });
     return map;
-  }, [data]);
+  }, [chart.series]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -119,7 +126,7 @@ export default function ResultEquityChart({
       },
       timeScale: {
         borderVisible: false,
-        timeVisible: data.some((point) => String(point.time).includes("T")),
+        timeVisible: data.some((point) => typeof point.time === "number"),
         secondsVisible: false,
         rightOffset: 4,
         barSpacing: data.length > 240 ? 4 : 7,
@@ -137,12 +144,11 @@ export default function ResultEquityChart({
         },
       },
       localization: {
-        priceFormatter: (price: number) =>
-          new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency: chart.currency ?? "USD",
-            maximumFractionDigits: 0,
-          }).format(price),
+        locale: chartLocale,
+        dateFormat: "dd MMM yyyy",
+        timeFormatter: (time: Time) =>
+          formatChartDateLabel(time, chartLocale, "short"),
+        priceFormatter: (price: number) => currencyFormatter.format(price),
       },
     });
 
@@ -211,11 +217,11 @@ export default function ResultEquityChart({
         setTooltip(null);
         return;
       }
-      const time = String(param.time);
+      const time = chartTimeLookupKey(param.time);
       setTooltip({
         x: param.point.x,
         y: param.point.y,
-        time,
+        time: formatChartDateLabel(param.time, chartLocale),
         value: datum.value,
         event: eventByTime.get(time)?.join(", "),
       });
@@ -226,7 +232,17 @@ export default function ResultEquityChart({
       chartApi.timeScale().unsubscribeVisibleLogicalRangeChange(updateVisibleMarkers);
       chartApi.remove();
     };
-  }, [chart, chartHeight, data, dataIndexByTime, eventByTime, isDark, isHeroDeltaEvidence]);
+  }, [
+    chart,
+    chartHeight,
+    chartLocale,
+    currencyFormatter,
+    data,
+    dataIndexByTime,
+    eventByTime,
+    isDark,
+    isHeroDeltaEvidence,
+  ]);
 
   if (data.length === 0) return null;
 
@@ -253,13 +269,7 @@ export default function ResultEquityChart({
           }}
         >
           <div className="font-medium text-black dark:text-white">{tooltip.time}</div>
-          <div>
-            {new Intl.NumberFormat("en-US", {
-              style: "currency",
-              currency: chart.currency ?? "USD",
-              maximumFractionDigits: 0,
-            }).format(tooltip.value)}
-          </div>
+          <div>{currencyFormatter.format(tooltip.value)}</div>
           {tooltip.event && <div className="mt-1 text-black/45 dark:text-white/45">{tooltip.event}</div>}
         </div>
       )}
@@ -267,12 +277,168 @@ export default function ResultEquityChart({
   );
 }
 
-function normalizeChartTime(value: string) {
+function chartTimeFromString(value: string): Time {
   const trimmed = value.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-  const dateOnly = trimmed.match(/^(\d{4}-\d{2}-\d{2})T/);
-  if (dateOnly) return dateOnly[1];
-  return trimmed;
+  if (dateOnlyParts(trimmed)) return trimmed as Time;
+
+  const utcTimestamp = utcTimestampFromDateTimeText(trimmed);
+  return utcTimestamp == null ? (trimmed as Time) : (utcTimestamp as Time);
+}
+
+export function chartTimeLookupKey(value: Time | string) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (dateOnlyParts(trimmed)) return trimmed;
+
+    const dateTime = dateTimeParts(trimmed);
+    if (dateTime) {
+      return `${dateTime.year}-${dateTime.month}-${dateTime.day}T${dateTime.hour}:${dateTime.minute}:${dateTime.second}`;
+    }
+
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime())
+      ? trimmed
+      : parsed.toISOString().slice(0, 19);
+  }
+  if (typeof value === "number") {
+    return new Date(value * 1000).toISOString().slice(0, 19);
+  }
+  return `${value.year}-${pad2(value.month)}-${pad2(value.day)}`;
+}
+
+function chartTimeToUtcDate(value: Time | string) {
+  if (typeof value === "number") {
+    return new Date(value * 1000);
+  }
+  if (typeof value !== "string") {
+    return new Date(Date.UTC(value.year, value.month - 1, value.day));
+  }
+
+  const normalized = value.trim();
+  const dateOnly = dateOnlyParts(normalized);
+  if (dateOnly) {
+    return new Date(
+      Date.UTC(
+        Number(dateOnly.year),
+        Number(dateOnly.month) - 1,
+        Number(dateOnly.day),
+      ),
+    );
+  }
+
+  const dateTime = dateTimeParts(normalized);
+  if (dateTime) {
+    return new Date(
+      Date.UTC(
+        Number(dateTime.year),
+        Number(dateTime.month) - 1,
+        Number(dateTime.day),
+        Number(dateTime.hour),
+        Number(dateTime.minute),
+        Number(dateTime.second),
+      ),
+    );
+  }
+
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function utcTimestampFromDateTimeText(value: string) {
+  const date = chartTimeToUtcDate(value);
+  if (!date) return null;
+  return Math.floor(date.getTime() / 1000);
+}
+
+function dateTimeParts(value: string) {
+  if (value.length < 16 || value[10] !== "T" || value[13] !== ":") {
+    return null;
+  }
+  const date = dateOnlyParts(value.slice(0, 10));
+  const hour = fixedDigits(value.slice(11, 13), 2);
+  const minute = fixedDigits(value.slice(14, 16), 2);
+  const second =
+    value.length >= 19 && value[16] === ":"
+      ? fixedDigits(value.slice(17, 19), 2)
+      : "00";
+  if (!date || hour == null || minute == null || second == null) return null;
+  return {
+    ...date,
+    hour,
+    minute,
+    second,
+  };
+}
+
+function dateOnlyParts(value: string) {
+  if (value.length !== 10 || value[4] !== "-" || value[7] !== "-") {
+    return null;
+  }
+  const year = fixedDigits(value.slice(0, 4), 4);
+  const month = fixedDigits(value.slice(5, 7), 2);
+  const day = fixedDigits(value.slice(8, 10), 2);
+  if (!year || !month || !day) return null;
+  return { year, month, day };
+}
+
+function fixedDigits(value: string, length: number) {
+  if (value.length !== length) return null;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 48 || code > 57) return null;
+  }
+  return value;
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function resolveChartLocale(locale?: string | null) {
+  const normalized = locale?.trim();
+  if (!normalized) return "en-US";
+  if (normalized.toLowerCase().startsWith("es")) return "es-419";
+  if (normalized.toLowerCase() === "en") return "en-US";
+  return normalized;
+}
+
+function chartCurrencyFormatter(currency: string | undefined, locale: string) {
+  return new Intl.NumberFormat(resolveChartLocale(locale), {
+    style: "currency",
+    currency: currency ?? "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
+export function formatChartCurrency(
+  value: number,
+  currency = "USD",
+  locale = "en-US",
+) {
+  return chartCurrencyFormatter(currency, locale).format(value);
+}
+
+export function formatChartDateLabel(
+  value: Time | string,
+  locale = "en-US",
+  month: "short" | "long" = "long",
+) {
+  const date = chartTimeToUtcDate(value);
+  if (!date) return String(value);
+  const includesTime =
+    typeof value === "number" ||
+    (typeof value === "string" &&
+      dateOnlyParts(value.trim()) === null &&
+      dateTimeParts(value.trim()) !== null);
+
+  return new Intl.DateTimeFormat(resolveChartLocale(locale), {
+    month,
+    day: "numeric",
+    year: "numeric",
+    ...(includesTime ? { hour: "numeric", minute: "2-digit" } : {}),
+    timeZone: "UTC",
+  }).format(date);
 }
 
 type MarkerViewportInput = {
@@ -313,7 +479,7 @@ export function selectVisibleTradeMarkers({
     .map((marker, ordinal) => ({
       marker,
       ordinal,
-      logicalIndex: dataIndexByTime.get(normalizeChartTime(marker.time)) ?? ordinal,
+      logicalIndex: dataIndexByTime.get(chartTimeLookupKey(marker.time)) ?? ordinal,
     }))
     .filter(({ logicalIndex }) => logicalIndex >= from && logicalIndex <= to)
     .sort((a, b) => a.logicalIndex - b.logicalIndex || a.ordinal - b.ordinal);
@@ -386,7 +552,7 @@ function toSeriesMarker(
 ): SeriesMarker<Time> {
   const isEntry = marker.type === "entry";
   return {
-    time: normalizeChartTime(marker.time) as Time,
+    time: chartTimeFromString(marker.time),
     position: isEntry ? "belowBar" : "aboveBar",
     color: isEntry
       ? restrained

@@ -117,6 +117,10 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
         kind: "portfolio_equity",
         currency: "USD",
         base_value: 1000,
+        value_extrema: {
+          peak: { time: "2025-12-31", value: 1560 },
+          lowest: { time: "2022-06-01", value: 984 },
+        },
         series: [
           { time: "2021-01-04", value: 1000 },
           { time: "2021-09-01", value: 1110 },

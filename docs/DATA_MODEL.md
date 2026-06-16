@@ -331,7 +331,7 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 ### Notes
 - Runs are immutable after completion.
 - `benchmark_symbol` is derived from `asset_class` defaults in Alpha (`SPY` for equities, `BTC` for crypto, tested pair for currency pairs).
-- `chart` stores the aggregate portfolio equity curve and capped executed-fill markers used by the result card. Multi-symbol runs store the portfolio curve, not separate comparison series.
+- `chart` stores the aggregate portfolio equity curve, display-ready value extrema, and capped executed-fill markers used by the result card. Multi-symbol runs store the portfolio curve, not separate comparison series.
 - `trades` may mirror chart event markers for lightweight UI hydration. Detailed execution ledgers can preserve signals, order intents, fills, ignored signals, and position snapshots, but list endpoints must expose only lightweight result metadata.
 - Saved strategies must be created from completed run state or an equivalent canonical result snapshot, not reconstructed from frontend display text.
 - Follow-up refinements from a result card must be seeded from

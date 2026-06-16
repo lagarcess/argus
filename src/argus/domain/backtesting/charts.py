@@ -89,7 +89,19 @@ def build_result_chart(
         "markers": markers,
         "currency": "USD",
         "base_value": series[0]["value"] if series else None,
+        "value_extrema": _chart_value_extrema(series),
         "attribution": "TradingView Lightweight Charts",
+    }
+
+
+def _chart_value_extrema(series: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not series:
+        return None
+    peak = max(series, key=lambda point: float(point["value"]))
+    lowest = min(series, key=lambda point: float(point["value"]))
+    return {
+        "peak": {"time": peak["time"], "value": peak["value"]},
+        "lowest": {"time": lowest["time"], "value": lowest["value"]},
     }
 
 

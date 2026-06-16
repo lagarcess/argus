@@ -35,6 +35,8 @@ export type ResultCardDisplayCopy = {
   startingCapitalLabel: string;
   totalContributedLabel: string;
   dateRangeLabel: string;
+  peakValueLabel: string;
+  lowestValueLabel: string;
   timeframeLabel: string;
   sideLabel: string;
   allocationLabel: string;
@@ -78,6 +80,8 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   startingCapitalLabel: "Starting capital",
   totalContributedLabel: "Total contributed",
   dateRangeLabel: "Date range",
+  peakValueLabel: "Peak value",
+  lowestValueLabel: "Lowest value",
   timeframeLabel: "Timeframe",
   sideLabel: "Side",
   allocationLabel: "Allocation",
@@ -357,6 +361,7 @@ function executionFacts(
   );
   const startingCapital =
     parsedStartingCapital ?? result.chart?.base_value ?? undefined;
+  const chartExtrema = chartValueExtrema(result.chart);
   const capitalBasisLabel = isRecurringContributionResult(
     result,
     resolvedParameters,
@@ -368,6 +373,18 @@ function executionFacts(
       ? undefined
       : { label: capitalBasisLabel, value: formatCurrency(startingCapital, locale) },
     { label: copy.dateRangeLabel, value: result.period },
+    chartExtrema
+      ? {
+          label: copy.peakValueLabel,
+          value: formatCurrency(chartExtrema.peak, locale, chartExtrema.currency),
+        }
+      : undefined,
+    chartExtrema
+      ? {
+          label: copy.lowestValueLabel,
+          value: formatCurrency(chartExtrema.lowest, locale, chartExtrema.currency),
+        }
+      : undefined,
     timeframe ? { label: copy.timeframeLabel, value: timeframe } : undefined,
     side ? { label: copy.sideLabel, value: side } : undefined,
     allocation ? { label: copy.allocationLabel, value: allocation } : undefined,
@@ -442,6 +459,17 @@ function contributionFromStructuredFacts(
 
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function chartValueExtrema(chart: StrategyResultPayload["chart"]) {
+  const peak = numberValue(chart?.value_extrema?.peak?.value);
+  const lowest = numberValue(chart?.value_extrema?.lowest?.value);
+  if (peak == null || lowest == null) return undefined;
+  return {
+    peak,
+    lowest,
+    currency: chart?.currency ?? "USD",
+  };
 }
 
 export function formatTimeframeForDisplay(
@@ -598,10 +626,11 @@ function benchmarkDisplayValue(
     .replace(/\bpts\b/gi, "percentage points");
 }
 
-function formatCurrency(value: number, locale = "en-US") {
+function formatCurrency(value: number, locale = "en-US", currency = "USD") {
   return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "USD",
+    currency,
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
 }

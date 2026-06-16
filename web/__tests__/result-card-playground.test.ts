@@ -114,6 +114,15 @@ describe("result card playground", () => {
     expect(positive.worstDrop.value).toBe("-12.4%");
     expect(positive.details).toContainEqual({ label: "Timeframe", value: "1D" });
     expect(positive.details).toContainEqual({ label: "Benchmark", value: "SPY" });
+    expect(positive.details.slice(0, 4)).toEqual([
+      { label: "Starting capital", value: "$1,000" },
+      {
+        label: "Date range",
+        value: "January 4, 2021 to December 31, 2025",
+      },
+      { label: "Peak value", value: "$1,560" },
+      { label: "Lowest value", value: "$984" },
+    ]);
 
     const negative = heroDeltaEvidenceView(resultCardPlaygroundFixtures[1].result);
     expect(negative.hero.value).toBe("$820");
@@ -313,6 +322,8 @@ describe("result card playground", () => {
         percentagePoints: (value) => `${value} puntos porcentuales`,
         beatBy: (value) => `Superó por ${value}`,
         startingCapitalLabel: "Capital inicial",
+        peakValueLabel: "Valor máximo",
+        lowestValueLabel: "Valor mínimo",
         timeframeLabel: "Temporalidad",
         benchmarkLabel: "Referencia",
         dailyData: "Datos diarios",
@@ -330,6 +341,14 @@ describe("result card playground", () => {
     expect(spanish.details).toContainEqual({
       label: "Capital inicial",
       value: "USD\u00a01,000",
+    });
+    expect(spanish.details).toContainEqual({
+      label: "Valor máximo",
+      value: "USD\u00a01,560",
+    });
+    expect(spanish.details).toContainEqual({
+      label: "Valor mínimo",
+      value: "USD\u00a0984",
     });
   });
 

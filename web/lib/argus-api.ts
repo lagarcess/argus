@@ -57,6 +57,10 @@ export type ResultChartPayload = {
   }>;
   currency?: string;
   base_value?: number | null;
+  value_extrema?: {
+    peak?: { time: string; value: number } | null;
+    lowest?: { time: string; value: number } | null;
+  } | null;
   attribution?: string;
 };
 

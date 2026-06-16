@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test";
 
 import {
   buildVisibleSeriesMarkers,
+  formatChartCurrency,
+  formatChartDateLabel,
+  chartTimeLookupKey,
   markerBudgetForViewport,
   selectVisibleTradeMarkers,
 } from "../components/chat/ResultEquityChart";
@@ -113,5 +116,45 @@ describe("ResultEquityChart marker disclosure", () => {
     expect(seriesMarkers.some((item) => item.color === "rgba(112, 163, 141, 0.42)")).toBe(true);
     expect(seriesMarkers.some((item) => item.color === "rgba(184, 92, 92, 0.38)")).toBe(true);
     expect(seriesMarkers.every((item) => item.size === 0.46)).toBe(true);
+  });
+});
+
+describe("ResultEquityChart locale formatting", () => {
+  test("formats Spanish chart dates and currency without fractional cents", () => {
+    const formattedDate = formatChartDateLabel("2026-01-15", "es-419");
+    const formattedCurrency = formatChartCurrency(12345.67, "USD", "es-419");
+
+    expect(formattedDate).toContain("enero");
+    expect(formattedDate).toStartWith("15");
+    expect(formattedDate).not.toContain("January");
+    expect(formattedCurrency).toBe(
+      new Intl.NumberFormat("es-419", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(12345.67),
+    );
+    expect(formattedCurrency).not.toMatch(/[.,]\d{2}\b/);
+  });
+
+  test("preserves intraday chart timestamps as UTC timestamp values", () => {
+    const intradayMarker: ResultChartMarker = {
+      time: "2026-01-15T14:30:00",
+      type: "entry",
+      label: "Buy AAPL",
+    };
+    const lookupKey = chartTimeLookupKey(intradayMarker.time);
+    const seriesMarkers = buildVisibleSeriesMarkers({
+      markers: [intradayMarker],
+      visibleRange: null,
+      chartWidth: 660,
+      dataIndexByTime: new Map([[lookupKey, 0]]),
+    });
+
+    expect(lookupKey).toBe("2026-01-15T14:30:00");
+    expect(typeof seriesMarkers[0]?.time).toBe("number");
+    expect(chartTimeLookupKey(seriesMarkers[0]!.time)).toBe(lookupKey);
+    expect(formatChartDateLabel(intradayMarker.time, "en-US")).toContain("2:30");
   });
 });

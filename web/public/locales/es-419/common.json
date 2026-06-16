@@ -244,6 +244,8 @@
       "details": {
         "starting_capital": "Capital inicial",
         "date_range": "Rango de fechas",
+        "peak_value": "Valor máximo",
+        "lowest_value": "Valor mínimo",
         "timeframe": "Temporalidad",
         "side": "Dirección",
         "allocation": "Asignación",

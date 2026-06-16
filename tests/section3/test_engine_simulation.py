@@ -539,6 +539,10 @@ def test_build_result_chart_uses_aggregate_portfolio_curve() -> None:
     assert chart["series"][0]["value"] == 10000
     assert chart["markers"][0]["type"] == "entry"
     assert chart["markers"][0]["label"] == "Buy AAPL, MSFT"
+    assert chart["value_extrema"] == {
+        "peak": max(chart["series"], key=lambda point: point["value"]),
+        "lowest": min(chart["series"], key=lambda point: point["value"]),
+    }
 
 
 def test_build_result_card_actions_by_symbol_count() -> None:

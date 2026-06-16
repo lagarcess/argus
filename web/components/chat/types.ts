@@ -18,12 +18,21 @@ export type ResultChartMarker = {
   symbols?: string[];
 };
 
+export type ResultChartValuePoint = {
+  time: string;
+  value: number;
+};
+
 export type ResultChartPayload = {
   kind: "portfolio_equity";
   series: ResultChartPoint[];
   markers?: ResultChartMarker[];
   currency?: string;
   base_value?: number | null;
+  value_extrema?: {
+    peak?: ResultChartValuePoint | null;
+    lowest?: ResultChartValuePoint | null;
+  } | null;
   attribution?: string;
 };
 
