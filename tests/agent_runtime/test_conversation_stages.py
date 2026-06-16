@@ -12,12 +12,8 @@ from argus.agent_runtime.llm_clarifier import (
     _render_clarification_response,
 )
 from argus.agent_runtime.stages.clarify import clarify_stage
-from argus.agent_runtime.stages.compose import (
-    compose_response_intent,
-    should_prefer_composed_intent,
-)
 from argus.agent_runtime.stages.confirm import confirm_stage
-from argus.agent_runtime.state.models import ResponseIntent, RunState, StrategySummary
+from argus.agent_runtime.state.models import RunState, StrategySummary
 from argus.llm import openrouter
 
 
@@ -56,6 +52,95 @@ def test_clarify_uses_generator_for_missing_required_fields() -> None:
     assert "asset_universe" not in result.patch["assistant_prompt"]
 
 
+def test_clarify_confirmation_action_period_uses_llm_voice_in_spanish() -> None:
+    state = RunState.new(current_user_message="Cambiar fechas", recent_thread_history=[])
+    state.intent = "strategy_drafting"
+    state.requested_field = "date_range"
+    state.missing_required_fields = ["date_range"]
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        capital_amount=100000,
+    )
+    clarifier = RecordingClarifier(
+        "Claro. ¿Qué nuevo rango quieres usar para AAPL?"
+    )
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+        language="es-419",
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == (
+        "Claro. ¿Qué nuevo rango quieres usar para AAPL?"
+    )
+    assert clarifier.requests[0].language == "es-419"
+    assert clarifier.requests[0].response_intent["semantic_needs"] == ["period"]
+    assert clarifier.requests[0].response_intent["facts"]["language"] == "es-419"
+    assert "Which date" not in result.patch["assistant_prompt"]
+
+
+def test_clarify_offline_fallback_uses_product_language() -> None:
+    state = RunState.new(current_user_message="Cambiar fechas", recent_thread_history=[])
+    state.intent = "strategy_drafting"
+    state.requested_field = "date_range"
+    state.missing_required_fields = ["date_range"]
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        capital_amount=100000,
+    )
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=None,
+        language="es-419",
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == (
+        "¿Qué periodo quieres usar para AAPL?"
+    )
+    assert "No pude formular" not in result.patch["assistant_prompt"]
+    assert "I could not" not in result.patch["assistant_prompt"]
+    assert "Which date" not in result.patch["assistant_prompt"]
+
+
+def test_clarify_empty_llm_response_uses_intent_fallback() -> None:
+    state = RunState.new(current_user_message="Change dates", recent_thread_history=[])
+    state.intent = "strategy_drafting"
+    state.requested_field = "date_range"
+    state.missing_required_fields = ["date_range"]
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        capital_amount=100000,
+    )
+    clarifier = RecordingClarifier(None)
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+        language="en",
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == "What date window should I use for AAPL?"
+    assert clarifier.requests
+    assert "I could not phrase" not in result.patch["assistant_prompt"]
+
+
 def test_clarify_dca_total_budget_expands_to_execution_details() -> None:
     state = RunState.new(
         current_user_message=(
@@ -89,10 +174,10 @@ def test_clarify_dca_total_budget_expands_to_execution_details() -> None:
         "schedule",
     ]
     request = clarifier.requests[0]
-    assert request.response_intent["semantic_needs"] == [
+    assert set(request.response_intent["semantic_needs"]) == {
         "sizing_amount",
         "schedule",
-    ]
+    }
 
 
 def test_clarify_dca_missing_execution_fields_win_over_total_budget_constraint() -> None:
@@ -180,7 +265,7 @@ def test_clarify_dca_missing_period_wins_over_total_budget_constraint() -> None:
             }
         ]
     }
-    clarifier = RecordingClarifier("Which date window should I use?")
+    clarifier = RecordingClarifier("What period should I use?")
 
     result = clarify_stage(
         state=state,
@@ -195,7 +280,7 @@ def test_clarify_dca_missing_period_wins_over_total_budget_constraint() -> None:
     assert clarifier.requests[0].unsupported_constraints == []
 
 
-def test_dca_amount_and_cadence_contract_can_override_under_specific_llm_copy() -> None:
+def test_dca_amount_and_cadence_contract_routes_total_budget_context_to_llm() -> None:
     state = RunState.new(
         current_user_message=(
             "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
@@ -203,29 +288,35 @@ def test_dca_amount_and_cadence_contract_can_override_under_specific_llm_copy() 
         ),
         recent_thread_history=[],
     )
+    state.intent = "strategy_drafting"
     state.missing_required_fields = ["cadence", "capital_amount"]
-    state.response_intent = ResponseIntent(
-        kind="clarification",
-        semantic_needs=["schedule", "sizing_amount"],
-        requested_fields=["cadence", "capital_amount"],
-        facts={
-            "strategy": StrategySummary(
-                strategy_type="dca_accumulation",
-                asset_universe=["LYFT"],
-                asset_class="equity",
-                date_range={"start": "2020-02-01", "end": "2025-02-28"},
-                extra_parameters={"total_capital": 200000},
-            ).model_dump(mode="python")
-        },
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="dca_accumulation",
+        asset_universe=["LYFT"],
+        asset_class="equity",
+        date_range={"start": "2020-02-01", "end": "2025-02-28"},
+        extra_parameters={"total_capital": 200000},
+    )
+    clarifier = RecordingClarifier(
+        "How much should each recurring purchase be, and how often should it happen?"
     )
 
-    assert should_prefer_composed_intent(state) is True
-    copy = compose_response_intent(state)
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+    )
 
-    assert copy is not None
-    assert "How much should each recurring purchase be" in copy
-    assert "how often should those purchases happen" in copy
-    assert "total budget" in copy.lower()
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == clarifier.question
+    request = clarifier.requests[0]
+    assert set(request.response_intent["semantic_needs"]) == {
+        "sizing_amount",
+        "schedule",
+    }
+    assert request.response_intent["facts"]["strategy"]["extra_parameters"] == {
+        "total_capital": 200000
+    }
 
 
 def test_ambiguous_asset_clarification_preserves_requested_field_context() -> None:
@@ -262,41 +353,43 @@ def test_ambiguous_asset_clarification_preserves_requested_field_context() -> No
     assert result.patch["ambiguous_fields"][0]["field_name"] == "asset_universe[0]"
 
 
-def test_dca_full_setup_fallback_uses_single_plain_question() -> None:
+def test_dca_full_setup_uses_llm_clarifier_with_all_missing_fields() -> None:
     state = RunState.new(
         current_user_message="Walk me through a DCA",
         recent_thread_history=[],
     )
-    state.response_intent = ResponseIntent(
-        kind="clarification",
-        semantic_needs=[
-            "asset_target",
-            "period",
-            "sizing_amount",
-            "schedule",
-        ],
-        requested_fields=[
-            "asset_universe",
-            "date_range",
-            "capital_amount",
-            "cadence",
-        ],
-        facts={
-            "strategy": StrategySummary(
-                strategy_type="dca_accumulation",
-            ).model_dump(mode="python")
-        },
+    state.intent = "strategy_drafting"
+    state.missing_required_fields = [
+        "asset_universe",
+        "date_range",
+        "capital_amount",
+        "cadence",
+    ]
+    state.candidate_strategy_draft = StrategySummary(strategy_type="dca_accumulation")
+    clarifier = RecordingClarifier(
+        "Pick an asset, a time window, an amount per purchase, and a cadence."
     )
 
-    copy = compose_response_intent(state)
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+    )
 
-    assert copy is not None
-    assert "To test it" in copy
-    assert "asset" in copy
-    assert "date window" in copy
-    assert "recurring purchase amount" in copy
-    assert "purchase cadence" in copy
-    assert copy.count("?") == 0
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == clarifier.question
+    assert clarifier.requests[0].missing_required_fields == [
+        "asset_universe",
+        "date_range",
+        "capital_amount",
+        "cadence",
+    ]
+    assert clarifier.requests[0].response_intent["semantic_needs"] == [
+        "asset_target",
+        "period",
+        "sizing_amount",
+        "schedule",
+    ]
 
 
 def test_clarify_uses_generator_for_unsupported_recovery() -> None:
@@ -333,7 +426,7 @@ def test_clarify_uses_generator_for_unsupported_recovery() -> None:
     )
 
 
-def test_clarify_composes_dca_cap_recovery_after_execution_fields_are_known() -> None:
+def test_clarify_uses_generator_for_dca_cap_recovery_after_execution_fields_are_known() -> None:
     state = RunState.new(
         current_user_message=(
             "what if I bought $125 of BTC every two weeks from 2022 through "
@@ -368,7 +461,11 @@ def test_clarify_composes_dca_cap_recovery_after_execution_fields_are_known() ->
             }
         ]
     }
-    clarifier = RecordingClarifier("This LLM clarification should not be used.")
+    clarifier = RecordingClarifier(
+        "I can keep the recurring-buy run and ignore the cap, change the recurring "
+        "amount, or switch to buy-and-hold with the starting capital. Which path "
+        "should I use?"
+    )
 
     result = clarify_stage(
         state=state,
@@ -378,11 +475,14 @@ def test_clarify_composes_dca_cap_recovery_after_execution_fields_are_known() ->
 
     assert result.outcome == "await_user_reply"
     assert result.patch["response_intent"]["kind"] == "unsupported_recovery"
-    assert clarifier.requests == []
+    assert result.patch["assistant_prompt"] == clarifier.question
+    assert len(clarifier.requests) == 1
+    assert clarifier.requests[0].unsupported_constraints[0]["category"] == (
+        "unsupported_dca_starting_principal"
+    )
     prompt = result.patch["assistant_prompt"]
-    assert "contribution cap" in prompt
-    assert "recurring contribution" in prompt
-    assert "run the recurring-buy simulation only" in prompt
+    assert "recurring-buy" in prompt
+    assert "starting capital" in prompt
 
 
 def test_clarify_routes_interpreter_prefill_through_target_aware_generator() -> None:
@@ -441,20 +541,25 @@ def test_beginner_guidance_uses_interpreter_prefill_without_second_llm() -> None
     assert clarifier.requests == []
 
 
-def test_beginner_guidance_composed_fallback_is_explicit_degraded_recovery() -> None:
+def test_beginner_guidance_without_prefill_uses_llm_clarifier() -> None:
     state = RunState.new(
         current_user_message="I want to create a new strategy.",
         recent_thread_history=[],
     )
-    state.response_intent = ResponseIntent(kind="beginner_guidance")
+    state.intent = "beginner_guidance"
+    clarifier = RecordingClarifier(
+        "Start with an asset and a rough window, and I can shape it into a test."
+    )
 
-    prompt = compose_response_intent(state)
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+    )
 
-    assert prompt is not None
-    assert "couldn't" in prompt.lower()
-    assert "runnable historical test" in prompt.lower()
-    assert "tell me an asset" not in prompt.lower()
-    assert "say it in one sentence" not in prompt.lower()
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == clarifier.question
+    assert clarifier.requests[0].response_intent["kind"] == "beginner_guidance"
 
 
 def test_rule_clarification_preserves_known_asset_context() -> None:
@@ -472,19 +577,25 @@ def test_rule_clarification_preserves_known_asset_context() -> None:
         asset_class="equity",
         entry_logic="MACD, RSI, and volume confirmation",
     )
-    state.response_intent = ResponseIntent(
-        kind="clarification",
-        semantic_needs=["rule_definition"],
-        requested_fields=["entry_logic"],
-        facts={"strategy": strategy.model_dump(mode="python")},
+    state.intent = "strategy_drafting"
+    state.missing_required_fields = ["entry_logic"]
+    state.candidate_strategy_draft = strategy
+    clarifier = RecordingClarifier(
+        "NVDA is the anchor. Which supported rule should I test?"
     )
 
-    prompt = compose_response_intent(state)
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+    )
 
-    assert prompt is not None
-    assert "NVDA" in prompt
-    assert "simplified into one supported rule" in prompt
-    assert "keep the full rule as a draft" in prompt
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == clarifier.question
+    assert clarifier.requests[0].candidate_strategy_draft.asset_universe == ["NVDA"]
+    assert clarifier.requests[0].response_intent["semantic_needs"] == [
+        "rule_definition"
+    ]
 
 
 def test_multi_field_signal_clarification_uses_plain_language() -> None:
@@ -497,20 +608,48 @@ def test_multi_field_signal_clarification_uses_plain_language() -> None:
         strategy_thesis="Buy when the 50-day moving average crosses the 200-day.",
         entry_logic="50 crosses 200",
     )
-    state.response_intent = ResponseIntent(
-        kind="clarification",
-        semantic_needs=["asset_target", "period"],
-        requested_fields=["asset_universe", "date_range"],
-        facts={"strategy": strategy.model_dump(mode="python")},
+    state.intent = "strategy_drafting"
+    state.missing_required_fields = ["asset_universe", "date_range"]
+    state.candidate_strategy_draft = strategy
+    clarifier = RecordingClarifier("What asset and date range should I use?")
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
     )
 
-    prompt = compose_response_intent(state)
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == clarifier.question
+    assert clarifier.requests[0].response_intent["semantic_needs"] == [
+        "asset_target",
+        "period",
+    ]
 
-    assert prompt is not None
-    assert "What should I test it on" in prompt
-    assert "date window" in prompt
-    assert "signal-rule" not in prompt
-    assert "direction" not in prompt
+
+def test_confirmation_action_assumption_uses_llm_voice_in_spanish() -> None:
+    state = RunState.new(current_user_message="Ajustar supuestos", recent_thread_history=[])
+    state.intent = "strategy_drafting"
+    state.requested_field = "assumption"
+    state.missing_required_fields = ["assumption"]
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+    )
+    clarifier = RecordingClarifier("¿Qué supuesto quieres ajustar para AAPL?")
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+        language="es-419",
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == clarifier.question
+    assert clarifier.requests[0].language == "es-419"
+    assert clarifier.requests[0].response_intent["semantic_needs"] == ["assumption"]
 
 
 def test_clarify_unsupported_recovery_uses_generator_over_prefilled_copy() -> None:
@@ -593,6 +732,25 @@ def test_clarifier_system_prompt_enforces_user_language() -> None:
         "'es-419')."
     ) in system_prompt
     assert "es-419" in messages[1].content
+
+
+def test_clarifier_system_prompt_avoids_stale_fixed_date_examples() -> None:
+    clarifier = OpenRouterClarificationGenerator()
+    request = clarifier.request_model(
+        current_user_message="Cambiar fechas",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL"],
+        ),
+        missing_required_fields=["date_range"],
+        response_intent={"kind": "clarification", "semantic_needs": ["period"]},
+        language="es-419",
+    )
+
+    system_prompt = clarifier._messages(request)[0].content
+
+    assert "avoid arbitrary fixed calendar examples" in system_prompt
+    assert "relative or rolling windows" in system_prompt
 
 
 def test_clarifier_system_prompt_guides_unsupported_recovery_context() -> None:
@@ -691,7 +849,7 @@ def test_openrouter_clarifier_uses_structured_response_contract(monkeypatch) -> 
             question=(
                 "Cheap can mean valuation, like P/E. For TSLA, I can use the "
                 "closest runnable proxy: buy-and-hold over a window you care "
-                "about. Which date window should I use?"
+                "about. What period should I test?"
             ),
             question_targets=["period"],
             directly_asks_user=True,
@@ -722,7 +880,7 @@ def test_openrouter_clarifier_uses_structured_response_contract(monkeypatch) -> 
     assert question is not None
     assert "TSLA" in question
     assert "P/E" in question
-    assert "date window" in question.lower()
+    assert "period" in question.lower()
     assert "missing_required_fields" not in question
     assert observed["task"] == "clarification"
     assert observed["schema_model"] is ClarificationResponse
@@ -878,7 +1036,7 @@ def test_openrouter_clarifier_rejects_vague_dca_detail_response(
     assert receipts[-1].failure_mode == "contract_violation"
 
 
-def test_openrouter_clarifier_renders_dca_contract_question(monkeypatch) -> None:
+def test_openrouter_clarifier_renders_dca_model_direct_question(monkeypatch) -> None:
     async def fake_json_schema(
         *, task, messages, schema_model, schema_name, model_name=None
     ):
@@ -886,9 +1044,12 @@ def test_openrouter_clarifier_renders_dca_contract_question(monkeypatch) -> None
         return ClarificationResponse(
             question=(
                 "Got it — LYFT, $200k total, from Feb 2020 to Feb 2025. "
-                "To set up the DCA, how often would you like to make purchases?"
+                "To set up the DCA, I need the recurring purchase amount and cadence."
             ),
-            direct_question="How often would you like to make purchases?",
+            direct_question=(
+                "How much should each recurring purchase be, and how often should "
+                "those purchases happen?"
+            ),
             question_targets=["sizing_amount", "schedule"],
             directly_asks_user=True,
             detail_targets=["recurring_purchase_amount", "purchase_cadence"],
@@ -926,6 +1087,57 @@ def test_openrouter_clarifier_renders_dca_contract_question(monkeypatch) -> None
     assert "How much should each recurring purchase be" in question
     assert "how often should those purchases happen" in question
     assert question.lower().count("how often") == 1
+
+
+def test_openrouter_clarifier_preserves_localized_dca_detail_question(
+    monkeypatch,
+) -> None:
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=(
+                "Entiendo: DCA para ETH. Para hacerlo ejecutable, necesito el monto "
+                "de cada compra y la frecuencia."
+            ),
+            direct_question=(
+                "¿Cuánto quieres comprar en cada operación recurrente y con qué "
+                "frecuencia?"
+            ),
+            question_targets=["sizing_amount", "schedule"],
+            directly_asks_user=True,
+            detail_targets=["recurring_purchase_amount", "purchase_cadence"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message="Compra ETH de forma recurrente desde 2022",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["ETH"],
+                asset_class="crypto",
+                date_range={"start": "2022-01-01", "end": "today"},
+            ),
+            missing_required_fields=["capital_amount", "cadence"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["sizing_amount", "schedule"],
+            },
+            language="es-419",
+        )
+    )
+
+    assert question is not None
+    assert "¿Cuánto quieres comprar" in question
+    assert "con qué frecuencia" in question
+    assert "How much should each recurring purchase be" not in question
 
 
 def test_openrouter_clarifier_preserves_initial_dca_setup_question(
@@ -1042,6 +1254,140 @@ def test_openrouter_clarifier_deduplicates_embedded_direct_question(
     assert question.endswith("what time period should we look at?")
 
 
+def test_openrouter_clarifier_deduplicates_identical_direct_question(
+    monkeypatch,
+) -> None:
+    repeated = (
+        "¿Qué período prefieres para la prueba de AAPL? Por ejemplo, dime un "
+        "rango de fechas concreto o una ventana como últimos 3 años."
+    )
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=repeated,
+            direct_question=repeated,
+            question_targets=["period"],
+            directly_asks_user=True,
+            detail_targets=["date_window"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message="Cambiar fechas",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+            ),
+            missing_required_fields=["date_range"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["period"],
+            },
+            language="es-419",
+        )
+    )
+
+    assert question == repeated
+
+
+def test_openrouter_clarifier_deduplicates_repeated_question_paragraph(
+    monkeypatch,
+) -> None:
+    repeated = (
+        "¿Qué período prefieres para la prueba de AAPL? Por ejemplo, dime un "
+        "rango de fechas concreto o una ventana como últimos 3 años."
+    )
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=f"{repeated} {repeated}",
+            question_targets=["period"],
+            directly_asks_user=True,
+            detail_targets=["date_window"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message="Cambiar fechas",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+            ),
+            missing_required_fields=["date_range"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["period"],
+            },
+            language="es-419",
+        )
+    )
+
+    assert question == repeated
+
+
+def test_openrouter_clarifier_does_not_append_embedded_direct_question(
+    monkeypatch,
+) -> None:
+    question_text = (
+        "¿Qué período prefieres para la prueba de AAPL? Puedes darme fechas "
+        "concretas o un rango como últimos 6 meses."
+    )
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=question_text,
+            direct_question="¿Qué período prefieres para la prueba de AAPL?",
+            question_targets=["period"],
+            directly_asks_user=True,
+            detail_targets=["date_window"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    rendered = clarifier(
+        clarifier.request_model(
+            current_user_message="Cambiar fechas",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+            ),
+            missing_required_fields=["date_range"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["period"],
+            },
+            language="es-419",
+        )
+    )
+
+    assert rendered == question_text
+
+
 def test_openrouter_clarifier_keeps_abbreviations_when_deduplicating_question(
     monkeypatch,
 ) -> None:
@@ -1123,7 +1469,10 @@ def test_openrouter_clarifier_keeps_decimal_and_abbreviation_in_contract_context
                 "Got it — LYFT with a $200.00 total budget, e.g., your planned "
                 "cap. I need one more detail before this is runnable."
             ),
-            direct_question="How often would you like to make purchases?",
+            direct_question=(
+                "How much should each recurring purchase be, and how often should "
+                "those purchases happen?"
+            ),
             question_targets=["sizing_amount", "schedule"],
             directly_asks_user=True,
             detail_targets=["recurring_purchase_amount", "purchase_cadence"],
@@ -1162,7 +1511,7 @@ def test_openrouter_clarifier_keeps_decimal_and_abbreviation_in_contract_context
     assert "How much should each recurring purchase be" in question
 
 
-def test_openrouter_clarifier_does_not_duplicate_contract_question_when_first(
+def test_openrouter_clarifier_does_not_duplicate_dca_direct_question_when_first(
     monkeypatch,
 ) -> None:
     async def fake_json_schema(
@@ -1217,19 +1566,38 @@ def test_openrouter_clarifier_does_not_duplicate_contract_question_when_first(
 def test_openrouter_clarifier_uses_missing_fields_for_dca_amount_and_cadence(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/primary")
+    monkeypatch.setenv("ARGUS_CHAT_FALLBACK_MODEL", "chat/fallback")
+    calls: list[str | None] = []
+
     async def fake_json_schema(
         *, task, messages, schema_model, schema_name, model_name=None
     ):
-        del task, messages, schema_model, schema_name, model_name
+        del task, messages, schema_model, schema_name
+        calls.append(model_name)
+        if model_name is None:
+            return ClarificationResponse(
+                question=(
+                    "Great, a 5-year DCA plan for LYFT. You mentioned a total budget. "
+                    "How often would you like to make purchases?"
+                ),
+                direct_question="How often would you like to make purchases?",
+                question_targets=["schedule"],
+                directly_asks_user=True,
+                detail_targets=["purchase_cadence"],
+            )
         return ClarificationResponse(
             question=(
                 "Great, a 5-year DCA plan for LYFT. You mentioned a total budget. "
-                "How often would you like to make purchases?"
+                "I need the recurring purchase amount and cadence."
             ),
-            direct_question="How often would you like to make purchases?",
-            question_targets=["schedule"],
+            direct_question=(
+                "How much should each recurring purchase be, and how often should "
+                "those purchases happen?"
+            ),
+            question_targets=["sizing_amount", "schedule"],
             directly_asks_user=True,
-            detail_targets=["purchase_cadence"],
+            detail_targets=["recurring_purchase_amount", "purchase_cadence"],
         )
 
     monkeypatch.setattr(
@@ -1261,6 +1629,7 @@ def test_openrouter_clarifier_uses_missing_fields_for_dca_amount_and_cadence(
     assert question is not None
     assert "How much should each recurring purchase be" in question
     assert "how often should those purchases happen" in question
+    assert calls == [None, "chat/fallback"]
 
 
 def test_openrouter_clarifier_renders_dca_direct_question_when_wrapper_is_vague(
@@ -1820,6 +2189,30 @@ def test_confirm_stage_persists_validated_launch_payload_before_ready() -> None:
     assert launch_payload["parameters"] == {}
 
 
+def test_confirm_stage_preserves_strategy_language_in_launch_payload() -> None:
+    state = RunState.new(
+        current_user_message=(
+            "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+        ),
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Comprar y mantener ETH.",
+        asset_universe=["ETH"],
+        asset_class="crypto",
+        capital_amount=100000,
+        date_range={"start": "2024-01-01", "end": "2024-03-31"},
+        extra_parameters={"language": "es-419"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    launch_payload = result.patch["confirmation_payload"]["launch_payload"]
+    assert result.outcome == "await_approval"
+    assert launch_payload["language"] == "es-419"
+
+
 def test_confirm_stage_prefers_structured_indicator_parameters_for_launch() -> None:
     state = RunState.new(
         current_user_message="Use RSI entry 20 exit 60.",
@@ -2009,7 +2402,7 @@ def test_confirm_stage_clarifies_non_executable_signal_rule_before_date() -> Non
     assert result.patch["missing_required_fields"] == ["entry_logic"]
 
 
-def test_confirm_stage_blocks_signal_rule_when_window_cannot_cover_warmup() -> None:
+def test_confirm_stage_blocks_canonical_signal_window_when_window_cannot_cover_warmup() -> None:
     state = RunState.new(
         current_user_message=(
             "Test SPY when the 50-day SMA crosses above the 200-day SMA last month."
@@ -2024,6 +2417,16 @@ def test_confirm_stage_blocks_signal_rule_when_window_cannot_cover_warmup() -> N
         date_range="last month",
         entry_logic="50-day SMA crosses above 200-day SMA",
         exit_logic="50-day SMA crosses below 200-day SMA",
+        extra_parameters={
+            "date_range_intent": {
+                "kind": "rolling_window",
+                "count": 1,
+                "unit": "month",
+                "anchor": "today",
+                "confidence": 0.92,
+                "evidence": "last month",
+            }
+        },
         entry_rule={
             "type": "moving_average_crossover",
             "fast_indicator": "sma",

@@ -15,7 +15,7 @@ export type ConfirmationActionEffect = {
 };
 
 export type ConsumedResultAction = {
-  type: "show_breakdown" | "save_strategy";
+  type: "show_breakdown" | "refine_strategy" | "save_strategy";
   runId?: string;
   savedStrategyId?: string | null;
 };
@@ -30,6 +30,12 @@ const CONFIRMATION_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"]>>
 const IN_PROGRESS_RUN_STATUSES = new Set<StrategyConfirmationStatus>([
   "running",
   "request_sent",
+]);
+const IN_FLIGHT_ACTION_STATUSES = new Set<StrategyConfirmationStatus>([
+  "draft_canceled",
+  "editing",
+  "request_sent",
+  "running",
 ]);
 
 export function confirmationActionStatusLabel(
@@ -118,6 +124,16 @@ export function isSaveActionMetadata(metadata: Record<string, unknown>) {
   );
 }
 
+export function isRefineActionMetadata(metadata: Record<string, unknown>) {
+  const chatAction = metadata.chat_action;
+  return (
+    typeof chatAction === "object" &&
+    chatAction !== null &&
+    "type" in chatAction &&
+    chatAction.type === "refine_strategy"
+  );
+}
+
 export function resultActionRunId(action: ChatActionOption | undefined) {
   const rawRunId = action?.payload?.run_id ?? action?.payload?.runId;
   return typeof rawRunId === "string" && rawRunId.trim() ? rawRunId.trim() : undefined;
@@ -128,7 +144,12 @@ export function consumedResultActionsFromApi(items: ApiMessage[]): ConsumedResul
     const metadata = message.metadata ?? {};
     const action = chatActionFromMetadata(metadata);
     if (isBreakdownActionMetadata(metadata)) {
-      return [{ type: "show_breakdown", runId: resultActionRunId(action) }];
+      const runId = resultActionRunId(action);
+      return runId ? [{ type: "show_breakdown", runId }] : [];
+    }
+    if (message.role === "assistant" && isRefineActionMetadata(metadata)) {
+      const runId = sourceResultRunIdFromMetadata(metadata) ?? resultActionRunId(action);
+      return runId ? [{ type: "refine_strategy", runId }] : [];
     }
     if (message.role === "assistant" && isSaveActionMetadata(metadata)) {
       const savedStrategyId = savedStrategyIdFromMetadata(metadata);
@@ -253,11 +274,15 @@ export function consumeResultActionOnMessages(
   messages: Message[],
   action: ChatActionOption | undefined,
 ): Message[] {
-  if (action?.type !== "show_breakdown") {
+  if (action?.type !== "show_breakdown" && action?.type !== "refine_strategy") {
+    return messages;
+  }
+  const runId = resultActionRunId(action);
+  if (!runId) {
     return messages;
   }
   return applyConsumedResultActions(messages, [
-    { type: "show_breakdown", runId: resultActionRunId(action) },
+    { type: action.type, runId },
   ]);
 }
 
@@ -386,6 +411,36 @@ export function settleOpenConfirmationsAfterStreamError(
   return supersedeOpenConfirmations(messages, "could_not_run");
 }
 
+export function settleConfirmationAfterActionTransportError(
+  messages: Message[],
+  action: ChatActionOption | undefined,
+): Message[] {
+  const effect = confirmationActionEffectFromAction(action);
+  if (!effect) {
+    return messages;
+  }
+  const failedEffect: ConfirmationActionEffect = {
+    ...effect,
+    status: "could_not_run",
+    statusLabel: confirmationStatusLabel("could_not_run"),
+  };
+  return messages.map((message) => {
+    if (message.kind !== "strategy_confirmation" || !message.confirmation) {
+      return message;
+    }
+    const confirmationId = message.confirmation.confirmation_id;
+    const ownsAction =
+      !effect.confirmationId ||
+      !confirmationId ||
+      effect.confirmationId === confirmationId;
+    const status = confirmationStatusFromPayload(message.confirmation);
+    if (!ownsAction || !IN_FLIGHT_ACTION_STATUSES.has(status)) {
+      return message;
+    }
+    return closeConfirmationForAction(message, failedEffect);
+  });
+}
+
 function closeConfirmationForAction(
   message: Message,
   effect: ConfirmationActionEffect,
@@ -491,9 +546,25 @@ function savedStrategyIdFromMetadata(metadata: Record<string, unknown>) {
   return stringOrNull(metadata.saved_strategy_id);
 }
 
+function sourceResultRunIdFromMetadata(metadata: Record<string, unknown>) {
+  const sourceResultRunId = stringOrNull(metadata.source_result_run_id);
+  if (sourceResultRunId) {
+    return sourceResultRunId;
+  }
+  const pendingStrategy = recordOrNull(metadata.pending_strategy);
+  const sourceResult = recordOrNull(pendingStrategy?.source_result);
+  return stringOrNull(sourceResult?.run_id) ?? stringOrNull(sourceResult?.runId);
+}
+
 function confirmationIdFromAction(action: ChatActionOption) {
   const rawValue = action.payload?.confirmation_id ?? action.payload?.confirmationId;
   return typeof rawValue === "string" && rawValue.trim() ? rawValue.trim() : undefined;
+}
+
+function recordOrNull(value: unknown) {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function stringOrNull(value: unknown) {

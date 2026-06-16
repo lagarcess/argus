@@ -111,7 +111,33 @@ Do not reopen these as debt unless a new bug is reproduced:
 
 Codex should own or closely supervise this:
 
-1. **Research Lab product spec**
+1. **Controlled alpha readiness slice**
+   - Active worker branch: `codex/private-alpha-readiness`, targeting
+     `codex/private-alpha-next` after review.
+   - Current local checkpoint: the language-agnostic runtime spine has focused
+     backend tests for messy English/Spanish buy-and-hold prompts with shorthand
+     capital (`100k`) and Codex browser QA for the English and Spanish
+     confirmation-card edit paths. The latest browser pass proved the English
+     `Change dates -> calendar 2024` and Spanish
+     `Cambiar fechas -> calendario 2024` flows update the active card instead
+     of silently re-confirming the prior rolling range or leaking macro-context
+     prose. The English `Change asset -> make it google instead` and Spanish
+     `Cambiar activo -> ponlo con google mejor` flows now update the active
+     card to provider-canonical `GOOGL` while preserving the rest of the setup.
+     A Spanish local browser pass also proved the full happy-path action chain:
+     confirmation, run, result card, Quick take, Explain result, Refine idea,
+     messy refinement into a new `GOOGL`/`$50,000`/six-month confirmation, and
+     structured cancellation. The local Spanish transcript matrix now passes
+     for DCA, missing DCA amount clarification, mixed-asset clarification,
+     currency pairs, unsupported valuation recovery, setup edits, approval, and
+     result follow-ups. A Spanish browser recovery pass now proves unsupported
+     valuation (`P/E`) clarifies into supported proxies, then a messy
+     buy-and-hold follow-up re-enters the normal confirmation funnel.
+   - Remaining before merge/release readiness: production-parity Render canary
+     and the rest of the controlled readiness slices in
+     `docs/specs/private-alpha-controlled-readiness-panel.md`.
+
+2. **Research Lab product spec**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
      saved research, and monitoring belong in a dedicated spec before code.
    - The active refined draft is

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from typing import Any
 
 from argus.api.main import app
@@ -206,7 +207,7 @@ def test_confirmation_action_uses_structured_metadata_only_when_checkpoint_missi
                 "type": "run_backtest",
                 "label": "Run backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "en",
         },
@@ -279,6 +280,104 @@ def test_confirmation_action_prefers_visible_card_metadata_over_checkpoint(
     )
 
     assert response.status_code == 200
+    fallback_payload = captured["fallback_confirmation_payload"]
+    assert fallback_payload["launch_payload"]["symbol"] == "AAPL"
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
+
+
+def test_valid_confirmation_action_reuses_recent_messages_for_metadata_fallback(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot
+    from argus.api import state as api_state
+    from argus.api.chat import actions as chat_actions
+    from argus.api.chat import recovery as chat_recovery
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+    recent_message_reads = 0
+
+    async def _checkpoint(**_: Any):
+        return {
+            "stage_outcome": "await_approval",
+            "latest_task_snapshot": TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Stale checkpoint draft.",
+                    asset_universe=["MSFT"],
+                    asset_class="equity",
+                    date_range="past year",
+                )
+            ),
+        }
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Used visible card context.",
+            },
+        }
+
+    def _recent_messages_for_conversation(
+        *,
+        user_id: str,
+        conversation_id: str,
+        limit: int,
+    ):
+        nonlocal recent_message_reads
+        recent_message_reads += 1
+        return list(api_state.store.messages.get(conversation_id, []))[-limit:]
+
+    monkeypatch.setattr(agent_router, "runtime_checkpoint_values", _checkpoint)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    monkeypatch.setattr(
+        agent_router,
+        "_recent_messages_for_conversation",
+        _recent_messages_for_conversation,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        chat_actions,
+        "_recent_messages_for_conversation",
+        _recent_messages_for_conversation,
+    )
+    monkeypatch.setattr(
+        chat_recovery,
+        "_recent_messages_for_conversation",
+        _recent_messages_for_conversation,
+    )
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=_confirmation_metadata(),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-aapl"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert recent_message_reads == 1
     fallback_payload = captured["fallback_confirmation_payload"]
     assert fallback_payload["launch_payload"]["symbol"] == "AAPL"
     snapshot = captured["fallback_latest_task_snapshot"]
@@ -401,6 +500,122 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
     final = _stream_payloads(response.text, "final")[0]
     assert final["confirmation"]["summary"]
     assert captured["thread_id"] == conversation["id"]
+
+
+def test_adjust_assumptions_action_round_trips_pending_edit_after_reload(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured_calls: list[dict[str, Any]] = []
+
+    async def _runtime(**kwargs: Any):
+        captured_calls.append(kwargs)
+        if kwargs["action_context"] is not None:
+            assert kwargs["action_context"]["type"] == "adjust_assumptions"
+            assert kwargs["fallback_confirmation_payload"]["strategy"][
+                "asset_universe"
+            ] == ["AAPL"]
+            snapshot = kwargs["fallback_latest_task_snapshot"]
+            assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
+            yield {"type": "stage_start", "stage": "interpret"}
+            yield {
+                "type": "final",
+                "payload": {
+                    "stage_outcome": "await_user_reply",
+                    "assistant_response": "What assumption should I adjust for AAPL?",
+                    "pending_strategy": {
+                        "strategy": snapshot.pending_strategy_summary.model_dump(
+                            mode="python"
+                        ),
+                        "requested_field": "assumption",
+                        "missing_required_fields": ["assumption"],
+                        "response_intent": {
+                            "kind": "clarification",
+                            "requested_fields": ["assumption"],
+                            "facts": {
+                                "structured_action": kwargs["action_context"],
+                            },
+                        },
+                    },
+                },
+            }
+            return
+
+        fallback_metadata = kwargs["fallback_selected_thread_metadata"]
+        assert fallback_metadata["fallback_source"] == "pending_strategy_metadata"
+        assert fallback_metadata["requested_field"] == "assumption"
+        snapshot = kwargs["fallback_latest_task_snapshot"]
+        assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Got it. I will use that assumption.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    metadata = _confirmation_metadata()
+    metadata["confirmation_card"]["actions"].append(
+        {
+            "id": "adjust-assumptions",
+            "type": "adjust_assumptions",
+            "label": "Adjust assumptions",
+            "presentation": "confirmation",
+            "payload": {"confirmation_id": "confirm-aapl"},
+        }
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=metadata,
+    )
+
+    action_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "adjust_assumptions",
+                "label": "Adjust assumptions",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-aapl"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert action_response.status_code == 200
+    final = _stream_payloads(action_response.text, "final")[0]
+    assert final["stage_outcome"] == "await_user_reply"
+    messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    latest_assistant = messages[-1]
+    assert latest_assistant["role"] == "assistant"
+    assert latest_assistant["metadata"]["chat_action"]["type"] == "adjust_assumptions"
+    assert latest_assistant["metadata"]["pending_strategy"]["requested_field"] == (
+        "assumption"
+    )
+
+    reply_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Use a 5000 dollar starting amount.",
+            "language": "en",
+        },
+    )
+
+    assert reply_response.status_code == 200
+    assert len(captured_calls) == 2
 
 
 def test_pending_strategy_metadata_fallback_is_used_even_when_checkpoint_has_pending(
@@ -739,6 +954,55 @@ def test_stale_confirmation_card_without_structured_payload_returns_recovery(
     assert "confirm it again" in text
 
 
+def test_stale_confirmation_card_without_structured_payload_returns_spanish_recovery(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "final", "payload": {"stage_outcome": "ready_to_respond"}}
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    metadata = _confirmation_metadata()
+    metadata.pop("confirmation_payload")
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Entendí esto como AAPL con comprar y mantener.",
+        metadata=metadata,
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Ejecutar backtest",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 0
+    text = _stream_payloads(response.text, "token")[0]["content"]
+    lowered = text.lower()
+    assert "confirmación" in lowered
+    assert "guardada" in lowered
+    assert "lost the active confirmation state" not in lowered
+
+
 def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
     from argus.api.routers import agent as agent_router
 
@@ -801,6 +1065,165 @@ def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
     text = _stream_payloads(response.text, "token")[0]["content"]
     assert "confirmation was updated" in text.lower()
     assert "latest" in text.lower()
+
+
+def test_stale_confirmation_action_id_returns_spanish_recovery(monkeypatch) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "final", "payload": {"stage_outcome": "approved_for_execution"}}
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    old_metadata = _confirmation_metadata()
+    old_metadata["confirmation_card"]["confirmation_id"] = "confirm-old"
+    old_metadata["confirmation_card"]["confirmation_state"] = "active"
+    old_metadata["confirmation_card"]["actions"][0]["payload"] = {
+        "confirmation_id": "confirm-old"
+    }
+    new_metadata = _confirmation_metadata()
+    new_metadata["confirmation_card"]["confirmation_id"] = "confirm-new"
+    new_metadata["confirmation_card"]["confirmation_state"] = "active"
+    new_metadata["confirmation_card"]["title"] = "NVDA comprar y mantener"
+    new_metadata["confirmation_card"]["actions"][0]["payload"] = {
+        "confirmation_id": "confirm-new"
+    }
+    new_metadata["confirmation_payload"]["strategy"]["asset_universe"] = ["NVDA"]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Entendí esto como AAPL con comprar y mantener.",
+        metadata=old_metadata,
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Entendí esto como NVDA con comprar y mantener.",
+        metadata=new_metadata,
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Ejecutar backtest",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-old"},
+            },
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 0
+    text = _stream_payloads(response.text, "token")[0]["content"]
+    lowered = text.lower()
+    assert "confirmación" in lowered
+    assert "tarjeta" in lowered
+    assert "confirmation was updated" not in lowered
+
+
+def test_run_confirmation_action_without_confirmation_id_does_not_execute(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "final", "payload": {"stage_outcome": "approved_for_execution"}}
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=_confirmation_metadata(),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 0
+    text = _stream_payloads(response.text, "token")[0]["content"]
+    lowered = text.lower()
+    assert "confirmation action" in lowered
+    assert "latest card action" in lowered
+
+
+def test_run_confirmation_action_without_confirmation_id_returns_spanish_recovery(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "final", "payload": {"stage_outcome": "approved_for_execution"}}
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Entendí esto como AAPL con comprar y mantener.",
+        metadata=_confirmation_metadata(),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Ejecutar backtest",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 0
+    text = _stream_payloads(response.text, "token")[0]["content"]
+    lowered = text.lower()
+    assert "identidad" in lowered
+    assert "tarjeta" in lowered
+    assert "confirmation action" not in lowered
 
 
 def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:
@@ -909,6 +1332,77 @@ def test_cancel_confirmation_action_persists_invisible_artifact_tombstone() -> N
         "type": "confirmation_cancelled",
         "confirmation_id": "confirm-aapl",
     }
+
+
+def test_canceled_confirmation_blocks_stale_checkpoint_run_action(monkeypatch) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _checkpoint_still_pending(**_: Any) -> dict[str, Any]:
+        return {
+            "stage_outcome": "await_approval",
+            "run_state": SimpleNamespace(
+                confirmation_payload=_confirmation_metadata()["confirmation_payload"]
+            ),
+        }
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "stage_start", "stage": "execute"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "approved_for_execution",
+                "assistant_response": "Running the stale draft.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "runtime_checkpoint_values", _checkpoint_still_pending)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=_confirmation_metadata(),
+    )
+
+    cancel_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "cancel_confirmation",
+                "label": "Cancel",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-aapl"},
+            },
+            "language": "en",
+        },
+    )
+    assert cancel_response.status_code == 200
+
+    stale_run_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-aapl"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert stale_run_response.status_code == 409
+    assert runtime_calls == 0
 
 
 def test_result_followup_after_reload_carries_latest_run_reference(
@@ -1701,23 +2195,33 @@ def test_refine_strategy_action_uses_card_run_before_runtime_memory(
     from argus.api.routers import agent as agent_router
 
     runtime_invoked = False
+    captured: dict[str, Any] = {}
 
-    async def _stale_runtime(**_: Any):
+    async def _runtime(**kwargs: Any):
         nonlocal runtime_invoked
         runtime_invoked = True
+        captured.update(kwargs)
         yield {"type": "stage_start", "stage": "interpret"}
         yield {
             "type": "final",
             "payload": {
-                "stage_outcome": "ready_to_respond",
-                "assistant_response": (
-                    "I do not have a completed result to refine. Run a strategy "
-                    "first, then use Refine strategy from the result card."
-                ),
+                "stage_outcome": "await_user_reply",
+                "assistant_response": "What would you like to change?",
+                "pending_strategy": {
+                    "requested_field": "refinement",
+                    "strategy": {
+                        "strategy_type": "buy_and_hold",
+                        "asset_universe": ["DOGE"],
+                        "asset_class": "crypto",
+                    },
+                },
+                "latest_run_id": kwargs[
+                    "fallback_latest_task_snapshot"
+                ].latest_backtest_result_reference.artifact_id,
             },
         }
 
-    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _stale_runtime)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
     client = _client()
     conversation = _conversation(client)
     user_id = _user_id(client)
@@ -1804,9 +2308,11 @@ def test_refine_strategy_action_uses_card_run_before_runtime_memory(
 
     assert response.status_code == 200
     final = _stream_payloads(response.text, "final")[0]
-    assert runtime_invoked is False
+    assert runtime_invoked is True
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.latest_backtest_result_reference is not None
+    assert snapshot.latest_backtest_result_reference.artifact_id == run.id
     assert final["stage_outcome"] == "await_user_reply"
-    assert "change" in final["assistant_response"].lower()
     assert final["latest_run_id"] == run.id
     assert final["pending_strategy"]["requested_field"] == "refinement"
     assert final["pending_strategy"]["strategy"]["asset_universe"] == ["DOGE"]
@@ -2311,6 +2817,170 @@ def test_retry_after_reload_carries_latest_failed_action_reference(monkeypatch) 
     assert reference.metadata["launch_payload"] == launch_payload
 
 
+def test_structured_retry_action_after_reload_carries_failed_action_reference(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_for_confirmation",
+                "assistant_response": "I rebuilt the failed run for review.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "MSFT",
+        "symbols": ["MSFT"],
+        "timeframe": "1D",
+        "date_range": {"start": "2025-05-13", "end": "2026-05-13"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 1000,
+        "benchmark_symbol": "SPY",
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I still have the MSFT buy-and-hold draft, but market data failed.",
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "failed_action": {
+                "artifact_id": "failed-msft-run",
+                "action_type": "run_backtest",
+                "launch_payload": launch_payload,
+                "failure_classification": "upstream_dependency_error",
+                "error": "market_data_unavailable",
+                "retryable": True,
+            },
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "retry_failed_action",
+                "label": "Retry",
+                "payload": {"failed_action_id": "failed-msft-run"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    snapshot = captured["fallback_latest_task_snapshot"]
+    reference = snapshot.latest_failed_action_reference
+    assert reference is not None
+    assert reference.artifact_id == "failed-msft-run"
+    assert reference.metadata["launch_payload"] == launch_payload
+
+
+def test_spanish_structured_retry_prefers_failed_action_over_stale_confirmation(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Recupere la prueba fallida.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "AAPL",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "date_range": {"start": "2025-01-01", "end": "2025-04-01"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 10000,
+        "benchmark_symbol": "SPY",
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Tengo una confirmacion anterior para AAPL.",
+        metadata=_confirmation_metadata(),
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="La ejecucion fallo, pero puedes reintentarla.",
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "failed_action": {
+                "artifact_id": "failed-aapl-es",
+                "action_type": "run_backtest",
+                "launch_payload": launch_payload,
+                "failure_classification": "upstream_dependency_error",
+                "error": "market_data_unavailable",
+                "retryable": True,
+            },
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "retry_failed_action",
+                "label": "Reintentar",
+                "labelKey": "common.retry",
+                "payload": {"failed_action_id": "failed-aapl-es"},
+            },
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["user"].language_preference == "es-419"
+    assert captured["action_context"]["type"] == "retry_failed_action"
+    assert captured["action_context"]["payload"] == {
+        "failed_action_id": "failed-aapl-es"
+    }
+    assert captured["fallback_selected_thread_metadata"] == {
+        "latest_task_type": "backtest_execution",
+        "last_stage_outcome": "execution_failed_recoverably",
+        "fallback_source": "failed_action_metadata",
+    }
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.pending_strategy_summary is None
+    assert snapshot.active_confirmation_reference is None
+    reference = snapshot.latest_failed_action_reference
+    assert reference is not None
+    assert reference.artifact_id == "failed-aapl-es"
+    assert reference.metadata["launch_payload"] == launch_payload
+
+
 def test_failed_action_fallback_is_superseded_by_newer_completed_result() -> None:
     from argus.api import state as api_state
     from argus.api.chat.recovery import failed_action_metadata_fallback_context
@@ -2434,3 +3104,84 @@ def test_save_strategy_action_without_canonical_run_id_does_not_save_latest() ->
     text = _stream_payloads(response.text, "token")[0]["content"]
     assert "could not find" in text
     assert client.get("/api/v1/strategies").json()["items"] == []
+
+
+def test_show_breakdown_action_without_canonical_run_id_does_not_use_latest(
+    monkeypatch,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    def _breakdown(run: BacktestRun | None, *, language: str) -> SimpleNamespace:
+        captured["run"] = run
+        return SimpleNamespace(
+            text=(
+                "I could not find the completed backtest to explain."
+                if run is None
+                else "Unexpected latest-run breakdown."
+            ),
+            source="missing_result" if run is None else "latest_result",
+            fallback_used=True,
+            failure_mode="missing_result" if run is None else None,
+        )
+
+    monkeypatch.setattr(
+        agent_router,
+        "result_breakdown_message_with_metadata",
+        _breakdown,
+    )
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = api_state.store.new_id()
+    api_state.store.backtest_runs[run_id] = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["MSFT"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 6.2}}},
+        config_snapshot={"template": "buy_and_hold", "symbols": ["MSFT"]},
+        conversation_result_card={
+            "title": "MSFT buy and hold",
+            "rows": [
+                {"key": "total_return_pct", "label": "Total Return", "value": "+6.2%"}
+            ],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Here is the completed result.",
+        metadata={"result_run_id": run_id, "latest_run_id": run_id},
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "show_breakdown",
+                "label": "Explain result",
+                "presentation": "result",
+                "payload": {},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["run"] is None
+    text = _stream_payloads(response.text, "token")[0]["content"]
+    assert "could not find" in text

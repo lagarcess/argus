@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
+from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
 from argus.agent_runtime.stages.interpret import StructuredInterpretation, interpret_stage
 from argus.agent_runtime.state.models import (
     AmbiguousField,
@@ -289,11 +290,6 @@ def test_active_confirmation_date_edit_refreshes_confirmation_card(
         "resolve_asset",
         lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
     )
-    monkeypatch.setattr(
-        interpret_module,
-        "current_message_date_range",
-        lambda message: {"end": "2026-06-02"},
-    )
     pending = StrategySummary(
         strategy_type="buy_and_hold",
         strategy_thesis="Buy and hold NU this year so far.",
@@ -311,7 +307,18 @@ def test_active_confirmation_date_edit_refreshes_confirmation_card(
             "to use a supported RSI rule?"
         ),
         user_goal_summary="User wants to adjust the visible confirmation date.",
-        candidate_strategy_draft=StrategySummary(),
+        candidate_strategy_draft=StrategySummary(
+            date_range={"end": "2026-06-02"},
+            extra_parameters={
+                "date_range_intent": {
+                    "kind": "endpoint_patch",
+                    "endpoint": "end",
+                    "end": "2026-06-02",
+                    "confidence": 0.8,
+                    "evidence": "yesterday",
+                }
+            },
+        ),
         missing_required_fields=[],
         semantic_turn_act="refine_current_idea",
         artifact_target="active_confirmation",
@@ -329,9 +336,61 @@ def test_active_confirmation_date_edit_refreshes_confirmation_card(
     assert strategy.date_range == {"start": "2026-01-01", "end": "2026-06-02"}
     assert result.stage_patch.get("assistant_response") is None
     assert (
-        "current_message_date_endpoint_patch_applied"
+        "semantic_date_constraint_preserved"
         in result.decision.reason_codes
     )
+
+
+def test_pending_date_edit_rejects_noop_inherited_date_range(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple over the last 12 months.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-15", "end": "2026-06-12"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User answered the visible card's date-range edit.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2025-06-15", "end": "2026-06-12"},
+            capital_amount=100000,
+            comparison_baseline="SPY",
+        ),
+        missing_required_fields=[],
+        semantic_turn_act="answer_pending_need",
+        artifact_target="active_confirmation",
+    )
+
+    result, _ = _interpret(
+        message="calendar 2024",
+        response=response,
+        snapshot=_task_snapshot_with_confirmation(pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "date_range",
+        },
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.missing_required_fields == ["date_range"]
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == {"start": "2025-06-15", "end": "2026-06-12"}
+    assert "pending_date_edit_noop_rejected" in result.decision.reason_codes
 
 
 def test_non_dca_capital_answer_updates_initial_capital_assumption(monkeypatch) -> None:
@@ -1229,86 +1288,6 @@ def test_dca_total_capital_and_recurring_contribution_keep_separate_roles(
     ]
 
 
-def test_dca_starting_principal_recovery_copy_is_specific() -> None:
-    from argus.agent_runtime.stages.compose import compose_response_intent
-    from argus.agent_runtime.state.models import ResponseIntent, RunState
-
-    state = RunState.new(
-        current_user_message="my total capital is 100k",
-        recent_thread_history=[],
-    )
-    state.response_intent = ResponseIntent(
-        kind="unsupported_recovery",
-        semantic_needs=["simplification_choice"],
-        facts={
-            "unsupported_constraints": [
-                {
-                    "category": "unsupported_dca_starting_principal",
-                    "raw_value": "$100,000 starting principal",
-                    "explanation": (
-                        "I understand the $100,000 as starting principal, but "
-                        "the current DCA backtest can only execute the recurring "
-                        "contribution."
-                    ),
-                    "simplification_options": [
-                        {"label": "Run recurring buys only"},
-                        {"label": "Adjust recurring contribution"},
-                        {"label": "Use buy and hold with starting capital"},
-                    ],
-                }
-            ]
-        },
-        options=[
-            {"label": "Run recurring buys only"},
-            {"label": "Adjust recurring contribution"},
-            {"label": "Use buy and hold with starting capital"},
-        ],
-    )
-
-    copy = compose_response_intent(state)
-
-    assert copy is not None
-    assert "current DCA backtest can only execute the recurring contribution" in copy
-    assert "run the recurring-buy simulation only" in copy
-    assert "adjust the recurring contribution" in copy
-    assert "switch to buy and hold with the starting capital" in copy
-
-
-def test_unsupported_strategy_recovery_copy_uses_sentence_case_options() -> None:
-    from argus.agent_runtime.stages.compose import compose_response_intent
-    from argus.agent_runtime.state.models import ResponseIntent, RunState
-
-    state = RunState.new(
-        current_user_message="Test Apple when news sentiment turns positive.",
-        recent_thread_history=[],
-    )
-    state.response_intent = ResponseIntent(
-        kind="unsupported_recovery",
-        semantic_needs=["simplification_choice"],
-        facts={
-            "unsupported_constraints": [
-                {
-                    "category": "unsupported_strategy_logic",
-                    "explanation": (
-                        "This idea depends on strategy logic that is not executable yet."
-                    ),
-                }
-            ]
-        },
-        options=[
-            {"label": "Use a supported RSI threshold rule"},
-            {"label": "Compare with buy and hold"},
-            {"label": "Use a supported moving-average crossover"},
-        ],
-    )
-
-    copy = compose_response_intent(state)
-
-    assert copy is not None
-    assert "I can use a supported RSI threshold rule" in copy
-    assert "Compare with" not in copy
-
-
 def test_dca_confirmation_card_uses_recurring_contribution_not_total_capital() -> None:
     from argus.api.chat.confirmation import runtime_confirmation_card
 
@@ -1625,7 +1604,7 @@ def test_change_asset_answer_patches_requested_field_only(monkeypatch) -> None:
         ("the chipmaker", "NVDA", "MSFT"),
     ],
 )
-def test_requested_asset_answer_uses_llm_mapped_asset_after_raw_provider_miss(
+def test_requested_asset_answer_uses_llm_mapped_asset_before_raw_phrase(
     monkeypatch,
     answer: str,
     mapped_symbol: str,
@@ -1672,7 +1651,7 @@ def test_requested_asset_answer_uses_llm_mapped_asset_after_raw_provider_miss(
 
     assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
-    assert provider_queries[0] == answer
+    assert provider_queries[0] == mapped_symbol
     normalized_queries = [query.strip().upper() for query in provider_queries]
     assert mapped_symbol in normalized_queries
     mapped_index = normalized_queries.index(mapped_symbol)
@@ -2752,7 +2731,7 @@ def test_support_field_answer_does_not_replace_prior_asset_with_provider_name_no
         ("ethereum", "ETH", "crypto"),
     ],
 )
-def test_requested_asset_answer_uses_provider_path_when_interpreter_unavailable(
+def test_requested_asset_answer_recovers_when_interpreter_unavailable(
     monkeypatch,
     answer: str,
     expected_symbol: str,
@@ -2792,15 +2771,12 @@ def test_requested_asset_answer_uses_provider_path_when_interpreter_unavailable(
     )
 
     assert len(interpreter.requests) == 1
-    assert result.outcome == "ready_for_confirmation"
-    strategy = result.decision.candidate_strategy_draft
-    assert provider_queries[0] == answer
-    assert "AAPL" not in provider_queries
-    assert strategy.asset_universe == [expected_symbol]
-    assert strategy.asset_class == expected_class
-    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
-    assert strategy.capital_amount == 10000
-    assert "assistant_response" not in result.patch
+    del expected_symbol, expected_class
+    assert result.outcome == "ready_to_respond"
+    assert provider_queries == []
+    assert "AAPL buy and hold setup" in result.patch["assistant_response"]
+    assert "could not safely apply that change" in result.patch["assistant_response"]
+    assert "confirmation_payload" not in result.patch
 
 
 def test_requested_asset_answer_does_not_hide_interpreter_exception(
@@ -2985,7 +2961,7 @@ def test_natural_language_approval_executes_only_after_confirmation_card(
 
     assert result.outcome == "ready_to_respond"
     response_text = result.patch["assistant_response"].lower()
-    assert "visible card" in response_text
+    assert "visible confirmation" in response_text
     assert "simulation" in response_text
     assert "confirmation_payload" not in result.patch
 
@@ -3029,7 +3005,7 @@ def test_confirmation_replay_without_material_change_defers_to_card_action(
 
     assert result.outcome == "ready_to_respond"
     response_text = result.patch["assistant_response"].lower()
-    assert "visible card" in response_text
+    assert "visible confirmation" in response_text
     assert "simulation" in response_text
     assert "confirmation_payload" not in result.patch
     assert "text_action_deferred_to_confirmation_card" in result.decision.reason_codes
@@ -3171,7 +3147,7 @@ def test_change_asset_action_publishes_clarification_intent_without_llm() -> Non
     )
 
     assert interpreter.requests == []
-    assert result.outcome == "await_user_reply"
+    assert result.outcome == "needs_clarification"
     assert result.patch["requested_field"] == "asset_universe"
     assert result.patch["missing_required_fields"] == ["asset_universe"]
     assert result.patch["assistant_prompt"] is None
@@ -3223,7 +3199,7 @@ def test_change_dates_action_anchors_to_visible_confirmation_payload() -> None:
     )
 
     assert interpreter.requests == []
-    assert result.outcome == "await_user_reply"
+    assert result.outcome == "needs_clarification"
     assert result.patch["requested_field"] == "date_range"
     draft = result.patch["candidate_strategy_draft"]
     assert draft["strategy_type"] == "dca_accumulation"
@@ -3310,7 +3286,7 @@ def test_refine_strategy_result_action_publishes_clarification_intent_without_ll
     assert interpreter.requests == []
     assert result.outcome == "await_user_reply"
     assert result.patch["requested_field"] == "refinement"
-    assert result.patch["assistant_prompt"] is None
+    assert result.patch["assistant_prompt"] == "What would you like to change?"
     assert result.patch["response_intent"]["kind"] == "clarification"
     assert result.patch["response_intent"]["semantic_needs"] == ["refinement"]
     assert result.patch["response_intent"]["requested_fields"] == ["refinement"]
@@ -3707,64 +3683,6 @@ def test_active_dca_confirmation_side_question_does_not_route_stale_candidate() 
     assert "educational_strategy_route_suppressed" in result.decision.reason_codes
 
 
-def test_dca_explanation_text_suppresses_misclassified_strategy_route() -> None:
-    pending = StrategySummary(
-        strategy_type="dca_accumulation",
-        strategy_thesis="Buy ETH every two weeks.",
-        asset_universe=["ETH"],
-        asset_class="crypto",
-        date_range={"start": "2022-01-01", "end": "2023-12-31"},
-        capital_amount=125,
-        cadence="biweekly",
-        comparison_baseline="BTC",
-        field_provenance={
-            "capital_amount": "recurring_contribution",
-            "cadence": "explicit_user",
-        },
-    )
-    stale_candidate = StrategySummary(
-        strategy_type="dca_accumulation",
-        strategy_thesis="Recurring buys for an unrelated parsed asset.",
-        asset_universe=["DG"],
-        asset_class="equity",
-        date_range={"start": "2022-01-01", "end": "2023-12-31"},
-        capital_amount=125,
-        cadence="biweekly",
-        field_provenance={
-            "capital_amount": "recurring_contribution",
-            "cadence": "explicit_user",
-        },
-    )
-    response = StructuredInterpretation(
-        intent="backtest_execution",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary="User asks what dollar cost averaging means.",
-        assistant_response=(
-            "Ready to test recurring buys for DG over January 1, 2022 - "
-            "December 31, 2023."
-        ),
-        candidate_strategy_draft=stale_candidate,
-        semantic_turn_act="new_idea",
-        artifact_target="active_confirmation",
-    )
-
-    result, _ = _interpret(
-        message="explain what dollar cost averaging means",
-        response=response,
-        snapshot=_task_snapshot_with_confirmation(pending),
-    )
-
-    answer = result.patch["assistant_response"]
-    assert result.outcome == "ready_to_respond"
-    assert result.decision.semantic_turn_act == "educational_question"
-    assert result.decision.candidate_strategy_draft.asset_universe == []
-    assert "Dollar cost averaging" in answer
-    assert "DG" not in answer
-    assert "Ready to test" not in answer
-    assert "educational_strategy_route_suppressed" in result.decision.reason_codes
-
-
 def test_dca_contract_audit_skips_educational_turn_with_stale_strategy_baggage() -> None:
     from argus.agent_runtime.llm_interpreter import (
         _response_needs_dca_contract_audit,
@@ -3835,7 +3753,7 @@ def test_dca_education_answer_cannot_claim_recurring_buys_unsupported(monkeypatc
 
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
-    assert "Recurring buys support" in answer
+    assert "could not phrase that capability answer" in answer
     assert "can't run" not in answer
     assert "not runnable" not in answer
 
@@ -3929,88 +3847,13 @@ def test_new_strategy_keeps_explicit_cashtag_symbol_context(monkeypatch) -> None
     assert "hidden_artifact_asset_context_cleared" not in result.decision.reason_codes
 
 
-def test_dca_total_budget_clarification_names_recurring_execution_detail() -> None:
-    from argus.agent_runtime.stages.compose import compose_response_intent
-    from argus.agent_runtime.state.models import ResponseIntent, RunState
-
-    state = RunState.new(
-        current_user_message=(
-            "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
-            "$200,000 of capital"
-        ),
-        recent_thread_history=[],
-    )
-    state.response_intent = ResponseIntent(
-        kind="clarification",
-        semantic_needs=["sizing_amount", "schedule"],
-        requested_fields=["capital_amount", "cadence"],
-        facts={
-            "strategy": StrategySummary(
-                strategy_type="dca_accumulation",
-                strategy_thesis="Recurring buys for LYFT.",
-                asset_universe=["LYFT"],
-                asset_class="equity",
-                date_range={"start": "2020-02-01", "end": "2025-02-28"},
-                extra_parameters={"initial_capital": 200000},
-            ).model_dump(mode="python")
-        },
-    )
-
-    copy = compose_response_intent(state)
-
-    assert copy is not None
-    assert "LYFT" in copy
-    assert "recurring" in copy.lower()
-    assert "how much" in copy.lower()
-    assert "how often" in copy.lower()
-    assert "total budget" in copy.lower()
-    assert "one more detail" not in copy.lower()
-
-
-def test_dca_total_budget_clarification_does_not_reask_known_cadence() -> None:
-    from argus.agent_runtime.stages.compose import compose_response_intent
-    from argus.agent_runtime.state.models import ResponseIntent, RunState
-
-    state = RunState.new(
-        current_user_message=(
-            "I would like to invest in LYFT monthly over 5 years, "
-            "$200,000 total"
-        ),
-        recent_thread_history=[],
-    )
-    state.response_intent = ResponseIntent(
-        kind="clarification",
-        semantic_needs=["sizing_amount"],
-        requested_fields=["capital_amount"],
-        facts={
-            "strategy": StrategySummary(
-                strategy_type="dca_accumulation",
-                strategy_thesis="Monthly recurring buys for LYFT.",
-                asset_universe=["LYFT"],
-                asset_class="equity",
-                date_range={"start": "2020-02-01", "end": "2025-02-28"},
-                cadence="monthly",
-                extra_parameters={"total_capital": 200000},
-            ).model_dump(mode="python")
-        },
-    )
-
-    copy = compose_response_intent(state)
-
-    assert copy is not None
-    copy_lower = copy.lower()
-    assert "how much" in copy_lower
-    assert "total budget" in copy_lower
-    assert "how often" not in copy_lower
-
-
 def test_supported_bollinger_capability_is_not_recovered_as_unsupported() -> None:
-    from argus.agent_runtime.capabilities.answers import compose_capability_answer
+    from argus.agent_runtime.capabilities.answers import capability_fact_packet
     from argus.agent_runtime.capabilities.contract import (
         build_default_capability_contract,
     )
 
-    answer = compose_capability_answer(
+    answer = capability_fact_packet(
         focus="supported_indicators",
         contract=build_default_capability_contract(),
     )
@@ -4070,7 +3913,7 @@ def test_invalid_date_answer_after_pending_clarification_asks_for_correction(
     assert "invalid_date_range_requires_correction" in result.decision.reason_codes
 
 
-def test_interpreter_unavailable_pending_date_answer_uses_date_contract_fallback(
+def test_interpreter_unavailable_pending_date_answer_does_not_parse_raw_prose(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -4099,21 +3942,9 @@ def test_interpreter_unavailable_pending_date_answer_uses_date_contract_fallback
         },
     )
 
-    assert result.outcome == "needs_clarification"
-    strategy = result.decision.candidate_strategy_draft
-    assert strategy.asset_universe == ["AAPL"]
-    assert strategy.comparison_baseline == "QQQ"
-    assert strategy.date_range == {
-        "start": "2024-01-01",
-        "end": "2023-12-31",
-    }
-    assert result.decision.missing_required_fields == ["date_range"]
-    assert any(
-        constraint.category == "invalid_date_range"
-        for constraint in result.decision.unsupported_constraints
-    )
-    assert "deterministic_pending_date_answer_fallback" in result.decision.reason_codes
-    assert "llm_interpreter_unavailable" not in result.decision.reason_codes
+    assert result.outcome == "ready_to_respond"
+    assert "deterministic_pending_date_answer_fallback" not in result.decision.reason_codes
+    assert "llm_interpreter_unavailable" in result.decision.reason_codes
 
 
 def test_fresh_complete_restatement_after_failed_clarification_starts_confirmation(
@@ -4278,6 +4109,7 @@ def test_structured_failed_action_retry_rebuilds_confirmation_without_llm() -> N
             "requested_failed_action_id": "failed-action-1",
             "latest_failed_action_id": "failed-action-1",
             "user_safe_message": "market_data_unavailable",
+            "language": "en",
         },
     }
     strategy = result.decision.candidate_strategy_draft
@@ -4334,6 +4166,7 @@ def test_structured_failed_action_recovery_does_not_retry_nonrerunnable_payload(
             "requested_failed_action_id": "failed-action-invalid-date",
             "latest_failed_action_id": "failed-action-invalid-date",
             "user_safe_message": "Date range is outside provider availability.",
+            "language": "en",
         },
     }
 
@@ -4705,6 +4538,42 @@ def test_stated_run_fidelity_removes_inferred_date_endpoint_and_restores_benchma
     assert "stated_run_field_fidelity_audit" in repaired.reason_codes
 
 
+def test_stated_run_fidelity_audit_rejects_localized_raw_cadence() -> None:
+    from argus.agent_runtime.llm_interpreter import (
+        StatedRunFieldFidelityAudit,
+        _response_from_stated_run_field_fidelity_audit,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants recurring ETH buys.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="dca_accumulation",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            capital_amount=100,
+            cadence=None,
+        ),
+        semantic_turn_act="new_idea",
+    )
+    audit = StatedRunFieldFidelityAudit(cadence="semanal")
+
+    repaired = _response_from_stated_run_field_fidelity_audit(
+        response=response,
+        audit=audit,
+    )
+
+    assert repaired is None
+    assert response.candidate_strategy_draft.cadence is None
+
+
 def test_stated_run_fidelity_audit_uses_current_message_context() -> None:
     from argus.agent_runtime.llm_interpreter import (
         _response_needs_stated_run_field_fidelity_audit,
@@ -4765,6 +4634,12 @@ def test_stated_run_fidelity_audit_skips_complete_aligned_comparison() -> None:
             asset_universe=["AAPL"],
             asset_class="equity",
             date_range={"start": "2024-01-01", "end": "2025-12-31"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="explicit_range",
+                start="2024-01-01",
+                end="2025-12-31",
+                evidence="start of 2024 and held through the end of 2025",
+            ),
             comparison_baseline="SPY",
             field_provenance={"comparison_baseline": "explicit_user"},
         ),
@@ -4805,6 +4680,12 @@ def test_stated_run_fidelity_audit_catches_repaired_default_window_and_benchmark
             asset_universe=["AAPL"],
             asset_class="equity",
             date_range="past year",
+            date_range_intent=LLMDateRangeIntent(
+                kind="endpoint_patch",
+                endpoint="start",
+                start="2024-01-01",
+                evidence="start of 2024",
+            ),
             comparison_baseline="SPY",
         ),
         semantic_turn_act="new_idea",
@@ -4949,6 +4830,12 @@ def test_current_message_contract_repair_preserves_partial_date_without_benchmar
             asset_universe=["AAPL"],
             asset_class="equity",
             date_range="past year",
+            date_range_intent=LLMDateRangeIntent(
+                kind="endpoint_patch",
+                endpoint="start",
+                start="2024-01-01",
+                evidence="start of 2024",
+            ),
             comparison_baseline="SPY",
         ),
         semantic_turn_act="new_idea",
@@ -4985,6 +4872,7 @@ def test_current_message_contract_repair_preserves_full_natural_date_range(
         _response_from_current_message_run_field_contract,
     )
     from argus.agent_runtime.llm_interpreter_types import (
+        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -5013,6 +4901,12 @@ def test_current_message_contract_repair_preserves_full_natural_date_range(
             asset_universe=["AAPL"],
             asset_class="equity",
             date_range=None,
+            date_range_intent=LLMDateRangeIntent(
+                kind="explicit_range",
+                start="2024-01-01",
+                end="2025-12-31",
+                evidence="start of 2024 and held through the end of 2025",
+            ),
             comparison_baseline="SPY",
         ),
         semantic_turn_act="new_idea",
@@ -5153,6 +5047,11 @@ def test_current_message_contract_repair_preserves_only_calendar_year_date_range
             asset_universe=["NVDA"],
             asset_class="equity",
             date_range={"end": "2024-12-31"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="calendar_year",
+                year=2024,
+                evidence="2024",
+            ),
             cadence=None,
             capital_amount=None,
             total_capital=250,
@@ -5193,6 +5092,7 @@ async def test_dca_calendar_period_label_does_not_become_timeframe_clarification
         _response_ready_for_runtime,
     )
     from argus.agent_runtime.llm_interpreter_types import (
+        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
@@ -5232,6 +5132,11 @@ async def test_dca_calendar_period_label_does_not_become_timeframe_clarification
             asset_universe=["NVDA"],
             asset_class="equity",
             date_range={"end": "2024"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="calendar_year",
+                year=2024,
+                evidence="2024",
+            ),
             timeframe="calendar_year",
             cadence="weekly",
             capital_amount=250,
@@ -5293,6 +5198,12 @@ async def test_current_year_so_far_refusal_enters_strategy_repair(monkeypatch) -
                 asset_universe=["AAPL"],
                 asset_class="equity",
                 date_range={"start": "2026-01-01", "end": "2026-06-01"},
+                date_range_intent=LLMDateRangeIntent(
+                    kind="year_to_date",
+                    year=2026,
+                    end="2026-06-01",
+                    evidence="2026 so far",
+                ),
                 comparison_baseline="QQQ",
                 raw_user_phrasing=request.current_user_message,
             ),
@@ -5359,11 +5270,9 @@ def test_stated_run_fidelity_preserves_current_year_so_far_contract() -> None:
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
-    from argus.agent_runtime.run_field_contract import current_message_date_range
 
     current_message = "how did apple perform against QQQ in 2026 so far?"
-    expected_range = current_message_date_range(current_message)
-    assert expected_range is not None
+    expected_range = {"start": "2026-01-01", "end": "today"}
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
@@ -5392,24 +5301,18 @@ def test_stated_run_fidelity_preserves_current_year_so_far_contract() -> None:
 
 
 def test_current_message_contract_repairs_full_future_year_to_so_far(
-    monkeypatch,
 ) -> None:
-    from argus.agent_runtime import llm_interpreter as llm_module
     from argus.agent_runtime.llm_interpreter import (
         _response_from_current_message_run_field_contract,
     )
     from argus.agent_runtime.llm_interpreter_types import (
+        LLMDateRangeIntent,
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
     from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 
     expected_range = {"start": "2026-01-01", "end": "2026-06-01"}
-    monkeypatch.setattr(
-        llm_module,
-        "_date_range_from_current_message",
-        lambda message: expected_range,
-    )
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
@@ -5420,6 +5323,12 @@ def test_current_message_contract_repairs_full_future_year_to_so_far(
             asset_universe=["AAPL"],
             asset_class="equity",
             date_range={"start": "2026-01-01", "end": "2026-12-31"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="year_to_date",
+                year=2026,
+                end="2026-06-01",
+                evidence="2026 so far",
+            ),
             comparison_baseline="QQQ",
         ),
         semantic_turn_act="new_idea",
@@ -5464,6 +5373,11 @@ def test_interpret_stage_repairs_dca_calendar_period_before_clarifying_timeframe
             cadence="weekly",
             capital_amount=250,
             extra_parameters={
+                "date_range_intent": {
+                    "kind": "calendar_year",
+                    "year": 2024,
+                    "evidence": "2024",
+                },
                 "field_provenance": {
                     "capital_amount": "recurring_contribution",
                     "cadence": "explicit_user",
@@ -5504,11 +5418,6 @@ def test_interpret_stage_repairs_current_year_so_far_before_execution(
         "resolve_asset",
         lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
     )
-    monkeypatch.setattr(
-        interpret_module,
-        "current_message_date_range",
-        lambda message: {"start": "2026-01-01", "end": "2026-06-01"},
-    )
     response = StructuredInterpretation(
         intent="backtest_execution",
         task_relation="new_task",
@@ -5522,7 +5431,14 @@ def test_interpret_stage_repairs_current_year_so_far_before_execution(
             date_range={"start": "2026-01-01", "end": "2026-12-31"},
             comparison_baseline="QQQ",
             extra_parameters={
-                "field_provenance": {"comparison_baseline": "explicit_user"}
+                "field_provenance": {"comparison_baseline": "explicit_user"},
+                "date_range_intent": {
+                    "kind": "year_to_date",
+                    "year": 2026,
+                    "end": "2026-06-01",
+                    "confidence": 0.8,
+                    "evidence": "2026 so far",
+                },
             },
         ),
         semantic_turn_act="new_idea",
@@ -5572,6 +5488,14 @@ def test_interpret_stage_repairs_missing_asset_and_explicit_date_from_current_me
             date_range=None,
             entry_logic="Buy when RSI(14) drops to 30 or below",
             exit_logic="Sell when RSI(14) rises to 55 or above",
+            extra_parameters={
+                "date_range_intent": {
+                    "kind": "explicit_range",
+                    "start": "2024-01-01",
+                    "end": "2024-12-31",
+                    "evidence": "from Jan 1 2024 to Dec 31 2024",
+                }
+            },
         ),
         semantic_turn_act="new_idea",
         missing_required_fields=["asset_universe", "date_range"],
@@ -5631,7 +5555,13 @@ def test_interpret_stage_repairs_missing_asset_when_benchmark_owner_is_known(
             date_range=None,
             comparison_baseline="QQQ",
             extra_parameters={
-                "field_provenance": {"comparison_baseline": "explicit_user"}
+                "field_provenance": {"comparison_baseline": "explicit_user"},
+                "date_range_intent": {
+                    "kind": "explicit_range",
+                    "start": "2024-01-01",
+                    "end": "2024-12-31",
+                    "evidence": "from Jan 1 2024 to Dec 31 2024",
+                },
             },
         ),
         semantic_turn_act="new_idea",
@@ -5680,6 +5610,14 @@ def test_interpret_stage_does_not_guess_missing_asset_from_ambiguous_mentions(
             asset_class=None,
             date_range=None,
             comparison_baseline=None,
+            extra_parameters={
+                "date_range_intent": {
+                    "kind": "explicit_range",
+                    "start": "2024-01-01",
+                    "end": "2024-12-31",
+                    "evidence": "from Jan 1 2024 to Dec 31 2024",
+                }
+            },
         ),
         semantic_turn_act="new_idea",
         missing_required_fields=["asset_universe", "date_range"],
@@ -5778,6 +5716,12 @@ def test_current_message_contract_repair_handles_other_symbol_dates_without_benc
             asset_universe=["MSFT"],
             asset_class="equity",
             date_range="past year",
+            date_range_intent=LLMDateRangeIntent(
+                kind="endpoint_patch",
+                endpoint="start",
+                start="2025-01-01",
+                evidence="from the beginning of 2025",
+            ),
             comparison_baseline="SPY",
         ),
         semantic_turn_act="new_idea",
@@ -5822,6 +5766,12 @@ def test_stated_run_fidelity_audit_skips_aligned_focused_repair() -> None:
             asset_universe=["AAPL"],
             asset_class="equity",
             date_range={"start": "2024-01-01", "end": "2025-12-31"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="explicit_range",
+                start="2024-01-01",
+                end="2025-12-31",
+                evidence="start of 2024 and held through the end of 2025",
+            ),
             comparison_baseline="SPY",
             field_provenance={"comparison_baseline": "explicit_user"},
         ),
@@ -5862,8 +5812,15 @@ def test_stated_run_fidelity_audit_skips_aligned_focused_repair_capital() -> Non
             strategy_thesis="Backtest TSLA when the 50 SMA crosses the 200 SMA.",
             asset_universe=["TSLA"],
             asset_class="equity",
-            date_range={"start": "2022-01-01", "end": "today"},
+            date_range={"start": "2022-01-01", "end": date.today().isoformat()},
+            date_range_intent=LLMDateRangeIntent(
+                kind="explicit_range",
+                start="2022-01-01",
+                end=date.today().isoformat(),
+                evidence="from January 2022 to today",
+            ),
             capital_amount=10000,
+            field_provenance={"capital_amount": "explicit_user"},
             entry_rule={
                 "type": "moving_average_crossover",
                 "fast_indicator": "sma",

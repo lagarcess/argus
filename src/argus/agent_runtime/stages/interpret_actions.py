@@ -14,6 +14,11 @@ from argus.agent_runtime.artifacts.patch_policy import (
 )
 from argus.agent_runtime.artifacts.patches import ArtifactPatch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.clarification_contract import offline_clarification_fallback
+from argus.agent_runtime.recovery_messages import (
+    recovery_message,
+    recovery_state_stage_patch,
+)
 from argus.agent_runtime.response_style import (
     result_followup_heading,
     with_response_heading,
@@ -21,18 +26,18 @@ from argus.agent_runtime.response_style import (
 from argus.agent_runtime.result_followups import (
     compose_result_followup_response,
     context_packet_ids_from_fact_bank,
-    fallback_result_followup_response,
-    record_result_followup_fallback_receipt,
+    record_result_followup_recovery_receipt,
     result_followup_fact_bank,
     result_followup_llm_task,
 )
-from argus.agent_runtime.run_field_contract import current_message_date_range
 from argus.agent_runtime.stages.approval_guard import (
+    decision_contains_material_strategy_patch,
     decision_is_pure_approval,
     decision_replays_visible_confirmation_without_material_change,
     decision_requests_confirmation_card_action,
 )
 from argus.agent_runtime.stages.artifact_context import (
+    RESULT_FOLLOWUP_TARGET_INFERRED,
     active_confirmation_effective_strategy,
     confirmation_payload_dict,
     confirmation_payload_is_validated_executable,
@@ -73,11 +78,8 @@ CONFIRMATION_EDIT_ACTION_FIELDS = {
     "change_dates": "date_range",
     "adjust_assumptions": "assumption",
 }
+TRANSPORT_RESULT_ACTION_TYPES = {"show_breakdown", "save_strategy"}
 
-TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE = (
-    "That strategy is ready on the visible card. Use the card action when you "
-    "want to start the simulation."
-)
 RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS = 10.0
 
 
@@ -111,6 +113,7 @@ def structured_action_stage_result_if_applicable(
     state: RunState,
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
+    language: str = "en",
 ) -> StageResult | None:
     action = state.structured_action
     if action is None:
@@ -121,17 +124,20 @@ def structured_action_stage_result_if_applicable(
             snapshot=snapshot,
             requested_failed_action_id=action.failed_action_artifact_id,
             require_requested_failed_action_id=True,
+            language=language,
         )
     if action.presentation == "result":
         return result_action_stage_result_if_applicable(
             state=state,
             snapshot=snapshot,
+            language=language,
         )
     if action.presentation != "confirmation":
         return None
     stale_action_response = stale_confirmation_action_response(
         action=action,
         snapshot=snapshot,
+        language=language,
     )
     if stale_action_response is not None:
         return StageResult(
@@ -156,9 +162,9 @@ def structured_action_stage_result_if_applicable(
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": (
-                    "I do not have an active confirmation to change. "
-                    "Describe the investing idea again and I will prepare a fresh draft."
+                "assistant_prompt": recovery_message(
+                    "confirmation_action_missing_context",
+                    language=language,
                 ),
                 "requested_field": None,
                 "missing_required_fields": [],
@@ -179,7 +185,7 @@ def structured_action_stage_result_if_applicable(
     if action_type in CONFIRMATION_EDIT_ACTION_FIELDS:
         requested_field = CONFIRMATION_EDIT_ACTION_FIELDS[action_type]
         return StageResult(
-            outcome="await_user_reply",
+            outcome="needs_clarification",
             stage_patch={
                 "candidate_strategy_draft": pending.model_dump(mode="python"),
                 "assistant_prompt": None,
@@ -193,6 +199,7 @@ def structured_action_stage_result_if_applicable(
                         "strategy": pending.model_dump(mode="python"),
                         "current_user_message": state.current_user_message,
                         "structured_action": action.model_dump(mode="python"),
+                        "language": language,
                     },
                     "options": [],
                 },
@@ -204,7 +211,10 @@ def structured_action_stage_result_if_applicable(
             outcome="ready_to_respond",
             stage_patch={
                 "candidate_strategy_draft": StrategySummary().model_dump(mode="python"),
-                "assistant_response": "No problem. I will leave that draft unrun.",
+                "assistant_response": recovery_message(
+                    "confirmation_cancelled",
+                    language=language,
+                ),
             },
         )
     return None
@@ -259,9 +269,31 @@ def result_action_stage_result_if_applicable(
     *,
     state: RunState,
     snapshot: TaskSnapshot | None,
+    language: str = "en",
 ) -> StageResult | None:
     action = state.structured_action
-    if action is None or action.type != "refine_strategy":
+    if action is None:
+        return None
+    if action.type in TRANSPORT_RESULT_ACTION_TYPES:
+        reference = (
+            snapshot.latest_backtest_result_reference if snapshot is not None else None
+        )
+        return StageResult(
+            outcome="ready_to_respond",
+            stage_patch={
+                "assistant_response": None,
+                "result_action_request": {
+                    "type": action.type,
+                    "action": action.model_dump(mode="python"),
+                    "latest_result_reference": (
+                        reference.model_dump(mode="python")
+                        if reference is not None
+                        else None
+                    ),
+                },
+            },
+        )
+    if action.type != "refine_strategy":
         return None
     reference = (
         snapshot.latest_backtest_result_reference if snapshot is not None else None
@@ -270,9 +302,9 @@ def result_action_stage_result_if_applicable(
         return StageResult(
             outcome="ready_to_respond",
             stage_patch={
-                "assistant_response": (
-                    "I do not have a completed result to refine. Run a strategy "
-                    "first, then use Refine strategy from the result card."
+                "assistant_response": recovery_message(
+                    "result_refine_missing",
+                    language=language,
                 ),
             },
         )
@@ -285,26 +317,31 @@ def result_action_stage_result_if_applicable(
         action_payload=action.payload,
         reference=reference,
     )
+    response_intent = {
+        "kind": "clarification",
+        "semantic_needs": ["refinement"],
+        "requested_fields": ["refinement"],
+        "facts": {
+            "strategy": strategy.model_dump(mode="python"),
+            "current_user_message": state.current_user_message,
+            "structured_action": action.model_dump(mode="python"),
+            "latest_run_id": latest_run_id,
+            "latest_result_reference": reference.model_dump(mode="python"),
+        },
+        "options": [],
+    }
     return StageResult(
         outcome="await_user_reply",
         stage_patch={
             "candidate_strategy_draft": strategy.model_dump(mode="python"),
-            "assistant_prompt": None,
+            "assistant_prompt": offline_clarification_fallback(
+                language=language,
+                response_intent=response_intent,
+                strategy=strategy,
+            ),
             "requested_field": "refinement",
             "missing_required_fields": ["refinement"],
-            "response_intent": {
-                "kind": "clarification",
-                "semantic_needs": ["refinement"],
-                "requested_fields": ["refinement"],
-                "facts": {
-                    "strategy": strategy.model_dump(mode="python"),
-                    "current_user_message": state.current_user_message,
-                    "structured_action": action.model_dump(mode="python"),
-                    "latest_run_id": latest_run_id,
-                    "latest_result_reference": reference.model_dump(mode="python"),
-                },
-                "options": [],
-            },
+            "response_intent": response_intent,
         },
     )
 
@@ -316,6 +353,7 @@ def approval_stage_result_if_applicable(
     state: RunState,
     selected_thread_metadata: dict[str, Any],
     interpretation: StructuredInterpretation | None = None,
+    language: str = "en",
 ) -> StageResult | None:
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
@@ -355,32 +393,15 @@ def approval_stage_result_if_applicable(
                 }
             ),
             stage_patch={
-                "assistant_response": TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE,
+                "assistant_response": _confirmation_action_guidance(language),
             },
         )
     if decision.semantic_turn_act != "approval":
         return None
-    if snapshot.active_confirmation_reference is not None and _active_confirmation_is_valid(
-        snapshot
-    ):
-        return StageResult(
-            outcome="ready_to_respond",
-            decision=decision.model_copy(
-                update={
-                    "intent": "conversation_followup",
-                    "task_relation": "continue",
-                    "requires_clarification": False,
-                    "candidate_strategy_draft": approved_strategy,
-                    "missing_required_fields": [],
-                    "semantic_turn_act": "approval",
-                }
-            ),
-            stage_patch={
-                "assistant_response": TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE,
-            },
-        )
-    if snapshot.active_confirmation_reference is not None and (
-        decision_requests_confirmation_card_action(
+    if (
+        snapshot.active_confirmation_reference is not None
+        and _active_confirmation_is_valid(snapshot)
+        and not decision_contains_material_strategy_patch(
             decision=decision,
             visible_strategy=approved_strategy,
             interpretation=interpretation,
@@ -404,7 +425,35 @@ def approval_stage_result_if_applicable(
                 }
             ),
             stage_patch={
-                "assistant_response": TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE,
+                "assistant_response": _confirmation_action_guidance(language),
+            },
+        )
+    if snapshot.active_confirmation_reference is not None and (
+        decision_requests_confirmation_card_action(
+            decision=decision,
+            visible_strategy=visible_confirmation_strategy,
+            interpretation=interpretation,
+            interpreted_candidate_strategy=(
+                interpretation.candidate_strategy_draft
+                if interpretation is not None
+                else None
+            ),
+        )
+    ):
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=decision.model_copy(
+                update={
+                    "intent": "conversation_followup",
+                    "task_relation": "continue",
+                    "requires_clarification": False,
+                    "candidate_strategy_draft": approved_strategy,
+                    "missing_required_fields": [],
+                    "semantic_turn_act": "approval",
+                }
+            ),
+            stage_patch={
+                "assistant_response": _confirmation_action_guidance(language),
             },
         )
     if not decision_is_pure_approval(
@@ -432,7 +481,7 @@ def approval_stage_result_if_applicable(
                 }
             ),
             stage_patch={
-                "assistant_response": TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE,
+                "assistant_response": _confirmation_action_guidance(language),
             },
         )
     confirmation_payload = validated_approval_confirmation_payload_from_state(
@@ -481,9 +530,13 @@ def approval_stage_result_if_applicable(
             }
         ),
         stage_patch={
-            "assistant_response": TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE,
+            "assistant_response": _confirmation_action_guidance(language),
         },
     )
+
+
+def _confirmation_action_guidance(language: str | None) -> str:
+    return recovery_message("confirmation_action_guidance", language=language)
 
 
 def _active_confirmation_is_valid(snapshot: TaskSnapshot) -> bool:
@@ -531,6 +584,7 @@ def _retry_failed_action_stage_result(
     snapshot: TaskSnapshot | None,
     requested_failed_action_id: str | None = None,
     require_requested_failed_action_id: bool = False,
+    language: str = "en",
 ) -> StageResult:
     reference = (
         snapshot.latest_failed_action_reference if snapshot is not None else None
@@ -564,6 +618,7 @@ def _retry_failed_action_stage_result(
                     status=retry_status,
                     reference=reference,
                     requested_failed_action_id=requested_failed_action_id,
+                    language=language,
                 )
             },
         )
@@ -584,6 +639,7 @@ def _retry_failed_action_stage_result(
                     status="missing_payload",
                     reference=reference,
                     requested_failed_action_id=requested_failed_action_id,
+                    language=language,
                 )
             },
         )
@@ -603,6 +659,7 @@ def _retry_failed_action_stage_result(
                     status="non_retryable",
                     reference=reference,
                     requested_failed_action_id=requested_failed_action_id,
+                    language=language,
                 )
             },
         )
@@ -624,6 +681,7 @@ def _retry_failed_action_stage_result(
                 status="rebuilt_confirmation",
                 reference=reference,
                 requested_failed_action_id=requested_failed_action_id,
+                language=language,
             ),
         },
     )
@@ -634,6 +692,7 @@ def _retry_failed_action_response_intent(
     status: ArtifactActionRecoveryStatus,
     reference: ArtifactReference | None,
     requested_failed_action_id: str | None,
+    language: str = "en",
 ) -> dict[str, Any]:
     metadata = dict(reference.metadata) if reference is not None else {}
     raw_user_safe_message = metadata.get("user_safe_message") or metadata.get("error")
@@ -650,6 +709,7 @@ def _retry_failed_action_response_intent(
         user_safe_message=user_safe_message,
     )
     payload = facts.model_dump()
+    payload["language"] = language
     if facts.user_safe_message is None:
         payload.pop("user_safe_message", None)
     return {
@@ -706,6 +766,7 @@ async def artifact_followup_stage_result_if_applicable(
     decision: InterpretDecision,
     snapshot: TaskSnapshot | None,
     current_user_message: str,
+    language: str = "en",
 ) -> StageResult | None:
     deterministic_patch_result = (
         _deterministic_result_artifact_patch_stage_result_if_applicable(
@@ -743,22 +804,31 @@ async def artifact_followup_stage_result_if_applicable(
         metadata=metadata,
         focus=focus,
         user_message=current_user_message,
+        language=language,
     )
+    used_recovery = response is None
     if response is None:
-        response = fallback_result_followup_response(
-            metadata=metadata,
-            focus=focus,
+        response = recovery_message(
+            "latest_result_followup_unavailable",
+            language=language,
         )
-    if response is None:
-        return None
     return StageResult(
         outcome="ready_to_respond",
         decision=_result_followup_decision(decision, focus=focus),
         stage_patch={
             "assistant_response": with_response_heading(
-                heading=result_followup_heading(focus),
+                heading=result_followup_heading(focus, language=language),
                 body=response,
-            )
+            ),
+            **(
+                recovery_state_stage_patch(
+                    "latest_result_followup_unavailable",
+                    language=language,
+                    retryable=True,
+                )
+                if used_recovery
+                else {}
+            ),
         },
     )
 
@@ -768,6 +838,8 @@ def _result_artifact_patch_stage_result_if_applicable(
     decision: InterpretDecision,
     snapshot: TaskSnapshot | None,
 ) -> StageResult | None:
+    if _result_followup_target_was_inferred_non_patch(decision):
+        return None
     if not decision_allows_result_artifact_patch(decision=decision):
         return None
     reference = (
@@ -803,7 +875,10 @@ def _deterministic_result_artifact_patch_stage_result_if_applicable(
     )
     if reference is None:
         return None
-    date_range = current_message_date_range(current_user_message)
+    del current_user_message
+    if _result_followup_target_was_inferred_non_patch(decision):
+        return None
+    date_range = decision.candidate_strategy_draft.date_range
     if not isinstance(date_range, dict) or not (
         date_range.get("start") and date_range.get("end")
     ):
@@ -831,6 +906,17 @@ def _deterministic_result_artifact_patch_stage_result_if_applicable(
         patched=patched,
         reason_code="artifact_patch_from_latest_result",
         additional_reason_codes=("artifact_date_patch_from_current_message",),
+    )
+
+
+def _result_followup_target_was_inferred_non_patch(
+    decision: InterpretDecision,
+) -> bool:
+    if RESULT_FOLLOWUP_TARGET_INFERRED not in decision.reason_codes:
+        return False
+    return _strategy_has_structured_non_patch_evidence(
+        strategy=decision.candidate_strategy_draft,
+        patch_fields=frozenset({"date_range", "strategy_type"}),
     )
 
 
@@ -954,6 +1040,7 @@ async def _compose_result_followup_with_timeout(
     metadata: dict[str, Any],
     focus: str,
     user_message: str,
+    language: str = "en",
 ) -> str | None:
     try:
         return await asyncio.wait_for(
@@ -961,12 +1048,13 @@ async def _compose_result_followup_with_timeout(
                 metadata=metadata,
                 focus=focus,
                 user_message=user_message,
+                language=language,
             ),
             timeout=RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS,
         )
     except TimeoutError:
         fact_bank = result_followup_fact_bank(metadata)
-        record_result_followup_fallback_receipt(
+        record_result_followup_recovery_receipt(
             task=result_followup_llm_task(fact_bank=fact_bank, focus=focus),
             failure_mode="result_followup_timeout",
             context_packet_ids=context_packet_ids_from_fact_bank(fact_bank),

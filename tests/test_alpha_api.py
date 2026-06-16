@@ -295,6 +295,18 @@ def test_patch_me_merges_nested_onboarding_state() -> None:
     }
 
 
+def test_patch_me_rejects_invalid_nested_onboarding_state() -> None:
+    client = _client()
+
+    response = client.patch(
+        "/api/v1/me",
+        json={"onboarding": {"stage": "complete"}},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "invalid_profile_patch"
+
+
 def test_conversation_messages_and_patch_follow_contract() -> None:
     client = _client()
 
@@ -422,6 +434,7 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     run = response.json()["run"]
     assert run["status"] == "completed"
     assert run["asset_class"] == "equity"
+    assert run["conversation_result_card"]["asset_class"] == "equity"
     assert run["benchmark_symbol"] == "SPY"
     assert run["config_snapshot"]["side"] == "long"
     assert run["config_snapshot"]["starting_capital"] == 1000
@@ -1285,10 +1298,35 @@ def test_starter_prompts_returns_personalized_suggestions() -> None:
     resp = client.get("/api/v1/chat/starter-prompts")
     assert resp.status_code == 200
     assert len(resp.json()["prompts"]) == 4
-    assert "Show me something interesting" in resp.json()["prompts"]
+    assert "Test Apple against SPY over the last 12 months." in resp.json()["prompts"]
 
     # Set specific goal
     _set_onboarding_ready(client, primary_goal="explore_crypto")
     resp = client.get("/api/v1/chat/starter-prompts")
     assert resp.status_code == 200
-    assert "Backtest Bitcoin halvings" in resp.json()["prompts"]
+    assert "Hold Bitcoin this year so far." in resp.json()["prompts"]
+
+
+def test_starter_prompts_follow_profile_language() -> None:
+    client = _client()
+
+    response = client.patch(
+        "/api/v1/me",
+        json={
+            "language": "es-419",
+            "onboarding": {
+                "stage": "ready",
+                "language_confirmed": True,
+                "primary_goal": "explore_crypto",
+                "completed": False,
+            },
+        },
+    )
+    assert response.status_code == 200
+
+    resp = client.get("/api/v1/chat/starter-prompts")
+    assert resp.status_code == 200
+    prompts = resp.json()["prompts"]
+    assert len(prompts) == 4
+    assert "Mantén Bitcoin en lo que va del año." in prompts
+    assert all("2024" not in prompt for prompt in prompts)

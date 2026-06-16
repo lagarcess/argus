@@ -191,7 +191,7 @@ export default function ChatMessage({
     return (
       <div className="flex w-full justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="max-w-[85%] rounded-full border border-black/10 bg-black/[0.03] px-4 py-2.5 text-[14px] font-medium leading-[1.45] text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">
-          {message.selectedAction ? actionLabel(message.selectedAction) : displayContent}
+          {displayContent || (message.selectedAction ? actionLabel(message.selectedAction) : "")}
         </div>
       </div>
     );
@@ -243,7 +243,11 @@ export default function ChatMessage({
               <StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />
             </div>
           ) : message.contentPresentation === "result_breakdown" && displayContent.trim() ? (
-            <ResultBreakdown content={displayContent} />
+            <ResultBreakdown
+              ariaLabel={t("chat.result_breakdown.aria_label", "Result breakdown")}
+              content={displayContent}
+              label={t("chat.result_breakdown.label", "Breakdown")}
+            />
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -367,10 +371,18 @@ function ResultReadout({ content }: { content: string }) {
   );
 }
 
-function ResultBreakdown({ content }: { content: string }) {
+function ResultBreakdown({
+  ariaLabel,
+  content,
+  label,
+}: {
+  ariaLabel: string;
+  content: string;
+  label: string;
+}) {
   return (
-    <section aria-label="Result breakdown">
-      <div className="argus-result-section-label">Breakdown</div>
+    <section aria-label={ariaLabel}>
+      <div className="argus-result-section-label">{label}</div>
       <div className="argus-result-breakdown prose dark:prose-invert max-w-none">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>
           {content}

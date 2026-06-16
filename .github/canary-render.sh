@@ -3,23 +3,32 @@
 
 set -euo pipefail
 
-APP_URL="${ARGUS_CANARY_APP_URL:-https://argus-app-suz5.onrender.com}"
-API_URL="${ARGUS_CANARY_API_URL:-https://argus-ohr5.onrender.com}"
-EMAIL="${ARGUS_CANARY_EMAIL:-}"
-PASSWORD="${ARGUS_CANARY_PASSWORD:-}"
-SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-}"
-SUPABASE_SERVICE_ROLE_KEY="${ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY:-}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT_DIR"
+
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/argus-env.sh"
+argus_load_root_env >/dev/null || true
+
+APP_URL="${ARGUS_CANARY_APP_URL:-$ARGUS_PRIVATE_LAUNCH_APP_URL}"
+API_URL="${ARGUS_CANARY_API_URL:-$ARGUS_PRIVATE_LAUNCH_API_URL}"
+EMAIL="${ARGUS_CANARY_EMAIL:-${MOCK_USER_EMAIL:-}}"
+PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"
+SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-${SUPABASE_URL:-${SUPABASE_PROJECT_URL:-}}}"
+SUPABASE_SERVICE_ROLE_KEY="${ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}"
 TIMEOUT_SECONDS="${ARGUS_CANARY_TIMEOUT_SECONDS:-240}"
 POLL_SLEEP_SECONDS="${ARGUS_CANARY_POLL_SLEEP_SECONDS:-5}"
+LANGUAGE="${ARGUS_CANARY_LANGUAGE:-en}"
 PROMPT="${ARGUS_CANARY_PROMPT:-Test an equal-weight AAPL and MSFT buy-and-hold strategy from January 1, 2025 through June 5, 2026 with 10,000 dollars}"
 
 if [ -z "$EMAIL" ]; then
-  echo "ARGUS_CANARY_EMAIL is required."
+  echo "ARGUS_CANARY_EMAIL or MOCK_USER_EMAIL is required."
   exit 1
 fi
 
 if [ -z "$PASSWORD" ]; then
-  echo "ARGUS_CANARY_PASSWORD is required."
+  echo "ARGUS_CANARY_PASSWORD or MOCK_USER_PASSWORD is required."
   exit 1
 fi
 
@@ -60,14 +69,14 @@ CONVERSATION_ID="$(
 )"
 
 CHAT_BODY="$(
-  CONVERSATION_ID="$CONVERSATION_ID" PROMPT="$PROMPT" python3 - <<'PY'
+  CONVERSATION_ID="$CONVERSATION_ID" PROMPT="$PROMPT" CANARY_LANGUAGE="$LANGUAGE" python3 - <<'PY'
 import json
 import os
 
 print(json.dumps({
     "conversation_id": os.environ["CONVERSATION_ID"],
     "message": os.environ["PROMPT"],
-    "language": "en",
+    "language": os.environ["CANARY_LANGUAGE"],
 }))
 PY
 )"
@@ -131,14 +140,14 @@ PY
 )"
 
 RUN_BODY="$(
-  CONVERSATION_ID="$CONVERSATION_ID" RUN_ACTION="$RUN_ACTION" python3 - <<'PY'
+  CONVERSATION_ID="$CONVERSATION_ID" RUN_ACTION="$RUN_ACTION" CANARY_LANGUAGE="$LANGUAGE" python3 - <<'PY'
 import json
 import os
 
 print(json.dumps({
     "conversation_id": os.environ["CONVERSATION_ID"],
     "action": json.loads(os.environ["RUN_ACTION"]),
-    "language": "en",
+    "language": os.environ["CANARY_LANGUAGE"],
 }))
 PY
 )"

@@ -78,6 +78,13 @@ const LABEL_TO_ROW_KEY: Record<string, StrategyConfirmationRowKey> = {
   strategy: "strategy",
 };
 
+const LABEL_KEY_TO_ROW_KEY = Object.fromEntries(
+  Object.entries(CONFIRMATION_ROW_LABEL_KEYS).map(([key, labelKey]) => [
+    labelKey,
+    key,
+  ]),
+) as Record<string, StrategyConfirmationRowKey>;
+
 function hasOwn<T extends object>(object: T, key: PropertyKey): key is keyof T {
   return Object.prototype.hasOwnProperty.call(object, key);
 }
@@ -158,10 +165,13 @@ export function confirmationActionStatus(
 }
 
 export function confirmationRowKey(
-  row: Pick<StrategyConfirmationRow, "key" | "label">,
+  row: Pick<StrategyConfirmationRow, "key" | "labelKey" | "label">,
 ): StrategyConfirmationRowKey | null {
   if (row.key && hasOwn(CONFIRMATION_ROW_LABEL_KEYS, row.key)) {
     return row.key;
+  }
+  if (row.labelKey && hasOwn(LABEL_KEY_TO_ROW_KEY, row.labelKey)) {
+    return LABEL_KEY_TO_ROW_KEY[row.labelKey];
   }
   const normalized = row.label.trim().toLowerCase();
   return hasOwn(LABEL_TO_ROW_KEY, normalized) ? LABEL_TO_ROW_KEY[normalized] : null;

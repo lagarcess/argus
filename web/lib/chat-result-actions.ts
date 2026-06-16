@@ -41,6 +41,7 @@ export function hydrateResultActions(
     .map((action) => ({
       id: action.id || action.type || action.label,
       label: action.label,
+      labelKey: action.labelKey,
       type: action.type,
       presentation: "result" as const,
       payload: {

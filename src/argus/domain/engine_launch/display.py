@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
+from babel.dates import format_date as format_locale_date
+
 Language = Literal["en", "es-419"]
 TimeframeUnit = Literal["minute", "hour", "day", "week"]
 
@@ -70,6 +72,33 @@ def format_data_through_label(value: object, *, language: str = "en") -> str:
     if _resolve_language(language) == "es-419":
         return f"Hasta {_spanish_short_month_day(parsed)}"
     return f"Through {_english_short_month_day(parsed)}"
+
+
+def format_date_label(value: object, *, language: str = "en") -> str:
+    parsed = _parse_date(value)
+    if parsed is None:
+        return str(value or "").strip()
+    return format_locale_date(
+        parsed,
+        format="long",
+        locale=_locale_identifier(language),
+    )
+
+
+def format_date_range_label(
+    start: object,
+    end: object,
+    *,
+    language: str = "en",
+    separator: str | None = None,
+) -> str:
+    start_label = format_date_label(start, language=language)
+    end_label = format_date_label(end, language=language)
+    if not start_label or not end_label:
+        return ""
+    if separator is None:
+        separator = " al " if _resolve_language(language) == "es-419" else " - "
+    return f"{start_label}{separator}{end_label}"
 
 
 def format_timeframe_data_caveat(
@@ -252,6 +281,10 @@ def _spanish_unit(unit: TimeframeUnit, *, amount: int) -> str:
 
 def _resolve_language(language: str) -> Language:
     return "es-419" if (language or "en").lower().startswith("es") else "en"
+
+
+def _locale_identifier(language: str) -> str:
+    return "es_419" if _resolve_language(language) == "es-419" else "en_US"
 
 
 def _parse_date(value: object) -> date | None:

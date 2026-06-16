@@ -120,6 +120,13 @@ def raise_backtest_problem(
             "Market Data Unavailable",
             "Market data is temporarily unavailable. Please retry shortly.",
         ),
+        "benchmark_data_unavailable": (
+            503,
+            "Benchmark Data Unavailable",
+            "Benchmark data does not cover enough of the selected window for a "
+            "trustworthy comparison. Try a shorter date range or another "
+            "same-class benchmark.",
+        ),
         "kraken_ohlc_window_exceeded": (
             422,
             "Data Window Too Wide",

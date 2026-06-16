@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
+from argus.agent_runtime.recovery_messages import recovery_message, recovery_state
 from argus.agent_runtime.resolution import mention_to_provenance
 from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
@@ -19,9 +20,12 @@ from argus.api import state as api_state
 from argus.api.chat.actions import (
     chat_display_message,
     chat_request_message,
+    confirmation_action_id,
     is_cancel_confirmation_action,
     is_confirmation_action,
     is_result_action,
+    missing_run_confirmation_action_id_message,
+    recent_metadata_invalidates_confirmation,
     run_for_result_action,
     stale_confirmation_action_message,
 )
@@ -42,6 +46,7 @@ from argus.api.chat.onboarding import (
 )
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
+    _recent_messages_for_conversation,
     checkpoint_has_pending_confirmation,
     confirmation_metadata_fallback_context,
     failed_action_metadata_fallback_context,
@@ -208,35 +213,78 @@ async def compose_private_alpha_save_response(**kwargs: Any) -> str | None:
     return await _compose_private_alpha_save_response(**kwargs)
 
 
-def fallback_private_alpha_save_response() -> str:
+def fallback_private_alpha_save_response(language: str | None = None) -> str:
     from argus.agent_runtime.result_followups import (
         fallback_private_alpha_save_response as _fallback_private_alpha_save_response,
     )
 
-    return _fallback_private_alpha_save_response()
+    return _fallback_private_alpha_save_response(language=language)
 
 
-def result_breakdown_message(run: BacktestRun | None) -> str:
+def result_breakdown_message(run: BacktestRun | None, *, language: str = "en") -> str:
     from argus.api.chat.breakdown import (
         result_breakdown_message as _result_breakdown_message,
     )
 
-    return _result_breakdown_message(run)
+    return _result_breakdown_message(run, language=language)
 
 
-def result_breakdown_message_with_metadata(run: BacktestRun | None) -> Any:
+def result_breakdown_message_with_metadata(
+    run: BacktestRun | None,
+    *,
+    language: str = "en",
+) -> Any:
     from argus.api.chat.breakdown import (
         result_breakdown_message_with_metadata as _result_breakdown_message_with_metadata,
     )
 
-    return _result_breakdown_message_with_metadata(run)
+    return _result_breakdown_message_with_metadata(run, language=language)
+
+
+def _result_action_request_type(runtime_result: dict[str, Any]) -> str | None:
+    request = runtime_result.get("result_action_request")
+    if not isinstance(request, dict):
+        return None
+    action_type = request.get("type")
+    if action_type in {"show_breakdown", "save_strategy"}:
+        return str(action_type)
+    return None
+
+
+def _missing_result_action_run_message(
+    *,
+    action_type: str,
+    language: str | None,
+) -> str:
+    is_es = str(language or "").lower().startswith("es")
+    if action_type == "save_strategy":
+        if is_es:
+            return (
+                "No pude encontrar el backtest completado para guardarlo. "
+                "Ejecuta la estrategia de nuevo y luego guárdala desde la "
+                "tarjeta de resultado."
+            )
+        return (
+            "I could not find the completed backtest to save. Run the strategy "
+            "again, then save it from the result card."
+        )
+    if is_es:
+        return (
+            "No pude encontrar el backtest completado para explicarlo. Ejecuta "
+            "la estrategia de nuevo y luego usa Explicar resultado desde la "
+            "tarjeta de resultado."
+        )
+    return (
+        "I could not find the completed backtest to explain. Run the strategy "
+        "again, then explain it from the result card."
+    )
 
 
 @router.get("/api/v1/chat/starter-prompts", response_model=StarterPromptsResponse)
 def list_starter_prompts(
     user: User = Depends(current_user),  # noqa: B008
 ) -> StarterPromptsResponse:
-    prompts = get_starter_prompts(user.onboarding.primary_goal)
+    prompts = get_starter_prompts(user.onboarding.primary_goal, user.language)
     return StarterPromptsResponse(prompts=prompts)
 
 
@@ -250,9 +298,6 @@ async def chat_stream(
     clean_idempotency_key = _clean_optional_header(idempotency_key)
     headers = {
         "X-Request-Id": request.state.request_id,
-        "X-RateLimit-Limit": "200",
-        "X-RateLimit-Remaining": "199",
-        "X-RateLimit-Reset": "3600",
         "X-Accel-Buffering": "no",
     }
     if api_state.supabase_gateway is not None:
@@ -262,6 +307,12 @@ async def chat_stream(
                 resource="chat_messages",
                 period="day",
                 limit_count=200,
+            )
+            api_state.supabase_gateway.check_and_increment_usage(
+                user_id=user.id,
+                resource="chat_messages",
+                period="hour",
+                limit_count=60,
             )
         except QuotaExceededError as exc:
             raise problem(
@@ -299,8 +350,9 @@ async def chat_stream(
     if current_user_profile is None:
         current_user_profile = user
 
-    request_message = chat_request_message(payload)
-    display_message = chat_display_message(payload)
+    language = payload.language or current_user_profile.language or "en"
+    request_message = chat_request_message(payload, language=language)
+    display_message = chat_display_message(payload, language=language)
     onboarding_goal = parse_onboarding_control_message(request_message)
 
     conversation = None
@@ -333,83 +385,15 @@ async def chat_stream(
         user_id=user.id,
         conversation_id=conversation.id,
     )
-    workflow = api_state.get_agent_runtime_workflow(request)
-    checkpoint_values = await runtime_checkpoint_values(
-        workflow=workflow,
-        conversation_id=conversation.id,
-    )
-    runtime_fallback = RuntimeFallbackContext()
-    stale_confirmation_message = stale_confirmation_action_message(
-        payload=payload,
-        user_id=user.id,
-        conversation_id=conversation.id,
-    )
-    if stale_confirmation_message is not None:
-        runtime_fallback = RuntimeFallbackContext(
-            recovery_message=stale_confirmation_message
-        )
-    elif is_confirmation_action(payload):
-        metadata_fallback = confirmation_metadata_fallback_context(
-            user_id=user.id,
-            conversation_id=conversation.id,
-        )
-        if metadata_fallback is None and not checkpoint_has_pending_confirmation(
-            checkpoint_values
-        ):
-            raise problem(
-                request,
-                status_code=409,
-                code="confirmation_required",
-                title="Confirmation Required",
-                detail=(
-                    "There is no pending strategy confirmation to approve. "
-                    "Describe the idea again and I will prepare a fresh confirmation."
-                ),
-            )
-        if metadata_fallback is not None:
-            runtime_fallback = metadata_fallback
-    elif is_result_action(payload):
-        result_fallback = latest_result_fallback_context(
-            user_id=user.id,
-            conversation_id=conversation.id,
-        )
-        if result_fallback is not None:
-            runtime_fallback = result_fallback
-    elif payload.action is None:
-        failed_fallback = failed_action_metadata_fallback_context(
-            user_id=user.id,
-            conversation_id=conversation.id,
-        )
-        if failed_fallback is not None:
-            runtime_fallback = failed_fallback
-        else:
-            confirmation_fallback = confirmation_metadata_fallback_context(
-                user_id=user.id,
-                conversation_id=conversation.id,
-            )
-            if confirmation_fallback is not None:
-                runtime_fallback = confirmation_fallback
-            else:
-                pending_fallback = pending_strategy_metadata_fallback_context(
-                    user_id=user.id,
-                    conversation_id=conversation.id,
-                )
-                if pending_fallback is not None:
-                    runtime_fallback = pending_fallback
-                else:
-                    result_fallback = latest_result_fallback_context(
-                        user_id=user.id,
-                        conversation_id=conversation.id,
-                    )
-                    if result_fallback is not None:
-                        runtime_fallback = result_fallback
     mention_provenance = [
         mention_to_provenance(mention.model_dump(mode="python"), index=index)
         for index, mention in enumerate(payload.mentions)
     ]
     cancel_confirmation_action = is_cancel_confirmation_action(payload)
-    request_message_record = None
-    if onboarding_goal is None and not cancel_confirmation_action:
+
+    def persist_request_message() -> Any | None:
+        if onboarding_goal is not None or cancel_confirmation_action:
+            return None
         user_metadata: dict[str, Any] = {
             "agent_runtime_turn": {
                 "status": "started",
@@ -427,13 +411,190 @@ async def chat_stream(
             ]
         if payload.action is not None:
             user_metadata["chat_action"] = payload.action.model_dump(mode="python")
-        request_message_record = create_message(
+        return create_message(
             user_id=user.id,
             conversation_id=conversation.id,
             role="user",
             content=display_message,
             metadata=user_metadata,
         )
+
+    try:
+        workflow = api_state.get_agent_runtime_workflow(request)
+        checkpoint_values = await runtime_checkpoint_values(
+            workflow=workflow,
+            conversation_id=conversation.id,
+        )
+    except Exception:
+        logger.exception(
+            "Agent runtime initialization failed",
+            conversation_id=conversation.id,
+        )
+        persist_request_message()
+        language = payload.language or conversation.language or current_user_profile.language
+        assistant_text = recovery_message("runtime_failure", language=language)
+        retry_metadata = retry_last_turn_metadata(
+            payload=payload,
+            request_message=request_message,
+        )
+        recovery = recovery_state(
+            "runtime_failure",
+            language=language,
+            retryable=retry_metadata is not None,
+        )
+        failure_metadata: dict[str, Any] = {
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "agent_runtime_failure",
+            "recovery": recovery,
+        }
+        if retry_metadata is not None:
+            failure_metadata.update(retry_metadata)
+        retry_last_turn = (
+            retry_metadata.get("retry_last_turn")
+            if isinstance(retry_metadata, dict)
+            else None
+        )
+        assistant_message = create_message(
+            user_id=user.id,
+            conversation_id=conversation.id,
+            role="assistant",
+            content=assistant_text,
+            metadata=failure_metadata,
+        )
+
+        async def initialization_failure_events() -> AsyncIterator[str]:
+            yield sse_data(
+                {
+                    "type": "error",
+                    "code": "agent_runtime_failure",
+                    "message": assistant_text,
+                    "message_id": assistant_message.id,
+                    "recovery": recovery,
+                    **(
+                        {"retry_last_turn": retry_last_turn}
+                        if isinstance(retry_last_turn, dict)
+                        else {}
+                    ),
+                }
+            )
+            yield sse_done()
+
+        return StreamingResponse(
+            initialization_failure_events(),
+            media_type="text/event-stream",
+            headers=headers,
+        )
+    runtime_fallback = RuntimeFallbackContext()
+    confirmation_action_messages = (
+        _recent_messages_for_conversation(
+            user_id=user.id,
+            conversation_id=conversation.id,
+            limit=20,
+        )
+        if is_confirmation_action(payload)
+        else None
+    )
+    stale_confirmation_message = stale_confirmation_action_message(
+        payload=payload,
+        user_id=user.id,
+        conversation_id=conversation.id,
+        recent_messages=confirmation_action_messages,
+        language=language,
+    )
+    if stale_confirmation_message is not None:
+        runtime_fallback = RuntimeFallbackContext(
+            recovery_message=stale_confirmation_message
+        )
+    elif is_confirmation_action(payload):
+        metadata_fallback = confirmation_metadata_fallback_context(
+            user_id=user.id,
+            conversation_id=conversation.id,
+            recent_messages=confirmation_action_messages,
+            language=language,
+        )
+        missing_run_confirmation_action_id = (
+            payload.action is not None
+            and payload.action.type == "run_backtest"
+            and confirmation_action_id(payload) is None
+        )
+        if metadata_fallback is not None and metadata_fallback.recovery_message:
+            runtime_fallback = metadata_fallback
+        elif metadata_fallback is None and not checkpoint_has_pending_confirmation(
+            checkpoint_values
+        ):
+            raise problem(
+                request,
+                status_code=409,
+                code="confirmation_required",
+                title="Confirmation Required",
+                detail=(
+                    "There is no pending strategy confirmation to approve. "
+                    "Describe the idea again and I will prepare a fresh confirmation."
+                ),
+            )
+        elif metadata_fallback is None and recent_metadata_invalidates_confirmation(
+            confirmation_action_messages
+        ):
+            raise problem(
+                request,
+                status_code=409,
+                code="confirmation_required",
+                title="Confirmation Required",
+                detail=(
+                    "That confirmation is no longer active. Describe the idea again "
+                    "and I will prepare a fresh confirmation."
+                ),
+            )
+        elif missing_run_confirmation_action_id:
+            runtime_fallback = RuntimeFallbackContext(
+                recovery_message=missing_run_confirmation_action_id_message(language)
+            )
+        elif metadata_fallback is not None:
+            runtime_fallback = metadata_fallback
+    elif is_result_action(payload):
+        result_fallback = latest_result_fallback_context(
+            user_id=user.id,
+            conversation_id=conversation.id,
+        )
+        if result_fallback is not None:
+            runtime_fallback = result_fallback
+    elif payload.action is not None and payload.action.type == "retry_failed_action":
+        failed_fallback = failed_action_metadata_fallback_context(
+            user_id=user.id,
+            conversation_id=conversation.id,
+        )
+        if failed_fallback is not None:
+            runtime_fallback = failed_fallback
+    elif payload.action is None:
+        failed_fallback = failed_action_metadata_fallback_context(
+            user_id=user.id,
+            conversation_id=conversation.id,
+        )
+        if failed_fallback is not None:
+            runtime_fallback = failed_fallback
+        else:
+            confirmation_fallback = confirmation_metadata_fallback_context(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                language=language,
+            )
+            if confirmation_fallback is not None:
+                runtime_fallback = confirmation_fallback
+            else:
+                pending_fallback = pending_strategy_metadata_fallback_context(
+                    user_id=user.id,
+                    conversation_id=conversation.id,
+                )
+                if pending_fallback is not None:
+                    runtime_fallback = pending_fallback
+                else:
+                    result_fallback = latest_result_fallback_context(
+                        user_id=user.id,
+                        conversation_id=conversation.id,
+                    )
+                    if result_fallback is not None:
+                        runtime_fallback = result_fallback
+    request_message_record = persist_request_message()
 
     onboarding_required = current_user_profile.onboarding.stage in {
         "language_selection",
@@ -551,7 +712,7 @@ async def chat_stream(
                 mapping = {
                     "learn_basics": (
                         "I'll keep this beginner-friendly. You can ask me to explain an investing term, "
-                        "walk through an asset in plain English, or set up a simple historical test. "
+                        "walk through an asset in plain language, or set up a simple historical test. "
                         "If you name an asset like Apple or Bitcoin, I'll help you choose a sensible next step."
                     ),
                     "test_stock_idea": (
@@ -660,172 +821,6 @@ async def chat_stream(
                 }
             )
             yield sse_done()
-            return
-
-        if payload.action is not None and payload.action.type == "save_strategy":
-            run = run_for_result_action(
-                payload=payload,
-                user=user,
-                conversation_id=conversation.id,
-                require_run_id=True,
-            )
-            metadata: dict[str, Any] = {
-                "conversation_mode": "result_review",
-                "chat_action": payload.action.model_dump(mode="python"),
-            }
-            if run is None:
-                assistant_text = (
-                    "I could not find the completed backtest to save. Run the "
-                    "strategy again, then save it from the result card."
-                )
-            elif not _strategies_enabled():
-                run_fact_bank = result_fact_bank(run)
-                metadata["result_fact_bank"] = run_fact_bank
-                metadata["latest_run_id"] = run.id
-                metadata["result_run_id"] = run.id
-                metadata["result_strategy_id"] = run.strategy_id
-                assistant_text = await compose_private_alpha_save_response(
-                    metadata=result_followup_metadata_from_run(run),
-                    user_message=chat_request_message(payload),
-                )
-                if assistant_text is None:
-                    assistant_text = fallback_private_alpha_save_response()
-            else:
-                strategy = save_strategy_from_run(user=user, run=run)
-                metadata.update(saved_strategy_metadata(run, strategy.id))
-                metadata["result_fact_bank"] = result_fact_bank(run)
-                assistant_text = f"Saved {strategy.name} to Strategies."
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=assistant_text,
-                metadata=metadata,
-            )
-            yield sse_data({"type": "stage_start", "stage": "next_step"})
-            yield sse_data({"type": "token", "content": assistant_text})
-            yield sse_data(
-                {
-                    "type": "final",
-                    "payload": {
-                        "stage_outcome": "ready_to_respond",
-                        "assistant_response": assistant_text,
-                        "message_id": assistant_message.id,
-                        "latest_run_id": metadata.get("latest_run_id"),
-                        "result_run_id": metadata.get("result_run_id"),
-                        "result_strategy_id": metadata.get("result_strategy_id"),
-                        "saved_strategy_id": metadata.get("saved_strategy_id"),
-                    },
-                }
-            )
-            yield sse_done()
-            schedule_artifact_naming(
-                assistant_message=assistant_text,
-                current_run=run,
-                saved_strategy_id=(
-                    str(metadata["saved_strategy_id"])
-                    if metadata.get("saved_strategy_id")
-                    else None
-                ),
-                message_id=assistant_message.id,
-            )
-            return
-
-        if payload.action is not None and payload.action.type == "show_breakdown":
-            run = run_for_result_action(
-                payload=payload,
-                user=user,
-                conversation_id=conversation.id,
-            )
-            yield sse_data({"type": "stage_start", "stage": "explain"})
-            receipt_token = begin_openrouter_route_receipt_capture()
-            try:
-                breakdown_message = result_breakdown_message_with_metadata(run)
-                assistant_text = breakdown_message.text
-            finally:
-                route_receipts = end_openrouter_route_receipt_capture(receipt_token)
-            metadata = {
-                "conversation_mode": "result_review",
-                "chat_action": payload.action.model_dump(mode="python"),
-                "result_breakdown_source": breakdown_message.source,
-                "result_breakdown_fallback_used": breakdown_message.fallback_used,
-            }
-            if breakdown_message.failure_mode is not None:
-                metadata["result_breakdown_failure_mode"] = breakdown_message.failure_mode
-            if run is not None:
-                metadata["latest_run_id"] = run.id
-                metadata["result_run_id"] = run.id
-                metadata["result_strategy_id"] = run.strategy_id
-                metadata["result_fact_bank"] = result_fact_bank(run)
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=assistant_text,
-                metadata=metadata,
-            )
-            persist_route_receipts(
-                receipts=route_receipts,
-                user_id=user.id,
-                conversation_id=conversation.id,
-                run_id=run.id if run is not None else None,
-                message_id=assistant_message.id,
-                metadata={"chat_action": payload.action.type},
-            )
-            yield sse_data({"type": "token", "content": assistant_text})
-            yield sse_data(
-                {
-                    "type": "final",
-                    "payload": {
-                        "stage_outcome": "ready_to_respond",
-                        "assistant_response": assistant_text,
-                        "message_id": assistant_message.id,
-                    },
-                }
-            )
-            yield sse_done()
-            schedule_artifact_naming(
-                assistant_message=assistant_text,
-                current_run=run,
-                message_id=assistant_message.id,
-            )
-            return
-
-        if payload.action is not None and payload.action.type == "refine_strategy":
-            from argus.api.chat.result_actions import (
-                missing_refine_strategy_action_turn,
-                refine_strategy_action_turn,
-            )
-
-            run = run_for_result_action(
-                payload=payload,
-                user=user,
-                conversation_id=conversation.id,
-                require_run_id=True,
-            )
-            turn = (
-                missing_refine_strategy_action_turn(action=payload.action)
-                if run is None
-                else refine_strategy_action_turn(run=run, action=payload.action)
-            )
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=turn.assistant_text,
-                metadata=turn.metadata,
-            )
-            final_payload = dict(turn.final_payload)
-            final_payload["message_id"] = assistant_message.id
-            yield sse_data({"type": "stage_start", "stage": turn.stage})
-            yield sse_data({"type": "token", "content": turn.assistant_text})
-            yield sse_data({"type": "final", "payload": final_payload})
-            yield sse_done()
-            schedule_artifact_naming(
-                assistant_message=turn.assistant_text,
-                current_run=run,
-                message_id=assistant_message.id,
-            )
             return
 
         runtime_user = UserState(
@@ -944,6 +939,17 @@ async def chat_stream(
                 ):
                     backtest_job = dict(final_response_payload["backtest_job"])
                 run = None
+                result_action_run = None
+                saved_strategy_id_for_naming: str | None = None
+                result_action_type = _result_action_request_type(runtime_result)
+                if (
+                    result_action_type is None
+                    and payload.action is not None
+                    and payload.action.presentation == "result"
+                    and payload.action.type in {"show_breakdown", "save_strategy"}
+                    and (not assistant_text or stage_status == "await_approval")
+                ):
+                    result_action_type = payload.action.type
 
                 if result_card is not None:
                     from argus.api.chat.persistence import persist_runtime_backtest_run
@@ -970,7 +976,7 @@ async def chat_stream(
                 metadata = {
                     "conversation_mode": (
                         "result_review"
-                        if result_card is not None
+                        if result_card is not None or result_action_type is not None
                         else "confirm"
                         if stage_status == "await_approval"
                         else "setup"
@@ -981,6 +987,81 @@ async def chat_stream(
                 }
                 if payload.action is not None:
                     metadata["chat_action"] = payload.action.model_dump(mode="python")
+                if result_action_type is not None and payload.action is not None:
+                    confirmation_card = None
+                    confirmation_anchor_text = None
+                    runtime_result.pop("confirmation", None)
+                    runtime_result.pop("confirmation_payload", None)
+                    runtime_result.pop("active_confirmation_reference", None)
+                    result_action_run = run_for_result_action(
+                        payload=payload,
+                        user=user,
+                        conversation_id=conversation.id,
+                        require_run_id=True,
+                    )
+                    if result_action_type == "show_breakdown":
+                        yield sse_data({"type": "stage_start", "stage": "explain"})
+                        breakdown_message = result_breakdown_message_with_metadata(
+                            result_action_run,
+                            language=runtime_user.language_preference,
+                        )
+                        assistant_text = breakdown_message.text
+                        metadata["result_breakdown_source"] = breakdown_message.source
+                        metadata["result_breakdown_fallback_used"] = (
+                            breakdown_message.fallback_used
+                        )
+                        if breakdown_message.failure_mode is not None:
+                            metadata["result_breakdown_failure_mode"] = (
+                                breakdown_message.failure_mode
+                            )
+                    elif result_action_type == "save_strategy":
+                        yield sse_data({"type": "stage_start", "stage": "next_step"})
+                        if result_action_run is None:
+                            assistant_text = _missing_result_action_run_message(
+                                action_type=result_action_type,
+                                language=runtime_user.language_preference,
+                            )
+                        elif not _strategies_enabled():
+                            assistant_text = await compose_private_alpha_save_response(
+                                metadata=result_followup_metadata_from_run(
+                                    result_action_run
+                                ),
+                                user_message=request_message,
+                            )
+                            if assistant_text is None:
+                                assistant_text = fallback_private_alpha_save_response(
+                                    language=runtime_user.language_preference
+                                )
+                        else:
+                            strategy = save_strategy_from_run(
+                                user=user,
+                                run=result_action_run,
+                            )
+                            saved_strategy_id_for_naming = strategy.id
+                            metadata.update(
+                                saved_strategy_metadata(result_action_run, strategy.id)
+                            )
+                            assistant_text = f"Saved {strategy.name} to Strategies."
+                    if assistant_text:
+                        runtime_result["assistant_response"] = assistant_text
+                    if result_action_run is not None:
+                        receipt_run_id = result_action_run.id
+                        metadata["latest_run_id"] = result_action_run.id
+                        metadata["result_run_id"] = result_action_run.id
+                        metadata["result_strategy_id"] = result_action_run.strategy_id
+                        metadata["result_fact_bank"] = result_fact_bank(result_action_run)
+                        runtime_result["latest_run_id"] = result_action_run.id
+                        runtime_result["result_run_id"] = result_action_run.id
+                        runtime_result["result_strategy_id"] = (
+                            result_action_run.strategy_id
+                        )
+                        if saved_strategy_id_for_naming is not None:
+                            runtime_result["saved_strategy_id"] = (
+                                saved_strategy_id_for_naming
+                            )
+                            runtime_result["result_strategy_id"] = (
+                                saved_strategy_id_for_naming
+                            )
                 if runtime_result.get("resolution_provenance"):
                     metadata["resolution_provenance"] = runtime_result[
                         "resolution_provenance"
@@ -1037,6 +1118,12 @@ async def chat_stream(
                     )
                     if isinstance(failed_action_metadata, dict):
                         metadata["failed_action"] = dict(failed_action_metadata)
+                retry_last_turn = runtime_result.get("retry_last_turn")
+                if isinstance(retry_last_turn, dict):
+                    metadata["retry_last_turn"] = dict(retry_last_turn)
+                recovery = runtime_result.get("recovery")
+                if isinstance(recovery, dict):
+                    metadata["recovery"] = dict(recovery)
                 if run is not None:
                     link_shadow_backtest_job_result(
                         user_id=user.id,
@@ -1074,6 +1161,20 @@ async def chat_stream(
                 persisted_text = (
                     confirmation_anchor_text or assistant_text or streamed_text
                 )
+                if not (
+                    persisted_text
+                    or confirmation_card is not None
+                    or run is not None
+                    or backtest_job is not None
+                ):
+                    logger.warning(
+                        "Agent runtime returned no visible terminal state",
+                        conversation_id=conversation.id,
+                        request_id=request.state.request_id,
+                        stage_outcome=stage_status,
+                        final_payload_keys=sorted(runtime_result.keys()),
+                    )
+                    raise RuntimeError("agent_runtime_empty_final")
                 assistant_message = None
                 if persisted_text:
                     assistant_message = create_message(
@@ -1088,6 +1189,8 @@ async def chat_stream(
                     "stage_outcome": stage_status,
                     "conversation_mode": metadata.get("conversation_mode"),
                 }
+                if result_action_type is not None:
+                    receipt_metadata["chat_action"] = result_action_type
 
                 runtime_result["message_id"] = (
                     assistant_message.id if assistant_message is not None else None
@@ -1105,7 +1208,8 @@ async def chat_stream(
                 yield sse_done()
                 schedule_artifact_naming(
                     assistant_message=persisted_text,
-                    current_run=run,
+                    current_run=result_action_run or run,
+                    saved_strategy_id=saved_strategy_id_for_naming,
                     message_id=(
                         assistant_message.id if assistant_message is not None else None
                     ),
@@ -1118,8 +1222,9 @@ async def chat_stream(
                 "Agent runtime chat streaming failed",
                 conversation_id=conversation.id,
             )
-            assistant_text = (
-                "Something went wrong. Your conversation is saved. " "Please try again."
+            assistant_text = recovery_message(
+                "runtime_failure",
+                language=runtime_user.language_preference,
             )
             failure_metadata: dict[str, Any] = {
                 "conversation_mode": "recovery",
@@ -1129,8 +1234,19 @@ async def chat_stream(
                 payload=payload,
                 request_message=request_message,
             )
+            recovery = recovery_state(
+                "runtime_failure",
+                language=runtime_user.language_preference,
+                retryable=retry_metadata is not None,
+            )
+            failure_metadata["recovery"] = recovery
             if retry_metadata is not None:
                 failure_metadata.update(retry_metadata)
+            retry_last_turn = (
+                retry_metadata.get("retry_last_turn")
+                if isinstance(retry_metadata, dict)
+                else None
+            )
             assistant_message = create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -1149,6 +1265,12 @@ async def chat_stream(
                     "code": "agent_runtime_failure",
                     "message": assistant_text,
                     "message_id": assistant_message.id,
+                    "recovery": recovery,
+                    **(
+                        {"retry_last_turn": retry_last_turn}
+                        if isinstance(retry_last_turn, dict)
+                        else {}
+                    ),
                 }
             )
             yield sse_done()

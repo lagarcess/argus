@@ -160,8 +160,11 @@ and login; it should not be exposed as a frontend product surface.
 - Add a new private-alpha user with only an `email`; set `role` only for
   `admin` or `developer` access. Use `disabled_at` to revoke access.
 - If an email is missing or `disabled_at` is set, `/auth/signup` and
-  `/auth/login` return `403 private_alpha_access_required`; authenticated API
-  requests must also reject disabled/unlisted emails after token validation.
+  `/auth/login` still check the allowlist before provider signup/session work,
+  but public auth responses are normalized to reduce invite enumeration:
+  signup returns `400 auth_signup_failed`, login returns `401 unauthorized`,
+  and authenticated API requests reject disabled/unlisted emails after token
+  validation with `403 private_alpha_access_required`.
 - The table may contain emails for existing Supabase Auth users; seeding the
   allowlist must not create auth users by itself.
 ---
@@ -331,7 +334,17 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 ### Notes
 - Runs are immutable after completion.
 - `benchmark_symbol` is derived from `asset_class` defaults in Alpha (`SPY` for equities, `BTC` for crypto, tested pair for currency pairs).
-- `chart` stores the aggregate portfolio equity curve, display-ready value extrema, and capped executed-fill markers used by the result card. Multi-symbol runs store the portfolio curve, not separate comparison series.
+- `metrics.aggregate.performance.portfolio_value_range` stores aggregate strategy portfolio equity close peak/lowest values for the run period.
+- `chart` stores the aggregate portfolio equity curve, its matching `value_summary`, and capped executed-fill markers used by the result card. Multi-symbol runs store the portfolio curve, not separate comparison series.
+- Direct run rows store the normalized engine config directly in
+  `config_snapshot`; chat-launched rows may include
+  `config_snapshot.engine_config` with the exact normalized engine config
+  executed by the launch adapter. This replay payload is canonical when present.
+- Benchmark comparisons are persisted only when benchmark observations cover the
+  selected window sufficiently; late, early-ending, or sparse benchmark data
+  should fail as data unavailable rather than being silently backfilled.
+- Legacy persisted chart payloads may include `value_extrema`; readers may use it
+  as a fallback, but new run writers should persist `value_summary`.
 - `trades` may mirror chart event markers for lightweight UI hydration. Detailed execution ledgers can preserve signals, order intents, fills, ignored signals, and position snapshots, but list endpoints must expose only lightweight result metadata.
 - Saved strategies must be created from completed run state or an equivalent canonical result snapshot, not reconstructed from frontend display text.
 - Follow-up refinements from a result card must be seeded from
@@ -463,7 +476,7 @@ Tracks resource consumption for quotas and limits.
 - **Cleanup Index**: `(period_end)`
 
 ### Alpha Enums
-- **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`
+- **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`, `feedback`
 - **Period**: `hour`, `day`
 
 ### Notes
@@ -601,7 +614,9 @@ Hard-coded technical limits in the backtesting logic.
 ### Layer 2: Rate Limits
 Short-window protection against abuse or runaway UI loops.
 - **Backtests**: Max 10 per hour.
-- **Chat**: Max 10 messages per minute.
+- **Chat**: Max 60 messages per hour.
+- **Feedback**: Max 20 submissions per hour.
+- **Unauthenticated auth attempts**: Login max 8 attempts and signup max 5 attempts per 10 minutes, keyed by endpoint plus client IP/email. This is an alpha abuse guard before provider calls, not a replacement for Supabase Auth protections.
 - **Mechanism**: Enforced via standard `Retry-After` headers.
 
 ### Layer 2.5: Backtest Concurrency
@@ -615,6 +630,7 @@ Durable job backpressure protects the chat API from compute spikes.
 Generous usage boundaries tracked via the `usage_counters` table.
 - **Backtest Runs**: 50 per day.
 - **Chat Messages**: 200 per day.
+- **Feedback**: 50 submissions per day.
 
 ---
 
@@ -633,7 +649,9 @@ Generous usage boundaries tracked via the `usage_counters` table.
      response instead of starting unbounded compute.
 6. **Execute**: Create a durable job and trigger workflow execution.
 7. **Increment**: Update/Insert the `usage_counters` row.
-8. **Response**: Return result or job state with rate-limit headers.
+8. **Response**: Return result or job state. Include rate-limit headers only
+   when they are backed by an active limiter; do not emit placeholder quota
+   values.
 
 ### Admin Bypass
 Users with `profiles.is_admin = true` may have quota and rate-limit checks bypassed by backend logic.

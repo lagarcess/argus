@@ -57,6 +57,12 @@ export type ResultChartPayload = {
   }>;
   currency?: string;
   base_value?: number | null;
+  value_summary?: {
+    peak_value?: number | null;
+    lowest_value?: number | null;
+    currency?: string | null;
+    source?: "strategy_portfolio_equity_close" | string;
+  } | null;
   value_extrema?: {
     peak?: { time: string; value: number } | null;
     lowest?: { time: string; value: number } | null;
@@ -68,6 +74,7 @@ export type ConversationResultCard = {
   title: string;
   symbols?: string[];
   strategy_label?: string;
+  asset_class?: AssetClass | null;
   date_range: {
     start: string;
     end: string;
@@ -249,7 +256,16 @@ export type ChatStreamEvent =
   | { event: "final"; data: ChatFinalPayload }
   | { event: "confirmation"; data: { confirmation: StrategyConfirmationPayload } }
   | { event: "result"; data: { run: BacktestRun } }
-  | { event: "error"; data: { code?: string; detail: string; message_id?: string } }
+  | {
+      event: "error";
+      data: {
+        code?: string;
+        detail: string;
+        message_id?: string;
+        recovery?: Record<string, unknown>;
+        retry_last_turn?: Record<string, unknown>;
+      };
+    }
   | { event: "done"; data: { message_id: string | null } };
 
 export type ChatFinalPayload = {
@@ -269,6 +285,8 @@ export type ChatFinalPayload = {
   backtest_job?: BacktestJob | null;
   next_actions?: string[];
   message_id?: string | null;
+  recovery?: Record<string, unknown> | null;
+  retry_last_turn?: Record<string, unknown> | null;
 };
 
 export type ChatActionRequest = {
@@ -371,7 +389,9 @@ function rememberDiscoverySearch(
 export function resultCardFromConversationCard(
   card: ConversationResultCard,
   run?: Pick<BacktestRun, "id" | "strategy_id"> &
-    Partial<Pick<BacktestRun, "benchmark_symbol" | "config_snapshot">>,
+    Partial<
+      Pick<BacktestRun, "asset_class" | "benchmark_symbol" | "config_snapshot">
+    >,
 ) {
   const rows = [...card.rows].sort(
     (a, b) => resultMetricDisplayOrder(a) - resultMetricDisplayOrder(b),
@@ -382,6 +402,7 @@ export function resultCardFromConversationCard(
     strategyLabel: card.strategy_label,
     symbols: card.symbols,
     period: card.date_range.display,
+    dateRange: card.date_range,
     statusLabel: card.status_label,
     metrics: rows.map((row) => ({
       label: displayResultMetricLabel(row, run?.benchmark_symbol),
@@ -389,6 +410,7 @@ export function resultCardFromConversationCard(
     })),
     benchmarkNote: displayResultBenchmarkNote(card.benchmark_note),
     assumptions: card.assumptions,
+    assetClass: run?.asset_class ?? card.asset_class ?? undefined,
     configSnapshot: run?.config_snapshot,
     runId: run?.id,
     strategyId: run?.strategy_id ?? null,
@@ -957,10 +979,19 @@ export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
         detail: String(payload.message ?? payload.detail ?? "Chat stream failed"),
         message_id:
           typeof payload.message_id === "string" ? payload.message_id : undefined,
+        recovery: recordFromPayload(payload.recovery),
+        retry_last_turn: recordFromPayload(payload.retry_last_turn),
       },
     };
   }
   return null;
+}
+
+function recordFromPayload(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
 }
 
 export async function searchDiscovery(

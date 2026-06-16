@@ -116,12 +116,12 @@ describe("result card playground", () => {
     expect(positive.details).toContainEqual({ label: "Benchmark", value: "SPY" });
     expect(positive.details.slice(0, 4)).toEqual([
       { label: "Starting capital", value: "$1,000" },
+      { label: "Peak value", value: "$1,560" },
+      { label: "Lowest value", value: "$984" },
       {
         label: "Date range",
         value: "January 4, 2021 to December 31, 2025",
       },
-      { label: "Peak value", value: "$1,560" },
-      { label: "Lowest value", value: "$984" },
     ]);
 
     const negative = heroDeltaEvidenceView(resultCardPlaygroundFixtures[1].result);
@@ -142,6 +142,25 @@ describe("result card playground", () => {
     expect(dca.details).not.toContainEqual({ label: "Starting capital", value: "$1,000" });
     expect(dca.details).toContainEqual({ label: "Cadence", value: "Monthly" });
     expect(dca.details).toContainEqual({ label: "Contribution", value: "$250" });
+
+    const spanishDca = heroDeltaEvidenceView(
+      resultCardPlaygroundFixtures.find((fixture) => fixture.id === "dca-result")!.result,
+      {
+        copy: {
+          ...defaultResultCardDisplayCopy,
+          totalContributedLabel: "Total aportado",
+          cadenceLabel: "Cadencia",
+          cadenceValueLabel: (cadence) =>
+            cadence === "monthly" ? "Mensual" : cadence,
+          contributionLabel: "Contribución",
+        },
+        locale: "es-419",
+      },
+    );
+    expect(spanishDca.details).toContainEqual({
+      label: "Cadencia",
+      value: "Mensual",
+    });
 
     const compactProductionShape = heroDeltaEvidenceView({
       ...resultCardPlaygroundFixtures[0].result,
@@ -310,26 +329,79 @@ describe("result card playground", () => {
     expect(structured.details).not.toContainEqual({ label: "Benchmark", value: "SPY" });
   });
 
-  test("keeps result card display copy configurable while Spanish is disabled", () => {
-    const spanish = heroDeltaEvidenceView(resultCardPlaygroundFixtures[0].result, {
-      copy: {
-        ...defaultResultCardDisplayCopy,
-        endingValueLabel: "Valor final",
-        comparedWithSymbolLabel: (symbol) => `Comparado con ${symbol}`,
-        worstDropLabel: "Peor caída",
-        gainNoun: "ganancia",
-        totalReturnSuffix: "rendimiento total",
-        percentagePoints: (value) => `${value} puntos porcentuales`,
-        beatBy: (value) => `Superó por ${value}`,
-        startingCapitalLabel: "Capital inicial",
-        peakValueLabel: "Valor máximo",
-        lowestValueLabel: "Valor mínimo",
-        timeframeLabel: "Temporalidad",
-        benchmarkLabel: "Referencia",
-        dailyData: "Datos diarios",
+  test("shows backend portfolio value range in expanded details", () => {
+    const structured = heroDeltaEvidenceView({
+      ...resultCardPlaygroundFixtures[0].result,
+      chart: {
+        kind: "portfolio_equity",
+        series: [],
+        currency: "USD",
+        base_value: 10000,
+        value_summary: {
+          peak_value: 20000,
+          lowest_value: 5000,
+          currency: "USD",
+          source: "strategy_portfolio_equity_close",
+        },
       },
-      locale: "es-419",
     });
+
+    expect(structured.details.slice(0, 4)).toEqual([
+      { label: "Starting capital", value: "$1,000" },
+      { label: "Peak value", value: "$20,000" },
+      { label: "Lowest value", value: "$5,000" },
+      { label: "Date range", value: "January 4, 2021 to December 31, 2025" },
+    ]);
+  });
+
+  test("keeps result card display copy configurable while Spanish is disabled", () => {
+    const spanish = heroDeltaEvidenceView(
+      {
+        ...resultCardPlaygroundFixtures[0].result,
+        assetClass: "crypto",
+        dateRange: {
+          start: "2024-01-01",
+          end: "2024-03-31",
+          display: "1 de enero de 2024 al 31 de marzo de 2024",
+        },
+        chart: {
+          ...(resultCardPlaygroundFixtures[0].result.chart ?? {
+            kind: "portfolio_equity" as const,
+            series: [],
+          }),
+          value_summary: {
+            peak_value: 1560,
+            lowest_value: 1000,
+            currency: "USD",
+            source: "strategy_portfolio_equity_close",
+          },
+        },
+      },
+      {
+        copy: {
+          ...defaultResultCardDisplayCopy,
+          endingValueLabel: "Valor final",
+          comparedWithSymbolLabel: (symbol) => `Comparado con ${symbol}`,
+          worstDropLabel: "Peor caída",
+          gainNoun: "ganancia",
+          totalReturnSuffix: "rendimiento total",
+          percentagePoints: (value) => `${value} puntos porcentuales`,
+          beatBy: (value) => `Superó por ${value}`,
+          assetClassLabel: (assetClass) =>
+            assetClass === "crypto" ? "Cripto" : assetClass,
+          startingCapitalLabel: "Capital inicial",
+          peakValueLabel: "Valor máximo",
+          lowestValueLabel: "Valor mínimo",
+          dateRangeLabel: "Rango de fechas",
+          timeframeLabel: "Temporalidad",
+          benchmarkLabel: "Referencia",
+          dailyData: "Datos diarios",
+          trustStrip:
+            "Simulación histórica · Sin comisiones/deslizamiento · No es asesoría",
+        },
+        locale: "es-419",
+      },
+    );
 
     expect(spanish.hero.label).toBe("Valor final");
     expect(spanish.hero.detail).toContain("ganancia");
@@ -338,17 +410,24 @@ describe("result card playground", () => {
     expect(spanish.benchmark.value).toBe("Superó por 27.9 puntos porcentuales");
     expect(spanish.worstDrop.label).toBe("Peor caída");
     expect(spanish.timeframeDisplay).toBe("Datos diarios");
+    expect(spanish.trustGroups).toEqual([
+      "Cripto · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría",
+    ]);
     expect(spanish.details).toContainEqual({
       label: "Capital inicial",
-      value: "USD\u00a01,000",
+      value: "$1,000",
     });
     expect(spanish.details).toContainEqual({
       label: "Valor máximo",
-      value: "USD\u00a01,560",
+      value: "$1,560",
     });
     expect(spanish.details).toContainEqual({
       label: "Valor mínimo",
-      value: "USD\u00a0984",
+      value: "$1,000",
+    });
+    expect(spanish.details).toContainEqual({
+      label: "Rango de fechas",
+      value: "1 ene 2024 \u2192 31 mar 2024",
     });
   });
 
@@ -407,6 +486,7 @@ describe("result card playground", () => {
     expect(mappedWithoutRun.symbols).toEqual(["AAPL", "MSFT"]);
     expect(mappedWithoutRun.statusLabel).toBe("Completed");
     expect(mappedWithoutRun.assumptions).toEqual(["Assumption 1", "Assumption 2"]);
+    expect(mappedWithoutRun.assetClass).toBeUndefined();
     expect(mappedWithoutRun.chart).toBeNull();
     expect(mappedWithoutRun.runId).toBeUndefined();
     expect(mappedWithoutRun.strategyId).toBeNull();
@@ -428,6 +508,31 @@ describe("result card playground", () => {
     expect(mappedWithRun.runId).toBe("run-123");
     expect(mappedWithRun.strategyId).toBe("strat-456");
     expect(mappedWithRun.configSnapshot).toEqual({ template: "buy_and_hold" });
+  });
+
+  test("hydrates asset class from persisted result cards when run context is absent", () => {
+    const mapped = resultCardFromConversationCard({
+      title: "ETH Buy and Hold",
+      symbols: ["ETH"],
+      strategy_label: "Buy and Hold",
+      asset_class: "crypto",
+      date_range: {
+        start: "2024-01-01",
+        end: "2024-03-31",
+        display: "January 1, 2024 to March 31, 2024",
+      },
+      status_label: "Simulation Complete",
+      rows: [
+        { key: "cash_value", label: "Cash Value ($)", value: "$100,000 -> $120,000" },
+        { key: "total_return_pct", label: "Total Return (%)", value: "+20.0%" },
+        { key: "benchmark_delta", label: "Vs benchmark", value: "+1.0% vs BTC" },
+        { key: "max_drawdown_pct", label: "Max Drawdown", value: "-10.0%" },
+      ],
+      assumptions: ["Long-only", "Equal weight", "Benchmark: BTC"],
+      actions: [],
+    });
+
+    expect(mapped.assetClass).toBe("crypto");
   });
 
 });

@@ -374,6 +374,52 @@ def test_build_benchmark_curve_aligns_and_normalizes() -> None:
     assert curve["equity_curve"][0] == pytest.approx(1.0, abs=1e-6)
 
 
+def test_build_benchmark_curve_rejects_late_start_without_future_backfill() -> None:
+    target_index = pd.date_range("2025-01-01", periods=7, freq="D", tz="UTC")
+    late_benchmark = pd.Series(
+        [100.0, 101.0, 102.0],
+        index=pd.date_range("2025-01-03", periods=3, freq="D", tz="UTC"),
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        engine.build_benchmark_curve(
+            {
+                "asset_class": "equity",
+                "benchmark_symbol": "SPY",
+                "start_date": "2025-01-01",
+                "end_date": "2025-01-07",
+                "timeframe": "1D",
+            },
+            target_index,
+            fetch_price_series_func=lambda **_: late_benchmark,
+        )
+
+    assert str(excinfo.value) == "benchmark_data_unavailable"
+
+
+def test_build_benchmark_curve_rejects_sparse_benchmark_observations() -> None:
+    target_index = pd.date_range("2025-01-01", periods=10, freq="D", tz="UTC")
+    sparse_benchmark = pd.Series(
+        [100.0, 102.0],
+        index=pd.DatetimeIndex([target_index[0], target_index[-1]]),
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        engine.build_benchmark_curve(
+            {
+                "asset_class": "equity",
+                "benchmark_symbol": "SPY",
+                "start_date": "2025-01-01",
+                "end_date": "2025-01-10",
+                "timeframe": "1D",
+            },
+            target_index,
+            fetch_price_series_func=lambda **_: sparse_benchmark,
+        )
+
+    assert str(excinfo.value) == "benchmark_data_unavailable"
+
+
 def test_buy_and_hold_metrics_match_total_return_benchmark_and_profit() -> None:
     config = engine.normalize_backtest_config(
         {
@@ -539,9 +585,12 @@ def test_build_result_chart_uses_aggregate_portfolio_curve() -> None:
     assert chart["series"][0]["value"] == 10000
     assert chart["markers"][0]["type"] == "entry"
     assert chart["markers"][0]["label"] == "Buy AAPL, MSFT"
-    assert chart["value_extrema"] == {
-        "peak": max(chart["series"], key=lambda point: point["value"]),
-        "lowest": min(chart["series"], key=lambda point: point["value"]),
+    assert "value_extrema" not in chart
+    assert chart["value_summary"] == {
+        "peak_value": max(point["value"] for point in chart["series"]),
+        "lowest_value": min(point["value"] for point in chart["series"]),
+        "currency": "USD",
+        "source": "strategy_portfolio_equity_close",
     }
 
 
@@ -573,6 +622,7 @@ def test_build_result_card_actions_by_symbol_count() -> None:
 
     # Case 1: Single symbol
     card = engine.build_result_card(config, metrics)
+    assert card["asset_class"] == "equity"
     row_keys = [row["key"] for row in card["rows"]]
     assert row_keys[:4] == [
         "cash_value",
@@ -584,8 +634,11 @@ def test_build_result_card_actions_by_symbol_count() -> None:
     actions = [a["type"] for a in card["actions"]]
     assert actions == ["show_breakdown", "save_strategy", "refine_strategy"]
     assert card["actions"][0]["label"] == "Explain result"
+    assert card["actions"][0]["labelKey"] == "chat.result_card.explain_result"
     assert card["actions"][1]["label"] == "Save"
+    assert card["actions"][1]["labelKey"] == "chat.result_card.save"
     assert card["actions"][2]["label"] == "Refine idea"
+    assert card["actions"][2]["labelKey"] == "chat.result_card.refine_idea"
     labels = [row["label"] for row in card["rows"][:4]]
     assert labels == [
         "Ending value",
@@ -618,6 +671,57 @@ def test_build_result_card_actions_by_symbol_count() -> None:
     # Verify Spanish labels
     card = engine.build_result_card(config, metrics, language="es-419")
     assert card["actions"][1]["label"] == "Guardar"
+    assert card["actions"][1]["labelKey"] == "chat.result_card.save"
+
+
+def test_build_result_card_dca_assumptions_name_recurring_contribution() -> None:
+    config = {
+        "template": "dca_accumulation",
+        "asset_class": "equity",
+        "symbols": ["NVDA"],
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-12-31",
+        "side": "long",
+        "starting_capital": 500,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {"dca_cadence": "monthly"},
+        "recurring_contribution": 500,
+        "starting_principal": 0.0,
+    }
+    metrics = {
+        "aggregate": {
+            "performance": {
+                "total_return_pct": 5.0,
+                "delta_vs_benchmark_pct": 1.0,
+                "profit": 300.0,
+            },
+            "risk": {"max_drawdown_pct": -4.0},
+            "efficiency": {"win_rate": 0.0, "total_trades": 12},
+        }
+    }
+
+    card = engine.build_result_card(config, metrics)
+    assert card["assumptions"] == [
+        "Recurring contribution: $500 monthly",
+        "Starting principal: $0",
+        "Long-only",
+        "Equal weight",
+        "No fees/slippage",
+        "Benchmark: SPY",
+    ]
+    assert not any("Starting capital" in item for item in card["assumptions"])
+
+    spanish_card = engine.build_result_card(config, metrics, language="es-419")
+    assert spanish_card["assumptions"] == [
+        "Aporte recurrente: $500 mensual",
+        "Capital inicial: $0",
+        "Solo largo",
+        "Peso igual",
+        "Sin comisiones/deslizamiento",
+        "Referencia: SPY",
+    ]
 
 
 def test_build_result_card_hides_win_rate_when_no_meaningful_closed_trades() -> None:

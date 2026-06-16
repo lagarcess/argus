@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from argus.agent_runtime.presentation_i18n import optional_parameter_display_label
 from argus.agent_runtime.response_style import (
     ARGUS_RESPONSE_STYLE_CONTRACT,
     with_response_heading,
@@ -19,7 +20,10 @@ from argus.agent_runtime.strategy_contract import display_strategy_type
 from argus.domain.benchmark_comparison import (
     benchmark_comparison_from_delta,
 )
-from argus.domain.engine_launch.display import normalize_legacy_data_caveat
+from argus.domain.engine_launch.display import (
+    format_date_range_label,
+    normalize_legacy_data_caveat,
+)
 from argus.domain.engine_launch.result_facts import (
     execution_note as result_execution_note,
 )
@@ -43,11 +47,24 @@ QuickTakeEmphasis = Literal[
     "no_trade",
     "neutral",
 ]
+QuickTakeLanguageQuality = Literal[
+    "matches_prompt_language",
+    "mixed_or_wrong_language",
+]
 
 RESULT_READOUT_SOURCE_LLM = "llm_explain_stage"
 RESULT_READOUT_SOURCE_DETERMINISTIC_FALLBACK = "deterministic_fallback"
 RESULT_READOUT_FAILURE_LLM_UNAVAILABLE = "llm_unavailable_or_rejected"
 RESULT_READOUT_FAILURE_QUICK_TAKE_DRAFT_REJECTED = "quick_take_draft_rejected"
+
+
+def _quick_take_heading(language: str | None) -> str:
+    return "Resumen rápido" if _is_spanish(language) else "Quick take"
+
+
+def _is_spanish(language: str | None) -> bool:
+    normalized = str(language or "").strip().lower()
+    return normalized.startswith("es")
 
 
 @dataclass(frozen=True)
@@ -97,6 +114,17 @@ class QuickTakeDraft(BaseModel):
         default=None,
         description="Optional compact caveat bullet grounded in fact_bank.",
     )
+    language_quality: QuickTakeLanguageQuality = Field(
+        description=(
+            "Self-audit for every user-facing sentence in takeaway, tested_bullet, "
+            "meaning_bullet, assumption_bullet, and caveat_bullet. Use "
+            "matches_prompt_language only when the prose is fully written in "
+            "prompt_context.language, allowing unchanged symbols, tickers, currency "
+            "codes, numbers, and percentages. Use mixed_or_wrong_language if any "
+            "user-facing phrase remains in a different language or copies internal "
+            "schema/fact-id wording."
+        )
+    )
     next_experiment_option_kinds: list[str] = Field(
         default_factory=list,
         description=(
@@ -122,10 +150,12 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         strategy=strategy,
         result_payload=result_payload,
         explanation_context=explanation_context,
+        language=language,
     )
     assumption_summary = _assumption_summary(
         optional_parameters=optional_parameters,
         explanation_context=explanation_context,
+        language=language,
     )
     caveat = _caveat_summary(explanation_context, language=language)
     result_facts = _result_facts_for_explanation(
@@ -134,7 +164,12 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         explanation_context=explanation_context,
     )
     execution_note = result_execution_note(result_facts)
-    rule_summary = result_rule_summary(result_facts)
+    rule_summary = _display_rule_summary(
+        strategy=strategy,
+        result_facts=result_facts,
+        rule_summary=result_rule_summary(result_facts),
+        language=language,
+    )
 
     total_return, benchmark_return, same_period = _resolved_return_metrics(
         result_payload=result_payload,
@@ -148,12 +183,13 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
             caveat=caveat,
             execution_note=execution_note,
             rule_summary=rule_summary,
+            language=language,
         )
         return StageResult(
             outcome="ready_to_respond",
             stage_patch={
                 "assistant_response": with_response_heading(
-                    heading="Quick take",
+                    heading=_quick_take_heading(language),
                     body=response,
                 )
             },
@@ -174,13 +210,14 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         caveat=caveat,
         execution_note=execution_note,
         rule_summary=rule_summary,
+        language=language,
     )
 
     return StageResult(
         outcome="ready_to_respond",
         stage_patch={
             "assistant_response": with_response_heading(
-                heading="Quick take",
+                heading=_quick_take_heading(language),
                 body=response,
             )
         },
@@ -216,7 +253,7 @@ async def explain_stage_async(*, state: RunState, language: str = "en") -> Stage
         stage_patch={
             **fallback.stage_patch,
             "assistant_response": with_response_heading(
-                heading="Quick take",
+                heading=_quick_take_heading(language),
                 body=llm_result.text,
             ),
             "assistant_response_source": RESULT_READOUT_SOURCE_LLM,
@@ -265,12 +302,19 @@ async def _llm_explanation(
         strategy=strategy,
         result_payload=result_payload,
         explanation_context=explanation_context,
+        language=language,
     )
     execution_note = result_execution_note(result_facts)
-    rule_summary = result_rule_summary(result_facts)
+    rule_summary = _display_rule_summary(
+        strategy=strategy,
+        result_facts=result_facts,
+        rule_summary=result_rule_summary(result_facts),
+        language=language,
+    )
     assumption_summary = _assumption_summary(
         optional_parameters=optional_parameters,
         explanation_context=explanation_context,
+        language=language,
     )
     caveat = _caveat_summary(explanation_context, language=language)
     allowed_next_experiments = structured_next_experiments(result_facts)
@@ -279,6 +323,21 @@ async def _llm_explanation(
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
+    total_return, benchmark_return, same_period = _resolved_return_metrics(
+        result_payload=result_payload,
+        explanation_context=explanation_context,
+    )
+    canonical_takeaway: str | None = None
+    if total_return is not None and benchmark_return is not None:
+        canonical_takeaway = _readout_takeaway(
+            total_return=total_return,
+            benchmark_return=benchmark_return,
+            benchmark_symbol=str(benchmark_contract.get("benchmark_symbol") or ""),
+            same_period=same_period,
+            delta=total_return - benchmark_return,
+            execution_note=execution_note,
+            language=language,
+        )
     fact_context = {
         "tested_summary": tested_summary,
         "execution_note": execution_note,
@@ -320,6 +379,13 @@ async def _llm_explanation(
                 "next experiments are validated here but presented through follow-up "
                 "actions and deeper explanation surfaces. "
                 "Benchmark returns belong only to benchmark_contract.benchmark_symbol. "
+                "Write every user-facing field in prompt_context.language. "
+                "If language starts with 'es', write user-facing fields in Spanish. "
+                "Symbols, tickers, currency codes, numbers, and percentages can stay "
+                "unchanged, but internal fact IDs and schema field names are never "
+                "user-facing copy. "
+                "Set language_quality to mixed_or_wrong_language if any rendered "
+                "sentence mixes languages or copies internal field wording. "
                 "Return structured fields so the runtime can validate fact usage; "
                 "do not invent facts or supported next experiment kinds."
                 " For user-facing beat/lagged wording, use the benchmark symbol "
@@ -353,6 +419,13 @@ async def _llm_explanation(
             required_fact_ids=required_fact_ids,
             allowed_next_experiments=allowed_next_experiments,
             relative_performance_truth=relative_performance_truth,
+            tested_line=_tested_readout_line(
+                tested_summary,
+                rule_summary,
+                language=language,
+            ),
+            canonical_takeaway=canonical_takeaway,
+            language=language,
         )
         if rendered is None:
             return _LLMExplanationResult(
@@ -482,9 +555,14 @@ def _render_quick_take_draft(
     required_fact_ids: set[str],
     allowed_next_experiments: Any,
     relative_performance_truth: QuickTakeRelativeClaim,
+    tested_line: str,
+    canonical_takeaway: str | None,
+    language: str,
 ) -> str | None:
     response = _coerce_quick_take_draft(draft)
     if response is None:
+        return None
+    if response.language_quality != "matches_prompt_language":
         return None
     truth = relative_performance_truth
     if truth != "unknown" and response.relative_performance_claim != truth:
@@ -508,9 +586,13 @@ def _render_quick_take_draft(
     ):
         return None
 
-    lines = [_clean_quick_take_line(response.takeaway), ""]
+    tested = _clean_quick_take_line(tested_line)
+    tested_label = "Probado:" if _is_spanish(language) else "Tested:"
+    takeaway = canonical_takeaway or response.takeaway
+    lines = [_clean_quick_take_line(takeaway), ""]
+    if tested:
+        lines.append(f"{tested_label} {tested}")
     for bullet in (
-        response.tested_bullet,
         response.meaning_bullet,
         response.assumption_bullet,
         response.caveat_bullet,
@@ -525,6 +607,8 @@ def _render_quick_take_draft(
 def _coerce_quick_take_draft(value: Any) -> QuickTakeDraft | None:
     if isinstance(value, QuickTakeDraft):
         return value
+    if isinstance(value, dict) and "language_quality" not in value:
+        value = {**value, "language_quality": "matches_prompt_language"}
     try:
         return QuickTakeDraft.model_validate(value)
     except (TypeError, ValidationError):
@@ -753,6 +837,82 @@ def _result_facts_for_explanation(
     return facts
 
 
+def _display_rule_summary(
+    *,
+    strategy: dict[str, Any],
+    result_facts: dict[str, Any],
+    rule_summary: str | None,
+    language: str,
+) -> str | None:
+    strategy_type = str(
+        strategy.get("strategy_type")
+        or _dict_value(result_facts.get("resolved_strategy"), "strategy_type")
+        or result_facts.get("strategy_type")
+        or ""
+    ).strip()
+    resolved_parameters = (
+        result_facts.get("resolved_parameters")
+        if isinstance(result_facts.get("resolved_parameters"), dict)
+        else {}
+    )
+    if strategy_type == "buy_and_hold":
+        if _is_spanish(language):
+            return "Regla: compra al inicio del periodo y mantén hasta el final."
+        return "Rule: buy at the start of the period and hold through the end."
+    if strategy_type == "dca_accumulation":
+        cadence = _cadence_display_label(
+            strategy.get("cadence") or resolved_parameters.get("cadence"),
+            language=language,
+        )
+        if _is_spanish(language):
+            cadence_phrase = f" con cadencia {cadence}" if cadence else ""
+            return f"Regla: compra de forma recurrente{cadence_phrase} y mantén."
+        cadence_phrase = f" on a {cadence} cadence" if cadence else ""
+        return f"Rule: buy recurring contributions{cadence_phrase} and hold."
+    if strategy_type == "indicator_threshold":
+        indicator = str(
+            resolved_parameters.get("indicator") or strategy.get("indicator") or ""
+        ).strip()
+        entry_threshold = resolved_parameters.get("entry_threshold")
+        exit_threshold = resolved_parameters.get("exit_threshold")
+        if indicator and entry_threshold is not None and exit_threshold is not None:
+            label = indicator.upper()
+            if _is_spanish(language):
+                return (
+                    f"Regla: compra cuando {label} esté en o por debajo de "
+                    f"{entry_threshold}; vende cuando esté en o por encima de "
+                    f"{exit_threshold}."
+                )
+            return (
+                f"Rule: buy when {label} is at or below {entry_threshold}; "
+                f"sell when it is at or above {exit_threshold}."
+            )
+    if _is_spanish(language):
+        return None
+    return rule_summary
+
+
+def _dict_value(value: Any, key: str) -> Any:
+    if isinstance(value, dict):
+        return value.get(key)
+    return None
+
+
+def _cadence_display_label(value: Any, *, language: str) -> str:
+    cadence = str(value or "").strip().lower().replace("-", "_")
+    if not cadence:
+        return ""
+    if _is_spanish(language):
+        return {
+            "daily": "diaria",
+            "weekly": "semanal",
+            "biweekly": "quincenal",
+            "monthly": "mensual",
+            "quarterly": "trimestral",
+        }.get(cadence, cadence.replace("_", " "))
+    return cadence.replace("_", " ")
+
+
 def _optional_parameters(state: RunState) -> dict[str, Any]:
     payload = state.confirmation_payload
     if payload is None:
@@ -779,24 +939,37 @@ def _tested_summary(
     strategy: dict[str, Any],
     result_payload: dict[str, Any],
     explanation_context: dict[str, Any],
+    language: str,
 ) -> str | None:
     assets = _asset_summary(strategy)
     strategy_label = _strategy_label(
-        strategy.get("strategy_type") or explanation_context.get("strategy_type")
+        strategy.get("strategy_type") or explanation_context.get("strategy_type"),
+        language=language,
     )
     period = _period_summary(
         strategy.get("date_range")
         or explanation_context.get("date_range")
-        or result_payload.get("date_range")
+        or result_payload.get("date_range"),
+        language=language,
     )
     if assets and strategy_label and period:
+        if _is_spanish(language):
+            return f"{assets}: {strategy_label} del {period}"
         return f"{assets} {strategy_label} over {period}"
     if assets and strategy_label:
+        if _is_spanish(language):
+            return f"{assets}: {strategy_label}"
         return f"{assets} {strategy_label}"
     if assets and period:
+        if _is_spanish(language):
+            return f"{assets} durante {period}"
         return f"{assets} over {period}"
     thesis = _thesis(strategy)
-    return f"the confirmed strategy: {thesis}" if thesis else None
+    if not thesis:
+        return None
+    if _is_spanish(language):
+        return f"la estrategia confirmada: {thesis}"
+    return f"the confirmed strategy: {thesis}"
 
 
 def _canonical_strategy_context(strategy: dict[str, Any]) -> dict[str, Any]:
@@ -817,13 +990,23 @@ def _asset_summary(strategy: dict[str, Any]) -> str | None:
     return None
 
 
-def _strategy_label(value: Any) -> str | None:
+def _strategy_label(value: Any, *, language: str) -> str | None:
     if not isinstance(value, str) or not value.strip():
         return None
+    if _is_spanish(language):
+        labels = {
+            "buy_and_hold": "comprar y mantener",
+            "dca_accumulation": "compras recurrentes",
+            "indicator_threshold": "umbral de indicador",
+            "signal_strategy": "estrategia de senales",
+        }
+        normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+        if normalized in labels:
+            return labels[normalized]
     return display_strategy_type({"strategy_type": value.strip()}).lower()
 
 
-def _period_summary(value: Any) -> str | None:
+def _period_summary(value: Any, *, language: str) -> str | None:
     if isinstance(value, str):
         period = value.strip()
         return period or None
@@ -834,6 +1017,8 @@ def _period_summary(value: Any) -> str | None:
         start = value.get("start")
         end = value.get("end")
         if start and end:
+            if _is_spanish(language):
+                return format_date_range_label(start, end, language=language)
             return f"{start} to {end}"
     return None
 
@@ -842,15 +1027,20 @@ def _assumption_summary(
     *,
     optional_parameters: dict[str, Any],
     explanation_context: dict[str, Any],
+    language: str,
 ) -> str:
     defaulted_labels: list[str] = []
     user_labels: list[str] = []
     assumptions = explanation_context.get("assumptions", [])
 
-    for value in optional_parameters.values():
+    for field_name, value in optional_parameters.items():
         if not isinstance(value, dict):
             continue
-        label = str(value.get("label") or "Unnamed setting")
+        label = optional_parameter_display_label(
+            field_name,
+            value.get("label"),
+            language=language,
+        )
         source = str(value.get("source") or "")
         if source == "default":
             defaulted_labels.append(label)
@@ -861,25 +1051,33 @@ def _assumption_summary(
     if isinstance(assumptions, list) and assumptions:
         assumption_text = _compact_sentence_list(assumptions, limit=3)
         if assumption_text:
-            parts.append("Assumptions: " + assumption_text)
+            label = "Supuestos: " if _is_spanish(language) else "Assumptions: "
+            parts.append(label + assumption_text)
     elif defaulted_labels:
-        parts.append("Defaults: " + ", ".join(defaulted_labels) + ".")
+        label = "Valores predeterminados: " if _is_spanish(language) else "Defaults: "
+        parts.append(label + ", ".join(defaulted_labels) + ".")
     if user_labels:
-        parts.append("User-set options: " + ", ".join(user_labels) + ".")
+        label = "Opciones elegidas: " if _is_spanish(language) else "User-set options: "
+        parts.append(label + ", ".join(user_labels) + ".")
     return " ".join(parts)
 
 
 def _caveat_summary(explanation_context: dict[str, Any], *, language: str) -> str:
+    default = (
+        "Es una comparación de retornos, no una atribución causal."
+        if _is_spanish(language)
+        else "This is a return comparison, not causal attribution."
+    )
     caveats = explanation_context.get("caveats", [])
     if not isinstance(caveats, list) or not caveats:
-        return "This is a return comparison, not causal attribution."
+        return default
     caveat_text = _compact_sentence_list(
         [normalize_legacy_data_caveat(value, language=language) for value in caveats],
         limit=2,
     )
     if not caveat_text:
-        return "This is a return comparison, not causal attribution."
-    return f"This is a return comparison, not causal attribution. {caveat_text}"
+        return default
+    return f"{default} {caveat_text}"
 
 
 def _build_response(
@@ -894,6 +1092,7 @@ def _build_response(
     caveat: str,
     execution_note: str | None,
     rule_summary: str | None,
+    language: str,
     next_check_override: str | None = None,
 ) -> str:
     tone = profile.effective_tone if profile is not None else "friendly"
@@ -902,7 +1101,7 @@ def _build_response(
         profile.effective_expertise_mode if profile is not None else "beginner"
     )
 
-    expertise_sentence = _expertise_sentence(expertise_mode)
+    expertise_sentence = _expertise_sentence(expertise_mode, language=language)
 
     if verbosity == "low":
         return _result_readout_markdown(
@@ -918,6 +1117,7 @@ def _build_response(
             rule_summary=rule_summary,
             next_check_override=next_check_override,
             compact=True,
+            language=language,
         )
 
     return _result_readout_markdown(
@@ -933,6 +1133,7 @@ def _build_response(
         rule_summary=rule_summary,
         next_check_override=next_check_override,
         compact=tone == "concise" and verbosity != "high",
+        language=language,
     )
 
 
@@ -950,6 +1151,7 @@ def _result_readout_markdown(
     rule_summary: str | None,
     next_check_override: str | None,
     compact: bool,
+    language: str,
 ) -> str:
     delta = total_return - benchmark_return
     takeaway = _readout_takeaway(
@@ -959,18 +1161,48 @@ def _result_readout_markdown(
         same_period=same_period,
         delta=delta,
         execution_note=execution_note,
+        language=language,
     )
-    tested = _tested_readout_line(tested_summary, rule_summary)
+    tested = _tested_readout_line(
+        tested_summary,
+        rule_summary,
+        language=language,
+    )
+    if _is_spanish(language):
+        lines = [
+            takeaway,
+            "",
+            f"- Probado: {tested}.",
+        ]
+        if execution_note:
+            lines.append(
+                f"- Señal: {_compact_execution_note(execution_note, language=language)}"
+            )
+        else:
+            lines.append(f"- Qué significa: {interpretation}")
+        next_check = next_check_override or _next_check_line(
+            execution_note=execution_note,
+            language=language,
+        )
+        if next_check:
+            lines.append(f"- Siguiente prueba: {next_check}")
+        if assumption_summary:
+            lines.append(f"- Supuestos: {_strip_leading_label(assumption_summary)}")
+        lines.append(f"- Ten en cuenta: {caveat}")
+        return "\n".join(lines)
     lines = [
         takeaway,
         "",
         f"- Tested: {tested}.",
     ]
     if execution_note:
-        lines.append(f"- Signal: {_compact_execution_note(execution_note)}")
+        lines.append(f"- Signal: {_compact_execution_note(execution_note, language=language)}")
     else:
         lines.append(f"- What that means: {interpretation}")
-    next_check = next_check_override or _next_check_line(execution_note=execution_note)
+    next_check = next_check_override or _next_check_line(
+        execution_note=execution_note,
+        language=language,
+    )
     if next_check:
         lines.append(f"- Next check: {next_check}")
     if assumption_summary:
@@ -987,10 +1219,25 @@ def _readout_takeaway(
     same_period: bool,
     delta: float,
     execution_note: str | None,
+    language: str,
 ) -> str:
-    benchmark_context = _benchmark_context_phrase(same_period)
-    benchmark_label = benchmark_symbol or "the benchmark"
-    relative = _relative_performance_sentence(delta)
+    benchmark_context = _benchmark_context_phrase(same_period, language=language)
+    benchmark_label = benchmark_symbol or (
+        "la referencia" if _is_spanish(language) else "the benchmark"
+    )
+    relative = _relative_performance_sentence(delta, language=language)
+    if _is_spanish(language):
+        if execution_note and abs(total_return) < 0.05:
+            return (
+                "No se abrió ninguna operación. La estrategia se mantuvo en efectivo "
+                "porque la condición de entrada no se activó; rindió "
+                f"{total_return:.1f}% mientras {benchmark_label} rindió "
+                f"{benchmark_return:.1f}% {benchmark_context}; {relative}"
+            )
+        return (
+            f"La estrategia rindió {total_return:.1f}% mientras {benchmark_label} "
+            f"rindió {benchmark_return:.1f}% {benchmark_context}, así que {relative}"
+        )
     if execution_note and abs(total_return) < 0.05:
         return (
             "No trade opened. The strategy stayed in cash because its entry "
@@ -1004,9 +1251,15 @@ def _readout_takeaway(
     )
 
 
-def _relative_performance_sentence(delta: float) -> str:
+def _relative_performance_sentence(delta: float, *, language: str) -> str:
     if abs(delta) < 0.05:
+        if _is_spanish(language):
+            return "estuvo prácticamente en línea con la referencia."
         return "was effectively in line with the benchmark."
+    if _is_spanish(language):
+        if delta > 0:
+            return f"superó la referencia por {abs(delta):.1f} puntos porcentuales."
+        return f"quedó por debajo por {abs(delta):.1f} puntos porcentuales."
     direction = "outperformed" if delta > 0 else "lagged"
     return f"{direction} by {abs(delta):.1f} percentage points."
 
@@ -1014,8 +1267,11 @@ def _relative_performance_sentence(delta: float) -> str:
 def _tested_readout_line(
     tested_summary: str | None,
     rule_summary: str | None,
+    *,
+    language: str,
 ) -> str:
-    tested = (tested_summary or "the confirmed strategy").strip().rstrip(".")
+    fallback = "la estrategia confirmada" if _is_spanish(language) else "the confirmed strategy"
+    tested = (tested_summary or fallback).strip().rstrip(".")
     if not rule_summary:
         return tested
     rule = rule_summary.strip()
@@ -1024,11 +1280,16 @@ def _tested_readout_line(
     return f"{tested}. {rule.rstrip('.')}"
 
 
-def _compact_execution_note(execution_note: str) -> str:
+def _compact_execution_note(execution_note: str, *, language: str) -> str:
     note = execution_note.strip()
     if note.startswith("No entry trades were executed") and (
         "entry condition did not trigger" in note
     ):
+        if _is_spanish(language):
+            return (
+                "La condición de entrada no se activó en esta ventana, así que no se "
+                "abrió ninguna posición."
+            )
         return (
             "The entry condition did not trigger in this window, so no position "
             "was opened."
@@ -1036,15 +1297,24 @@ def _compact_execution_note(execution_note: str) -> str:
     return note
 
 
-def _next_check_line(*, execution_note: str | None) -> str | None:
+def _next_check_line(*, execution_note: str | None, language: str) -> str | None:
     if execution_note and execution_note.startswith("No entry trades were executed"):
+        if _is_spanish(language):
+            return (
+                "Afloja el umbral de entrada o amplía la ventana antes de juzgar "
+                "la idea."
+            )
         return (
             "Loosen the entry threshold or widen the window before judging the " "idea."
         )
     return None
 
 
-def _benchmark_context_phrase(same_period: bool) -> str:
+def _benchmark_context_phrase(same_period: bool, *, language: str) -> str:
+    if _is_spanish(language):
+        if same_period:
+            return "en el mismo periodo"
+        return "en la ventana de comparación"
     if same_period:
         return "over the same period"
     return "for the comparison window"
@@ -1054,10 +1324,23 @@ def _strip_leading_label(value: str) -> str:
     text = value.strip()
     if text.startswith("Assumptions:"):
         return text[len("Assumptions:") :].strip()
+    if text.startswith("Supuestos:"):
+        return text[len("Supuestos:") :].strip()
     return text
 
 
-def _expertise_sentence(expertise_mode: str) -> str:
+def _expertise_sentence(expertise_mode: str, *, language: str) -> str:
+    if _is_spanish(language):
+        if expertise_mode == "advanced":
+            return "Esto es solo una comparación de retornos, sin atribución causal."
+        if expertise_mode == "intermediate":
+            return (
+                "Úsalo como comparación directa contra la referencia antes de decidir "
+                "ajustes."
+            )
+        return (
+            "Úsalo como evidencia para revisar la regla confirmada antes de refinarla."
+        )
     if expertise_mode == "advanced":
         return "This is a return comparison only, without causal attribution."
     if expertise_mode == "intermediate":
@@ -1079,18 +1362,45 @@ def _build_incomplete_result_response(
     caveat: str,
     execution_note: str | None,
     rule_summary: str | None,
+    language: str,
 ) -> str:
     tone = profile.effective_tone if profile is not None else "friendly"
     verbosity = profile.effective_verbosity if profile is not None else "medium"
     expertise_mode = (
         profile.effective_expertise_mode if profile is not None else "beginner"
     )
+    if _is_spanish(language):
+        tested_sentence = (
+            f"Esto aplica a {tested_summary}."
+            if tested_summary is not None
+            else "Esto aplica a la estrategia confirmada."
+        )
+        expertise_sentence = _expertise_sentence(expertise_mode, language=language)
+        base = (
+            "El resultado está incompleto, así que todavía no puedo reportar "
+            f"retornos observados. {tested_sentence} {expertise_sentence}"
+        )
+        execution_sentence = f" {execution_note}" if execution_note else ""
+        if verbosity == "high":
+            if tone == "friendly":
+                return (
+                    "Este es el estado actual. "
+                    f"{base}{execution_sentence} Supuestos y salvedades: "
+                    f"{assumption_summary} {caveat}"
+                )
+            return (
+                f"{base}{execution_sentence} Supuestos y salvedades: "
+                f"{assumption_summary} {caveat}"
+            )
+        return (
+            f"{base}{execution_sentence} Salvedad: {assumption_summary} {caveat}"
+        )
     tested_sentence = (
         f"This applies to {tested_summary}."
         if tested_summary is not None
         else "This applies to the confirmed strategy."
     )
-    expertise_sentence = _expertise_sentence(expertise_mode)
+    expertise_sentence = _expertise_sentence(expertise_mode, language=language)
     base = (
         "The result payload is incomplete, so I cannot report observed returns yet. "
         f"{tested_sentence} {expertise_sentence}"

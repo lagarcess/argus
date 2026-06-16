@@ -561,7 +561,8 @@ def test_run_backtest_job_uses_mainline_llm_quick_take_path(
         run_id_factory=lambda: "run-workflow",
     )
 
-    assert "AAPL beat SPY by 4.2 percentage points" in result["result_readout"]
+    assert "The strategy returned 12.3% while SPY returned 8.1%" in result["result_readout"]
+    assert "outperformed by 4.2 percentage points" in result["result_readout"]
     metadata = gateway.row["execution_metadata"]["workflow_backtest"]
     assert metadata["result_readout_source"] == "llm_explain_stage"
     assert metadata["result_readout_fallback_used"] is False

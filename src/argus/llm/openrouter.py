@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -20,6 +21,9 @@ load_dotenv()
 
 OpenRouterTask = Literal[
     "interpretation",
+    "interpretation_repair",
+    "field_fidelity",
+    "capability_conflict",
     "clarification",
     "chat_composer",
     "result_summary",
@@ -27,6 +31,9 @@ OpenRouterTask = Literal[
     "name_suggestion",
 ]
 OpenRouterModelTier = Literal["utility", "chat", "structured", "context"]
+OpenRouterReasoningEffort = Literal[
+    "xhigh", "high", "medium", "low", "minimal", "none"
+]
 
 SchemaModelT = TypeVar("SchemaModelT", bound=BaseModel)
 
@@ -38,6 +45,7 @@ class OpenRouterProfile:
     max_tokens: int
     timeout_seconds: int = 12
     max_retries: int = 1
+    reasoning_effort: OpenRouterReasoningEffort = "none"
 
 
 @dataclass(frozen=True)
@@ -83,7 +91,31 @@ _ROUTE_RECEIPT_CAPTURE: ContextVar[list[OpenRouterRouteReceipt] | None] = Contex
 
 
 OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
-    "interpretation": OpenRouterProfile("interpretation", temperature=0, max_tokens=3200),
+    "interpretation": OpenRouterProfile(
+        "interpretation",
+        temperature=0,
+        max_tokens=3200,
+        reasoning_effort="medium",
+    ),
+    "interpretation_repair": OpenRouterProfile(
+        "interpretation_repair",
+        temperature=0,
+        max_tokens=2200,
+        timeout_seconds=20,
+    ),
+    "field_fidelity": OpenRouterProfile(
+        "field_fidelity",
+        temperature=0,
+        max_tokens=900,
+        timeout_seconds=20,
+    ),
+    "capability_conflict": OpenRouterProfile(
+        "capability_conflict",
+        temperature=0,
+        max_tokens=700,
+        timeout_seconds=15,
+        reasoning_effort="medium",
+    ),
     "clarification": OpenRouterProfile("clarification", temperature=0, max_tokens=360),
     "chat_composer": OpenRouterProfile("chat_composer", temperature=0.2, max_tokens=1200),
     "result_summary": OpenRouterProfile(
@@ -103,6 +135,9 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
 
 OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
     "interpretation": "structured",
+    "interpretation_repair": "structured",
+    "field_fidelity": "structured",
+    "capability_conflict": "context",
     "clarification": "chat",
     "chat_composer": "chat",
     "result_summary": "chat",
@@ -264,6 +299,7 @@ def openrouter_profile_for_task(task: OpenRouterTask) -> OpenRouterProfile:
         max_tokens=profile.max_tokens,
         timeout_seconds=timeout_override,
         max_retries=profile.max_retries,
+        reasoning_effort=profile.reasoning_effort,
     )
 
 
@@ -457,10 +493,13 @@ async def invoke_openrouter_json_schema(
         )
         try:
             async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
-                response = await _post_openrouter_json_schema(
-                    client=client,
-                    api_key=api_key,
-                    payload=payload,
+                response = await asyncio.wait_for(
+                    _post_openrouter_json_schema(
+                        client=client,
+                        api_key=api_key,
+                        payload=payload,
+                    ),
+                    timeout=profile.timeout_seconds,
                 )
             data = response.json()
             _raise_openrouter_payload_error(data)
@@ -557,10 +596,13 @@ async def invoke_openrouter_chat_completion(
         }
         try:
             async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
-                response = await _post_openrouter_json_schema(
-                    client=client,
-                    api_key=api_key,
-                    payload=payload,
+                response = await asyncio.wait_for(
+                    _post_openrouter_json_schema(
+                        client=client,
+                        api_key=api_key,
+                        payload=payload,
+                    ),
+                    timeout=profile.timeout_seconds,
                 )
                 data = response.json()
                 _raise_openrouter_payload_error(data)
@@ -810,8 +852,11 @@ def _elapsed_ms(started_at: float) -> int:
     return int((time.perf_counter() - started_at) * 1000)
 
 
-def _disable_reasoning_for_structured_artifact(payload: dict[str, object]) -> None:
-    payload["reasoning"] = {"effort": "none"}
+def _apply_reasoning_for_structured_artifact(
+    payload: dict[str, object],
+    profile: OpenRouterProfile,
+) -> None:
+    payload["reasoning"] = {"effort": profile.reasoning_effort}
 
 
 def _json_schema_payload(
@@ -833,10 +878,11 @@ def _json_schema_payload(
                 "schema": schema_model.model_json_schema(),
             },
         },
+        "provider": {"require_parameters": True},
         "temperature": profile.temperature,
         "max_tokens": profile.max_tokens,
     }
-    _disable_reasoning_for_structured_artifact(payload)
+    _apply_reasoning_for_structured_artifact(payload, profile)
     return payload
 
 

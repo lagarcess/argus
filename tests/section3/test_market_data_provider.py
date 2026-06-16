@@ -8,6 +8,13 @@ from argus.domain.market_data import assets, provider
 from argus.domain.market_data.assets import ResolvedAsset
 
 
+@pytest.fixture(autouse=True)
+def clear_asset_cache_between_tests():
+    assets.clear_asset_cache()
+    yield
+    assets.clear_asset_cache()
+
+
 def test_normalize_df_enforces_utc_sorted_lowercase_ohlcv() -> None:
     frame = pd.DataFrame(
         {
@@ -286,6 +293,41 @@ def test_asset_search_supports_provider_backed_crypto_name_pair_aliases(
     assert bitcoin_usd[0].canonical_symbol == "BTC"
     assert bitcoin_dollar[0].canonical_symbol == "BTC"
     assert btc_usd[0].canonical_symbol == "BTC"
+
+
+def test_exact_crypto_base_name_beats_prefixed_crypto_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mapping: dict[str, ResolvedAsset] = {}
+    bitcoin_cash = ResolvedAsset(
+        canonical_symbol="BCH",
+        asset_class="crypto",
+        name="Bitcoin Cash / USD",
+        raw_symbol="BCH/USD",
+    )
+    bitcoin_usdc = ResolvedAsset(
+        canonical_symbol="BTCUSDC",
+        asset_class="crypto",
+        name="Bitcoin / USD Coin",
+        raw_symbol="BTC/USDC",
+    )
+    bitcoin = ResolvedAsset(
+        canonical_symbol="BTC",
+        asset_class="crypto",
+        name="Bitcoin / USD",
+        raw_symbol="BTC/USD",
+    )
+    assets._add_aliases(mapping, bitcoin_cash, canonical="BCH")
+    assets._add_aliases(mapping, bitcoin_usdc, canonical="BTCUSDC")
+    assets._add_aliases(mapping, bitcoin, canonical="BTC")
+
+    assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    monkeypatch.setattr(assets, "_load_assets_from_alpaca", lambda: mapping)
+    monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {})
+
+    assert assets.resolve_asset("Bitcoin").canonical_symbol == "BTC"
+    assert assets.search_assets("Bitcoin")[0].canonical_symbol == "BTC"
 
 
 def test_crypto_aliases_tolerate_missing_provider_name() -> None:

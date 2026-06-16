@@ -19,8 +19,62 @@ class LLMRiskRule(BaseModel):
     mode: str | None = None
 
 
+class LLMDateRangeIntent(BaseModel):
+    kind: (
+        Literal[
+            "explicit_range",
+            "rolling_window",
+            "year_to_date",
+            "calendar_year",
+            "since",
+            "endpoint_patch",
+        ]
+        | None
+    ) = Field(
+        default=None,
+        description=(
+            "Canonical, language-neutral temporal intent. Use this for relative "
+            "or semantic windows such as last 12 months or year to date instead "
+            "of asking deterministic code to parse localized prose."
+        ),
+    )
+    start: str | None = Field(
+        default=None,
+        description="ISO date, YYYY-MM-DD, or canonical sentinel 'today'.",
+    )
+    end: str | None = Field(
+        default=None,
+        description="ISO date, YYYY-MM-DD, or canonical sentinel 'today'.",
+    )
+    day_offset: int | None = Field(
+        default=None,
+        description=(
+            "Optional day offset from anchor for endpoint patches, e.g. -1 for "
+            "the previous day. This is canonical machine data, not localized text."
+        ),
+    )
+    count: int | None = Field(default=None, ge=1)
+    unit: Literal["day", "week", "month", "quarter", "year"] | None = None
+    anchor: Literal["today", "current_date"] | None = "today"
+    year: int | None = Field(default=None, ge=1900, le=2100)
+    endpoint: Literal["start", "end"] | None = None
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+    evidence: str | None = Field(
+        default=None,
+        description="Short user-message span supporting this intent.",
+    )
+
+
 class LLMStrategyDraft(BaseModel):
     raw_user_phrasing: str | None = None
+    language: str | None = Field(
+        default=None,
+        description=(
+            "Detected user-message language as a BCP-47-style code such as en, "
+            "es, or es-419. This guides user-facing prose and bounded parsers; "
+            "executable fields still use canonical Argus values."
+        ),
+    )
     strategy_type: str | None = None
     strategy_thesis: str | None = None
     asset_universe: list[str] = Field(default_factory=list)
@@ -37,6 +91,14 @@ class LLMStrategyDraft(BaseModel):
     entry_threshold: float | None = None
     exit_threshold: float | None = None
     date_range: str | dict[str, str] | None = None
+    date_range_raw_text: str | None = Field(
+        default=None,
+        description=(
+            "Exact short user text span that expresses the requested date or time "
+            "window, for example 'last 8 months' or 'enero 2024 a marzo 2024'."
+        ),
+    )
+    date_range_intent: LLMDateRangeIntent | None = None
     sizing_mode: str | None = None
     capital_amount: float | None = None
     recurring_contribution: float | None = None
@@ -48,6 +110,14 @@ class LLMStrategyDraft(BaseModel):
     comparison_baseline: str | None = None
     refinement_of: str | None = None
     field_provenance: dict[str, str] = Field(default_factory=dict)
+    evidence_spans: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Short user-message spans that justify extracted canonical fields, keyed "
+            "by field name such as strategy_type, asset_universe, date_range, "
+            "capital_amount, cadence, or comparison_baseline."
+        ),
+    )
     extra_parameters: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -112,9 +182,33 @@ class FocusedStrategyExtraction(BaseModel):
     is_testable_strategy: bool
     requires_clarification: bool = False
     user_goal_summary: str
-    strategy_type: str | None = None
+    language: str | None = None
+    strategy_type: str | None = Field(
+        default=None,
+        description=(
+            "Canonical executable strategy family selected by the current user "
+            "message. Use buy_and_hold when the user asks in any language to buy, "
+            "hold, keep, compare performance, or test one asset over a period "
+            "without a separate entry rule, including counterfactual performance "
+            "questions such as what would have happened if the user bought or owned "
+            "the asset over a period. Use dca_accumulation for recurring "
+            "fixed-amount buys and populate cadence plus recurring_contribution. "
+            "Use indicator_threshold for supported indicator threshold rules, and "
+            "signal_strategy for supported signal/crossover rules. Leave null only "
+            "when no executable family is semantically selected."
+        ),
+    )
     strategy_thesis: str | None = None
-    asset_universe: list[str] = Field(default_factory=list)
+    asset_universe: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Primary traded/tested assets explicitly stated by the user. Include "
+            "ticker symbols or asset names in any language, such as AAPL, Apple, "
+            "ETH, or Bitcoin. Do not put benchmark/reference/comparison assets "
+            "here unless the user explicitly says to buy, hold, or test them as "
+            "traded assets."
+        ),
+    )
     asset_class: str | None = None
     timeframe: str | None = Field(
         default=None,
@@ -133,6 +227,18 @@ class FocusedStrategyExtraction(BaseModel):
             "missing_required_fields."
         ),
     )
+    date_range_raw_text: str | None = None
+    date_range_intent: LLMDateRangeIntent | None = Field(
+        default=None,
+        description=(
+            "Canonical temporal intent for relative or semantic windows. For "
+            "phrases equivalent to last/past/previous N days, weeks, months, "
+            "quarters, or years in any language, return kind=rolling_window with "
+            "count, unit, anchor=today, confidence, and evidence. For current-year "
+            "to current-date windows in any language, return kind=year_to_date "
+            "with confidence and evidence."
+        ),
+    )
     comparison_baseline: str | None = Field(
         default=None,
         description=(
@@ -147,6 +253,22 @@ class FocusedStrategyExtraction(BaseModel):
             "Examples: $1k -> 1000, $500 -> 500."
         ),
     )
+    recurring_contribution: float | None = Field(
+        default=None,
+        description=(
+            "User-stated contribution for each recurring DCA buy. Populate this "
+            "for recurring fixed-amount purchases; keep capital_amount equal to "
+            "the same amount unless the user separately states a total budget."
+        ),
+    )
+    cadence: str | None = Field(
+        default=None,
+        description=(
+            "Canonical recurring-buy cadence for DCA, such as daily, weekly, "
+            "biweekly, monthly, or quarterly. Leave null when no recurring cadence "
+            "is stated."
+        ),
+    )
     entry_logic: str | None = None
     exit_logic: str | None = None
     entry_rule: dict[str, Any] | None = None
@@ -159,3 +281,54 @@ class FocusedStrategyExtraction(BaseModel):
     missing_required_fields: list[str] = Field(default_factory=list)
     assistant_response: str | None = None
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+    evidence_spans: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Bounded snippets from the current user message that support populated "
+            "canonical fields. Evidence spans are provenance only and never replace "
+            "strategy_type, asset_universe, comparison_baseline, date_range_intent, "
+            "capital_amount, recurring_contribution, or cadence. If evidence "
+            "identifies a supported strategy, asset, benchmark, time window, "
+            "contribution, or cadence, the corresponding canonical field must also "
+            "be populated."
+        ),
+    )
+
+
+class FocusedDateWindowExtraction(BaseModel):
+    has_date_window: bool = Field(
+        description=(
+            "True when the current user message states a backtest date window, "
+            "lookback window, start/end date, or other temporal constraint."
+        )
+    )
+    date_range_raw_text: str | None = Field(
+        default=None,
+        description=(
+            "Shortest exact user-message span that expresses the temporal window. "
+            "Keep the user's language; this is provenance, not executable input."
+        ),
+    )
+    date_range_intent: LLMDateRangeIntent | None = Field(
+        default=None,
+        description=(
+            "Canonical language-neutral temporal intent. Required for relative or "
+            "semantic windows. A present-anchored lookback duration is complete "
+            "without explicit calendar endpoints. Do not calculate endpoint dates "
+            "for relative windows."
+        ),
+    )
+    date_range: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Use only when the user explicitly states calendar endpoints. Values "
+            "must be ISO dates or the canonical sentinel today/current_date. Never "
+            "put relative, shorthand, or prose windows in start/end; use "
+            "date_range_intent for those."
+        ),
+    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    evidence: str | None = Field(
+        default=None,
+        description="Short user-message span supporting the temporal extraction.",
+    )

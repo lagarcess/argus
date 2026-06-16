@@ -3,6 +3,7 @@ from __future__ import annotations
 from argus.agent_runtime.response_style import (
     ARGUS_RESPONSE_STYLE_CONTRACT,
     argus_response_style_contract,
+    result_followup_heading,
 )
 from argus.agent_runtime.result_followups import result_followup_llm_messages
 from argus.api.chat.breakdown import _result_breakdown_llm_messages
@@ -14,13 +15,14 @@ def test_argus_response_style_contract_names_human_readability_requirements() ->
 
     for idea in (
         "warm",
-        "plain-english",
+        "plain language",
         "concise",
         "curiosity-forward",
         "financial pdf",
         "unsupported causal",
     ):
         assert idea in normalized
+    assert "plain-english" not in normalized
 
 
 def test_result_followup_prompt_includes_argus_response_style_contract() -> None:
@@ -41,6 +43,12 @@ def test_result_followup_prompt_includes_argus_response_style_contract() -> None
     assert "plain takeaway" in messages[0]["content"]
     assert "not a metric recap" in messages[0]["content"]
     assert "two short paragraphs" in messages[0]["content"]
+
+
+def test_result_followup_headings_are_enabled_language_aware() -> None:
+    assert result_followup_heading("general", language="es-419") == "Qué pasó"
+    assert result_followup_heading("assumptions", language="es-419") == "Supuestos"
+    assert result_followup_heading("general", language="en") == "What happened"
 
 
 def test_result_breakdown_prompt_includes_argus_response_style_contract() -> None:

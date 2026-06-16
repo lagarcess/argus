@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from loguru import logger
+from pydantic import ValidationError
 
 from argus.api import state as api_state
-from argus.api.dependencies import current_user, dev_memory_fallback_enabled
+from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.schemas import ProfilePatch, User, UserResponse
 from argus.domain.store import utcnow
 
@@ -32,6 +33,7 @@ def get_me(user: User = Depends(current_user)) -> UserResponse:  # noqa: B008
 @router.patch("/me", response_model=UserResponse)
 def patch_me(
     patch: ProfilePatch,
+    request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> UserResponse:
     current = (
@@ -52,7 +54,17 @@ def patch_me(
         onboarding.update(onboarding_patch)
         data["onboarding"] = onboarding
     data["updated_at"] = utcnow()
-    updated = User.model_validate(data)
+    try:
+        updated = User.model_validate(data)
+    except ValidationError as exc:
+        raise problem(
+            request,
+            status_code=422,
+            code="invalid_profile_patch",
+            title="Invalid Profile Patch",
+            detail="The profile update could not be applied.",
+            context={"errors": exc.errors()},
+        ) from exc
 
     if api_state.supabase_gateway is not None:
         try:

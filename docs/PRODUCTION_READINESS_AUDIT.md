@@ -17,7 +17,9 @@ Before implementation changes, the branch baseline passed:
 ## Product Gaps Closed In This Branch
 
 - Deterministic clarification copy is gated so raw fields and enums do not become the primary assistant voice.
-- Conversational runtime stabilization now routes clarification through an internal response-intent composer before text reaches chat.
+- Conversational runtime stabilization now routes normal clarification through the
+  structured LLM clarifier; deterministic recovery copy is limited to explicit
+  artifact-action failure states.
 - Natural relative periods with number words, such as `last two years`, resolve before confirmation.
 - Well-known asset aliases keep provider-truth asset classes when live provider lookup is unavailable during interpretation.
 - Thin or stale LLM outputs are rejected or recomposed from current state.

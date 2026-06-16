@@ -25,28 +25,31 @@ file.
 
 ## Current Spanish Readiness Decision
 
-Spanish work on `codex/private-alpha-next-jules-intake` is **scaffolding only**
-until a separate Codex-owned runtime readiness gate passes. The branch may add
-locale files, stable translation keys, documentation, and static UI tests, but
-it must not be treated as a release signal for Spanish private-alpha users.
+Spanish work that only adds locale files, stable translation keys,
+documentation, and static UI tests is **scaffolding only** until a separate
+Codex-owned runtime readiness gate passes. `codex/private-alpha-readiness` now
+has local runtime-spine proof for a focused messy buy-and-hold shape in English
+and Spanish, but that proof is not a release signal by itself.
 
 Keep `NEXT_PUBLIC_ENABLE_SPANISH` disabled in production-like Render
 environments until all of these pass:
 
 - Spanish static UI smoke for the private-alpha surfaces.
 - Spanish production-parity chat QA covering at least one multi-turn
-  clarification and confirmation flow.
+  clarification and confirmation flow plus a direct supported prompt that
+  carries shorthand capital into the canonical confirmation card.
 - Spanish result/job/retry/recovery surfaces render without English happy-path
   or failure copy leaking into the user-facing transcript.
 - A live or local QA canary verifies that structured runtime state survives
   continuation turns without depending on translated labels as executable truth.
 
-The current known blocker is runtime-state normalization in Spanish
-continuation flows. A Spanish user can reach paths where serialized
-`resolution_provenance` entries rehydrate as dictionaries while runtime helpers
-expect model objects. That is a language-readiness blocker because it exposes
-that the chat/backtest spine is not yet fully presentation-language agnostic.
-Fixing this belongs to Codex-owned runtime work, not mechanical locale intake.
+Previously, the known blocker was runtime-state normalization in Spanish
+continuation flows. The readiness branch now normalizes that state class and
+has focused local browser proof for messy English/Spanish buy-and-hold prompts
+with `100k`. The remaining blocker is broader coverage: multi-turn
+clarification, result execution, retry/recovery, indicator/DCA prompts, and a
+production-parity live canary still need to pass before enabling Spanish in
+Render.
 
 ## Frontend Responsibilities
 
@@ -108,6 +111,8 @@ Before enabling a language flag in Render:
 - Profile update QA confirms language and locale persist through `/me`.
 - Production-parity chat QA confirms assistant prose follows the selected
   language while still honoring Argus voice.
+- Supported messy prompt QA confirms canonical fields survive the LLM pass and
+  post-interpretation audits without phrase gates or chip-specific shortcuts.
 - Live canary passes before inviting users in that language.
 - Rollback is simple: turn the public language flag off without a migration.
 

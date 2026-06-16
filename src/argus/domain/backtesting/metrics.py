@@ -28,6 +28,18 @@ def _max_drawdown_pct(equity_curve: pd.Series) -> float:
     return float(drawdown.min() * 100.0)
 
 
+def portfolio_value_summary(equity_curve: pd.Series) -> dict[str, Any] | None:
+    values = equity_curve.dropna().astype(float)
+    if values.empty:
+        return None
+    return {
+        "peak_value": round(float(values.max()), 2),
+        "lowest_value": round(float(values.min()), 2),
+        "currency": "USD",
+        "source": "strategy_portfolio_equity_close",
+    }
+
+
 def _annualized_return_pct(
     total_return: float, periods: int, periods_per_year: float
 ) -> float:

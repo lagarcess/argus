@@ -57,6 +57,7 @@ import {
   failedActionRetryActionFromMetadata,
   hasFailedActionMetadata,
   isRetryAction,
+  retryLastTurnActionFromMetadata,
   retryLastTurnActionFromMessage,
   retryLastTurnFailedAssistantIdFromAction,
   retryLastTurnMessageFromAction,
@@ -79,7 +80,10 @@ import {
   hydrateResultActions,
   hydrateResultActionsForRun,
 } from "@/lib/chat-result-actions";
-import { appendOrReplacePendingAssistantMessage } from "@/lib/chat-send-state";
+import {
+  appendOrReplacePendingAssistantMessage,
+  replaceOrAppendFinalAssistantMessage,
+} from "@/lib/chat-send-state";
 import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
@@ -112,6 +116,7 @@ import {
   hiddenSaveActionMessageIdsFromApi,
   isBreakdownActionMetadata,
   normalizeConfirmationHistory,
+  settleConfirmationAfterActionTransportError,
   resultActionRunId,
   settleOpenConfirmationsAfterStreamError,
   settleOpenConfirmationsAfterTextFinal,
@@ -1135,6 +1140,12 @@ export default function ChatInterface() {
     resetToEmptyChatSurface();
   }, [conversationId, refreshHistory, resetToEmptyChatSurface]);
 
+  const actionDisplayLabel = useCallback(
+    (action: ChatActionOption) =>
+      action.labelKey ? t(action.labelKey, action.label) : action.label,
+    [t],
+  );
+
   const handleTriggerPrompt = async (_type: 'strategy', customPrompt?: string) => {
     // 1. Switch view
     setCurrentView("chat");
@@ -1225,7 +1236,7 @@ export default function ChatInterface() {
       id: crypto.randomUUID(),
       role: "user",
       kind: action?.type ? "action" : "text",
-      content: action?.label ?? trimmed,
+      content: action?.type ? actionDisplayLabel(action) : trimmed,
       mentions,
       selectedAction: action,
     };
@@ -1283,13 +1294,18 @@ export default function ChatInterface() {
         );
       }
       if (event.event === "error") {
+        const errorPayload = event.data as typeof event.data & Record<string, unknown>;
         const persistedErrorMessageId = event.data.message_id?.trim();
+        const metadataRetryAction = retryLastTurnActionFromMetadata(errorPayload, {
+          assistantMessageId: persistedErrorMessageId,
+        });
         const visibleRetryAction =
-          retryLastTurnAction && persistedErrorMessageId
+          metadataRetryAction ??
+          (retryLastTurnAction && persistedErrorMessageId
             ? retryLastTurnActionFromMessage(trimmed, {
                 assistantMessageId: persistedErrorMessageId,
               })
-            : retryLastTurnAction;
+            : retryLastTurnAction);
         setInputActions([]);
         setStreamStatus(null);
         setIsStreamingResponse(false);
@@ -1321,8 +1337,15 @@ export default function ChatInterface() {
         const finalPayload = event.data as typeof event.data & Record<string, unknown>;
         const finalText = event.data.assistant_response ?? event.data.assistant_prompt ?? "";
         const finalStageOutcome = event.data.stage_outcome;
+        const finalMessageId =
+          typeof finalPayload.message_id === "string"
+            ? finalPayload.message_id
+            : undefined;
         const finalRetryActions = [
           failedActionRetryActionFromMetadata(finalPayload),
+          retryLastTurnActionFromMetadata(finalPayload, {
+            assistantMessageId: finalMessageId,
+          }),
         ].filter((retryAction): retryAction is ChatActionOption => Boolean(retryAction));
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
         const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
@@ -1338,26 +1361,29 @@ export default function ChatInterface() {
         }
         if (event.data.confirmation) {
           const confirmation = event.data.confirmation as StrategyConfirmationPayload;
+          const finalAssistantId = finalMessageId ?? assistantId;
           setInputActions([]);
           setMessages((prev) =>
             normalizeRetryActionHistory(
               normalizeConfirmationHistory(
-                prev.map((m) =>
-                  m.id === assistantId
-                    ? {
-                        ...m,
-                        kind: "strategy_confirmation",
-                        content: undefined,
-                        confirmation,
-                        actions: confirmation.actions ?? [],
-                      }
-                    : m,
+                replaceOrAppendFinalAssistantMessage(
+                  prev,
+                  assistantId,
+                  {
+                    id: finalAssistantId,
+                    role: "ai",
+                    kind: "strategy_confirmation",
+                    content: undefined,
+                    confirmation,
+                    actions: confirmation.actions ?? [],
+                  },
                 ),
               ),
             ),
           );
         } else if (event.data.run) {
           const run = event.data.run as BacktestRun;
+          const finalAssistantId = finalMessageId ?? assistantId;
           const baseCard = resultCardFromRun(run);
           const resultActions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
           const card = {
@@ -1369,40 +1395,43 @@ export default function ChatInterface() {
           setMessages((prev) =>
             normalizeRetryActionHistory(
               normalizeConfirmationHistory(
-                prev.map((m) =>
-                  m.id === assistantId
-                    ? {
-                        ...m,
-                        kind: "strategy_result",
-                        content: m.content || finalText || undefined,
-                        result: card,
-                        actions: resultActions,
-                        savedStrategyId: card.savedStrategyId,
-                      }
-                    : m,
+                replaceOrAppendFinalAssistantMessage(
+                  prev,
+                  assistantId,
+                  {
+                    id: finalAssistantId,
+                    role: "ai",
+                    kind: "strategy_result",
+                    content: finalText || undefined,
+                    result: card,
+                    actions: resultActions,
+                    savedStrategyId: card.savedStrategyId,
+                  },
                 ),
               ),
             ),
           );
         } else if (finalBacktestJob) {
+          const finalAssistantId = finalMessageId ?? assistantId;
           setInputActions([]);
           setMessages((prev) =>
             normalizeRetryActionHistory(
               normalizeConfirmationHistory(
                 applyBacktestJobUpdate(
-                  prev.map((m) =>
-                    m.id === assistantId
-                      ? {
-                          ...m,
-                          kind: "backtest_job",
-                          content: finalText || m.content || undefined,
-                          backtestJob: finalBacktestJob,
-                          artifactId: finalBacktestJob.id,
-                          artifactType: "backtest_job",
-                          artifactStatus: finalBacktestJob.status,
-                          actions: undefined,
-                        }
-                      : m,
+                  replaceOrAppendFinalAssistantMessage(
+                    prev,
+                    assistantId,
+                    {
+                      id: finalAssistantId,
+                      role: "ai",
+                      kind: "backtest_job",
+                      content: finalText || undefined,
+                      backtestJob: finalBacktestJob,
+                      artifactId: finalBacktestJob.id,
+                      artifactType: "backtest_job",
+                      artifactStatus: finalBacktestJob.status,
+                      actions: undefined,
+                    },
                   ),
                   { job: finalBacktestJob, run: null },
                 ),
@@ -1411,16 +1440,31 @@ export default function ChatInterface() {
           );
         } else if (finalText) {
           setMessages((prev) => {
-            const nextMessages = prev.map((m) =>
-              mergeFinalTextMessage(m, {
-                assistantId,
-                finalText,
-                finalActions: finalRetryActions,
+            const finalAssistantId = finalMessageId ?? assistantId;
+            const nextMessages = replaceOrAppendFinalAssistantMessage(
+              prev.map((m) =>
+                mergeFinalTextMessage(m, {
+                  assistantId,
+                  finalText,
+                  finalActions: finalRetryActions,
+                  contentPresentation:
+                    action?.type === "show_breakdown"
+                      ? "result_breakdown"
+                      : undefined,
+                }),
+              ),
+              assistantId,
+              {
+                id: finalAssistantId,
+                role: "ai",
+                kind: "text",
+                content: finalText,
+                actions: finalRetryActions.length > 0 ? finalRetryActions : undefined,
                 contentPresentation:
                   action?.type === "show_breakdown"
                     ? "result_breakdown"
                     : undefined,
-              }),
+              },
             );
             if (
               isConfirmationAction(action) ||
@@ -1491,16 +1535,21 @@ export default function ChatInterface() {
           ? err.message
           : t('chat.error_backtest');
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? {
-                ...m,
-                content: isRateLimit
-                  ? t('chat.rate_limit_error')
-                  : fallbackMessage,
-                actions: retryLastTurnAction ? [retryLastTurnAction] : m.actions,
-              }
-            : m,
+        normalizeRetryActionHistory(
+          settleConfirmationAfterActionTransportError(
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    content: isRateLimit
+                      ? t('chat.rate_limit_error')
+                      : fallbackMessage,
+                    actions: retryLastTurnAction ? [retryLastTurnAction] : m.actions,
+                  }
+                : m,
+            ),
+            action,
+          ),
         ),
       );
       markConversationAttentionIfOutOfFocus(targetConversationId);
@@ -1880,6 +1929,8 @@ export default function ChatInterface() {
   const composerActions = hasActiveArtifactActionSet(messages)
     ? []
     : visibleComposerActions(inputActions);
+  const actionLabel = (action: ChatActionOption) =>
+    action.labelKey ? t(action.labelKey, action.label) : action.label;
   const latestAssistantContent =
     [...messages].reverse().find((message) => message.role === "ai")?.content?.trim() ?? "";
   const showStreamStatus = Boolean(streamStatus && latestAssistantContent.length === 0);
@@ -2000,7 +2051,7 @@ export default function ChatInterface() {
                   type="button"
                   onClick={() => setShowChatOptions(!showChatOptions)}
                   className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-                  aria-label="Chat options"
+                  aria-label={t("chat.chat_options", "Chat options")}
                 >
                   <MoreVertical className="h-5 w-5" />
                 </button>
@@ -2156,21 +2207,21 @@ export default function ChatInterface() {
                 {/* Starter Actions / Chips */}
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Test Apple against SPY for 2024 and show me the result.'))}
+                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Buy and hold AAPL over the last 12 months with SPY as the benchmark.'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />
                     {t('chat.starter_actions.tsla.label', 'Test Apple vs SPY')}
                   </button>
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.btc.value', 'Test buying BTC (Bitcoin) on January 1, 2024 and holding it through December 31, 2024.'))}
+                    onClick={() => handleSend(t('chat.starter_actions.btc.value', 'What if I bought Bitcoin this year so far?'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <Bitcoin className="h-4 w-4 text-black/60 dark:text-white/60" />
                     {t('chat.starter_actions.btc.label', 'Test Bitcoin (BTC) hold')}
                   </button>
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.dca.value', 'Test this investing idea. Strategy: recurring buys. Asset: NVDA (Nvidia). Recurring contribution: $250 per week. Period: January 1, 2024 through December 31, 2024.'))}
+                    onClick={() => handleSend(t('chat.starter_actions.dca.value', 'What if I bought $250 of Nvidia every week over the last 12 months?'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <LineChart className="h-4 w-4 text-black/60 dark:text-white/60" />
@@ -2278,7 +2329,7 @@ export default function ChatInterface() {
                             onClick={() => handleAction(action)}
                             className="min-h-11 rounded-full border border-black/10 bg-white/90 px-4 py-2 text-[14px] font-medium tracking-tight text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white dark:hover:bg-white/6"
                           >
-                            {action.label}
+                            {actionLabel(action)}
                           </button>
                         ))}
                       </div>

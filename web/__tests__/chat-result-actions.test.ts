@@ -12,6 +12,7 @@ describe("chat result actions", () => {
       {
         id: "explain-result",
         label: "Explain result",
+        labelKey: "chat.result_card.explain_result",
         type: "show_breakdown",
         presentation: "result",
       },
@@ -54,6 +55,7 @@ describe("chat result actions", () => {
       "refine_strategy",
       "save_strategy",
     ]);
+    expect(hydrated[0]?.labelKey).toBe("chat.result_card.explain_result");
     expect(hydrated.map((action) => action.label)).not.toContain("Try next");
   });
 

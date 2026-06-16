@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import calendar
 import inspect
 import os
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from typing import Any, cast, get_args
 
 from argus.agent_runtime.artifacts.patch_policy import (
@@ -19,18 +18,23 @@ from argus.agent_runtime.asset_text_grounding import (
 )
 from argus.agent_runtime.capabilities.answers import (
     EXECUTABLE_STRATEGY_FAMILIES,
-    compose_capability_answer,
-    compose_capability_recovery_answer,
+    capability_fact_packet,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
+from argus.agent_runtime.recovery_messages import (
+    recovery_message,
+    recovery_state_stage_patch,
+    retry_last_turn_stage_patch,
+)
 from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
+from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.response_style import (
     result_followup_heading,
     with_response_heading,
@@ -39,7 +43,6 @@ from argus.agent_runtime.result_followups import (
     compose_private_alpha_save_response,
     compose_result_followup_response,
     fallback_private_alpha_save_response,
-    fallback_result_followup_response,
 )
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
@@ -50,10 +53,7 @@ from argus.agent_runtime.rule_specs import (
     strategy_rule,
 )
 from argus.agent_runtime.run_field_contract import (
-    current_message_date_range,
-    current_message_dca_cadence,
     current_message_execution_context_tokens,
-    message_states_bar_timeframe,
 )
 from argus.agent_runtime.semantic_integrity import (
     SemanticIntegrityReport,
@@ -61,9 +61,8 @@ from argus.agent_runtime.semantic_integrity import (
     filter_unsubstantiated_timeframe_constraints,
 )
 from argus.agent_runtime.stages.artifact_context import (
-    LEGACY_RESULT_EXPLANATION_TARGET_INFERRED,
-    LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED,
-    launch_payload_from_failed_action,
+    RESULT_EXPLANATION_TARGET_INFERRED,
+    RESULT_FOLLOWUP_TARGET_INFERRED,
 )
 from argus.agent_runtime.stages.artifact_context import (
     draft_assumptions_response as _draft_assumptions_response,
@@ -108,6 +107,7 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
     UnsupportedConstraint,
     UserState,
+    dedupe_resolution_provenance_items,
 )
 from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
@@ -115,7 +115,7 @@ from argus.agent_runtime.strategy_contract import (
     display_strategy_type,
     executable_strategy_type,
     has_partial_explicit_date_range,
-    resolve_date_range,
+    strategy_can_be_approved,
 )
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
@@ -142,6 +142,13 @@ from argus.domain.indicators import (
 )
 from argus.domain.market_data import resolve_asset
 from argus.llm.openrouter import invoke_openrouter_chat_completion
+from argus.nlp.natural_time import (
+    dateparser_languages_for_user_language,
+    parse_date_text,
+    resolve_date_range_endpoint_patch,
+    resolve_date_range_intent,
+    resolve_date_range_text,
+)
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 _STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
@@ -170,14 +177,6 @@ _USER_GROUNDED_CADENCE_SOURCES = frozenset(
 class _LiveContextCuriosityFacts:
     content: str
     packet_symbols: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class _ProvenanceAsset:
-    canonical_symbol: str
-    asset_class: str
-    raw_symbol: str = ""
-    name: str = ""
 
 
 STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
@@ -227,29 +226,12 @@ async def interpret_stage_async(
         state=state,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata or {},
+        language=user.language_preference,
     )
     if structured_action_result is not None:
         return structured_action_result
     selected_metadata = dict(selected_thread_metadata or {})
     if structured_interpreter is None:
-        pending_date_result = await _pending_date_answer_result_when_interpreter_unavailable(
-            state=state,
-            user=user,
-            snapshot=snapshot,
-            capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata,
-        )
-        if pending_date_result is not None:
-            return pending_date_result
-        pending_asset_result = await _pending_asset_answer_result_when_interpreter_unavailable(
-            state=state,
-            user=user,
-            snapshot=snapshot,
-            capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata,
-        )
-        if pending_asset_result is not None:
-            return pending_asset_result
         return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
@@ -268,24 +250,6 @@ async def interpret_stage_async(
         ),
     )
     if interpretation is None:
-        pending_date_result = await _pending_date_answer_result_when_interpreter_unavailable(
-            state=state,
-            user=user,
-            snapshot=snapshot,
-            capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata,
-        )
-        if pending_date_result is not None:
-            return pending_date_result
-        pending_asset_result = await _pending_asset_answer_result_when_interpreter_unavailable(
-            state=state,
-            user=user,
-            snapshot=snapshot,
-            capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata,
-        )
-        if pending_asset_result is not None:
-            return pending_asset_result
         return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
@@ -303,89 +267,17 @@ async def interpret_stage_async(
     )
 
 
-async def _pending_date_answer_result_when_interpreter_unavailable(
-    *,
-    state: RunState,
-    user: UserState,
-    snapshot: TaskSnapshot | None,
-    capability_contract: Any,
-    selected_thread_metadata: dict[str, Any],
-) -> StageResult | None:
-    interpretation = _pending_date_answer_interpretation_when_unavailable(
-        current_user_message=state.current_user_message,
-        snapshot=snapshot,
-        selected_thread_metadata=selected_thread_metadata,
-    )
-    if interpretation is None:
-        return None
-    return await _stage_result_from_interpretation(
-        state=state,
-        user=user,
-        snapshot=snapshot,
-        interpretation=interpretation,
-        capability_contract=capability_contract,
-        selected_thread_metadata=selected_thread_metadata,
-    )
-
-
-async def _pending_asset_answer_result_when_interpreter_unavailable(
-    *,
-    state: RunState,
-    user: UserState,
-    snapshot: TaskSnapshot | None,
-    capability_contract: Any,
-    selected_thread_metadata: dict[str, Any],
-) -> StageResult | None:
-    interpretation = _pending_asset_answer_interpretation_when_unavailable(
-        current_user_message=state.current_user_message,
-        snapshot=snapshot,
-        selected_thread_metadata=selected_thread_metadata,
-    )
-    if interpretation is None:
-        return None
-    return await _stage_result_from_interpretation(
-        state=state,
-        user=user,
-        snapshot=snapshot,
-        interpretation=interpretation,
-        capability_contract=capability_contract,
-        selected_thread_metadata=selected_thread_metadata,
-    )
-
-
-def _pending_asset_answer_interpretation_when_unavailable(
+def _pending_date_answer_route_repair_interpretation(
     *,
     current_user_message: str,
+    language: str | None,
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
-) -> StructuredInterpretation | None:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field != "asset_universe":
-        return None
-    if snapshot is None or snapshot.pending_strategy_summary is None:
-        return None
-    asset_answer = current_user_message.strip()
-    if not asset_answer:
-        return None
-    return StructuredInterpretation(
-        intent="backtest_execution",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary="User supplied the requested replacement asset.",
-        candidate_strategy_draft=StrategySummary(asset_universe=[asset_answer]),
-        missing_required_fields=[],
-        semantic_turn_act="answer_pending_need",
-        reason_codes=["deterministic_pending_asset_answer_fallback"],
-    )
-
-
-def _pending_date_answer_interpretation_when_unavailable(
-    *,
-    current_user_message: str,
-    snapshot: TaskSnapshot | None,
-    selected_thread_metadata: dict[str, Any],
+    reason_code: str = "pending_date_answer_route_repaired",
+    user_goal_summary: str = (
+        "User supplied the requested date range after structured interpretation "
+        "misrouted the pending-field answer."
+    ),
 ) -> StructuredInterpretation | None:
     requested_field = _field_base(
         str(selected_thread_metadata.get("requested_field") or "")
@@ -394,140 +286,91 @@ def _pending_date_answer_interpretation_when_unavailable(
         return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
-    endpoint_role = _pending_date_endpoint_role(snapshot.pending_strategy_summary)
-    endpoint = _parse_pending_date_endpoint_answer(
-        current_user_message,
-        endpoint_role=endpoint_role,
-    )
-    if endpoint is None:
+    if snapshot.latest_backtest_result_reference is not None:
         return None
+    last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
+    if last_stage_outcome and last_stage_outcome != "await_user_reply":
+        return None
+    prior = _active_strategy_from_snapshot(snapshot)
+    if prior is None:
+        return None
+    if not _prior_strategy_allows_pending_date_answer_fallback(prior):
+        return None
+    current_date = date.today()
+    text = current_user_message.strip()
+    if not text:
+        return None
+    languages = dateparser_languages_for_user_language(language)
+    resolved_range = resolve_date_range_text(
+        text,
+        today=current_date,
+        languages=languages,
+    )
+    date_range: dict[str, str] | None = None
+    date_range_intent: dict[str, Any] | None = None
+    if resolved_range is not None:
+        date_range = resolved_range.payload
+    else:
+        endpoint = parse_date_text(
+            text,
+            today=current_date,
+            endpoint="end",
+            languages=languages,
+        )
+        if endpoint is None:
+            return None
+        endpoint_patch = {
+            "kind": "endpoint_patch",
+            "endpoint": "end",
+            "end": endpoint.isoformat(),
+            "confidence": 0.8,
+            "evidence": text,
+        }
+        prior_intent = prior.extra_parameters.get("date_range_intent")
+        resolved_patch = resolve_date_range_endpoint_patch(
+            prior_intent,
+            endpoint_patch,
+            today=current_date,
+        )
+        if resolved_patch is not None:
+            date_range = resolved_patch.payload
+            date_range_intent = {
+                **endpoint_patch,
+                "base_intent": prior_intent,
+            }
+        else:
+            date_range = {"end": endpoint.isoformat()}
+            date_range_intent = endpoint_patch
+    if date_range is None:
+        return None
+    extra_parameters: dict[str, Any] = {
+        "date_range_raw_text": text,
+        "evidence_spans": {"date_range": text},
+    }
+    if date_range_intent is not None:
+        extra_parameters["date_range_intent"] = date_range_intent
     return StructuredInterpretation(
         intent="backtest_execution",
         task_relation="continue",
         requires_clarification=False,
-        user_goal_summary="User supplied the requested date range detail.",
+        user_goal_summary=user_goal_summary,
         candidate_strategy_draft=StrategySummary(
-            date_range={endpoint_role: endpoint.isoformat()},
+            date_range=date_range,
+            extra_parameters=extra_parameters,
         ),
         missing_required_fields=[],
         semantic_turn_act="answer_pending_need",
-        reason_codes=["deterministic_pending_date_answer_fallback"],
+        reason_codes=[reason_code],
     )
 
 
-def _pending_date_endpoint_role(strategy: StrategySummary) -> str:
-    date_range = strategy.date_range
-    if isinstance(date_range, dict):
-        has_start = bool(date_range.get("start") or date_range.get("from"))
-        has_end = bool(date_range.get("end") or date_range.get("to"))
-        if has_start and not has_end:
-            return "end"
-        if has_end and not has_start:
-            return "start"
-    return "end"
-
-
-def _parse_pending_date_endpoint_answer(
-    message: str,
-    *,
-    endpoint_role: str,
-) -> date | None:
-    folded = str(message or "").strip().casefold()
-    if not folded:
-        return None
-    if any(
-        token in folded
-        for token in ("today", "now", "present", "current", "through now")
-    ):
-        return date.today()
-    tokens = _date_answer_tokens(folded)
-    year = _first_year_token(tokens)
-    if year is None:
-        return None
-    month = _first_month_token(tokens)
-    day = _first_day_token(tokens, year=year)
-    if month is not None and day is not None:
-        try:
-            return date(year, month, day)
-        except ValueError:
-            return None
-    is_end = endpoint_role == "end" or any(
-        token in tokens for token in ("end", "through", "until", "to")
-    )
-    if month is not None:
-        day = calendar.monthrange(year, month)[1] if is_end else 1
-        return date(year, month, day)
-    return date(year, 12, 31) if is_end else date(year, 1, 1)
-
-
-def _date_answer_tokens(value: str) -> list[str]:
-    tokens: list[str] = []
-    current: list[str] = []
-    for char in value:
-        if char.isalnum():
-            current.append(char)
-            continue
-        if current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
-
-
-def _first_year_token(tokens: list[str]) -> int | None:
-    for token in tokens:
-        if len(token) == 4 and token.isdigit():
-            year = int(token)
-            if 1900 <= year <= 2100:
-                return year
-    return None
-
-
-_MONTH_NAME_TO_NUMBER = {
-    "jan": 1,
-    "january": 1,
-    "feb": 2,
-    "february": 2,
-    "mar": 3,
-    "march": 3,
-    "apr": 4,
-    "april": 4,
-    "may": 5,
-    "jun": 6,
-    "june": 6,
-    "jul": 7,
-    "july": 7,
-    "aug": 8,
-    "august": 8,
-    "sep": 9,
-    "sept": 9,
-    "september": 9,
-    "oct": 10,
-    "october": 10,
-    "nov": 11,
-    "november": 11,
-    "dec": 12,
-    "december": 12,
-}
-
-
-def _first_month_token(tokens: list[str]) -> int | None:
-    for token in tokens:
-        month = _MONTH_NAME_TO_NUMBER.get(token)
-        if month is not None:
-            return month
-    return None
-
-
-def _first_day_token(tokens: list[str], *, year: int) -> int | None:
-    for token in tokens:
-        if not token.isdigit() or int(token) == year:
-            continue
-        day = int(token)
-        if 1 <= day <= 31:
-            return day
-    return None
+def _prior_strategy_allows_pending_date_answer_fallback(
+    prior: StrategySummary,
+) -> bool:
+    if not strategy_can_be_approved(prior):
+        return False
+    endpoints = _date_range_endpoints(prior.date_range)
+    return endpoints is not None and all(endpoints)
 
 
 async def _call_structured_interpreter(
@@ -566,6 +409,20 @@ async def _stage_result_from_interpretation(
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
     )
+    interpretation = _repair_pending_date_answer_route_when_pending_need_is_active(
+        interpretation=interpretation,
+        current_user_message=state.current_user_message,
+        language=user.language_preference,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    interpretation = _repair_pending_date_answer_noop_from_current_message(
+        interpretation=interpretation,
+        current_user_message=state.current_user_message,
+        language=user.language_preference,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
     route_suppression_reason_codes: list[str] = []
     expects_strategy_route = _strategy_route_expected(
         intent=interpretation.intent,
@@ -573,43 +430,24 @@ async def _stage_result_from_interpretation(
     ) or _candidate_strategy_has_backtest_shape(
         interpretation.candidate_strategy_draft
     )
-    dca_education_answer = _dca_education_answer_for_message(
-        state.current_user_message
-    )
     educational_turn_has_strategy_baggage = _educational_turn_has_strategy_baggage(
         interpretation=interpretation,
         expects_strategy_route=expects_strategy_route,
     )
-    misclassified_dca_education_has_strategy_baggage = (
-        _misclassified_dca_education_has_strategy_baggage(
-            interpretation=interpretation,
-            expects_strategy_route=expects_strategy_route,
-            dca_education_answer=dca_education_answer,
-        )
-    )
-    if (
-        educational_turn_has_strategy_baggage
-        or misclassified_dca_education_has_strategy_baggage
-    ):
+    if educational_turn_has_strategy_baggage:
         expects_strategy_route = False
         route_suppression_reason_codes.append("educational_strategy_route_suppressed")
-        update: dict[str, Any] = {
-            "intent": "conversation_followup",
-            "task_relation": "continue",
-            "requires_clarification": False,
-            "candidate_strategy_draft": StrategySummary(),
-            "missing_required_fields": [],
-            "ambiguous_fields": [],
-            "unsupported_constraints": [],
-            "semantic_turn_act": "educational_question",
-        }
-        if (
-            misclassified_dca_education_has_strategy_baggage
-            and dca_education_answer is not None
-        ):
-            update["assistant_response"] = dca_education_answer
         interpretation = interpretation.model_copy(
-            update=update,
+            update={
+                "intent": "conversation_followup",
+                "task_relation": "continue",
+                "requires_clarification": False,
+                "candidate_strategy_draft": StrategySummary(),
+                "missing_required_fields": [],
+                "ambiguous_fields": [],
+                "unsupported_constraints": [],
+                "semantic_turn_act": "educational_question",
+            },
         )
     incoming_strategy = _strategy_with_contextual_merge(
         strategy=interpretation.candidate_strategy_draft,
@@ -771,11 +609,14 @@ async def _stage_result_from_interpretation(
             )
         )
     if expects_strategy_route:
+        prior_strategy = _active_strategy_from_snapshot(snapshot)
         strategy, interpretation = _strategy_with_current_message_run_field_contract(
             strategy=strategy,
             interpretation=interpretation,
+            prior_strategy=prior_strategy,
             current_user_message=state.current_user_message,
             supported_timeframes=_supported_timeframes(capability_contract),
+            language=user.language_preference,
         )
     shape_default_reason_codes: list[str] = []
     if expects_strategy_route:
@@ -906,6 +747,23 @@ async def _stage_result_from_interpretation(
         strategy=strategy,
         constraints=unsupported_constraints,
     )
+    pending_date_edit_reason_codes: list[str] = []
+    if _pending_date_edit_reuses_prior_date_range(
+        strategy=strategy,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+        semantic_turn_act=interpretation.semantic_turn_act,
+    ):
+        missing_required_fields = list(
+            dict.fromkeys([*missing_required_fields, "date_range"])
+        )
+        pending_date_edit_reason_codes.append("pending_date_edit_noop_rejected")
+        interpretation = interpretation.model_copy(
+            update={
+                "requires_clarification": True,
+                "assistant_response": None,
+            }
+        )
     response_overrides = interpretation.response_profile_overrides
     effective_profile = resolve_effective_response_profile(
         user=user,
@@ -973,6 +831,7 @@ async def _stage_result_from_interpretation(
             *ambiguity_filter_reason_codes,
             *artifact_target_reason_codes,
             *hidden_context_guard_reason_codes,
+            *pending_date_edit_reason_codes,
             *post_validation_reason_codes,
             *interpretation.reason_codes,
         ],
@@ -1008,16 +867,10 @@ async def _stage_result_from_interpretation(
         state=state,
         selected_thread_metadata=selected_thread_metadata,
         interpretation=interpretation,
+        language=user.language_preference,
     )
     if approval_result is not None:
         return approval_result
-    runnable_prompt_result = _runnable_prompt_example_result_if_applicable(
-        decision=decision,
-        snapshot=snapshot,
-        current_user_message=state.current_user_message,
-    )
-    if runnable_prompt_result is not None:
-        return runnable_prompt_result
     retry_result = _retry_failed_action_stage_result_if_applicable(
         decision=decision,
         snapshot=snapshot,
@@ -1039,6 +892,7 @@ async def _stage_result_from_interpretation(
     if pending_refinement_result is not None:
         return pending_refinement_result
     private_alpha_save_result = await _private_alpha_save_request_result_if_applicable(
+        user=user,
         decision=decision,
         snapshot=snapshot,
         current_user_message=state.current_user_message,
@@ -1049,6 +903,7 @@ async def _stage_result_from_interpretation(
         decision=decision,
         snapshot=snapshot,
         current_user_message=state.current_user_message,
+        language=user.language_preference,
     )
     if followup_result is not None:
         return followup_result
@@ -1060,6 +915,7 @@ async def _stage_result_from_interpretation(
         assistant_response=interpretation.assistant_response,
         current_user_message=state.current_user_message,
         artifact_target=artifact_target,
+        language=user.language_preference,
     )
     if context_answer is not None:
         return StageResult(
@@ -1072,6 +928,7 @@ async def _stage_result_from_interpretation(
         assistant_response=interpretation.assistant_response,
         current_user_message=state.current_user_message,
         capability_contract=capability_contract,
+        language=user.language_preference,
     )
     if supported_strategy_answer is not None:
         return StageResult(
@@ -1087,6 +944,7 @@ async def _stage_result_from_interpretation(
         assistant_response=interpretation.assistant_response,
         current_user_message=state.current_user_message,
         capability_contract=capability_contract,
+        language=user.language_preference,
     )
     if capability_answer is not None:
         return StageResult(
@@ -1109,6 +967,7 @@ async def _stage_result_from_interpretation(
         requires_clarification=requires_clarification,
         current_user_message=state.current_user_message,
         capability_contract=capability_contract,
+        language=user.language_preference,
     )
     if unanchored_strategy_recovery is not None:
         return StageResult(
@@ -1122,6 +981,7 @@ async def _stage_result_from_interpretation(
         requires_clarification=requires_clarification,
         assistant_response=interpretation.assistant_response,
         current_user_message=state.current_user_message,
+        language=user.language_preference,
     )
     if educational_recovery is not None:
         return StageResult(
@@ -1135,6 +995,7 @@ async def _stage_result_from_interpretation(
         requires_clarification=requires_clarification,
         assistant_response=interpretation.assistant_response,
         current_user_message=state.current_user_message,
+        language=user.language_preference,
     )
     if unhandled_recovery is not None:
         return StageResult(
@@ -1185,17 +1046,21 @@ def _strategy_with_current_message_run_field_contract(
     *,
     strategy: StrategySummary,
     interpretation: StructuredInterpretation,
+    prior_strategy: StrategySummary | None,
     current_user_message: str,
     supported_timeframes: tuple[str, ...],
+    language: str,
 ) -> tuple[StrategySummary, StructuredInterpretation]:
-    raw_date_range = _explicit_date_range_from_current_message_for_repair(
-        current_user_message,
-        strategy=strategy,
-    )
+    del current_user_message
+    raw_date_range = _explicit_date_range_from_strategy_for_repair(strategy)
     date_range, date_endpoint_patch_applied = (
         _complete_current_message_date_endpoint_patch(
             strategy=strategy,
             date_range=raw_date_range,
+            prior_date_range=(
+                prior_strategy.date_range if prior_strategy is not None else None
+            ),
+            language=language,
         )
     )
     updated = strategy.model_copy(deep=True)
@@ -1203,7 +1068,7 @@ def _strategy_with_current_message_run_field_contract(
     repaired_field_bases: set[str] = set()
     repair_reason_codes = ["current_message_run_field_contract_repair"]
     if date_endpoint_patch_applied:
-        repair_reason_codes.append("current_message_date_endpoint_patch_applied")
+        repair_reason_codes.append("structured_date_endpoint_patch_applied")
     if (
         date_range is not None
         and not has_partial_explicit_date_range(date_range)
@@ -1216,25 +1081,11 @@ def _strategy_with_current_message_run_field_contract(
         updated.date_range = date_range
         changed = True
         repaired_field_bases.add("date_range")
-    dca_cadence = current_message_dca_cadence(current_user_message)
-    if _strategy_needs_current_message_dca_contract_repair(
-        strategy=updated,
-        cadence=dca_cadence,
-    ):
-        if executable_strategy_type(updated) != "dca_accumulation":
-            updated.strategy_type = "dca_accumulation"
-            repaired_field_bases.update({"entry_logic", "exit_logic", "strategy_type"})
-        if updated.cadence in (None, "", [], {}):
-            updated.cadence = dca_cadence
-            repaired_field_bases.add("cadence")
-        changed = True
-        repair_reason_codes.append("current_message_dca_contract_repair")
     if (
         _strategy_has_non_executable_timeframe_label(
             updated,
             supported_timeframes=supported_timeframes,
         )
-        and not message_states_bar_timeframe(current_user_message)
     ):
         updated.timeframe = None
         changed = True
@@ -1251,14 +1102,7 @@ def _strategy_with_current_message_run_field_contract(
         for field in interpretation.ambiguous_fields
         if field.field_name.split("[", 1)[0] not in repaired_field_bases
     ]
-    unsupported_constraints = [
-        constraint
-        for constraint in interpretation.unsupported_constraints
-        if not (
-            "current_message_dca_contract_repair" in repair_reason_codes
-            and constraint.category == "unsupported_strategy_logic"
-        )
-    ]
+    unsupported_constraints = list(interpretation.unsupported_constraints)
     requires_clarification = interpretation.requires_clarification
     assistant_response = interpretation.assistant_response
     if (
@@ -1292,8 +1136,21 @@ def _complete_current_message_date_endpoint_patch(
     *,
     strategy: StrategySummary,
     date_range: dict[str, str] | None,
+    prior_date_range: Any = None,
+    language: str | None = None,
 ) -> tuple[dict[str, str] | None, bool]:
-    if date_range is None or not has_partial_explicit_date_range(date_range):
+    if date_range is None:
+        return date_range, False
+    rolling_patch = _rolling_window_range_from_endpoint_patch(
+        strategy.extra_parameters.get("date_range_intent"),
+        date_range=date_range,
+        prior_date_range=prior_date_range,
+        date_range_raw_text=strategy.extra_parameters.get("date_range_raw_text"),
+        language=language,
+    )
+    if rolling_patch is not None:
+        return rolling_patch, True
+    if not has_partial_explicit_date_range(date_range):
         return date_range, False
     prior = strategy.date_range
     if not isinstance(prior, dict):
@@ -1305,46 +1162,134 @@ def _complete_current_message_date_endpoint_patch(
     return {"start": str(start), "end": str(end)}, True
 
 
-def _strategy_needs_current_message_dca_contract_repair(
-    *,
-    strategy: StrategySummary,
-    cadence: str | None,
-) -> bool:
-    if cadence is None:
-        return False
-    strategy_family = _declared_strategy_family(strategy)
-    if strategy_family not in {None, "dca_accumulation"}:
-        return False
-    return bool(
-        strategy.asset_universe
-        and strategy.capital_amount is not None
-    )
-
-
-def _explicit_date_range_from_current_message_for_repair(
-    current_user_message: str,
-    *,
-    strategy: StrategySummary,
-) -> dict[str, str] | None:
-    date_range = current_message_date_range(current_user_message)
-    if date_range is not None:
-        return date_range
-    if strategy.date_range not in (None, "", [], {}):
+def _iso_date_value(value: Any) -> date | None:
+    if not isinstance(value, str) or not value.strip():
         return None
     try:
-        resolved = resolve_date_range(current_user_message)
-    except Exception:
+        return date.fromisoformat(value.strip())
+    except ValueError:
         return None
-    if resolved.used_default or not isinstance(resolved.payload, dict):
+
+
+def _rolling_window_range_from_endpoint_patch(
+    date_range_intent: Any,
+    *,
+    date_range: dict[str, str] | None = None,
+    prior_date_range: Any = None,
+    date_range_raw_text: Any = None,
+    language: str | None = None,
+) -> dict[str, str] | None:
+    if not isinstance(date_range_intent, dict):
         return None
-    payload = {
-        key: str(value)
-        for key in ("start", "end")
-        if (value := resolved.payload.get(key)) not in (None, "")
-    }
-    if set(payload) != {"start", "end"}:
+    base_intent = date_range_intent.get("base_intent")
+    if not isinstance(base_intent, dict):
         return None
-    return payload
+    endpoint_patch = _endpoint_patch_with_inferred_endpoint(
+        date_range_intent,
+        date_range=date_range,
+        prior_date_range=prior_date_range,
+        date_range_raw_text=date_range_raw_text,
+        language=language,
+    )
+    resolved = resolve_date_range_endpoint_patch(
+        base_intent,
+        endpoint_patch,
+    )
+    return resolved.payload if resolved is not None else None
+
+
+def _endpoint_patch_with_inferred_endpoint(
+    date_range_intent: dict[str, Any],
+    *,
+    date_range: dict[str, str] | None,
+    prior_date_range: Any,
+    date_range_raw_text: Any,
+    language: str | None,
+) -> dict[str, Any]:
+    endpoint = str(date_range_intent.get("endpoint") or "").strip()
+    if endpoint in {"start", "end"}:
+        if date_range_intent.get(endpoint) not in (None, "", [], {}):
+            return date_range_intent
+        endpoint_value = _endpoint_date_from_bounded_text(
+            date_range_raw_text,
+            language=language,
+        )
+        if endpoint_value is None:
+            return date_range_intent
+        patch = dict(date_range_intent)
+        patch[endpoint] = endpoint_value
+        return patch
+    inferred = _changed_date_endpoint(
+        date_range=date_range,
+        prior_date_range=prior_date_range,
+    )
+    if inferred is None:
+        return date_range_intent
+    endpoint, value = inferred
+    patch = dict(date_range_intent)
+    patch["endpoint"] = endpoint
+    patch[endpoint] = value
+    return patch
+
+
+def _endpoint_date_from_bounded_text(
+    value: Any,
+    *,
+    language: str | None,
+) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    parsed = parse_date_text(
+        text,
+        languages=dateparser_languages_for_user_language(language),
+    )
+    return parsed.isoformat() if parsed is not None else None
+
+
+def _changed_date_endpoint(
+    *,
+    date_range: dict[str, str] | None,
+    prior_date_range: Any,
+) -> tuple[str, str] | None:
+    if not isinstance(date_range, dict):
+        return None
+    start = date_range.get("start") or date_range.get("from")
+    end = date_range.get("end") or date_range.get("to")
+    start_value = str(start).strip() if start not in (None, "", [], {}) else None
+    end_value = str(end).strip() if end not in (None, "", [], {}) else None
+    if bool(start_value) != bool(end_value):
+        endpoint = "start" if start_value else "end"
+        value = start_value or end_value
+        return (endpoint, value) if value else None
+
+    prior_endpoints = _date_range_endpoints(prior_date_range)
+    if prior_endpoints is None or start_value is None or end_value is None:
+        return None
+    prior_start, prior_end = prior_endpoints
+    start_changed = prior_start is not None and start_value != prior_start
+    end_changed = prior_end is not None and end_value != prior_end
+    if start_changed == end_changed:
+        return None
+    return ("start", start_value) if start_changed else ("end", end_value)
+
+
+def _explicit_date_range_from_strategy_for_repair(
+    strategy: StrategySummary,
+) -> dict[str, str] | None:
+    intent = strategy.extra_parameters.get("date_range_intent")
+    if isinstance(intent, dict):
+        resolved = resolve_date_range_intent(intent)
+        if resolved is not None:
+            return resolved.payload
+    if isinstance(strategy.date_range, dict):
+        payload = {
+            key: str(value)
+            for key in ("start", "end")
+            if (value := strategy.date_range.get(key)) not in (None, "")
+        }
+        return payload or None
+    return None
 
 
 def _strategy_date_range_needs_current_message_repair(
@@ -1354,13 +1299,19 @@ def _strategy_date_range_needs_current_message_repair(
     current_date_range: dict[str, str],
 ) -> bool:
     if interpretation.semantic_turn_act == "answer_pending_need":
-        return False
+        return (
+            strategy.date_range in (None, "", [], {})
+            or has_partial_explicit_date_range(strategy.date_range)
+            or not isinstance(strategy.date_range, dict)
+            or _date_range_endpoints(strategy.date_range)
+            != _date_range_endpoints(current_date_range)
+        )
     if strategy.date_range in (None, "", [], {}):
         return True
     if has_partial_explicit_date_range(strategy.date_range):
         return True
     if isinstance(strategy.date_range, str):
-        return True
+        return False
     if _date_range_endpoints(strategy.date_range) != _date_range_endpoints(
         current_date_range
     ):
@@ -1372,6 +1323,31 @@ def _strategy_date_range_needs_current_message_repair(
         field.field_name.split("[", 1)[0] == "date_range"
         for field in interpretation.ambiguous_fields
     )
+
+
+def _pending_date_edit_reuses_prior_date_range(
+    *,
+    strategy: StrategySummary,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+    semantic_turn_act: SemanticTurnAct | None,
+) -> bool:
+    if semantic_turn_act != "answer_pending_need":
+        return False
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return False
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "date_range":
+        return False
+    prior = _active_strategy_from_snapshot(snapshot)
+    if prior is None:
+        return False
+    prior_endpoints = _date_range_endpoints(prior.date_range)
+    if prior_endpoints is None or not all(prior_endpoints):
+        return False
+    return _date_range_endpoints(strategy.date_range) == prior_endpoints
 
 
 def _date_range_endpoints(value: Any) -> tuple[str | None, str | None] | None:
@@ -1499,6 +1475,119 @@ def _repair_fresh_restatement_route_when_pending_need_is_active(
     )
 
 
+def _repair_pending_date_answer_route_when_pending_need_is_active(
+    *,
+    interpretation: StructuredInterpretation,
+    current_user_message: str,
+    language: str | None,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+) -> StructuredInterpretation:
+    if (
+        interpretation.semantic_turn_act == "answer_pending_need"
+        and not interpretation.requires_clarification
+    ):
+        return interpretation
+    if _candidate_strategy_has_backtest_shape(interpretation.candidate_strategy_draft):
+        return interpretation
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "date_range":
+        return interpretation
+    last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
+    if last_stage_outcome and last_stage_outcome != "await_user_reply":
+        return interpretation
+    repaired = _pending_date_answer_route_repair_interpretation(
+        current_user_message=current_user_message,
+        language=language,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    if repaired is None:
+        return interpretation
+    return repaired
+
+
+def _repair_pending_date_answer_noop_from_current_message(
+    *,
+    interpretation: StructuredInterpretation,
+    current_user_message: str,
+    language: str | None,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+) -> StructuredInterpretation:
+    if interpretation.semantic_turn_act != "answer_pending_need":
+        return interpretation
+    if interpretation.requires_clarification:
+        return interpretation
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "date_range":
+        return interpretation
+    last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
+    if last_stage_outcome and last_stage_outcome != "await_user_reply":
+        return interpretation
+    prior = _active_strategy_from_snapshot(snapshot)
+    if prior is None:
+        return interpretation
+    prior_endpoints = _date_range_endpoints(prior.date_range)
+    if prior_endpoints is None or not all(prior_endpoints):
+        return interpretation
+    candidate = interpretation.candidate_strategy_draft
+    candidate_endpoints = _date_range_endpoints(candidate.date_range)
+    if candidate_endpoints is not None and candidate_endpoints != prior_endpoints:
+        return interpretation
+    text = current_user_message.strip()
+    if not text:
+        return interpretation
+    resolved_range = resolve_date_range_text(
+        text,
+        today=date.today(),
+        languages=dateparser_languages_for_user_language(language),
+    )
+    if resolved_range is None:
+        return interpretation
+    repaired_date_range = resolved_range.payload
+    if _date_range_endpoints(repaired_date_range) == prior_endpoints:
+        return interpretation
+    extra_parameters = dict(candidate.extra_parameters)
+    evidence_spans = extra_parameters.get("evidence_spans")
+    if not isinstance(evidence_spans, dict):
+        evidence_spans = {}
+    extra_parameters.update(
+        {
+            "date_range_raw_text": text,
+            "date_range_intent": {
+                "kind": "explicit_range",
+                "start": repaired_date_range["start"],
+                "end": repaired_date_range["end"],
+                "confidence": 0.9,
+                "evidence": text,
+            },
+            "evidence_spans": {
+                **evidence_spans,
+                "date_range": text,
+            },
+        }
+    )
+    return interpretation.model_copy(
+        update={
+            "candidate_strategy_draft": candidate.model_copy(
+                update={
+                    "date_range": repaired_date_range,
+                    "extra_parameters": extra_parameters,
+                }
+            ),
+            "reason_codes": [
+                *interpretation.reason_codes,
+                "pending_date_answer_current_message_repaired",
+            ],
+        }
+    )
+
+
 def _validated_artifact_target(
     *,
     interpretation: StructuredInterpretation,
@@ -1532,14 +1621,14 @@ def _validated_artifact_target(
         and snapshot is not None
         and snapshot.latest_backtest_result_reference is not None
     ):
-        reason_codes.append(LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED)
+        reason_codes.append(RESULT_FOLLOWUP_TARGET_INFERRED)
         return "latest_result", reason_codes
     if (
         interpretation.intent == "results_explanation"
         and snapshot is not None
         and snapshot.latest_backtest_result_reference is not None
     ):
-        reason_codes.append(LEGACY_RESULT_EXPLANATION_TARGET_INFERRED)
+        reason_codes.append(RESULT_EXPLANATION_TARGET_INFERRED)
         return "latest_result", reason_codes
     return proposed, reason_codes
 
@@ -1681,6 +1770,7 @@ async def _capability_answer_if_applicable(
     assistant_response: str | None,
     current_user_message: str,
     capability_contract: Any,
+    language: str,
 ) -> str | None:
     if (
         focus is None
@@ -1695,10 +1785,11 @@ async def _capability_answer_if_applicable(
         focus=focus,
         current_user_message=current_user_message,
         capability_contract=capability_contract,
+        language=language,
     )
     if composed:
         return composed
-    return compose_capability_answer(focus=focus, contract=capability_contract)
+    return recovery_message("capability_answer_unavailable", language=language)
 
 
 async def _context_curiosity_answer_if_applicable(
@@ -1710,6 +1801,7 @@ async def _context_curiosity_answer_if_applicable(
     assistant_response: str | None,
     current_user_message: str,
     artifact_target: ArtifactTarget | None,
+    language: str,
 ) -> str | None:
     if (
         focus is None
@@ -1722,10 +1814,14 @@ async def _context_curiosity_answer_if_applicable(
         focus=focus,
         current_user_message=current_user_message,
         artifact_target=artifact_target,
+        language=language,
     )
     if composed:
         return composed
-    return assistant_response or _context_curiosity_recovery_answer(focus)
+    return assistant_response or _context_curiosity_recovery_answer(
+        focus,
+        language=language,
+    )
 
 
 async def _compose_natural_capability_answer(
@@ -1733,8 +1829,9 @@ async def _compose_natural_capability_answer(
     focus: CapabilityQuestionFocus,
     current_user_message: str,
     capability_contract: Any,
+    language: str = "en",
 ) -> str | None:
-    fact_packet = compose_capability_answer(
+    fact_packet = capability_fact_packet(
         focus=focus,
         contract=capability_contract,
     )
@@ -1743,7 +1840,8 @@ async def _compose_natural_capability_answer(
             "role": "system",
             "content": (
                 "You are Argus, a chat-first investing experimentation assistant. "
-                "Answer in warm, plain English. Keep it concise and useful for a "
+                f"{response_language_instruction(language)} "
+                "Answer in warm, plain language. Keep it concise and useful for a "
                 "normal person. Use the supported-strategy facts as hard bounds. "
                 "Do not invent unsupported strategy families, predictions, or "
                 "investment advice. If the user asks about a concept such as dollar "
@@ -1767,20 +1865,9 @@ async def _compose_natural_capability_answer(
             focus=focus,
         ):
             return answer
-        return compose_capability_answer(
-            focus=focus,
-            contract=capability_contract,
-        )
+        return None
     except Exception:
-        if focus == "supported_indicators":
-            return compose_capability_answer(
-                focus=focus,
-                contract=capability_contract,
-            )
-        return compose_capability_recovery_answer(
-            focus=focus,
-            contract=capability_contract,
-        )
+        return None
 
 
 def _capability_answer_respects_contract(
@@ -1805,6 +1892,7 @@ async def _supported_strategy_education_repair_if_needed(
     assistant_response: str | None,
     current_user_message: str,
     capability_contract: Any,
+    language: str,
 ) -> str | None:
     if (
         semantic_turn_act != "educational_question"
@@ -1812,93 +1900,13 @@ async def _supported_strategy_education_repair_if_needed(
         or not _answer_contradicts_supported_strategy_families(assistant_response)
     ):
         return None
-    return await _compose_natural_capability_answer(
+    composed = await _compose_natural_capability_answer(
         focus="supported_strategies",
         current_user_message=current_user_message,
         capability_contract=capability_contract,
+        language=language,
     )
-
-
-def _runnable_prompt_example_result_if_applicable(
-    *,
-    decision: InterpretDecision,
-    snapshot: TaskSnapshot | None,
-    current_user_message: str,
-) -> StageResult | None:
-    if not _message_asks_for_runnable_prompt_example(current_user_message):
-        return None
-    prompt = _runnable_prompt_example_from_failed_action(snapshot)
-    reason_code = (
-        "retry_failed_action_prompt_example_suppressed"
-        if decision.semantic_turn_act == "retry_failed_action"
-        else "runnable_prompt_example_route_suppressed"
-    )
-    return StageResult(
-        outcome="ready_to_respond",
-        decision=decision.model_copy(
-            update={
-                "intent": "conversation_followup",
-                "task_relation": "continue",
-                "requires_clarification": False,
-                "candidate_strategy_draft": StrategySummary(),
-                "missing_required_fields": [],
-                "reason_codes": [
-                    *decision.reason_codes,
-                    reason_code,
-                ],
-                "semantic_turn_act": "educational_question",
-                "capability_question_focus": "general",
-                "artifact_target": "none",
-            }
-        ),
-        stage_patch={"assistant_response": prompt},
-    )
-
-
-def _message_asks_for_runnable_prompt_example(message: str) -> bool:
-    tokens = set(_plain_word_tokens(message))
-    if "prompt" not in tokens and "example" not in tokens:
-        return False
-    if not tokens & {"run", "runnable", "errors", "error"}:
-        return False
-    return bool(
-        tokens
-        & {
-            "example",
-            "give",
-            "provide",
-            "show",
-            "suggest",
-            "try",
-            "what",
-            "which",
-            "write",
-        }
-    )
-
-
-def _runnable_prompt_example_from_failed_action(snapshot: TaskSnapshot | None) -> str:
-    payload = (
-        launch_payload_from_failed_action(snapshot.latest_failed_action_reference)
-        if snapshot is not None and snapshot.latest_failed_action_reference is not None
-        else None
-    )
-    symbol = "Amazon stock"
-    start = "January 1, 2026"
-    end = (date.today() - timedelta(days=1)).isoformat()
-    if isinstance(payload, dict):
-        raw_symbol = str(
-            (payload.get("symbols") or [payload.get("symbol") or ""])[0]
-            if isinstance(payload.get("symbols"), list)
-            else payload.get("symbol") or ""
-        ).strip()
-        if raw_symbol:
-            symbol = f"{raw_symbol.upper()} stock"
-        date_range = payload.get("date_range")
-        if isinstance(date_range, dict):
-            start = str(date_range.get("start") or start)
-            end = str(date_range.get("end") or end)
-    return f'Try: "Buy and hold {symbol} from {start} through {end}."'
+    return composed or recovery_message("capability_answer_unavailable", language=language)
 
 
 def _answer_contradicts_supported_strategy_families(answer: str) -> bool:
@@ -2042,6 +2050,7 @@ async def _compose_natural_context_curiosity_answer(
     focus: ContextQuestionFocus,
     current_user_message: str,
     artifact_target: ArtifactTarget | None,
+    language: str = "en",
 ) -> str | None:
     fact_packet = _context_curiosity_fact_packet(focus)
     live_facts = await _live_context_curiosity_facts(focus)
@@ -2049,6 +2058,7 @@ async def _compose_natural_context_curiosity_answer(
         return _packet_grounded_context_recovery_answer(
             focus=focus,
             live_facts=live_facts,
+            language=language,
         )
     provenance_rule = (
         "If you use visible artifact context, say so naturally with phrases like "
@@ -2061,7 +2071,8 @@ async def _compose_natural_context_curiosity_answer(
             "role": "system",
             "content": (
                 "You are Argus, a chat-first investing experimentation assistant. "
-                "Answer broad market or macro curiosity in warm, plain English. "
+                f"{response_language_instruction(language)} "
+                "Answer broad market or macro curiosity in warm, plain language. "
                 "Keep it concise. The opening sentence must give useful investing "
                 "context, not an apology, greeting, or capability rejection. Explain "
                 "any product boundary after the context and only if needed. Offer a "
@@ -2123,6 +2134,7 @@ async def _compose_natural_context_curiosity_answer(
         return _packet_grounded_context_recovery_answer(
             focus=focus,
             live_facts=live_facts,
+            language=language,
         )
     except Exception:
         return None
@@ -2334,16 +2346,16 @@ def _packet_grounded_context_recovery_answer(
     *,
     focus: ContextQuestionFocus,
     live_facts: _LiveContextCuriosityFacts,
+    language: str,
 ) -> str:
     if focus == "market_movers" and live_facts.packet_symbols:
         seeds = _join_context_symbols(live_facts.packet_symbols[:5])
-        return (
-            f"A short-lived movers snapshot can help pick experiment seeds: {seeds}. "
-            "Treat those as symbols to validate, not recommendations or a live "
-            "ranking. Pick one, and I can test buy-and-hold, recurring buys, or a "
-            "supported indicator rule over a historical window."
+        return recovery_message(
+            "context_market_movers_seed_recovery",
+            language=language,
+            seeds=seeds,
         )
-    return _context_curiosity_recovery_answer(focus)
+    return _context_curiosity_recovery_answer(focus, language=language)
 
 
 def _join_context_symbols(symbols: tuple[str, ...]) -> str:
@@ -2377,23 +2389,16 @@ def _supported_experiment_fact_packet() -> str:
     )
 
 
-def _context_curiosity_recovery_answer(focus: ContextQuestionFocus) -> str:
+def _context_curiosity_recovery_answer(
+    focus: ContextQuestionFocus,
+    *,
+    language: str,
+) -> str:
     if focus == "macro_context":
-        return (
-            "Macro conditions can be useful context for a historical test. Give me "
-            "a strategy or symbol and I can help compare how it behaved across "
-            "different rate or inflation backdrops."
-        )
+        return recovery_message("context_macro_recovery", language=language)
     if focus == "corporate_events":
-        return (
-            "Corporate events are most useful when tied to a symbol and period. "
-            "Give me an equity ticker and I can use events like splits or dividends "
-            "as context around a historical test."
-        )
-    return (
-        "A market move can be a useful starting point for an experiment. Give me "
-        "a symbol or idea and I can turn it into a historical test instead of a feed."
-    )
+        return recovery_message("context_corporate_events_recovery", language=language)
+    return recovery_message("context_market_movers_recovery", language=language)
 
 
 async def _unanchored_strategy_route_answer_if_needed(
@@ -2403,6 +2408,7 @@ async def _unanchored_strategy_route_answer_if_needed(
     requires_clarification: bool,
     current_user_message: str,
     capability_contract: Any,
+    language: str,
 ) -> str | None:
     if (
         "unanchored_strategy_route_suppressed" not in reason_codes
@@ -2413,18 +2419,20 @@ async def _unanchored_strategy_route_answer_if_needed(
     composed = await _compose_unanchored_strategy_recovery_answer(
         current_user_message=current_user_message,
         capability_contract=capability_contract,
+        language=language,
     )
     if composed:
         return composed
-    return _llm_composition_unavailable_recovery_answer()
+    return _llm_composition_unavailable_recovery_answer(language=language)
 
 
 async def _compose_unanchored_strategy_recovery_answer(
     *,
     current_user_message: str,
     capability_contract: Any,
+    language: str = "en",
 ) -> str | None:
-    fact_packet = compose_capability_answer(
+    fact_packet = capability_fact_packet(
         focus="supported_strategies",
         contract=capability_contract,
     )
@@ -2435,7 +2443,8 @@ async def _compose_unanchored_strategy_recovery_answer(
                 "You are Argus, a chat-first investing experimentation assistant. "
                 "The user expressed a broad or vague investing strategy intention, "
                 "but deterministic validation found no executable strategy anchor "
-                "yet. Do not create a draft. Answer in warm, plain English. Give "
+                f"yet. Do not create a draft. {response_language_instruction(language)} "
+                "Answer in warm, plain language. Give "
                 "useful beginner-friendly context, name only supported experiment "
                 "families from the facts, and offer one clear next step. Do not use "
                 "report tone, do not say generic filler like 'I'm here', and do not "
@@ -2463,6 +2472,7 @@ async def _educational_answer_recovery_if_needed(
     requires_clarification: bool,
     assistant_response: str | None,
     current_user_message: str,
+    language: str,
 ) -> str | None:
     if (
         semantic_turn_act != "educational_question"
@@ -2472,11 +2482,12 @@ async def _educational_answer_recovery_if_needed(
     ):
         return None
     composed = await _compose_general_educational_answer(
-        current_user_message=current_user_message
+        current_user_message=current_user_message,
+        language=language,
     )
     if composed:
         return composed
-    return _llm_composition_unavailable_recovery_answer()
+    return _llm_composition_unavailable_recovery_answer(language=language)
 
 
 async def _unhandled_response_recovery_if_needed(
@@ -2486,26 +2497,29 @@ async def _unhandled_response_recovery_if_needed(
     requires_clarification: bool,
     assistant_response: str | None,
     current_user_message: str,
+    language: str,
 ) -> str | None:
     if expects_strategy_route or requires_clarification or assistant_response:
         return None
     composed = await _compose_unhandled_conversation_answer(
         semantic_turn_act=semantic_turn_act,
         current_user_message=current_user_message,
+        language=language,
     )
     if composed:
         return composed
-    return _llm_composition_unavailable_recovery_answer()
+    return _llm_composition_unavailable_recovery_answer(language=language)
 
 
-def _llm_composition_unavailable_recovery_answer() -> str:
-    return (
-        "I couldn't shape that cleanly just now. Try giving me an asset and rough "
-        "time window, and I'll turn it into the closest runnable historical test."
-    )
+def _llm_composition_unavailable_recovery_answer(*, language: str) -> str:
+    return recovery_message("interpreter_unavailable", language=language)
 
 
-async def _compose_general_educational_answer(*, current_user_message: str) -> str | None:
+async def _compose_general_educational_answer(
+    *,
+    current_user_message: str,
+    language: str = "en",
+) -> str | None:
     messages = [
         {
             "role": "system",
@@ -2513,7 +2527,8 @@ async def _compose_general_educational_answer(*, current_user_message: str) -> s
                 "You are Argus, a chat-first investing experimentation assistant. "
                 "The structured interpreter identified this as an educational or "
                 "broad investing-curiosity turn but did not produce user-facing prose. "
-                "Answer in warm, plain English. Start with useful context, keep it "
+                f"{response_language_instruction(language)} "
+                "Answer in warm, plain language. Start with useful context, keep it "
                 "concise, avoid report tone, do not name data vendors, do not imply "
                 "live news coverage, and do not give investment advice. End with one "
                 "nearby historical experiment or recoverable next step when useful."
@@ -2536,6 +2551,7 @@ async def _compose_unhandled_conversation_answer(
     *,
     semantic_turn_act: SemanticTurnAct | None,
     current_user_message: str,
+    language: str = "en",
 ) -> str | None:
     messages = [
         {
@@ -2543,8 +2559,10 @@ async def _compose_unhandled_conversation_answer(
             "content": (
                 "You are Argus, a chat-first investing experimentation assistant. "
                 "The runtime has no executable strategy, no clarification contract, "
-                "and no user-facing answer for this turn. Recover by answering in "
-                "warm, plain English. Do not use report tone. Do not name data "
+                "and no user-facing answer for this turn. "
+                f"{response_language_instruction(language)} "
+                "Recover by answering in warm, plain language. Do not use report tone. "
+                "Do not name data "
                 "vendors, imply live market-news coverage, invent current facts, "
                 "or give investment advice. Preserve continuity of exploration by "
                 "offering one nearby historical experiment or recoverable next step "
@@ -2791,6 +2809,12 @@ def _requested_asset_answer_candidates(
     current_user_message: str,
 ) -> list[_RequestedAssetCandidate]:
     candidates: list[_RequestedAssetCandidate] = []
+    for symbol in explicit_strategy.asset_universe:
+        candidate = str(symbol or "").strip()
+        if candidate:
+            candidates.append(
+                _RequestedAssetCandidate(text=candidate, source="llm_extraction")
+            )
     answer = current_user_message.strip()
     if answer:
         candidates.append(
@@ -2800,19 +2824,17 @@ def _requested_asset_answer_candidates(
                 from_user_answer=True,
             )
         )
-    for symbol in explicit_strategy.asset_universe:
-        candidate = str(symbol or "").strip()
-        if candidate:
-            candidates.append(
-                _RequestedAssetCandidate(text=candidate, source="llm_extraction")
-            )
     deduped: list[_RequestedAssetCandidate] = []
-    seen: set[str] = set()
+    seen: dict[str, int] = {}
     for candidate in candidates:
         key = candidate.text.casefold()
-        if key in seen:
+        existing_index = seen.get(key)
+        if existing_index is not None:
+            existing = deduped[existing_index]
+            if candidate.from_user_answer and not existing.from_user_answer:
+                deduped[existing_index] = candidate
             continue
-        seen.add(key)
+        seen[key] = len(deduped)
         deduped.append(candidate)
     return deduped
 
@@ -3052,16 +3074,28 @@ def _offline_interpreter_unavailable_result(
         effective_response_profile=effective_profile,
         semantic_turn_act=None,
     )
+    stage_patch: dict[str, Any] = {
+        "assistant_response": _offline_recovery_message(
+            snapshot,
+            current_user_message=current_user_message,
+            selected_thread_metadata=selected_thread_metadata or {},
+            language=user.language_preference,
+        ),
+    }
+    stage_patch.update(
+        recovery_state_stage_patch(
+            "interpreter_unavailable",
+            language=user.language_preference,
+            retryable=True,
+        )
+    )
+    retry_last_turn = retry_last_turn_stage_patch(current_user_message)
+    if retry_last_turn is not None:
+        stage_patch.update(retry_last_turn)
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
-        stage_patch={
-            "assistant_response": _offline_recovery_message(
-                snapshot,
-                current_user_message=current_user_message,
-                selected_thread_metadata=selected_thread_metadata or {},
-            ),
-        },
+        stage_patch=stage_patch,
     )
 
 
@@ -3119,15 +3153,16 @@ async def _active_confirmation_followup_when_interpreter_unavailable(
     strategy = snapshot.pending_strategy_summary
     setup_phrase = _current_setup_phrase(strategy)
     assumptions_response = _draft_assumptions_response(snapshot)
-    action_guidance = (
-        "The visible confirmation is still ready. Use the card to start the "
-        "simulation, or use the card controls to change it."
+    action_guidance = recovery_message(
+        "confirmation_action_guidance",
+        language=user.language_preference,
     )
     response = await compose_active_confirmation_interpreter_recovery(
         current_user_message=current_user_message,
         setup_phrase=setup_phrase,
         assumptions_response=assumptions_response,
         action_guidance=action_guidance,
+        language=user.language_preference,
     )
     if response is None:
         return None
@@ -3178,14 +3213,14 @@ async def _latest_result_followup_when_interpreter_unavailable(
         metadata=metadata,
         focus="general",
         user_message=current_user_message,
+        language=user.language_preference,
     )
+    used_recovery = response is None
     if response is None:
-        response = fallback_result_followup_response(
-            metadata=metadata,
-            focus="general",
+        response = recovery_message(
+            "latest_result_followup_unavailable",
+            language=user.language_preference,
         )
-    if response is None:
-        return None
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -3216,9 +3251,21 @@ async def _latest_result_followup_when_interpreter_unavailable(
         decision=decision,
         stage_patch={
             "assistant_response": with_response_heading(
-                heading=result_followup_heading("general"),
+                heading=result_followup_heading(
+                    "general",
+                    language=user.language_preference,
+                ),
                 body=response,
-            )
+            ),
+            **(
+                recovery_state_stage_patch(
+                    "latest_result_followup_unavailable",
+                    language=user.language_preference,
+                    retryable=True,
+                )
+                if used_recovery
+                else {}
+            ),
         },
     )
 
@@ -3252,22 +3299,27 @@ async def _latest_result_followup_recovery_if_applicable(
         response = await compose_private_alpha_save_response(
             metadata=metadata,
             user_message=current_user_message,
+            language=user.language_preference,
         )
         if response is None:
-            response = fallback_private_alpha_save_response()
+            response = fallback_private_alpha_save_response(
+                language=user.language_preference
+            )
     else:
         response = await compose_result_followup_response(
             metadata=metadata,
             focus=focus,
             user_message=current_user_message,
+            language=user.language_preference,
         )
+        used_recovery = response is None
         if response is None:
-            response = fallback_result_followup_response(
-                metadata=metadata,
-                focus=focus,
+            response = recovery_message(
+                "latest_result_followup_unavailable",
+                language=user.language_preference,
             )
-        if response is None:
-            return None
+    if save_requested and not _strategies_enabled():
+        used_recovery = False
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -3297,16 +3349,29 @@ async def _latest_result_followup_recovery_if_applicable(
                 response
                 if save_requested and not _strategies_enabled()
                 else with_response_heading(
-                    heading=result_followup_heading(focus),
+                    heading=result_followup_heading(
+                        focus,
+                        language=user.language_preference,
+                    ),
                     body=response,
                 )
-            )
+            ),
+            **(
+                recovery_state_stage_patch(
+                    "latest_result_followup_unavailable",
+                    language=user.language_preference,
+                    retryable=True,
+                )
+                if used_recovery
+                else {}
+            ),
         },
     )
 
 
 async def _private_alpha_save_request_result_if_applicable(
     *,
+    user: UserState,
     decision: InterpretDecision,
     snapshot: TaskSnapshot | None,
     current_user_message: str,
@@ -3322,9 +3387,12 @@ async def _private_alpha_save_request_result_if_applicable(
     response = await compose_private_alpha_save_response(
         metadata=dict(snapshot.latest_backtest_result_reference.metadata),
         user_message=current_user_message,
+        language=user.language_preference,
     )
     if response is None:
-        response = fallback_private_alpha_save_response()
+        response = fallback_private_alpha_save_response(
+            language=user.language_preference
+        )
     return StageResult(
         outcome="ready_to_respond",
         decision=decision.model_copy(
@@ -3354,6 +3422,7 @@ def _offline_recovery_message(
     *,
     current_user_message: str = "",
     selected_thread_metadata: dict[str, Any] | None = None,
+    language: str = "en",
 ) -> str:
     if snapshot is not None and snapshot.pending_strategy_summary is not None:
         strategy = snapshot.pending_strategy_summary
@@ -3362,36 +3431,32 @@ def _offline_recovery_message(
             current_user_message=current_user_message,
             selected_thread_metadata=selected_thread_metadata or {},
         ):
-            return (
-                "I saved your reply, but I could not safely apply that assumption "
-                "change, so I left the current idea unchanged. Please retry the "
-                "change in a moment."
-            )
+            return recovery_message("assumption_edit_unapplied", language=language)
         if snapshot.active_confirmation_reference is None:
-            return (
-                f"I still have the {setup_phrase} in this chat, but I could not "
-                "safely apply that change. Please retry in a moment."
+            return recovery_message(
+                "setup_change_unapplied",
+                language=language,
+                setup_phrase=setup_phrase,
             )
         assumptions_response = _draft_assumptions_response(snapshot)
-        action_guidance = (
-            "The visible confirmation is still ready. Use the card to start the "
-            "simulation, or use the card controls to change it."
+        action_guidance = recovery_message(
+            "confirmation_action_guidance",
+            language=language,
         )
         if assumptions_response is not None:
             return f"{assumptions_response} {action_guidance}"
-        return (
-            f"I still have the {setup_phrase} confirmation in this chat, "
-            f"but I could not safely apply that change. {action_guidance}"
+        return recovery_message(
+            "confirmation_change_unapplied",
+            language=language,
+            setup_phrase=setup_phrase,
+            action_guidance=action_guidance,
         )
     if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
-        return (
-            "I still have the latest result in this chat, but I could not safely "
-            "answer that follow-up. Please retry in a moment."
+        return recovery_message(
+            "latest_result_followup_unavailable",
+            language=language,
         )
-    return (
-        "I saved your message, but I could not turn it into a reliable test setup. "
-        "Please retry in a moment."
-    )
+    return recovery_message("interpreter_unavailable", language=language)
 
 
 def _current_setup_phrase(strategy: StrategySummary) -> str:
@@ -3623,30 +3688,6 @@ def _should_apply_current_message_asset_grounding(
     return not bool(prior and prior.asset_universe)
 
 
-def _current_message_date_range_for_contextual_edit(
-    *,
-    current_user_message: str | None,
-    selected_thread_metadata: dict[str, Any],
-) -> dict[str, str] | None:
-    if _field_base(str(selected_thread_metadata.get("requested_field") or "")) != (
-        "date_range"
-    ):
-        return None
-    message = str(current_user_message or "").strip()
-    if not message:
-        return None
-    try:
-        resolved = resolve_date_range(message)
-    except Exception:
-        return None
-    if resolved.used_default:
-        return None
-    payload = resolved.payload
-    if set(payload) != {"start", "end"}:
-        return None
-    return payload
-
-
 def _contextual_date_range_value(
     *,
     base: Any,
@@ -3656,15 +3697,10 @@ def _contextual_date_range_value(
 ) -> dict[str, Any]:
     if _has_complete_date_range(incoming):
         return incoming
-    return (
-        _current_message_date_range_for_contextual_edit(
-            current_user_message=current_user_message,
-            selected_thread_metadata=selected_thread_metadata,
-        )
-        or _merged_contextual_date_range(
-            base=base,
-            incoming=incoming,
-        )
+    del current_user_message
+    return _merged_contextual_date_range(
+        base=base,
+        incoming=incoming,
     )
 
 
@@ -3837,6 +3873,20 @@ def _merge_contextual_extra_parameters(
                 nested[nested_key] = nested_value
             merged[key] = nested
             continue
+        if (
+            key == "date_range_intent"
+            and isinstance(value, dict)
+            and isinstance(merged.get(key), dict)
+        ):
+            base_intent = dict(merged[key])
+            if (
+                str(value.get("kind") or "").strip() == "endpoint_patch"
+                and str(base_intent.get("kind") or "").strip() == "rolling_window"
+            ):
+                nested = dict(value)
+                nested["base_intent"] = base_intent
+                merged[key] = nested
+                continue
         merged[key] = value
     return merged
 
@@ -3976,11 +4026,7 @@ def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
     provenance: list[ResolutionProvenance] = []
 
     for index, symbol in enumerate(updated.asset_universe):
-        resolution = _trusted_user_mention_resolution(
-            updated,
-            index=index,
-            symbol=symbol,
-        ) or _resolve_asset_candidate(
+        resolution = _resolve_asset_candidate(
             symbol,
             field=f"asset_universe[{index}]",
             source=_asset_resolution_source_for_canonicalization(
@@ -4012,54 +4058,6 @@ def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
         [*updated.resolution_provenance, *provenance]
     )
     return updated
-
-
-def _trusted_user_mention_resolution(
-    strategy: StrategySummary,
-    *,
-    index: int,
-    symbol: str,
-) -> AssetResolution | None:
-    field = f"asset_universe[{index}]"
-    normalized_symbol = str(symbol or "").strip().upper()
-    for raw_item in strategy.resolution_provenance:
-        if isinstance(raw_item, ResolutionProvenance):
-            item = raw_item
-        else:
-            try:
-                item = ResolutionProvenance.model_validate(raw_item)
-            except (TypeError, ValueError):
-                continue
-        if item.source != "user_mention":
-            continue
-        if item.candidate_kind != "asset" or item.resolution_status != "resolved":
-            continue
-        if item.validated_by != "provider_catalog":
-            continue
-        if _field_base(item.field) != "asset_universe":
-            continue
-        if item.field != field and len(strategy.asset_universe) > 1:
-            continue
-        canonical = str(item.canonical_symbol or "").strip().upper()
-        raw_text = str(item.raw_text or "").strip().upper()
-        asset_class = str(item.asset_class or "").strip()
-        if asset_class not in _BACKTEST_ASSET_CLASSES:
-            continue
-        if normalized_symbol not in {canonical, raw_text}:
-            continue
-        asset = _ProvenanceAsset(
-            canonical_symbol=canonical or normalized_symbol,
-            asset_class=asset_class,
-            raw_symbol=canonical or normalized_symbol,
-        )
-        return AssetResolution(
-            status="resolved",
-            raw_text=item.raw_text,
-            asset=asset,
-            candidates=(asset,),
-            provenance=item,
-        )
-    return None
 
 
 def _strategy_with_current_message_asset_grounding(
@@ -4112,6 +4110,7 @@ def _strategy_with_current_message_asset_grounding(
         if repaired_symbols != current_symbols:
             updated = strategy.model_copy(deep=True)
             updated.asset_universe = repaired_symbols
+            updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
             return updated, ["current_message_asset_grounding_repaired"]
         return strategy, []
 
@@ -4136,6 +4135,7 @@ def _strategy_with_current_message_asset_grounding(
         if repaired_symbols != current_symbols:
             updated = strategy.model_copy(deep=True)
             updated.asset_universe = repaired_symbols
+            updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
             return updated, ["current_message_asset_grounding_repaired"]
         return strategy, []
 
@@ -4201,6 +4201,7 @@ def _strategy_with_current_message_asset_grounding(
         updated.asset_class = next(iter(asset_classes))
     elif len(asset_classes) > 1:
         updated.asset_class = "mixed"
+    updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
     updated.resolution_provenance = _dedupe_resolution_provenance(
         [
             item
@@ -4343,6 +4344,7 @@ def _strategy_with_missing_asset_grounded_from_current_message(
     updated.asset_universe = grounded_symbols
     if asset_class:
         updated.asset_class = asset_class
+    updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
     updated.resolution_provenance = _dedupe_resolution_provenance(
         [
             item
@@ -4412,7 +4414,7 @@ def _strategy_with_missing_asset_from_misplaced_benchmark(
         updated.comparison_baseline = None
     updated.strategy_thesis = None
     updated.extra_parameters = _without_field_provenance_keys(
-        updated.extra_parameters,
+        _without_invalid_symbols(updated.extra_parameters),
         {"comparison_baseline"},
     )
     updated.resolution_provenance = _dedupe_resolution_provenance(
@@ -4457,6 +4459,14 @@ def _without_field_provenance_keys(
             updated["field_provenance"] = remaining
         else:
             updated.pop("field_provenance", None)
+    return updated
+
+
+def _without_invalid_symbols(extra_parameters: dict[str, Any]) -> dict[str, Any]:
+    if not extra_parameters:
+        return {}
+    updated = dict(extra_parameters)
+    updated.pop("invalid_symbols", None)
     return updated
 
 
@@ -5056,72 +5066,6 @@ def _educational_turn_has_strategy_baggage(
     )
 
 
-def _misclassified_dca_education_has_strategy_baggage(
-    *,
-    interpretation: StructuredInterpretation,
-    expects_strategy_route: bool,
-    dca_education_answer: str | None,
-) -> bool:
-    if (
-        interpretation.semantic_turn_act == "educational_question"
-        or dca_education_answer is None
-    ):
-        return False
-    return bool(
-        expects_strategy_route
-        or _strategy_has_content(interpretation.candidate_strategy_draft)
-        or interpretation.requires_clarification
-        or interpretation.missing_required_fields
-        or interpretation.ambiguous_fields
-        or interpretation.unsupported_constraints
-    )
-
-
-def _dca_education_answer_for_message(message: str) -> str | None:
-    tokens = _plain_word_tokens(message)
-    if not tokens:
-        return None
-    if not _message_asks_for_strategy_explanation(tokens):
-        return None
-    if not _message_mentions_dca_concept(tokens):
-        return None
-    return (
-        "Dollar cost averaging means investing a set amount on a recurring "
-        "schedule instead of all at once. In Argus, the closest runnable version "
-        "is recurring buys/DCA: choose one asset, a date range, a cadence, and a "
-        "contribution amount, and I can simulate the historical result."
-    )
-
-
-def _message_asks_for_strategy_explanation(tokens: list[str]) -> bool:
-    if any(token in {"explain", "define", "meaning"} for token in tokens):
-        return True
-    if any(token in {"mean", "means"} for token in tokens) and "what" in tokens:
-        return True
-    explanation_starts = (
-        ("what", "is"),
-        ("what", "are"),
-        ("what", "does"),
-        ("tell", "me", "about"),
-    )
-    if any(
-        _token_sequence_spans(tokens, list(sequence))
-        for sequence in explanation_starts
-    ):
-        return True
-    return "how" in tokens and any(token in {"work", "works"} for token in tokens)
-
-
-def _message_mentions_dca_concept(tokens: list[str]) -> bool:
-    dca_terms = (
-        ("dca",),
-        ("dollar", "cost", "averaging"),
-        ("recurring", "buy"),
-        ("recurring", "buys"),
-    )
-    return any(_token_sequence_spans(tokens, list(term)) for term in dca_terms)
-
-
 def _candidate_strategy_has_backtest_shape(strategy: StrategySummary) -> bool:
     return _strategy_has_execution_anchor(strategy)
 
@@ -5177,27 +5121,7 @@ def _dedupe_ambiguous_fields(fields: list[AmbiguousField]) -> list[AmbiguousFiel
 def _dedupe_resolution_provenance(
     provenance: list[ResolutionProvenance | dict[str, Any]],
 ) -> list[ResolutionProvenance]:
-    seen: set[tuple[str, str, str, str]] = set()
-    deduped: list[ResolutionProvenance] = []
-    for raw_item in provenance:
-        if isinstance(raw_item, ResolutionProvenance):
-            item = raw_item
-        else:
-            try:
-                item = ResolutionProvenance.model_validate(raw_item)
-            except (TypeError, ValueError):
-                continue
-        key = (
-            item.field,
-            item.raw_text,
-            item.source,
-            item.candidate_kind,
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(item)
-    return deduped
+    return dedupe_resolution_provenance_items(provenance)
 
 
 def normalize_task_snapshot(

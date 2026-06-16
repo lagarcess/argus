@@ -54,6 +54,49 @@ def test_parse_sse_events_accepts_canonical_data_frames() -> None:
     ]
 
 
+def test_stream_phase_timings_capture_first_event_and_token() -> None:
+    module = _load_benchmark_module()
+
+    timings = module._stream_phase_timings_from_chunks(
+        response_headers_ms=5.0,
+        chunks=[
+            (10.0, "data: {\"type\":\"stage_start\",\"stage\":\"interpret\"}\n\n"),
+            (25.0, "data: {\"type\":\"token\",\"content\":\"Ready\"}\n\n"),
+            (40.0, "data: {\"type\":\"final\",\"payload\":{}}\n\n"),
+            (45.0, "data: [DONE]\n\n"),
+        ],
+        total_ms=50.0,
+    )
+
+    assert timings == {
+        "response_headers": 5.0,
+        "first_byte": 10.0,
+        "first_sse_event": 10.0,
+        "first_token": 25.0,
+        "total": 50.0,
+    }
+
+
+def test_stream_phase_timings_are_partial_when_no_token_streams() -> None:
+    module = _load_benchmark_module()
+
+    timings = module._stream_phase_timings_from_chunks(
+        response_headers_ms=7.0,
+        chunks=[
+            (15.0, "data: {\"type\":\"final\",\"payload\":{}}\n\n"),
+            (20.0, "data: [DONE]\n\n"),
+        ],
+        total_ms=22.0,
+    )
+
+    assert timings == {
+        "response_headers": 7.0,
+        "first_byte": 15.0,
+        "first_sse_event": 15.0,
+        "total": 22.0,
+    }
+
+
 def test_extract_confirmation_run_action_uses_backend_action_shape() -> None:
     module = _load_benchmark_module()
 
@@ -126,6 +169,21 @@ def test_markdown_summary_reports_live_timings_and_unavailable_metrics() -> None
                     "total": 13000.0,
                     "render_task_duration": 5000.0,
                 },
+                "stream_timings_ms": {
+                    "confirmation": {
+                        "response_headers": 100.0,
+                        "first_byte": 150.0,
+                        "first_sse_event": 180.0,
+                        "first_token": 1200.0,
+                        "total": 2500.0,
+                    },
+                    "run": {
+                        "response_headers": 80.0,
+                        "first_byte": 110.0,
+                        "first_sse_event": 140.0,
+                        "total": 900.0,
+                    },
+                },
                 "voice": {
                     "result_readout_source": "llm_explain_stage",
                     "result_readout_fallback_used": False,
@@ -151,6 +209,13 @@ def test_markdown_summary_reports_live_timings_and_unavailable_metrics() -> None
     assert "13.00s" in markdown
     assert "12.00s" in markdown
     assert "llm_explain_stage" in markdown
+    assert "## Stream Phase Timings" in markdown
+    assert "Confirmation" in markdown
+    assert "First Byte" in markdown
+    assert "First SSE" in markdown
+    assert "First Token" in markdown
+    assert "1.20s" in markdown
+    assert "Run" in markdown
     assert "Workflow Internal Timings" in markdown
     assert "Provider Fetch" in markdown
     assert "1.40s" in markdown

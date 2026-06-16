@@ -7,6 +7,7 @@ from argus.domain.backtesting.execution import _execution_realism_settings
 from argus.domain.benchmark_comparison import (
     benchmark_comparison_from_delta,
 )
+from argus.domain.engine_launch.display import format_date_range_label
 
 
 def _format_money(value: float) -> str:
@@ -74,6 +75,8 @@ def build_result_card(
         ]
         if bool(realism["enabled"]):
             assumptions[2] = "Execution realism enabled"
+    if is_dca:
+        assumptions = _dca_assumptions(config, is_es=is_es) + assumptions
 
     rows = [
         {
@@ -117,6 +120,7 @@ def build_result_card(
             "id": "show-breakdown",
             "type": "show_breakdown",
             "label": "Explicar resultado" if is_es else "Explain result",
+            "labelKey": "chat.result_card.explain_result",
             "presentation": "result",
             "payload": {},
         },
@@ -124,6 +128,7 @@ def build_result_card(
             "id": "save-strategy",
             "type": "save_strategy",
             "label": "Guardar" if is_es else "Save",
+            "labelKey": "chat.result_card.save",
             "presentation": "result",
             "payload": {},
         },
@@ -131,6 +136,7 @@ def build_result_card(
             "id": "refine-strategy",
             "type": "refine_strategy",
             "label": "Refinar idea" if is_es else "Refine idea",
+            "labelKey": "chat.result_card.refine_idea",
             "presentation": "result",
             "payload": {},
         },
@@ -139,12 +145,16 @@ def build_result_card(
         "title": f"{symbols} {template_display}",
         "symbols": list(config["symbols"]),
         "strategy_label": template_display,
+        "asset_class": config["asset_class"],
         "date_range": {
             "start": config["start_date"],
             "end": config["end_date"],
-            "display": f"{start.strftime('%d/%m/%Y')} al {end.strftime('%d/%m/%Y')}"
-            if is_es
-            else f"{start.strftime('%B')} {start.day}, {start.year} to {end.strftime('%B')} {end.day}, {end.year}",
+            "display": format_date_range_label(
+                start,
+                end,
+                language=language,
+                separator=" to " if not is_es else None,
+            ),
         },
         "status_label": status_label,
         "rows": rows,
@@ -159,3 +169,39 @@ def _should_show_win_rate(config: dict[str, Any], efficiency: dict[str, Any]) ->
     if config["template"] in {"buy_and_hold", "dca_accumulation"}:
         return False
     return int(efficiency.get("total_trades", 0) or 0) > 1
+
+
+def _dca_assumptions(config: dict[str, Any], *, is_es: bool) -> list[str]:
+    contribution = float(
+        config.get("recurring_contribution") or config["starting_capital"]
+    )
+    principal = float(config.get("starting_principal") or 0.0)
+    cadence = _dca_cadence_label(config, is_es=is_es)
+    cadence_suffix = f" {cadence}" if cadence else ""
+    if is_es:
+        return [
+            f"Aporte recurrente: {_format_money(contribution)}{cadence_suffix}",
+            f"Capital inicial: {_format_money(principal)}",
+        ]
+    return [
+        f"Recurring contribution: {_format_money(contribution)}{cadence_suffix}",
+        f"Starting principal: {_format_money(principal)}",
+    ]
+
+
+def _dca_cadence_label(config: dict[str, Any], *, is_es: bool) -> str:
+    parameters = (
+        config.get("parameters") if isinstance(config.get("parameters"), dict) else {}
+    )
+    cadence = str(parameters.get("dca_cadence") or "").strip().lower()
+    if not cadence:
+        return ""
+    if is_es:
+        return {
+            "daily": "diario",
+            "weekly": "semanal",
+            "biweekly": "quincenal",
+            "monthly": "mensual",
+            "quarterly": "trimestral",
+        }.get(cadence, cadence.replace("_", " "))
+    return cadence.replace("_", " ")

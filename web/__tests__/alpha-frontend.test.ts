@@ -85,7 +85,7 @@ describe("Argus Alpha frontend contract", () => {
   test("chat header keeps the history options affordance", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 
-    expect(chat).toContain('aria-label="Chat options"');
+    expect(chat).toContain('aria-label={t("chat.chat_options", "Chat options")}');
     expect(chat).toContain("MoreVertical");
     expect(chat).toContain("chat.rename_chat");
     expect(chat).toContain("chat.pin_chat");
@@ -127,8 +127,10 @@ describe("Argus Alpha frontend contract", () => {
     const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
     const flags = readFileSync(join(root, "lib/private-alpha-flags.ts"), "utf-8");
     const envExample = readFileSync(join(root, ".env.local.example"), "utf-8");
-    const en = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
-    const es = readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8");
+    const enSource = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
+    const esSource = readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8");
+    const en = JSON.parse(enSource);
+    const es = JSON.parse(esSource);
 
     expect(flags).toContain("NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED");
     expect(flags).toContain("chatExploratorySuggestionsEnabled");
@@ -143,12 +145,35 @@ describe("Argus Alpha frontend contract", () => {
     expect(input).toContain("const prompts = chatExploratorySuggestionsEnabled");
     expect(input).toContain("placeholder");
     expect(chat).toContain("chat.followup_placeholder");
-    expect(en).toContain("from January 1, 2024 through December 31, 2024");
-    expect(en).toContain("Strategy: recurring buys");
-    expect(en).toContain("Asset: NVDA");
-    expect(en).toContain("Recurring contribution: $250 per week");
-    expect(en).toContain("Period: January 1, 2024 through December 31, 2024");
-    expect(es).toContain("del 1 de enero de 2024 al 31 de diciembre de 2024");
+
+    const starterAndPlaceholderText = [
+      ...en.chat.placeholder_prompts,
+      ...es.chat.placeholder_prompts,
+      en.chat.starter_actions.tsla.value,
+      en.chat.starter_actions.btc.value,
+      en.chat.starter_actions.dca.value,
+      es.chat.starter_actions.tsla.value,
+      es.chat.starter_actions.btc.value,
+      es.chat.starter_actions.dca.value,
+    ].join("\n");
+
+    expect(starterAndPlaceholderText).not.toContain("2024");
+    expect(starterAndPlaceholderText).not.toContain("January 1");
+    expect(starterAndPlaceholderText).not.toContain("December 31");
+    expect(starterAndPlaceholderText).not.toContain("1 de enero");
+    expect(starterAndPlaceholderText).not.toContain("31 de diciembre");
+    expect(starterAndPlaceholderText).not.toContain("Strategy:");
+    expect(starterAndPlaceholderText).not.toContain("Asset:");
+    expect(starterAndPlaceholderText).not.toContain("Period:");
+    expect(starterAndPlaceholderText).not.toContain("Estrategia:");
+    expect(starterAndPlaceholderText).not.toContain("Activo:");
+    expect(starterAndPlaceholderText).not.toContain("Periodo:");
+    expect(en.chat.starter_actions.tsla.value).toBe("Buy and hold AAPL over the last 12 months with SPY as the benchmark.");
+    expect(en.chat.starter_actions.btc.value).toBe("What if I bought Bitcoin this year so far?");
+    expect(en.chat.starter_actions.dca.value).toBe("What if I bought $250 of Nvidia every week over the last 12 months?");
+    expect(es.chat.starter_actions.tsla.value).toBe("Compra y mantén AAPL durante los últimos 12 meses con SPY como referencia.");
+    expect(es.chat.starter_actions.btc.value).toBe("¿Qué habría pasado si compraba Bitcoin en lo que va del año?");
+    expect(es.chat.starter_actions.dca.value).toBe("¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?");
   });
 
   test("assistant turn controls use shared tooltips and robust clipboard copy", () => {
@@ -206,7 +231,16 @@ describe("Argus Alpha frontend contract", () => {
     expect(sendState).toContain("message.id !== assistantId");
     expect(retry).not.toContain("content.includes");
     expect(retry).not.toContain(".match(");
+    expect(chat).toContain("const actionLabel = (action: ChatActionOption) =>");
+    expect(chat).toContain("{actionLabel(action)}");
+    expect(chat).toContain("const actionDisplayLabel = useCallback");
+    expect(chat).toContain("content: action?.type ? actionDisplayLabel(action) : trimmed");
+    expect(chat).not.toContain("content: action?.label ?? trimmed");
+    expect(chat).not.toContain("{action.label}\n                          </button>");
     expect(message).toContain("action.labelKey ? t(action.labelKey, action.label) : action.label");
+    expect(message).toContain(
+      '{displayContent || (message.selectedAction ? actionLabel(message.selectedAction) : "")}',
+    );
     expect(message).toContain("const retryAction = message.actions?.find");
     expect(message).toContain("message.actions?.find(isRetryAction)");
     expect(message).toContain("const footerMessageActions =");
@@ -263,9 +297,11 @@ describe("Argus Alpha frontend contract", () => {
     const css = readFileSync(join(root, "app/globals.css"), "utf-8");
 
     expect(message).toContain("function ResultBreakdown");
-    expect(message).toContain('aria-label="Result breakdown"');
+    expect(message).toContain('ariaLabel={t("chat.result_breakdown.aria_label", "Result breakdown")}');
+    expect(message).toContain('label={t("chat.result_breakdown.label", "Breakdown")}');
     expect(message).toContain("argus-result-section-label");
-    expect(message).toContain("Breakdown");
+    expect(message).toContain("{label}");
+    expect(message).not.toContain("<div className=\"argus-result-section-label\">Breakdown</div>");
     expect(message).toContain('message.contentPresentation === "result_breakdown" && displayContent.trim()');
     expect(chat).toContain('action?.type === "show_breakdown"');
     expect(chat).toContain('contentPresentation:');
@@ -300,8 +336,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(chart).toContain("selectVisibleTradeMarkers");
     expect(chart).toContain("subscribeVisibleLogicalRangeChange");
     expect(chart).toContain("markersApi.setMarkers");
-    expect(chart).toContain("TODO(launch): Provide correct TradingView attribution before launch.");
-    expect(chart).toContain("attributionLogo: false");
+    expect(chart).toContain("resultChartAttributionLabel(chart.attribution)");
+    expect(chart).toContain('data-testid="result-equity-chart-attribution"');
+    expect(chart).toContain("RESULT_CHART_ATTRIBUTION_URL");
+    expect(chart).toContain("https://www.tradingview.com/");
+    expect(chart).not.toContain("TODO(launch): Provide correct TradingView attribution before launch.");
     expect(chart).toContain('const CHART_POSITIVE_COLOR = "#70a38d"');
     expect(chart).toContain('const CHART_NEGATIVE_COLOR = "#b85c5c"');
     expect(chart).toContain('const BUY_POSITIVE_MARKER_COLOR = "#70a38d"');
@@ -444,7 +483,7 @@ describe("Argus Alpha frontend contract", () => {
     const stage = parseChatStreamFrame('data: {"type":"stage_start","stage":"execute"}');
     const token = parseChatStreamFrame('data: {"type":"token","content":"Running"}');
     const error = parseChatStreamFrame(
-      'data: {"type":"error","code":"agent_runtime_failure","message":"Something went wrong.","message_id":"assistant-persisted-1"}',
+      'data: {"type":"error","code":"agent_runtime_failure","message":"Something went wrong.","message_id":"assistant-persisted-1","retry_last_turn":{"message":"test AAPL"},"recovery":{"code":"runtime_failure","retryable":true,"language":"en"}}',
     );
     const done = parseChatStreamFrame("data: [DONE]");
 
@@ -456,6 +495,12 @@ describe("Argus Alpha frontend contract", () => {
         code: "agent_runtime_failure",
         detail: "Something went wrong.",
         message_id: "assistant-persisted-1",
+        retry_last_turn: { message: "test AAPL" },
+        recovery: {
+          code: "runtime_failure",
+          retryable: true,
+          language: "en",
+        },
       },
     });
     expect(done).toEqual({ event: "done", data: { message_id: null } });

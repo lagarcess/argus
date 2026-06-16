@@ -11,9 +11,12 @@ def _source(path: str) -> str:
 
 def test_canary_defaults_to_private_launch_urls() -> None:
     source = _source(".github/canary-render.sh")
+    env_source = _source(".github/argus-env.sh")
 
-    assert "https://argus-app-suz5.onrender.com" in source
-    assert "https://argus-ohr5.onrender.com" in source
+    assert 'APP_URL="${ARGUS_CANARY_APP_URL:-$ARGUS_PRIVATE_LAUNCH_APP_URL}"' in source
+    assert 'API_URL="${ARGUS_CANARY_API_URL:-$ARGUS_PRIVATE_LAUNCH_API_URL}"' in source
+    assert 'ARGUS_PRIVATE_LAUNCH_APP_URL="https://argus-app-suz5.onrender.com"' in env_source
+    assert 'ARGUS_PRIVATE_LAUNCH_API_URL="https://argus-ohr5.onrender.com"' in env_source
 
 
 def test_canary_requires_auth_inputs_without_echoing_password() -> None:
@@ -21,8 +24,25 @@ def test_canary_requires_auth_inputs_without_echoing_password() -> None:
 
     assert "ARGUS_CANARY_EMAIL" in source
     assert "ARGUS_CANARY_PASSWORD" in source
-    assert "ARGUS_CANARY_PASSWORD is required" in source
+    assert "ARGUS_CANARY_PASSWORD or MOCK_USER_PASSWORD is required" in source
     assert "set -x" not in source
+
+
+def test_canary_loads_root_env_and_accepts_local_aliases() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert 'source "$SCRIPT_DIR/argus-env.sh"' in source
+    assert "argus_load_root_env >/dev/null || true" in source
+    assert 'EMAIL="${ARGUS_CANARY_EMAIL:-${MOCK_USER_EMAIL:-}}"' in source
+    assert 'PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"' in source
+    assert (
+        'SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-${SUPABASE_URL:-${SUPABASE_PROJECT_URL:-}}}"'
+        in source
+    )
+    assert (
+        'SUPABASE_SERVICE_ROLE_KEY="${ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}"'
+        in source
+    )
 
 
 def test_canary_exercises_confirmation_and_run_backtest_action() -> None:
@@ -40,6 +60,15 @@ def test_canary_exercises_confirmation_and_run_backtest_action() -> None:
     assert "backtest_jobs" in source
     assert "route_receipts" in source
     assert "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in source
+
+
+def test_canary_language_can_be_overridden_for_spanish_live_qa() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert 'LANGUAGE="${ARGUS_CANARY_LANGUAGE:-en}"' in source
+    assert 'CANARY_LANGUAGE="$LANGUAGE"' in source
+    assert '"language": os.environ["CANARY_LANGUAGE"]' in source
+    assert '"language": "en"' not in source
 
 
 def test_canary_fails_async_jobs_that_use_result_readout_fallback() -> None:

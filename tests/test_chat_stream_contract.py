@@ -283,6 +283,152 @@ def test_chat_stream_confirmation_uses_final_payload_without_named_events(
     assert "run" not in payload
 
 
+def test_chat_stream_persists_repaired_current_message_asset_grounding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.graph.workflow import build_workflow
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+    from argus.agent_runtime.state.models import ResolutionProvenance, StrategySummary
+    from argus.api import state as api_state
+    from argus.domain.market_data.assets import ResolvedAsset
+
+    class ApplePseudoTickerInterpreter:
+        async def ainvoke(self, request: Any) -> StructuredInterpretation:
+            return StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="new_task",
+                requires_clarification=False,
+                user_goal_summary="El usuario quiere comprar y mantener Apple.",
+                candidate_strategy_draft=StrategySummary(
+                    raw_user_phrasing=request.current_user_message,
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Comprar y mantener Apple.",
+                    asset_universe=["APPLE"],
+                    date_range={"start": "2025-06-16", "end": "2026-06-16"},
+                    capital_amount=100000,
+                ),
+                semantic_turn_act="new_idea",
+            )
+
+    provider_queries: list[tuple[str, str]] = []
+
+    def _resolution(query: str, *, field: str, source: str) -> AssetResolution:
+        provider_queries.append((query, source))
+        raw = query.strip()
+        if raw == "APPLE" and source == "llm_extraction":
+            return AssetResolution(
+                status="unsupported",
+                raw_text=query,
+                asset=None,
+                candidates=(),
+                provenance=ResolutionProvenance(
+                    field=field,
+                    raw_text=query,
+                    source=source,
+                    candidate_kind="asset",
+                    resolution_status="unsupported",
+                    canonical_symbol=None,
+                    asset_class=None,
+                    validated_by="provider_catalog",
+                    confidence="high",
+                ),
+            )
+        if raw.casefold() == "apple" and source == "user_mention":
+            asset = ResolvedAsset(
+                canonical_symbol="AAPL",
+                asset_class="equity",
+                name="Apple Inc.",
+                raw_symbol="AAPL",
+            )
+            return AssetResolution(
+                status="resolved",
+                raw_text=query,
+                asset=asset,
+                candidates=(asset,),
+                provenance=ResolutionProvenance(
+                    field=field,
+                    raw_text=query,
+                    source=source,
+                    candidate_kind="asset",
+                    resolution_status="resolved",
+                    canonical_symbol="AAPL",
+                    asset_class="equity",
+                    validated_by="provider_catalog",
+                    confidence="medium",
+                ),
+            )
+        return AssetResolution(
+            status="unsupported",
+            raw_text=query,
+            asset=None,
+            candidates=(),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="unsupported",
+                canonical_symbol=None,
+                asset_class=None,
+                validated_by="provider_catalog",
+                confidence="low",
+            ),
+        )
+
+    monkeypatch.setattr(interpret_module, "runtime_resolve_asset_candidate", _resolution)
+    client = _client()
+    checkpointer = api_state.build_agent_runtime_checkpointer()
+    workflow = build_workflow(
+        contract=build_default_capability_contract(),
+        structured_interpreter=ApplePseudoTickerInterpreter(),
+        checkpointer=checkpointer,
+    )
+    monkeypatch.setattr(
+        app.state,
+        "agent_runtime_checkpointer",
+        checkpointer,
+        raising=False,
+    )
+    monkeypatch.setattr(app.state, "agent_runtime_workflow", workflow, raising=False)
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Prueba comprar y mantener Apple con 100k durante el ultimo ano",
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert ("APPLE", "llm_extraction") in provider_queries
+    assert ("Apple", "user_mention") in provider_queries
+    payload = _final_payload(response.text)
+    confirmation_payload = payload["confirmation_payload"]
+    strategy = confirmation_payload["strategy"]
+    assert strategy["asset_universe"] == ["AAPL"]
+    assert strategy["asset_class"] == "equity"
+    assert "invalid_symbols" not in strategy.get("extra_parameters", {})
+    assert confirmation_payload["launch_payload"]["symbol"] == "AAPL"
+    assert confirmation_payload["launch_payload"]["symbols"] == ["AAPL"]
+    assert payload["confirmation"]["title"] == "AAPL: Comprar y mantener"
+
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    metadata = messages[-1]["metadata"]
+    persisted_strategy = metadata["confirmation_payload"]["strategy"]
+    assert persisted_strategy["asset_universe"] == ["AAPL"]
+    assert "invalid_symbols" not in persisted_strategy.get("extra_parameters", {})
+    assert metadata["confirmation_payload"]["launch_payload"]["symbols"] == ["AAPL"]
+
+
 def test_chat_stream_result_uses_final_payload_run_without_named_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -364,6 +510,56 @@ def test_chat_stream_result_uses_final_payload_run_without_named_events(
     ]
     assert messages[-1]["id"] == payload["message_id"]
     assert messages[-1]["content"] == "Short grounded summary."
+
+
+@pytest.mark.parametrize("action_type", ["show_breakdown", "save_strategy"])
+def test_result_actions_enter_runtime_before_transport_handling(
+    monkeypatch: pytest.MonkeyPatch,
+    action_type: str,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured_action_contexts: list[dict[str, Any] | None] = []
+
+    async def _fake_stream_agent_turn_events(**kwargs: Any):
+        captured_action_contexts.append(kwargs.get("action_context"))
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Runtime handled the result action.",
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "language": "en",
+            "action": {
+                "type": action_type,
+                "label": action_type.replace("_", " "),
+                "presentation": "result",
+                "payload": {"run_id": "run-from-card"},
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured_action_contexts
+    assert captured_action_contexts[0]["type"] == action_type
+    assert _final_payload(response.text)["assistant_response"] == (
+        "Runtime handled the result action."
+    )
 
 
 def test_chat_stream_artifact_naming_scheduler_failure_does_not_block_done(
@@ -563,6 +759,51 @@ def test_chat_stream_missing_runtime_final_emits_recoverable_error(
     assert response.text.count("data: [DONE]") == 1
 
 
+def test_chat_stream_runtime_initialization_failure_emits_recoverable_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+
+    def _broken_workflow(_request: Any) -> Any:
+        raise RuntimeError("workflow import failed")
+
+    monkeypatch.setattr(api_state, "get_agent_runtime_workflow", _broken_workflow)
+    client = _client()
+    conversation = _conversation(client)
+    message = "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": message,
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    events = _data_events(response.text)
+    assert len(events) == 1
+    assert events[0]["type"] == "error"
+    assert events[0]["code"] == "agent_runtime_failure"
+    assert "Algo salió mal" in events[0]["message"]
+    assert events[0]["recovery"] == {
+        "code": "runtime_failure",
+        "retryable": True,
+        "language": "es-419",
+    }
+    assert events[0]["retry_last_turn"] == {"message": message}
+    assert response.text.count("data: [DONE]") == 1
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assert [message["role"] for message in messages[-2:]] == ["user", "assistant"]
+    assistant_message = messages[-1]
+    assert assistant_message["content"] == events[0]["message"]
+    assert assistant_message["metadata"]["recovery"] == events[0]["recovery"]
+    assert assistant_message["metadata"]["retry_last_turn"] == {"message": message}
+
+
 def test_chat_stream_runtime_failure_persists_retry_last_turn_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -597,9 +838,181 @@ def test_chat_stream_runtime_failure_persists_retry_last_turn_metadata(
     assert assistant_message["metadata"]["retry_last_turn"] == {
         "message": "what if I bought $125 of BTC every two weeks in 2022?"
     }
+    assert assistant_message["metadata"]["recovery"] == {
+        "code": "runtime_failure",
+        "retryable": True,
+        "language": "en",
+    }
     assert assistant_message["metadata"]["agent_runtime_stage_outcome"] == (
         "agent_runtime_failure"
     )
+
+
+def test_chat_stream_runtime_failure_localizes_recovery_for_spanish_user(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _incomplete_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _incomplete_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+    message = "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": message,
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    events = _data_events(response.text)
+    error_event = events[-1]
+    assert error_event["type"] == "error"
+    assert "Algo salió mal" in error_event["message"]
+    assert "Something went wrong" not in error_event["message"]
+    assert error_event["recovery"] == {
+        "code": "runtime_failure",
+        "retryable": True,
+        "language": "es-419",
+    }
+    assert error_event["retry_last_turn"] == {"message": message}
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant_message = messages[-1]
+    assert assistant_message["content"] == error_event["message"]
+    assert assistant_message["metadata"]["retry_last_turn"] == {"message": message}
+    assert assistant_message["metadata"]["recovery"] == error_event["recovery"]
+
+
+def test_chat_stream_final_persists_retry_last_turn_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": (
+                    "Guardé tu mensaje, pero no pude convertirlo en una "
+                    "configuración de prueba confiable. Intenta de nuevo en "
+                    "un momento."
+                ),
+                "retry_last_turn": {
+                    "message": (
+                        "Compra y mantén ETH de enero de 2024 hasta marzo de "
+                        "2024 con 100000"
+                    )
+                },
+                "recovery": {
+                    "code": "interpreter_unavailable",
+                    "retryable": True,
+                    "language": "es-419",
+                },
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": (
+                "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 "
+                "con 100000"
+            ),
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    final_payload = _final_payload(response.text)
+    assert final_payload["retry_last_turn"] == {
+        "message": "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+    }
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant_message = messages[-1]
+    assert assistant_message["metadata"]["retry_last_turn"] == final_payload[
+        "retry_last_turn"
+    ]
+    assert assistant_message["metadata"]["recovery"] == final_payload["recovery"]
+
+
+def test_chat_stream_empty_final_persists_visible_recovery_for_user_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": None,
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+    message = "What if I bought Bitcoin this year so far?"
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": message,
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    events = _data_events(response.text)
+    assert events[-1]["type"] == "error"
+    assert events[-1]["message"]
+    assert events[-1]["retry_last_turn"] == {"message": message}
+    assert events[-1]["recovery"] == {
+        "code": "runtime_failure",
+        "retryable": True,
+        "language": "en",
+    }
+    assert response.text.count("data: [DONE]") == 1
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assert [message["role"] for message in messages[-2:]] == ["user", "assistant"]
+    assistant_message = messages[-1]
+    assert assistant_message["content"] == events[-1]["message"]
+    assert assistant_message["metadata"]["conversation_mode"] == "recovery"
+    assert assistant_message["metadata"]["retry_last_turn"] == {"message": message}
+    assert assistant_message["metadata"]["recovery"] == events[-1]["recovery"]
 
 
 def test_chat_stream_persists_runtime_start_marker_on_user_message(

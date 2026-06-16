@@ -15,7 +15,7 @@ from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState, StrategySummary
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
-    resolve_date_range,
+    resolve_executable_date_range,
 )
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
@@ -142,7 +142,10 @@ def _validated_launch_payload(
         launch_state = state.model_copy(
             update={"confirmation_payload": confirmation_payload}
         )
-        launch_payload = _launch_payload(launch_state)
+        launch_payload = _launch_payload(
+            launch_state,
+            language=_confirmation_payload_language(confirmation_payload),
+        )
         request = LaunchBacktestRequest.model_validate(launch_payload)
         validate_launch_supported(request)
     except ValidationError as exc:
@@ -158,6 +161,17 @@ def _validated_launch_payload(
         "requested_field": None,
         "assistant_prompt": None,
     }
+
+
+def _confirmation_payload_language(confirmation_payload: dict[str, Any]) -> str:
+    strategy = confirmation_payload.get("strategy")
+    if not isinstance(strategy, dict):
+        return "en"
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return "en"
+    language = str(extra_parameters.get("language") or "").strip()
+    return language or "en"
 
 
 def _validation_error_code(exc: ValidationError) -> str:
@@ -279,6 +293,11 @@ def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, A
     return dict(strategy)
 
 
+def _strategy_extra_parameters(strategy: dict[str, Any]) -> dict[str, Any] | None:
+    extra_parameters = strategy.get("extra_parameters")
+    return extra_parameters if isinstance(extra_parameters, dict) else None
+
+
 def _strategy_with_latest_complete_data_adjustment(
     strategy: dict[str, Any],
 ) -> dict[str, Any]:
@@ -288,7 +307,11 @@ def _strategy_with_latest_complete_data_adjustment(
         return strategy
     today = _today()
     try:
-        resolved = resolve_date_range(strategy.get("date_range"), today=today)
+        resolved = resolve_executable_date_range(
+            strategy.get("date_range"),
+            extra_parameters=_strategy_extra_parameters(strategy),
+            today=today,
+        )
     except (TypeError, ValueError):
         return strategy
     adjustment = latest_complete_data_adjustment(
@@ -383,7 +406,10 @@ def _date_limit_recovery_patch(
                 ],
             },
         )
-    resolved = resolve_date_range(raw_date_range)
+    resolved = resolve_executable_date_range(
+        raw_date_range,
+        extra_parameters=_strategy_extra_parameters(strategy),
+    )
     asset_class = _strategy_asset_class(strategy)
     timeframe = _strategy_timeframe(strategy)
     if asset_class is None:

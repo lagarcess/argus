@@ -10,7 +10,6 @@ from argus.agent_runtime.result_followups import (
     coerce_result_followup_draft,
     compose_private_alpha_save_response,
     compose_result_followup_response,
-    fallback_result_followup_response,
     render_private_alpha_save_draft,
     render_result_followup_draft,
     result_followup_fact_bank,
@@ -109,6 +108,7 @@ async def test_private_alpha_save_response_uses_llm_fact_contract() -> None:
             },
         },
         user_message="save this",
+        language="es-419",
         invoke_json_schema_func=fake_schema_client,
     )
 
@@ -116,6 +116,7 @@ async def test_private_alpha_save_response_uses_llm_fact_contract() -> None:
     assert "Saved" not in response
     assert calls[0]["task"] == "chat_composer"
     assert calls[0]["schema_model"] is PrivateAlphaSaveDraft
+    assert "Answer in Spanish" in calls[0]["messages"][0]["content"]
     assert "save_surface_status" in calls[0]["messages"][1]["content"]
     assert "retrieval_path" in calls[0]["messages"][1]["content"]
 
@@ -305,6 +306,24 @@ def test_result_followup_prompt_keeps_runtime_words_out_of_market_facts() -> Non
     assert "routing fix" not in json.dumps(payload["fact_bank"])
 
 
+def test_result_followup_prompt_uses_requested_response_language() -> None:
+    messages = result_followup_llm_messages(
+        fact_bank={
+            "symbols": "ETH",
+            "total_return": "+18.1%",
+            "caveat": "Historical simulation evidence, not a prediction.",
+        },
+        focus="general",
+        user_message="explícame esto",
+        required_fact_ids={"symbols", "total_return", "caveat"},
+        language="es-419",
+    )
+
+    system_prompt = messages[0]["content"]
+    assert "Answer in Spanish" in system_prompt
+    assert "plain-English" not in system_prompt
+
+
 def test_result_followup_fact_bank_uses_user_safe_benchmark_comparison() -> None:
     fact_bank = result_followup_fact_bank(
         {
@@ -382,9 +401,11 @@ def test_result_followup_rejects_user_visible_internal_fact_names() -> None:
 
 
 @pytest.mark.asyncio
-async def test_result_followup_falls_back_when_structured_claim_contradicts_positive_delta() -> (
+async def test_result_followup_rejects_when_structured_claim_contradicts_positive_delta() -> (
     None
 ):
+    openrouter.clear_openrouter_route_receipts()
+
     async def fake_schema_client(**kwargs: Any) -> object:
         schema = kwargs["schema_model"]
         return schema(
@@ -424,10 +445,9 @@ async def test_result_followup_falls_back_when_structured_claim_contradicts_posi
         invoke_json_schema_func=fake_schema_client,
     )
 
-    assert response is not None
-    assert response.startswith("AAPL beat SPY")
-    assert "underperformed" not in response.lower()
-    assert "14.5 percentage points" in response
+    assert response is None
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert receipts[-1].failure_mode == "relative_performance_claim_contradiction"
 
 
 @pytest.mark.asyncio
@@ -788,58 +808,6 @@ async def test_context_backed_why_followup_appends_missing_required_run_facts() 
     assert calls[0]["context_packet_ids"] == ["packet-1"]
 
 
-def test_performance_fallback_preserves_context_packet_backdrop() -> None:
-    response = fallback_result_followup_response(
-        metadata={
-            "symbols": ["TSLA"],
-            "benchmark_symbol": "SPY",
-            "metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 130.0,
-                        "benchmark_return_pct": 24.8,
-                        "delta_vs_benchmark_pct": 105.2,
-                    },
-                    "risk": {"max_drawdown_pct": -32.7},
-                }
-            },
-            "config_snapshot": {
-                "template": "buy_and_hold",
-                "date_range": {"start": "2023-01-01", "end": "2023-12-31"},
-            },
-            "context_packets": [
-                {
-                    "id": "packet-1",
-                    "provider": "fred",
-                    "packet_type": "macro",
-                    "facts": [
-                        {
-                            "kind": "macro_observation",
-                            "label": "FEDFUNDS latest observation",
-                            "value": 5.33,
-                        }
-                    ],
-                    "limitations": [
-                        "FRED macro observations are contextual backdrop only."
-                    ],
-                }
-            ],
-        },
-        focus="why_underperformed",
-    )
-
-    assert response is not None
-    assert "TSLA beat SPY" in response
-    assert "Context backdrop:" not in response
-    assert "Context I can use only as backdrop:" not in response
-    assert "One backdrop data point:" not in response
-    assert "Careful backdrop:" in response
-    assert "Fed funds rate latest observation was 5.33" in response
-    assert "Context limits:" not in response
-    assert "simulated trades" in response
-    assert "caus" in response.lower()
-
-
 @pytest.mark.asyncio
 async def test_next_experiment_followup_requires_runnable_next_tests_fact() -> None:
     async def fake_schema_client(**kwargs: Any) -> object:
@@ -963,344 +931,4 @@ async def test_result_followup_rejects_self_reported_unsupported_causality() -> 
         invoke_json_schema_func=fake_schema_client,
     )
 
-    assert response is not None
-    assert "beat SPY" in response
-    assert "causal proof" not in response.lower()
-    assert "likely helped" not in response.lower()
-
-
-def test_result_followup_fallback_uses_neutral_result_language() -> None:
-    response = fallback_result_followup_response(
-        metadata={
-            "symbols": ["AAPL"],
-            "benchmark_symbol": "SPY",
-            "metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 39.7,
-                        "benchmark_return_pct": 27.3,
-                        "delta_vs_benchmark_pct": 12.4,
-                    }
-                }
-            },
-            "config_snapshot": {
-                "template": "buy_and_hold",
-                "date_range": {"start": "2025-05-14", "end": "2026-05-14"},
-            },
-        },
-        focus="why_underperformed",
-    )
-
-    assert response is not None
-    assert response.startswith("AAPL beat SPY")
-    assert "It did not underperform" not in response
-
-
-def test_what_tested_fallback_includes_performance_context_when_focus_drifts() -> None:
-    response = fallback_result_followup_response(
-        metadata={
-            "symbols": ["NVDA"],
-            "benchmark_symbol": "SPY",
-            "metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 23.6,
-                        "benchmark_return_pct": 11.4,
-                        "delta_vs_benchmark_pct": 12.2,
-                    }
-                }
-            },
-            "config_snapshot": {
-                "template": "buy_and_hold",
-                "symbols": ["NVDA"],
-                "date_range": {
-                    "start": "2025-11-14",
-                    "end": "2026-05-14",
-                },
-            },
-        },
-        focus="what_tested",
-    )
-
-    assert response is not None
-    assert "I tested NVDA" in response
-    assert "The strategy returned +23.6%" in response
-    assert "SPY returned +11.4%" in response
-    assert "Benchmark comparison: Beat by 12.2 percentage points" in response
-
-
-def test_general_result_followup_fallback_is_fact_complete_when_focus_is_uncertain() -> (
-    None
-):
-    response = fallback_result_followup_response(
-        metadata={
-            "symbols": ["NVDA"],
-            "benchmark_symbol": "SPY",
-            "metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 21.9,
-                        "benchmark_return_pct": 11.4,
-                        "delta_vs_benchmark_pct": 10.4,
-                    },
-                    "risk": {"max_drawdown_pct": -15.7},
-                }
-            },
-            "config_snapshot": {
-                "template": "buy_and_hold",
-                "date_range": {
-                    "start": "2025-11-15",
-                    "end": "2026-05-15",
-                },
-            },
-        },
-        focus="general",
-    )
-
-    assert response is not None
-    assert "NVDA" in response
-    assert "buy and hold" in response
-    assert "2025-11-15 to 2026-05-15" in response
-    assert "+21.9%" in response
-    assert "SPY returned +11.4%" in response
-    assert "Benchmark comparison: Beat by 10.4 percentage points" in response
-    assert "max drawdown was -15.7%" in response.lower()
-    assert "next step" in response.lower()
-
-
-def test_result_followup_fallback_avoids_internal_next_test_label() -> None:
-    response = fallback_result_followup_response(
-        metadata={
-            "symbols": ["TSLA"],
-            "benchmark_symbol": "SPY",
-            "metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": -32.6,
-                        "benchmark_return_pct": 53.6,
-                        "delta_vs_benchmark_pct": -86.2,
-                    }
-                }
-            },
-            "config_snapshot": {"template": "signal_strategy"},
-        },
-        focus="next_experiment",
-    )
-
-    assert response is not None
-    assert "A good next move" in response
-    assert "- Adjust the signal periods or crossover direction." in response
-    assert "- Compare TSLA with buy-and-hold." in response
-    assert "Runnable next tests" not in response
-    assert "{" not in response
-
-
-def test_result_followup_fallback_does_not_duplicate_strategy_word() -> None:
-    response = fallback_result_followup_response(
-        metadata={
-            "symbols": ["TSLA"],
-            "benchmark_symbol": "SPY",
-            "metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": -32.6,
-                        "benchmark_return_pct": 53.6,
-                        "delta_vs_benchmark_pct": -86.2,
-                    }
-                }
-            },
-            "config_snapshot": {"template": "signal_strategy"},
-        },
-        focus="why_underperformed",
-    )
-
-    assert response is not None
-    assert "signal strategy strategy" not in response
-    assert "signal strategy on TSLA" in response
-
-
-def test_result_followup_fallback_does_not_expose_context_packet_plumbing() -> None:
-    response = fallback_result_followup_response(
-        metadata={
-            "symbols": ["TSLA"],
-            "benchmark_symbol": "SPY",
-            "metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 27.5,
-                        "benchmark_return_pct": 23.8,
-                        "delta_vs_benchmark_pct": 3.8,
-                    },
-                    "risk": {"max_drawdown_pct": -17.7},
-                }
-            },
-            "config_snapshot": {
-                "template": "indicator_threshold",
-                "date_range": {"start": "2025-05-20", "end": "2026-05-20"},
-            },
-            "context_packets": [
-                {
-                    "id": "packet-1",
-                    "provider": "fred",
-                    "packet_type": "macro",
-                    "facts": [
-                        {
-                            "kind": "macro_observation",
-                            "label": "DGS10 latest observation",
-                            "value": 4.61,
-                        },
-                        {
-                            "kind": "macro_observation_change",
-                            "label": "DGS10 change from previous observation",
-                            "value": 0.02,
-                        },
-                    ],
-                    "limitations": [
-                        "FRED macro observations are contextual backdrop only."
-                    ],
-                }
-            ],
-        },
-        focus="general",
-    )
-
-    assert response is not None
-    assert "10-year Treasury yield latest observation was 4.61" in response
-    assert "caus" in response.lower()
-    assert "fred" not in response.lower()
-    assert "context_packet" not in response
-
-
-def test_performance_fallback_keeps_context_backdrop_short() -> None:
-    response = fallback_result_followup_response(
-        metadata={
-            "symbols": ["TSLA"],
-            "benchmark_symbol": "SPY",
-            "metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": -32.6,
-                        "benchmark_return_pct": 54.9,
-                        "delta_vs_benchmark_pct": -87.5,
-                    },
-                    "risk": {"max_drawdown_pct": -56.0},
-                }
-            },
-            "config_snapshot": {"template": "signal_strategy"},
-            "context_packets": [
-                {
-                    "id": "packet-1",
-                    "provider": "alpaca",
-                    "packet_type": "news",
-                    "facts": [
-                        {
-                            "kind": "news_headline",
-                            "label": "First headline",
-                        },
-                        {
-                            "kind": "news_headline",
-                            "label": "Second headline",
-                        },
-                        {
-                            "kind": "news_headline",
-                            "label": "Third headline",
-                        },
-                    ],
-                    "limitations": [
-                        "Context is backdrop only; it cannot change the simulated trades, metrics, or benchmark, and it should not be treated as causal proof."
-                    ],
-                }
-            ],
-        },
-        focus="why_underperformed",
-    )
-
-    assert response is not None
-    assert "TSLA lagged SPY" in response
-    assert "Context I can use only as backdrop:" not in response
-    assert "One backdrop data point:" not in response
-    assert "Careful backdrop:" in response
-    assert "First headline" in response
-    assert "Second headline" not in response
-    assert "simulated trades" in response
-
-
-def test_performance_fallback_for_same_asset_buy_hold_reads_like_argus() -> None:
-    response = fallback_result_followup_response(
-        metadata={
-            "symbols": ["BTC"],
-            "benchmark_symbol": "BTC",
-            "metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 75.5,
-                        "benchmark_return_pct": 75.5,
-                        "delta_vs_benchmark_pct": 0.0,
-                    },
-                    "risk": {"max_drawdown_pct": -49.7},
-                }
-            },
-            "config_snapshot": {
-                "template": "buy_and_hold",
-                "date_range": {"start": "2024-01-01", "end": "2026-05-20"},
-            },
-            "context_packets": [
-                {
-                    "id": "packet-1",
-                    "provider": "fred",
-                    "packet_type": "macro",
-                    "facts": [
-                        {
-                            "kind": "macro_observation",
-                            "label": "UNRATE latest observation",
-                            "value": 4.3,
-                        }
-                    ],
-                    "limitations": [
-                        "FRED macro observations are contextual backdrop only."
-                    ],
-                }
-            ],
-        },
-        focus="why_underperformed",
-    )
-
-    assert response is not None
-    assert "Here is the performance context" not in response
-    assert "One backdrop data point" not in response
-    assert "BTC matched BTC in this run" in response
-    assert "benchmark was also BTC" in response
-    assert "not a separate strategy edge" in response
-    assert "Careful backdrop:" in response
-    assert "unemployment rate latest observation was 4.3" in response
-    assert "prove causality" in response
-
-
-def test_performance_fallback_keeps_core_risk_fact_when_focus_drifts() -> None:
-    response = fallback_result_followup_response(
-        metadata={
-            "symbols": ["NVDA"],
-            "benchmark_symbol": "SPY",
-            "metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 21.9,
-                        "benchmark_return_pct": 11.4,
-                        "delta_vs_benchmark_pct": 10.4,
-                    },
-                    "risk": {"max_drawdown_pct": -15.7},
-                }
-            },
-            "config_snapshot": {
-                "template": "buy_and_hold",
-                "date_range": {
-                    "start": "2025-11-15",
-                    "end": "2026-05-15",
-                },
-            },
-        },
-        focus="why_underperformed",
-    )
-
-    assert response is not None
-    assert "max drawdown was -15.7%" in response.lower()
+    assert response is None

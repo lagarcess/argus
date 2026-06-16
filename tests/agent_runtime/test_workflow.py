@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 import pytest
@@ -17,6 +18,7 @@ from argus.agent_runtime.runtime import (
 )
 from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
+    InterpretDecision,
     StageResult,
     StructuredInterpretation,
 )
@@ -24,7 +26,9 @@ from argus.agent_runtime.stages.next_step import next_step_stage
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     FinalResponsePayload,
+    ResolutionProvenance,
     ResponseIntent,
+    ResponseProfile,
     RunState,
     SimplificationOption,
     StrategySummary,
@@ -32,6 +36,7 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
 )
+from argus.nlp.natural_time import resolve_date_range_intent
 from langgraph.checkpoint.memory import MemorySaver
 
 
@@ -39,6 +44,16 @@ class ResolvedAssetStub:
     def __init__(self, canonical_symbol: str, asset_class: str) -> None:
         self.canonical_symbol = canonical_symbol
         self.asset_class = asset_class
+
+
+class RecordingClarifier:
+    def __init__(self, response: str) -> None:
+        self.response = response
+        self.requests: list[Any] = []
+
+    def __call__(self, request: Any) -> str:
+        self.requests.append(request)
+        return self.response
 
 
 def test_task_snapshot_clears_failed_action_after_new_confirmation() -> None:
@@ -63,6 +78,144 @@ def test_task_snapshot_clears_failed_action_after_new_confirmation() -> None:
     )
 
     assert snapshot.latest_failed_action_reference is None
+
+
+def test_task_snapshot_normalizes_prior_dict_resolution_provenance() -> None:
+    prior = TaskSnapshot(
+        resolution_provenance=[
+            {
+                "field": "asset_universe[0]",
+                "raw_text": "Tesla",
+                "source": "llm_extraction",
+                "candidate_kind": "asset",
+                "resolution_status": "resolved",
+                "canonical_symbol": "TSLA",
+                "asset_class": "equity",
+                "validated_by": "provider_catalog",
+                "confidence": "high",
+            },
+            ResolutionProvenance(
+                field="asset_universe[0]",
+                raw_text="Tesla",
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol="TSLA",
+                asset_class="equity",
+                validated_by="provider_catalog",
+                confidence="high",
+            ),
+        ]
+    )
+
+    snapshot = _build_task_snapshot(
+        run_state=RunState(current_user_message="si, ejecutalo"),
+        stage_outcome=WorkflowStageOutcome.AWAIT_USER_REPLY,
+        prior_task_snapshot=prior,
+        artifact_references=[],
+    )
+
+    assert snapshot.resolution_provenance == [
+        ResolutionProvenance(
+            field="asset_universe[0]",
+            raw_text="Tesla",
+            source="llm_extraction",
+            candidate_kind="asset",
+            resolution_status="resolved",
+            canonical_symbol="TSLA",
+            asset_class="equity",
+            validated_by="provider_catalog",
+            confidence="high",
+        )
+    ]
+
+
+def test_public_result_normalizes_dict_resolution_provenance() -> None:
+    run_state = RunState(current_user_message="si, ejecutalo")
+    run_state.resolution_provenance = [
+        {
+            "field": "asset_universe[0]",
+            "raw_text": "Tesla",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "TSLA",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "high",
+        },
+        ResolutionProvenance(
+            field="asset_universe[0]",
+            raw_text="Tesla",
+            source="llm_extraction",
+            candidate_kind="asset",
+            resolution_status="resolved",
+            canonical_symbol="TSLA",
+            asset_class="equity",
+            validated_by="provider_catalog",
+            confidence="high",
+        ),
+    ]
+
+    public = _public_result({"run_state": run_state})
+
+    assert public["resolution_provenance"] == [
+        {
+            "field": "asset_universe[0]",
+            "raw_text": "Tesla",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "TSLA",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "high",
+        }
+    ]
+
+
+def test_interpret_decision_patch_normalizes_dict_resolution_provenance() -> None:
+    decision = InterpretDecision(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="El usuario aprobo la confirmacion visible.",
+        confidence=0.9,
+        effective_response_profile=ResponseProfile(
+            effective_tone="friendly",
+            effective_verbosity="medium",
+            effective_expertise_mode="beginner",
+        ),
+    )
+    decision.resolution_provenance = [
+        {
+            "field": "asset_universe[0]",
+            "raw_text": "Tesla",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "TSLA",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "high",
+        }
+    ]
+
+    patch = decision.to_patch()
+
+    assert patch["resolution_provenance"] == [
+        {
+            "field": "asset_universe[0]",
+            "raw_text": "Tesla",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "TSLA",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "high",
+        }
+    ]
 
 
 class RsiConfirmationInterpreter:
@@ -168,6 +321,81 @@ class AssetAnswerThenApprovalInterpreter:
         )
 
 
+class SpanishDateAnswerInterpreter:
+    def __init__(self) -> None:
+        self.requests: list[InterpretationRequest] = []
+
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        self.requests.append(request)
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="El usuario dio una nueva ventana de fechas.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                date_range={"start": "2025-12-14", "end": "2026-06-12"},
+                extra_parameters={
+                    "date_range_intent": {
+                        "kind": "rolling_window",
+                        "count": 6,
+                        "unit": "month",
+                        "anchor": "today",
+                        "evidence": "ultimos 6 meses",
+                    },
+                    "evidence_spans": {
+                        "date_range_intent": "ultimos 6 meses",
+                    },
+                },
+                refinement_of="visible confirmation",
+            ),
+            confidence=0.94,
+            semantic_turn_act="answer_pending_need",
+        )
+
+
+class SpanishAssumptionAnswerInterpreter:
+    def __init__(self) -> None:
+        self.requests: list[InterpretationRequest] = []
+
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        self.requests.append(request)
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="El usuario ajustó el capital inicial.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                capital_amount=250000,
+                refinement_of="visible confirmation",
+            ),
+            confidence=0.94,
+            semantic_turn_act="answer_pending_need",
+        )
+
+
+class SpanishAssetAnswerInterpreter:
+    def __init__(self) -> None:
+        self.requests: list[InterpretationRequest] = []
+
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        self.requests.append(request)
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="El usuario dio un activo de reemplazo.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                asset_universe=["GOOGL"],
+                refinement_of="visible confirmation",
+            ),
+            confidence=0.94,
+            semantic_turn_act="answer_pending_need",
+        )
+
+
 class ConversationalInterpreter:
     async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
         return StructuredInterpretation(
@@ -225,6 +453,15 @@ class ShortWindowCrossoverInterpreter:
                 asset_universe=["SPY"],
                 asset_class="equity",
                 date_range="past month",
+                extra_parameters={
+                    "date_range_intent": {
+                        "kind": "rolling_window",
+                        "count": 1,
+                        "unit": "month",
+                        "anchor": "today",
+                        "evidence": "last month",
+                    }
+                },
                 entry_logic="20-day SMA crosses above 50-day SMA",
                 exit_logic="20-day SMA crosses below 50-day SMA",
                 entry_rule={
@@ -335,7 +572,7 @@ class IndicatorDateRepairInterpreter:
         )
 
 
-def test_runtime_preserves_explicit_stage_prompt_over_composed_intent() -> None:
+def test_runtime_preserves_explicit_stage_prompt_over_recovery_fallback() -> None:
     run_state = RunState.new(
         current_user_message="use a 20-day SMA crossing above the 50-day SMA",
         recent_thread_history=[],
@@ -383,13 +620,26 @@ def test_next_step_preserves_completed_result_answer() -> None:
     assert updated["stage_outcome"] == WorkflowStageOutcome.END_RUN
     assert updated["assistant_response"] == "Grounded result readout."
     assert updated["next_actions"] == [
+        "show_breakdown",
         "refine_strategy",
-        "compare_benchmark",
         "save_strategy",
     ]
+    assert "compare_benchmark" not in updated["next_actions"]
 
 
-def test_runtime_recovers_offline_clarifier_with_composed_intent() -> None:
+def test_next_step_without_completed_result_does_not_emit_legacy_actions() -> None:
+    run_state = RunState.new(
+        current_user_message="",
+        recent_thread_history=[],
+    )
+
+    result = next_step_stage(state=run_state)
+
+    assert result.outcome == "end_run"
+    assert result.patch["next_actions"] == []
+
+
+def test_runtime_preserves_offline_clarifier_as_recovery() -> None:
     run_state = RunState.new(
         current_user_message="Test buying SPY when it starts rising.",
         recent_thread_history=[],
@@ -410,15 +660,43 @@ def test_runtime_recovers_offline_clarifier_with_composed_intent() -> None:
         {
             "run_state": run_state,
             "assistant_prompt": (
-                "I could not generate the clarifying question right now. "
-                "Please try again."
+                "I could not phrase the follow-up clearly just now. Your draft "
+                "is still here; tell me the detail you want to change, or try "
+                "again in a moment."
             ),
         }
     )
 
-    assert "try again" not in result["assistant_prompt"].lower()
-    assert "date window" in result["assistant_prompt"]
-    assert "specific testable rule" in result["assistant_prompt"]
+    assert result["assistant_prompt"].startswith(
+        "I could not phrase the follow-up clearly"
+    )
+    assert "I can test" not in result["assistant_prompt"]
+    assert "Which date window" not in result["assistant_prompt"]
+    assert result["assistant_response"] == result["assistant_prompt"]
+
+
+def test_runtime_does_not_synthesize_slot_copy_for_general_clarification() -> None:
+    run_state = RunState.new(
+        current_user_message="Cambiar fechas",
+        recent_thread_history=[],
+    )
+    run_state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["period"],
+        requested_fields=["date_range"],
+        facts={
+            "language": "es-419",
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": ["AAPL"],
+            },
+        },
+    )
+
+    result = _compose_runtime_response({"run_state": run_state})
+
+    assert "assistant_prompt" not in result
+    assert "assistant_response" not in result
 
 
 def test_runtime_preserves_successful_llm_rule_clarification() -> None:
@@ -668,8 +946,12 @@ async def test_workflow_preserves_confirmation_validation_prompt(monkeypatch) ->
 
     monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
 
+    clarifier = RecordingClarifier(
+        "Use a longer date range, or choose a shorter indicator period."
+    )
     workflow = build_workflow(
         structured_interpreter=ShortWindowCrossoverInterpreter(),
+        clarification_generator=clarifier,
         checkpointer=MemorySaver(),
     )
 
@@ -681,9 +963,21 @@ async def test_workflow_preserves_confirmation_validation_prompt(monkeypatch) ->
     )
 
     assert result["stage_outcome"] == "await_user_reply"
-    assert "enough bars" in result["assistant_prompt"]
-    assert "longer date range" in result["assistant_prompt"]
+    assert result["assistant_prompt"] == (
+        "Use a longer date range, or choose a shorter indicator period."
+    )
     assert result["pending_strategy"]["requested_field"] == "date_range"
+    response_intent = result["pending_strategy"]["response_intent"]
+    assert response_intent["kind"] == "unsupported_recovery"
+    assert clarifier.requests
+    assert clarifier.requests[0].response_intent["facts"][
+        "unsupported_constraints"
+    ][0]["category"] == "data_window_too_short_for_rule"
+    assert clarifier.requests[0].response_intent["options"] == [
+        {"label": "Use a longer date range"},
+        {"label": "Use a shorter indicator period"},
+        {"label": "Choose a simpler supported rule"},
+    ]
     assert "confirmation_payload" not in result
 
 
@@ -776,6 +1070,42 @@ async def test_workflow_confirms_runnable_draft_instead_of_optional_settings_pro
         == 1000.0
     )
     assert "optional_parameter_choices" not in result
+
+
+@pytest.mark.asyncio
+async def test_workflow_confirmation_assumption_action_stays_in_clarification() -> None:
+    workflow = build_workflow(
+        structured_interpreter=None,
+        checkpointer=MemorySaver(),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1", language_preference="es-419"),
+        thread_id="thread-confirmation-assumption-action",
+        message="adjust assumptions",
+        action_context={
+            "type": "adjust_assumptions",
+            "label": "Adjust assumptions",
+            "presentation": "confirmation",
+            "payload": {"confirmation_id": "confirmation-1"},
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert result["stage_outcome"] == "await_user_reply"
+    assert result["assistant_response"] == "¿Qué supuesto quieres ajustar para AAPL?"
+    assert "I can test" not in result["assistant_response"]
+    assert "confirmation_payload" not in result
 
 
 @pytest.mark.asyncio
@@ -990,9 +1320,257 @@ async def test_workflow_typed_approval_after_card_edit_defers_to_card_action(
     )
 
     assert approval_result["stage_outcome"] == "ready_to_respond"
-    assert "visible card" in approval_result["assistant_response"]
+    assert "visible confirmation" in approval_result["assistant_response"]
     assert "simulation" in approval_result["assistant_response"]
     assert "confirmation_payload" not in approval_result
+
+
+@pytest.mark.asyncio
+async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        resolution_module,
+        "resolve_market_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_date_range_intent",
+        lambda value: resolve_date_range_intent(value, today=date(2026, 6, 15)),
+    )
+
+    interpreter = SpanishDateAnswerInterpreter()
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", language_preference="es-419")
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Comprar y mantener AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+    thread_id = "thread-spanish-change-dates-answer"
+
+    prompt_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="Cambiar fechas",
+        action_context={
+            "type": "change_dates",
+            "label": "Cambiar fechas",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert interpreter.requests == []
+    assert prompt_result["stage_outcome"] == "await_user_reply"
+    assert prompt_result["pending_strategy"]["requested_field"] == "date_range"
+    assert prompt_result["pending_strategy"]["missing_required_fields"] == [
+        "date_range"
+    ]
+
+    answer_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="ultimos 6 meses",
+    )
+
+    assert len(interpreter.requests) == 1
+    assert interpreter.requests[0].user.language_preference == "es-419"
+    assert interpreter.requests[0].latest_task_snapshot is not None
+    assert (
+        interpreter.requests[0].latest_task_snapshot.pending_strategy_summary
+        is not None
+    )
+    assert interpreter.requests[0].selected_thread_metadata["requested_field"] == (
+        "date_range"
+    )
+    assert answer_result["stage_outcome"] == "await_approval"
+    strategy = answer_result["confirmation_payload"]["strategy"]
+    assert strategy["asset_universe"] == ["AAPL"]
+    assert strategy["capital_amount"] == 100000
+    assert strategy["comparison_baseline"] == "SPY"
+    expected_range = resolve_date_range_intent(
+        {
+            "kind": "rolling_window",
+            "count": 6,
+            "unit": "month",
+            "anchor": "today",
+        },
+        today=date(2026, 6, 15),
+    )
+    assert expected_range is not None
+    assert strategy["date_range"] == expected_range.payload
+    assert answer_result["pending_strategy"]["requested_field"] is None
+    assert answer_result["pending_strategy"]["missing_required_fields"] == []
+
+
+@pytest.mark.asyncio
+async def test_workflow_spanish_adjust_assumptions_answer_reenters_interpreter() -> None:
+    interpreter = SpanishAssumptionAnswerInterpreter()
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", language_preference="es-419")
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Comprar y mantener AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        comparison_baseline="SPY",
+    )
+    thread_id = "thread-spanish-adjust-assumptions-answer"
+
+    prompt_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="Ajustar supuestos",
+        action_context={
+            "type": "adjust_assumptions",
+            "label": "Ajustar supuestos",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert interpreter.requests == []
+    assert prompt_result["stage_outcome"] == "await_user_reply"
+    assert prompt_result["pending_strategy"]["requested_field"] == "assumption"
+    assert prompt_result["pending_strategy"]["missing_required_fields"] == [
+        "assumption"
+    ]
+
+    answer_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="ponle como doscientos cincuenta mil",
+    )
+
+    assert len(interpreter.requests) == 1
+    request = interpreter.requests[0]
+    assert request.user.language_preference == "es-419"
+    assert request.latest_task_snapshot is not None
+    assert request.latest_task_snapshot.pending_strategy_summary is not None
+    assert request.selected_thread_metadata["requested_field"] == "assumption"
+    assert answer_result["stage_outcome"] == "await_approval"
+    strategy = answer_result["confirmation_payload"]["strategy"]
+    assert strategy["asset_universe"] == ["AAPL"]
+    assert strategy["date_range"] == {"start": "2025-06-14", "end": "2026-06-12"}
+    assert strategy["comparison_baseline"] == "SPY"
+    assert strategy.get("capital_amount") is None
+    assert (
+        answer_result["confirmation_payload"]["optional_parameters"][
+            "initial_capital"
+        ]["value"]
+        == 250000
+    )
+    assert answer_result["pending_strategy"]["requested_field"] is None
+    assert answer_result["pending_strategy"]["missing_required_fields"] == []
+
+
+@pytest.mark.asyncio
+async def test_workflow_spanish_change_asset_answer_reenters_interpreter(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().casefold()
+        if normalized in {"google", "googl"}:
+            return ResolvedAssetStub("GOOGL", "equity")
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+
+    interpreter = SpanishAssetAnswerInterpreter()
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", language_preference="es-419")
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Comprar y mantener AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+    thread_id = "thread-spanish-change-asset-answer"
+
+    prompt_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="Cambiar activo",
+        action_context={
+            "type": "change_asset",
+            "label": "Cambiar activo",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert interpreter.requests == []
+    assert prompt_result["stage_outcome"] == "await_user_reply"
+    assert prompt_result["pending_strategy"]["requested_field"] == "asset_universe"
+    assert prompt_result["pending_strategy"]["missing_required_fields"] == [
+        "asset_universe"
+    ]
+
+    answer_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="ponlo con google mejor",
+    )
+
+    assert len(interpreter.requests) == 1
+    request = interpreter.requests[0]
+    assert request.user.language_preference == "es-419"
+    assert request.latest_task_snapshot is not None
+    assert request.latest_task_snapshot.pending_strategy_summary is not None
+    assert request.selected_thread_metadata["requested_field"] == "asset_universe"
+    assert answer_result["stage_outcome"] == "await_approval"
+    strategy = answer_result["confirmation_payload"]["strategy"]
+    assert strategy["strategy_type"] == "buy_and_hold"
+    assert strategy["asset_universe"] == ["GOOGL"]
+    assert strategy["asset_class"] == "equity"
+    assert strategy["date_range"] == {"start": "2025-06-14", "end": "2026-06-12"}
+    assert strategy["capital_amount"] == 100000
+    assert strategy["comparison_baseline"] == "SPY"
+    assert "assistant_response" not in answer_result
+    assert answer_result["pending_strategy"]["requested_field"] is None
+    assert answer_result["pending_strategy"]["missing_required_fields"] == []
 
 
 @pytest.mark.asyncio
@@ -1115,6 +1693,6 @@ async def test_workflow_uses_checkpointer_for_thread_state(monkeypatch) -> None:
     assert snapshot.pending_strategy_summary is not None
     assert snapshot.pending_strategy_summary.asset_universe == ["BTC"]
     assert second["stage_outcome"] == "ready_to_respond"
-    assert "visible card" in second["assistant_response"]
+    assert "visible confirmation" in second["assistant_response"]
     assert "simulation" in second["assistant_response"]
     assert "run" not in second

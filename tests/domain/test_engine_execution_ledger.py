@@ -56,6 +56,28 @@ def test_chart_markers_use_executed_fills_not_raw_signals() -> None:
     assert markers[0]["label"] == "Buy AAPL"
 
 
+def test_chart_markers_preserve_same_bar_fill_order_after_reentry() -> None:
+    index = pd.date_range("2024-01-01", periods=3, freq="D")
+    entries = pd.Series([True, True, False], index=index)
+    exits = pd.Series([False, True, False], index=index)
+    ledger = _build_long_only_execution_ledger(
+        symbol="AAPL",
+        entries=entries,
+        exits=exits,
+        allow_accumulation=False,
+    )
+    events: dict[str, dict[str, set[str]]] = {}
+
+    _collect_execution_fill_events(events, symbol="AAPL", execution_events=ledger)
+    markers = _chart_markers_from_events(events)
+
+    assert [(marker["time"], marker["type"]) for marker in markers] == [
+        ("2024-01-01", "entry"),
+        ("2024-01-02", "exit"),
+        ("2024-01-02", "entry"),
+    ]
+
+
 def test_long_only_ledger_blocks_duplicate_full_position_buys() -> None:
     index = pd.date_range("2024-01-01", periods=4, freq="D")
     entries = pd.Series([True, True, True, False], index=index)
@@ -129,6 +151,39 @@ def test_result_chart_markers_are_executed_fills(
     assert chart["markers"][0]["time"] == "2024-01-02"
 
 
+def test_result_chart_includes_strategy_portfolio_value_range(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    index = pd.date_range("2024-01-01", periods=3, freq="D")
+    bars = pd.DataFrame({"close": [100.0, 200.0, 50.0]}, index=index)
+    entries = pd.Series([True, False, False], index=index)
+    exits = pd.Series([False, False, False], index=index)
+
+    monkeypatch.setattr(engine, "fetch_ohlcv", lambda **_: bars)
+    monkeypatch.setattr(engine, "_build_signals", lambda *_: (entries, exits))
+
+    chart = engine.build_result_chart(
+        {
+            "template": "rsi_mean_reversion",
+            "symbols": ["AAPL"],
+            "asset_class": "equity",
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-03",
+            "timeframe": "1D",
+            "starting_capital": 10000.0,
+            "parameters": {},
+            "benchmark": "SPY",
+        }
+    )
+
+    assert chart["value_summary"] == {
+        "peak_value": 20000.0,
+        "lowest_value": 5000.0,
+        "currency": "USD",
+        "source": "strategy_portfolio_equity_close",
+    }
+
+
 def test_metrics_trade_count_uses_executed_fills(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -161,3 +216,9 @@ def test_metrics_trade_count_uses_executed_fills(
 
     assert metrics["by_symbol"]["AAPL"]["efficiency"]["total_trades"] == 2
     assert metrics["aggregate"]["efficiency"]["total_trades"] == 2
+    assert metrics["aggregate"]["performance"]["portfolio_value_range"] == {
+        "peak_value": 11000.0,
+        "lowest_value": 9500.0,
+        "currency": "USD",
+        "source": "strategy_portfolio_equity_close",
+    }

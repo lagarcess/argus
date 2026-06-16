@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  RESULT_CHART_ATTRIBUTION_FOOTER_CLASS,
+  RESULT_CHART_ATTRIBUTION_URL,
   buildVisibleSeriesMarkers,
+  chartTimeLookupKey,
   formatChartCurrency,
   formatChartDateLabel,
-  chartTimeLookupKey,
   markerBudgetForViewport,
+  resultChartAttributionLabel,
   selectVisibleTradeMarkers,
 } from "../components/chat/ResultEquityChart";
 import type { ResultChartMarker } from "../components/chat/types";
@@ -137,7 +140,29 @@ describe("ResultEquityChart locale formatting", () => {
     );
     expect(formattedCurrency).not.toMatch(/[.,]\d{2}\b/);
   });
+});
 
+describe("ResultEquityChart attribution", () => {
+  test("uses backend attribution text with a TradingView fallback", () => {
+    expect(resultChartAttributionLabel(" TradingView Lightweight Charts ")).toBe(
+      "TradingView Lightweight Charts",
+    );
+    expect(resultChartAttributionLabel("")).toBe("TradingView Lightweight Charts");
+    expect(resultChartAttributionLabel(undefined)).toBe(
+      "TradingView Lightweight Charts",
+    );
+    expect(RESULT_CHART_ATTRIBUTION_URL).toBe("https://www.tradingview.com/");
+  });
+
+  test("keeps attribution in a visible footer instead of overlaying chart content", () => {
+    expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).toContain("border-t");
+    expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).not.toContain("absolute");
+    expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).not.toContain("hidden");
+    expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).not.toContain("sr-only");
+  });
+});
+
+describe("ResultEquityChart intraday timestamps", () => {
   test("preserves intraday chart timestamps as UTC timestamp values", () => {
     const intradayMarker: ResultChartMarker = {
       time: "2026-01-15T14:30:00",

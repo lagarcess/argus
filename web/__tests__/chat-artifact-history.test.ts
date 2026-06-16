@@ -2,8 +2,12 @@ import { describe, expect, test } from "bun:test";
 
 import {
   applyConfirmationActionEffects,
+  applyConsumedResultActions,
+  consumeResultActionOnMessages,
   confirmationActionEffectsFromApi,
+  consumedResultActionsFromApi,
   normalizeConfirmationHistory,
+  settleConfirmationAfterActionTransportError,
   settleOpenConfirmationsAfterStreamError,
   settleOpenConfirmationsAfterTextFinal,
 } from "../components/chat/artifact-history";
@@ -56,6 +60,67 @@ function confirmationMessage(): Message {
         payload: { confirmation_id: "confirm-aapl" },
       },
     ],
+  };
+}
+
+function resultMessage(runId: string): Message {
+  return {
+    id: `assistant-result-${runId}`,
+    role: "ai",
+    kind: "strategy_result",
+    result: {
+      strategyName: "AAPL buy and hold",
+      period: "past year",
+      runId,
+      metrics: [],
+      actions: [
+        {
+          type: "show_breakdown",
+          label: "Explain result",
+          presentation: "result",
+          payload: { run_id: runId, conversation_id: "conversation-1" },
+        },
+      ],
+    },
+    actions: [
+      {
+        type: "show_breakdown",
+        label: "Explain result",
+        presentation: "result",
+        payload: { run_id: runId, conversation_id: "conversation-1" },
+      },
+    ],
+  };
+}
+
+function resultMessageWithResultActions(runId: string): Message {
+  const actions = [
+    {
+      type: "show_breakdown",
+      label: "Explain result",
+      presentation: "result",
+      payload: { run_id: runId, conversation_id: "conversation-1" },
+    },
+    {
+      type: "refine_strategy",
+      label: "Refine idea",
+      presentation: "result",
+      payload: { run_id: runId, conversation_id: "conversation-1" },
+    },
+  ] satisfies Message["actions"];
+
+  return {
+    id: `assistant-result-actions-${runId}`,
+    role: "ai",
+    kind: "strategy_result",
+    result: {
+      strategyName: "AAPL buy and hold",
+      period: "past year",
+      runId,
+      metrics: [],
+      actions,
+    },
+    actions,
   };
 }
 
@@ -137,6 +202,47 @@ describe("chat artifact history", () => {
     expect(settled.confirmation?.statusLabel).toBe("Could not run");
     expect(settled.confirmation?.actions).toEqual([]);
     expect(settled.actions).toEqual([]);
+  });
+
+  test("action transport errors settle only the action-owned confirmation", () => {
+    const previousCard: Message = {
+      ...confirmationMessage(),
+      id: "previous-confirmation",
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_id: "confirm-previous-aapl",
+        confirmation_state: "superseded",
+        status: "updated",
+        statusLabel: "Updated",
+        actions: [],
+      },
+      actions: [],
+    };
+    const [running] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "run_backtest",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Running",
+      },
+    ]);
+
+    const messages = settleConfirmationAfterActionTransportError(
+      [previousCard, running],
+      {
+        type: "run_backtest",
+        label: "Run backtest",
+        presentation: "confirmation",
+        payload: { confirmation_id: "confirm-aapl" },
+      },
+    );
+
+    expect(messages[0].confirmation?.confirmation_state).toBe("superseded");
+    expect(messages[0].confirmation?.statusLabel).toBe("Updated");
+    expect(messages[1].confirmation?.confirmation_state).toBe("superseded");
+    expect(messages[1].confirmation?.status).toBe("could_not_run");
+    expect(messages[1].confirmation?.statusLabel).toBe("Could not run");
+    expect(messages[1].confirmation?.actions).toEqual([]);
+    expect(messages[1].actions).toEqual([]);
   });
 
   test("cancel action tombstones hide action transcript noise on reload", () => {
@@ -442,5 +548,126 @@ describe("chat artifact history", () => {
 
     expect(message.confirmation?.confirmation_state).toBe("cancelled");
     expect(message.confirmation?.statusLabel).toBe("Draft canceled");
+  });
+
+  test("breakdown action metadata without canonical run id does not consume result actions", () => {
+    const items: ApiMessage[] = [
+      {
+        id: "assistant-breakdown",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "I could not find the completed backtest to explain.",
+        created_at: "2026-05-15T00:00:01Z",
+        metadata: {
+          chat_action: {
+            type: "show_breakdown",
+            label: "Explain result",
+            presentation: "result",
+            payload: {},
+          },
+          result_breakdown_source: "missing_result",
+        },
+      },
+    ];
+
+    const consumedActions = consumedResultActionsFromApi(items);
+    const messages = applyConsumedResultActions(
+      [resultMessage("run-a"), resultMessage("run-b")],
+      consumedActions,
+    );
+
+    expect(consumedActions).toEqual([]);
+    expect(messages[0].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+    ]);
+    expect(messages[1].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+    ]);
+  });
+
+  test("optimistic breakdown action without canonical run id does not consume result actions", () => {
+    const messages = consumeResultActionOnMessages(
+      [resultMessage("run-a"), resultMessage("run-b")],
+      {
+        type: "show_breakdown",
+        label: "Explain result",
+        presentation: "result",
+        payload: {},
+      },
+    );
+
+    expect(messages[0].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+    ]);
+    expect(messages[1].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+    ]);
+  });
+
+  test("refine action metadata consumes only the source result refine action", () => {
+    const items: ApiMessage[] = [
+      {
+        id: "assistant-refine",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "What would you like to change next for AAPL?",
+        created_at: "2026-05-15T00:00:01Z",
+        metadata: {
+          chat_action: {
+            type: "refine_strategy",
+            label: "Refine idea",
+            presentation: "result",
+            payload: { run_id: "run-a", conversation_id: "conversation-1" },
+          },
+          pending_strategy: {
+            requested_field: "refinement",
+            source_result: {
+              run_id: "run-a",
+              conversation_id: "conversation-1",
+            },
+          },
+          source_result_run_id: "run-a",
+        },
+      },
+    ];
+
+    const messages = applyConsumedResultActions(
+      [
+        resultMessageWithResultActions("run-a"),
+        resultMessageWithResultActions("run-b"),
+      ],
+      consumedResultActionsFromApi(items),
+    );
+
+    expect(messages[0].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+    ]);
+    expect(messages[1].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+      "refine_strategy",
+    ]);
+  });
+
+  test("optimistic refine action consumes only the matching result refine action", () => {
+    const messages = consumeResultActionOnMessages(
+      [
+        resultMessageWithResultActions("run-a"),
+        resultMessageWithResultActions("run-b"),
+      ],
+      {
+        type: "refine_strategy",
+        label: "Refine idea",
+        presentation: "result",
+        payload: { run_id: "run-a", conversation_id: "conversation-1" },
+      },
+    );
+
+    expect(messages[0].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+    ]);
+    expect(messages[1].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+      "refine_strategy",
+    ]);
   });
 });

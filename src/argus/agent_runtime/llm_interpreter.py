@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import Mapping
 from datetime import date
 from typing import Any
 
@@ -23,8 +24,10 @@ from argus.agent_runtime.benchmark_evidence import (
 )
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.llm_interpreter_types import (
+    FocusedDateWindowExtraction,
     FocusedStrategyExtraction,
     LLMAmbiguousField,
+    LLMDateRangeIntent,
     LLMInterpretationResponse,
     LLMRiskRule,
     LLMStrategyDraft,
@@ -34,6 +37,7 @@ from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
+from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.result_followups import result_followup_fact_bank
 from argus.agent_runtime.rule_specs import (
     executable_rule_spec_from_strategy,
@@ -45,19 +49,10 @@ from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
 )
 from argus.agent_runtime.run_field_contract import (
-    current_message_date_range as _date_range_from_current_message,
-)
-from argus.agent_runtime.run_field_contract import (
-    current_message_dca_cadence as _dca_cadence_from_current_message,
-)
-from argus.agent_runtime.run_field_contract import (
     current_message_execution_context_tokens,
 )
 from argus.agent_runtime.run_field_contract import (
     field_fidelity_tokens as _field_fidelity_tokens,
-)
-from argus.agent_runtime.run_field_contract import (
-    message_states_bar_timeframe as _message_states_bar_timeframe,
 )
 from argus.agent_runtime.signal_rule_repair import (
     SignalRuleGroundingAudit,
@@ -82,8 +77,10 @@ from argus.agent_runtime.state.models import (
     SimplificationOption,
     StrategySummary,
     UnsupportedConstraint,
+    dedupe_resolution_provenance_items,
 )
 from argus.agent_runtime.strategy_contract import (
+    SUPPORTED_STRATEGY_TYPES,
     canonical_strategy_type,
     executable_strategy_type,
     executable_strategy_type_from_extracted_fields,
@@ -97,15 +94,16 @@ from argus.agent_runtime.turn_execution_evidence import (
 from argus.domain.backtesting.rules import (
     canonicalize_rule_spec,
     describe_rule_spec,
-    explicit_signal_rule_intent_from_text,
 )
 from argus.domain.indicators import (
     executable_indicator_spec,
     normalize_indicator_parameters,
 )
 from argus.domain.market_data import resolve_asset
+from argus.domain.slot_normalizer import normalize_parameter_value
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.llm.openrouter import (
+    OpenRouterTask,
     build_openrouter_model,
     invoke_openrouter_json_schema,
     log_openrouter_failure,
@@ -113,8 +111,42 @@ from argus.llm.openrouter import (
     openrouter_task_timeout_seconds,
     record_openrouter_route_receipt,
 )
+from argus.nlp.natural_time import (
+    dateparser_languages_for_user_language,
+    resolve_date_range_intent,
+    resolve_date_range_text,
+    resolve_rolling_window_intent_text,
+)
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
+_INTERPRETATION_REPAIR_TASK: OpenRouterTask = "interpretation_repair"
+_DATE_EVIDENCE_SPAN_KEYS = (
+    "date_range",
+    "date_range_raw_text",
+    "date_range_intent",
+    "date_window",
+    "period",
+    "temporal_window",
+    "time_window",
+    "window",
+)
+_COMPARISON_BASELINE_EVIDENCE_KEYS = (
+    "baseline",
+    "benchmark",
+    "comparison_baseline",
+    "comparison_baseline_evidence",
+    "comparison_target",
+    "reference",
+)
+
+
+def _field_path_base(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    for separator in ("[", "."):
+        text = text.split(separator, 1)[0]
+    return text.strip()
 
 
 def _selected_thread_metadata_context(metadata: dict[str, Any]) -> str:
@@ -316,10 +348,13 @@ class StatedRunFieldFidelityAudit(BaseModel):
         default=None,
         description=(
             "Starting capital explicitly stated by the current user message, "
-            "normalized as a number. Examples: 10k -> 10000, $500 -> 500. "
-            "Leave null when the user did not state starting capital. For DCA "
-            "or recurring buys, do not put the per-purchase contribution here; "
-            "use recurring_contribution_amount."
+            "normalized as a number. Examples: 10k -> 10000, $500 -> 500, "
+            "100k -> 100000, 100000 -> 100000 when the message uses that "
+            "plain number or shorthand as the amount to test or invest. "
+            "Leave null when the user did not state starting capital. Do not "
+            "treat dates, indicator windows, percentages, or asset names as "
+            "capital. For DCA or recurring buys, do not put the per-purchase "
+            "contribution here; use recurring_contribution_amount."
         ),
     )
     recurring_contribution_amount: float | None = Field(
@@ -359,7 +394,53 @@ class StatedRunFieldFidelityAudit(BaseModel):
         default=None,
         description=(
             "Benchmark or comparison asset explicitly stated by the current user "
-            "message. Leave null when the user did not state one."
+            "message. This is language-agnostic: if the current message states "
+            "an asset as a benchmark, reference, baseline, against/versus target, "
+            "or comparison target, return that asset here. Leave null when the "
+            "user did not state one."
+        ),
+    )
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+
+
+class StatedStartingCapitalAudit(BaseModel):
+    starting_capital: float | None = Field(
+        default=None,
+        description=(
+            "Starting capital explicitly stated by the current user message, "
+            "normalized as a number. Return null when the current message does "
+            "not state starting capital. Preserve plain numeric allocation "
+            "amounts in any language when they are used as the amount to test, "
+            "invest, allocate, put on, or use as capital."
+        ),
+    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class SupportedStrategyCapabilityConflictAudit(BaseModel):
+    selected_strategy_type: str | None = Field(
+        default=None,
+        description=(
+            "Canonical executable strategy family when the current user message "
+            "semantically selects a supported Alpha strategy. Use buy_and_hold or "
+            "dca_accumulation only when the message itself supports that choice. "
+            "Leave null when the request contains unsupported custom logic or "
+            "does not clearly select a supported strategy."
+        ),
+    )
+    drop_unsupported_strategy_logic: bool = Field(
+        description=(
+            "True only when the unsupported_strategy_logic constraint is a model "
+            "contradiction because the current user message asks for a supported "
+            "buy_and_hold or dca_accumulation run without any extra unsupported "
+            "entry, exit, fundamental, sentiment, event, custom scripting, or "
+            "brokerage/trading rule."
+        ),
+    )
+    keep_unsupported_strategy_logic: bool = Field(
+        description=(
+            "True when the current user message includes an extra unsupported "
+            "strategy rule or condition beyond the supported canonical strategy."
         ),
     )
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
@@ -677,6 +758,34 @@ class OpenRouterStructuredInterpreter:
             "Do not invent support. Preserve the user's raw phrasing and normalized "
             "meaning. Use prior strategy state for corrections like 'weekly instead', "
             "'use Nvidia instead', 'keep everything else', and 'sell all'.\n\n"
+            "Language-agnostic contract: users may speak English, Spanish, or another "
+            "language. Always return canonical internal values for executable fields "
+            "such as strategy_type, asset_class, cadence, timeframe, indicator, "
+            "semantic_turn_act, artifact_target, and result_followup_focus; do not "
+            "translate those machine fields. Put the detected user language in "
+            "candidate_strategy_draft.language. Put the exact bounded date/window "
+            "phrase in candidate_strategy_draft.date_range_raw_text. For relative "
+            "or semantic time windows, also fill candidate_strategy_draft."
+            "date_range_intent with canonical fields: kind=rolling_window with "
+            "count/unit, kind=year_to_date with optional year, kind=calendar_year "
+            "with year, kind=since with start/year, kind=explicit_range with "
+            "ISO start/end, or kind=endpoint_patch with endpoint plus ISO date or "
+            "anchor=today and day_offset for relative day edits. Do not translate "
+            "these machine fields. A user-stated relative lookback anchored to the "
+            "present is already a complete temporal constraint; do not ask for "
+            "calendar endpoints only because the user used natural language instead "
+            "of ISO dates. Also record "
+            "short evidence_spans for extracted fields such as strategy_type, "
+            "asset_universe, date_range, capital_amount, cadence, and "
+            "comparison_baseline. Use date_range for canonical dates only when you "
+            "are confident; deterministic date parsing, intent date math, and validation run after this "
+            "schema. Write assistant_response in the resolved product language "
+            "from the user language preference unless the user explicitly asks "
+            "to switch languages. Detected input language is metadata for "
+            "interpretation, not the rendering contract. Treat short, "
+            "messy, or grammatically imperfect follow-ups as normal user input, not "
+            "malformed requests; extract supported strategy intent, asset evidence, "
+            "date/window intent, and language when those facts are visible.\n\n"
             "Supported execution truth for Alpha: long-only backtests; buy_and_hold, "
             "dca_accumulation, registry-backed indicator threshold rules, and "
             "schema-backed signal strategies are executable. RSI is executable with "
@@ -693,11 +802,17 @@ class OpenRouterStructuredInterpreter:
             "are supported through Kraken; currency pair benchmark is the tested "
             "pair itself. No brokerage trading, shorting, mixed asset-class runs, "
             "custom scripting, or real slippage/fee realism.\n\n"
-            "Benchmark language matters: phrases like 'against SPY', 'versus QQQ', "
-            "'compared with BTC', or 'beat the market' describe comparison_baseline "
-            "or the benchmark, not additional assets to buy. Do not add benchmark "
-            "symbols to asset_universe unless the user explicitly says to buy, hold, "
-            "or test both as assets. Set field_provenance.comparison_baseline="
+            "Benchmark language matters in any user language: when a symbol is "
+            "framed as a benchmark, reference, comparison target, or market "
+            "baseline, put it in comparison_baseline instead of asset_universe. "
+            "A one-asset buy/hold request with a separate benchmark is executable "
+            "as the primary asset plus comparison_baseline; do not call this an "
+            "unsupported direct comparison. Do not add benchmark symbols to "
+            "asset_universe unless the user explicitly says to buy, hold, or test "
+            "both as traded assets. Examples: AAPL against SPY, AAPL with SPY "
+            "as the benchmark, and AAPL con SPY como referencia all mean "
+            "asset_universe=['AAPL'] and comparison_baseline='SPY'. "
+            "Set field_provenance.comparison_baseline="
             "'explicit_user' only when the current user message explicitly names "
             "the comparison or benchmark. When the user gives exact start/end dates, "
             "preserve them as date_range {'start':'YYYY-MM-DD','end':'YYYY-MM-DD'}; "
@@ -796,9 +911,18 @@ class OpenRouterStructuredInterpreter:
             "field_provenance.cadence='explicit_user' only when the user explicitly "
             "stated the purchase schedule in the current message or visible active "
             "draft context. Never infer monthly from a multi-year date range.\n\n"
-            "If the user explicitly says buy and hold, hold, or buy-and-hold, classify it as "
-            "buy_and_hold even when the sentence also contains a start date like Jan 1. "
-            "A start date is the backtest period, not entry logic.\n\n"
+            "If the user explicitly asks, in their language, for a simple buy-and-hold "
+            "investment test, classify it as buy_and_hold even when the sentence also "
+            "contains a start date. "
+            "A start date is the backtest period, not entry logic. If you set "
+            "strategy_type to buy_and_hold or dca_accumulation, do not also add "
+            "unsupported_strategy_logic unless the user asked for an additional "
+            "entry rule, exit rule, fundamental rule, sentiment/news/event rule, "
+            "custom script, brokerage action, shorting, or another unsupported "
+            "condition beyond that supported strategy. Preserve those extra rules "
+            "in entry_logic, exit_logic, or strategy_thesis when they exist so a "
+            "later audit can distinguish supported strategy intent from unsupported "
+            "custom logic.\n\n"
             "Clarify only when required meaning is missing, genuinely ambiguous, "
             "or unsupported in a way that requires the user to choose a simplification. "
             "Starting capital, timeframe, benchmark, fees, and slippage have safe defaults; "
@@ -1074,6 +1198,11 @@ def _suspicious_extracted_asset_symbols(
                 suspicious.append(symbol)
                 continue
             continue
+        if _provider_exact_ticker_supports_extracted_symbol(
+            symbol,
+            provider_ticker_symbol_map=provider_ticker_symbol_map,
+        ):
+            continue
         if folded in lower_tokens:
             suspicious.append(symbol)
             continue
@@ -1095,6 +1224,31 @@ def _current_message_provider_ticker_asset_map(
         if symbol and symbol not in symbol_map:
             symbol_map[symbol] = asset
     return symbol_map
+
+
+def _provider_exact_ticker_supports_extracted_symbol(
+    symbol: str,
+    *,
+    provider_ticker_symbol_map: dict[str, Any],
+) -> bool:
+    asset = provider_ticker_symbol_map.get(symbol)
+    if asset is None:
+        return False
+    asset_class = str(getattr(asset, "asset_class", "") or "").strip()
+    return asset_class in {"crypto", "currency_pair"} and len(symbol) >= 3
+
+
+def _request_has_provider_exact_execution_asset(
+    request: InterpretationRequest,
+) -> bool:
+    provider_ticker_symbol_map = _current_message_provider_ticker_asset_map(request)
+    return any(
+        _provider_exact_ticker_supports_extracted_symbol(
+            symbol,
+            provider_ticker_symbol_map=provider_ticker_symbol_map,
+        )
+        for symbol in provider_ticker_symbol_map
+    )
 
 
 def _misplaced_benchmark_asset_candidate(
@@ -1292,12 +1446,21 @@ def _response_without_ungrounded_symbols(
     draft.asset_universe = [symbol for symbol in original_symbols if symbol in grounded]
     if len(draft.asset_universe) == len(original_symbols):
         return response
+    missing_required_fields = list(response.missing_required_fields)
+    requires_clarification = response.requires_clarification
     if not draft.asset_universe:
         draft.asset_class = None
+        if canonical_strategy_type(draft.strategy_type):
+            missing_required_fields = list(
+                dict.fromkeys([*missing_required_fields, "asset_universe"])
+            )
+            requires_clarification = True
     return response.model_copy(
         update={
             "candidate_strategy_draft": draft,
             "assistant_response": None,
+            "requires_clarification": requires_clarification,
+            "missing_required_fields": missing_required_fields,
             "reason_codes": list(
                 dict.fromkeys([*response.reason_codes, reason_code])
             ),
@@ -1383,7 +1546,7 @@ def _response_from_requested_asset_answer_candidate_audit(
         missing = [
             field
             for field in response.missing_required_fields
-            if str(field).split("[", 1)[0] != "asset_universe"
+            if _field_path_base(field) != "asset_universe"
         ]
         return response.model_copy(
             update={
@@ -1449,11 +1612,7 @@ def _draft_has_valid_requested_asset_update(
 
 
 def _selected_requested_field_base(request: InterpretationRequest) -> str:
-    return (
-        str(request.selected_thread_metadata.get("requested_field") or "")
-        .split("[", 1)[0]
-        .strip()
-    )
+    return _field_path_base(request.selected_thread_metadata.get("requested_field"))
 
 
 def _prior_strategy_symbols(request: InterpretationRequest) -> set[str]:
@@ -1679,12 +1838,17 @@ def _response_needs_capability_side_question_audit(
         response.candidate_strategy_draft
     ):
         return False
+    if _response_needs_material_evidence_strategy_repair(
+        response=response,
+        request=request,
+    ):
+        return False
     if _response_had_unsubstantiated_asset_removed(response):
         return True
     pending_field = str(
         request.selected_thread_metadata.get("requested_field") or ""
     ).strip()
-    if pending_field.split("[", 1)[0] == "refinement":
+    if _field_path_base(pending_field) == "refinement":
         return False
     if pending_field:
         return True
@@ -1879,7 +2043,7 @@ def _response_needs_context_question_audit(
     pending_field = str(
         request.selected_thread_metadata.get("requested_field") or ""
     ).strip()
-    if pending_field.split("[", 1)[0] == "refinement":
+    if _field_path_base(pending_field) == "refinement":
         return False
     if _response_targets_latest_result_followup(response=response, request=request):
         return False
@@ -2011,6 +2175,11 @@ async def _strategy_family_continuity_audited_response(
         if draft.capital_amount is None:
             missing_required_fields = list(
                 dict.fromkeys([*missing_required_fields, "capital_amount"])
+            )
+            requires_clarification = True
+        if _llm_value_is_empty(draft.cadence):
+            missing_required_fields = list(
+                dict.fromkeys([*missing_required_fields, "cadence"])
             )
             requires_clarification = True
     return response.model_copy(
@@ -2161,10 +2330,18 @@ def _current_message_has_dca_contract_shape(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
-    if _dca_cadence_from_current_message(request.current_user_message) is None:
+    draft = response.candidate_strategy_draft
+    if _supported_dca_cadence_value(draft.cadence) is not None:
+        return _draft_contains_structured_capital_context(draft)
+    if not _request_current_turn_has_material_execution_evidence(request):
         return False
-    return _draft_contains_structured_capital_context(
-        response.candidate_strategy_draft
+    if response.intent == "unsupported_or_out_of_scope":
+        return _llm_strategy_draft_has_extractable_fields(draft)
+    if response.capability_question_focus is not None:
+        return _llm_strategy_draft_has_extractable_fields(draft)
+    return (
+        response.semantic_turn_act == "unsupported_request"
+        and _llm_strategy_draft_has_extractable_fields(draft)
     )
 
 
@@ -2242,26 +2419,65 @@ def _dca_contract_missing_fields(
     missing = [
         field
         for field in current_missing
-        if str(field).split("[", 1)[0] not in stale_rule_fields
+        if _field_path_base(field) not in stale_rule_fields
     ]
+    if _llm_value_is_empty(draft.date_range) or has_partial_explicit_date_range(
+        draft.date_range
+    ):
+        resolved_date_range = _date_range_from_intent_or_bounded_evidence(draft)
+        if resolved_date_range is not None:
+            draft.date_range = resolved_date_range
     present_fields: set[str] = set()
     if draft.asset_universe:
         present_fields.add("asset_universe")
     if draft.date_range not in (None, "", [], {}):
         present_fields.add("date_range")
-    if draft.capital_amount is not None:
+    if _dca_draft_has_recurring_amount(draft):
         present_fields.add("capital_amount")
     if draft.cadence not in (None, "", [], {}):
         present_fields.add("cadence")
+    required_fields = ["asset_universe", "date_range", "capital_amount", "cadence"]
+    missing = list(dict.fromkeys([*missing, *required_fields]))
     return [
         field
         for field in missing
-        if str(field).split("[", 1)[0] not in present_fields
+        if _field_path_base(field) not in present_fields
     ]
 
 
+def _capability_required_missing_fields_for_canonical_strategy(
+    current_missing: list[str],
+    *,
+    draft: LLMStrategyDraft,
+) -> list[str]:
+    strategy_type = executable_strategy_type(draft.model_dump(mode="python"))
+    if strategy_type == "buy_and_hold":
+        if _llm_value_is_empty(draft.date_range) or has_partial_explicit_date_range(
+            draft.date_range
+        ):
+            resolved_date_range = _date_range_from_intent_or_bounded_evidence(draft)
+            if resolved_date_range is not None:
+                draft.date_range = resolved_date_range
+        missing: list[str] = []
+        if not draft.asset_universe:
+            missing.append("asset_universe")
+        if _llm_value_is_empty(draft.date_range) or has_partial_explicit_date_range(
+            draft.date_range
+        ):
+            missing.append("date_range")
+        return missing
+    if strategy_type == "dca_accumulation":
+        return _dca_contract_missing_fields(current_missing, draft=draft)
+    return list(current_missing)
+
+
 def _supported_dca_cadence_value(value: Any) -> str | None:
-    normalized = str(value or "").strip().casefold()
+    normalized_value = normalize_parameter_value(
+        "dca_accumulation",
+        "dca_cadence",
+        value,
+    )
+    normalized = str(normalized_value or "").strip().casefold()
     if not normalized:
         return None
     capability = STRATEGY_CAPABILITIES.get("dca_accumulation")
@@ -2273,6 +2489,17 @@ def _supported_dca_cadence_value(value: Any) -> str | None:
         if normalized == candidate:
             return candidate
     return None
+
+
+def _dca_draft_has_recurring_amount(draft: LLMStrategyDraft) -> bool:
+    if draft.recurring_contribution is not None:
+        return True
+    if draft.capital_amount is None:
+        return False
+    return _capital_source(draft.field_provenance, "capital_amount") in {
+        "recurring_contribution",
+        "explicit_recurring_contribution",
+    }
 
 
 def _dca_total_budget_source(value: Any) -> str:
@@ -2346,9 +2573,11 @@ async def _dca_contribution_role_audited_response(
         return response
     if audit.recurring_contribution_explicit:
         draft = response.candidate_strategy_draft.model_copy(deep=True)
+        draft.recurring_contribution = draft.capital_amount
         if draft.field_provenance.get("capital_amount") != "recurring_contribution":
             draft.field_provenance["capital_amount"] = "recurring_contribution"
-        cadence = _dca_cadence_from_current_message(request.current_user_message)
+        draft.field_provenance["recurring_contribution"] = "explicit_user"
+        cadence = _supported_dca_cadence_value(draft.cadence)
         missing_required_fields = list(response.missing_required_fields)
         if cadence is not None:
             draft.cadence = cadence
@@ -2356,12 +2585,12 @@ async def _dca_contribution_role_audited_response(
             missing_required_fields = [
                 field
                 for field in missing_required_fields
-                if str(field).split("[", 1)[0] != "cadence"
+                if _field_path_base(field) != "cadence"
             ]
         missing_required_fields = [
             field
             for field in missing_required_fields
-            if str(field).split("[", 1)[0] != "capital_amount"
+            if _field_path_base(field) != "capital_amount"
         ]
         return response.model_copy(
             update={
@@ -2757,6 +2986,7 @@ def _llm_draft_from_strategy_summary(strategy: StrategySummary) -> LLMStrategyDr
     indicator_parameters = extra_parameters.get("indicator_parameters")
     if not isinstance(indicator_parameters, dict):
         indicator_parameters = {}
+    date_range_intent = extra_parameters.get("date_range_intent")
     return LLMStrategyDraft(
         raw_user_phrasing=strategy.raw_user_phrasing,
         strategy_type=strategy.strategy_type,
@@ -2775,6 +3005,11 @@ def _llm_draft_from_strategy_summary(strategy: StrategySummary) -> LLMStrategyDr
         entry_threshold=indicator_parameters.get("entry_threshold"),
         exit_threshold=indicator_parameters.get("exit_threshold"),
         date_range=strategy.date_range,
+        date_range_intent=(
+            LLMDateRangeIntent.model_validate(date_range_intent)
+            if isinstance(date_range_intent, dict)
+            else None
+        ),
         sizing_mode=strategy.sizing_mode,
         capital_amount=strategy.capital_amount,
         recurring_contribution=extra_parameters.get("recurring_contribution"),
@@ -2954,6 +3189,44 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
     )
+    conflict_response = await _audit_supported_strategy_capability_conflict(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if conflict_response is not None:
+        conflict_response = await _underfilled_strategy_repaired_response(
+            response=conflict_response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        return await _stated_run_field_audited_response(
+            response=conflict_response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+    date_window_response = await _focused_date_window_audited_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if date_window_response is not None:
+        return await _stated_run_field_audited_response(
+            response=date_window_response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+    supported_date_gap_response = await _supported_date_gap_schema_repaired_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if supported_date_gap_response is not None:
+        return await _stated_run_field_audited_response(
+            response=supported_date_gap_response,
+            preferred_model=preferred_model,
+            request=request,
+        )
     if response.capability_question_focus is not None and (
         response.artifact_target == "none" or not _request_has_latest_result(request)
     ):
@@ -2979,6 +3252,36 @@ async def _response_ready_for_runtime(
             if context_response is not None:
                 return context_response
         return response
+    if _response_needs_material_evidence_strategy_repair(
+        response=response,
+        request=request,
+    ):
+        repaired_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if repaired_response is not None:
+            return await _stated_run_field_audited_response(
+                response=repaired_response,
+                preferred_model=preferred_model,
+                request=request,
+            )
+    if _response_needs_pre_guidance_focused_strategy_extraction(
+        response=response,
+        request=request,
+    ):
+        repaired_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if repaired_response is not None:
+            return await _stated_run_field_audited_response(
+                response=repaired_response,
+                preferred_model=preferred_model,
+                request=request,
+            )
     response = _vague_strategy_start_as_guidance(response)
     if _is_vague_strategy_start_guidance(response):
         return response
@@ -3094,7 +3397,7 @@ async def _response_ready_for_runtime(
             response=response,
             request=request,
         ):
-            audited_response = await _audit_stated_run_field_fidelity(
+            audited_response = await _audit_stated_run_fields(
                 response=response,
                 preferred_model=preferred_model,
                 request=request,
@@ -3111,13 +3414,31 @@ async def _response_ready_for_runtime(
             "OpenRouter interpretation replayed the active artifact without a "
             "material current-turn update"
         )
-    audited_response = await _audit_stated_run_field_fidelity(
+    audited_response = await _audit_stated_run_fields(
         response=response,
         preferred_model=preferred_model,
         request=request,
     )
     if audited_response is not None:
         response = audited_response
+        date_window_response = await _focused_date_window_audited_response(
+            response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if date_window_response is not None:
+            response = date_window_response
+    conflict_response = await _audit_supported_strategy_capability_conflict(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if conflict_response is not None:
+        response = await _underfilled_strategy_repaired_response(
+            response=conflict_response,
+            preferred_model=preferred_model,
+            request=request,
+        )
     grounded_response = await _audit_executable_strategy_grounding(
         response=response,
         preferred_model=preferred_model,
@@ -3125,6 +3446,9 @@ async def _response_ready_for_runtime(
     )
     if grounded_response is not None:
         response = grounded_response
+    response = _response_with_executable_fields_preferred_over_clarification_prose(
+        response
+    )
     if _structured_interpretation_has_required_shape(response, request=request):
         return response
 
@@ -3146,6 +3470,24 @@ async def _response_ready_for_runtime(
             request=request,
         )
     raise ValueError("OpenRouter interpretation returned an incomplete strategy draft")
+
+
+async def _supported_date_gap_schema_repaired_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _response_has_repairable_current_turn_date_gap(
+        response=response,
+        request=request,
+    ):
+        return None
+    return await _repair_incomplete_strategy_extraction(
+        failed_response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
 
 
 async def _plan_artifact_edit_response(
@@ -3186,12 +3528,88 @@ async def _stated_run_field_audited_response(
         response = grounded_response
         if response.requires_clarification:
             return response
+    date_window_response = await _focused_date_window_audited_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if date_window_response is not None:
+        response = date_window_response
+    audited_response = await _audit_stated_run_fields(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if audited_response is not None:
+        response = audited_response
+        date_window_response = await _focused_date_window_audited_response(
+            response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if date_window_response is not None:
+            response = date_window_response
+    conflict_response = await _audit_supported_strategy_capability_conflict(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if conflict_response is not None:
+        response = await _underfilled_strategy_repaired_response(
+            response=conflict_response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+    if (
+        _response_needs_supported_signal_rule_recovery(
+            response,
+            current_user_message=request.current_user_message,
+        )
+        or _llm_signal_strategy_is_underfilled(response.candidate_strategy_draft)
+    ):
+        response = await _signal_rule_checked_response(
+            response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+    return _response_with_executable_fields_preferred_over_clarification_prose(
+        response
+    )
+
+
+async def _underfilled_strategy_repaired_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    if _structured_interpretation_has_required_shape(response, request=request):
+        return response
+    repaired_response = await _repair_incomplete_strategy_extraction(
+        failed_response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    return repaired_response or response
+
+
+async def _audit_stated_run_fields(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
     audited_response = await _audit_stated_run_field_fidelity(
         response=response,
         preferred_model=preferred_model,
         request=request,
     )
-    return audited_response or response
+    if audited_response is not None:
+        return audited_response
+    return await _audit_stated_starting_capital_fidelity(
+        response=response,
+        request=request,
+    )
 
 
 def _clear_auto_simplified_strategy_when_rule_is_ambiguous(
@@ -3267,10 +3685,13 @@ async def _repair_incomplete_strategy_extraction(
     if not _strategy_extraction_repair_is_allowed(failed_response, request=request):
         return None
     messages = _focused_strategy_extraction_messages(request)
-    for model_name in _unique_repair_models(preferred_model):
+    for model_name in _unique_repair_models(
+        preferred_model,
+        task=_INTERPRETATION_REPAIR_TASK,
+    ):
         try:
             extraction = await invoke_openrouter_json_schema(
-                task="interpretation",
+                task=_INTERPRETATION_REPAIR_TASK,
                 messages=_openrouter_wire_messages(messages),
                 schema_model=FocusedStrategyExtraction,
                 schema_name="FocusedStrategyExtraction",
@@ -3293,7 +3714,21 @@ async def _repair_incomplete_strategy_extraction(
             preferred_model=model_name,
             request=request,
         )
-        audited_response = await _audit_stated_run_field_fidelity(
+        conflict_response = await _audit_supported_strategy_capability_conflict(
+            response=response,
+            preferred_model=model_name,
+            request=request,
+        )
+        if conflict_response is not None:
+            response = conflict_response
+        date_window_response = await _focused_date_window_audited_response(
+            response=response,
+            preferred_model=model_name,
+            request=request,
+        )
+        if date_window_response is not None:
+            response = date_window_response
+        audited_response = await _audit_stated_run_fields(
             response=response,
             preferred_model=model_name,
             request=request,
@@ -3303,6 +3738,440 @@ async def _repair_incomplete_strategy_extraction(
         if _structured_interpretation_has_required_shape(response, request=request):
             return response
     return None
+
+
+async def _focused_date_window_audited_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _response_needs_focused_date_window_intent_repair(
+        response=response,
+        request=request,
+    ):
+        return None
+    messages = _focused_date_window_extraction_messages(
+        response=response,
+        request=request,
+    )
+    for model_name in _unique_repair_models(
+        preferred_model,
+        task=_INTERPRETATION_REPAIR_TASK,
+    ):
+        try:
+            extraction = await invoke_openrouter_json_schema(
+                task=_INTERPRETATION_REPAIR_TASK,
+                messages=messages,
+                schema_model=FocusedDateWindowExtraction,
+                schema_name="FocusedDateWindowExtraction",
+                model_name=model_name,
+            )
+        except Exception as exc:
+            log_openrouter_failure(
+                task=_INTERPRETATION_REPAIR_TASK,
+                model_name=model_name,
+                exc=exc,
+                message="Focused date-window extraction failed; preserving draft dates",
+            )
+            continue
+        if not isinstance(extraction, FocusedDateWindowExtraction):
+            continue
+        repaired = _response_from_focused_date_window_extraction(
+            response=response,
+            extraction=extraction,
+            request=request,
+        )
+        if repaired is not None:
+            return repaired
+    return None
+
+
+def _response_needs_focused_date_window_intent_repair(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    pending_date_answer = _request_has_pending_date_answer_context(request)
+    if (
+        response.intent not in {"strategy_drafting", "backtest_execution"}
+        and not pending_date_answer
+    ):
+        return False
+    pending_supported_date_answer = (
+        _pending_supported_execution_date_answer_can_use_focused_audit(
+            response=response,
+            request=request,
+        )
+    )
+    if "focused_date_window_intent_repair" in response.reason_codes:
+        return False
+    draft = response.candidate_strategy_draft
+    has_repairable_current_turn_date_gap = (
+        _response_has_repairable_current_turn_date_gap(
+            response=response,
+            request=request,
+        )
+    )
+    if response.task_relation != "new_task" and not (
+        pending_date_answer
+        or pending_supported_date_answer
+        or has_repairable_current_turn_date_gap
+    ):
+        return False
+    has_material_evidence = (
+        _request_current_turn_has_material_execution_evidence(request)
+        or _draft_has_supported_capability_shape_for_date_repair(draft)
+        or pending_date_answer
+    )
+    has_semantic_date_evidence = _draft_has_semantic_date_window_evidence(draft)
+    if response.semantic_turn_act == "answer_pending_need" and not (
+        (
+            has_material_evidence
+            and _response_has_pending_base_field(response, "date_range")
+        )
+        or pending_supported_date_answer
+        or has_repairable_current_turn_date_gap
+    ):
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "refine_current_idea",
+        "result_followup",
+        "retry_failed_action",
+        "unsupported_request",
+    }:
+        return False
+    if response.semantic_turn_act == "educational_question" and not pending_date_answer:
+        return False
+    if (
+        not pending_date_answer
+        and not has_material_evidence
+        and not _supported_partial_draft_has_repairable_shape(draft)
+    ):
+        return False
+    if resolve_date_range_intent(draft.date_range_intent) is not None:
+        return False
+    has_complete_date_range = _has_complete_date_range_payload(
+        normalize_date_range_candidate(draft.date_range)
+    )
+    has_pending_date_range = _response_has_pending_base_field(response, "date_range")
+    if (
+        has_complete_date_range
+        and response.requires_clarification
+        and not has_pending_date_range
+    ):
+        return False
+    if has_pending_date_range:
+        return (
+            has_material_evidence
+            or has_semantic_date_evidence
+            or _supported_partial_draft_has_repairable_shape(draft)
+        )
+    if _llm_value_is_empty(draft.date_range):
+        return (
+            pending_date_answer
+            or has_semantic_date_evidence
+            or has_repairable_current_turn_date_gap
+        )
+    if has_partial_explicit_date_range(draft.date_range):
+        return True
+    if has_semantic_date_evidence:
+        return True
+    if _complete_date_range_needs_current_turn_date_audit(
+        response=response,
+        request=request,
+        has_complete_date_range=has_complete_date_range,
+    ):
+        return True
+    if not _llm_value_is_empty(draft.date_range_raw_text):
+        return True
+    return has_repairable_current_turn_date_gap
+
+
+def _request_has_pending_date_answer_context(
+    request: InterpretationRequest,
+) -> bool:
+    if request.selected_thread_metadata.get("last_stage_outcome") != (
+        "await_user_reply"
+    ):
+        return False
+    requested_field = _field_path_base(
+        str(request.selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "date_range":
+        return False
+    if not request.current_user_message.strip():
+        return False
+    return _request_has_active_strategy_context(request)
+
+
+def _complete_date_range_needs_current_turn_date_audit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+    has_complete_date_range: bool,
+) -> bool:
+    if not has_complete_date_range:
+        return False
+    if not _request_current_turn_has_material_execution_evidence(request):
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    if not _llm_strategy_draft_has_concrete_execution_target(draft):
+        return False
+    if _draft_has_semantic_date_window_evidence(draft):
+        return False
+    if resolve_date_range_intent(draft.date_range_intent) is not None:
+        return False
+    return True
+
+
+def _response_has_repairable_current_turn_date_gap(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if not response.requires_clarification:
+        return False
+    draft = response.candidate_strategy_draft
+    if not _llm_value_is_empty(draft.date_range):
+        return False
+    if canonical_strategy_type(draft.strategy_type) not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    if not _llm_strategy_draft_has_concrete_execution_target(draft):
+        return False
+    return bool(
+        request.current_user_message.strip()
+        or draft.raw_user_phrasing
+        or draft.strategy_thesis
+    )
+
+
+def _pending_supported_execution_date_answer_can_use_focused_audit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if response.semantic_turn_act != "answer_pending_need":
+        return False
+    if not _response_has_pending_base_field(response, "date_range"):
+        return False
+    if response.unsupported_constraints or response.ambiguous_fields:
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    if not _llm_strategy_draft_has_concrete_execution_target(draft):
+        return False
+    return bool(
+        request.current_user_message.strip()
+        or draft.raw_user_phrasing
+        or draft.strategy_thesis
+    )
+
+
+def _draft_has_semantic_date_window_evidence(draft: LLMStrategyDraft) -> bool:
+    if not _llm_value_is_empty(draft.date_range_raw_text):
+        return True
+    evidence_spans = _draft_semantic_evidence_spans(draft)
+    return any(
+        not _llm_value_is_empty(evidence_spans.get(key))
+        for key in _DATE_EVIDENCE_SPAN_KEYS
+    )
+
+
+def _draft_has_comparison_baseline_evidence(draft: LLMStrategyDraft) -> bool:
+    evidence_spans = _draft_semantic_evidence_spans(draft)
+    return any(
+        not _llm_value_is_empty(evidence_spans.get(key))
+        for key in _COMPARISON_BASELINE_EVIDENCE_KEYS
+    )
+
+
+def _draft_has_supported_capability_shape_for_date_repair(
+    draft: LLMStrategyDraft,
+) -> bool:
+    strategy_type = executable_strategy_type(draft.model_dump(mode="python"))
+    if strategy_type not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    if not (draft.asset_universe or draft.asset_class):
+        return False
+    return any(
+        [
+            draft.capital_amount is not None,
+            draft.total_capital is not None,
+            draft.initial_capital is not None,
+            draft.recurring_contribution is not None,
+            bool(draft.timeframe),
+            bool(draft.cadence),
+            bool(draft.comparison_baseline),
+            _llm_strategy_draft_has_rule_or_indicator_fields(draft),
+            bool(draft.field_provenance),
+            bool(_draft_semantic_evidence_spans(draft)),
+        ]
+    )
+
+
+def _draft_semantic_evidence_spans(draft: LLMStrategyDraft) -> dict[str, str]:
+    evidence_spans: dict[str, str] = {
+        str(key): str(value)
+        for key, value in (draft.evidence_spans or {}).items()
+        if not _llm_value_is_empty(value)
+    }
+    extra_evidence_spans = (draft.extra_parameters or {}).get("evidence_spans")
+    if isinstance(extra_evidence_spans, Mapping):
+        for key, value in extra_evidence_spans.items():
+            normalized_key = str(key)
+            if normalized_key not in evidence_spans and not _llm_value_is_empty(value):
+                evidence_spans[normalized_key] = str(value)
+    return evidence_spans
+
+
+def _focused_date_window_extraction_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You extract only the temporal constraint for an Argus backtest. "
+                "The current user message may be in any language, shorthand, or "
+                "messy prose. Return canonical machine fields, not user-facing "
+                "copy. Do not decide strategy, asset, capital, support status, or "
+                "whether to run. Do not infer a default window when the current "
+                "message does not state one. Do not copy endpoint dates from the "
+                "structured draft unless they are directly supported by the current "
+                "user message. If the structured draft has a partial date_range "
+                "whose start or end contains natural-language prose instead of an "
+                "ISO date or today/current_date sentinel, treat that value only as "
+                "non-executable evidence and re-extract the temporal intent from "
+                "the current user message.\n\n"
+                "For relative or semantic windows, do not calculate endpoint dates. "
+                "A relative lookback anchored to the present is already a complete "
+                "temporal constraint, even when the user does not provide calendar "
+                "endpoint dates. If the current message states a lookback duration "
+                "with a count and time unit in any language, set has_date_window=true "
+                "and return date_range_intent kind=rolling_window with anchor=today. "
+                "Do not ask for start/end dates just because the current message uses "
+                "natural language. "
+                "Return date_range_intent with kind=rolling_window, count, unit, "
+                "anchor=today, confidence, and evidence. For year-to-date, return "
+                "kind=year_to_date. For a calendar year, return kind=calendar_year "
+                "and year. For since-style windows, return kind=since and start. "
+                "For explicit calendar start/end endpoints, return date_range with "
+                "ISO dates or the canonical sentinel today/current_date. Never put "
+                "prose or shorthand relative windows inside date_range start/end. "
+                "If no temporal window is present, has_date_window=false."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Structured draft JSON that may contain drifted dates: "
+                f"{response.candidate_strategy_draft.model_dump(mode='json')}"
+            ),
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
+
+
+def _response_from_focused_date_window_extraction(
+    *,
+    response: LLMInterpretationResponse,
+    extraction: FocusedDateWindowExtraction,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not extraction.has_date_window or extraction.confidence < 0.65:
+        return None
+    repaired = response.model_copy(deep=True)
+    draft = repaired.candidate_strategy_draft
+    raw_text = (
+        str(extraction.date_range_raw_text or "").strip()
+        or str(extraction.evidence or "").strip()
+    )
+    changed = False
+    if extraction.date_range_intent is not None:
+        intent_resolution = resolve_date_range_intent(extraction.date_range_intent)
+        if intent_resolution is None:
+            return None
+        draft.date_range_intent = extraction.date_range_intent
+        draft.date_range = intent_resolution.payload
+        changed = True
+    elif extraction.date_range is not None:
+        normalized_date_range = normalize_date_range_candidate(extraction.date_range)
+        if not _has_complete_date_range_payload(normalized_date_range):
+            return None
+        try:
+            explicit_resolution = resolve_date_range(normalized_date_range)
+        except Exception:
+            return None
+        if explicit_resolution.used_default:
+            return None
+        draft.date_range = explicit_resolution.payload
+        changed = True
+    if not changed:
+        return None
+    pending_date_answer = _request_has_pending_date_answer_context(request)
+    if raw_text:
+        draft.date_range_raw_text = raw_text
+        draft.evidence_spans = {
+            **dict(draft.evidence_spans or {}),
+            "date_range": raw_text,
+        }
+    if not has_partial_explicit_date_range(draft.date_range):
+        repaired.missing_required_fields = [
+            field
+            for field in repaired.missing_required_fields
+            if _field_path_base(field) != "date_range"
+        ]
+        repaired.ambiguous_fields = [
+            field
+            for field in repaired.ambiguous_fields
+            if _field_path_base(field.field_name) != "date_range"
+        ]
+    if (
+        pending_date_answer
+        and not repaired.missing_required_fields
+        and not repaired.ambiguous_fields
+        and not repaired.unsupported_constraints
+    ):
+        repaired.requires_clarification = False
+        repaired.assistant_response = None
+        repaired.intent = "backtest_execution"
+        repaired.task_relation = "continue"
+        repaired.semantic_turn_act = "answer_pending_need"
+        repaired.result_followup_focus = None
+        repaired.capability_question_focus = None
+        repaired.context_question_focus = None
+        repaired.artifact_target = "active_confirmation"
+    elif (
+        repaired.requires_clarification
+        and not repaired.missing_required_fields
+        and not repaired.ambiguous_fields
+        and not repaired.unsupported_constraints
+        and _llm_strategy_draft_has_concrete_execution_target(draft)
+    ):
+        repaired.requires_clarification = False
+        repaired.assistant_response = None
+        repaired.intent = "backtest_execution"
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *repaired.reason_codes,
+                "focused_date_window_intent_repair",
+                *(
+                    ["pending_date_answer_focused_window_repair"]
+                    if pending_date_answer
+                    else []
+                ),
+            ]
+        )
+    )
+    return repaired
 
 
 async def _plan_pending_artifact_assumption_edit(
@@ -3333,9 +4202,9 @@ async def _plan_pending_artifact_assumption_edit(
 def _request_targets_pending_artifact_assumption_edit(
     request: InterpretationRequest,
 ) -> bool:
-    requested_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).split("[", 1)[0]
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
     if requested_field != "assumption":
         return False
     snapshot = request.latest_task_snapshot
@@ -3494,6 +4363,7 @@ def _response_needs_supported_signal_rule_recovery(
     *,
     current_user_message: str,
 ) -> bool:
+    del current_user_message
     draft = response.candidate_strategy_draft
     if canonical_strategy_type(draft.strategy_type) == "signal_strategy":
         return False
@@ -3501,11 +4371,7 @@ def _response_needs_supported_signal_rule_recovery(
         return False
     if not (draft.raw_user_phrasing or draft.strategy_thesis):
         return False
-    if not _has_explicit_signal_rule_intent(
-        current_user_message,
-        draft.raw_user_phrasing,
-        draft.strategy_thesis,
-    ):
+    if not _response_has_signal_rule_shape(response):
         return False
     if response.intent == "unsupported_or_out_of_scope":
         return True
@@ -3517,16 +4383,20 @@ def _response_needs_supported_signal_rule_recovery(
     )
 
 
-def _has_explicit_signal_rule_intent(*values: str | None) -> bool:
-    for value in values:
-        if not value:
-            continue
-        try:
-            if explicit_signal_rule_intent_from_text(value) is not None:
-                return True
-        except ValueError:
-            continue
-    return False
+def _response_has_signal_rule_shape(response: LLMInterpretationResponse) -> bool:
+    if any(
+        item.category == "unsupported_strategy_logic"
+        for item in response.unsupported_constraints
+    ):
+        return True
+    return any(
+        _field_path_base(field) in {"entry_logic", "exit_logic", "rule_spec"}
+        for field in response.missing_required_fields
+    ) or any(
+        _field_path_base(field.field_name)
+        in {"entry_logic", "exit_logic", "rule_spec"}
+        for field in response.ambiguous_fields
+    )
 
 
 def _supported_signal_rule_planning_response(
@@ -3717,9 +4587,9 @@ async def _repair_pending_signal_rule_answer_if_needed(
 
 
 def _request_targets_pending_signal_rule(request: InterpretationRequest) -> bool:
-    requested_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).split("[", 1)[0]
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
     return requested_field in {"entry_logic", "exit_logic"}
 
 
@@ -4027,8 +4897,16 @@ def _prior_strategy_payload(
     return prior.model_dump(mode="json")
 
 
-def _unique_repair_models(preferred_model: str) -> list[str]:
-    candidates = [preferred_model, *openrouter_structured_model_candidates()]
+def _unique_repair_models(
+    preferred_model: str,
+    *,
+    task: OpenRouterTask = "interpretation",
+) -> list[str]:
+    task_candidates = openrouter_structured_model_candidates(task=task)
+    if task == "interpretation":
+        candidates = [preferred_model, *task_candidates]
+    else:
+        candidates = [*task_candidates, preferred_model]
     seen: set[str] = set()
     ordered: list[str] = []
     for model_name in candidates:
@@ -4064,12 +4942,37 @@ def _response_needs_testable_idea_repair(
 ) -> bool:
     if _is_vague_strategy_start_guidance(response):
         return False
-    requested_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).split("[", 1)[0]
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
     if requested_field:
         return False
     draft = response.candidate_strategy_draft
+    if _supported_anchor_needs_focused_run_window_repair(
+        response=response,
+        request=request,
+    ):
+        return True
+    if _supported_partial_strategy_needs_focused_schema_repair(
+        response=response,
+        request=request,
+    ):
+        return True
+    if _noncanonical_strategy_text_needs_focused_schema_repair(
+        response=response,
+        request=request,
+    ):
+        return True
+    if (
+        response.intent == "unsupported_or_out_of_scope"
+        and response.semantic_turn_act == "unsupported_request"
+        and any(
+            item.category == "unsupported_strategy_logic"
+            for item in response.unsupported_constraints
+        )
+        and bool(draft.raw_user_phrasing or draft.strategy_thesis)
+    ):
+        return True
     if _llm_strategy_draft_has_semantic_execution_anchor(draft):
         return False
     if (
@@ -4093,6 +4996,250 @@ def _response_needs_testable_idea_repair(
     ):
         return True
     return False
+
+
+def _supported_anchor_needs_focused_run_window_repair(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if not (
+        response.intent in {"strategy_drafting", "backtest_execution"}
+        and response.requires_clarification
+        and bool(response.assistant_response)
+    ):
+        return False
+    if _semantic_turn_act_blocks_supported_schema_repair(
+        response=response,
+        request=request,
+    ):
+        return False
+    if (
+        response.capability_question_focus is not None
+        or response.context_question_focus is not None
+        or response.unsupported_constraints
+        or response.ambiguous_fields
+    ):
+        return False
+    if not _request_current_turn_has_material_execution_evidence(request):
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) not in {
+        "buy_and_hold",
+        "dca_accumulation",
+        "indicator_threshold",
+        "signal_strategy",
+    }:
+        return False
+    if not (draft.raw_user_phrasing or draft.strategy_thesis):
+        return False
+    return _llm_value_is_empty(draft.date_range) and (
+        _date_range_from_intent_or_bounded_evidence(draft) is None
+    )
+
+
+def _supported_partial_strategy_needs_focused_schema_repair(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if not (
+        response.intent in {"strategy_drafting", "backtest_execution"}
+        and response.requires_clarification
+        and bool(response.assistant_response)
+    ):
+        return False
+    if _semantic_turn_act_blocks_supported_schema_repair(
+        response=response,
+        request=request,
+    ):
+        return False
+    if (
+        response.capability_question_focus is not None
+        or response.context_question_focus is not None
+        or response.unsupported_constraints
+        or response.ambiguous_fields
+    ):
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) not in {
+        "buy_and_hold",
+        "dca_accumulation",
+        "indicator_threshold",
+        "signal_strategy",
+    }:
+        return False
+    if not (
+        draft.raw_user_phrasing
+        or draft.strategy_thesis
+        or request.current_user_message.strip()
+    ):
+        return False
+    missing_fields = {
+        _field_path_base(field)
+        for field in response.missing_required_fields
+        if str(field).strip()
+    }
+    if not missing_fields:
+        return _llm_value_is_empty(
+            draft.date_range
+        ) and _supported_partial_draft_has_repairable_shape(draft)
+    if not missing_fields.intersection(
+        {
+            "asset_universe",
+            "capital_amount",
+            "cadence",
+            "date_range",
+            "entry_logic",
+            "entry_rule",
+            "entry_threshold",
+            "exit_logic",
+            "exit_rule",
+            "exit_threshold",
+            "indicator",
+            "indicator_period",
+            "rule_spec",
+        }
+    ):
+        return False
+    return _supported_partial_draft_has_repairable_shape(draft)
+
+
+def _supported_partial_draft_has_repairable_shape(draft: LLMStrategyDraft) -> bool:
+    return any(
+        [
+            bool(draft.asset_universe),
+            bool(draft.asset_class),
+            bool(draft.timeframe),
+            bool(draft.cadence),
+            bool(draft.date_range),
+            bool(draft.date_range_raw_text),
+            bool(draft.comparison_baseline),
+            draft.capital_amount is not None,
+            draft.total_capital is not None,
+            draft.initial_capital is not None,
+            draft.recurring_contribution is not None,
+            bool(draft.evidence_spans),
+            bool(draft.field_provenance),
+            bool(draft.extra_parameters),
+        ]
+    )
+
+
+def _noncanonical_strategy_text_needs_focused_schema_repair(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if response.intent not in {
+        "backtest_execution",
+        "beginner_guidance",
+        "conversation_followup",
+        "strategy_drafting",
+        "unsupported_or_out_of_scope",
+    }:
+        return False
+    if not (
+        response.requires_clarification
+        and bool(response.assistant_response)
+        and _request_current_turn_has_material_execution_evidence(request)
+    ):
+        return False
+    if (
+        response.capability_question_focus is not None
+        or response.context_question_focus is not None
+        or response.unsupported_constraints
+        or response.ambiguous_fields
+    ):
+        return False
+    if response.semantic_turn_act in {
+        "answer_pending_need",
+        "approval",
+        "educational_question",
+        "refine_current_idea",
+        "result_followup",
+        "retry_failed_action",
+    }:
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) in SUPPORTED_STRATEGY_TYPES:
+        return False
+    if _llm_strategy_draft_has_structured_rule_or_indicator_fields(draft):
+        return False
+    return bool(
+        draft.raw_user_phrasing
+        or draft.strategy_thesis
+        or draft.strategy_type
+        or request.current_user_message.strip()
+    )
+
+
+def _semantic_turn_act_blocks_supported_schema_repair(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if response.semantic_turn_act == "answer_pending_need":
+        return _request_has_active_strategy_context(
+            request
+        ) and not _request_current_turn_has_material_execution_evidence(request)
+    return response.semantic_turn_act in {
+        "approval",
+        "educational_question",
+        "refine_current_idea",
+        "result_followup",
+        "retry_failed_action",
+        "unsupported_request",
+    }
+
+
+def _response_needs_material_evidence_strategy_repair(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if not _request_current_turn_has_material_execution_evidence(request):
+        return False
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if not response.requires_clarification or not response.assistant_response:
+        return False
+    if response.capability_question_focus is not None:
+        return False
+    draft = response.candidate_strategy_draft
+    if _llm_strategy_draft_has_semantic_execution_anchor(draft):
+        return False
+    return bool(draft.raw_user_phrasing or draft.strategy_thesis)
+
+
+def _response_needs_pre_guidance_focused_strategy_extraction(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if response.semantic_turn_act not in {None, "new_idea"}:
+        return False
+    if response.requires_clarification and response.assistant_response:
+        return False
+    if (
+        response.capability_question_focus is not None
+        or response.context_question_focus is not None
+        or response.unsupported_constraints
+        or response.ambiguous_fields
+    ):
+        return False
+    if not _request_current_turn_has_material_execution_evidence(request):
+        return False
+    draft = response.candidate_strategy_draft
+    if _llm_strategy_draft_has_semantic_execution_anchor(draft):
+        return False
+    return bool(
+        draft.raw_user_phrasing
+        or draft.strategy_thesis
+        or request.current_user_message.strip()
+    )
 
 
 def _vague_strategy_start_as_guidance(
@@ -4131,13 +5278,6 @@ def _is_vague_strategy_start(response: LLMInterpretationResponse) -> bool:
     if response.unsupported_constraints or response.ambiguous_fields:
         return False
     draft = response.candidate_strategy_draft
-    if _has_explicit_signal_rule_intent(
-        draft.raw_user_phrasing,
-        draft.strategy_thesis,
-        draft.entry_logic,
-        draft.exit_logic,
-    ):
-        return False
     return not _llm_strategy_draft_has_semantic_execution_anchor(draft)
 
 
@@ -4354,7 +5494,9 @@ def _executable_strategy_grounding_messages(
                 "the user's choice. Valuation language like cheap, undervalued, or P/E "
                 "is financially valid context, but Argus needs a supported historical "
                 "proxy or explicit baseline before running it. Do not expose provider "
-                "plumbing. Write assistant_response in warm, plain English, with short "
+                "plumbing. "
+                f"{response_language_instruction(request.user.language_preference)} "
+                "Write assistant_response in warm, plain language, with short "
                 "sentences and no report tone. Return only JSON matching the schema."
             ),
         },
@@ -4407,6 +5549,7 @@ async def _audit_stated_run_field_fidelity(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
+    del preferred_model
     if not _response_needs_stated_run_field_fidelity_audit(
         response=response,
         request=request,
@@ -4427,35 +5570,357 @@ async def _audit_stated_run_field_fidelity(
         response=response,
         request=request,
     )
-    best_repaired: LLMInterpretationResponse | None = None
-    for model_name in _unique_repair_models(preferred_model):
-        try:
-            audit = await invoke_openrouter_json_schema(
-                task="interpretation",
-                messages=messages,
-                schema_model=StatedRunFieldFidelityAudit,
-                schema_name="StatedRunFieldFidelityAudit",
-                model_name=model_name,
-            )
-        except Exception:
-            continue
-        if not isinstance(audit, StatedRunFieldFidelityAudit):
-            continue
-        repaired = _response_from_stated_run_field_fidelity_audit(
-            response=response,
-            audit=audit,
-            current_message=request.current_user_message,
+    try:
+        audit = await invoke_openrouter_json_schema(
+            task="field_fidelity",
+            messages=messages,
+            schema_model=StatedRunFieldFidelityAudit,
+            schema_name="StatedRunFieldFidelityAudit",
         )
-        if repaired is not None:
-            if not _stated_run_field_audit_omitted_expected_fields(
-                response=response,
-                audit=audit,
-                request=request,
-            ):
-                return repaired
-            if best_repaired is None:
-                best_repaired = repaired
-    return best_repaired or deterministic_repair
+    except Exception:
+        capital_recheck = await _audit_stated_starting_capital_fidelity(
+            response=deterministic_repair or response,
+            request=request,
+        )
+        if capital_recheck is not None:
+            return capital_recheck
+        return deterministic_repair
+    if not isinstance(audit, StatedRunFieldFidelityAudit):
+        capital_recheck = await _audit_stated_starting_capital_fidelity(
+            response=deterministic_repair or response,
+            request=request,
+        )
+        if capital_recheck is not None:
+            return capital_recheck
+        return deterministic_repair
+    repaired = _response_from_stated_run_field_fidelity_audit(
+        response=response,
+        audit=audit,
+        current_message=request.current_user_message,
+    )
+    candidate_response = repaired or deterministic_repair or response
+    capital_recheck = await _audit_stated_starting_capital_fidelity(
+        response=candidate_response,
+        request=request,
+    )
+    if capital_recheck is not None:
+        return capital_recheck
+    if repaired is None:
+        return deterministic_repair
+    return repaired
+
+
+async def _audit_supported_strategy_capability_conflict(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _response_needs_supported_strategy_capability_conflict_audit(response):
+        return None
+    messages = _supported_strategy_capability_conflict_messages(
+        response=response,
+        request=request,
+    )
+    try:
+        audit = await invoke_openrouter_json_schema(
+            task="capability_conflict",
+            messages=messages,
+            schema_model=SupportedStrategyCapabilityConflictAudit,
+            schema_name="SupportedStrategyCapabilityConflictAudit",
+        )
+    except Exception:
+        return _structured_supported_strategy_capability_conflict_fallback(
+            response
+        )
+    if not isinstance(audit, SupportedStrategyCapabilityConflictAudit):
+        return _structured_supported_strategy_capability_conflict_fallback(
+            response
+        )
+    if (
+        audit.drop_unsupported_strategy_logic
+        and not audit.keep_unsupported_strategy_logic
+        and audit.confidence >= 0.7
+    ):
+        strategy_type = canonical_strategy_type(audit.selected_strategy_type)
+        if not strategy_type:
+            strategy_type = canonical_strategy_type(
+                response.candidate_strategy_draft.strategy_type
+            )
+        if strategy_type not in {"buy_and_hold", "dca_accumulation"}:
+            return None
+        repaired = _response_with_supported_strategy_capability_conflict_removed(
+            response=response,
+            strategy_type=strategy_type,
+        )
+        return await _dca_contribution_role_audited_response(
+            response=repaired,
+            preferred_model=preferred_model,
+            request=request,
+        )
+    if audit.confidence < 0.7:
+        return _structured_supported_strategy_capability_conflict_fallback(
+            response
+        )
+    return None
+
+
+def _structured_supported_strategy_capability_conflict_fallback(
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse | None:
+    if not _response_needs_supported_strategy_capability_conflict_audit(response):
+        return None
+    if any(
+        item.category != "unsupported_strategy_logic"
+        for item in response.unsupported_constraints
+    ):
+        return None
+    draft = response.candidate_strategy_draft
+    strategy_type = canonical_strategy_type(draft.strategy_type)
+    if strategy_type not in {"buy_and_hold", "dca_accumulation"}:
+        return None
+    if _llm_strategy_draft_has_rule_or_indicator_fields(draft):
+        return None
+    if not (draft.asset_universe or draft.asset_class):
+        return None
+    if strategy_type == "buy_and_hold" and not (
+        draft.date_range
+        or _draft_has_semantic_date_window_evidence(draft)
+        or resolve_date_range_intent(draft.date_range_intent) is not None
+    ):
+        return None
+    if strategy_type == "dca_accumulation" and not (
+        draft.recurring_contribution is not None
+        or draft.capital_amount is not None
+        or draft.total_capital is not None
+        or draft.initial_capital is not None
+    ):
+        return None
+    repaired = _response_with_supported_strategy_capability_conflict_removed(
+        response=response,
+        strategy_type=strategy_type,
+    )
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                code
+                for code in repaired.reason_codes
+                if code != "supported_strategy_capability_conflict_audit"
+            ]
+            + ["supported_strategy_capability_structured_fallback"]
+        )
+    )
+    return repaired
+
+
+def _response_needs_supported_strategy_capability_conflict_audit(
+    response: LLMInterpretationResponse,
+) -> bool:
+    if response.intent not in {
+        "strategy_drafting",
+        "backtest_execution",
+        "unsupported_or_out_of_scope",
+    }:
+        return False
+    has_unsupported_strategy_logic = any(
+        item.category == "unsupported_strategy_logic"
+        for item in response.unsupported_constraints
+    )
+    if response.capability_question_focus is not None and (
+        not has_unsupported_strategy_logic
+    ):
+        return False
+    if not has_unsupported_strategy_logic:
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) in {
+        "buy_and_hold",
+        "dca_accumulation",
+    }:
+        return True
+    if response.semantic_turn_act != "unsupported_request":
+        return False
+    if _llm_value_is_empty(draft.strategy_type) and _llm_value_is_empty(
+        draft.strategy_thesis
+    ):
+        return False
+    if _llm_strategy_draft_has_rule_or_indicator_fields(draft):
+        return _llm_strategy_draft_has_concrete_execution_target(draft)
+    return _llm_strategy_draft_has_concrete_execution_target(draft)
+
+
+def _supported_strategy_capability_conflict_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> list[dict[str, str]]:
+    constraints = [
+        item.model_dump(mode="json")
+        for item in response.unsupported_constraints
+        if item.category == "unsupported_strategy_logic"
+    ]
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus's capability-conflict audit. The primary interpreter "
+                "returned both a supported canonical strategy and an "
+                "unsupported_strategy_logic constraint, or returned a raw natural-"
+                "language strategy phrase as unsupported while preserving executable "
+                "field evidence. Decide whether the current user message semantically "
+                "selects a supported Alpha strategy or asks for real unsupported "
+                "custom logic. Use semantic meaning, not keyword or phrase matching. "
+                "Supported Alpha strategy families include buy_and_hold and "
+                "dca_accumulation when the user is only asking to test holding or "
+                "recurring fixed-dollar buys over a period. A plain performance, "
+                "return, or benchmark comparison between one primary asset and a "
+                "reference asset over a stated window is a supported buy_and_hold "
+                "comparison with comparison_baseline; it is not unsupported custom "
+                "strategy logic unless the user adds a separate unsupported rule. "
+                "Keep the unsupported "
+                "constraint when the current message adds an extra unsupported entry "
+                "condition, exit condition, fundamental rule, sentiment/news/event "
+                "rule, custom script, brokerage action, shorting, or other logic "
+                "beyond the supported strategy family. Drop it only when the message "
+                "semantically asks for the supported strategy itself and no extra "
+                "unsupported rule. Set selected_strategy_type to the canonical "
+                "supported family when dropping the constraint. Reason from the "
+                "current message and structured draft meaning. Return only JSON "
+                "matching the schema."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Structured draft JSON: "
+                f"{response.candidate_strategy_draft.model_dump(mode='json')}"
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Unsupported strategy constraints JSON: "
+                f"{json.dumps(constraints, ensure_ascii=False)}"
+            ),
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
+
+
+def _response_with_supported_strategy_capability_conflict_removed(
+    *,
+    response: LLMInterpretationResponse,
+    strategy_type: str,
+) -> LLMInterpretationResponse:
+    repaired = response.model_copy(deep=True)
+    repaired.candidate_strategy_draft.strategy_type = strategy_type
+    if strategy_type in {"buy_and_hold", "dca_accumulation"}:
+        _clear_rule_or_indicator_fields(repaired.candidate_strategy_draft)
+    repaired.unsupported_constraints = [
+        item
+        for item in repaired.unsupported_constraints
+        if item.category != "unsupported_strategy_logic"
+    ]
+    repaired.missing_required_fields = (
+        _capability_required_missing_fields_for_canonical_strategy(
+            repaired.missing_required_fields,
+            draft=repaired.candidate_strategy_draft,
+        )
+    )
+    repaired.intent = "strategy_drafting"
+    repaired.semantic_turn_act = "new_idea"
+    repaired.requires_clarification = bool(
+        repaired.missing_required_fields
+        or repaired.ambiguous_fields
+        or repaired.unsupported_constraints
+    )
+    repaired.assistant_response = None
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *repaired.reason_codes,
+                "supported_strategy_capability_conflict_audit",
+            ]
+        )
+    )
+    repaired.capability_question_focus = None
+    if (
+        not repaired.unsupported_constraints
+        and not repaired.ambiguous_fields
+        and not repaired.missing_required_fields
+        and _llm_strategy_draft_has_concrete_execution_target(
+            repaired.candidate_strategy_draft
+        )
+    ):
+        repaired.intent = "backtest_execution"
+        repaired.requires_clarification = False
+        repaired.assistant_response = None
+        repaired.semantic_turn_act = "new_idea"
+    return repaired
+
+
+def _clear_rule_or_indicator_fields(draft: LLMStrategyDraft) -> None:
+    draft.entry_logic = None
+    draft.exit_logic = None
+    draft.entry_rule = None
+    draft.exit_rule = None
+    draft.rule_spec = None
+    draft.indicator = None
+    draft.indicator_period = None
+    draft.entry_threshold = None
+    draft.exit_threshold = None
+
+
+def _response_with_executable_fields_preferred_over_clarification_prose(
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse:
+    draft = response.candidate_strategy_draft
+    if not (
+        response.requires_clarification
+        and response.assistant_response
+        and response.intent
+        in {
+            "strategy_drafting",
+            "backtest_execution",
+            "unsupported_or_out_of_scope",
+        }
+        and response.semantic_turn_act
+        not in {
+            "answer_pending_need",
+            "approval",
+            "educational_question",
+            "refine_current_idea",
+            "result_followup",
+            "retry_failed_action",
+        }
+        and response.capability_question_focus is None
+        and response.context_question_focus is None
+        and not response.unsupported_constraints
+        and not response.ambiguous_fields
+        and not response.missing_required_fields
+        and canonical_strategy_type(draft.strategy_type)
+        in {"buy_and_hold", "dca_accumulation"}
+        and not _llm_strategy_draft_has_rule_or_indicator_fields(draft)
+        and _llm_strategy_draft_has_executable_shape(draft)
+        and not has_partial_explicit_date_range(draft.date_range)
+    ):
+        return response
+    return response.model_copy(
+        update={
+            "intent": "backtest_execution",
+            "requires_clarification": False,
+            "assistant_response": None,
+            "semantic_turn_act": "new_idea",
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "executable_fields_overrode_clarification_prose",
+                    ]
+                )
+            ),
+        }
+    )
 
 
 def _response_from_current_message_run_field_contract(
@@ -4470,7 +5935,12 @@ def _response_from_current_message_run_field_contract(
     current_message = request.current_user_message
     changed = False
 
-    date_range = _date_range_from_current_message(current_message)
+    date_range = _date_range_from_intent_or_bounded_evidence(
+        draft,
+        language=request.user.language_preference,
+    )
+    if date_range is None:
+        return None
     if (
         date_range is not None
         and (
@@ -4481,14 +5951,12 @@ def _response_from_current_message_run_field_contract(
             or _response_needs_current_message_date_repair(
                 response=repaired,
                 current_message=current_message,
+                language=request.user.language_preference,
             )
         )
     ):
         draft.date_range = date_range
-        if (
-            _draft_has_non_executable_timeframe_label(draft)
-            and not _message_states_bar_timeframe(current_message)
-        ):
+        if _draft_has_non_executable_timeframe_label(draft):
             draft.timeframe = None
         if has_partial_explicit_date_range(date_range):
             repaired.requires_clarification = True
@@ -4500,12 +5968,12 @@ def _response_from_current_message_run_field_contract(
             repaired.missing_required_fields = [
                 field
                 for field in repaired.missing_required_fields
-                if str(field).split("[", 1)[0] != "date_range"
+                if _field_path_base(field) != "date_range"
             ]
             repaired.ambiguous_fields = [
                 field
                 for field in repaired.ambiguous_fields
-                if field.field_name.split("[", 1)[0] != "date_range"
+                if _field_path_base(field.field_name) != "date_range"
             ]
         changed = True
 
@@ -4520,6 +5988,16 @@ def _response_from_current_message_run_field_contract(
     ):
         repaired.requires_clarification = False
         repaired.assistant_response = None
+    if (
+        changed
+        and not repaired.requires_clarification
+        and not repaired.missing_required_fields
+        and not repaired.ambiguous_fields
+        and not repaired.unsupported_constraints
+        and _llm_strategy_draft_has_concrete_execution_target(draft)
+    ):
+        repaired.intent = "backtest_execution"
+        repaired.semantic_turn_act = "new_idea"
 
     if not changed:
         return None
@@ -4532,6 +6010,21 @@ def _response_from_current_message_run_field_contract(
         )
     )
     return repaired
+
+
+def _natural_time_language_candidates_from_hints(
+    *language_hints: str | None,
+) -> tuple[tuple[str, ...] | None, ...]:
+    hinted_languages: list[tuple[str, ...] | None] = []
+    for language in language_hints:
+        if not str(language or "").strip():
+            continue
+        hints = dateparser_languages_for_user_language(language)
+        if hints not in hinted_languages:
+            hinted_languages.append(hints)
+    if None not in hinted_languages:
+        hinted_languages.append(None)
+    return tuple(hinted_languages)
 
 
 def _response_needs_stated_run_field_fidelity_audit(
@@ -4570,9 +6063,9 @@ def _response_needs_stated_run_field_fidelity_audit(
     current_message = request.current_user_message if request is not None else ""
     requested_field = ""
     if request is not None:
-        requested_field = str(
-            request.selected_thread_metadata.get("requested_field") or ""
-        ).split("[", 1)[0]
+        requested_field = _field_path_base(
+            request.selected_thread_metadata.get("requested_field")
+        )
     if (
         canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
         and _dca_response_needs_semantic_field_audit(response)
@@ -4587,11 +6080,33 @@ def _response_needs_stated_run_field_fidelity_audit(
         return True
     if _draft_has_unprovenanced_benchmark(draft):
         return True
+    if _response_has_current_message_date_range_reconciliation(
+        response=response,
+        request=request,
+    ):
+        return True
     if response.semantic_turn_act == "answer_pending_need":
+        if _supported_pending_need_has_recoverable_current_turn_run_fields(
+            response=response,
+            request=request,
+            current_message=current_message,
+            requested_field=requested_field,
+        ):
+            return True
         if requested_field == "date_range":
-            return _draft_contains_structured_date_context(
-                draft,
-                current_message=current_message,
+            return any(
+                [
+                    not _llm_value_is_empty(draft.date_range),
+                    _draft_has_semantic_date_window_evidence(draft),
+                    _draft_missing_comparison_baseline_needs_stated_run_field_audit(
+                        draft,
+                        current_message=current_message,
+                    ),
+                    _draft_capital_needs_stated_run_field_audit(
+                        draft,
+                        current_message=current_message,
+                    ),
+                ]
             )
         if requested_field == "assumption":
             return _draft_capital_needs_stated_run_field_audit(
@@ -4621,7 +6136,7 @@ def _response_needs_stated_run_field_fidelity_audit(
                     current_message=current_message,
                 ),
                 _llm_value_is_empty(draft.timeframe)
-                and _draft_contains_structured_timeframe_context(draft),
+                and _draft_has_timeframe_evidence_for_audit(draft),
                 _draft_date_range_needs_stated_run_field_audit(
                     draft,
                     current_message=current_message,
@@ -4639,8 +6154,76 @@ def _response_needs_stated_run_field_fidelity_audit(
                 current_message=current_message,
             ),
             _llm_value_is_empty(draft.timeframe)
-            and _draft_contains_structured_timeframe_context(draft),
+            and _draft_has_timeframe_evidence_for_audit(draft),
             _draft_date_range_needs_stated_run_field_audit(
+                draft,
+                current_message=current_message,
+            ),
+        ]
+    )
+
+
+def _response_has_current_message_date_range_reconciliation(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest | None,
+) -> bool:
+    if request is None:
+        return False
+    date_range = _date_range_from_intent_or_bounded_evidence(
+        response.candidate_strategy_draft,
+        language=request.user.language_preference,
+    )
+    if date_range is None:
+        return False
+    draft = response.candidate_strategy_draft
+    if _llm_value_is_empty(draft.date_range):
+        return True
+    if has_partial_explicit_date_range(draft.date_range):
+        return True
+    if not isinstance(draft.date_range, dict):
+        return False
+    return _normalized_stated_field(draft.date_range) != _normalized_stated_field(
+        date_range
+    )
+
+
+def _supported_pending_need_has_recoverable_current_turn_run_fields(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest | None,
+    current_message: str,
+    requested_field: str,
+) -> bool:
+    if request is None:
+        return False
+    if requested_field:
+        return False
+    if response.unsupported_constraints or response.ambiguous_fields:
+        return False
+    if (
+        response.capability_question_focus is not None
+        or response.context_question_focus is not None
+    ):
+        return False
+    if _request_has_active_strategy_context(
+        request
+    ) and not _request_current_turn_has_material_execution_evidence(request):
+        return False
+    if not _request_current_turn_has_material_execution_evidence(request):
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    if not _llm_strategy_draft_has_concrete_execution_target(draft):
+        return False
+    return any(
+        [
+            _draft_missing_comparison_baseline_needs_stated_run_field_audit(
+                draft,
+                current_message=current_message,
+            ),
+            _draft_capital_needs_stated_run_field_audit(
                 draft,
                 current_message=current_message,
             ),
@@ -4655,9 +6238,9 @@ def _pending_dca_assumption_reply_needs_stated_run_field_audit(
 ) -> bool:
     if request is None or response.semantic_turn_act != "answer_pending_need":
         return False
-    requested_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).split("[", 1)[0]
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
     if requested_field != "assumption":
         return False
     return canonical_strategy_type(
@@ -4716,7 +6299,7 @@ def _ready_response_has_unreconciled_stated_run_fields(
                 current_message=current_message,
             ),
             _llm_value_is_empty(draft.timeframe)
-            and _draft_contains_structured_timeframe_context(draft),
+            and _draft_has_timeframe_evidence_for_audit(draft),
             _draft_date_range_needs_stated_run_field_audit(
                 draft,
                 current_message=current_message,
@@ -4732,7 +6315,9 @@ def _draft_capital_needs_stated_run_field_audit(
 ) -> bool:
     if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
         return False
-    if _text_contains_structured_capital_context(current_message):
+    if not _draft_has_non_money_execution_anchor(draft):
+        return False
+    if _text_contains_capital_audit_signal(current_message, draft=draft):
         return True
     return draft.capital_amount is None and _draft_contains_structured_capital_context(draft)
 
@@ -4746,6 +6331,8 @@ def _draft_missing_comparison_baseline_needs_stated_run_field_audit(
         return False
     if not _llm_strategy_draft_has_concrete_execution_target(draft):
         return False
+    if _draft_has_comparison_baseline_evidence(draft):
+        return True
     return current_message_has_extra_provider_asset_for_benchmark(
         draft,
         current_message=current_message,
@@ -4769,12 +6356,16 @@ def _response_needs_current_message_date_repair(
     *,
     response: LLMInterpretationResponse,
     current_message: str,
+    language: str | None = None,
 ) -> bool:
     draft = response.candidate_strategy_draft
     if not _llm_value_is_empty(draft.date_range):
         return False
-    if _date_range_from_current_message(current_message) is None:
+    del current_message
+    if _date_range_from_intent_or_bounded_evidence(draft, language=language) is None:
         return False
+    if _llm_strategy_draft_has_concrete_execution_target(draft):
+        return True
     if _response_has_pending_base_field(response, "date_range"):
         return True
     return response.requires_clarification and _llm_strategy_draft_has_concrete_execution_target(
@@ -4827,10 +6418,10 @@ def _response_has_pending_base_field(
     field_name: str,
 ) -> bool:
     return any(
-        str(field).split("[", 1)[0] == field_name
+        _field_path_base(field) == field_name
         for field in response.missing_required_fields
     ) or any(
-        field.field_name.split("[", 1)[0] == field_name
+        _field_path_base(field.field_name) == field_name
         for field in response.ambiguous_fields
     )
 
@@ -4852,7 +6443,7 @@ def _draft_date_range_needs_stated_run_field_audit(
 ) -> bool:
     if _llm_value_is_empty(draft.date_range):
         return False
-    current_message_range = _date_range_from_current_message(current_message)
+    current_message_range = _date_range_from_intent_or_bounded_evidence(draft)
     if (
         current_message_range is not None
         and not has_partial_explicit_date_range(current_message_range)
@@ -4862,9 +6453,9 @@ def _draft_date_range_needs_stated_run_field_audit(
         != _normalized_stated_field(current_message_range)
     ):
         return True
-    if _draft_date_range_has_unstated_current_endpoint(
-        draft.date_range,
-        current_message=current_message,
+    if (
+        current_message_range is None
+        and _draft_date_range_has_unstated_current_endpoint(draft.date_range)
     ):
         return True
     if has_partial_explicit_date_range(draft.date_range):
@@ -4879,34 +6470,14 @@ def _draft_date_range_needs_stated_run_field_audit(
 
 def _draft_date_range_has_unstated_current_endpoint(
     date_range_value: Any,
-    *,
-    current_message: str = "",
 ) -> bool:
     if not isinstance(date_range_value, dict):
-        return False
-    if _message_states_current_date_endpoint(current_message):
         return False
     for key in ("end", "to"):
         endpoint = date_range_value.get(key)
         if _date_endpoint_is_runtime_current(endpoint):
             return True
     return False
-
-
-def _message_states_current_date_endpoint(message: str) -> bool:
-    folded = str(message or "").casefold()
-    return any(
-        token in folded
-        for token in (
-            "today",
-            "now",
-            "present",
-            "current",
-            "to date",
-            "through now",
-            "until now",
-        )
-    )
 
 
 def _date_endpoint_is_runtime_current(value: Any) -> bool:
@@ -4928,50 +6499,73 @@ def _draft_contains_structured_capital_context(draft: LLMStrategyDraft) -> bool:
 
 
 def _text_contains_structured_capital_context(text: str) -> bool:
-    folded = str(text or "").casefold()
-    if "$" in text or "usd" in folded or "dollar" in folded:
+    if "$" in str(text or ""):
         return True
-    for token in _field_fidelity_tokens(folded):
-        if token.endswith("k") and any(character.isdigit() for character in token):
+    for token in _field_fidelity_tokens(str(text or "")):
+        normalized = token.strip().casefold()
+        if any(character.isdigit() for character in normalized) and any(
+            character.isalpha() for character in normalized
+        ):
             return True
     return False
 
 
-def _draft_contains_structured_timeframe_context(draft: LLMStrategyDraft) -> bool:
-    text = _structured_draft_context_text(draft).casefold()
-    return any(token in text for token in ("hour", "daily", "bars", "candles"))
+def _draft_has_non_money_execution_anchor(draft: LLMStrategyDraft) -> bool:
+    return any(
+        [
+            canonical_strategy_type(draft.strategy_type) in SUPPORTED_STRATEGY_TYPES,
+            bool(draft.asset_universe),
+            bool(draft.asset_class),
+            bool(draft.date_range),
+            draft.date_range_intent is not None,
+            bool(draft.timeframe),
+            bool(draft.cadence),
+            bool(draft.comparison_baseline),
+            _llm_strategy_draft_has_rule_or_indicator_fields(draft),
+            _draft_has_semantic_date_window_evidence(draft),
+            _draft_has_comparison_baseline_evidence(draft),
+        ]
+    )
 
 
-def _draft_contains_structured_date_context(
-    draft: LLMStrategyDraft,
+def _text_contains_capital_audit_signal(
+    text: str,
     *,
-    current_message: str = "",
+    draft: LLMStrategyDraft,
 ) -> bool:
-    text = _structured_draft_context_text(
-        draft,
-        extra_text=current_message,
-    ).casefold()
-    if any(
-        token in text
-        for token in (
-            "from",
-            "since",
-            "through",
-            "until",
-            "today",
-            "year",
-            "start",
-            "beginning",
-            "end",
-        )
-    ):
+    if "$" in str(text or ""):
         return True
-    for token in _field_fidelity_tokens(text):
-        if len(token) == 4 and token.isdigit():
-            year = int(token)
-            if 1900 <= year <= 2100:
-                return True
-    return False
+    tokens = _field_fidelity_tokens(str(text or "").casefold())
+    if not tokens:
+        return False
+    date_tokens = _draft_date_evidence_tokens(draft)
+    return any(
+        token not in date_tokens and any(character.isdigit() for character in token)
+        for token in tokens
+    )
+
+
+def _draft_date_evidence_tokens(draft: LLMStrategyDraft) -> set[str]:
+    candidates = list(_bounded_date_evidence_candidates(draft))
+    date_range = normalize_date_range_candidate(draft.date_range)
+    if isinstance(date_range, Mapping):
+        candidates.extend(str(value) for value in date_range.values() if value)
+    date_range_intent = draft.date_range_intent
+    intent_evidence = getattr(date_range_intent, "evidence", None)
+    if intent_evidence:
+        candidates.append(str(intent_evidence))
+    return {
+        token
+        for candidate in candidates
+        for token in _field_fidelity_tokens(str(candidate).casefold())
+    }
+
+
+def _draft_has_timeframe_evidence_for_audit(draft: LLMStrategyDraft) -> bool:
+    if not _llm_value_is_empty(draft.timeframe):
+        return True
+    evidence_spans = _draft_semantic_evidence_spans(draft)
+    return not _llm_value_is_empty(evidence_spans.get("timeframe"))
 
 
 def _structured_draft_context_text(
@@ -4982,9 +6576,11 @@ def _structured_draft_context_text(
     values = (
         extra_text,
         draft.raw_user_phrasing,
+        draft.date_range_raw_text,
         draft.strategy_thesis,
         draft.entry_logic,
         draft.exit_logic,
+        " ".join((draft.evidence_spans or {}).values()),
     )
     return " ".join(str(value) for value in values if value)
 
@@ -5229,8 +6825,20 @@ def _stated_run_field_fidelity_messages(
                 "reshaped. Do not infer defaults, fees, slippage, symbols, or rules. "
                 "If a field is absent from the current user message, return null "
                 "for that field. Normalize starting capital exactly from the "
-                "current message: 10k -> 10000, 100K -> 100000, and $10,000 "
-                "-> 10000. For DCA or recurring buys, return the per-purchase "
+                "current message: 10k -> 10000, 100K -> 100000, $10,000 "
+                "-> 10000, 100k -> 100000, and a plain number such as "
+                "100000 -> 100000 when the message uses it as the amount to "
+                "test, invest, allocate, put on, or use as capital. This is "
+                "language-agnostic: preserve bare numeric amounts and numeric "
+                "magnitude shorthand that appear in the user's investing idea. "
+                "A standalone numeric magnitude at the end of an otherwise "
+                "complete strategy, asset, and date-window request is a "
+                "starting-capital candidate when it is not serving as a date, "
+                "lookback window, percentage, indicator parameter, share count, "
+                "or asset identifier. Do not require currency symbols. Do not "
+                "treat dates, calendar years, "
+                "indicator windows, lookback windows, percentages, share counts, "
+                "or asset names as capital. For DCA or recurring buys, return the per-purchase "
                 "recurring contribution as recurring_contribution_amount, not "
                 "capital_amount; return cadence only when the current message states "
                 "one. If a money amount is total budget, starting principal, or cap, "
@@ -5246,9 +6854,11 @@ def _stated_run_field_fidelity_messages(
                 "the beginning of 2024', or 'since 2024' state only a start "
                 "endpoint unless the message also states an end. Return explicit "
                 "comparison assets as comparison_baseline, "
-                "not asset_universe. Phrases like compare with, compared against, "
-                "versus, vs, or benchmark name a comparison_baseline when followed "
-                "by an asset. If the draft has a default benchmark but the current "
+                "not asset_universe. Treat benchmark/reference/baseline/comparison "
+                "relationships semantically in any language; if a user names an "
+                "asset as a reference, benchmark, against/versus target, or "
+                "comparison target, that asset belongs in comparison_baseline. "
+                "If the draft has a default benchmark but the current "
                 "message states a different comparison asset, return the user-stated "
                 "comparison asset. Return "
                 "only JSON matching the schema."
@@ -5287,19 +6897,21 @@ def _response_from_stated_run_field_fidelity_audit(
             draft.field_provenance["capital_amount"] = "recurring_contribution"
             changed = True
     if audit.cadence:
-        cadence = str(audit.cadence).strip().casefold()
-        if draft.cadence != cadence:
-            draft.cadence = cadence
-            changed = True
-        if draft.field_provenance.get("cadence") != "explicit_user":
-            draft.field_provenance["cadence"] = "explicit_user"
-            changed = True
+        cadence = _supported_dca_cadence_value(audit.cadence)
+        if cadence is not None:
+            if draft.cadence != cadence:
+                draft.cadence = cadence
+                changed = True
+            if draft.field_provenance.get("cadence") != "explicit_user":
+                draft.field_provenance["cadence"] = "explicit_user"
+                changed = True
     if audit.timeframe and draft.timeframe != audit.timeframe:
         draft.timeframe = audit.timeframe
         changed = True
     if audit.date_range not in (None, "", [], {}):
         audited_date_range: Any = audit.date_range
-        expected_date_range = _date_range_from_current_message(current_message)
+        del current_message
+        expected_date_range = _date_range_from_intent_or_bounded_evidence(draft)
         if (
             isinstance(expected_date_range, dict)
             and not has_partial_explicit_date_range(expected_date_range)
@@ -5348,7 +6960,10 @@ def _stated_run_field_audit_omitted_expected_fields(
     request: InterpretationRequest,
 ) -> bool:
     draft = response.candidate_strategy_draft
-    expected_date_range = _date_range_from_current_message(request.current_user_message)
+    del request
+    expected_date_range = _date_range_from_intent_or_bounded_evidence(draft)
+    if expected_date_range is None and isinstance(draft.date_range, dict):
+        expected_date_range = draft.date_range
     if (
         not _llm_value_is_empty(draft.date_range)
         and expected_date_range is not None
@@ -5356,6 +6971,155 @@ def _stated_run_field_audit_omitted_expected_fields(
     ):
         return True
     return False
+
+
+async def _audit_stated_starting_capital_fidelity(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _response_needs_stated_starting_capital_recheck(
+        response=response,
+        request=request,
+    ):
+        return None
+    try:
+        audit = await invoke_openrouter_json_schema(
+            task="field_fidelity",
+            messages=_stated_starting_capital_messages(
+                response=response,
+                request=request,
+            ),
+            schema_model=StatedStartingCapitalAudit,
+            schema_name="StatedStartingCapitalAudit",
+        )
+    except Exception:
+        return None
+    if not isinstance(audit, StatedStartingCapitalAudit):
+        return None
+    return _response_from_stated_starting_capital_audit(
+        response=response,
+        audit=audit,
+    )
+
+
+def _response_needs_stated_starting_capital_recheck(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "result_followup",
+        "unsupported_request",
+    }:
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
+        return False
+    if draft.capital_amount is not None:
+        return False
+    return _llm_strategy_draft_has_concrete_execution_target(draft)
+
+
+def _stated_starting_capital_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus's focused starting-capital verifier. The broad "
+                "run-field audit may have omitted a money amount. Decide only "
+                "whether the current user message explicitly states starting "
+                "capital for the runnable idea. Return starting_capital as a "
+                "normalized number only when the message uses the amount as the "
+                "cash to test, invest, allocate, put on, or use as capital. This "
+                "is language-agnostic: normalize numeric magnitude shorthand "
+                "such as 100k -> 100000 and 2.5m -> 2500000 when it is the "
+                "allocation amount. Use structured draft prose as supporting "
+                "evidence when it says an amount from the current message is "
+                "starting capital but the numeric field is missing; the current "
+                "user message remains authoritative. Treat draft prose that captures "
+                "a user-stated starting-capital amount while capital_amount is null "
+                "as a contradiction to reconcile from the current message, not as "
+                "evidence that no capital was stated. A standalone numeric magnitude "
+                "at the end of an otherwise complete strategy, asset, and "
+                "date-window request is a starting-capital candidate when it is "
+                "not serving as a date, lookback window, percentage, indicator "
+                "parameter, share count, or asset identifier. Do not require a "
+                "currency symbol. Return null for dates, calendar years, "
+                "indicator periods, lookback windows, percentages, share counts, "
+                "asset names, ticker symbols, or benchmark names. For DCA or "
+                "recurring buys, do not return per-purchase contribution here. "
+                "Do not copy default assumptions from the draft. If unsure, "
+                "return null with low confidence. Return only JSON matching the "
+                "schema."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Draft prose evidence JSON: "
+                f"{json.dumps(_starting_capital_prose_evidence_payload(response), ensure_ascii=False)}"
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Structured draft JSON: "
+                f"{response.candidate_strategy_draft.model_dump(mode='json')}"
+            ),
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
+
+
+def _starting_capital_prose_evidence_payload(
+    response: LLMInterpretationResponse,
+) -> dict[str, Any]:
+    draft = response.candidate_strategy_draft
+    return {
+        "raw_user_phrasing": draft.raw_user_phrasing,
+        "strategy_thesis": draft.strategy_thesis,
+        "evidence_spans": draft.evidence_spans,
+        "date_range_raw_text": draft.date_range_raw_text,
+        "capital_amount": draft.capital_amount,
+        "field_provenance": dict(draft.field_provenance or {}),
+    }
+
+
+def _response_from_stated_starting_capital_audit(
+    *,
+    response: LLMInterpretationResponse,
+    audit: StatedStartingCapitalAudit,
+) -> LLMInterpretationResponse | None:
+    if audit.starting_capital is None or audit.confidence < 0.8:
+        return None
+    repaired = response.model_copy(deep=True)
+    draft = repaired.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
+        return None
+    if draft.capital_amount == audit.starting_capital and draft.field_provenance.get(
+        "capital_amount"
+    ) == "starting_capital":
+        return None
+    draft.capital_amount = float(audit.starting_capital)
+    draft.field_provenance["capital_amount"] = "starting_capital"
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *repaired.reason_codes,
+                "stated_run_field_fidelity_audit",
+                "stated_starting_capital_recheck",
+            ]
+        )
+    )
+    return repaired
 
 
 def _normalized_stated_field(value: Any) -> str:
@@ -5434,8 +7198,11 @@ def _focused_strategy_extraction_has_material_fields(
             bool(extraction.asset_class),
             bool(extraction.timeframe),
             bool(extraction.date_range),
+            extraction.date_range_intent is not None,
             bool(extraction.comparison_baseline),
             extraction.capital_amount is not None,
+            extraction.recurring_contribution is not None,
+            bool(extraction.cadence),
             bool(extraction.entry_rule),
             bool(extraction.exit_rule),
             bool(extraction.rule_spec),
@@ -5459,18 +7226,38 @@ def _strategy_extraction_repair_is_allowed(
     if response.semantic_turn_act == "retry_failed_action":
         return not _request_has_failed_action_launch_payload(request)
     if response.semantic_turn_act == "unsupported_request":
-        return (
-            response.intent
-            in {
-                "unsupported_or_out_of_scope",
-                "beginner_guidance",
-                "conversation_followup",
-            }
-            and not response.unsupported_constraints
+        if _noncanonical_strategy_text_needs_focused_schema_repair(
+            response=response,
+            request=request,
+        ):
+            return True
+        if response.intent not in {
+            "unsupported_or_out_of_scope",
+            "beginner_guidance",
+            "conversation_followup",
+        }:
+            return False
+        if not response.unsupported_constraints:
+            return True
+        if not any(
+            item.category == "unsupported_strategy_logic"
+            for item in response.unsupported_constraints
+        ):
+            return False
+        if (
+            _request_has_active_strategy_context(request)
+            and not _request_current_turn_has_material_execution_evidence(request)
+        ):
+            return False
+        return bool(
+            response.candidate_strategy_draft.raw_user_phrasing
+            or response.candidate_strategy_draft.strategy_thesis
+            or request.current_user_message.strip()
         )
+    if response.semantic_turn_act == "answer_pending_need":
+        return _request_current_turn_has_material_execution_evidence(request)
     return response.semantic_turn_act not in {
         "refine_current_idea",
-        "answer_pending_need",
         "approval",
         "result_followup",
     }
@@ -5515,7 +7302,20 @@ def _focused_strategy_extraction_messages(
                 "Interpret only the current user message and return all fields needed "
                 "to draft an executable backtest. Do not omit a field that appears in "
                 "the message. Do not invent fees, slippage, position size, or provider "
-                "details. is_testable_strategy means the user is asking for a strategy "
+                "details. If the current message semantically gives a supported "
+                "strategy family, primary asset, benchmark/reference asset, relative "
+                "window, capital amount, recurring contribution, or recurring cadence, "
+                "returning null or empty for that field is an extraction failure. Do "
+                "not ask the user to choose a supported strategy when the current "
+                "message already selected one semantically. "
+                "Evidence spans are provenance only. Never put a supported "
+                "strategy, asset, benchmark, time window, or capital amount only "
+                "inside evidence_spans; populate the matching canonical field too. "
+                "date_range_intent is the canonical object field, not an "
+                "evidence_spans key; if a time window is visible, populate "
+                "date_range_raw_text with the exact bounded phrase and "
+                "date_range_intent with the canonical intent. "
+                "is_testable_strategy means the user is asking for a strategy "
                 "or backtest idea; it does not mean Argus can execute every part. For "
                 "clear sentiment, news, fundamental, external-data, or other draft-only "
                 "strategy requests, set is_testable_strategy=true, preserve the asset, "
@@ -5535,12 +7335,27 @@ def _focused_strategy_extraction_messages(
                 "in asset_universe; the provider-backed resolver will validate and "
                 "canonicalize assets after interpretation. Preserve user-stated "
                 "benchmark/comparison assets such as QQQ, SPY, BTC, or IWM in "
-                "comparison_baseline, not asset_universe. Natural date periods should "
-                "be compact strings such as 'past 2 years' or 'last 3 months'. If the "
-                "user gives a start date and says today, preserve the end as 'today' or "
+                "comparison_baseline, not asset_universe. In any language, a request "
+                "to buy, hold, or test one primary asset over a window with another "
+                "asset as a benchmark, reference, baseline, or comparison target is "
+                "an executable buy_and_hold setup with that other asset in "
+                "comparison_baseline; it is not unsupported custom logic. Relative windows such as "
+                "'last 8 months' or equivalent phrases in any language must become "
+                "date_range_intent with kind=rolling_window, count, unit, "
+                "anchor=today, confidence, and evidence. Current-year-to-current-date "
+                "windows in any language must become date_range_intent with "
+                "kind=year_to_date, confidence, and evidence. Do not ask for exact "
+                "endpoint dates when the current message states a relative window. "
+                "Use date_range_raw_text only as bounded evidence for the same "
+                "window, not as the executable date contract. If the user gives a "
+                "start date and says today, preserve the end as 'today' or "
                 f"{date.today().isoformat()}, not a stale model date. If the user gives "
                 "only a start or only an end, preserve only that endpoint and include "
                 "date_range in missing_required_fields; do not infer today. Preserve "
+                "language, date_range_raw_text, date_range_intent, and evidence_spans "
+                "when available. Use date_range_intent for relative or semantic time "
+                "windows so deterministic code receives canonical date math inputs "
+                "instead of localized prose. Preserve "
                 "user-stated timeframes such as 1 hour candles, hourly bars, 1h, "
                 "4 hour candles, 4h, daily candles, or 1D as timeframe. Normalize "
                 "one-hour/hourly to 1h, four-hour to 4h, and daily to 1D. Preserve "
@@ -5561,8 +7376,18 @@ def _focused_strategy_extraction_messages(
                 "overrides as numbers. If the user states only one threshold side, "
                 "fill that side and leave only the unstated side null so the runtime "
                 "can apply the supported default. Do not ask about RSI period; it has "
-                "a supported default. For explicit buy-and-hold ideas, set strategy_type "
-                "to buy_and_hold."
+                "a supported default.\n\n"
+                "A one-time historical acquisition or purchase plus holding through "
+                "a period is normal user language for the supported buy_and_hold "
+                "simulation, not unsupported manual trade replay. Preserve the asset, "
+                "capital_amount, and date_range_intent when present. Do not ask the "
+                "user to choose buy-and-hold again when the current message already "
+                "semantically selected holding and did not state a separate entry or "
+                "exit rule. A recurring fixed-amount purchase over a period is normal "
+                "user language for the supported dca_accumulation simulation. Preserve "
+                "the asset, recurring_contribution, cadence, capital_amount, and "
+                "date_range_intent when present. Do not route recurring fixed-amount "
+                "buys to unsupported recovery when those executable fields are stated."
             )
         ),
         HumanMessage(content=request.current_user_message),
@@ -5583,6 +7408,11 @@ def _response_from_focused_strategy_extraction(
     )
     exit_logic = extraction.exit_logic or moving_average_crossover_text(
         extraction.exit_rule
+    ) or moving_average_crossover_text(
+        opposite_moving_average_crossover_rule(extraction.entry_rule)
+    )
+    asset_universe, resolved_asset_class = _canonical_asset_universe_from_llm_extraction(
+        extraction.asset_universe
     )
     if strategy_type is None:
         return LLMInterpretationResponse(
@@ -5592,22 +7422,28 @@ def _response_from_focused_strategy_extraction(
             user_goal_summary=extraction.user_goal_summary,
             candidate_strategy_draft=LLMStrategyDraft(
                 raw_user_phrasing=request.current_user_message,
+                language=extraction.language,
                 strategy_thesis=extraction.strategy_thesis
                 or extraction.user_goal_summary,
-                asset_universe=list(extraction.asset_universe),
-                asset_class=extraction.asset_class,
+                asset_universe=asset_universe,
+                asset_class=extraction.asset_class or resolved_asset_class,
                 timeframe=extraction.timeframe,
                 date_range=extraction.date_range,
+                date_range_raw_text=extraction.date_range_raw_text,
+                date_range_intent=extraction.date_range_intent,
                 comparison_baseline=extraction.comparison_baseline,
                 capital_amount=extraction.capital_amount,
+                recurring_contribution=extraction.recurring_contribution,
+                cadence=extraction.cadence,
                 entry_logic=entry_logic,
                 exit_logic=exit_logic,
                 indicator=extraction.indicator,
                 indicator_period=extraction.indicator_period,
                 entry_threshold=extraction.entry_threshold,
                 exit_threshold=extraction.exit_threshold,
-                field_provenance=_comparison_baseline_provenance(
-                    extraction.comparison_baseline,
+                evidence_spans=dict(extraction.evidence_spans or {}),
+                field_provenance=_focused_extraction_field_provenance(
+                    extraction=extraction,
                     current_message=request.current_user_message,
                 ),
                 extra_parameters={
@@ -5649,14 +7485,19 @@ def _response_from_focused_strategy_extraction(
         user_goal_summary=extraction.user_goal_summary,
         candidate_strategy_draft=LLMStrategyDraft(
             raw_user_phrasing=request.current_user_message,
+            language=extraction.language,
             strategy_type=strategy_type,
             strategy_thesis=extraction.strategy_thesis or extraction.user_goal_summary,
-            asset_universe=list(extraction.asset_universe),
-            asset_class=extraction.asset_class,
+            asset_universe=asset_universe,
+            asset_class=extraction.asset_class or resolved_asset_class,
             timeframe=extraction.timeframe,
             date_range=extraction.date_range,
+            date_range_raw_text=extraction.date_range_raw_text,
+            date_range_intent=extraction.date_range_intent,
             comparison_baseline=extraction.comparison_baseline,
             capital_amount=extraction.capital_amount,
+            recurring_contribution=extraction.recurring_contribution,
+            cadence=extraction.cadence,
             entry_logic=entry_logic,
             exit_logic=exit_logic,
             entry_rule=extraction.entry_rule,
@@ -5666,8 +7507,9 @@ def _response_from_focused_strategy_extraction(
             indicator_period=extraction.indicator_period,
             entry_threshold=extraction.entry_threshold,
             exit_threshold=extraction.exit_threshold,
-            field_provenance=_comparison_baseline_provenance(
-                extraction.comparison_baseline,
+            evidence_spans=dict(extraction.evidence_spans or {}),
+            field_provenance=_focused_extraction_field_provenance(
+                extraction=extraction,
                 current_message=request.current_user_message,
             ),
         ),
@@ -5677,10 +7519,57 @@ def _response_from_focused_strategy_extraction(
         reason_codes=["focused_strategy_extraction_repair"],
         semantic_turn_act="new_idea",
     )
+    response.missing_required_fields = (
+        _capability_required_missing_fields_for_canonical_strategy(
+            response.missing_required_fields,
+            draft=response.candidate_strategy_draft,
+        )
+    )
+    if response.missing_required_fields or response.ambiguous_fields:
+        response.intent = "strategy_drafting"
+        response.requires_clarification = True
+        response.assistant_response = None
     return _merge_focused_repair_with_base(
         response=response,
         base_response=base_response,
     )
+
+
+def _canonical_asset_universe_from_llm_extraction(
+    values: list[str],
+) -> tuple[list[str], str | None]:
+    symbols: list[str] = []
+    seen: set[str] = set()
+    asset_classes: set[str] = set()
+    for index, value in enumerate(values):
+        raw_text = str(value or "").strip()
+        if not raw_text:
+            continue
+        symbol = ""
+        try:
+            resolution = _resolve_asset_candidate(
+                raw_text,
+                field=f"asset_universe[{index}]",
+                source="llm_extraction",
+            )
+        except Exception:
+            resolution = None
+        if (
+            resolution is not None
+            and resolution.status == "resolved"
+            and resolution.asset is not None
+        ):
+            symbol = str(resolution.asset.canonical_symbol or "").upper()
+            asset_class = str(resolution.asset.asset_class or "").strip()
+            if asset_class:
+                asset_classes.add(asset_class)
+        if not symbol:
+            symbol = raw_text.upper()
+        if symbol and symbol not in seen:
+            seen.add(symbol)
+            symbols.append(symbol)
+    resolved_asset_class = next(iter(asset_classes)) if len(asset_classes) == 1 else None
+    return symbols, resolved_asset_class
 
 
 def _comparison_baseline_provenance(
@@ -5690,6 +7579,32 @@ def _comparison_baseline_provenance(
 ) -> dict[str, str]:
     del comparison_baseline, current_message
     return {}
+
+
+def _focused_extraction_field_provenance(
+    *,
+    extraction: FocusedStrategyExtraction,
+    current_message: str,
+) -> dict[str, str]:
+    provenance = _comparison_baseline_provenance(
+        extraction.comparison_baseline,
+        current_message=current_message,
+    )
+    evidence_spans = dict(extraction.evidence_spans or {})
+    if (
+        extraction.comparison_baseline
+        and _llm_value_is_empty(provenance.get("comparison_baseline"))
+        and not _llm_value_is_empty(evidence_spans.get("comparison_baseline"))
+    ):
+        provenance["comparison_baseline"] = "explicit_user"
+    if extraction.recurring_contribution is not None:
+        provenance["recurring_contribution"] = "explicit_user"
+        provenance["capital_amount"] = "recurring_contribution"
+    elif extraction.capital_amount is not None:
+        provenance["capital_amount"] = "explicit_user"
+    if extraction.cadence:
+        provenance["cadence"] = "explicit_user"
+    return provenance
 
 
 def _merge_focused_repair_with_base(
@@ -5708,6 +7623,7 @@ def _merge_focused_repair_with_base(
         "asset_universe",
         "asset_class",
         "date_range",
+        "date_range_intent",
         "timeframe",
         "cadence",
         "capital_amount",
@@ -5817,18 +7733,9 @@ def _openrouter_wire_messages(messages: list[BaseMessage]) -> list[dict[str, str
         wire_messages[0]["content"] = (
             wire_messages[0]["content"]
             + "\n\nReturn only valid JSON matching the supplied schema. "
-            "Do not include reasoning, markdown, prose, or omitted strategy fields "
-            "for a strategy/backtest request. For an indicator-threshold request like "
-            "'Backtest TSLA using RSI entry at 20 or lower and exit at 60 or higher "
-            "over the last 3 months', the JSON must include candidate_strategy_draft "
-            "with strategy_type='rsi_mean_reversion', asset_universe=['TSLA'], "
-            "date_range='last 3 months', indicator='rsi', entry_threshold=20, "
-            "and exit_threshold=60. For a moving-average crossover request, include "
-            "candidate_strategy_draft.entry_rule as the typed moving_average_crossover "
-            "object described above. For a MACD crossover request, include "
-            "candidate_strategy_draft.rule_spec with the MACD line crossing its "
-            "signal line using the default 12/26/9 parameters unless the user "
-            "overrides them."
+            "Do not include reasoning, markdown, prose, or fields that are not "
+            "defined by the supplied schema. Use the schema descriptions and the "
+            "task-specific instructions above as the contract for canonical values."
         )
     return wire_messages
 
@@ -5885,9 +7792,37 @@ def _structured_interpretation_has_required_shape(
     ):
         return False
     if response.requires_clarification and response.assistant_response:
+        if _supported_anchor_needs_focused_run_window_repair(
+            response=response,
+            request=request,
+        ):
+            return False
+        if _supported_partial_strategy_needs_focused_schema_repair(
+            response=response,
+            request=request,
+        ):
+            return False
+        if _noncanonical_strategy_text_needs_focused_schema_repair(
+            response=response,
+            request=request,
+        ):
+            return False
         return True
     draft = response.candidate_strategy_draft
     if _llm_strategy_draft_has_extractable_fields(draft):
+        if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
+            missing = _capability_required_missing_fields_for_canonical_strategy(
+                response.missing_required_fields,
+                draft=draft,
+            )
+            if missing:
+                if _structured_strategy_missing_fields_can_clarify(
+                    response=response,
+                    draft=draft,
+                    missing=missing,
+                ):
+                    return True
+                return False
         if _llm_signal_strategy_is_underfilled(draft):
             return False
         if _response_replays_prior_strategy_without_current_turn_update(
@@ -5902,6 +7837,40 @@ def _structured_interpretation_has_required_shape(
     }:
         return False
     return False
+
+
+def _structured_strategy_missing_fields_can_clarify(
+    *,
+    response: LLMInterpretationResponse,
+    draft: LLMStrategyDraft,
+    missing: list[str],
+) -> bool:
+    if not missing:
+        return False
+    if not response.requires_clarification:
+        return False
+    if not response.missing_required_fields:
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "result_followup",
+        "retry_failed_action",
+        "unsupported_request",
+    }:
+        return False
+    if response.unsupported_constraints:
+        return False
+    if "supported_strategy_capability_conflict_audit" in response.reason_codes:
+        return False
+    strategy_type = executable_strategy_type(draft.model_dump(mode="python"))
+    if strategy_type not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    declared_missing = {
+        _field_path_base(field) for field in response.missing_required_fields
+    }
+    return set(missing).issubset(
+        declared_missing
+    ) and _llm_strategy_draft_has_extractable_fields(draft)
 
 
 def _request_has_failed_action_launch_payload(request: InterpretationRequest) -> bool:
@@ -5919,9 +7888,9 @@ def _response_underfills_pending_result_refinement(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
-    requested_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).split("[", 1)[0]
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
     if requested_field != "refinement":
         return False
     snapshot = request.latest_task_snapshot
@@ -6045,7 +8014,9 @@ def _llm_strategy_draft_has_executable_shape(draft: LLMStrategyDraft) -> bool:
     if strategy_type == "buy_and_hold":
         return bool(draft.asset_universe or draft.date_range)
     if strategy_type == "dca_accumulation":
-        return bool(draft.cadence)
+        return bool(_supported_dca_cadence_value(draft.cadence)) and (
+            _dca_draft_has_recurring_amount(draft)
+        )
     if strategy_type == "signal_strategy":
         return _llm_strategy_draft_has_structured_rule_or_indicator_fields(draft)
     return bool(
@@ -6166,6 +8137,12 @@ def _material_strategy_updates_from_draft(
         for key, value in payload.items()
         if key in material_fields and value not in (None, "", [], {})
     }
+    if "date_range" not in updates and draft.date_range_intent is not None:
+        intent_resolution = resolve_date_range_intent(draft.date_range_intent)
+        if intent_resolution is not None:
+            updates["date_range"] = _normalized_material_date_range_payload(
+                intent_resolution.payload
+            )
     indicator_updates = {
         key: payload.get(key)
         for key in {
@@ -6183,15 +8160,29 @@ def _material_strategy_updates_from_draft(
 
 def _normalized_material_strategy_value(key: str, value: Any) -> Any:
     if key == "date_range":
-        normalized = normalize_date_range_candidate(value)
-        try:
-            resolved = resolve_date_range(normalized)
-        except Exception:
-            return normalized
-        return (resolved.start.isoformat(), resolved.end.isoformat())
+        return _normalized_material_date_range_payload(value)
     if key == "asset_universe" and isinstance(value, list):
         return [str(symbol).strip().upper() for symbol in value if str(symbol).strip()]
     return value
+
+
+def _normalized_material_date_range_payload(value: Any) -> Any:
+    normalized = normalize_date_range_candidate(value)
+    if isinstance(normalized, str):
+        natural = resolve_date_range_text(normalized)
+        if natural is not None:
+            return ("resolved", natural.start.isoformat(), natural.end.isoformat())
+    try:
+        resolved = resolve_date_range(normalized)
+    except Exception:
+        return normalized
+    if resolved.used_default and isinstance(normalized, str) and normalized.strip():
+        return (
+            "unresolved_default",
+            resolved.start.isoformat(),
+            resolved.end.isoformat(),
+        )
+    return ("resolved", resolved.start.isoformat(), resolved.end.isoformat())
 
 
 def _normalize_response_for_runtime_context(
@@ -6276,7 +8267,8 @@ def _request_current_turn_has_material_execution_evidence(
         request.current_user_message,
         has_provider_asset_mention=bool(
             _resolved_asset_mentions_from_message(request.current_user_message)
-        ),
+        )
+        or _request_has_provider_exact_execution_asset(request),
         active_strategy_context=_request_has_active_strategy_context(request),
         requested_field=request.selected_thread_metadata.get("requested_field"),
     )
@@ -6285,6 +8277,14 @@ def _request_current_turn_has_material_execution_evidence(
 def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
     payload = draft.model_dump(mode="python")
     field_provenance = payload.pop("field_provenance", {}) or {}
+    language = _clean_optional_text(payload.pop("language", None))
+    date_range_raw_text = _clean_optional_text(payload.pop("date_range_raw_text", None))
+    date_range_intent = _clean_date_range_intent_payload(
+        payload.pop("date_range_intent", None)
+    )
+    evidence_spans = _clean_evidence_spans(payload.pop("evidence_spans", {}) or {})
+    if not date_range_intent:
+        date_range_intent = _date_range_intent_from_bounded_evidence(draft)
     initial_capital = payload.pop("initial_capital", None)
     total_capital = payload.pop("total_capital", None)
     recurring_contribution = payload.pop("recurring_contribution", None)
@@ -6344,10 +8344,40 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload.setdefault("extra_parameters", {})["field_provenance"] = dict(
             field_provenance
         )
+    if language:
+        payload.setdefault("extra_parameters", {})["language"] = language
+    if date_range_raw_text:
+        payload.setdefault("extra_parameters", {})["date_range_raw_text"] = (
+            date_range_raw_text
+        )
+    if date_range_intent:
+        payload.setdefault("extra_parameters", {})["date_range_intent"] = (
+            date_range_intent
+        )
+    if evidence_spans:
+        payload.setdefault("extra_parameters", {})["evidence_spans"] = evidence_spans
+    _normalize_llm_domain_slots(payload)
+    field_provenance = _evidence_backed_field_provenance(
+        payload=payload,
+        field_provenance=field_provenance,
+        evidence_spans=evidence_spans,
+    )
+    if field_provenance:
+        payload.setdefault("extra_parameters", {})["field_provenance"] = dict(
+            field_provenance
+        )
     payload["date_range"] = normalize_date_range_candidate(
         payload.get("date_range"),
         raw_user_phrasing=payload.get("raw_user_phrasing"),
     )
+    if date_range_intent:
+        intent_resolution = resolve_date_range_intent(date_range_intent)
+        intent_kind = str(date_range_intent.get("kind") or "").strip()
+        if intent_resolution is not None and (
+            intent_kind != "endpoint_patch"
+            or not _has_complete_date_range_payload(payload["date_range"])
+        ):
+            payload["date_range"] = intent_resolution.payload
     if draft.strategy_type:
         payload.setdefault("extra_parameters", {})["raw_strategy_type"] = (
             draft.strategy_type
@@ -6357,6 +8387,155 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         for rule in draft.risk_rules
     ]
     return StrategySummary.model_validate(payload)
+
+
+def _evidence_backed_field_provenance(
+    *,
+    payload: dict[str, Any],
+    field_provenance: dict[str, Any],
+    evidence_spans: dict[str, str],
+) -> dict[str, Any]:
+    updated = dict(field_provenance or {})
+    evidence_backed_fields = {
+        "cadence": "explicit_user",
+        "comparison_baseline": "explicit_user",
+        "timeframe": "explicit_user",
+    }
+    for field_name, source in evidence_backed_fields.items():
+        if field_name in updated:
+            continue
+        if field_name not in evidence_spans:
+            continue
+        if payload.get(field_name) in (None, "", [], {}):
+            continue
+        updated[field_name] = source
+    return updated
+
+
+def _normalize_llm_domain_slots(payload: dict[str, Any]) -> None:
+    strategy_type = canonical_strategy_type(
+        payload.get("strategy_type"),
+        cadence=payload.get("cadence"),
+    )
+    if strategy_type != "dca_accumulation":
+        return
+    raw_cadence = payload.get("cadence")
+    if raw_cadence in (None, "", [], {}):
+        return
+    cadence = _supported_dca_cadence_value(raw_cadence)
+    if cadence is None:
+        payload.setdefault("extra_parameters", {})["raw_cadence"] = raw_cadence
+        payload["cadence"] = None
+        return
+    payload["cadence"] = cadence
+    extra_parameters = payload.setdefault("extra_parameters", {})
+    extra_parameters["recurring_cadence"] = cadence
+
+
+def _clean_optional_text(value: Any) -> str | None:
+    text = str(value or "").strip()
+    return text or None
+
+
+def _clean_evidence_spans(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    cleaned: dict[str, str] = {}
+    for key, span in value.items():
+        normalized_key = str(key or "").strip()
+        normalized_span = str(span or "").strip()
+        if normalized_key and normalized_span:
+            cleaned[normalized_key] = normalized_span
+    return cleaned
+
+
+def _clean_date_range_intent_payload(value: Any) -> dict[str, Any]:
+    if value in (None, "", [], {}):
+        return {}
+    if isinstance(value, dict):
+        return dict(value)
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        dumped = model_dump(mode="python")
+        return dict(dumped) if isinstance(dumped, dict) else {}
+    return {}
+
+
+def _has_complete_date_range_payload(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    start = value.get("start") or value.get("from")
+    end = value.get("end") or value.get("to")
+    return bool(start not in (None, "", [], {}) and end not in (None, "", [], {}))
+
+
+def _date_range_from_intent_or_bounded_evidence(
+    draft: LLMStrategyDraft,
+    *,
+    language: str | None = None,
+) -> dict[str, str] | None:
+    intent_resolution = resolve_date_range_intent(draft.date_range_intent)
+    if intent_resolution is not None:
+        return intent_resolution.payload
+    bounded = _date_range_from_bounded_evidence(draft, language=language)
+    if bounded is not None:
+        return bounded
+    return None
+
+
+def _date_range_from_bounded_evidence(
+    draft: LLMStrategyDraft,
+    *,
+    language: str | None = None,
+) -> dict[str, str] | None:
+    evidence_candidates = _bounded_date_evidence_candidates(draft)
+    if not evidence_candidates:
+        return None
+    language_candidates = _natural_time_language_candidates_from_hints(
+        draft.language,
+        language,
+    )
+    for candidate in evidence_candidates:
+        for languages in language_candidates:
+            resolved = resolve_date_range_text(candidate, languages=languages)
+            if resolved is not None:
+                return resolved.payload
+    return None
+
+
+def _date_range_intent_from_bounded_evidence(
+    draft: LLMStrategyDraft,
+    *,
+    language: str | None = None,
+) -> dict[str, Any]:
+    evidence_candidates = _bounded_date_evidence_candidates(draft)
+    if not evidence_candidates:
+        return {}
+    language_candidates = _natural_time_language_candidates_from_hints(
+        draft.language,
+        language,
+    )
+    for candidate in evidence_candidates:
+        for languages in language_candidates:
+            intent = resolve_rolling_window_intent_text(
+                candidate,
+                languages=languages,
+            )
+            if intent is not None:
+                return intent
+    return {}
+
+
+def _bounded_date_evidence_candidates(draft: LLMStrategyDraft) -> list[str]:
+    candidates: list[str] = []
+    if draft.date_range_raw_text:
+        candidates.append(draft.date_range_raw_text)
+    evidence_spans = _draft_semantic_evidence_spans(draft)
+    for key in _DATE_EVIDENCE_SPAN_KEYS:
+        value = evidence_spans.get(key)
+        if value:
+            candidates.append(value)
+    return list(dict.fromkeys(str(item).strip() for item in candidates if str(item).strip()))
 
 
 def _non_dca_starting_capital_from_total_fields(
@@ -6821,8 +9000,6 @@ def _dca_cadence_has_user_provenance(
         cadence_source = field_provenance.get("cadence")
         if cadence_source in {"user", "explicit_user", "prior", "visible_draft"}:
             return True
-    if _dca_cadence_from_current_message(request.current_user_message) == cadence:
-        return True
     snapshot = request.latest_task_snapshot
     if snapshot is None:
         return False
@@ -6903,14 +9080,6 @@ def _humanize_simplification_label(label: str) -> str:
 
 
 def _dedupe_resolution_provenance(
-    items: list[ResolutionProvenance],
+    items: list[ResolutionProvenance | dict[str, Any]],
 ) -> list[ResolutionProvenance]:
-    seen: set[tuple[str, str, str, str]] = set()
-    deduped: list[ResolutionProvenance] = []
-    for item in items:
-        key = (item.field, item.raw_text, item.source, item.candidate_kind)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(item)
-    return deduped
+    return dedupe_resolution_provenance_items(items)

@@ -54,6 +54,26 @@ def run_backtest(
                 headers={"Retry-After": "60"},
             ) from exc
 
+    if payload.conversation_id:
+        conversation = None
+        if api_state.supabase_gateway is not None:
+            conversation = api_state.supabase_gateway.get_conversation(
+                user_id=user.id,
+                conversation_id=payload.conversation_id,
+            )
+        else:
+            owner_id = api_state.store.conversation_owners.get(payload.conversation_id)
+            if owner_id in {None, user.id}:
+                conversation = api_state.store.conversations.get(payload.conversation_id)
+        if conversation is None:
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Conversation not found.",
+            )
+
     data = payload.model_dump(exclude_none=True)
     if payload.strategy_id:
         strategy = None

@@ -14,6 +14,7 @@ from argus.domain.backtesting.execution import (
     _dca_equity_curve,
     _execution_realism_settings,
 )
+from argus.domain.backtesting.metrics import portfolio_value_summary
 from argus.domain.backtesting.signals import _build_signals
 from argus.domain.market_data import fetch_ohlcv
 
@@ -83,26 +84,18 @@ def build_result_chart(
         for ts, value in aggregate_equity.items()
     ]
     markers = _thin_chart_markers(_chart_markers_from_events(events), limit=80)
-    return {
+    chart = {
         "kind": "portfolio_equity",
         "series": series,
         "markers": markers,
         "currency": "USD",
         "base_value": series[0]["value"] if series else None,
-        "value_extrema": _chart_value_extrema(series),
         "attribution": "TradingView Lightweight Charts",
     }
-
-
-def _chart_value_extrema(series: list[dict[str, Any]]) -> dict[str, Any] | None:
-    if not series:
-        return None
-    peak = max(series, key=lambda point: float(point["value"]))
-    lowest = min(series, key=lambda point: float(point["value"]))
-    return {
-        "peak": {"time": peak["time"], "value": peak["value"]},
-        "lowest": {"time": lowest["time"], "value": lowest["value"]},
-    }
+    value_summary = portfolio_value_summary(aggregate_equity)
+    if value_summary is not None:
+        chart["value_summary"] = value_summary
+    return chart
 
 
 def _collect_execution_fill_events(
@@ -136,15 +129,6 @@ def _chart_markers_from_events(
     for time_key in sorted(events):
         entry_symbols = sorted(events[time_key].get("entry", set()))
         exit_symbols = sorted(events[time_key].get("exit", set()))
-        if entry_symbols:
-            markers.append(
-                {
-                    "time": time_key,
-                    "type": "entry",
-                    "label": _event_label("Buy", entry_symbols),
-                    "symbols": entry_symbols,
-                }
-            )
         if exit_symbols:
             markers.append(
                 {
@@ -152,6 +136,15 @@ def _chart_markers_from_events(
                     "type": "exit",
                     "label": _event_label("Sell", exit_symbols),
                     "symbols": exit_symbols,
+                }
+            )
+        if entry_symbols:
+            markers.append(
+                {
+                    "time": time_key,
+                    "type": "entry",
+                    "label": _event_label("Buy", entry_symbols),
+                    "symbols": entry_symbols,
                 }
             )
     return markers

@@ -4,6 +4,7 @@ const runId = `${Date.now()}-${process.pid}`;
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
 const reuseExistingServer =
   process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER === "true";
+const mockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH ?? "true";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -25,7 +26,7 @@ export default defineConfig({
     reuseExistingServer,
     timeout: 120_000,
     env: {
-      NEXT_PUBLIC_MOCK_AUTH: "true",
+      NEXT_PUBLIC_MOCK_AUTH: mockAuth,
       NEXT_PUBLIC_ENABLE_DEV_ONBOARDING_RESET: "true",
     },
   },

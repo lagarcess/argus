@@ -246,6 +246,79 @@ class _FakeTerminalTaskRunClient:
         return dict(self.payload)
 
 
+class _StaleJobScanGateway:
+    def __init__(self) -> None:
+        self.jobs: list[dict[str, object]] = [
+            {
+                "id": "job-stale-running",
+                "user_id": "user-1",
+                "status": "running",
+                "queued_at": "2026-06-06T12:00:00+00:00",
+                "started_at": "2026-06-06T12:01:00+00:00",
+                "updated_at": "2026-06-06T12:01:00+00:00",
+                "execution_metadata": {
+                    "workflow_dispatch": {"task_run_id": "trn-stale-1"}
+                },
+            },
+            {
+                "id": "job-fresh-queued",
+                "user_id": "user-1",
+                "status": "queued",
+                "queued_at": "2026-06-06T12:28:00+00:00",
+                "created_at": "2026-06-06T12:28:00+00:00",
+                "updated_at": "2026-06-06T12:28:00+00:00",
+                "execution_metadata": {
+                    "workflow_dispatch": {"task_run_id": "trn-fresh-1"}
+                },
+            },
+        ]
+        self.failed_updates: list[dict[str, object]] = []
+        self.list_calls: list[dict[str, object]] = []
+
+    def list_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+        oldest_first: bool = False,
+    ) -> list[dict[str, object]]:
+        self.list_calls.append(
+            {
+                "status": status,
+                "user_id": user_id,
+                "limit": limit,
+                "oldest_first": oldest_first,
+            }
+        )
+        jobs = [
+            dict(job)
+            for job in self.jobs
+            if job.get("status") == status
+            and (user_id is None or job.get("user_id") == user_id)
+        ]
+        return jobs[:limit]
+
+    def mark_backtest_job_failed(self, **payload: object) -> dict[str, object]:
+        self.failed_updates.append(payload)
+        for job in self.jobs:
+            if job["id"] == payload["job_id"]:
+                execution_metadata = dict(job.get("execution_metadata") or {})
+                execution_metadata.update(dict(payload.get("execution_metadata") or {}))
+                job.update(
+                    {
+                        "status": "failed",
+                        "failure_code": payload["failure_code"],
+                        "failure_detail": payload["failure_detail"],
+                        "retryable": payload["retryable"],
+                        "finished_at": payload.get("finished_at"),
+                        "execution_metadata": execution_metadata,
+                    }
+                )
+                return dict(job)
+        raise AssertionError("unknown job")
+
+
 def _payload() -> dict[str, object]:
     return {
         "strategy_type": "buy_and_hold",
@@ -535,3 +608,84 @@ def test_backtest_job_status_endpoint_reconciles_terminal_workflow_run(
     assert payload["job"]["status"] == "failed"
     assert payload["job"]["failure_code"] == "workflow_task_timeout"
     assert payload["job"]["retryable"] is True
+
+
+def test_stale_backtest_job_scan_reconciles_terminal_task_run() -> None:
+    from argus.api.chat.backtest_jobs import scan_stale_backtest_jobs
+
+    gateway = _StaleJobScanGateway()
+    task_client = _FakeTerminalTaskRunClient(
+        {
+            "id": "trn-stale-1",
+            "status": "failed",
+            "error": "task timed out",
+            "completedAt": "2026-06-06T12:03:00Z",
+        }
+    )
+
+    report = scan_stale_backtest_jobs(
+        gateway=gateway,
+        now=datetime(2026, 6, 6, 12, 30, tzinfo=timezone.utc),
+        queued_age_seconds=900,
+        running_age_seconds=900,
+        limit=20,
+        task_run_client=task_client,
+    )
+
+    assert task_client.calls == ["trn-stale-1"]
+    assert gateway.list_calls == [
+        {
+            "status": "queued",
+            "user_id": None,
+            "limit": 20,
+            "oldest_first": True,
+        },
+        {
+            "status": "running",
+            "user_id": None,
+            "limit": 20,
+            "oldest_first": True,
+        },
+    ]
+    assert gateway.failed_updates[0]["job_id"] == "job-stale-running"
+    assert report["status"] == "ready"
+    assert report["stale_count"] == 1
+    assert report["reconciled_count"] == 1
+    assert report["unresolved_count"] == 0
+
+
+def test_stale_backtest_job_scan_reports_unresolved_jobs_without_task_metadata() -> None:
+    from argus.api.chat.backtest_jobs import scan_stale_backtest_jobs
+
+    gateway = _StaleJobScanGateway()
+    gateway.jobs[0]["execution_metadata"] = {}
+    task_client = _FakeTerminalTaskRunClient(
+        {
+            "id": "trn-stale-1",
+            "status": "failed",
+            "error": "task timed out",
+        }
+    )
+
+    report = scan_stale_backtest_jobs(
+        gateway=gateway,
+        now=datetime(2026, 6, 6, 12, 30, tzinfo=timezone.utc),
+        queued_age_seconds=900,
+        running_age_seconds=900,
+        limit=20,
+        task_run_client=task_client,
+    )
+
+    assert task_client.calls == []
+    assert report["status"] == "degraded"
+    assert report["reconciled_count"] == 0
+    assert report["unresolved_count"] == 1
+    assert report["unresolved_jobs"] == [
+        {
+            "id": "job-stale-running",
+            "status": "running",
+            "user_id": "user-1",
+            "age_seconds": 1740,
+            "task_run_id": None,
+        }
+    ]

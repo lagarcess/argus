@@ -31,6 +31,14 @@ describe("Spanish UI Smoke Harness", () => {
     "chat.confirmation.rows.period",
     "chat.confirmation.actions.run_backtest",
     "chat.confirmation.actions.change_dates",
+    "chat.asset_class.equity",
+    "chat.asset_class.crypto",
+    "chat.asset_class.currency_pair",
+    "chat.cadence.daily",
+    "chat.cadence.weekly",
+    "chat.cadence.biweekly",
+    "chat.cadence.monthly",
+    "chat.cadence.quarterly",
     "settings.title",
     "settings.profile.title",
     "settings.profile.delete_account",
@@ -204,5 +212,13 @@ describe("Spanish UI Smoke Harness", () => {
         process.env.NEXT_PUBLIC_ENABLE_SPANISH = originalEnv;
       }
     }
+  });
+
+  test("I18n provider keeps the document language in sync", () => {
+    const providerSource = fs.readFileSync(path.join(webRoot, "components/I18nProvider.tsx"), "utf-8");
+
+    expect(providerSource).toContain("document.documentElement.lang");
+    expect(providerSource).toContain("languageChanged");
+    expect(providerSource).toContain("normalizeEnabledLanguage");
   });
 });

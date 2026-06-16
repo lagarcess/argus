@@ -71,6 +71,15 @@ def test_dev_script_ignores_database_urls_even_when_env_contains_them() -> None:
     assert "Database URLs: Ignored" in dev_script
 
 
+def test_dev_script_disables_disk_market_data_cache_for_stable_memory_qa() -> None:
+    dev_script = _source(".github/dev.sh")
+    env_contract = ENV_CONTRACT.read_text()
+
+    assert "Synthetic fixtures (no API calls)" in dev_script
+    assert "Disk market-data cache: Disabled" in dev_script
+    assert "export ENABLE_MARKET_DATA_CACHE=false" in env_contract
+
+
 def test_dev_and_qa_scripts_source_shared_env_contract() -> None:
     assert ENV_CONTRACT.exists()
     assert 'source "$SCRIPT_DIR/argus-env.sh"' in _source(".github/dev.sh")
@@ -366,6 +375,47 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
     assert "render_workflow_json" in source
 
 
+def test_render_env_sync_prints_api_deploy_status_without_mutation() -> None:
+    source = _source(".github/render-env-sync.sh")
+
+    assert ".github/render-env-sync.sh api-deploy-status" in source
+    assert "print_api_deploy_status()" in source
+    assert "/v1/services/${service_id}/deploys?limit=1" in source
+    assert 'print_deploy_status "$API_SERVICE_ID" "argus-api"' in source
+    assert "commit_short" in source
+    assert "deploy_id" in source
+
+    deploy_status_block = source.split(
+        "print_api_deploy_status() {",
+        maxsplit=1,
+    )[1].split("\n}", maxsplit=1)[0]
+
+    assert "put_render_env" not in deploy_status_block
+    assert "delete_render_env" not in deploy_status_block
+
+
+def test_render_env_sync_prints_web_deploy_status_without_mutation() -> None:
+    env_contract = ENV_CONTRACT.read_text()
+    source = _source(".github/render-env-sync.sh")
+
+    assert 'ARGUS_PRIVATE_LAUNCH_WEB_SERVICE_ID="srv-d7ap6bmslomc73eqp8m0"' in (
+        env_contract
+    )
+    assert ".github/render-env-sync.sh web-deploy-status" in source
+    assert "WEB_SERVICE_ID" in source
+    assert "print_web_deploy_status()" in source
+    assert "/v1/services/${service_id}/deploys?limit=1" in source
+    assert 'print_deploy_status "$WEB_SERVICE_ID" "argus-app"' in source
+
+    deploy_status_block = source.split(
+        "print_web_deploy_status() {",
+        maxsplit=1,
+    )[1].split("\n}", maxsplit=1)[0]
+
+    assert "put_render_env" not in deploy_status_block
+    assert "delete_render_env" not in deploy_status_block
+
+
 def test_render_env_sync_can_sync_api_runtime_config() -> None:
     source = _source(".github/render-env-sync.sh")
 
@@ -520,3 +570,60 @@ def test_warmup_script_can_assert_expected_api_mode_without_mutating_render() ->
     assert "ARGUS_BACKTEST_REAL_WORKFLOW_TASK=argus-backtests/run_backtest_job" in warmup
     assert "put_render_env" not in warmup
     assert "delete_render_env" not in warmup
+
+
+def test_warmup_script_runs_stale_job_scan_when_supabase_verifier_env_exists() -> None:
+    warmup = _source(".github/warmup-render.sh")
+
+    assert ".github/stale-backtest-jobs.sh" in warmup
+    assert "ARGUS_STALE_JOBS_SUPABASE_URL" in warmup
+    assert "ARGUS_STALE_JOBS_SUPABASE_SERVICE_ROLE_KEY" in warmup
+    assert "Skipping stale backtest job scan" in warmup
+    assert "set -x" not in warmup
+
+
+def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    before_sessions = runbook.split("## Before Tester Sessions", maxsplit=1)[
+        1
+    ].split("## Backtest Workflow Modes", maxsplit=1)[0]
+    normalized_before_sessions = " ".join(before_sessions.split())
+
+    assert ".github/render-env-sync.sh api-real-workflow-on" in before_sessions
+    assert ".github/render-env-sync.sh api-deploy-status" in before_sessions
+    assert ".github/render-env-sync.sh web-deploy-status" in before_sessions
+    assert ".github/warmup-render.sh --expect-mode real-workflow" in before_sessions
+    assert ".github/canary-render.sh" in before_sessions
+    assert (
+        "API deploy-status, app deploy-status, warmup, English canary, and Spanish canary"
+        in normalized_before_sessions
+    )
+    assert "both scripts pass" not in before_sessions
+    assert ".github/stale-backtest-jobs.sh" in runbook
+    assert "api-safe-off` is the default private-alpha tester mode" not in runbook
+    assert "NEXT_PUBLIC_POSTHOG_KEY" in runbook
+
+
+def test_private_launch_runbook_smoke_covers_final_readiness_path() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    smoke_test = runbook.split("## Smoke Test", maxsplit=1)[1].split(
+        "## Supabase Persistence Check",
+        maxsplit=1,
+    )[0]
+
+    for expected in (
+        "Cold-start starter chips are visible",
+        "do not reference 2024",
+        "Spanish prompt",
+        "Run backtest",
+        "Change dates",
+        "Change asset",
+        "Adjust assumptions",
+        "Cancel",
+        "Quick take",
+        "Explain result",
+        "Retry",
+        "Reloading the page preserves the conversation, job state, and result",
+        "Feedback can be submitted",
+    ):
+        assert expected in smoke_test

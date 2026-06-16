@@ -60,11 +60,17 @@ def test_legacy_orchestrator_file_is_deleted() -> None:
     assert importlib.util.find_spec("argus.domain.orchestrator") is None
 
 
+def test_legacy_signal_parser_package_is_deleted() -> None:
+    signals_path = ROOT / "src" / "argus" / "agent_runtime" / "signals"
+    assert not (signals_path / "__init__.py").exists()
+    assert not (signals_path / "task_relation.py").exists()
+    assert list(signals_path.glob("*.py")) == []
+
+
 def test_regex_nlu_artifacts_are_absent() -> None:
     paths = [
         "src/argus/agent_runtime/stages/interpret.py",
         "src/argus/agent_runtime/extraction/structured.py",
-        "src/argus/agent_runtime/signals/task_relation.py",
     ]
     forbidden = [
         "extract_signals(",

@@ -237,6 +237,7 @@ def _run_indicator_threshold(
             "entry_threshold": indicator_parameters["entry_threshold"],
             "exit_threshold": indicator_parameters["exit_threshold"],
             "rule_spec": indicator_parameters["rule_spec"],
+            "engine_config": dict(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -328,6 +329,7 @@ def _run_signal_strategy(
             "cadence": request.cadence,
             "template": config["template"],
             "rule_spec": rule_spec,
+            "engine_config": dict(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -415,13 +417,11 @@ def _run_dca_accumulation(
             "starting_principal": 0.0,
             "position_size": request.position_size,
             "cadence": cadence,
+            "engine_config": dict(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
-        assumptions=[
-            f"Recurring allocation: ${recurring_allocation:,.0f}.",
-            f"Cadence: {cadence}.",
-        ],
+        assumptions=list(result_card.get("assumptions", [])),
         caveats=[
             format_timeframe_data_caveat(config["timeframe"], language=language),
             format_recurring_entry_caveat(config["timeframe"], language=language),
@@ -493,6 +493,7 @@ def _run_buy_and_hold(
             "capital_amount": starting_capital,
             "position_size": request.position_size,
             "cadence": request.cadence,
+            "engine_config": dict(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -716,13 +717,13 @@ def _initial_price(
 
 
 def _resolve_request_symbols(request: LaunchBacktestRequest) -> tuple[list[str], str]:
-    if request.asset_class is not None:
-        if not request.symbols:
-            raise ValueError("invalid_symbol_count")
-        return [symbol.strip().upper() for symbol in request.symbols], request.asset_class
     assets = [classify_symbol(symbol) for symbol in request.symbols]
     if not assets:
         raise ValueError("invalid_symbol_count")
+    if request.asset_class is not None:
+        if any(asset.asset_class != request.asset_class for asset in assets):
+            raise ValueError("asset_class_conflict")
+        return [asset.symbol for asset in assets], request.asset_class
     asset_class = assets[0].asset_class
     if any(asset.asset_class != asset_class for asset in assets):
         raise ValueError("asset_class_conflict")
@@ -783,7 +784,7 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "unsupported_rule_operator",
         "provider_timeframe_unavailable",
     }
-    if error_code == "market_data_unavailable":
+    if error_code in {"market_data_unavailable", "benchmark_data_unavailable"}:
         return "upstream_dependency_error", "failed_upstream"
     if error_code in invalid_inputs:
         return "parameter_validation_error", "blocked_invalid_input"
