@@ -134,7 +134,8 @@ export function consumedResultActionsFromApi(items: ApiMessage[]): ConsumedResul
     const metadata = message.metadata ?? {};
     const action = chatActionFromMetadata(metadata);
     if (isBreakdownActionMetadata(metadata)) {
-      return [{ type: "show_breakdown", runId: resultActionRunId(action) }];
+      const runId = resultActionRunId(action);
+      return runId ? [{ type: "show_breakdown", runId }] : [];
     }
     if (message.role === "assistant" && isSaveActionMetadata(metadata)) {
       const savedStrategyId = savedStrategyIdFromMetadata(metadata);
@@ -262,8 +263,12 @@ export function consumeResultActionOnMessages(
   if (action?.type !== "show_breakdown") {
     return messages;
   }
+  const runId = resultActionRunId(action);
+  if (!runId) {
+    return messages;
+  }
   return applyConsumedResultActions(messages, [
-    { type: "show_breakdown", runId: resultActionRunId(action) },
+    { type: "show_breakdown", runId },
   ]);
 }
 

@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 
 import {
   applyConfirmationActionEffects,
+  applyConsumedResultActions,
+  consumeResultActionOnMessages,
   confirmationActionEffectsFromApi,
+  consumedResultActionsFromApi,
   normalizeConfirmationHistory,
   settleConfirmationAfterActionTransportError,
   settleOpenConfirmationsAfterStreamError,
@@ -55,6 +58,36 @@ function confirmationMessage(): Message {
         label: "Run backtest",
         presentation: "confirmation",
         payload: { confirmation_id: "confirm-aapl" },
+      },
+    ],
+  };
+}
+
+function resultMessage(runId: string): Message {
+  return {
+    id: `assistant-result-${runId}`,
+    role: "ai",
+    kind: "strategy_result",
+    result: {
+      strategyName: "AAPL buy and hold",
+      period: "past year",
+      runId,
+      metrics: [],
+      actions: [
+        {
+          type: "show_breakdown",
+          label: "Explain result",
+          presentation: "result",
+          payload: { run_id: runId, conversation_id: "conversation-1" },
+        },
+      ],
+    },
+    actions: [
+      {
+        type: "show_breakdown",
+        label: "Explain result",
+        presentation: "result",
+        payload: { run_id: runId, conversation_id: "conversation-1" },
       },
     ],
   };
@@ -484,5 +517,59 @@ describe("chat artifact history", () => {
 
     expect(message.confirmation?.confirmation_state).toBe("cancelled");
     expect(message.confirmation?.statusLabel).toBe("Draft canceled");
+  });
+
+  test("breakdown action metadata without canonical run id does not consume result actions", () => {
+    const items: ApiMessage[] = [
+      {
+        id: "assistant-breakdown",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "I could not find the completed backtest to explain.",
+        created_at: "2026-05-15T00:00:01Z",
+        metadata: {
+          chat_action: {
+            type: "show_breakdown",
+            label: "Explain result",
+            presentation: "result",
+            payload: {},
+          },
+          result_breakdown_source: "missing_result",
+        },
+      },
+    ];
+
+    const consumedActions = consumedResultActionsFromApi(items);
+    const messages = applyConsumedResultActions(
+      [resultMessage("run-a"), resultMessage("run-b")],
+      consumedActions,
+    );
+
+    expect(consumedActions).toEqual([]);
+    expect(messages[0].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+    ]);
+    expect(messages[1].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+    ]);
+  });
+
+  test("optimistic breakdown action without canonical run id does not consume result actions", () => {
+    const messages = consumeResultActionOnMessages(
+      [resultMessage("run-a"), resultMessage("run-b")],
+      {
+        type: "show_breakdown",
+        label: "Explain result",
+        presentation: "result",
+        payload: {},
+      },
+    );
+
+    expect(messages[0].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+    ]);
+    expect(messages[1].result?.actions?.map((action) => action.type)).toEqual([
+      "show_breakdown",
+    ]);
   });
 });
