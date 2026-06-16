@@ -1252,6 +1252,12 @@ Production-parity browser QA refresh on 2026-06-16:
   final SSE confirmation payload and persisted assistant metadata contain
   `AAPL` with no stale `invalid_symbols`. The focused stream-contract file
   returned `24 passed`.
+- Follow-up browser coverage now prevents the Spanish readiness smoke from
+  passing with English mocked backend result text. The Playwright mock API
+  returns localized Spanish result summary, breakdown, and refine text when
+  `language="es-419"`, and the Spanish smoke asserts the localized summary plus
+  Spanish result breakdown copy after reload and `Explicar resultado`. The full
+  `web/e2e/chat-action-recovery.spec.ts` Chromium run returned `6 passed`.
 - Fresh in-app Browser QA after the result-action refresh restarted
   `.github/qa.sh` against the updated tree and reused the real-auth frontend.
   Login reached `/chat` with no console warnings. The same Spanish Apple prompt

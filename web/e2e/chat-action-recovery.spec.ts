@@ -295,6 +295,18 @@ async function mockChatApi(
     language === "es-419"
       ? "Recuperado despues de reintentar."
       : "Recovered after retry.";
+  const resultSummary =
+    language === "es-419"
+      ? "Resumen rápido: AAPL terminó por debajo del valor inicial y quedó detrás de SPY."
+      : "Quick take: AAPL finished below the starting value and lagged SPY.";
+  const resultBreakdown =
+    language === "es-419"
+      ? "Desglose: la mayor parte de la diferencia vino de la brecha contra SPY y la caída máxima."
+      : "Breakdown: most of the shortfall came from the benchmark gap and drawdown.";
+  const refinePrompt =
+    language === "es-419"
+      ? "Dime qué quieres ajustar a continuación."
+      : "Tell me what you want to refine next.";
   const streamRequests: StreamRequest[] = [];
   const feedbackRequests: Array<Record<string, unknown>> = [];
   const messages: ApiMessage[] = [];
@@ -351,7 +363,7 @@ async function mockChatApi(
       }),
       persistedAssistantMessage(
         "msg-result",
-        "Quick take: AAPL finished below the starting value and lagged SPY.",
+        resultSummary,
         {
           result_card: resultCard(
             activeDateRange,
@@ -516,14 +528,13 @@ async function mockChatApi(
         { type: "stage_start", stage: "execute" },
         {
           type: "token",
-          content: "Quick take: AAPL finished below the starting value and lagged SPY.",
+          content: resultSummary,
         },
         {
           type: "final",
           payload: {
             stage_outcome: "completed",
-            assistant_response:
-              "Quick take: AAPL finished below the starting value and lagged SPY.",
+            assistant_response: resultSummary,
             run: completedRun(
               activeDateRange,
               activeAssetSymbol,
@@ -542,8 +553,7 @@ async function mockChatApi(
           type: "final",
           payload: {
             stage_outcome: "ready_to_respond",
-            assistant_response:
-              "Breakdown: most of the shortfall came from the benchmark gap and drawdown.",
+            assistant_response: resultBreakdown,
             message_id: "msg-breakdown",
           },
         },
@@ -557,7 +567,7 @@ async function mockChatApi(
           type: "final",
           payload: {
             stage_outcome: "ready_to_respond",
-            assistant_response: "Tell me what you want to refine next.",
+            assistant_response: refinePrompt,
             message_id: "msg-refine",
           },
         },
@@ -763,14 +773,14 @@ test("private-alpha readiness smoke covers starter, Spanish edit, result, reload
 
   await page.getByRole("button", { name: "Ejecutar backtest" }).click();
   await expect(page.getByText("Simulación completa")).toBeVisible();
-  await expect(page.getByText("Quick take: AAPL finished below")).toBeVisible();
+  await expect(page.getByText("Resumen rápido: AAPL terminó")).toBeVisible();
   await expect(
     page.getByText("1 feb 2025 → 1 may 2025").first(),
   ).toBeVisible();
 
   await page.reload({ waitUntil: "networkidle" });
   await expect(page.getByText("Simulación completa")).toBeVisible();
-  await expect(page.getByText("Quick take: AAPL finished below")).toBeVisible();
+  await expect(page.getByText("Resumen rápido: AAPL terminó")).toBeVisible();
   await expect(page.getByRole("button", { name: "Explicar resultado" })).toBeVisible();
 
   await page.getByRole("button", { name: "Más acciones" }).nth(1).click();
@@ -797,7 +807,7 @@ test("private-alpha readiness smoke covers starter, Spanish edit, result, reload
 
   await page.getByRole("button", { name: "Explicar resultado" }).click();
   await expect(page.getByLabel("Desglose del resultado")).toContainText(
-    "most of the shortfall",
+    "mayor parte de la diferencia",
   );
 
   await page.getByTestId("chat-input").fill("Provocar reintento");
