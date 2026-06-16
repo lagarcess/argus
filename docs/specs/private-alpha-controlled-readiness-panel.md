@@ -854,6 +854,7 @@ poetry run python scripts/benchmarks/backtest_infra_benchmark.py
 .github/render-env-sync.sh api-status
 .github/warmup-render.sh --expect-mode real-workflow
 .github/canary-render.sh
+poetry run python scripts/ops/alpha_readiness_metrics.py --json
 poetry run python scripts/benchmarks/render_internet_benchmark.py --repeat 1
 ```
 
@@ -895,6 +896,12 @@ Latest Render verification on 2026-06-16:
   `.github/warmup-render.sh --expect-mode real-workflow`, then runs
   `.github/canary-render.sh`. It has read-only repository permissions and does
   not deploy or configure analytics.
+- Closed locally in the readiness worktree:
+  `scripts/ops/alpha_readiness_metrics.py` summarizes aggregate
+  `backtest_jobs.execution_metadata` signals without emitting user ids,
+  conversation ids, prompts, or analytics events. A live 2026-06-16 run over the
+  last 24 hours returned `job_count=0`, `active_jobs=0`,
+  `deterministic_readout_fallbacks=0`, and `terminal_failures=0`.
 - Closed locally in the readiness worktree: `.github/stale-backtest-jobs.sh`
   scans stale queued/running backtest jobs, reconciles terminal Render task runs
   through the existing backtest-job helper, and is invoked by
@@ -910,7 +917,8 @@ For controlled alpha:
 - executed stale queued/running job scan output;
 - OpenRouter credit/rate-limit check;
 - Supabase error-log scan;
-- small metrics extractor over `backtest_jobs.execution_metadata`.
+- aggregate metrics extractor over `backtest_jobs.execution_metadata`, using
+  `poetry run python scripts/ops/alpha_readiness_metrics.py --json`.
 
 For public mode later:
 
@@ -1429,7 +1437,11 @@ surfaces.
 - Add stale job scan. Closed locally in the readiness branch:
   `.github/stale-backtest-jobs.sh` checks stale queued/running jobs before
   tester warmup when Supabase verifier credentials are present.
-- Add minimal alpha metrics extraction.
+- Add minimal alpha metrics extraction. Closed locally:
+  `scripts/ops/alpha_readiness_metrics.py` emits aggregate-only backtest job
+  health, readout provenance, and latency summaries from existing
+  `backtest_jobs.execution_metadata`; it does not add analytics vendor
+  instrumentation or emit user/conversation/prompt identifiers.
 
 ### Slice 6: Product Analytics Plan
 

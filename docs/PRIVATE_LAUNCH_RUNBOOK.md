@@ -72,6 +72,17 @@ If you need to run only the stale job scan during incident triage:
 .github/stale-backtest-jobs.sh --json
 ```
 
+For privacy-safe aggregate job health over the existing Supabase
+`backtest_jobs.execution_metadata` records:
+
+```bash
+poetry run python scripts/ops/alpha_readiness_metrics.py --json
+```
+
+This report is operational only. It summarizes job statuses, readout provenance,
+and timings without emitting user ids, conversation ids, prompt text, or product
+analytics events.
+
 ## Backtest Workflow Modes
 
 The permanent Render Workflow service is `argus-backtests`. It owns multiple
