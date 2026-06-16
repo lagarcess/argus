@@ -122,6 +122,65 @@ async def test_threaded_runtime_event_source_cancels_worker_on_close() -> None:
     assert await asyncio.to_thread(worker_closed.wait, 1)
 
 
+@pytest.mark.asyncio
+async def test_threaded_runtime_event_source_reports_stuck_worker_after_cancel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.chat import runtime_worker
+
+    warnings: list[tuple[str, dict[str, Any]]] = []
+
+    class _Logger:
+        def debug(self, *_args: Any, **_kwargs: Any) -> None:
+            return None
+
+        def exception(self, *_args: Any, **_kwargs: Any) -> None:
+            return None
+
+        def warning(self, message: str, **kwargs: Any) -> None:
+            warnings.append((message, kwargs))
+
+    monkeypatch.setattr(runtime_worker, "logger", _Logger())
+
+    class _BlockedRuntimeEvents:
+        def __init__(self) -> None:
+            self._index = 0
+
+        def __aiter__(self) -> "_BlockedRuntimeEvents":
+            return self
+
+        async def __anext__(self) -> dict[str, Any]:
+            self._index += 1
+            if self._index == 1:
+                return {"type": "stage_start", "stage": "interpret"}
+            if self._index == 2:
+                time.sleep(0.2)
+                return {
+                    "type": "final",
+                    "payload": {"stage_outcome": "await_approval"},
+                }
+            raise StopAsyncIteration
+
+    def _blocked_runtime_events() -> _BlockedRuntimeEvents:
+        return _BlockedRuntimeEvents()
+
+    runtime_events = runtime_worker.threaded_runtime_event_source(
+        _blocked_runtime_events
+    )
+
+    assert await asyncio.wait_for(anext(runtime_events), timeout=1) == {
+        "type": "stage_start",
+        "stage": "interpret",
+    }
+
+    await runtime_events.aclose()
+
+    assert warnings
+    assert warnings[-1][0] == "Threaded chat runtime worker still running after cancel"
+    assert warnings[-1][1]["future_done"] is False
+    assert warnings[-1][1]["worker_task_done"] is False
+
+
 def test_runtime_worker_auto_mode_is_reserved_for_prod_like_streams(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -648,6 +707,17 @@ def test_chat_stream_runtime_stall_emits_recoverable_error(
     assert events[-1]["code"] == "agent_runtime_failure"
     assert "conversation is saved" in events[-1]["message"]
     assert response.text.count("data: [DONE]") == 1
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    runtime_diagnostics = messages[-1]["metadata"]["runtime_diagnostics"]
+    assert runtime_diagnostics["code"] == "agent_runtime_event_timeout"
+    assert runtime_diagnostics["timeout_seconds"] == 0.01
+    assert runtime_diagnostics["last_event"] == {
+        "type": "stage_start",
+        "stage": "interpret",
+    }
+    assert runtime_diagnostics["event_count"] == 1
 
 
 def test_chat_stream_runtime_keepalive_preserves_slow_progressing_turn(

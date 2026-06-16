@@ -802,7 +802,7 @@ The canonical backtest config used by the engine for execution and reproducibili
 - **Not currently executable in DCA:** separate starting principal, total capital budget, contribution ceiling, or maximum invested cap.
 - If the user supplies both a recurring contribution and a starting/total capital amount, Argus must preserve the distinction conversationally, but must not show `Ready to run` as if both amounts will execute in the DCA engine.
 - The supported recovery path is to ask whether the user wants to run the recurring-buy simulation only, adjust the recurring contribution, or switch to a supported buy-and-hold style test using starting capital.
-- TODO(dca-engine): Add explicit support for DCA starting principal, contribution ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation card display, result assumptions, and model capability wording.
+- Deferred(dca-engine): Add explicit support for DCA starting principal, contribution ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation card display, result assumptions, and model capability wording. This is broader unsupported DCA engine capability work and is outside the Spanish canary/chart attribution fix.
 
 ### Symbol Constraints
 - **Minimum:** 1 symbol

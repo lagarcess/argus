@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
+from loguru import logger
+
 from argus.agent_runtime.artifact_action_recovery import (
     artifact_action_recovery_message,
 )
@@ -100,6 +102,7 @@ async def stream_agent_turn_events(
     config = {"configurable": {"thread_id": thread_id}}
     seen_stage_starts: set[str] = set()
     seen_stage_outcomes: set[str] = set()
+    logger.debug("Agent runtime stream started", thread_id=thread_id)
 
     async for event in workflow.astream_events(
         initial_state,
@@ -111,6 +114,11 @@ async def stream_agent_turn_events(
         if kind == "on_chain_start" and node_name in WORKFLOW_NODE_NAMES:
             if node_name not in seen_stage_starts:
                 seen_stage_starts.add(node_name)
+                logger.debug(
+                    "Agent runtime stage started",
+                    thread_id=thread_id,
+                    stage=node_name,
+                )
                 yield {"type": "stage_start", "stage": node_name}
             continue
         if kind == "on_chat_model_stream" and node_name in TOKEN_STREAM_NODES:
@@ -122,9 +130,17 @@ async def stream_agent_turn_events(
             outcome = _stage_outcome_from_event(event)
             if outcome is not None and outcome not in seen_stage_outcomes:
                 seen_stage_outcomes.add(outcome)
+                logger.debug(
+                    "Agent runtime stage outcome",
+                    thread_id=thread_id,
+                    stage=node_name,
+                    outcome=outcome,
+                )
                 yield {"type": "stage_outcome", "outcome": outcome}
 
+    logger.debug("Agent runtime final state fetch started", thread_id=thread_id)
     final_state = await _final_workflow_state(workflow=workflow, config=config)
+    logger.debug("Agent runtime final state fetch completed", thread_id=thread_id)
     yield {"type": "final", "payload": _public_result(final_state)}
 
 

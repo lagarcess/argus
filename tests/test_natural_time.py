@@ -9,6 +9,7 @@ from argus.nlp.natural_time import (
     resolve_date_range_endpoint_patch,
     resolve_date_range_intent,
     resolve_date_range_text,
+    resolve_rolling_window_intent_text,
 )
 
 
@@ -68,6 +69,93 @@ def test_resolves_english_relative_time_span() -> None:
     assert resolved is not None
     assert resolved.label == "past 6 months"
     assert resolved.payload == {"start": "2025-12-01", "end": "2026-06-01"}
+
+
+def test_resolves_language_agnostic_year_windows_to_rolling_intent() -> None:
+    today = date(2026, 6, 16)
+
+    cases = [
+        ("last 2 years", ("en",), 2),
+        ("last year", ("en",), 1),
+        ("últimos 2 años", ("es", "en"), 2),
+        ("ultimo año", ("es", "en"), 1),
+        ("último año", ("es", "en"), 1),
+    ]
+
+    for text, languages, count in cases:
+        assert resolve_rolling_window_intent_text(
+            text,
+            today=today,
+            languages=languages,
+        ) == {
+            "kind": "rolling_window",
+            "count": count,
+            "unit": "year",
+            "anchor": "today",
+            "confidence": 0.65,
+            "evidence": text,
+        }
+
+
+def test_resolves_relative_year_windows_before_strategy_semantics() -> None:
+    today = date(2026, 6, 16)
+
+    cases = [
+        ("buy_and_hold", "last 2 years", ("en",), "2024-06-16"),
+        ("dca_accumulation", "last year", ("en",), "2025-06-16"),
+        ("buy_and_hold", "últimos 2 años", ("es", "en"), "2024-06-16"),
+        ("dca_accumulation", "último año", ("es", "en"), "2025-06-16"),
+    ]
+
+    for strategy_type, text, languages, expected_start in cases:
+        intent = resolve_rolling_window_intent_text(
+            text,
+            today=today,
+            languages=languages,
+        )
+        resolved = resolve_date_range_intent(intent, today=today)
+
+        assert resolved is not None, strategy_type
+        assert resolved.payload == {
+            "start": expected_start,
+            "end": "2026-06-16",
+        }
+
+
+def test_calendar_year_evidence_is_not_a_rolling_window() -> None:
+    assert (
+        resolve_rolling_window_intent_text(
+            "durante 2024",
+            today=date(2026, 6, 16),
+            languages=("es", "en"),
+        )
+        is None
+    )
+
+
+def test_resolves_language_agnostic_year_window_endpoint_patch() -> None:
+    today = date(2026, 6, 16)
+    base_intent = resolve_rolling_window_intent_text(
+        "últimos 2 años",
+        today=today,
+        languages=("es", "en"),
+    )
+
+    resolved = resolve_date_range_endpoint_patch(
+        base_intent,
+        {
+            "kind": "endpoint_patch",
+            "endpoint": "end",
+            "end": "today",
+            "confidence": 0.9,
+            "evidence": "que termine hoy",
+        },
+        today=today,
+    )
+
+    assert resolved is not None
+    assert resolved.payload == {"start": "2024-06-16", "end": "2026-06-16"}
+    assert resolved.evidence_spans == ("últimos 2 años", "que termine hoy")
 
 
 def test_resolves_current_year_to_date_in_spanish() -> None:

@@ -102,6 +102,17 @@ async def _threaded_runtime_event_source(
             ):
                 worker_loop.call_soon_threadsafe(worker_task.cancel)
         future.cancel()
+        if not future.done():
+            worker_task = worker_task_box.get("task")
+            logger.warning(
+                "Threaded chat runtime worker still running after cancel",
+                future_done=future.done(),
+                future_cancelled=future.cancelled(),
+                worker_loop_ready=worker_loop_ready.is_set(),
+                worker_task_done=worker_task.done() if worker_task else None,
+                worker_task_cancelled=worker_task.cancelled() if worker_task else None,
+                queue_size=queue.qsize(),
+            )
 
 
 def _runtime_executor() -> ThreadPoolExecutor:

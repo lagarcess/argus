@@ -86,6 +86,12 @@ RUNTIME_EVENT_TIMEOUT_SECONDS = 120.0
 RUNTIME_EVENT_KEEPALIVE_SECONDS = 15.0
 
 
+class RuntimeEventTimeoutError(asyncio.TimeoutError):
+    def __init__(self, diagnostics: dict[str, Any]) -> None:
+        super().__init__("agent_runtime_event_timeout")
+        self.diagnostics = diagnostics
+
+
 def _runtime_event_timeout_seconds() -> float:
     return _positive_float_env(
         "ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS",
@@ -132,6 +138,8 @@ async def _runtime_events_with_keepalive(
     next_runtime_event_started = time.monotonic()
     runtime_timeout_seconds = _runtime_event_timeout_seconds()
     runtime_keepalive_seconds = _runtime_event_keepalive_seconds()
+    last_event: dict[str, str] | None = None
+    event_count = 0
 
     try:
         while True:
@@ -153,17 +161,45 @@ async def _runtime_events_with_keepalive(
                     time.monotonic() - next_runtime_event_started
                     >= runtime_timeout_seconds
                 ):
+                    elapsed_seconds = time.monotonic() - next_runtime_event_started
                     await _cancel_runtime_event_task(next_runtime_event)
                     next_runtime_event = None
-                    raise asyncio.TimeoutError("agent_runtime_event_timeout") from None
+                    raise RuntimeEventTimeoutError(
+                        {
+                            "code": "agent_runtime_event_timeout",
+                            "timeout_seconds": runtime_timeout_seconds,
+                            "elapsed_seconds": round(elapsed_seconds, 3),
+                            "keepalive_seconds": runtime_keepalive_seconds,
+                            "event_count": event_count,
+                            "last_event": last_event,
+                        }
+                    ) from None
                 yield None
                 continue
             except StopAsyncIteration:
                 break
+            event_count += 1
+            last_event = _runtime_event_boundary(runtime_event)
             yield runtime_event
     finally:
         if next_runtime_event is not None and not next_runtime_event.done():
             await _cancel_runtime_event_task(next_runtime_event)
+
+
+def _runtime_event_boundary(runtime_event: dict[str, Any]) -> dict[str, str]:
+    boundary = {"type": str(runtime_event.get("type") or "unknown")}
+    stage = runtime_event.get("stage")
+    if stage not in (None, "", [], {}):
+        boundary["stage"] = str(stage)
+    outcome = runtime_event.get("outcome")
+    if outcome not in (None, "", [], {}):
+        boundary["outcome"] = str(outcome)
+    return boundary
+
+
+def _runtime_failure_diagnostics(exc: BaseException) -> dict[str, Any] | None:
+    diagnostics = getattr(exc, "diagnostics", None)
+    return dict(diagnostics) if isinstance(diagnostics, dict) else None
 
 
 def _strategies_enabled() -> bool:
@@ -1217,10 +1253,12 @@ async def chat_stream(
                 return
             if not final_seen:
                 raise RuntimeError("agent_runtime_missing_final")
-        except Exception:
+        except Exception as exc:
+            runtime_diagnostics = _runtime_failure_diagnostics(exc)
             logger.exception(
                 "Agent runtime chat streaming failed",
                 conversation_id=conversation.id,
+                runtime_diagnostics=runtime_diagnostics,
             )
             assistant_text = recovery_message(
                 "runtime_failure",
@@ -1230,6 +1268,8 @@ async def chat_stream(
                 "conversation_mode": "recovery",
                 "agent_runtime_stage_outcome": "agent_runtime_failure",
             }
+            if runtime_diagnostics is not None:
+                failure_metadata["runtime_diagnostics"] = runtime_diagnostics
             retry_metadata = retry_last_turn_metadata(
                 payload=payload,
                 request_message=request_message,
@@ -1259,6 +1299,8 @@ async def chat_stream(
                 "stage_outcome": "agent_runtime_failure",
                 "conversation_mode": "recovery",
             }
+            if runtime_diagnostics is not None:
+                receipt_metadata["runtime_diagnostics"] = runtime_diagnostics
             yield sse_data(
                 {
                     "type": "error",

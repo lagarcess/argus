@@ -149,6 +149,7 @@ from argus.nlp.natural_time import (
     resolve_date_range_intent,
     resolve_date_range_text,
 )
+from loguru import logger
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 _STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
@@ -220,6 +221,11 @@ async def interpret_stage_async(
     selected_thread_metadata: dict[str, Any] | None = None,
     structured_interpreter: StructuredInterpreter | None = None,
 ) -> StageResult:
+    logger.debug(
+        "Interpret stage started",
+        language=user.language_preference,
+        selected_thread_metadata_keys=sorted((selected_thread_metadata or {}).keys()),
+    )
     capability_contract = build_default_capability_contract()
     snapshot = normalize_task_snapshot(latest_task_snapshot)
     structured_action_result = _structured_action_stage_result_if_applicable(
@@ -250,12 +256,20 @@ async def interpret_stage_async(
         ),
     )
     if interpretation is None:
+        logger.debug("Interpret stage structured interpreter returned no result")
         return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
             current_user_message=state.current_user_message,
             selected_thread_metadata=selected_metadata,
         )
+    logger.debug(
+        "Interpret stage structured interpreter completed",
+        intent=interpretation.intent,
+        semantic_turn_act=interpretation.semantic_turn_act,
+        requires_clarification=interpretation.requires_clarification,
+        missing_required_fields=interpretation.missing_required_fields,
+    )
 
     return await _stage_result_from_interpretation(
         state=state,
@@ -399,6 +413,11 @@ async def _stage_result_from_interpretation(
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
     original_semantic_turn_act = interpretation.semantic_turn_act
+    logger.debug(
+        "Interpret stage post-LLM repair started",
+        intent=interpretation.intent,
+        semantic_turn_act=interpretation.semantic_turn_act,
+    )
     interpretation = _repair_retry_route_when_pending_need_is_active(
         interpretation=interpretation,
         snapshot=snapshot,
@@ -1069,6 +1088,10 @@ def _strategy_with_current_message_run_field_contract(
     repair_reason_codes = ["current_message_run_field_contract_repair"]
     if date_endpoint_patch_applied:
         repair_reason_codes.append("structured_date_endpoint_patch_applied")
+        logger.debug(
+            "Interpret stage date endpoint patch applied",
+            strategy_type=strategy.strategy_type,
+        )
     if (
         date_range is not None
         and not has_partial_explicit_date_range(date_range)
@@ -1081,6 +1104,10 @@ def _strategy_with_current_message_run_field_contract(
         updated.date_range = date_range
         changed = True
         repaired_field_bases.add("date_range")
+        logger.debug(
+            "Interpret stage date range repaired from temporal contract",
+            strategy_type=strategy.strategy_type,
+        )
     if (
         _strategy_has_non_executable_timeframe_label(
             updated,

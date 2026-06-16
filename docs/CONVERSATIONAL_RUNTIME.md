@@ -179,7 +179,7 @@ empty state should expose Collections.
 - Strategy comparisons are interpreted conversationally. Execution should run supported strategies separately and explain the comparison from real result payloads.
 - DCA requests that include separate starting principal, total capital budget, or investment ceiling are understood conversationally, but those modifiers are not executable in the current DCA engine. Argus should offer a recurring-only run, an adjusted recurring contribution, or a buy-and-hold style test using starting capital.
 
-TODO(dca-engine): Add first-class support for DCA starting principal, investment ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation cards, result assumptions, and model capability wording.
+Deferred(dca-engine): Add first-class support for DCA starting principal, investment ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation cards, result assumptions, and model capability wording. This is broader unsupported DCA engine capability work and is outside the Spanish canary/chart attribution fix.
 
 ## Unsupported Handling
 

@@ -114,8 +114,7 @@ export default function ResultEquityChart({
           : isHeroDeltaEvidence
             ? "rgba(0,0,0,0.52)"
             : "rgba(0,0,0,0.42)",
-        // A footer link keeps attribution visible without overlaying chart data.
-        attributionLogo: false,
+        attributionLogo: true,
       },
       grid: {
         vertLines: { color: "transparent" },

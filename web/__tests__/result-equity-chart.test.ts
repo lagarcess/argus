@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   RESULT_CHART_ATTRIBUTION_FOOTER_CLASS,
@@ -13,6 +15,8 @@ import {
 } from "../components/chat/ResultEquityChart";
 import type { ResultChartMarker } from "../components/chat/types";
 import type { LogicalRange } from "lightweight-charts";
+
+const root = join(import.meta.dir, "..");
 
 function marker(day: number, type: ResultChartMarker["type"] = "entry"): ResultChartMarker {
   const date = new Date(Date.UTC(2026, 0, day));
@@ -155,6 +159,13 @@ describe("ResultEquityChart attribution", () => {
   });
 
   test("keeps attribution in a visible footer instead of overlaying chart content", () => {
+    const source = readFileSync(
+      join(root, "components/chat/ResultEquityChart.tsx"),
+      "utf-8",
+    );
+
+    expect(source).toContain("attributionLogo: true");
+    expect(source).not.toContain("attributionLogo: false");
     expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).toContain("border-t");
     expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).not.toContain("absolute");
     expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).not.toContain("hidden");

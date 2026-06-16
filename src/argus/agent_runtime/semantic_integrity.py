@@ -398,10 +398,9 @@ def _unsupported_dca_starting_principal_constraint(
 ) -> UnsupportedConstraint:
     formatted = _format_money(total_capital)
     role_label = _dca_total_capital_role_label(source)
-    # TODO(dca-engine): Support starting principal, contribution ceilings, and
-    # recurring contributions as separate DCA execution inputs across engine
-    # launch models, LangGraph contracts, confirmation cards, result assumptions,
-    # and capability wording.
+    # Deferred(dca-engine): Starting principal, contribution ceilings, and
+    # recurring contributions require a broader DCA engine capability expansion
+    # across launch models, LangGraph contracts, cards, assumptions, and wording.
     return UnsupportedConstraint(
         category="unsupported_dca_starting_principal",
         raw_value=f"{formatted} {role_label}",

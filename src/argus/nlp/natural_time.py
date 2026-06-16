@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import calendar
+import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -125,12 +126,18 @@ def resolve_rolling_window_intent_text(
         today=current_date,
         languages=languages,
     )
-    if resolved is None:
-        return None
-    window = _rolling_window_fields_from_range(
-        start=resolved.start,
-        end=resolved.end,
-        today=current_date,
+    window = (
+        _rolling_window_fields_from_range(
+            start=resolved.start,
+            end=resolved.end,
+            today=current_date,
+        )
+        if resolved is not None
+        else _rolling_window_fields_from_single_date_evidence(
+            raw,
+            today=current_date,
+            languages=languages,
+        )
     )
     if window is None:
         return None
@@ -273,6 +280,61 @@ def _rolling_window_fields_from_range(
     if day_delta % 7 == 0:
         return {"count": day_delta // 7, "unit": "week"}
     return {"count": day_delta, "unit": "day"}
+
+
+def _rolling_window_fields_from_single_date_evidence(
+    text: str,
+    *,
+    today: date,
+    languages: tuple[str, ...] | None,
+) -> dict[str, Any] | None:
+    word_window = _singular_relative_year_window_from_words(text)
+    if word_window is not None:
+        return word_window
+    parsed = _single_searched_date_span(text, today=today, languages=languages)
+    if parsed is not None and parsed.value < today:
+        if _span_has_explicit_year(parsed.span):
+            return None
+        window = _rolling_window_fields_from_range(
+            start=parsed.value,
+            end=today,
+            today=today,
+        )
+        if (
+            parsed.period == "year"
+            and window is not None
+            and window.get("unit") == "month"
+            and int(window.get("count") or 0) % 12 == 0
+        ):
+            return {"count": int(window["count"]) // 12, "unit": "year"}
+        return window
+    return None
+
+
+def _singular_relative_year_window_from_words(text: str) -> dict[str, Any] | None:
+    words = _normalized_words(text)
+    if "ano" not in words and "year" not in words:
+        return None
+    if "ultimo" not in words and "last" not in words:
+        return None
+    return {"count": 1, "unit": "year"}
+
+
+def _normalized_words(text: str) -> set[str]:
+    normalized = unicodedata.normalize("NFKD", str(text or ""))
+    ascii_text = "".join(char for char in normalized if not unicodedata.combining(char))
+    words: set[str] = set()
+    current: list[str] = []
+    for char in ascii_text.casefold():
+        if char.isalpha():
+            current.append(char)
+            continue
+        if current:
+            words.add("".join(current))
+            current = []
+    if current:
+        words.add("".join(current))
+    return words
 
 
 def resolve_date_range_endpoint_patch(

@@ -28,12 +28,19 @@ from argus.domain.market_data.capabilities import (
     latest_complete_data_adjustment,
     market_data_window_violation,
 )
+from loguru import logger
 from pydantic import ValidationError
 
 
 def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResult:
+    logger.debug("Confirm stage started")
     strategy = _strategy_payload(state.candidate_strategy_draft)
     strategy = _strategy_with_latest_complete_data_adjustment(strategy)
+    logger.debug(
+        "Confirm stage latest complete data adjustment checked",
+        strategy_type=strategy.get("strategy_type"),
+        asset_class=strategy.get("asset_class"),
+    )
     date_limit_recovery = _date_limit_recovery_patch(
         strategy=strategy,
         optional_parameter_status=state.optional_parameter_status,
@@ -313,7 +320,17 @@ def _strategy_with_latest_complete_data_adjustment(
             today=today,
         )
     except (TypeError, ValueError):
+        logger.debug(
+            "Confirm stage skipped latest data adjustment after date resolution error",
+            asset_class=asset_class,
+        )
         return strategy
+    logger.debug(
+        "Confirm stage latest data adjustment started",
+        asset_class=asset_class,
+        timeframe=_strategy_timeframe(strategy),
+        end_date=resolved.end.isoformat(),
+    )
     adjustment = latest_complete_data_adjustment(
         asset_class=asset_class,
         timeframe=_strategy_timeframe(strategy),
@@ -322,6 +339,11 @@ def _strategy_with_latest_complete_data_adjustment(
         clock=_market_clock_for_strategy(asset_class),
     )
     if adjustment is None:
+        logger.debug(
+            "Confirm stage latest data adjustment not needed",
+            asset_class=asset_class,
+            end_date=resolved.end.isoformat(),
+        )
         return strategy
     extra_parameters = dict(strategy.get("extra_parameters") or {})
     return {
@@ -358,8 +380,15 @@ def _market_clock_for_strategy(asset_class: str) -> Any:
     if asset_class != "equity":
         return None
     try:
-        return fetch_alpaca_market_clock()
+        logger.debug("Confirm stage market clock fetch started", asset_class=asset_class)
+        clock = fetch_alpaca_market_clock()
+        logger.debug("Confirm stage market clock fetch completed", asset_class=asset_class)
+        return clock
     except Exception:
+        logger.opt(exception=True).debug(
+            "Confirm stage market clock fetch failed",
+            asset_class=asset_class,
+        )
         return None
 
 
