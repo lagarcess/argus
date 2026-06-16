@@ -3404,7 +3404,7 @@ def test_direct_json_schema_enforces_wall_clock_task_budget(monkeypatch) -> None
         openrouter.httpx, "AsyncClient", lambda **kwargs: SlowAsyncClient(**kwargs)
     )
 
-    with pytest.raises(TimeoutError):
+    with pytest.raises((TimeoutError, asyncio.TimeoutError)):
         asyncio.run(
             asyncio.wait_for(
                 openrouter.invoke_openrouter_json_schema(
