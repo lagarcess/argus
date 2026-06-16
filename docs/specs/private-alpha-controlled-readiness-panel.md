@@ -908,6 +908,33 @@ Latest Render verification on 2026-06-16:
   `.github/warmup-render.sh` when service-role Supabase verifier credentials are
   present.
 
+Latest local browser QA on 2026-06-16:
+
+- Environment: backend on `http://127.0.0.1:8010/api/v1` with memory
+  persistence, mock auth, and synthetic fixture market data; frontend on
+  `http://127.0.0.1:3000` using `web/.env.local`.
+- Cold-start slate: English starter chips were visible, did not reference 2024,
+  did not use field-template syntax, and clicking `Test Apple vs SPY` submitted
+  a normal user turn. That rolling-window starter correctly entered runtime and
+  asked for an end-date clarification instead of bypassing interpretation.
+- Spanish golden path: the prompt `Prueba una estrategia de comprar y mantener
+  AAPL desde el 1 de enero de 2024 hasta el 31 de diciembre de 2024 con 10000
+  dolares y SPY como referencia.` produced a confirmation card with AAPL, SPY,
+  `$10,000`, daily data, no fees/slippage, and `Run backtest`.
+- Result path: `Run backtest` completed locally, rendered the result card,
+  TradingView chart attribution, benchmark comparison, Quick take, and
+  `Explain result`. `Explain result` produced a separate `BREAKDOWN` while the
+  Quick take remained visible.
+- Reload path: reloading the conversation URL preserved the Spanish prompt,
+  completed result card, Quick take, breakdown, and feedback controls.
+- Feedback path: the in-app Browser click bridge timed out on the small feedback
+  icon buttons, but standalone Playwright against the same local URL clicked a
+  `Good response` control, opened the feedback dialog, submitted text, and
+  verified `Feedback submitted.` with no console issues. The direct local API
+  feedback smoke also returned `{"success":true}`.
+- Console health: in-app Browser console inspection after the run returned no
+  `error` or `warn` entries and no framework overlay text.
+
 ### Daily Automation Candidates
 
 For controlled alpha:
