@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  RESULT_CHART_ATTRIBUTION_FOOTER_CLASS,
+  RESULT_CHART_ATTRIBUTION_URL,
   buildVisibleSeriesMarkers,
   formatChartCurrency,
   formatChartDateLabel,
   markerBudgetForViewport,
+  resultChartAttributionLabel,
   selectVisibleTradeMarkers,
 } from "../components/chat/ResultEquityChart";
 import type { ResultChartMarker } from "../components/chat/types";
@@ -135,5 +138,25 @@ describe("ResultEquityChart locale formatting", () => {
       }).format(12345.67),
     );
     expect(formattedCurrency).not.toContain("67");
+  });
+});
+
+describe("ResultEquityChart attribution", () => {
+  test("uses backend attribution text with a TradingView fallback", () => {
+    expect(resultChartAttributionLabel(" TradingView Lightweight Charts ")).toBe(
+      "TradingView Lightweight Charts",
+    );
+    expect(resultChartAttributionLabel("")).toBe("TradingView Lightweight Charts");
+    expect(resultChartAttributionLabel(undefined)).toBe(
+      "TradingView Lightweight Charts",
+    );
+    expect(RESULT_CHART_ATTRIBUTION_URL).toBe("https://www.tradingview.com/");
+  });
+
+  test("keeps attribution in a visible footer instead of overlaying chart content", () => {
+    expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).toContain("border-t");
+    expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).not.toContain("absolute");
+    expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).not.toContain("hidden");
+    expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).not.toContain("sr-only");
   });
 });

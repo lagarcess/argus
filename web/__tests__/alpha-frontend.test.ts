@@ -336,8 +336,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(chart).toContain("selectVisibleTradeMarkers");
     expect(chart).toContain("subscribeVisibleLogicalRangeChange");
     expect(chart).toContain("markersApi.setMarkers");
-    expect(chart).toContain("TODO(launch): Provide correct TradingView attribution before launch.");
-    expect(chart).toContain("attributionLogo: false");
+    expect(chart).toContain("resultChartAttributionLabel(chart.attribution)");
+    expect(chart).toContain('data-testid="result-equity-chart-attribution"');
+    expect(chart).toContain("RESULT_CHART_ATTRIBUTION_URL");
+    expect(chart).toContain("https://www.tradingview.com/");
+    expect(chart).not.toContain("TODO(launch): Provide correct TradingView attribution before launch.");
     expect(chart).toContain('const CHART_POSITIVE_COLOR = "#70a38d"');
     expect(chart).toContain('const CHART_NEGATIVE_COLOR = "#b85c5c"');
     expect(chart).toContain('const BUY_POSITIVE_MARKER_COLOR = "#70a38d"');

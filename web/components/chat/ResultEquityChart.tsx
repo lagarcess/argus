@@ -47,6 +47,12 @@ const BUY_POSITIVE_MARKER_COLOR = "#70a38d";
 const SELL_NEGATIVE_MARKER_COLOR = "#b85c5c";
 const BUY_RESTRAINED_MARKER_COLOR = "rgba(112, 163, 141, 0.42)";
 const SELL_RESTRAINED_MARKER_COLOR = "rgba(184, 92, 92, 0.38)";
+const RESULT_CHART_ATTRIBUTION_FALLBACK = "TradingView Lightweight Charts";
+export const RESULT_CHART_ATTRIBUTION_URL = "https://www.tradingview.com/";
+export const RESULT_CHART_ATTRIBUTION_FOOTER_CLASS =
+  "border-t border-black/[0.04] px-3 pb-2 pt-1.5 text-[10px] leading-snug text-black/45 dark:border-white/[0.06] dark:text-white/45";
+const RESULT_CHART_ATTRIBUTION_HERO_FOOTER_CLASS =
+  "border-t border-black/[0.035] px-3 pb-2 pt-1.5 text-[10px] leading-snug text-black/45 dark:border-white/[0.055] dark:text-white/45";
 
 export default function ResultEquityChart({
   chart,
@@ -63,6 +69,7 @@ export default function ResultEquityChart({
   const chartLocale = resolveChartLocale(i18n.language);
   const isHeroDeltaEvidence = presentation === "heroDeltaEvidence";
   const chartHeight = isHeroDeltaEvidence ? 164 : 168;
+  const attributionLabel = resultChartAttributionLabel(chart.attribution);
   const currencyFormatter = useMemo(
     () => chartCurrencyFormatter(chart.currency, chartLocale),
     [chart.currency, chartLocale],
@@ -107,7 +114,7 @@ export default function ResultEquityChart({
           : isHeroDeltaEvidence
             ? "rgba(0,0,0,0.52)"
             : "rgba(0,0,0,0.42)",
-        // TODO(launch): Provide correct TradingView attribution before launch.
+        // A footer link keeps attribution visible without overlaying chart data.
         attributionLogo: false,
       },
       grid: {
@@ -260,6 +267,23 @@ export default function ResultEquityChart({
         data-testid="result-equity-chart"
         style={{ height: chartHeight }}
       />
+      <div
+        className={
+          isHeroDeltaEvidence
+            ? RESULT_CHART_ATTRIBUTION_HERO_FOOTER_CLASS
+            : RESULT_CHART_ATTRIBUTION_FOOTER_CLASS
+        }
+        data-testid="result-equity-chart-attribution"
+      >
+        <a
+          className="inline-flex max-w-full text-inherit underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/30"
+          href={RESULT_CHART_ATTRIBUTION_URL}
+          rel="noreferrer"
+          target="_blank"
+        >
+          {attributionLabel}
+        </a>
+      </div>
       {tooltip && (
         <div
           className="pointer-events-none absolute z-10 min-w-[148px] rounded-[10px] border border-black/10 bg-white/95 px-3 py-2 text-[11px] leading-snug text-black/70 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white/75"
@@ -355,6 +379,11 @@ function chartCurrencyFormatter(currency: string | undefined, locale: string) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
+}
+
+export function resultChartAttributionLabel(attribution?: string | null) {
+  const normalized = attribution?.trim();
+  return normalized || RESULT_CHART_ATTRIBUTION_FALLBACK;
 }
 
 export function formatChartCurrency(
