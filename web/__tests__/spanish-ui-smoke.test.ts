@@ -213,4 +213,12 @@ describe("Spanish UI Smoke Harness", () => {
       }
     }
   });
+
+  test("I18n provider keeps the document language in sync", () => {
+    const providerSource = fs.readFileSync(path.join(webRoot, "components/I18nProvider.tsx"), "utf-8");
+
+    expect(providerSource).toContain("document.documentElement.lang");
+    expect(providerSource).toContain("languageChanged");
+    expect(providerSource).toContain("normalizeEnabledLanguage");
+  });
 });
