@@ -924,7 +924,11 @@ Latest local browser QA on 2026-06-16:
 - Result path: `Run backtest` completed locally, rendered the result card,
   TradingView chart attribution, benchmark comparison, Quick take, and
   `Explain result`. `Explain result` produced a separate `BREAKDOWN` while the
-  Quick take remained visible.
+  Quick take remained visible. Backend logs recorded a local
+  `result_breakdown` LLM timeout and deterministic fallback for that breakdown;
+  this is acceptable as local UI-path evidence only. The deployed canary remains
+  strict that golden-path result readout voice must come from the LLM explain
+  stage without fallback.
 - Reload path: reloading the conversation URL preserved the Spanish prompt,
   completed result card, Quick take, breakdown, and feedback controls.
 - Feedback path: the in-app Browser click bridge timed out on the small feedback
