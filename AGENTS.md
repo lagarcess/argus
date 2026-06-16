@@ -109,6 +109,10 @@ Integration guardrails:
 - Production deploys remain manual and founder-directed.
 - Perplexity Research Lab remains design-only until a later approved
   implementation milestone.
+- When working from `codex/private-alpha-readiness-clean`, use
+  `docs/specs/private-alpha-readiness-orchestration.md` as the active
+  release-captain/subagent coordination note before dispatching or executing
+  readiness work.
 
 ---
 
