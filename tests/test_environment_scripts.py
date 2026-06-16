@@ -375,6 +375,24 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
     assert "render_workflow_json" in source
 
 
+def test_render_env_sync_prints_api_deploy_status_without_mutation() -> None:
+    source = _source(".github/render-env-sync.sh")
+
+    assert ".github/render-env-sync.sh api-deploy-status" in source
+    assert "print_api_deploy_status()" in source
+    assert "/v1/services/${API_SERVICE_ID}/deploys?limit=1" in source
+    assert "commit_short" in source
+    assert "deploy_id" in source
+
+    deploy_status_block = source.split(
+        "print_api_deploy_status() {",
+        maxsplit=1,
+    )[1].split("\n}", maxsplit=1)[0]
+
+    assert "put_render_env" not in deploy_status_block
+    assert "delete_render_env" not in deploy_status_block
+
+
 def test_render_env_sync_can_sync_api_runtime_config() -> None:
     source = _source(".github/render-env-sync.sh")
 
@@ -548,6 +566,7 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     ].split("## Backtest Workflow Modes", maxsplit=1)[0]
 
     assert ".github/render-env-sync.sh api-real-workflow-on" in before_sessions
+    assert ".github/render-env-sync.sh api-deploy-status" in before_sessions
     assert ".github/warmup-render.sh --expect-mode real-workflow" in before_sessions
     assert ".github/canary-render.sh" in before_sessions
     assert ".github/stale-backtest-jobs.sh" in runbook

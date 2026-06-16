@@ -18,6 +18,7 @@ usage() {
   cat <<'USAGE'
 Usage:
   .github/render-env-sync.sh api-status
+  .github/render-env-sync.sh api-deploy-status
   .github/render-env-sync.sh api-safe-off
   .github/render-env-sync.sh api-proof-shadow-on
   .github/render-env-sync.sh api-real-workflow-on
@@ -28,6 +29,7 @@ Usage:
 
 Commands:
   api-status              Print redacted API workflow env status for argus-api.
+  api-deploy-status       Print latest argus-api deploy status and commit.
   api-safe-off            Disable API job dispatch/execution and blank its Render key.
   api-proof-shadow-on     Enable proof-only shadow dispatch to workflow_proof.
   api-real-workflow-on    Enable real async dispatch to run_backtest_job.
@@ -128,6 +130,14 @@ render_workflow_json() {
     --header "Accept: application/json"
 }
 
+render_api_deploy_json() {
+  curl -fsS \
+    --request GET \
+    --url "https://api.render.com/v1/services/${API_SERVICE_ID}/deploys?limit=1" \
+    --header "Authorization: Bearer ${RENDER_API_KEY}" \
+    --header "Accept: application/json"
+}
+
 print_api_status() {
   require_local_env RENDER_API_KEY
   render_env_json "$API_SERVICE_ID" | jq -r '
@@ -153,6 +163,27 @@ print_api_status() {
         "\($key)=\($value // "<missing>")"
       end
   ' | sort
+}
+
+print_api_deploy_status() {
+  require_local_env RENDER_API_KEY
+  render_api_deploy_json | jq -r '
+    .[0].deploy as $deploy
+    | if $deploy == null then
+        "deploy_id=<missing>",
+        "status=<missing>",
+        "commit=<missing>",
+        "commit_short=<missing>"
+      else
+        ($deploy.commit.id // "") as $commit
+        | "deploy_id=\($deploy.id // "<missing>")",
+          "status=\($deploy.status // "<missing>")",
+          "commit=\(if $commit == "" then "<missing>" else $commit end)",
+          "commit_short=\(if $commit == "" then "<missing>" else $commit[0:7] end)",
+          "created_at=\($deploy.createdAt // "<missing>")",
+          "finished_at=\($deploy.finishedAt // "<missing>")"
+      end
+  '
 }
 
 sync_api_proof_shadow_on() {
@@ -313,6 +344,9 @@ command="${1:-}"
 case "$command" in
   api-status)
     print_api_status
+    ;;
+  api-deploy-status)
+    print_api_deploy_status
     ;;
   api-safe-off)
     sync_api_safe_off

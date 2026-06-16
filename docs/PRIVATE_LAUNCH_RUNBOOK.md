@@ -45,7 +45,17 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-8. Run the product warmup script and verify the API stayed in real workflow
+8. Confirm the live `argus-api` deploy commit matches the readiness commit you
+   intend to test:
+
+```bash
+.github/render-env-sync.sh api-deploy-status
+```
+
+If the commit is not the readiness branch commit, stop and deploy `argus-api`
+before running the strict canaries.
+
+9. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
    stale queued/running job scan:
 
@@ -53,7 +63,7 @@ Restart `argus-api` after changing Render env values.
 .github/warmup-render.sh --expect-mode real-workflow
 ```
 
-9. Run the golden-path canary:
+10. Run the golden-path canary:
 
 ```bash
 .github/canary-render.sh
