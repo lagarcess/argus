@@ -4,6 +4,7 @@ import {
   RESULT_CHART_ATTRIBUTION_FOOTER_CLASS,
   RESULT_CHART_ATTRIBUTION_URL,
   buildVisibleSeriesMarkers,
+  chartTimeLookupKey,
   formatChartCurrency,
   formatChartDateLabel,
   markerBudgetForViewport,
@@ -137,7 +138,7 @@ describe("ResultEquityChart locale formatting", () => {
         maximumFractionDigits: 0,
       }).format(12345.67),
     );
-    expect(formattedCurrency).not.toContain("67");
+    expect(formattedCurrency).not.toMatch(/[.,]\d{2}\b/);
   });
 });
 
@@ -158,5 +159,27 @@ describe("ResultEquityChart attribution", () => {
     expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).not.toContain("absolute");
     expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).not.toContain("hidden");
     expect(RESULT_CHART_ATTRIBUTION_FOOTER_CLASS).not.toContain("sr-only");
+  });
+});
+
+describe("ResultEquityChart intraday timestamps", () => {
+  test("preserves intraday chart timestamps as UTC timestamp values", () => {
+    const intradayMarker: ResultChartMarker = {
+      time: "2026-01-15T14:30:00",
+      type: "entry",
+      label: "Buy AAPL",
+    };
+    const lookupKey = chartTimeLookupKey(intradayMarker.time);
+    const seriesMarkers = buildVisibleSeriesMarkers({
+      markers: [intradayMarker],
+      visibleRange: null,
+      chartWidth: 660,
+      dataIndexByTime: new Map([[lookupKey, 0]]),
+    });
+
+    expect(lookupKey).toBe("2026-01-15T14:30:00");
+    expect(typeof seriesMarkers[0]?.time).toBe("number");
+    expect(chartTimeLookupKey(seriesMarkers[0]!.time)).toBe(lookupKey);
+    expect(formatChartDateLabel(intradayMarker.time, "en-US")).toContain("2:30");
   });
 });

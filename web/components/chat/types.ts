@@ -26,6 +26,11 @@ export type ResultChartValueSummary = {
   source?: "strategy_portfolio_equity_close" | string;
 };
 
+export type ResultChartValuePoint = {
+  time: string;
+  value: number;
+};
+
 export type ResultChartPayload = {
   kind: "portfolio_equity";
   series: ResultChartPoint[];
@@ -33,6 +38,10 @@ export type ResultChartPayload = {
   currency?: string;
   base_value?: number | null;
   value_summary?: ResultChartValueSummary | null;
+  value_extrema?: {
+    peak?: ResultChartValuePoint | null;
+    lowest?: ResultChartValuePoint | null;
+  } | null;
   attribution?: string;
 };
 

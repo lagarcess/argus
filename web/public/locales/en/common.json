@@ -262,6 +262,8 @@
         "peak_value": "Peak value",
         "lowest_value": "Lowest value",
         "date_range": "Date range",
+        "peak_value": "Peak value",
+        "lowest_value": "Lowest value",
         "timeframe": "Timeframe",
         "side": "Side",
         "allocation": "Allocation",

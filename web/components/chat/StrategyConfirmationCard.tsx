@@ -2,6 +2,7 @@ import {
   CalendarDays,
   CheckCircle2,
   CircleSlash2,
+  type LucideIcon,
   Loader2,
   Pencil,
   PencilLine,
@@ -12,7 +13,6 @@ import {
   SlidersHorizontal,
   TriangleAlert,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
@@ -72,6 +72,13 @@ const CONFIRMATION_STATUS_ICON_STATE = {
 
 const actionClassName =
   "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[12px] font-medium tracking-tight text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22";
+
+const TERMINAL_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
+  "could_not_run",
+  "draft_canceled",
+  "not_completed",
+  "run_complete",
+]);
 
 export default function StrategyConfirmationCard({ confirmation, onAction }: StrategyConfirmationCardProps) {
   const { t, i18n } = useTranslation();
@@ -209,7 +216,8 @@ function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: 
   );
   const statusIcon = confirmationStatusIcon(status);
   const tone: ArtifactStatusTone =
-    confirmation.confirmation_state === "active" && status === "editing"
+    confirmation.confirmation_state === "active" &&
+    !TERMINAL_CONFIRMATION_STATUSES.has(status)
       ? "info"
       : artifactLifecycleTone(status);
   return {

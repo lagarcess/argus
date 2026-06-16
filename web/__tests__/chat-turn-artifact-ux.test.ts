@@ -78,6 +78,8 @@ describe("chat turn artifact UX", () => {
     expect(card).toContain("CONFIRMATION_STATUS_ICON_STATE");
     expect(card).toContain("satisfies Record<StrategyConfirmationStatus, ConfirmationStatusIconState>");
     expect(card).toContain("function confirmationStatusIcon(");
+    expect(card).toContain("TERMINAL_CONFIRMATION_STATUSES");
+    expect(card).toContain("!TERMINAL_CONFIRMATION_STATUSES.has(status)");
     expect(card).toContain("data-confirmation-status={displayState.status}");
     expect(card).not.toContain('if (status === "editing")');
     expect(card).toContain("editing: { icon: Pencil, isSpinning: false }");

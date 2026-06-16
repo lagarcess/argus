@@ -63,6 +63,10 @@ export type ResultChartPayload = {
     currency?: string | null;
     source?: "strategy_portfolio_equity_close" | string;
   } | null;
+  value_extrema?: {
+    peak?: { time: string; value: number } | null;
+    lowest?: { time: string; value: number } | null;
+  } | null;
   attribution?: string;
 };
 

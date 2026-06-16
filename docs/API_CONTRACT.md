@@ -614,6 +614,7 @@ Ownership hardening:
 - `chart.kind` is currently `portfolio_equity`.
 - `chart.series` is the aggregate portfolio equity curve. Multi-symbol runs must use the equal-weight portfolio curve, not a symbol comparison chart.
 - `chart.value_summary` mirrors aggregate strategy portfolio equity close values for result-card details. It is not an asset OHLC high/low and does not describe the benchmark.
+- Legacy persisted `chart.value_extrema` may be read as a fallback only; new writers must emit `chart.value_summary` as the canonical shape.
 - `chart.markers` contains capped entry/exit events derived from executed fills only. Raw strategy signals, blocked exits while flat, and duplicate blocked entries must not appear as chart markers.
 - The frontend must keep TradingView attribution visible when rendering Lightweight Charts.
 

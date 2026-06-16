@@ -343,6 +343,8 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 - Benchmark comparisons are persisted only when benchmark observations cover the
   selected window sufficiently; late, early-ending, or sparse benchmark data
   should fail as data unavailable rather than being silently backfilled.
+- Legacy persisted chart payloads may include `value_extrema`; readers may use it
+  as a fallback, but new run writers should persist `value_summary`.
 - `trades` may mirror chart event markers for lightweight UI hydration. Detailed execution ledgers can preserve signals, order intents, fills, ignored signals, and position snapshots, but list endpoints must expose only lightweight result metadata.
 - Saved strategies must be created from completed run state or an equivalent canonical result snapshot, not reconstructed from frontend display text.
 - Follow-up refinements from a result card must be seeded from

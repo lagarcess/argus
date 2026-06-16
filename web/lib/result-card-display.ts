@@ -415,7 +415,20 @@ function portfolioValueSummaryDetails(
 ) {
   const summary = recordValue(result.chart?.value_summary);
   if (!summary) {
-    return [];
+    const legacyExtrema = chartValueExtrema(result.chart);
+    if (!legacyExtrema) {
+      return [];
+    }
+    return [
+      {
+        label: copy.peakValueLabel,
+        value: formatCurrency(legacyExtrema.peak, locale, legacyExtrema.currency),
+      },
+      {
+        label: copy.lowestValueLabel,
+        value: formatCurrency(legacyExtrema.lowest, locale, legacyExtrema.currency),
+      },
+    ];
   }
   const source = stringValue(summary.source);
   if (source && source !== "strategy_portfolio_equity_close") {
@@ -491,6 +504,17 @@ function contributionFromStructuredFacts(
 
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function chartValueExtrema(chart: StrategyResultPayload["chart"]) {
+  const peak = numberValue(chart?.value_extrema?.peak?.value);
+  const lowest = numberValue(chart?.value_extrema?.lowest?.value);
+  if (peak == null || lowest == null) return undefined;
+  return {
+    peak,
+    lowest,
+    currency: chart?.currency ?? "USD",
+  };
 }
 
 export function formatTimeframeForDisplay(
@@ -641,11 +665,12 @@ function benchmarkDisplayValue(
     .replace(/\bpts\b/gi, "percentage points");
 }
 
-function formatCurrency(value: number, locale = "en-US") {
+function formatCurrency(value: number, locale = "en-US", currency = "USD") {
   return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "USD",
+    currency,
     currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
 }

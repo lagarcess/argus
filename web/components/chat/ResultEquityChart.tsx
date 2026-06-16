@@ -77,7 +77,7 @@ export default function ResultEquityChart({
   const data = useMemo<BaselineData<Time>[]>(
     () =>
       chart.series.map((point) => ({
-        time: normalizeChartTime(point.time) as Time,
+        time: chartTimeFromString(point.time),
         value: point.value,
       })),
     [chart.series],
@@ -85,7 +85,7 @@ export default function ResultEquityChart({
   const eventByTime = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const marker of chart.markers ?? []) {
-      const time = normalizeChartTime(marker.time);
+      const time = chartTimeLookupKey(marker.time);
       const existing = map.get(time) ?? [];
       map.set(time, [...existing, marker.label]);
     }
@@ -93,11 +93,11 @@ export default function ResultEquityChart({
   }, [chart.markers]);
   const dataIndexByTime = useMemo(() => {
     const map = new Map<string, number>();
-    data.forEach((point, index) => {
-      map.set(String(point.time), index);
+    chart.series.forEach((point, index) => {
+      map.set(chartTimeLookupKey(point.time), index);
     });
     return map;
-  }, [data]);
+  }, [chart.series]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -133,7 +133,7 @@ export default function ResultEquityChart({
       },
       timeScale: {
         borderVisible: false,
-        timeVisible: data.some((point) => String(point.time).includes("T")),
+        timeVisible: data.some((point) => typeof point.time === "number"),
         secondsVisible: false,
         rightOffset: 4,
         barSpacing: data.length > 240 ? 4 : 7,
@@ -224,7 +224,7 @@ export default function ResultEquityChart({
         setTooltip(null);
         return;
       }
-      const time = normalizeChartTimeValue(param.time);
+      const time = chartTimeLookupKey(param.time);
       setTooltip({
         x: param.point.x,
         y: param.point.y,
@@ -301,36 +301,31 @@ export default function ResultEquityChart({
   );
 }
 
-function normalizeChartTime(value: string) {
+function chartTimeFromString(value: string): Time {
   const trimmed = value.trim();
-  if (isIsoDateOnly(trimmed)) return trimmed;
-  if (isIsoDateOnly(trimmed.slice(0, 10)) && trimmed[10] === "T") {
-    return trimmed.slice(0, 10);
+  if (dateOnlyParts(trimmed)) return trimmed as Time;
+
+  const utcTimestamp = utcTimestampFromDateTimeText(trimmed);
+  return utcTimestamp == null ? (trimmed as Time) : (utcTimestamp as Time);
+}
+
+export function chartTimeLookupKey(value: Time | string) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (dateOnlyParts(trimmed)) return trimmed;
+
+    const dateTime = dateTimeParts(trimmed);
+    if (dateTime) {
+      return `${dateTime.year}-${dateTime.month}-${dateTime.day}T${dateTime.hour}:${dateTime.minute}:${dateTime.second}`;
+    }
+
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime())
+      ? trimmed
+      : parsed.toISOString().slice(0, 19);
   }
-  return trimmed;
-}
-
-function isIsoDateOnly(value: string) {
-  if (value.length !== 10) return false;
-  if (value[4] !== "-" || value[7] !== "-") return false;
-  const year = Number(value.slice(0, 4));
-  const month = Number(value.slice(5, 7));
-  const day = Number(value.slice(8, 10));
-  return (
-    Number.isInteger(year) &&
-    Number.isInteger(month) &&
-    Number.isInteger(day) &&
-    month >= 1 &&
-    month <= 12 &&
-    day >= 1 &&
-    day <= 31
-  );
-}
-
-function normalizeChartTimeValue(value: Time | string) {
-  if (typeof value === "string") return normalizeChartTime(value);
   if (typeof value === "number") {
-    return new Date(value * 1000).toISOString().slice(0, 10);
+    return new Date(value * 1000).toISOString().slice(0, 19);
   }
   return `${value.year}-${pad2(value.month)}-${pad2(value.day)}`;
 }
@@ -343,20 +338,80 @@ function chartTimeToUtcDate(value: Time | string) {
     return new Date(Date.UTC(value.year, value.month - 1, value.day));
   }
 
-  const normalized = normalizeChartTime(value);
-  const datePart = normalized.slice(0, 10);
-  if (isIsoDateOnly(datePart)) {
+  const normalized = value.trim();
+  const dateOnly = dateOnlyParts(normalized);
+  if (dateOnly) {
     return new Date(
       Date.UTC(
-        Number(datePart.slice(0, 4)),
-        Number(datePart.slice(5, 7)) - 1,
-        Number(datePart.slice(8, 10)),
+        Number(dateOnly.year),
+        Number(dateOnly.month) - 1,
+        Number(dateOnly.day),
+      ),
+    );
+  }
+
+  const dateTime = dateTimeParts(normalized);
+  if (dateTime) {
+    return new Date(
+      Date.UTC(
+        Number(dateTime.year),
+        Number(dateTime.month) - 1,
+        Number(dateTime.day),
+        Number(dateTime.hour),
+        Number(dateTime.minute),
+        Number(dateTime.second),
       ),
     );
   }
 
   const date = new Date(normalized);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function utcTimestampFromDateTimeText(value: string) {
+  const date = chartTimeToUtcDate(value);
+  if (!date) return null;
+  return Math.floor(date.getTime() / 1000);
+}
+
+function dateTimeParts(value: string) {
+  if (value.length < 16 || value[10] !== "T" || value[13] !== ":") {
+    return null;
+  }
+  const date = dateOnlyParts(value.slice(0, 10));
+  const hour = fixedDigits(value.slice(11, 13), 2);
+  const minute = fixedDigits(value.slice(14, 16), 2);
+  const second =
+    value.length >= 19 && value[16] === ":"
+      ? fixedDigits(value.slice(17, 19), 2)
+      : "00";
+  if (!date || hour == null || minute == null || second == null) return null;
+  return {
+    ...date,
+    hour,
+    minute,
+    second,
+  };
+}
+
+function dateOnlyParts(value: string) {
+  if (value.length !== 10 || value[4] !== "-" || value[7] !== "-") {
+    return null;
+  }
+  const year = fixedDigits(value.slice(0, 4), 4);
+  const month = fixedDigits(value.slice(5, 7), 2);
+  const day = fixedDigits(value.slice(8, 10), 2);
+  if (!year || !month || !day) return null;
+  return { year, month, day };
+}
+
+function fixedDigits(value: string, length: number) {
+  if (value.length !== length) return null;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 48 || code > 57) return null;
+  }
+  return value;
 }
 
 function pad2(value: number) {
@@ -366,9 +421,8 @@ function pad2(value: number) {
 function resolveChartLocale(locale?: string | null) {
   const normalized = locale?.trim();
   if (!normalized) return "en-US";
-  const language = normalized.split("-")[0]?.toLowerCase();
-  if (language === "es") return "es-419";
-  if (language === "en") return "en-US";
+  if (normalized.toLowerCase().startsWith("es")) return "es-419";
+  if (normalized.toLowerCase() === "en") return "en-US";
   return normalized;
 }
 
@@ -379,11 +433,6 @@ function chartCurrencyFormatter(currency: string | undefined, locale: string) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
-}
-
-export function resultChartAttributionLabel(attribution?: string | null) {
-  const normalized = attribution?.trim();
-  return normalized || RESULT_CHART_ATTRIBUTION_FALLBACK;
 }
 
 export function formatChartCurrency(
@@ -401,13 +450,24 @@ export function formatChartDateLabel(
 ) {
   const date = chartTimeToUtcDate(value);
   if (!date) return String(value);
+  const includesTime =
+    typeof value === "number" ||
+    (typeof value === "string" &&
+      dateOnlyParts(value.trim()) === null &&
+      dateTimeParts(value.trim()) !== null);
 
   return new Intl.DateTimeFormat(resolveChartLocale(locale), {
     month,
     day: "numeric",
     year: "numeric",
+    ...(includesTime ? { hour: "numeric", minute: "2-digit" } : {}),
     timeZone: "UTC",
   }).format(date);
+}
+
+export function resultChartAttributionLabel(attribution?: string | null) {
+  const normalized = attribution?.trim();
+  return normalized || RESULT_CHART_ATTRIBUTION_FALLBACK;
 }
 
 type MarkerViewportInput = {
@@ -448,7 +508,7 @@ export function selectVisibleTradeMarkers({
     .map((marker, ordinal) => ({
       marker,
       ordinal,
-      logicalIndex: dataIndexByTime.get(normalizeChartTime(marker.time)) ?? ordinal,
+      logicalIndex: dataIndexByTime.get(chartTimeLookupKey(marker.time)) ?? ordinal,
     }))
     .filter(({ logicalIndex }) => logicalIndex >= from && logicalIndex <= to)
     .sort((a, b) => a.logicalIndex - b.logicalIndex || a.ordinal - b.ordinal);
@@ -521,7 +581,7 @@ function toSeriesMarker(
 ): SeriesMarker<Time> {
   const isEntry = marker.type === "entry";
   return {
-    time: normalizeChartTime(marker.time) as Time,
+    time: chartTimeFromString(marker.time),
     position: isEntry ? "belowBar" : "aboveBar",
     color: isEntry
       ? restrained

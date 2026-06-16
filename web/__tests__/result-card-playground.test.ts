@@ -114,6 +114,15 @@ describe("result card playground", () => {
     expect(positive.worstDrop.value).toBe("-12.4%");
     expect(positive.details).toContainEqual({ label: "Timeframe", value: "1D" });
     expect(positive.details).toContainEqual({ label: "Benchmark", value: "SPY" });
+    expect(positive.details.slice(0, 4)).toEqual([
+      { label: "Starting capital", value: "$1,000" },
+      { label: "Peak value", value: "$1,560" },
+      { label: "Lowest value", value: "$984" },
+      {
+        label: "Date range",
+        value: "January 4, 2021 to December 31, 2025",
+      },
+    ]);
 
     const negative = heroDeltaEvidenceView(resultCardPlaygroundFixtures[1].result);
     expect(negative.hero.value).toBe("$820");
