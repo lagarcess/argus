@@ -928,6 +928,15 @@ Latest local verification on 2026-06-16:
   fallbacks before recovering with `¿Qué periodo quieres usar para AAPL?`; the
   follow-up answer still updated the active confirmation and result to
   `1 feb 2025 -> 1 may 2025`.
+- Local QA-mode live-provider/date smoke on branch HEAD `20887a5` used the
+  root `.env` plus `web/.env.local` with the strict QA backend and frontend
+  running locally. The in-app Browser path was attempted first, but login input
+  was blocked by the Browser virtual-clipboard limitation, so the same rendered
+  flow was exercised with repo Playwright against `http://localhost:3000`.
+  Prompt `Prueba comprar y mantener Apple con 100k durante el ultimo ano`
+  reached a Spanish confirmation with provider-canonical `AAPL`, `$100,000`,
+  and `16 jun 2025 -> 16 jun 2026`; executing the card produced a completed
+  result with the same date window, chart, and Spanish quick summary.
 - `cd web && bun run test:e2e chat-action-recovery.spec.ts onboarding.spec.ts --project=chromium`
   returned 13 passed for the affected browser recovery, readiness-smoke,
   Spanish edit-loop, and private-alpha onboarding specs.
