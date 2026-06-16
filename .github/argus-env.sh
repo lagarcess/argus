@@ -176,6 +176,7 @@ argus_export_dev_mode() {
   export ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture
   export ARGUS_CHECKPOINTER_MODE=memory
   export ARGUS_MOCK_AUTH=true
+  export ENABLE_MARKET_DATA_CACHE=false
   export ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=false
   export ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=false
   export ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=false

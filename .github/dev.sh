@@ -24,6 +24,7 @@ argus_export_dev_mode
 echo "🔵 Dev Mode activated:"
 echo "   - Persistence: Memory (ephemeral)"
 echo "   - Market Data: Synthetic fixtures (no API calls)"
+echo "   - Disk market-data cache: Disabled"
 echo "   - Fallback: Tolerant (keeps going on errors)"
 echo "   - Runtime checkpoints: Memory"
 echo "   - Database URLs: Ignored"

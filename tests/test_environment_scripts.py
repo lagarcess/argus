@@ -71,6 +71,15 @@ def test_dev_script_ignores_database_urls_even_when_env_contains_them() -> None:
     assert "Database URLs: Ignored" in dev_script
 
 
+def test_dev_script_disables_disk_market_data_cache_for_stable_memory_qa() -> None:
+    dev_script = _source(".github/dev.sh")
+    env_contract = ENV_CONTRACT.read_text()
+
+    assert "Synthetic fixtures (no API calls)" in dev_script
+    assert "Disk market-data cache: Disabled" in dev_script
+    assert "export ENABLE_MARKET_DATA_CACHE=false" in env_contract
+
+
 def test_dev_and_qa_scripts_source_shared_env_contract() -> None:
     assert ENV_CONTRACT.exists()
     assert 'source "$SCRIPT_DIR/argus-env.sh"' in _source(".github/dev.sh")
