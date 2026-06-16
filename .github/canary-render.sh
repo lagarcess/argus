@@ -19,6 +19,7 @@ SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-${SUPABASE_URL:-${SUPABASE_PROJECT_UR
 SUPABASE_SERVICE_ROLE_KEY="${ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}"
 TIMEOUT_SECONDS="${ARGUS_CANARY_TIMEOUT_SECONDS:-240}"
 POLL_SLEEP_SECONDS="${ARGUS_CANARY_POLL_SLEEP_SECONDS:-5}"
+LANGUAGE="${ARGUS_CANARY_LANGUAGE:-en}"
 PROMPT="${ARGUS_CANARY_PROMPT:-Test an equal-weight AAPL and MSFT buy-and-hold strategy from January 1, 2025 through June 5, 2026 with 10,000 dollars}"
 
 if [ -z "$EMAIL" ]; then
@@ -68,14 +69,14 @@ CONVERSATION_ID="$(
 )"
 
 CHAT_BODY="$(
-  CONVERSATION_ID="$CONVERSATION_ID" PROMPT="$PROMPT" python3 - <<'PY'
+  CONVERSATION_ID="$CONVERSATION_ID" PROMPT="$PROMPT" CANARY_LANGUAGE="$LANGUAGE" python3 - <<'PY'
 import json
 import os
 
 print(json.dumps({
     "conversation_id": os.environ["CONVERSATION_ID"],
     "message": os.environ["PROMPT"],
-    "language": "en",
+    "language": os.environ["CANARY_LANGUAGE"],
 }))
 PY
 )"
@@ -139,14 +140,14 @@ PY
 )"
 
 RUN_BODY="$(
-  CONVERSATION_ID="$CONVERSATION_ID" RUN_ACTION="$RUN_ACTION" python3 - <<'PY'
+  CONVERSATION_ID="$CONVERSATION_ID" RUN_ACTION="$RUN_ACTION" CANARY_LANGUAGE="$LANGUAGE" python3 - <<'PY'
 import json
 import os
 
 print(json.dumps({
     "conversation_id": os.environ["CONVERSATION_ID"],
     "action": json.loads(os.environ["RUN_ACTION"]),
-    "language": "en",
+    "language": os.environ["CANARY_LANGUAGE"],
 }))
 PY
 )"

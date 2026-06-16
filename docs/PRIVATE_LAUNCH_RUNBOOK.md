@@ -59,6 +59,12 @@ Restart `argus-api` after changing Render env values.
 .github/canary-render.sh
 ```
 
+After the readiness branch is deployed, rerun the same strict canary in Spanish:
+
+```bash
+ARGUS_CANARY_LANGUAGE=es-419 ARGUS_CANARY_PROMPT='Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 con 10000 dolares' .github/canary-render.sh
+```
+
 Only send the app URL to testers after both scripts pass. If warmup fails, do
 not invite testers yet. Check Render service status and redeploy only if the
 service is stuck. If warmup passes but the canary fails, treat it as an Argus

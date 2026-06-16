@@ -896,6 +896,19 @@ Latest Render verification on 2026-06-16:
   `0ca6b215-5dcb-44db-a014-48722c478311`. The script verified confirmation,
   the structured `run_backtest` action, async workflow completion, persisted
   messages, Supabase rows, result-summary route receipt, and LLM readout voice.
+- Closed locally in the readiness worktree: `.github/canary-render.sh` now
+  accepts `ARGUS_CANARY_LANGUAGE`, so the same strict canary harness can be
+  reused for Spanish live QA instead of a one-off curl path.
+- Deployment-drift finding on 2026-06-16: running the Spanish canary with
+  `ARGUS_CANARY_LANGUAGE=es-419` against the live Render API reached
+  confirmation, emitted the structured `run_backtest` action, and completed job
+  `b78df19d-c7fa-4b37-a3d7-38ac2d865eff` with run
+  `316a9db8-3990-40e7-9f65-e2d98da2ee6c`, but failed the strict readout gate
+  because the deployed API is still commit `f335d7814335f8b1b330d3ee37e7125cafdbc478`
+  from `codex/private-alpha-next`. Persisted metadata showed
+  `result_readout_source=deterministic_fallback` and
+  `result_readout_failure_mode=quick_take_draft_rejected`. Rerun this Spanish
+  canary only after the readiness branch is deployed.
 - Closed locally in the readiness worktree: `.github/workflows/private-alpha-canary.yml`
   adds a manual and daily GitHub Actions gate that requires canary secrets, runs
   `.github/warmup-render.sh --expect-mode real-workflow`, then runs
@@ -1421,7 +1434,11 @@ surfaces.
   edit regression: a starter flow followed by `Use Jan 1 2025 to Apr 1 2025`
   now regenerates the confirmation and completed result with the explicit
   Jan 1-Apr 1, 2025 window instead of reusing the prior rolling default.
-- Live QA with at least one Spanish prompt in Render staging.
+- Spanish live QA is now scriptable through
+  `ARGUS_CANARY_LANGUAGE=es-419 .github/canary-render.sh`, but the live Render
+  API must first move past deployed commit
+  `f335d7814335f8b1b330d3ee37e7125cafdbc478`; the 2026-06-16 Spanish canary
+  failed the strict LLM readout gate on that older deployment.
 
 ### Slice 2: Alpha Trust And Legal Shell
 
