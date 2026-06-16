@@ -188,7 +188,7 @@ The readiness slice should be sequenced like this:
 | Tenant ownership | Add app-level ownership checks before service-role writes that accept parent IDs. | Service-role backend paths must preserve tenant boundaries. |
 | Feedback privacy | Cap feedback payloads, schema context, and redact URL query strings. | Feedback should help us learn without collecting accidental secrets. |
 | Workflow mode | Require real workflow dispatch/execution config and green warmup/canary before sessions. | Prevents in-process heavy execution or hidden workflow drift. |
-| Confirmation action I/O | Resolved locally on `codex/private-alpha-readiness`; [GitHub issue 112](https://github.com/lagarcess/argus/issues/112) should close after merge. Valid confirmation actions now reuse one recent-message read before entering runtime. | This remains a latency-sensitive action path that owns stale-confirmation guardrails, so the focused regression coverage must stay green. |
+| Confirmation action I/O | Resolved locally on `codex/private-alpha-readiness-clean`; [GitHub issue 112](https://github.com/lagarcess/argus/issues/112) should close after merge. Valid confirmation actions now reuse one recent-message read before entering runtime. | This remains a latency-sensitive action path that owns stale-confirmation guardrails, so the focused regression coverage must stay green. |
 | Cold-start prompts | Replace stale exact-date starter chips/placeholders with natural rolling-window examples in English and Spanish. | Exact 2024 examples make Argus feel brittle and outdated, and they teach users that imprecise natural prompts may break the product. |
 
 ## Acceptable With Disclosure For Controlled Alpha
@@ -827,10 +827,16 @@ Backpressure exists:
 - 5 running global;
 - 10 queued global.
 
-Issue 112 is resolved locally on `codex/private-alpha-readiness` and remains
-open on GitHub until the branch is merged. Valid confirmation actions share one
-recent-message read between stale-confirmation validation and confirmation
-metadata fallback, while stale confirmation actions still stop before runtime.
+Issue 112 is resolved locally on `codex/private-alpha-readiness-clean` and
+remains open on GitHub until the branch is merged. Valid confirmation actions
+share one recent-message read between stale-confirmation validation and
+confirmation metadata fallback, while stale confirmation actions still stop
+before runtime.
+Fresh local proof on 2026-06-16:
+`tests/test_chat_runtime_reload_guardrails.py::test_valid_confirmation_action_reuses_recent_messages_for_metadata_fallback`,
+`tests/test_chat_runtime_reload_guardrails.py::test_stale_confirmation_action_id_does_not_execute`,
+and `tests/test_chat_runtime_reload_guardrails.py::test_canceled_confirmation_blocks_stale_checkpoint_run_action`
+passed together.
 
 ### Must Fix Or Verify Before Testers
 
@@ -1518,7 +1524,9 @@ surfaces.
   mode verification; the authenticated canary then passed confirmation,
   structured `run_backtest`, async workflow completion, persisted messages,
   Supabase verifier checks, result-summary route receipt, and LLM readout voice.
-- Keep issue 112 duplicate-read regression tests green until merge.
+- Keep issue 112 duplicate-read regression tests green until merge. Closed
+  locally on 2026-06-16 for valid confirmation reuse, stale confirmation ID,
+  and canceled stale-checkpoint run guardrails.
 - Add or document daily canary automation. Closed locally:
   `.github/workflows/private-alpha-canary.yml` runs the real-workflow warmup and
   authenticated canary manually or on a daily schedule once GitHub secrets are

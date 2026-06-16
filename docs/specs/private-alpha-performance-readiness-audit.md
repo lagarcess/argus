@@ -88,7 +88,7 @@ No runtime source changes were made as part of this audit.
   user-message persistence.
 - Metadata fallback can repeat recent-message scans in the same turn, but the
   issue 112 confirmation-action case is resolved locally on
-  `codex/private-alpha-readiness`.
+  `codex/private-alpha-readiness-clean`.
 - [GitHub issue 112](https://github.com/lagarcess/argus/issues/112) remains open
   until merge; focused tests now prove valid confirmation actions reuse one
   recent-message read while stale confirmation actions still stop before
