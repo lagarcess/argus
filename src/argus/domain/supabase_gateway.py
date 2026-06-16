@@ -565,12 +565,13 @@ class SupabaseGateway:
         status: str,
         user_id: str | None = None,
         limit: int = 100,
+        oldest_first: bool = False,
     ) -> list[dict[str, Any]]:
         query = (
             self.client.table("backtest_jobs")
             .select("*")
             .eq("status", status)
-            .order("created_at", desc=True)
+            .order("created_at", desc=not oldest_first)
         )
         if user_id is not None:
             query = query.eq("user_id", user_id)

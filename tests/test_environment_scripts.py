@@ -529,3 +529,13 @@ def test_warmup_script_can_assert_expected_api_mode_without_mutating_render() ->
     assert "ARGUS_BACKTEST_REAL_WORKFLOW_TASK=argus-backtests/run_backtest_job" in warmup
     assert "put_render_env" not in warmup
     assert "delete_render_env" not in warmup
+
+
+def test_warmup_script_runs_stale_job_scan_when_supabase_verifier_env_exists() -> None:
+    warmup = _source(".github/warmup-render.sh")
+
+    assert ".github/stale-backtest-jobs.sh" in warmup
+    assert "ARGUS_STALE_JOBS_SUPABASE_URL" in warmup
+    assert "ARGUS_STALE_JOBS_SUPABASE_SERVICE_ROLE_KEY" in warmup
+    assert "Skipping stale backtest job scan" in warmup
+    assert "set -x" not in warmup

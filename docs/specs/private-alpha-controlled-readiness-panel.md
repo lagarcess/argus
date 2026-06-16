@@ -888,6 +888,11 @@ Latest Render verification on 2026-06-15:
 - `.github/canary-render.sh` was not run because this worktree environment is
   missing `ARGUS_CANARY_EMAIL` and `ARGUS_CANARY_PASSWORD`. The authenticated
   canary remains the next deployed proof gate.
+- Closed locally in the readiness worktree: `.github/stale-backtest-jobs.sh`
+  scans stale queued/running backtest jobs, reconciles terminal Render task runs
+  through the existing backtest-job helper, and is invoked by
+  `.github/warmup-render.sh` when service-role Supabase verifier credentials are
+  present.
 
 ### Daily Automation Candidates
 
@@ -895,7 +900,7 @@ For controlled alpha:
 
 - real-workflow mode drift check;
 - warmup plus canary;
-- stale queued/running job reconciler;
+- executed stale queued/running job scan output;
 - OpenRouter credit/rate-limit check;
 - Supabase error-log scan;
 - small metrics extractor over `backtest_jobs.execution_metadata`.
@@ -1405,7 +1410,9 @@ surfaces.
 - Run warmup/canary.
 - Keep issue 112 duplicate-read regression tests green until merge.
 - Add or document daily canary automation.
-- Add stale job scan.
+- Add stale job scan. Closed locally in the readiness branch:
+  `.github/stale-backtest-jobs.sh` checks stale queued/running jobs before
+  tester warmup when Supabase verifier credentials are present.
 - Add minimal alpha metrics extraction.
 
 ### Slice 6: Product Analytics Plan
