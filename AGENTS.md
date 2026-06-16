@@ -96,6 +96,16 @@ Integration guardrails:
   summarize outputs, close/archive completed agents, and leave open only agents
   with an explicit active follow-up. Jules cleanup follows the
   `argus-jules-intake` skill.
+- For horizon-spec work, follow the AI-native engineering cadence: delegate
+  code-aware planning/scoping, first-pass implementation, test generation,
+  review, and documentation support to bounded agents, but keep prioritization,
+  sequencing, architecture tradeoffs, release readiness, and merge/deploy
+  ownership with the main Codex release captain and founder. Before
+  implementation, the release captain should write or activate a Goal that names
+  the outcome, verification surface, constraints, no-touch areas, and stop
+  conditions. Subagent prompts must include lane-specific goals with allowed
+  surfaces, forbidden surfaces, expected output, verification evidence, and
+  cleanup expectation.
 - Production deploys remain manual and founder-directed.
 - Perplexity Research Lab remains design-only until a later approved
   implementation milestone.
