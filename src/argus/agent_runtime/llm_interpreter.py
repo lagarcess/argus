@@ -3947,6 +3947,15 @@ async def _repair_incomplete_strategy_extraction(
             base_response=failed_response,
         )
         response = _normalize_response_for_runtime_context(response, request=request)
+        if _response_can_skip_optional_runtime_readiness_audits(
+            response=response,
+            request=request,
+        ):
+            _log_runtime_readiness_step(
+                "ready_after_focused_strategy_repair",
+                response=response,
+            )
+            return response
         response = await _signal_rule_checked_response(
             response=response,
             preferred_model=model_name,
