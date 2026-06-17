@@ -14522,7 +14522,10 @@ async def test_focused_strategy_repair_recovers_omitted_provider_assets(
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
+    resolved_queries: list[str] = []
+
     def resolve_asset(query: str) -> ResolvedAssetStub:
+        resolved_queries.append(query)
         normalized = query.strip().upper()
         if normalized not in {"AAPL", "MSFT"}:
             raise ValueError("invalid_symbol")
@@ -14596,6 +14599,8 @@ async def test_focused_strategy_repair_recovers_omitted_provider_assets(
     assert repaired is not None
     assert repaired.candidate_strategy_draft.asset_universe == ["AAPL", "MSFT"]
     assert repaired.candidate_strategy_draft.asset_class == "equity"
+    assert {"AAPL", "MSFT"}.issubset(resolved_queries)
+    assert set(resolved_queries) <= {"AAPL", "MSFT"}
     assert "provider_catalog_asset_recovery" in repaired.reason_codes
     assert interpreter_module._response_can_skip_optional_runtime_readiness_audits(
         response=repaired,

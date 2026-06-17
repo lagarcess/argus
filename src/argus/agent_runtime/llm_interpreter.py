@@ -1185,19 +1185,6 @@ def _suspicious_extracted_asset_symbols(
         if str(getattr(asset, "canonical_symbol", "")).strip()
     }
     provider_ticker_symbol_map = _current_message_provider_ticker_asset_map(request)
-    misplaced_benchmark_candidate = _misplaced_benchmark_asset_candidate(
-        response=response,
-        request=request,
-        provider_ticker_symbol_map=provider_ticker_symbol_map,
-        ignored_name_supported_symbols=set(symbols),
-    )
-    misplaced_benchmark_symbol = (
-        str(getattr(misplaced_benchmark_candidate, "canonical_symbol", "") or "")
-        .strip()
-        .upper()
-        if misplaced_benchmark_candidate is not None
-        else None
-    )
     context_symbols = _context_inheritable_asset_symbols(
         response=response,
         request=request,
@@ -1209,14 +1196,6 @@ def _suspicious_extracted_asset_symbols(
         if symbol in raw_tokens or f"${symbol}" in raw_tokens or folded in cashtag_tokens:
             continue
         if symbol in grounded_symbols or symbol in context_symbols:
-            if (
-                misplaced_benchmark_symbol
-                and symbol != misplaced_benchmark_symbol
-                and symbol in grounded_symbols
-                and symbol not in provider_ticker_symbol_map
-            ):
-                suspicious.append(symbol)
-                continue
             continue
         if _provider_exact_ticker_supports_extracted_symbol(
             symbol,
@@ -1463,6 +1442,12 @@ def _response_without_ungrounded_symbols(
     grounded = {symbol.strip().upper() for symbol in grounded_symbols if symbol.strip()}
     draft = response.candidate_strategy_draft.model_copy(deep=True)
     original_symbols = [str(symbol).strip().upper() for symbol in draft.asset_universe]
+    mixed_asset_response = _response_with_mixed_asset_guardrail_from_symbols(
+        response=response,
+        symbols=original_symbols,
+    )
+    if mixed_asset_response is not None:
+        return mixed_asset_response
     draft.asset_universe = [symbol for symbol in original_symbols if symbol in grounded]
     if len(draft.asset_universe) == len(original_symbols):
         return response
@@ -1483,6 +1468,78 @@ def _response_without_ungrounded_symbols(
             "missing_required_fields": missing_required_fields,
             "reason_codes": list(
                 dict.fromkeys([*response.reason_codes, reason_code])
+            ),
+        }
+    )
+
+
+def _response_with_mixed_asset_guardrail_from_symbols(
+    *,
+    response: LLMInterpretationResponse,
+    symbols: list[str],
+) -> LLMInterpretationResponse | None:
+    resolved_symbols: list[str] = []
+    asset_classes: set[str] = set()
+    for index, symbol in enumerate(symbols):
+        try:
+            resolution = _resolve_asset_candidate(
+                symbol,
+                field=f"asset_universe[{index}]",
+                source="llm_extraction",
+            )
+        except ValueError:
+            continue
+        if resolution.status != "resolved" or resolution.asset is None:
+            continue
+        canonical_symbol = str(resolution.asset.canonical_symbol or "").strip().upper()
+        asset_class = str(resolution.asset.asset_class or "").strip().lower()
+        if canonical_symbol:
+            resolved_symbols.append(canonical_symbol)
+        if asset_class:
+            asset_classes.add(asset_class)
+    if len(asset_classes) <= 1:
+        return None
+    draft = response.candidate_strategy_draft.model_copy(deep=True)
+    draft.asset_universe = list(dict.fromkeys(resolved_symbols))
+    draft.asset_class = "mixed"
+    unsupported_constraints = list(response.unsupported_constraints)
+    if not any(
+        item.category == "unsupported_asset_mix" for item in unsupported_constraints
+    ):
+        unsupported_constraints.append(
+            LLMUnsupportedConstraint(
+                category="unsupported_asset_mix",
+                raw_value=", ".join(draft.asset_universe),
+                explanation=(
+                    "Argus Alpha cannot run equity, crypto, and currency pairs "
+                    "together in one simulation yet."
+                ),
+                simplification_labels=[
+                    "Run one asset class at a time",
+                    "Run the equity symbols only",
+                    "Run the crypto or currency pair symbols only",
+                ],
+            )
+        )
+    missing_required_fields = [
+        field
+        for field in response.missing_required_fields
+        if _field_path_base(field) != "asset_universe"
+    ]
+    return response.model_copy(
+        update={
+            "candidate_strategy_draft": draft,
+            "assistant_response": None,
+            "requires_clarification": True,
+            "missing_required_fields": missing_required_fields,
+            "unsupported_constraints": unsupported_constraints,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "mixed_asset_guardrail_preserved_grounding_symbols",
+                    ]
+                )
             ),
         }
     )
@@ -3694,7 +3751,7 @@ def _optional_runtime_readiness_audit_blocker(
         return "missing_benchmark_fidelity"
     if (
         "stated_run_field_fidelity_audit" not in response.reason_codes
-        and _draft_missing_comparison_baseline_needs_stated_run_field_audit(
+        and _draft_missing_exact_ticker_benchmark_needs_fidelity_audit(
             draft,
             current_message=request.current_user_message,
         )
@@ -4875,20 +4932,59 @@ def _augment_strategy_assets_from_resolvable_context(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
+    asset_grounding_removed_symbols = any(
+        code in response.reason_codes
+        for code in {
+            "asset_grounding_audit_low_confidence_cleared_suspicious_symbols",
+            "asset_grounding_audit_removed_unsubstantiated_symbols",
+            "asset_grounding_audit_unavailable_cleared_suspicious_symbols",
+        }
+    )
     draft = response.candidate_strategy_draft
     if draft.asset_universe:
         return response
     if not _llm_strategy_draft_has_non_asset_strategy_anchor(draft):
         return response
-    assets = _resolved_asset_mentions_from_values(request.current_user_message)
+    assets = _resolved_asset_mentions_from_values(
+        request.current_user_message,
+        exact_tickers_only=not (
+            canonical_strategy_type(draft.strategy_type) == "signal_strategy"
+            or _llm_strategy_draft_has_rule_or_indicator_fields(draft)
+        ),
+    )
     if not assets:
+        return response
+    asset_classes = {asset.asset_class for asset in assets}
+    if asset_grounding_removed_symbols and len(asset_classes) <= 1:
         return response
     repaired = response.model_copy(deep=True)
     repaired_draft = repaired.candidate_strategy_draft
     repaired_draft.asset_universe = [asset.canonical_symbol for asset in assets]
-    asset_classes = {asset.asset_class for asset in assets}
     if len(asset_classes) == 1:
         repaired_draft.asset_class = next(iter(asset_classes))
+    elif len(asset_classes) > 1:
+        repaired_draft.asset_class = "mixed"
+        if not any(
+            item.category == "unsupported_asset_mix"
+            for item in repaired.unsupported_constraints
+        ):
+            repaired.unsupported_constraints.append(
+                LLMUnsupportedConstraint(
+                    category="unsupported_asset_mix",
+                    raw_value=", ".join(repaired_draft.asset_universe),
+                    explanation=(
+                        "Argus Alpha cannot run equity, crypto, and currency pairs "
+                        "together in one simulation yet."
+                    ),
+                    simplification_labels=[
+                        "Run one asset class at a time",
+                        "Run the equity symbols only",
+                        "Run the crypto or currency pair symbols only",
+                    ],
+                )
+            )
+        repaired.requires_clarification = True
+        repaired.assistant_response = None
     repaired.missing_required_fields = [
         field
         for field in repaired.missing_required_fields
@@ -4921,13 +5017,38 @@ def _augment_strategy_assets_from_resolvable_context(
     return repaired
 
 
-def _resolved_asset_mentions_from_values(*values: str | None) -> list[Any]:
+def _resolved_asset_mentions_from_values(
+    *values: str | None,
+    exact_tickers_only: bool = True,
+) -> list[Any]:
     resolved_assets: list[Any] = []
     seen: set[str] = set()
+
+    def _resolve_candidate(query: str) -> AssetResolution | None:
+        if not _asset_recovery_query_is_explicit_ticker(query):
+            return None
+        try:
+            return _resolve_asset_candidate(
+                query,
+                field="asset_universe[0]",
+                source="user_mention",
+            )
+        except ValueError:
+            return None
+
     for value in values:
         if not value:
             continue
-        for asset in _resolved_asset_mentions_from_message(value):
+        assets = (
+            provider_ticker_assets_from_text(
+                value,
+                resolve_candidate=_resolve_candidate,
+                limit=5,
+            )
+            if exact_tickers_only
+            else _resolved_asset_mentions_from_message(value)
+        )
+        for asset in assets:
             symbol = asset.canonical_symbol
             if symbol in seen:
                 continue
@@ -4936,6 +5057,22 @@ def _resolved_asset_mentions_from_values(*values: str | None) -> list[Any]:
             if len(resolved_assets) >= 5:
                 return resolved_assets
     return resolved_assets
+
+
+def _asset_recovery_query_is_explicit_ticker(query: str) -> bool:
+    candidate = str(query or "").strip().lstrip("$")
+    if not candidate:
+        return False
+    compact = "".join(
+        character
+        for character in candidate
+        if character.isalnum()
+    )
+    return (
+        len(compact) >= 2
+        and any(character.isalpha() for character in compact)
+        and candidate == candidate.upper()
+    )
 
 
 def _llm_strategy_draft_has_non_asset_strategy_anchor(
@@ -6838,6 +6975,77 @@ def _draft_missing_comparison_baseline_needs_stated_run_field_audit(
         resolved_asset_mentions=_resolved_asset_mentions_from_message(current_message),
         resolve_candidate=_resolve_benchmark_candidate_from_message,
     )
+
+
+def _draft_missing_exact_ticker_benchmark_needs_fidelity_audit(
+    draft: LLMStrategyDraft,
+    *,
+    current_message: str,
+) -> bool:
+    if not _llm_value_is_empty(draft.comparison_baseline):
+        return False
+    if not _llm_strategy_draft_has_concrete_execution_target(draft):
+        return False
+    draft_symbols = {
+        str(symbol or "").strip().upper()
+        for symbol in draft.asset_universe
+        if str(symbol or "").strip()
+    }
+    if not draft_symbols:
+        return False
+    draft_asset_class = str(draft.asset_class or "").strip().lower()
+    for query in _explicit_benchmark_ticker_queries(current_message):
+        resolution = _resolve_benchmark_candidate_from_message(query)
+        if (
+            resolution is None
+            or resolution.status != "resolved"
+            or resolution.asset is None
+        ):
+            continue
+        asset = resolution.asset
+        symbol = str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
+        if not symbol or symbol in draft_symbols:
+            continue
+        asset_class = str(getattr(asset, "asset_class", "") or "").strip().lower()
+        if draft_asset_class and asset_class and asset_class != draft_asset_class:
+            continue
+        return True
+    return False
+
+
+def _explicit_benchmark_ticker_queries(message: str) -> list[str]:
+    tokens = _field_fidelity_tokens(str(message or ""))
+    queries: list[str] = []
+    seen: set[str] = set()
+    benchmark_cues = {"against", "vs", "versus", "contra"}
+    for index, token in enumerate(tokens):
+        candidate = token.strip().lstrip("$")
+        if not candidate:
+            continue
+        compact = "".join(
+            character
+            for character in candidate
+            if character.isalnum()
+        )
+        if len(compact) < 2 or not any(character.isalpha() for character in compact):
+            continue
+        previous = tokens[index - 1].strip().casefold() if index > 0 else ""
+        is_cued_lowercase_ticker = (
+            previous in benchmark_cues
+            and candidate == candidate.lower()
+            and len(compact) <= 5
+        )
+        if not (
+            _asset_recovery_query_is_explicit_ticker(token)
+            or is_cued_lowercase_ticker
+        ):
+            continue
+        normalized = candidate.upper()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        queries.append(candidate)
+    return queries
 
 
 def _resolve_benchmark_candidate_from_message(query: str) -> AssetResolution | None:
