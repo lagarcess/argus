@@ -39,6 +39,41 @@ def test_live_ticker_resolution_uses_exact_lookup_before_universe(
     assets.clear_asset_cache()
 
 
+def test_live_ticker_resolution_caches_exact_provider_lookup(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    assets.clear_asset_cache()
+    calls = 0
+
+    def exact_alpaca_lookup(symbol: str) -> ResolvedAsset:
+        nonlocal calls
+        calls += 1
+        assert symbol == "MSFT"
+        return ResolvedAsset(
+            canonical_symbol="MSFT",
+            asset_class="equity",
+            name="Microsoft Corporation",
+            raw_symbol="MSFT",
+            provider="alpaca",
+        )
+
+    monkeypatch.setattr(
+        assets,
+        "_load_asset_from_alpaca_symbol",
+        exact_alpaca_lookup,
+    )
+
+    first = assets.resolve_asset("MSFT")
+    second = assets.resolve_asset("MSFT")
+
+    assert first.canonical_symbol == "MSFT"
+    assert second.canonical_symbol == "MSFT"
+    assert calls == 1
+
+    assets.clear_asset_cache()
+
+
 def test_live_asset_universe_loader_times_out_slow_provider_and_uses_fallback(
     monkeypatch,
 ) -> None:

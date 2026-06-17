@@ -63,6 +63,7 @@ SYNTHETIC_UNIT_ASSETS: dict[str, tuple[AssetClass, str, str]] = {
 
 _ASSET_ALIAS_MAP: dict[str, ResolvedAsset] | None = None
 _ASSET_CACHE_TS: float = 0.0
+_ASSET_EXACT_LOOKUP_CACHE: dict[str, ResolvedAsset] = {}
 _ASSET_CACHE_LOCK = threading.Lock()
 KRAKEN_PUBLIC_API_BASE = "https://api.kraken.com/0"
 FIAT_CODES = {"USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"}
@@ -562,12 +563,20 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
 def _resolve_live_provider_ticker(symbol: str) -> ResolvedAsset | None:
     if _asset_provider_mode() != "live_provider":
         return None
+    with _ASSET_CACHE_LOCK:
+        cached = _ASSET_EXACT_LOOKUP_CACHE.get(symbol)
+    if cached is not None:
+        logger.debug("Asset provider exact lookup cache hit symbol={}", symbol)
+        return cached
     try:
-        return _run_live_provider_call(
+        asset = _run_live_provider_call(
             lambda: _load_asset_from_alpaca_symbol(symbol),
             provider="alpaca",
-            operation="symbol_lookup",
+            operation=f"symbol_lookup:{symbol}",
         )
+        with _ASSET_CACHE_LOCK:
+            _ASSET_EXACT_LOOKUP_CACHE[symbol] = asset
+        return asset
     except Exception:
         return None
 
@@ -681,7 +690,8 @@ def _name_match_score(query: str, record: ResolvedAsset) -> int:
 
 
 def clear_asset_cache() -> None:
-    global _ASSET_ALIAS_MAP, _ASSET_CACHE_TS
+    global _ASSET_ALIAS_MAP, _ASSET_CACHE_TS, _ASSET_EXACT_LOOKUP_CACHE
     with _ASSET_CACHE_LOCK:
         _ASSET_ALIAS_MAP = None
         _ASSET_CACHE_TS = 0.0
+        _ASSET_EXACT_LOOKUP_CACHE = {}
