@@ -338,6 +338,8 @@ Scope:
 - Stand up a local ephemeral stack that mirrors the release-critical surfaces
   needed for smoke testing: API, web, and the workflow/backtest integration
   path.
+- Implement the stack with Docker Compose or an equivalent disposable local
+  container orchestration layer.
 - Use it to validate the candidate SHA, the current feature-flag set, and the
   intended workflow mode before the internet-reachable deploy is touched.
 - Treat the stack as disposable: create it, run the smoke checks, tear it down.
@@ -362,6 +364,58 @@ Verification:
 - The smoke gate confirms the environment is suitable enough to justify the
   expensive internet-reachable canary.
 - The smoke gate does not mutate production or private-alpha release state.
+
+### Recommended Agent Lanes
+
+Use the standing roster with crisp lane ownership:
+
+- `argus-slice-planner`: phase ordering, promotion criteria, and rollback
+  shape for Phases 1 through 9.
+- `argus-code-scout`: repo impact map for the smoke gate, drift gate, and
+  canary files.
+- `argus-runtime-guardian`: runtime-finalization and reload contradiction
+  review for Phases 1 to 4.
+- `argus-evidence-engine-critic`: backtest evidence and result-card truth for
+  Phase 5.
+- `argus-security-release-reviewer`: release manifest, env drift exposure, and
+  live-config risk for Phases 6 through 9.
+- `argus-verification-qa`: local smoke proof, browser canary proof, and release
+  confidence for Phases 7 and 8.
+- `argus-product-architect` and `argus-domain-modeler`: memo-to-product object
+  translation only, before implementation begins.
+
+When a phase needs a narrower one-off agent than the standing roster, spawn a
+custom bounded agent with this blueprint:
+
+- Goal: one sentence naming the exact phase and proof target.
+- Allowed surfaces: a short file list or subsystem list only.
+- Forbidden surfaces: anything outside the phase, plus release/config mutation
+  unless explicitly requested.
+- Expected output: a single artifact type, such as impact map, object model,
+  phase plan, or verification matrix.
+- Verification evidence: exact commands, files, or browser observations needed.
+- Cleanup: close the agent when the artifact is delivered.
+
+Custom-agent examples:
+
+- Docker smoke-stack agent:
+  - Goal: design the disposable local smoke stack for Phase 7 and list the
+    exact commands and container layout needed to prove the release contract.
+  - Allowed surfaces: `docs/specs/private-alpha-ci-cd-sota.md`, `.github/dev.sh`,
+    `.github/qa.sh`, `.github/local-smoke.sh`, `docker-compose.yml` or the
+    equivalent local orchestration files.
+  - Forbidden surfaces: runtime interpreter behavior, backtest math, release
+    config mutation, and frontend state changes.
+  - Expected output: container topology, startup/shutdown flow, and smoke
+    verification checklist.
+
+- Canary-proof agent:
+  - Goal: define the minimal evidence needed to prove the live canary catches
+    timeout/reload contradictions.
+  - Allowed surfaces: `.github/canary-render.sh`, `.github/workflows`,
+    `tests/test_render_canary_script.py`, browser QA notes.
+  - Forbidden surfaces: product scope, data model changes, and deploy topology.
+  - Expected output: canary proof matrix and failure-evidence requirements.
 
 ### Phase 8: Expand Canary Coverage
 
