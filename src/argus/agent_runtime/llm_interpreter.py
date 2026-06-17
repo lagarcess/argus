@@ -895,6 +895,15 @@ class OpenRouterStructuredInterpreter:
             "'direction':'bullish'|'bearish'}. If the user leaves exit unspecified, "
             "you may omit exit_rule and deterministic validation will derive the "
             "opposite crossover from entry_rule. "
+            "For non-recurring buy-and-hold or backtest requests, any explicit "
+            "cash amount that the user says to use, test, invest, allocate, or "
+            "start with belongs in capital_amount as the starting capital, "
+            "normalized as a number, with field_provenance.capital_amount="
+            "'starting_capital'. This is language-agnostic: phrases equivalent "
+            "to 'with 10000 dollars' or 'con 10000 dolares' are complete capital "
+            "evidence for a buy_and_hold request. Do not leave capital_amount "
+            "null or put this amount only in total_capital/initial_capital for "
+            "non-DCA runs. "
             "For natural periods, return date_range as a normalized string when exact dates "
             "are not available, or as {'start': 'YYYY-MM-DD', 'end': 'YYYY-MM-DD'} when the "
             "user provides exact dates. For recurring buys, extract cadence as daily, weekly, "
@@ -3147,6 +3156,21 @@ async def _response_ready_for_runtime(
             response=response,
         )
         return response
+    capital_response = await _early_starting_capital_rechecked_response(
+        response=response,
+        request=request,
+    )
+    if capital_response is not None:
+        response = capital_response
+        if _response_can_skip_optional_runtime_readiness_audits(
+            response=response,
+            request=request,
+        ):
+            _log_runtime_readiness_step(
+                "ready_after_starting_capital_recheck",
+                response=response,
+            )
+            return response
     response = await _pending_response_option_selected_response(
         response=response,
         preferred_model=preferred_model,
@@ -7344,6 +7368,29 @@ def _response_needs_stated_starting_capital_recheck(
     return _llm_strategy_draft_has_concrete_execution_target(draft)
 
 
+async def _early_starting_capital_rechecked_response(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if (
+        _optional_runtime_readiness_audit_blocker(
+            response=response,
+            request=request,
+        )
+        != "stated_starting_capital_recheck"
+    ):
+        return None
+    _log_runtime_readiness_step(
+        "starting_capital_recheck_started",
+        response=response,
+    )
+    return await _audit_stated_starting_capital_fidelity(
+        response=response,
+        request=request,
+    )
+
+
 def _draft_has_grounded_non_dca_starting_capital(draft: LLMStrategyDraft) -> bool:
     if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
         return False
@@ -7938,7 +7985,10 @@ def _focused_extraction_field_provenance(
         provenance["recurring_contribution"] = "explicit_user"
         provenance["capital_amount"] = "recurring_contribution"
     elif extraction.capital_amount is not None:
-        provenance["capital_amount"] = "explicit_user"
+        if canonical_strategy_type(extraction.strategy_type) == "dca_accumulation":
+            provenance["capital_amount"] = "recurring_contribution"
+        else:
+            provenance["capital_amount"] = "starting_capital"
     if extraction.cadence:
         provenance["cadence"] = "explicit_user"
     return provenance

@@ -249,8 +249,11 @@ class FocusedStrategyExtraction(BaseModel):
     capital_amount: float | None = Field(
         default=None,
         description=(
-            "User-stated starting capital or recurring contribution amount. "
-            "Examples: $1k -> 1000, $500 -> 500."
+            "User-stated cash amount normalized as a number. For non-recurring "
+            "buy-and-hold or backtest requests, this is the starting capital to "
+            "test or invest with, even when the user says it in another language. "
+            "For recurring DCA requests, this is the recurring contribution "
+            "amount. Examples: $1k -> 1000, 10000 dollars -> 10000."
         ),
     )
     recurring_contribution: float | None = Field(
