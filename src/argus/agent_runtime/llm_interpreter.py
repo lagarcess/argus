@@ -3547,10 +3547,38 @@ def _response_can_skip_optional_runtime_readiness_audits(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
+    blocker = _optional_runtime_readiness_audit_blocker(
+        response=response,
+        request=request,
+    )
+    if blocker is None:
+        return True
+    logger.debug(
+        "Structured interpreter runtime readiness skip blocked reason={} "
+        "intent={} semantic_turn_act={} strategy_type={}",
+        blocker,
+        response.intent,
+        response.semantic_turn_act,
+        canonical_strategy_type(response.candidate_strategy_draft.strategy_type),
+        blocker=blocker,
+        intent=response.intent,
+        semantic_turn_act=response.semantic_turn_act,
+        strategy_type=canonical_strategy_type(
+            response.candidate_strategy_draft.strategy_type
+        ),
+    )
+    return False
+
+
+def _optional_runtime_readiness_audit_blocker(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> str | None:
     if response.intent not in {"strategy_drafting", "backtest_execution"}:
-        return False
+        return "unsupported_intent"
     if response.semantic_turn_act != "new_idea":
-        return False
+        return "not_new_idea"
     if (
         response.requires_clarification
         or response.missing_required_fields
@@ -3559,52 +3587,54 @@ def _response_can_skip_optional_runtime_readiness_audits(
         or response.capability_question_focus is not None
         or response.context_question_focus is not None
     ):
-        return False
+        return "pending_clarification_or_constraint"
     draft = response.candidate_strategy_draft
     strategy_type = executable_strategy_type(draft.model_dump(mode="python"))
     if strategy_type not in SUPPORTED_STRATEGY_TYPES:
-        return False
+        return "unsupported_strategy_type"
     if _llm_strategy_draft_has_rule_or_indicator_fields(draft):
-        return False
+        return "rule_or_indicator_fields"
     if _capability_required_missing_fields_for_canonical_strategy([], draft=draft):
-        return False
+        return "missing_required_execution_fields"
     if not _structured_interpretation_has_required_shape(response, request=request):
-        return False
+        return "required_shape_missing"
     if _response_replays_prior_strategy_without_current_turn_update(
         response=response,
         request=request,
     ):
-        return False
+        return "prior_strategy_replay"
     if _response_needs_launch_field_fidelity_repair(response=response):
-        return False
+        return "launch_field_fidelity"
     if _response_needs_executable_strategy_grounding_audit(response=response):
-        return False
+        return "executable_strategy_grounding"
     if _response_needs_supported_strategy_capability_conflict_audit(response):
-        return False
+        return "capability_conflict"
     if _response_needs_temporal_runtime_repair(response=response, request=request):
-        return False
+        return "temporal_runtime_repair"
     if not _draft_asset_universe_has_exact_provider_symbols(draft):
-        return False
+        return "asset_universe_not_exact_provider_symbols"
     if _response_needs_missing_benchmark_fidelity_audit(response):
-        return False
-    if _draft_has_unprovenanced_benchmark(draft):
-        return False
+        return "missing_benchmark_fidelity"
+    if _draft_has_unprovenanced_benchmark(
+        draft
+    ) and not _draft_has_supported_default_benchmark(draft):
+        return "unprovenanced_benchmark"
     if _response_has_current_message_date_range_reconciliation(
         response=response,
         request=request,
     ):
-        return False
+        return "date_range_reconciliation"
     if (
         canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
         and _dca_response_needs_semantic_field_audit(response)
     ):
-        return False
+        return "dca_semantic_field_audit"
     if _response_needs_stated_starting_capital_recheck(
         response=response,
         request=request,
     ):
-        return False
-    return True
+        return "stated_starting_capital_recheck"
+    return None
 
 
 def _draft_asset_universe_has_exact_provider_symbols(
@@ -3633,6 +3663,49 @@ def _draft_asset_universe_has_exact_provider_symbols(
         if resolution.asset.canonical_symbol.upper() != symbol.upper():
             return False
     return True
+
+
+def _draft_has_supported_default_benchmark(draft: LLMStrategyDraft) -> bool:
+    benchmark = _normalized_extracted_symbol(draft.comparison_baseline)
+    if benchmark is None:
+        return False
+    asset_class = _single_provider_asset_class_for_draft(draft)
+    if asset_class == "equity":
+        return benchmark == "SPY"
+    if asset_class == "crypto":
+        return benchmark == "BTC"
+    return False
+
+
+def _single_provider_asset_class_for_draft(draft: LLMStrategyDraft) -> str | None:
+    symbols = [
+        str(symbol or "").strip()
+        for symbol in draft.asset_universe
+        if str(symbol or "").strip()
+    ]
+    asset_classes: set[str] = set()
+    for symbol in symbols:
+        try:
+            resolution = _resolve_asset_candidate(
+                symbol,
+                field="asset_universe",
+                source="llm_extraction",
+            )
+        except ValueError:
+            return None
+        if resolution.status != "resolved" or resolution.asset is None:
+            return None
+        asset_class = str(resolution.asset.asset_class or "").strip().lower()
+        if asset_class:
+            asset_classes.add(asset_class)
+    if len(asset_classes) == 1:
+        return next(iter(asset_classes))
+    if asset_classes:
+        return None
+    explicit_asset_class = str(draft.asset_class or "").strip().lower()
+    if explicit_asset_class in {"equity", "crypto"}:
+        return explicit_asset_class
+    return None
 
 
 def _response_needs_temporal_runtime_repair(
@@ -7266,9 +7339,26 @@ def _response_needs_stated_starting_capital_recheck(
     draft = response.candidate_strategy_draft
     if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
         return False
-    if draft.capital_amount is not None:
+    if _draft_has_grounded_non_dca_starting_capital(draft):
         return False
     return _llm_strategy_draft_has_concrete_execution_target(draft)
+
+
+def _draft_has_grounded_non_dca_starting_capital(draft: LLMStrategyDraft) -> bool:
+    if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
+        return False
+    if draft.capital_amount is not None:
+        return True
+    field_provenance = draft.field_provenance or {}
+    if (
+        draft.initial_capital is not None
+        and _capital_source(field_provenance, "initial_capital") in _TOTAL_CAPITAL_SOURCES
+    ):
+        return True
+    return (
+        draft.total_capital is not None
+        and _capital_source(field_provenance, "total_capital") in _TOTAL_CAPITAL_SOURCES
+    )
 
 
 def _stated_starting_capital_messages(

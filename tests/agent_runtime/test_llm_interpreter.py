@@ -14235,7 +14235,9 @@ async def test_complete_absolute_run_skips_optional_runtime_readiness_audits(
             asset_universe=["AAPL", "MSFT"],
             asset_class="equity",
             date_range={"start": "2025-01-01", "end": "2026-06-05"},
-            capital_amount=10000,
+            total_capital=10000,
+            comparison_baseline="SPY",
+            field_provenance={"total_capital": "total_capital"},
         ),
         semantic_turn_act="new_idea",
         artifact_target="none",
@@ -14266,6 +14268,57 @@ async def test_complete_absolute_run_skips_optional_runtime_readiness_audits(
         "AAPL",
         "MSFT",
     ]
+    assert ready_response.candidate_strategy_draft.comparison_baseline == "SPY"
+    assert ready_response.candidate_strategy_draft.total_capital == 10000
+
+
+def test_unprovenanced_non_default_benchmark_blocks_runtime_fast_path(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized not in {"AAPL"}:
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(normalized, "equity", name=normalized)
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Test AAPL from January 1, 2025 to June 5, 2026.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2025-01-01", "end": "2026-06-05"},
+            capital_amount=10000,
+            comparison_baseline="QQQ",
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="Test AAPL from January 1, 2025 to June 5, 2026.",
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1", language_preference="en"),
+    )
+
+    assert (
+        interpreter_module._optional_runtime_readiness_audit_blocker(
+            response=response,
+            request=request,
+        )
+        == "unprovenanced_benchmark"
+    )
+    assert not interpreter_module._response_can_skip_optional_runtime_readiness_audits(
+        response=response,
+        request=request,
+    )
 
 
 def test_relative_window_evidence_blocks_optional_readiness_fast_path() -> None:
