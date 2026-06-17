@@ -3181,6 +3181,22 @@ async def _response_ready_for_runtime(
                 response=response,
             )
             return response
+    focused_response = await _early_focused_strategy_repaired_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if focused_response is not None:
+        response = focused_response
+        if _response_can_skip_optional_runtime_readiness_audits(
+            response=response,
+            request=request,
+        ):
+            _log_runtime_readiness_step(
+                "ready_after_early_focused_strategy_repair",
+                response=response,
+            )
+            return response
     response = await _pending_response_option_selected_response(
         response=response,
         preferred_model=preferred_model,
@@ -7409,6 +7425,54 @@ async def _early_starting_capital_rechecked_response(
         return None
     _log_runtime_readiness_step(
         "starting_capital_recheck_repaired",
+        response=repaired,
+    )
+    return repaired
+
+
+async def _early_focused_strategy_repaired_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    blocker = _optional_runtime_readiness_audit_blocker(
+        response=response,
+        request=request,
+    )
+    if blocker not in {
+        "missing_required_execution_fields",
+        "required_shape_missing",
+        "stated_starting_capital_recheck",
+    }:
+        return None
+    if (
+        response.requires_clarification
+        or response.capability_question_focus is not None
+        or response.context_question_focus is not None
+        or response.unsupported_constraints
+        or response.ambiguous_fields
+    ):
+        return None
+    if not _request_current_turn_has_material_execution_evidence(request):
+        return None
+    _log_runtime_readiness_step(
+        "early_focused_strategy_repair_started",
+        response=response,
+    )
+    repaired = await _repair_incomplete_strategy_extraction(
+        failed_response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if repaired is None:
+        _log_runtime_readiness_step(
+            "early_focused_strategy_repair_no_repair",
+            response=response,
+        )
+        return None
+    _log_runtime_readiness_step(
+        "early_focused_strategy_repaired",
         response=repaired,
     )
     return repaired
