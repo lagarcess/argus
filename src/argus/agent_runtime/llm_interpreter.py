@@ -415,7 +415,17 @@ class StatedStartingCapitalAudit(BaseModel):
             "invest, allocate, put on, or use as capital."
         ),
     )
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    confidence: float = Field(
+        default=0.8,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Confidence in the starting_capital extraction. Use high confidence "
+            "for an exact current-message amount; leave the default acceptable "
+            "confidence when starting_capital is directly present but no separate "
+            "confidence value is needed."
+        ),
+    )
 
 
 class SupportedStrategyCapabilityConflictAudit(BaseModel):
@@ -7385,10 +7395,21 @@ async def _early_starting_capital_rechecked_response(
         "starting_capital_recheck_started",
         response=response,
     )
-    return await _audit_stated_starting_capital_fidelity(
+    repaired = await _audit_stated_starting_capital_fidelity(
         response=response,
         request=request,
     )
+    if repaired is None:
+        _log_runtime_readiness_step(
+            "starting_capital_recheck_no_repair",
+            response=response,
+        )
+        return None
+    _log_runtime_readiness_step(
+        "starting_capital_recheck_repaired",
+        response=repaired,
+    )
+    return repaired
 
 
 def _draft_has_grounded_non_dca_starting_capital(draft: LLMStrategyDraft) -> bool:
@@ -7425,7 +7446,11 @@ def _stated_starting_capital_messages(
                 "cash to test, invest, allocate, put on, or use as capital. This "
                 "is language-agnostic: normalize numeric magnitude shorthand "
                 "such as 100k -> 100000 and 2.5m -> 2500000 when it is the "
-                "allocation amount. Use structured draft prose as supporting "
+                "allocation amount. Include confidence; use high confidence for "
+                "an exact literal amount from the current message. For example, "
+                "a non-recurring buy-and-hold request that says 'con 10000 dolares' "
+                "should return starting_capital 10000 with high confidence. "
+                "Use structured draft prose as supporting "
                 "evidence when it says an amount from the current message is "
                 "starting capital but the numeric field is missing; the current "
                 "user message remains authoritative. Treat draft prose that captures "

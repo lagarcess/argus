@@ -14297,7 +14297,6 @@ async def test_missing_starting_capital_rechecks_before_optional_runtime_audits(
         if schema_name == "StatedStartingCapitalAudit":
             return interpreter_module.StatedStartingCapitalAudit(
                 starting_capital=10000,
-                confidence=0.94,
             )
         raise AssertionError(f"Unexpected schema {schema_name}")
 
