@@ -82,6 +82,35 @@ The branch/deploy process also drifted from a SOTA approach:
 The long-term target is a promotion-based system with explicit release
 contracts.
 
+### Current Service Topology
+
+Argus does not need more services at this stage. The stable target topology is:
+
+- `argus-app`: web surface
+- `argus-api`: chat/runtime/orchestration surface
+- `argus-backtests`: workflow execution surface
+
+The workflow surface has two explicit tasks, not two separate services:
+
+- `argus-backtests/workflow_proof`
+- `argus-backtests/run_backtest_job`
+
+Use the proof task when:
+
+- validating the dispatch path end to end
+- warming or smoke-testing workflow wiring
+- proving queue/job persistence without exposing real execution
+
+Use the real task when:
+
+- a tester intentionally presses `Run backtest`
+- the release manifest says the deploy is in real workflow mode
+- the warmup/canary gate has already verified the proof path and live env
+
+Do not introduce a new workflow service unless a future decision proves that the
+proof and real paths need separate isolation boundaries, queues, or
+permissions.
+
 ### Environment Topology
 
 - `main`: the clean release checkpoint and the normal production promotion
@@ -114,6 +143,28 @@ Release readiness should be checked at four layers together:
 - Every promoted release should have a release manifest containing commit SHA,
   expected env fingerprint, flag state, canary matrix, rollback target, and a
   go/no-go decision record.
+- The backtest workflow task choice is part of the release manifest and must be
+  explicit for each environment.
+
+### Promotion Path
+
+Use the following progression when moving from integration to `main`:
+
+1. Develop on a focused `codex/private-alpha-next` slice.
+2. Validate on the staging/private-alpha surface with the proof workflow task.
+3. Record the release manifest, including the workflow task selection and env
+   fingerprint.
+4. Merge the approved slice to `main`.
+5. Update the release/config contract for the target environment.
+6. Promote the live environment so `argus-backtests` runs the intended task
+   (`workflow_proof` for proof validation or `run_backtest_job` for real
+   execution).
+7. Re-run warmup and canaries against the exact deployed SHA and env
+   fingerprint.
+
+When the backtest service moves between proof and real workflow modes, the
+change must be documented in the release manifest and verified by warmup before
+tester access is allowed.
 
 ## Implementation Phases
 
@@ -274,8 +325,45 @@ Verification:
 - The gate reports drift in a way a release captain can act on quickly.
 - The gate should emit an env fingerprint that can be attached to the release
   manifest and canary record.
+- The gate should explicitly report the backtest workflow task currently active
+  in the live environment.
 
-### Phase 7: Expand Canary Coverage
+### Phase 7: Add A Local Ephemeral Smoke Gate
+
+Objective:
+- Run a cheap, disposable pre-deploy validation before any Render deploy or
+  tester invite.
+
+Scope:
+- Stand up a local ephemeral stack that mirrors the release-critical surfaces
+  needed for smoke testing: API, web, and the workflow/backtest integration
+  path.
+- Use it to validate the candidate SHA, the current feature-flag set, and the
+  intended workflow mode before the internet-reachable deploy is touched.
+- Treat the stack as disposable: create it, run the smoke checks, tear it down.
+- Keep the smoke gate fast enough that it can run on every candidate push
+  without consuming the live canary budget.
+
+Likely files:
+- `.github/local-smoke.sh`
+- `.github/dev.sh`
+- `.github/qa.sh`
+- `.github/workflows/private-alpha-smoke.yml`
+- `tests/test_local_smoke_contract.py`
+
+Parallel sub-slices:
+- local stack bootstrap
+- mode/flag fingerprint check
+- pre-deploy happy-path smoke run
+
+Verification:
+- The smoke gate fails before deploy if the candidate SHA, feature flags, or
+  workflow mode do not match the release contract.
+- The smoke gate confirms the environment is suitable enough to justify the
+  expensive internet-reachable canary.
+- The smoke gate does not mutate production or private-alpha release state.
+
+### Phase 8: Expand Canary Coverage
 
 Objective:
 - Make the canary cover the real failure class, not just happy-path completion.
@@ -297,8 +385,10 @@ Verification:
 - Canary passes only when commit, env, and behavior all agree.
 - Canary evidence should be stored with the release manifest so the same SHA
   and env fingerprint can be audited later.
+- Canary evidence should note whether the backtest service is in proof or real
+  workflow mode.
 
-### Phase 8: Update Runbooks And Source-Of-Truth Docs
+### Phase 9: Update Runbooks And Source-Of-Truth Docs
 
 Objective:
 - Make the promotion path understandable and repeatable.
@@ -330,9 +420,11 @@ Recommended order:
    the same files.
 4. Phase 6 should land before any new tester invite, because it governs the
    promotion gate itself.
-5. Phase 7 follows the drift gate so the canary reflects the final release
+5. Phase 7 introduces the cheap local smoke gate so expensive internet-facing
+   canaries only run on candidates that already match the release contract.
+6. Phase 8 follows the smoke gate so the canary reflects the final release
    contract.
-6. Phase 8 is last, but it should be drafted during implementation so the gate
+7. Phase 9 is last, but it should be drafted during implementation so the gate
    instructions stay in sync with the code.
 
 ## Acceptance Criteria
@@ -344,11 +436,15 @@ The system is ready only when all of the following are true:
 - Reload/hydration cannot preserve contradictory state.
 - Spanish support is validated as a release dimension, not assumed.
 - The live deploy’s effective runtime env matches the documented contract.
+- The candidate passes a local ephemeral smoke stack before any internet-
+  reachable canary or deploy.
 - The canary asserts both commit and runtime mode.
 - `main` is the promotion target, not a surprise prerequisite.
 - Public tester exposure only happens after the release gate passes.
 - A release manifest exists for each promoted candidate and includes SHA,
   env fingerprint, canary evidence, rollback target, and approver.
+- The backtest service task currently active in each environment is explicitly
+  documented and verified before testers are invited.
 
 ## Non-Goals
 
@@ -367,6 +463,8 @@ The current checkout and private-alpha deploy evidence show:
   alpha flow relies on manual deploys and env sync helpers.
 - The live API is in `real-workflow` mode now, but the effective env contract
   should still be audited before each invite.
+- The intended pre-deploy check is a local ephemeral stack, not a second live
+  environment.
 - The web feature flags are intentionally off for private alpha.
 - Spanish support exists in the codebase and tests, but the release process
   must treat it as a contract, not a memory.
