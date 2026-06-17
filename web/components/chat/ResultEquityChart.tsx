@@ -31,6 +31,11 @@ type TooltipState = {
   event?: string;
 };
 
+export type MarkerLabelSet = {
+  entry: string;
+  exit: string;
+};
+
 const CHART_POSITIVE_COLOR = "#70a38d";
 const CHART_NEGATIVE_COLOR = "#b85c5c";
 const CHART_POSITIVE_COLOR_DARK_EVIDENCE = "#7fb39f";
@@ -48,6 +53,10 @@ const SELL_NEGATIVE_MARKER_COLOR = "#b85c5c";
 const BUY_RESTRAINED_MARKER_COLOR = "rgba(112, 163, 141, 0.42)";
 const SELL_RESTRAINED_MARKER_COLOR = "rgba(184, 92, 92, 0.38)";
 const RESULT_CHART_ATTRIBUTION_FALLBACK = "TradingView Lightweight Charts";
+const DEFAULT_MARKER_LABELS: MarkerLabelSet = {
+  entry: "Buy",
+  exit: "Sell",
+};
 export const RESULT_CHART_ATTRIBUTION_URL = "https://www.tradingview.com/";
 export const RESULT_CHART_ATTRIBUTION_FOOTER_CLASS =
   "border-t border-black/[0.04] px-3 pb-2 pt-1.5 text-[10px] leading-snug text-black/45 dark:border-white/[0.06] dark:text-white/45";
@@ -61,7 +70,7 @@ export default function ResultEquityChart({
 }: ResultEquityChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const isDark = appearanceOverride
     ? appearanceOverride === "dark"
@@ -70,6 +79,13 @@ export default function ResultEquityChart({
   const isHeroDeltaEvidence = presentation === "heroDeltaEvidence";
   const chartHeight = isHeroDeltaEvidence ? 164 : 168;
   const attributionLabel = resultChartAttributionLabel(chart.attribution);
+  const markerLabels = useMemo(
+    () => ({
+      entry: t("chat.result_chart.markers.entry", DEFAULT_MARKER_LABELS.entry),
+      exit: t("chat.result_chart.markers.exit", DEFAULT_MARKER_LABELS.exit),
+    }),
+    [t],
+  );
   const currencyFormatter = useMemo(
     () => chartCurrencyFormatter(chart.currency, chartLocale),
     [chart.currency, chartLocale],
@@ -87,10 +103,13 @@ export default function ResultEquityChart({
     for (const marker of chart.markers ?? []) {
       const time = chartTimeLookupKey(marker.time);
       const existing = map.get(time) ?? [];
-      map.set(time, [...existing, marker.label]);
+      map.set(time, [
+        ...existing,
+        resultChartMarkerDisplayLabel(marker, markerLabels),
+      ]);
     }
     return map;
-  }, [chart.markers]);
+  }, [chart.markers, markerLabels]);
   const dataIndexByTime = useMemo(() => {
     const map = new Map<string, number>();
     chart.series.forEach((point, index) => {
@@ -194,6 +213,7 @@ export default function ResultEquityChart({
       chartWidth: container.clientWidth,
       dataIndexByTime,
       restrained: isHeroDeltaEvidence,
+      markerLabels,
     };
     const markersApi = createSeriesMarkers(
       series as ISeriesApi<"Baseline", Time>,
@@ -208,6 +228,7 @@ export default function ResultEquityChart({
           chartWidth: container.clientWidth,
           dataIndexByTime,
           restrained: isHeroDeltaEvidence,
+          markerLabels,
         }),
       );
     };
@@ -248,6 +269,7 @@ export default function ResultEquityChart({
     eventByTime,
     isDark,
     isHeroDeltaEvidence,
+    markerLabels,
   ]);
 
   if (data.length === 0) return null;
@@ -469,6 +491,17 @@ export function resultChartAttributionLabel(attribution?: string | null) {
   return normalized || RESULT_CHART_ATTRIBUTION_FALLBACK;
 }
 
+export function resultChartMarkerDisplayLabel(
+  marker: ResultChartMarker,
+  markerLabels: MarkerLabelSet = DEFAULT_MARKER_LABELS,
+) {
+  const label = marker.type === "entry" ? markerLabels.entry : markerLabels.exit;
+  const symbols = (marker.symbols ?? [])
+    .map((symbol) => symbol.trim())
+    .filter(Boolean);
+  return symbols.length > 0 ? `${label} ${symbols.join(", ")}` : label;
+}
+
 type MarkerViewportInput = {
   chartWidth: number;
   visibleBars: number;
@@ -490,6 +523,7 @@ type VisibleTradeMarkerInput = {
   chartWidth: number;
   dataIndexByTime: Map<string, number>;
   restrained?: boolean;
+  markerLabels?: MarkerLabelSet;
 };
 
 export function selectVisibleTradeMarkers({
@@ -539,7 +573,12 @@ export function buildVisibleSeriesMarkers(
     chartWidth: input.chartWidth,
   });
   return visibleMarkers.map((marker, index) =>
-    toSeriesMarker(marker, labeledIndexes.has(index), input.restrained),
+    toSeriesMarker(
+      marker,
+      labeledIndexes.has(index),
+      input.restrained,
+      input.markerLabels,
+    ),
   );
 }
 
@@ -577,6 +616,7 @@ function toSeriesMarker(
   marker: ResultChartMarker,
   showLabel: boolean,
   restrained = false,
+  markerLabels: MarkerLabelSet = DEFAULT_MARKER_LABELS,
 ): SeriesMarker<Time> {
   const isEntry = marker.type === "entry";
   return {
@@ -590,7 +630,9 @@ function toSeriesMarker(
         ? SELL_RESTRAINED_MARKER_COLOR
         : SELL_NEGATIVE_MARKER_COLOR,
     shape: isEntry ? "arrowUp" : "arrowDown",
-    text: showLabel ? (isEntry ? "Buy" : "Sell") : undefined,
+    text: showLabel
+      ? resultChartMarkerDisplayLabel(marker, markerLabels)
+      : undefined,
     ...(restrained ? { size: 0.46 } : {}),
   };
 }

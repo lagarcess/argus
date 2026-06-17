@@ -4,11 +4,17 @@ import json
 import os
 import threading
 import time
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeVar
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+from loguru import logger
+
+T = TypeVar("T")
 
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 AssetProviderMode = Literal[
@@ -70,6 +76,15 @@ def _cache_ttl_seconds() -> int:
     except ValueError:
         value = 900
     return max(value, 60)
+
+
+def _asset_universe_loader_timeout_seconds() -> float:
+    raw = (os.getenv("ARGUS_ASSET_UNIVERSE_LOADER_TIMEOUT_SECONDS") or "20").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        return 20.0
+    return max(value, 0.01)
 
 
 def _asset_provider_mode() -> AssetProviderMode:
@@ -205,33 +220,14 @@ def _load_assets_from_alpaca() -> dict[str, ResolvedAsset]:
 
     aliases: dict[str, ResolvedAsset] = {}
     for asset in active_assets:
-        raw_symbol = str(getattr(asset, "symbol", "") or "").upper()
-        raw_name = str(getattr(asset, "name", "") or "")
-        raw_asset_class = getattr(asset, "asset_class", "") or ""
-        row_class = str(getattr(raw_asset_class, "value", raw_asset_class) or "")
-        asset_class = _asset_class_for_row(row_class)
-        if not raw_symbol or asset_class is None:
+        parsed = _resolved_asset_from_alpaca_asset(asset)
+        if parsed is None:
             continue
-
-        canonical = (
-            _canonicalize_crypto_symbol(raw_symbol)
-            if asset_class == "crypto"
-            else _normalize_symbol(raw_symbol)
-        )
-        if not canonical:
-            continue
-
-        resolved = ResolvedAsset(
-            canonical_symbol=canonical,
-            asset_class=asset_class,
-            name=raw_name,
-            raw_symbol=raw_symbol,
-            provider="alpaca",
-        )
+        canonical, resolved = parsed
         _add_aliases(aliases, resolved, canonical=canonical)
 
         # Add name alias (lower-case, stripped)
-        name_alias = raw_name.lower().strip()
+        name_alias = resolved.name.lower().strip()
         if name_alias and name_alias not in aliases:
             aliases[name_alias] = resolved
 
@@ -239,6 +235,57 @@ def _load_assets_from_alpaca() -> dict[str, ResolvedAsset]:
         raise ValueError("asset_universe_unavailable")
 
     return aliases
+
+
+def _load_asset_from_alpaca_symbol(symbol: str) -> ResolvedAsset:
+    from alpaca.trading.client import TradingClient
+
+    key = (os.getenv("ALPACA_API_KEY") or "").strip()
+    secret = (os.getenv("ALPACA_SECRET_KEY") or "").strip()
+    if not key or not secret:
+        raise ValueError("asset_universe_unavailable")
+
+    paper = (os.getenv("ALPACA_PAPER_TRADING") or "true").strip().lower() != "false"
+    client = TradingClient(api_key=key, secret_key=secret, paper=paper)
+    parsed = _resolved_asset_from_alpaca_asset(client.get_asset(symbol))
+    if parsed is None:
+        raise ValueError("invalid_symbol")
+    _, resolved = parsed
+    return resolved
+
+
+def _resolved_asset_from_alpaca_asset(
+    asset: object,
+) -> tuple[str, ResolvedAsset] | None:
+    raw_status = getattr(asset, "status", None) or "active"
+    status = str(getattr(raw_status, "value", raw_status) or "").lower()
+    if status and status != "active":
+        return None
+
+    raw_symbol = str(getattr(asset, "symbol", "") or "").upper()
+    raw_name = str(getattr(asset, "name", "") or "")
+    raw_asset_class = getattr(asset, "asset_class", "") or ""
+    row_class = str(getattr(raw_asset_class, "value", raw_asset_class) or "")
+    asset_class = _asset_class_for_row(row_class)
+    if not raw_symbol or asset_class is None:
+        return None
+
+    canonical = (
+        _canonicalize_crypto_symbol(raw_symbol)
+        if asset_class == "crypto"
+        else _normalize_symbol(raw_symbol)
+    )
+    if not canonical:
+        return None
+
+    resolved = ResolvedAsset(
+        canonical_symbol=canonical,
+        asset_class=asset_class,
+        name=raw_name,
+        raw_symbol=raw_symbol,
+        provider="alpaca",
+    )
+    return canonical, resolved
 
 
 def _load_assets_from_kraken() -> dict[str, ResolvedAsset]:
@@ -376,15 +423,71 @@ def _load_asset_universe() -> dict[str, ResolvedAsset]:
 
     aliases: dict[str, ResolvedAsset] = {}
     first_error: Exception | None = None
-    for loader in (_load_assets_from_alpaca, _load_assets_from_kraken):
+    for provider, loader in (
+        ("alpaca", _load_assets_from_alpaca),
+        ("kraken", _load_assets_from_kraken),
+    ):
         try:
-            aliases.update(loader())
+            aliases.update(_load_live_provider_assets(loader, provider=provider))
         except Exception as exc:
             first_error = first_error or exc
 
     if not aliases:
         raise ValueError("asset_universe_unavailable") from first_error
     return aliases
+
+
+def _load_live_provider_assets(
+    loader: Callable[[], dict[str, ResolvedAsset]],
+    *,
+    provider: str,
+) -> dict[str, ResolvedAsset]:
+    return _run_live_provider_call(
+        loader,
+        provider=provider,
+        operation="asset_universe",
+    )
+
+
+def _run_live_provider_call(
+    loader: Callable[[], T],
+    *,
+    provider: str,
+    operation: str,
+) -> T:
+    timeout_seconds = _asset_universe_loader_timeout_seconds()
+    executor = ThreadPoolExecutor(
+        max_workers=1,
+        thread_name_prefix=f"argus-assets-{provider}",
+    )
+    future = executor.submit(loader)
+    try:
+        logger.debug(
+            "Asset universe provider load started",
+            provider=provider,
+            operation=operation,
+            timeout_seconds=timeout_seconds,
+        )
+        result = future.result(timeout=timeout_seconds)
+        logger.debug(
+            "Asset universe provider load completed",
+            provider=provider,
+            operation=operation,
+            result_type=type(result).__name__,
+            result_size=len(result) if hasattr(result, "__len__") else None,
+        )
+        return result
+    except TimeoutError as exc:
+        future.cancel()
+        logger.warning(
+            "Asset universe provider timed out",
+            provider=provider,
+            operation=operation,
+            timeout_seconds=timeout_seconds,
+        )
+        raise ValueError("asset_universe_unavailable") from exc
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 def _refresh_asset_cache_if_needed(*, force: bool = False) -> None:
@@ -433,6 +536,10 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
         return confident_name_matches[0]
 
     if _is_unresolved_ticker_like_query(symbol):
+        live_asset = _resolve_live_provider_ticker(candidate)
+        if live_asset is not None:
+            _cache_resolved_asset(live_asset)
+            return live_asset
         raise ValueError("invalid_symbol")
 
     # 4. Provider-backed name search. This is intentionally sourced from the
@@ -443,6 +550,29 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
         return matches[0]
 
     raise ValueError("invalid_symbol")
+
+
+def _resolve_live_provider_ticker(symbol: str) -> ResolvedAsset | None:
+    if _asset_provider_mode() != "live_provider":
+        return None
+    try:
+        return _run_live_provider_call(
+            lambda: _load_asset_from_alpaca_symbol(symbol),
+            provider="alpaca",
+            operation="symbol_lookup",
+        )
+    except Exception:
+        return None
+
+
+def _cache_resolved_asset(record: ResolvedAsset) -> None:
+    with _ASSET_CACHE_LOCK:
+        if _ASSET_ALIAS_MAP is None:
+            return
+        _add_aliases(_ASSET_ALIAS_MAP, record, canonical=record.canonical_symbol)
+        name_alias = record.name.lower().strip()
+        if name_alias:
+            _ASSET_ALIAS_MAP[name_alias] = record
 
 
 def warm_asset_universe(

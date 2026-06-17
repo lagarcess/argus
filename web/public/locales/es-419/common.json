@@ -280,6 +280,12 @@
         "generic": "Datos {{value}}"
       }
     },
+    "result_chart": {
+      "markers": {
+        "entry": "Comprar",
+        "exit": "Vender"
+      }
+    },
     "strategy_type": {
       "buy_and_hold": "Comprar y mantener",
       "dca_accumulation": "Compras recurrentes",

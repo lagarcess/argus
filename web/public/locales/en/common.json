@@ -280,6 +280,12 @@
         "generic": "{{value}} data"
       }
     },
+    "result_chart": {
+      "markers": {
+        "entry": "Buy",
+        "exit": "Sell"
+      }
+    },
     "strategy_type": {
       "buy_and_hold": "Buy and Hold",
       "dca_accumulation": "Recurring Buys",

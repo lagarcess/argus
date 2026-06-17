@@ -10,6 +10,7 @@ import {
   formatChartCurrency,
   formatChartDateLabel,
   markerBudgetForViewport,
+  resultChartMarkerDisplayLabel,
   resultChartAttributionLabel,
   selectVisibleTradeMarkers,
 } from "../components/chat/ResultEquityChart";
@@ -103,6 +104,41 @@ describe("ResultEquityChart marker disclosure", () => {
     );
     expect(seriesMarkers.filter((item) => item.text).length).toBeLessThanOrEqual(4);
     expect(seriesMarkers.every((item) => item.size == null)).toBe(true);
+  });
+
+  test("localizes marker labels from structured entry and exit types", () => {
+    const markers = Array.from({ length: 8 }, (_, index) =>
+      marker(index + 1, index % 2 === 0 ? "entry" : "exit"),
+    );
+
+    const seriesMarkers = buildVisibleSeriesMarkers({
+      markers,
+      visibleRange: logicalRange(0, 80),
+      chartWidth: 660,
+      dataIndexByTime: new Map(
+        markers.map((item, index) => [item.time, index]),
+      ),
+      markerLabels: {
+        entry: "Comprar",
+        exit: "Vender",
+      },
+    });
+
+    expect(seriesMarkers.some((item) => item.text === "Comprar")).toBe(true);
+    expect(seriesMarkers.some((item) => item.text === "Vender")).toBe(true);
+    expect(seriesMarkers.some((item) => item.text === "Buy")).toBe(false);
+    expect(seriesMarkers.some((item) => item.text === "Sell")).toBe(false);
+    expect(
+      resultChartMarkerDisplayLabel(
+        {
+          time: "2026-01-01",
+          type: "entry",
+          label: "Buy AAPL",
+          symbols: ["AAPL", "MSFT"],
+        },
+        { entry: "Comprar", exit: "Vender" },
+      ),
+    ).toBe("Comprar AAPL, MSFT");
   });
 
   test("can render restrained markers for the playground evidence card", () => {
