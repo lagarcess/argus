@@ -5588,7 +5588,9 @@ def _response_needs_pre_guidance_focused_strategy_extraction(
         return False
     draft = response.candidate_strategy_draft
     if _llm_strategy_draft_has_semantic_execution_anchor(draft):
-        return False
+        return bool(
+            _capability_required_missing_fields_for_canonical_strategy([], draft=draft)
+        )
     return bool(
         draft.raw_user_phrasing
         or draft.strategy_thesis
@@ -8604,6 +8606,30 @@ def _normalize_response_for_runtime_context(
 ) -> LLMInterpretationResponse:
     if _request_has_latest_result(request):
         return response
+    if (
+        response.intent in {"strategy_drafting", "backtest_execution"}
+        and response.semantic_turn_act is None
+        and not _request_has_active_strategy_context(request)
+        and (
+            _llm_strategy_draft_has_extractable_fields(
+                response.candidate_strategy_draft
+            )
+            or _request_current_turn_has_material_execution_evidence(request)
+        )
+    ):
+        response = response.model_copy(
+            update={
+                "semantic_turn_act": "new_idea",
+                "reason_codes": list(
+                    dict.fromkeys(
+                        [
+                            *response.reason_codes,
+                            "coerced_missing_turn_act_to_new_idea",
+                        ]
+                    )
+                ),
+            }
+        )
     if response.intent != "results_explanation":
         return response
     if (

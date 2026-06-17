@@ -14387,6 +14387,125 @@ async def test_missing_starting_capital_rechecks_before_optional_runtime_audits(
     assert "stated_run_field_fidelity_audit" in ready_response.reason_codes
 
 
+@pytest.mark.asyncio
+async def test_missing_turn_act_underfilled_strategy_repairs_before_baseline_audits(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized not in {"AAPL", "MSFT"}:
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(normalized, "equity", name=normalized)
+
+    async def fail_baseline_audit(**_kwargs):
+        raise AssertionError("baseline audit should not run before focused repair")
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Comprar y mantener AAPL y MSFT.",
+                language="es-419",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Comprar y mantener AAPL y MSFT con pesos iguales.",
+                asset_universe=["AAPL", "MSFT"],
+                asset_class="equity",
+                date_range={"start": "2025-01-01", "end": "2026-06-05"},
+                capital_amount=10000,
+                confidence=0.92,
+                evidence_spans={
+                    "asset_universe": "AAPL y MSFT",
+                    "capital_amount": "10000 dolares",
+                    "date_range": "1 de enero de 2025 hasta el 5 de junio de 2026",
+                    "strategy_type": "comprar y mantener",
+                },
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return interpreter_module.FocusedDateWindowExtraction(
+                has_date_window=False,
+                confidence=0.1,
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(confidence=0.9)
+        if schema_name == "StatedStartingCapitalAudit":
+            return interpreter_module.StatedStartingCapitalAudit(
+                starting_capital=None,
+                confidence=0.9,
+            )
+        if schema_name == "SupportedStrategyCapabilityConflictAudit":
+            return interpreter_module.SupportedStrategyCapabilityConflictAudit(
+                selected_strategy_type=None,
+                confidence=0.2,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    for name in (
+        "_capability_side_question_audited_response",
+        "_context_question_audited_response",
+        "_dca_contract_audited_response",
+        "_strategy_family_continuity_audited_response",
+        "_dca_contribution_role_audited_response",
+    ):
+        monkeypatch.setattr(interpreter_module, name, fail_baseline_audit)
+
+    message = (
+        "Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos "
+        "iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 "
+        "con 10000 dolares"
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            language="es-419",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Comprar y mantener AAPL y MSFT con pesos iguales.",
+            asset_universe=["AAPL", "MSFT"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+        ),
+        semantic_turn_act=None,
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert calls[0] == "FocusedStrategyExtraction"
+    assert ready_response.semantic_turn_act == "new_idea"
+    assert "coerced_missing_turn_act_to_new_idea" in ready_response.reason_codes
+    assert ready_response.candidate_strategy_draft.date_range == {
+        "start": "2025-01-01",
+        "end": "2026-06-05",
+    }
+    assert ready_response.candidate_strategy_draft.capital_amount == 10000
+
+
 def test_unprovenanced_non_default_benchmark_blocks_runtime_fast_path(
     monkeypatch,
 ) -> None:
