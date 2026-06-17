@@ -8,6 +8,7 @@ from datetime import date
 from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.artifact_edit_planner import (
@@ -3136,6 +3137,7 @@ async def _response_ready_for_runtime(
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
     response = _normalize_response_for_runtime_context(response, request=request)
+    _log_runtime_readiness_step("started", response=response)
     response = await _pending_response_option_selected_response(
         response=response,
         preferred_model=preferred_model,
@@ -3189,6 +3191,17 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
     )
+    _log_runtime_readiness_step("baseline_audits_completed", response=response)
+    if _response_can_skip_optional_runtime_readiness_audits(
+        response=response,
+        request=request,
+    ):
+        _log_runtime_readiness_step("ready_after_baseline_audits", response=response)
+        return response
+    _log_runtime_readiness_step(
+        "capability_conflict_audit_started",
+        response=response,
+    )
     conflict_response = await _audit_supported_strategy_capability_conflict(
         response=response,
         preferred_model=preferred_model,
@@ -3205,6 +3218,10 @@ async def _response_ready_for_runtime(
             preferred_model=preferred_model,
             request=request,
         )
+    _log_runtime_readiness_step(
+        "focused_date_window_audit_started",
+        response=response,
+    )
     date_window_response = await _focused_date_window_audited_response(
         response=response,
         preferred_model=preferred_model,
@@ -3216,6 +3233,10 @@ async def _response_ready_for_runtime(
             preferred_model=preferred_model,
             request=request,
         )
+    _log_runtime_readiness_step(
+        "supported_date_gap_repair_started",
+        response=response,
+    )
     supported_date_gap_response = await _supported_date_gap_schema_repaired_response(
         response=response,
         preferred_model=preferred_model,
@@ -3470,6 +3491,168 @@ async def _response_ready_for_runtime(
             request=request,
         )
     raise ValueError("OpenRouter interpretation returned an incomplete strategy draft")
+
+
+def _log_runtime_readiness_step(
+    step: str,
+    *,
+    response: LLMInterpretationResponse,
+) -> None:
+    draft = response.candidate_strategy_draft
+    logger.debug(
+        "Structured interpreter runtime readiness step",
+        step=step,
+        intent=response.intent,
+        task_relation=response.task_relation,
+        semantic_turn_act=response.semantic_turn_act,
+        requires_clarification=response.requires_clarification,
+        strategy_type=canonical_strategy_type(draft.strategy_type),
+        has_date_range=not _llm_value_is_empty(draft.date_range),
+        has_date_range_intent=draft.date_range_intent is not None,
+        has_date_range_raw_text=not _llm_value_is_empty(draft.date_range_raw_text),
+        missing_required_fields=list(response.missing_required_fields),
+        ambiguous_field_count=len(response.ambiguous_fields),
+        unsupported_constraint_count=len(response.unsupported_constraints),
+        reason_codes=list(response.reason_codes),
+    )
+
+
+def _response_can_skip_optional_runtime_readiness_audits(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if response.semantic_turn_act != "new_idea":
+        return False
+    if (
+        response.requires_clarification
+        or response.missing_required_fields
+        or response.ambiguous_fields
+        or response.unsupported_constraints
+        or response.capability_question_focus is not None
+        or response.context_question_focus is not None
+    ):
+        return False
+    draft = response.candidate_strategy_draft
+    strategy_type = executable_strategy_type(draft.model_dump(mode="python"))
+    if strategy_type not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    if _llm_strategy_draft_has_rule_or_indicator_fields(draft):
+        return False
+    if _capability_required_missing_fields_for_canonical_strategy([], draft=draft):
+        return False
+    if not _structured_interpretation_has_required_shape(response, request=request):
+        return False
+    if _response_replays_prior_strategy_without_current_turn_update(
+        response=response,
+        request=request,
+    ):
+        return False
+    if _response_needs_launch_field_fidelity_repair(response=response):
+        return False
+    if _response_needs_executable_strategy_grounding_audit(response=response):
+        return False
+    if _response_needs_supported_strategy_capability_conflict_audit(response):
+        return False
+    if _response_needs_temporal_runtime_repair(response=response, request=request):
+        return False
+    if _response_needs_missing_benchmark_fidelity_audit(response):
+        return False
+    if _draft_has_unprovenanced_benchmark(draft):
+        return False
+    if _response_has_current_message_date_range_reconciliation(
+        response=response,
+        request=request,
+    ):
+        return False
+    if (
+        canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
+        and _dca_response_needs_semantic_field_audit(response)
+    ):
+        return False
+    if _response_needs_stated_starting_capital_recheck(
+        response=response,
+        request=request,
+    ):
+        return False
+    return True
+
+
+def _response_needs_temporal_runtime_repair(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if _request_has_pending_date_answer_context(request):
+        return True
+    if _response_has_repairable_current_turn_date_gap(
+        response=response,
+        request=request,
+    ):
+        return True
+    draft = response.candidate_strategy_draft
+    if has_partial_explicit_date_range(draft.date_range):
+        return True
+    resolved_from_draft = _date_range_from_intent_or_bounded_evidence(
+        draft,
+        language=request.user.language_preference,
+    )
+    if _llm_value_is_empty(draft.date_range):
+        return resolved_from_draft is not None
+    current_message_range = _date_range_from_current_turn_message(request)
+    if (
+        current_message_range is not None
+        and isinstance(draft.date_range, dict)
+        and not has_partial_explicit_date_range(draft.date_range)
+        and _normalized_stated_field(draft.date_range)
+        != _normalized_stated_field(current_message_range)
+    ):
+        return True
+    if _current_turn_has_relative_window_evidence(request):
+        return True
+    if (
+        resolved_from_draft is not None
+        and isinstance(draft.date_range, dict)
+        and not has_partial_explicit_date_range(draft.date_range)
+        and _normalized_stated_field(draft.date_range)
+        != _normalized_stated_field(resolved_from_draft)
+    ):
+        return True
+    return False
+
+
+def _date_range_from_current_turn_message(
+    request: InterpretationRequest,
+) -> dict[str, str] | None:
+    current_message = request.current_user_message.strip()
+    if not current_message:
+        return None
+    for languages in _natural_time_language_candidates_from_hints(
+        request.user.language_preference
+    ):
+        resolved = resolve_date_range_text(current_message, languages=languages)
+        if resolved is not None:
+            return resolved.payload
+    return None
+
+
+def _current_turn_has_relative_window_evidence(
+    request: InterpretationRequest,
+) -> bool:
+    current_message = request.current_user_message.strip()
+    if not current_message:
+        return False
+    for languages in _natural_time_language_candidates_from_hints(
+        request.user.language_preference
+    ):
+        if (
+            resolve_rolling_window_intent_text(current_message, languages=languages)
+            is not None
+        ):
+            return True
+    return False
 
 
 async def _supported_date_gap_schema_repaired_response(

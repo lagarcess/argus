@@ -14074,6 +14074,133 @@ def test_dca_required_fields_accept_resolved_date_range_intent() -> None:
 
 
 @pytest.mark.asyncio
+async def test_complete_absolute_run_skips_optional_runtime_readiness_audits(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def passthrough_response(**kwargs):
+        return kwargs["response"]
+
+    async def fail_optional_audit(**_kwargs):
+        raise AssertionError("optional readiness audit should not run")
+
+    for name in (
+        "_pending_response_option_selected_response",
+        "_requested_asset_answer_candidate_audited_response",
+        "_latest_result_routing_audited_response",
+        "_asset_grounding_audited_response",
+        "_capability_side_question_audited_response",
+        "_context_question_audited_response",
+        "_dca_contract_audited_response",
+        "_strategy_family_continuity_audited_response",
+        "_dca_contribution_role_audited_response",
+    ):
+        monkeypatch.setattr(interpreter_module, name, passthrough_response)
+    for name in (
+        "_audit_supported_strategy_capability_conflict",
+        "_focused_date_window_audited_response",
+        "_supported_date_gap_schema_repaired_response",
+        "_repair_incomplete_strategy_extraction",
+        "_audit_stated_run_fields",
+        "_audit_executable_strategy_grounding",
+    ):
+        monkeypatch.setattr(interpreter_module, name, fail_optional_audit)
+
+    message = (
+        "Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos "
+        "iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 "
+        "con 10000 dolares"
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            language="es-419",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Comprar y mantener AAPL y MSFT con pesos iguales.",
+            asset_universe=["AAPL", "MSFT"],
+            asset_class="equity",
+            date_range={"start": "2025-01-01", "end": "2026-06-05"},
+            capital_amount=10000,
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    assert interpreter_module._response_can_skip_optional_runtime_readiness_audits(
+        response=response,
+        request=request,
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert ready_response.candidate_strategy_draft.date_range == {
+        "start": "2025-01-01",
+        "end": "2026-06-05",
+    }
+    assert ready_response.candidate_strategy_draft.asset_universe == [
+        "AAPL",
+        "MSFT",
+    ]
+
+
+def test_relative_window_evidence_blocks_optional_readiness_fast_path() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    message = (
+        "Compra y mantén AAPL durante los últimos 2 años con 10000 dolares."
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            language="es-419",
+            strategy_type="buy_and_hold",
+            strategy_thesis=message,
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2026-01-01"},
+            capital_amount=10000,
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    assert interpreter_module._current_turn_has_relative_window_evidence(request)
+    assert interpreter_module._response_needs_temporal_runtime_repair(
+        response=response,
+        request=request,
+    )
+    assert not interpreter_module._response_can_skip_optional_runtime_readiness_audits(
+        response=response,
+        request=request,
+    )
+
+
+@pytest.mark.asyncio
 async def test_dca_repair_uses_focused_date_audit_from_bounded_evidence_span(
     monkeypatch,
 ) -> None:
