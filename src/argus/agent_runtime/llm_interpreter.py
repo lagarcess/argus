@@ -3160,6 +3160,36 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
     )
+    if _response_needs_material_evidence_strategy_repair(
+        response=response,
+        request=request,
+    ):
+        repaired_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if repaired_response is not None:
+            return await _stated_run_field_audited_response(
+                response=repaired_response,
+                preferred_model=preferred_model,
+                request=request,
+            )
+    if _response_needs_pre_guidance_focused_strategy_extraction(
+        response=response,
+        request=request,
+    ):
+        repaired_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if repaired_response is not None:
+            return await _stated_run_field_audited_response(
+                response=repaired_response,
+                preferred_model=preferred_model,
+                request=request,
+            )
     response = await _capability_side_question_audited_response(
         response=response,
         preferred_model=preferred_model,
@@ -3273,36 +3303,6 @@ async def _response_ready_for_runtime(
             if context_response is not None:
                 return context_response
         return response
-    if _response_needs_material_evidence_strategy_repair(
-        response=response,
-        request=request,
-    ):
-        repaired_response = await _repair_incomplete_strategy_extraction(
-            failed_response=response,
-            preferred_model=preferred_model,
-            request=request,
-        )
-        if repaired_response is not None:
-            return await _stated_run_field_audited_response(
-                response=repaired_response,
-                preferred_model=preferred_model,
-                request=request,
-            )
-    if _response_needs_pre_guidance_focused_strategy_extraction(
-        response=response,
-        request=request,
-    ):
-        repaired_response = await _repair_incomplete_strategy_extraction(
-            failed_response=response,
-            preferred_model=preferred_model,
-            request=request,
-        )
-        if repaired_response is not None:
-            return await _stated_run_field_audited_response(
-                response=repaired_response,
-                preferred_model=preferred_model,
-                request=request,
-            )
     response = _vague_strategy_start_as_guidance(response)
     if _is_vague_strategy_start_guidance(response):
         return response
@@ -3500,7 +3500,23 @@ def _log_runtime_readiness_step(
 ) -> None:
     draft = response.candidate_strategy_draft
     logger.debug(
-        "Structured interpreter runtime readiness step",
+        "Structured interpreter runtime readiness step={} intent={} "
+        "semantic_turn_act={} strategy_type={} requires_clarification={} "
+        "has_date_range={} has_date_range_intent={} has_date_range_raw_text={} "
+        "missing_required_fields={} ambiguous_field_count={} "
+        "unsupported_constraint_count={} reason_codes={}",
+        step,
+        response.intent,
+        response.semantic_turn_act,
+        canonical_strategy_type(draft.strategy_type),
+        response.requires_clarification,
+        not _llm_value_is_empty(draft.date_range),
+        draft.date_range_intent is not None,
+        not _llm_value_is_empty(draft.date_range_raw_text),
+        list(response.missing_required_fields),
+        len(response.ambiguous_fields),
+        len(response.unsupported_constraints),
+        list(response.reason_codes),
         step=step,
         intent=response.intent,
         task_relation=response.task_relation,

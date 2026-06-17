@@ -3735,6 +3735,109 @@ async def test_material_execution_evidence_routes_to_structured_repair_before_ca
 
 
 @pytest.mark.asyncio
+async def test_underfilled_nonclarifying_execution_repairs_before_capability(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized not in {"AAPL", "MSFT"}:
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(normalized, "equity", name=normalized)
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "CapabilitySideQuestionAudit":
+            raise AssertionError("capability audit should not run first")
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Comprar y mantener AAPL y MSFT.",
+                language="es-419",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Comprar y mantener AAPL y MSFT con pesos iguales.",
+                asset_universe=["AAPL", "MSFT"],
+                asset_class="equity",
+                date_range={"start": "2025-01-01", "end": "2026-06-05"},
+                capital_amount=10000,
+                confidence=0.92,
+                evidence_spans={
+                    "asset_universe": "AAPL y MSFT",
+                    "capital_amount": "10000 dolares",
+                    "date_range": "1 de enero de 2025 hasta el 5 de junio de 2026",
+                    "strategy_type": "comprar y mantener",
+                },
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=10000,
+                date_range={"start": "2025-01-01", "end": "2026-06-05"},
+                confidence=0.91,
+            )
+        if schema_name == "StatedStartingCapitalAudit":
+            return interpreter_module.StatedStartingCapitalAudit(
+                starting_capital=10000,
+                confidence=0.91,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    message = (
+        "Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos "
+        "iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 "
+        "con 10000 dolares"
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            strategy_thesis=message,
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert calls[0] == "FocusedStrategyExtraction"
+    assert "CapabilitySideQuestionAudit" not in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.requires_clarification is False
+    assert ready_response.candidate_strategy_draft.asset_universe == [
+        "AAPL",
+        "MSFT",
+    ]
+    assert ready_response.candidate_strategy_draft.date_range == {
+        "start": "2025-01-01",
+        "end": "2026-06-05",
+    }
+
+
+@pytest.mark.asyncio
 async def test_noncanonical_strategy_text_with_material_evidence_gets_repaired(
     monkeypatch,
 ) -> None:
