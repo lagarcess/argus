@@ -5,6 +5,11 @@ Date: 2026-06-10
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
+Current note: for the 2026-06-17 CI/CD SOTA release-captain mission, use
+`docs/specs/private-alpha-ci-cd-sota.md` as the active execution roadmap. This
+document remains the staging and branch-process context for
+`codex/private-alpha-next`.
+
 ## Purpose
 
 This document is the working source of truth for the next integration branch

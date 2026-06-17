@@ -6,6 +6,10 @@
 **Purpose:** Capture the read-only performance panel findings for the controlled
 alpha readiness slice.
 
+Scope note: this is a supporting readiness artifact, not the active execution
+roadmap for the 2026-06-17 CI/CD SOTA release-captain mission. Use
+`docs/specs/private-alpha-ci-cd-sota.md` for current release-gate sequencing.
+
 This addendum is intentionally not an optimization plan yet. It identifies what
 Argus should measure first, which speed wins look clean enough to consider, and
 which tempting optimizations should be avoided until data proves they matter.

@@ -1,9 +1,16 @@
 # Private Alpha CI/CD SOTA Plan
 
-Status: Draft
+Status: Active execution roadmap
 Date: 2026-06-17
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, reviewers, release-captains
+
+This is the current source of truth for the `codex/private-alpha-next`
+release-captain mission. It supersedes
+`docs/specs/private-alpha-next-integration.md` for execution sequencing while
+preserving that document as staging and branch-process context. The promoted
+decision memo in `docs/specs/private-alpha-next-decision-memo.md` is future
+context only for this run.
 
 ## Purpose
 

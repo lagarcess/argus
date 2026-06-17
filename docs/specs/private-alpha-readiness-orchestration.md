@@ -7,6 +7,11 @@ Checkpoint: current branch tip; latest named browser-QA evidence bundle is
 `2e35785 docs(readiness): record local browser QA refresh`
 Audience: Codex release captain, bounded subagents, reviewers
 
+Scope note: this is branch-specific guidance for
+`codex/private-alpha-readiness-clean`. For the current
+`codex/private-alpha-next` CI/CD SOTA mission, use
+`docs/specs/private-alpha-ci-cd-sota.md` as the active execution roadmap.
+
 ## Mission
 
 Deliver the controlled private-alpha readiness slice end to end so Argus can be

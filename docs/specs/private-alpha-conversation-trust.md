@@ -30,9 +30,11 @@ renders, empty send remains disabled with the expected tooltip, provider-backed
 and clearing the composer disables send again.
 
 This document is therefore historical for the completed conversation-trust push
-and still useful as design context. New work should start from
-`docs/specs/private-alpha-next-integration.md` so agents do not reopen closed
-slices or mistake future product thesis work for current implementation scope.
+and still useful as design context. Current `codex/private-alpha-next`
+release-gate work should start from `docs/specs/private-alpha-ci-cd-sota.md`
+after the canon docs, using `docs/specs/private-alpha-next-integration.md` only
+as staging context. This keeps agents from reopening closed slices or mistaking
+future product thesis work for current implementation scope.
 
 ## Product Thesis
 
