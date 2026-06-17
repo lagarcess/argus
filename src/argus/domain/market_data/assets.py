@@ -463,14 +463,18 @@ def _run_live_provider_call(
     future = executor.submit(loader)
     try:
         logger.debug(
-            "Asset universe provider load started",
+            "Asset provider call started "
+            f"provider={provider} operation={operation} "
+            f"timeout_seconds={timeout_seconds}",
             provider=provider,
             operation=operation,
             timeout_seconds=timeout_seconds,
         )
         result = future.result(timeout=timeout_seconds)
         logger.debug(
-            "Asset universe provider load completed",
+            "Asset provider call completed "
+            f"provider={provider} operation={operation} "
+            f"result_type={type(result).__name__}",
             provider=provider,
             operation=operation,
             result_type=type(result).__name__,
@@ -480,7 +484,9 @@ def _run_live_provider_call(
     except TimeoutError as exc:
         future.cancel()
         logger.warning(
-            "Asset universe provider timed out",
+            "Asset provider call timed out "
+            f"provider={provider} operation={operation} "
+            f"timeout_seconds={timeout_seconds}",
             provider=provider,
             operation=operation,
             timeout_seconds=timeout_seconds,
@@ -507,10 +513,15 @@ def _refresh_asset_cache_if_needed(*, force: bool = False) -> None:
 
 
 def resolve_asset(symbol: str) -> ResolvedAsset:
+    candidate = _normalize_symbol(symbol)
+    if _is_unresolved_ticker_like_query(symbol):
+        live_asset = _resolve_live_provider_ticker(candidate)
+        if live_asset is not None:
+            return live_asset
+
     _refresh_asset_cache_if_needed()
     assert _ASSET_ALIAS_MAP is not None
 
-    candidate = _normalize_symbol(symbol)
     # 1. Direct ticker match
     direct = _ASSET_ALIAS_MAP.get(candidate) or _ASSET_ALIAS_MAP.get(
         candidate.replace("/", "")
@@ -536,10 +547,6 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
         return confident_name_matches[0]
 
     if _is_unresolved_ticker_like_query(symbol):
-        live_asset = _resolve_live_provider_ticker(candidate)
-        if live_asset is not None:
-            _cache_resolved_asset(live_asset)
-            return live_asset
         raise ValueError("invalid_symbol")
 
     # 4. Provider-backed name search. This is intentionally sourced from the
@@ -563,16 +570,6 @@ def _resolve_live_provider_ticker(symbol: str) -> ResolvedAsset | None:
         )
     except Exception:
         return None
-
-
-def _cache_resolved_asset(record: ResolvedAsset) -> None:
-    with _ASSET_CACHE_LOCK:
-        if _ASSET_ALIAS_MAP is None:
-            return
-        _add_aliases(_ASSET_ALIAS_MAP, record, canonical=record.canonical_symbol)
-        name_alias = record.name.lower().strip()
-        if name_alias:
-            _ASSET_ALIAS_MAP[name_alias] = record
 
 
 def warm_asset_universe(
