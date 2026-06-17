@@ -515,7 +515,8 @@ def _refresh_asset_cache_if_needed(*, force: bool = False) -> None:
 
 def resolve_asset(symbol: str) -> ResolvedAsset:
     candidate = _normalize_symbol(symbol)
-    if _is_unresolved_ticker_like_query(symbol):
+    explicit_ticker_query = _is_explicit_ticker_query(symbol)
+    if explicit_ticker_query and _is_unresolved_ticker_like_query(symbol):
         live_asset = _resolve_live_provider_ticker(candidate)
         if live_asset is not None:
             return live_asset
@@ -524,10 +525,12 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
     assert _ASSET_ALIAS_MAP is not None
 
     # 1. Direct ticker match
-    direct = _ASSET_ALIAS_MAP.get(candidate) or _ASSET_ALIAS_MAP.get(
-        candidate.replace("/", "")
-    )
-    if direct:
+    direct = None
+    if explicit_ticker_query:
+        direct = _ASSET_ALIAS_MAP.get(candidate) or _ASSET_ALIAS_MAP.get(
+            candidate.replace("/", "")
+        )
+    if direct is not None:
         return direct
 
     # 2. Case-insensitive ticker or name match
@@ -545,7 +548,9 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
 
     confident_name_matches = _high_confidence_name_matches(symbol)
     if len(confident_name_matches) == 1:
-        return confident_name_matches[0]
+        asset = confident_name_matches[0]
+        if _accepts_high_confidence_name_match(symbol, asset):
+            return asset
 
     if _is_unresolved_ticker_like_query(symbol):
         raise ValueError("invalid_symbol")
@@ -617,6 +622,30 @@ def _is_unresolved_ticker_like_query(query: str) -> bool:
     if not compact.isalpha() or not 2 <= len(compact) <= 5:
         return False
     return "/" not in raw and " " not in raw
+
+
+def _is_explicit_ticker_query(query: str) -> bool:
+    raw = str(query or "").strip()
+    if not raw or " " in raw:
+        return False
+    if "/" in raw or "-" in raw:
+        return True
+    compact = raw.replace("/", "").replace("-", "")
+    return bool(compact and compact.isalpha() and compact == compact.upper())
+
+
+def _accepts_high_confidence_name_match(query: str, asset: ResolvedAsset) -> bool:
+    raw = str(query or "").strip()
+    compact = raw.replace("/", "").replace("-", "")
+    if (
+        compact.isalpha()
+        and 2 <= len(compact) <= 3
+        and compact == compact.lower()
+        and "/" not in raw
+        and " " not in raw
+    ):
+        return asset.asset_class == "crypto"
+    return True
 
 
 def is_ticker_like_query(query: str) -> bool:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 
+import pytest
 from argus.domain.market_data import assets
 from argus.domain.market_data.assets import ResolvedAsset
 
@@ -35,6 +36,70 @@ def test_live_ticker_resolution_uses_exact_lookup_before_universe(
 
     assert resolved.canonical_symbol == "AAPL"
     assert resolved.provider == "alpaca"
+
+    assets.clear_asset_cache()
+
+
+def test_lowercase_language_token_does_not_use_exact_ticker_lookup(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    assets.clear_asset_cache()
+    deere = ResolvedAsset(
+        canonical_symbol="DE",
+        asset_class="equity",
+        name="Deere & Company",
+        raw_symbol="DE",
+        provider="alpaca",
+    )
+
+    def forbidden_exact_lookup(symbol: str) -> ResolvedAsset:
+        raise AssertionError(f"lowercase language token used exact lookup: {symbol}")
+
+    monkeypatch.setattr(
+        assets,
+        "_load_asset_from_alpaca_symbol",
+        forbidden_exact_lookup,
+    )
+    monkeypatch.setattr(
+        assets,
+        "_load_asset_universe",
+        lambda: {"DE": deere, "deere & company": deere},
+    )
+
+    with pytest.raises(ValueError, match="invalid_symbol"):
+        assets.resolve_asset("de")
+
+    assets.clear_asset_cache()
+
+
+def test_lowercase_crypto_symbol_can_still_resolve_by_provider_name(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    assets.clear_asset_cache()
+    ethereum = ResolvedAsset(
+        canonical_symbol="ETH",
+        asset_class="crypto",
+        name="Ethereum / USD",
+        raw_symbol="ETH/USD",
+        provider="kraken",
+    )
+
+    monkeypatch.setattr(
+        assets,
+        "_load_asset_from_alpaca_symbol",
+        lambda symbol: (_ for _ in ()).throw(AssertionError(symbol)),
+    )
+    monkeypatch.setattr(
+        assets,
+        "_load_asset_universe",
+        lambda: {"ETH": ethereum, "ethereum / usd": ethereum},
+    )
+
+    resolved = assets.resolve_asset("eth")
+
+    assert resolved.canonical_symbol == "ETH"
 
     assets.clear_asset_cache()
 
