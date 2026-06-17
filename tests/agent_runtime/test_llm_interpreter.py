@@ -14182,12 +14182,19 @@ async def test_complete_absolute_run_skips_optional_runtime_readiness_audits(
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized not in {"AAPL", "MSFT"}:
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(normalized, "equity", name=normalized)
+
     async def passthrough_response(**kwargs):
         return kwargs["response"]
 
     async def fail_optional_audit(**_kwargs):
         raise AssertionError("optional readiness audit should not run")
 
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
     for name in (
         "_pending_response_option_selected_response",
         "_requested_asset_answer_candidate_audited_response",

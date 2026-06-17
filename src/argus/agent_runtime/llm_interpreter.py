@@ -100,7 +100,7 @@ from argus.domain.indicators import (
     executable_indicator_spec,
     normalize_indicator_parameters,
 )
-from argus.domain.market_data import resolve_asset
+from argus.domain.market_data import is_ticker_like_query, resolve_asset
 from argus.domain.slot_normalizer import normalize_parameter_value
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.llm.openrouter import (
@@ -3138,6 +3138,15 @@ async def _response_ready_for_runtime(
 ) -> LLMInterpretationResponse:
     response = _normalize_response_for_runtime_context(response, request=request)
     _log_runtime_readiness_step("started", response=response)
+    if _response_can_skip_optional_runtime_readiness_audits(
+        response=response,
+        request=request,
+    ):
+        _log_runtime_readiness_step(
+            "ready_after_initial_interpretation",
+            response=response,
+        )
+        return response
     response = await _pending_response_option_selected_response(
         response=response,
         preferred_model=preferred_model,
@@ -3574,6 +3583,8 @@ def _response_can_skip_optional_runtime_readiness_audits(
         return False
     if _response_needs_temporal_runtime_repair(response=response, request=request):
         return False
+    if not _draft_asset_universe_has_exact_provider_symbols(draft):
+        return False
     if _response_needs_missing_benchmark_fidelity_audit(response):
         return False
     if _draft_has_unprovenanced_benchmark(draft):
@@ -3593,6 +3604,34 @@ def _response_can_skip_optional_runtime_readiness_audits(
         request=request,
     ):
         return False
+    return True
+
+
+def _draft_asset_universe_has_exact_provider_symbols(
+    draft: LLMStrategyDraft,
+) -> bool:
+    symbols = [
+        str(symbol or "").strip()
+        for symbol in draft.asset_universe
+        if str(symbol or "").strip()
+    ]
+    if not symbols:
+        return False
+    for symbol in symbols:
+        if not is_ticker_like_query(symbol):
+            return False
+        try:
+            resolution = _resolve_asset_candidate(
+                symbol,
+                field="asset_universe",
+                source="llm_extraction",
+            )
+        except ValueError:
+            return False
+        if resolution.status != "resolved" or resolution.asset is None:
+            return False
+        if resolution.asset.canonical_symbol.upper() != symbol.upper():
+            return False
     return True
 
 
