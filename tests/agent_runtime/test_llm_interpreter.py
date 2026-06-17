@@ -2247,7 +2247,10 @@ async def test_money_only_underfilled_strategy_uses_supported_rule_repair(
     assert repaired.requires_clarification is False
     assert "focused_strategy_extraction_repair" in repaired.reason_codes
     assert draft.asset_universe == ["TSLA"]
-    assert draft.date_range == {"start": "2022-01-01", "end": "today"}
+    assert draft.date_range == {
+        "start": "2022-01-01",
+        "end": date.today().isoformat(),
+    }
     assert draft.capital_amount == 10000
     assert draft.strategy_type == "signal_strategy"
     assert draft.entry_rule == {
@@ -2356,7 +2359,10 @@ async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
     assert draft.strategy_type == "signal_strategy"
     assert draft.asset_universe == ["TSLA"]
     assert draft.asset_class == "equity"
-    assert draft.date_range == {"start": "2022-01-01", "end": "today"}
+    assert draft.date_range == {
+        "start": "2022-01-01",
+        "end": date.today().isoformat(),
+    }
     assert draft.capital_amount == 10000
     assert draft.entry_rule == {
         "type": "moving_average_crossover",
@@ -2643,7 +2649,10 @@ async def test_unsupported_supported_rule_classification_gets_signal_rule_repair
     assert repaired.unsupported_constraints == []
     assert draft.strategy_type == "signal_strategy"
     assert draft.asset_universe == ["TSLA"]
-    assert draft.date_range == {"start": "2022-01-01", "end": "today"}
+    assert draft.date_range == {
+        "start": "2022-01-01",
+        "end": date.today().isoformat(),
+    }
     assert draft.capital_amount == 10000
     assert draft.entry_logic == "50-day SMA crosses above 200-day SMA"
     assert draft.exit_logic == "50-day SMA crosses below 200-day SMA"
@@ -8256,7 +8265,10 @@ async def test_llm_interpreter_repairs_silently_reshaped_launch_fields(
     assert calls == ["field_fidelity_audit"]
     strategy = ready_response.candidate_strategy_draft
     assert strategy.timeframe == "1h"
-    assert strategy.date_range == {"start": "2020-01-01", "end": "today"}
+    assert strategy.date_range == {
+        "start": "2020-01-01",
+        "end": date.today().isoformat(),
+    }
     assert strategy.capital_amount == 1000
 
 
@@ -14502,6 +14514,93 @@ async def test_failed_capital_recheck_uses_focused_strategy_repair_before_baseli
         "capital_amount"
     ] == "starting_capital"
     assert "focused_strategy_extraction_repair" in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_focused_strategy_repair_recovers_omitted_provider_assets(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized not in {"AAPL", "MSFT"}:
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(normalized, "equity", name=normalized)
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Comprar y mantener AAPL y MSFT.",
+                language="es-419",
+                strategy_type="buy_and_hold",
+                strategy_thesis=(
+                    "Comprar y mantener AAPL y MSFT con pesos iguales y "
+                    "10000 dólares."
+                ),
+                asset_universe=[],
+                date_range={"start": "2025-01-01", "end": "2026-06-05"},
+                capital_amount=10000,
+                confidence=0.9,
+                evidence_spans={
+                    "date_range": "1 de enero de 2025 hasta el 5 de junio de 2026",
+                    "strategy_type": "comprar y mantener",
+                },
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    message = (
+        "Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos "
+        "iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 "
+        "con 10000 dolares"
+    )
+    seed_response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            strategy_type="buy_and_hold",
+            strategy_thesis=message,
+        ),
+        semantic_turn_act="new_idea",
+    )
+    request = InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    repaired = await interpreter_module._repair_incomplete_strategy_extraction(
+        failed_response=seed_response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert calls == ["FocusedStrategyExtraction"]
+    assert repaired is not None
+    assert repaired.candidate_strategy_draft.asset_universe == ["AAPL", "MSFT"]
+    assert repaired.candidate_strategy_draft.asset_class == "equity"
+    assert "provider_catalog_asset_recovery" in repaired.reason_codes
+    assert interpreter_module._response_can_skip_optional_runtime_readiness_audits(
+        response=repaired,
+        request=request,
+    )
 
 
 @pytest.mark.asyncio

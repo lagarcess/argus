@@ -3287,6 +3287,33 @@ async def _response_ready_for_runtime(
     ):
         _log_runtime_readiness_step("ready_after_baseline_audits", response=response)
         return response
+    if (
+        _optional_runtime_readiness_audit_blocker(
+            response=response,
+            request=request,
+        )
+        == "launch_field_fidelity"
+    ):
+        _log_runtime_readiness_step(
+            "launch_field_fidelity_audit_started",
+            response=response,
+        )
+        audited_response = await _audit_stated_run_fields(
+            response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if audited_response is not None:
+            response = audited_response
+            if _response_can_skip_optional_runtime_readiness_audits(
+                response=response,
+                request=request,
+            ):
+                _log_runtime_readiness_step(
+                    "ready_after_launch_field_fidelity_audit",
+                    response=response,
+                )
+                return response
     _log_runtime_readiness_step(
         "capability_conflict_audit_started",
         response=response,
@@ -3665,6 +3692,14 @@ def _optional_runtime_readiness_audit_blocker(
         return "asset_universe_not_exact_provider_symbols"
     if _response_needs_missing_benchmark_fidelity_audit(response):
         return "missing_benchmark_fidelity"
+    if (
+        "stated_run_field_fidelity_audit" not in response.reason_codes
+        and _draft_missing_comparison_baseline_needs_stated_run_field_audit(
+            draft,
+            current_message=request.current_user_message,
+        )
+    ):
+        return "missing_benchmark_fidelity"
     if _draft_has_unprovenanced_benchmark(
         draft
     ) and not _draft_has_supported_default_benchmark(draft):
@@ -3786,6 +3821,10 @@ def _response_needs_temporal_runtime_repair(
         and not has_partial_explicit_date_range(draft.date_range)
         and _normalized_stated_field(draft.date_range)
         != _normalized_stated_field(current_message_range)
+        and (
+            "runtime_date_range_normalization" not in response.reason_codes
+            or _current_turn_has_relative_window_evidence(request)
+        )
     ):
         return True
     if _current_turn_has_relative_window_evidence(request):
@@ -3966,11 +4005,20 @@ async def _audit_stated_run_fields(
         request=request,
     )
     if audited_response is not None:
-        return audited_response
-    return await _audit_stated_starting_capital_fidelity(
+        return _response_with_resolved_runtime_date_range(
+            response=audited_response,
+            request=request,
+        )
+    capital_response = await _audit_stated_starting_capital_fidelity(
         response=response,
         request=request,
     )
+    if capital_response is not None:
+        return _response_with_resolved_runtime_date_range(
+            response=capital_response,
+            request=request,
+        )
+    return None
 
 
 def _clear_auto_simplified_strategy_when_rule_is_ambiguous(
@@ -4070,6 +4118,10 @@ async def _repair_incomplete_strategy_extraction(
             base_response=failed_response,
         )
         response = _normalize_response_for_runtime_context(response, request=request)
+        response = _augment_strategy_assets_from_resolvable_context(
+            response=response,
+            request=request,
+        )
         if _response_can_skip_optional_runtime_readiness_audits(
             response=response,
             request=request,
@@ -5754,6 +5806,8 @@ def _response_needs_launch_field_fidelity_repair(
         return False
     if "focused_strategy_extraction_repair" in response.reason_codes:
         return False
+    if "stated_run_field_fidelity_audit" in response.reason_codes:
+        return False
     draft = response.candidate_strategy_draft
     if not _llm_value_is_empty(draft.timeframe):
         return str(draft.timeframe).strip() in _EXECUTABLE_TIMEFRAMES
@@ -5818,6 +5872,8 @@ def _response_needs_executable_strategy_grounding_audit(
     }:
         return False
     if "executable_strategy_grounding_audit" in response.reason_codes:
+        return False
+    if "stated_run_field_fidelity_audit" in response.reason_codes:
         return False
     if _response_needs_launch_field_fidelity_repair(response=response):
         return False
@@ -6560,6 +6616,77 @@ def _response_has_current_message_date_range_reconciliation(
     )
 
 
+def _response_with_resolved_runtime_date_range(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    date_range = _resolved_runtime_date_range_from_draft(
+        response.candidate_strategy_draft,
+        request=request,
+    )
+    if date_range is None:
+        return response
+    draft = response.candidate_strategy_draft
+    if _normalized_stated_field(draft.date_range) == _normalized_stated_field(
+        date_range
+    ):
+        return response
+    repaired = response.model_copy(deep=True)
+    repaired.candidate_strategy_draft.date_range = date_range
+    if not has_partial_explicit_date_range(date_range):
+        repaired.missing_required_fields = [
+            field
+            for field in repaired.missing_required_fields
+            if _field_path_base(field) != "date_range"
+        ]
+        repaired.ambiguous_fields = [
+            field
+            for field in repaired.ambiguous_fields
+            if _field_path_base(field.field_name) != "date_range"
+        ]
+    if (
+        repaired.requires_clarification
+        and not has_partial_explicit_date_range(date_range)
+        and not repaired.missing_required_fields
+        and not repaired.ambiguous_fields
+        and not repaired.unsupported_constraints
+        and _llm_strategy_draft_has_concrete_execution_target(
+            repaired.candidate_strategy_draft
+        )
+    ):
+        repaired.requires_clarification = False
+        repaired.assistant_response = None
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *repaired.reason_codes,
+                "runtime_date_range_normalization",
+            ]
+        )
+    )
+    return repaired
+
+
+def _resolved_runtime_date_range_from_draft(
+    draft: LLMStrategyDraft,
+    *,
+    request: InterpretationRequest,
+) -> dict[str, str] | None:
+    normalized = normalize_date_range_candidate(draft.date_range)
+    if isinstance(normalized, dict) and _has_complete_date_range_payload(normalized):
+        try:
+            resolved = resolve_date_range(normalized)
+        except Exception:
+            resolved = None
+        if resolved is not None and not resolved.used_default:
+            return resolved.payload
+    return _date_range_from_intent_or_bounded_evidence(
+        draft,
+        language=request.user.language_preference,
+    )
+
+
 def _supported_pending_need_has_recoverable_current_turn_run_fields(
     *,
     response: LLMInterpretationResponse,
@@ -6867,14 +6994,14 @@ def _date_endpoint_is_runtime_current(value: Any) -> bool:
 
 
 def _draft_contains_structured_capital_context(draft: LLMStrategyDraft) -> bool:
-    return _text_contains_structured_capital_context(_structured_draft_context_text(draft))
-
-
-def _text_contains_structured_capital_context(text: str) -> bool:
+    text = _structured_draft_context_text(draft)
     if "$" in str(text or ""):
         return True
+    non_capital_tokens = _draft_non_capital_numeric_evidence_tokens(draft)
     for token in _field_fidelity_tokens(str(text or "")):
         normalized = token.strip().casefold()
+        if normalized in non_capital_tokens:
+            continue
         if any(character.isdigit() for character in normalized) and any(
             character.isalpha() for character in normalized
         ):
@@ -6910,11 +7037,19 @@ def _text_contains_capital_audit_signal(
     tokens = _field_fidelity_tokens(str(text or "").casefold())
     if not tokens:
         return False
-    date_tokens = _draft_date_evidence_tokens(draft)
+    non_capital_tokens = _draft_non_capital_numeric_evidence_tokens(draft)
     return any(
-        token not in date_tokens and any(character.isdigit() for character in token)
+        token not in non_capital_tokens
+        and any(character.isdigit() for character in token)
         for token in tokens
     )
+
+
+def _draft_non_capital_numeric_evidence_tokens(draft: LLMStrategyDraft) -> set[str]:
+    tokens = set(_draft_date_evidence_tokens(draft))
+    if not _llm_value_is_empty(draft.timeframe):
+        tokens.update(_field_fidelity_tokens(str(draft.timeframe).casefold()))
+    return tokens
 
 
 def _draft_date_evidence_tokens(draft: LLMStrategyDraft) -> set[str]:
@@ -6929,8 +7064,17 @@ def _draft_date_evidence_tokens(draft: LLMStrategyDraft) -> set[str]:
     return {
         token
         for candidate in candidates
-        for token in _field_fidelity_tokens(str(candidate).casefold())
+        for token in _date_evidence_tokens_from_text(candidate)
     }
+
+
+def _date_evidence_tokens_from_text(value: Any) -> set[str]:
+    text = str(value or "").casefold()
+    tokens = set(_field_fidelity_tokens(text))
+    for separator in ("-", "/"):
+        if separator in text:
+            tokens.update(_field_fidelity_tokens(text.replace(separator, " ")))
+    return tokens
 
 
 def _draft_has_timeframe_evidence_for_audit(draft: LLMStrategyDraft) -> bool:
@@ -7393,7 +7537,12 @@ def _response_needs_stated_starting_capital_recheck(
         return False
     if _draft_has_grounded_non_dca_starting_capital(draft):
         return False
-    return _llm_strategy_draft_has_concrete_execution_target(draft)
+    if not _llm_strategy_draft_has_concrete_execution_target(draft):
+        return False
+    return _text_contains_capital_audit_signal(
+        request.current_user_message,
+        draft=draft,
+    ) or _draft_contains_structured_capital_context(draft)
 
 
 async def _early_starting_capital_rechecked_response(
