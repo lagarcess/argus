@@ -17,7 +17,7 @@ Usage:
   .github/warmup-render.sh [--expect-mode <safe-off|proof-shadow|real-workflow>]
 
 Options:
-  --expect-mode  Verify argus-api workflow flags without mutating Render config.
+  --expect-mode  Verify release config/env fingerprint without mutating Render config.
 USAGE
 }
 
@@ -119,38 +119,20 @@ assert_api_mode() {
       ;;
   esac
 
-  echo "Checking API mode: $mode"
-  status="$("$SCRIPT_DIR/render-env-sync.sh" api-status)"
+  echo "Checking release config for API mode: $mode"
+  if ! status="$("$SCRIPT_DIR/render-env-sync.sh" release-config-audit --expect-mode "$mode")"; then
+    printf "%s\n" "$status"
+    return 1
+  fi
   printf "%s\n" "$status"
 
-  case "$mode" in
-    safe-off)
-      require_status_line "$status" "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=false"
-      require_status_line "$status" "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=false"
-      require_status_line "$status" "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=false"
-      require_status_line "$status" "ARGUS_BACKTEST_WORKFLOW_TASK=argus-backtests/workflow_proof"
-      require_status_line "$status" "ARGUS_BACKTEST_REAL_WORKFLOW_TASK=argus-backtests/run_backtest_job"
-      require_status_line "$status" "RENDER_API_KEY=<missing-or-empty>"
-      ;;
-    proof-shadow)
-      require_status_line "$status" "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=true"
-      require_status_line "$status" "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=true"
-      require_status_line "$status" "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=false"
-      require_status_line "$status" "ARGUS_BACKTEST_WORKFLOW_TASK=argus-backtests/workflow_proof"
-      require_status_line "$status" "ARGUS_BACKTEST_REAL_WORKFLOW_TASK=argus-backtests/run_backtest_job"
-      require_status_line "$status" "RENDER_API_KEY=<redacted-present>"
-      ;;
-    real-workflow)
-      require_status_line "$status" "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=true"
-      require_status_line "$status" "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=true"
-      require_status_line "$status" "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true"
-      require_status_line "$status" "ARGUS_BACKTEST_WORKFLOW_TASK=argus-backtests/workflow_proof"
-      require_status_line "$status" "ARGUS_BACKTEST_REAL_WORKFLOW_TASK=argus-backtests/run_backtest_job"
-      require_status_line "$status" "RENDER_API_KEY=<redacted-present>"
-      ;;
-  esac
+  require_status_line "$status" "status=ready"
+  if ! grep -Eq '^env_fingerprint=[0-9a-f]{64}$' <<< "$status"; then
+    echo "ERROR: release config audit did not emit env_fingerprint."
+    return 1
+  fi
 
-  echo "OK: API mode matched $mode"
+  echo "OK: release config matched $mode"
 }
 
 run_stale_job_scan() {
