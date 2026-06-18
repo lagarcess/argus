@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import time
+from datetime import date
 from typing import Any
 
 import pytest
@@ -1436,7 +1437,10 @@ def test_default_interpreter_audits_stated_fields_after_focused_repair_defaults(
     ]
     assert "FocusedDateWindowExtraction" in seen_schema_names
     draft = result.candidate_strategy_draft
-    assert draft.date_range == {"start": "2022-01-01", "end": "today"}
+    assert draft.date_range == {
+        "start": "2022-01-01",
+        "end": date.today().isoformat(),
+    }
     assert draft.capital_amount == 10000
     assert "stated_run_field_fidelity_audit" in result.reason_codes
 
@@ -1803,10 +1807,11 @@ def test_default_interpreter_retries_stale_prior_strategy_replay(
     )
 
     assert result is not None
-    assert calls == [
+    assert calls[:2] == [
         ("primary/model", "LLMInterpretationResponse"),
         ("primary/model", "AssetGroundingAudit"),
     ]
+    assert calls[-1] == ("fallback/model", "LLMInterpretationResponse")
     assert result.candidate_strategy_draft.asset_universe == ["NVDA"]
 
 
@@ -1876,10 +1881,12 @@ def test_default_interpreter_plans_stale_artifact_edit_before_fallback(
     )
 
     assert result is not None
-    assert calls == [
+    assert calls[:2] == [
         ("primary/model", "LLMInterpretationResponse"),
         ("primary/model", "AssetGroundingAudit"),
     ]
+    assert calls[2:] == [("primary/model", "LLMInterpretationResponse")]
+    assert all(model_name != "fallback/model" for model_name, _schema_name in calls)
     assert interpreter.last_status == "used"
     assert result.candidate_strategy_draft.asset_universe == ["NVDA"]
 

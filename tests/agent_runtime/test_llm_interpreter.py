@@ -15454,3 +15454,187 @@ async def test_vague_guidance_does_not_preempt_focused_strategy_extraction(
     assert draft.asset_universe == ["NVDA"]
     assert draft.recurring_contribution == 250
     assert draft.cadence == "weekly"
+
+
+@pytest.mark.asyncio
+async def test_explicit_model_timeout_churn_uses_focused_strategy_repair(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    class TimeoutStructuredModel:
+        async def ainvoke(self, _messages):
+            raise TimeoutError("structured model timed out")
+
+    class TimeoutChatModel:
+        def with_structured_output(self, _schema):
+            return TimeoutStructuredModel()
+
+    build_calls: list[str] = []
+    repair_calls: list[str] = []
+
+    def build_model(_task, *, model_name=None):
+        build_calls.append(str(model_name))
+        return TimeoutChatModel()
+
+    def resolve_model(model_name=None, fallback=False, *, task=None):
+        del task
+        if model_name:
+            return str(model_name)
+        return "fallback/model" if fallback else "primary/model"
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized in {"NVIDIA", "NVDA"}:
+            return ResolvedAssetStub(
+                "NVDA",
+                "equity",
+                name="NVIDIA Corporation",
+                raw_symbol=query,
+            )
+        raise ValueError("invalid_symbol")
+
+    async def repair_schema(**kwargs):
+        schema_name = kwargs["schema_name"]
+        repair_calls.append(schema_name)
+        if schema_name == "FocusedStrategyExtraction":
+            return interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Test weekly Nvidia purchases.",
+                language="en",
+                strategy_type="dca_accumulation",
+                strategy_thesis="Buy $250 of Nvidia every week.",
+                asset_universe=["NVDA"],
+                asset_class="equity",
+                capital_amount=250,
+                recurring_contribution=250,
+                cadence="weekly",
+                date_range_raw_text="during the last year",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="rolling_window",
+                    count=1,
+                    unit="year",
+                    anchor="today",
+                    confidence=0.92,
+                    evidence="during the last year",
+                ),
+                confidence=0.91,
+                evidence_spans={
+                    "asset_universe": "Nvidia",
+                    "recurring_contribution": "$250",
+                    "cadence": "every week",
+                    "date_range": "during the last year",
+                },
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "primary/model")
+    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "fallback/model")
+    monkeypatch.setattr(interpreter_module, "build_openrouter_model", build_model)
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        "argus.llm.openrouter.resolve_openrouter_model",
+        resolve_model,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        repair_schema,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract(),
+        model_name="primary/model",
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message=(
+                "What if I bought $250 of Nvidia every week during the last year?"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert build_calls == ["primary/model", "fallback/model"]
+    assert "FocusedStrategyExtraction" in repair_calls
+    assert result is not None
+    assert interpreter.last_status == "fallback_used"
+    assert result.intent == "backtest_execution"
+    assert result.candidate_strategy_draft.strategy_type == "dca_accumulation"
+    assert result.candidate_strategy_draft.asset_universe == ["NVDA"]
+    assert result.candidate_strategy_draft.capital_amount == 250
+    assert result.candidate_strategy_draft.cadence == "weekly"
+    assert "focused_strategy_extraction_repair" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_explicit_model_timeout_churn_does_not_repair_nonmaterial_refinement(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    class TimeoutStructuredModel:
+        async def ainvoke(self, _messages):
+            raise TimeoutError("structured model timed out")
+
+    class TimeoutChatModel:
+        def with_structured_output(self, _schema):
+            return TimeoutStructuredModel()
+
+    repair_calls: list[str] = []
+
+    def build_model(_task, *, model_name=None):
+        del model_name
+        return TimeoutChatModel()
+
+    def resolve_model(model_name=None, fallback=False, *, task=None):
+        del task
+        if model_name:
+            return str(model_name)
+        return "fallback/model" if fallback else "primary/model"
+
+    async def repair_schema(**kwargs):
+        repair_calls.append(kwargs["schema_name"])
+        raise AssertionError("non-material refinement should not reach repair schema")
+
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "primary/model")
+    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "fallback/model")
+    monkeypatch.setattr(interpreter_module, "build_openrouter_model", build_model)
+    monkeypatch.setattr(
+        "argus.llm.openrouter.resolve_openrouter_model",
+        resolve_model,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        repair_schema,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract(),
+        model_name="primary/model",
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message="Actually make it Nvidia.",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    raw_user_phrasing="Test buying and holding Apple over the past year.",
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Test buying and holding Apple over the past year.",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    date_range="last 1 year",
+                )
+            ),
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is None
+    assert repair_calls == []
+    assert interpreter.last_status == "failed"

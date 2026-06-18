@@ -695,6 +695,21 @@ class OpenRouterStructuredInterpreter:
         if repaired_response is not None:
             self.last_status = "fallback_used"
             return self._to_runtime_interpretation(repaired_response, request=request)
+        repaired_response = await _focused_strategy_repair_after_candidate_failures(
+            request=request,
+            preferred_model=fallback_model_name or primary_model_name,
+        )
+        if repaired_response is not None:
+            self.last_status = "fallback_used"
+            repaired_response = await _stated_run_field_audited_response(
+                response=repaired_response,
+                preferred_model=fallback_model_name or primary_model_name,
+                request=request,
+            )
+            return self._to_runtime_interpretation(
+                repaired_response,
+                request=request,
+            )
         return None
 
     def _messages(self, request: InterpretationRequest) -> list[BaseMessage]:
@@ -8116,6 +8131,12 @@ async def _focused_strategy_repair_after_candidate_failures(
         reason_codes=["structured_interpretation_candidates_failed"],
         semantic_turn_act="new_idea",
     )
+    logger.bind(
+        llm_task=_INTERPRETATION_REPAIR_TASK,
+        preferred_model=preferred_model,
+        current_message_length=len(request.current_user_message),
+        reason_codes=list(seed_response.reason_codes),
+    ).info("Structured interpretation candidates failed; attempting focused repair")
     return await _repair_incomplete_strategy_extraction(
         failed_response=seed_response,
         preferred_model=preferred_model,
