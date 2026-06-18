@@ -35,6 +35,18 @@ export function hydrateTextMessageFromApi(
     kind: "text",
     content: message.content,
     actions: isAssistant && retryActions.length > 0 ? retryActions : undefined,
-    contentPresentation: isAssistant ? options.contentPresentation : undefined,
+    contentPresentation: isAssistant
+      ? runtimeFailureContentPresentation(metadata, options.contentPresentation)
+      : undefined,
   };
+}
+
+function runtimeFailureContentPresentation(
+  metadata: Record<string, unknown>,
+  fallback: Message["contentPresentation"],
+): Message["contentPresentation"] {
+  if (metadata.agent_runtime_failure_superseded === true) {
+    return "superseded_runtime_failure";
+  }
+  return fallback;
 }

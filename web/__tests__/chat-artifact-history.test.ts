@@ -13,6 +13,8 @@ import {
 } from "../components/chat/artifact-history";
 import type { ChatActionOption, Message } from "../components/chat/types";
 import type { ApiMessage } from "../lib/argus-api";
+import { hydrateTextMessageFromApi } from "../lib/chat-message-hydration";
+import { normalizeRetryActionHistory } from "../lib/chat-retry-action-history";
 
 type ConfirmationActionType = Extract<
   ChatActionOption["type"],
@@ -531,6 +533,68 @@ describe("chat artifact history", () => {
     expect(normalizedConfirmation.confirmation?.statusLabel).toBe("Run complete");
     expect(normalizedConfirmation.confirmation?.actions).toEqual([]);
     expect(normalizedConfirmation.actions).toEqual([]);
+  });
+
+  test("hydration preserves unmarked stale failure text while stripping retry", () => {
+    const messages = normalizeRetryActionHistory([
+      {
+        id: "assistant-failed",
+        role: "ai",
+        kind: "text",
+        content: "Something went wrong. Your conversation is saved. Please try again.",
+        actions: [
+          {
+            id: "retry-last-turn",
+            label: "Retry",
+            type: "retry_last_turn",
+            payload: {
+              message:
+                "Backtest buy and hold AAPL from January 2025 through June 2026",
+              failed_assistant_id: "assistant-failed",
+            },
+          },
+        ],
+      },
+      resultMessage("run-aapl"),
+    ]);
+
+    const failedMessage = messages.find(
+      (message) => message.id === "assistant-failed",
+    );
+    expect(failedMessage).toBeDefined();
+    expect(failedMessage?.actions).toBeUndefined();
+    expect(messages).toHaveLength(2);
+    expect(messages[1].kind).toBe("strategy_result");
+  });
+
+  test("hydration removes backend-superseded runtime failure text", () => {
+    const failedMessage = hydrateTextMessageFromApi({
+      id: "assistant-failed",
+      conversation_id: "conversation-aapl",
+      role: "assistant",
+      content: "Something went wrong. Your conversation is saved. Please try again.",
+      created_at: "2026-06-01T00:00:00Z",
+      metadata: {
+        conversation_mode: "recovery",
+        agent_runtime_stage_outcome: "agent_runtime_failure",
+        agent_runtime_failure_superseded: true,
+        recovery: {
+          code: "runtime_failure",
+          retryable: false,
+          language: "en",
+        },
+      },
+    });
+    const messages = normalizeRetryActionHistory([
+      failedMessage,
+      resultMessage("run-aapl"),
+    ]);
+
+    expect(messages.find((message) => message.id === "assistant-failed")).toBe(
+      undefined,
+    );
+    expect(messages).toHaveLength(1);
+    expect(messages[0].kind).toBe("strategy_result");
   });
 
   test("specific action effects beat broad fallback effects during hydration", () => {

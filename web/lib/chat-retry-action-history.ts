@@ -3,14 +3,17 @@ import { isRetryAction } from "./chat-retry-actions";
 
 export function normalizeRetryActionHistory(messages: Message[]): Message[] {
   const latestIndex = messages.length - 1;
-  return messages.map((message, index) => {
+  return messages.flatMap((message, index) => {
+    if (isSupersededRuntimeFailureMessage(message)) {
+      return [];
+    }
     if (!message.actions?.some(isRetryAction)) {
-      return message;
+      return [message];
     }
     if (isLiveRetryMessage(message, index, latestIndex)) {
-      return message;
+      return [message];
     }
-    return stripRetryActions(message);
+    return [stripRetryActions(message)];
   });
 }
 
@@ -20,6 +23,14 @@ function isLiveRetryMessage(
   latestIndex: number,
 ): boolean {
   return index === latestIndex && message.role === "ai" && message.kind === "text";
+}
+
+function isSupersededRuntimeFailureMessage(message: Message): boolean {
+  return (
+    message.role === "ai" &&
+    message.kind === "text" &&
+    message.contentPresentation === "superseded_runtime_failure"
+  );
 }
 
 function stripRetryActions(message: Message): Message {

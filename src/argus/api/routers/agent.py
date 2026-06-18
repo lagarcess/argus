@@ -51,6 +51,7 @@ from argus.api.chat.recovery import (
     confirmation_metadata_fallback_context,
     failed_action_metadata_fallback_context,
     latest_result_fallback_context,
+    mark_terminal_runtime_failure_checkpoint,
     pending_strategy_metadata_fallback_context,
     runtime_checkpoint_values,
 )
@@ -72,7 +73,11 @@ from argus.api.chat.streaming import (
 )
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
-from argus.api.message_store import create_message, load_runtime_thread_history
+from argus.api.message_store import (
+    create_message,
+    latest_unresolved_terminal_runtime_failure_metadata,
+    load_runtime_thread_history,
+)
 from argus.api.naming import get_starter_prompts, resolve_language
 from argus.api.schemas import BacktestRun, ChatStreamRequest, StarterPromptsResponse, User
 from argus.domain.supabase_gateway import QuotaExceededError
@@ -426,6 +431,16 @@ async def chat_stream(
         for index, mention in enumerate(payload.mentions)
     ]
     cancel_confirmation_action = is_cancel_confirmation_action(payload)
+    runtime_user = UserState(
+        user_id=user.id,
+        display_name=current_user_profile.display_name,
+        language_preference=(
+            payload.language
+            or conversation.language
+            or current_user_profile.language
+            or "en"
+        ),
+    )
 
     def persist_request_message() -> Any | None:
         if onboarding_goal is not None or cancel_confirmation_action:
@@ -455,8 +470,22 @@ async def chat_stream(
             metadata=user_metadata,
         )
 
+    workflow: Any | None = None
     try:
         workflow = api_state.get_agent_runtime_workflow(request)
+        terminal_failure_metadata = latest_unresolved_terminal_runtime_failure_metadata(
+            user_id=user.id,
+            conversation_id=conversation.id,
+        )
+        if terminal_failure_metadata is not None:
+            await mark_terminal_runtime_failure_checkpoint(
+                workflow=workflow,
+                conversation_id=conversation.id,
+                user=runtime_user,
+                message=request_message,
+                recent_thread_history=recent_thread_history,
+                failure_metadata=terminal_failure_metadata,
+            )
         checkpoint_values = await runtime_checkpoint_values(
             workflow=workflow,
             conversation_id=conversation.id,
@@ -481,10 +510,25 @@ async def chat_stream(
         failure_metadata: dict[str, Any] = {
             "conversation_mode": "recovery",
             "agent_runtime_stage_outcome": "agent_runtime_failure",
+            "agent_runtime_turn": {
+                "status": "failed",
+                "terminal": True,
+                "conversation_id": conversation.id,
+                "request_id": request.state.request_id,
+            },
             "recovery": recovery,
         }
         if retry_metadata is not None:
             failure_metadata.update(retry_metadata)
+        if workflow is not None:
+            await mark_terminal_runtime_failure_checkpoint(
+                workflow=workflow,
+                conversation_id=conversation.id,
+                user=runtime_user,
+                message=request_message,
+                recent_thread_history=recent_thread_history,
+                failure_metadata=failure_metadata,
+            )
         retry_last_turn = (
             retry_metadata.get("retry_last_turn")
             if isinstance(retry_metadata, dict)
@@ -859,16 +903,6 @@ async def chat_stream(
             yield sse_done()
             return
 
-        runtime_user = UserState(
-            user_id=user.id,
-            display_name=current_user_profile.display_name,
-            language_preference=(
-                payload.language
-                or conversation.language
-                or current_user_profile.language
-                or "en"
-            ),
-        )
         action_context = (
             payload.action.model_dump(mode="python")
             if payload.action is not None
@@ -1020,6 +1054,12 @@ async def chat_stream(
                         else "guide"
                     ),
                     "agent_runtime_stage_outcome": stage_status,
+                    "agent_runtime_turn": {
+                        "status": "succeeded",
+                        "terminal": True,
+                        "conversation_id": conversation.id,
+                        "request_id": request.state.request_id,
+                    },
                 }
                 if payload.action is not None:
                     metadata["chat_action"] = payload.action.model_dump(mode="python")
@@ -1267,6 +1307,12 @@ async def chat_stream(
             failure_metadata: dict[str, Any] = {
                 "conversation_mode": "recovery",
                 "agent_runtime_stage_outcome": "agent_runtime_failure",
+                "agent_runtime_turn": {
+                    "status": "failed",
+                    "terminal": True,
+                    "conversation_id": conversation.id,
+                    "request_id": request.state.request_id,
+                },
             }
             if runtime_diagnostics is not None:
                 failure_metadata["runtime_diagnostics"] = runtime_diagnostics
@@ -1282,6 +1328,14 @@ async def chat_stream(
             failure_metadata["recovery"] = recovery
             if retry_metadata is not None:
                 failure_metadata.update(retry_metadata)
+            await mark_terminal_runtime_failure_checkpoint(
+                workflow=workflow,
+                conversation_id=conversation.id,
+                user=runtime_user,
+                message=request_message,
+                recent_thread_history=recent_thread_history,
+                failure_metadata=failure_metadata,
+            )
             retry_last_turn = (
                 retry_metadata.get("retry_last_turn")
                 if isinstance(retry_metadata, dict)

@@ -186,7 +186,10 @@ export type Message = {
     | "strategy_confirmation"
     | "backtest_job"
     | "action";
-  contentPresentation?: "result_breakdown" | "conversation_load_failure";
+  contentPresentation?:
+    | "result_breakdown"
+    | "conversation_load_failure"
+    | "superseded_runtime_failure";
   content?: string;
   mentions?: ChatMention[];
   selectedAction?: ChatActionOption;

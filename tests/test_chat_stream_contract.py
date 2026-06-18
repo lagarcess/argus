@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 from contextlib import asynccontextmanager
+from threading import Event
 from typing import Any
 
 import pytest
@@ -718,6 +719,155 @@ def test_chat_stream_runtime_stall_emits_recoverable_error(
         "stage": "interpret",
     }
     assert runtime_diagnostics["event_count"] == 1
+
+
+def test_chat_stream_visible_failure_path_is_terminal_for_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.message_store import create_message
+    from argus.api.routers import agent as agent_router
+
+    late_success_persisted = Event()
+    prompt = "Backtest buy and hold AAPL from January 2025 through June 2026"
+    late_confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Buy and hold AAPL.",
+            "asset_universe": ["AAPL"],
+            "asset_class": "equity",
+            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
+        },
+        "optional_parameters": {},
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "AAPL",
+            "symbols": ["AAPL"],
+            "timeframe": "1D",
+            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
+            "sizing_mode": "capital_amount",
+            "capital_amount": 10000,
+            "benchmark_symbol": "SPY",
+        },
+        "validation": {"status": "ready_to_run", "executable": True},
+    }
+
+    async def _late_success_stream_agent_turn_events(**kwargs: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        time.sleep(0.05)
+        create_message(
+            user_id=kwargs["user"].user_id,
+            conversation_id=kwargs["thread_id"],
+            role="assistant",
+            content="Ready to test AAPL.",
+            metadata={
+                "conversation_mode": "confirm",
+                "agent_runtime_stage_outcome": "await_approval",
+                "confirmation_payload": late_confirmation_payload,
+                "confirmation_card": {
+                    "confirmation_id": "late-confirmation-aapl",
+                    "confirmation_state": "active",
+                    "title": "AAPL buy and hold",
+                    "summary": "Ready to test AAPL.",
+                    "rows": [],
+                    "actions": [
+                        {
+                            "type": "run_backtest",
+                            "label": "Run backtest",
+                            "presentation": "confirmation",
+                            "payload": {
+                                "confirmation_id": "late-confirmation-aapl"
+                            },
+                        }
+                    ],
+                },
+            },
+        )
+        late_success_persisted.set()
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_approval",
+                "assistant_response": "Ready to test AAPL.",
+                "confirmation_payload": late_confirmation_payload,
+            },
+        }
+
+    @asynccontextmanager
+    async def _isolated_workflow():
+        yield "worker_loop_workflow"
+
+    monkeypatch.setattr(agent_router, "runtime_worker_enabled", lambda: True)
+    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.005)
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _late_success_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(
+        agent_router.api_state,
+        "isolated_agent_runtime_workflow",
+        _isolated_workflow,
+        raising=False,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": prompt,
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert late_success_persisted.wait(1)
+    events = _data_events(response.text)
+    error_events = [event for event in events if event.get("type") == "error"]
+    final_events = [event for event in events if event.get("type") == "final"]
+    assert error_events == [
+        {
+            "type": "error",
+            "code": "agent_runtime_failure",
+            "message": error_events[0]["message"],
+            "message_id": error_events[0]["message_id"],
+            "recovery": {
+                "code": "runtime_failure",
+                "retryable": True,
+                "language": "en",
+            },
+            "retry_last_turn": {"message": prompt},
+        }
+    ]
+    assert final_events == []
+    assert response.text.count("data: [DONE]") == 1
+
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant_messages = [
+        message for message in messages if message["role"] == "assistant"
+    ]
+    failure_messages = [
+        message
+        for message in assistant_messages
+        if message["metadata"].get("agent_runtime_stage_outcome")
+        == "agent_runtime_failure"
+    ]
+    assert len(failure_messages) == 1
+    failure_metadata = failure_messages[0]["metadata"]
+    assert failure_metadata["recovery"]["code"] == "runtime_failure"
+    assert failure_metadata["retry_last_turn"] == {"message": prompt}
+    assert not any(
+        message["metadata"].get("confirmation_payload")
+        or message["metadata"].get("confirmation_card")
+        or message["metadata"].get("result_card")
+        or message["metadata"].get("result_run_id")
+        for message in assistant_messages
+        if message["id"] != failure_messages[0]["id"]
+    )
 
 
 def test_chat_stream_runtime_keepalive_preserves_slow_progressing_turn(

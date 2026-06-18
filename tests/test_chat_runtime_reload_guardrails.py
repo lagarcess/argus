@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from argus.api.main import app
 from argus.api.message_store import create_message
 from argus.api.schemas import BacktestRun
@@ -3053,6 +3055,461 @@ def test_failed_action_fallback_is_superseded_by_newer_completed_result() -> Non
     )
 
     assert fallback is None
+
+
+def test_failed_turn_retry_marker_is_superseded_when_late_run_artifact_is_present_on_reload(
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import latest_result_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    prompt = "Backtest buy and hold AAPL from January 2025 through June 2026"
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="user",
+        content=prompt,
+        metadata={},
+    )
+    failed_assistant = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Something went wrong. Your conversation is saved. Please try again.",
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "agent_runtime_failure",
+            "recovery": {
+                "code": "runtime_failure",
+                "retryable": True,
+                "language": "en",
+            },
+            "retry_last_turn": {
+                "message": prompt,
+            },
+        },
+    )
+    run_id = api_state.store.new_id()
+    api_state.store.backtest_runs[run_id] = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 12.0}}},
+        config_snapshot={
+            "template": "buy_and_hold",
+            "symbols": ["AAPL"],
+            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
+        },
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "status_label": "Simulation Complete",
+            "rows": [
+                {
+                    "key": "total_return_pct",
+                    "label": "Total Return",
+                    "value": "+12.0%",
+                }
+            ],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_run_owners[run_id] = user_id
+    completed_run = api_state.store.backtest_runs[run_id]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Here is the completed result.",
+        metadata={
+            "conversation_mode": "result_review",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "result_card": completed_run.conversation_result_card,
+            "result_run_id": run_id,
+            "latest_run_id": run_id,
+            "result_conversation_id": conversation["id"],
+        },
+    )
+
+    result_fallback = latest_result_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+    assert result_fallback is not None
+    assert result_fallback.latest_task_snapshot is not None
+    assert (
+        result_fallback.latest_task_snapshot.latest_backtest_result_reference
+        is not None
+    )
+    result_reference = (
+        result_fallback.latest_task_snapshot.latest_backtest_result_reference
+    )
+    assert result_reference.artifact_id == run_id
+
+    hydrated_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    failed_reload_message = next(
+        message
+        for message in hydrated_messages
+        if message["id"] == failed_assistant.id
+    )
+    assert "retry_last_turn" not in failed_reload_message["metadata"]
+    recovery = failed_reload_message["metadata"].get("recovery")
+    assert not (isinstance(recovery, dict) and recovery.get("retryable") is True)
+
+
+def test_failed_turn_retry_marker_is_not_superseded_by_result_after_new_user_turn(
+) -> None:
+    from argus.api import state as api_state
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    failed_prompt = "Backtest buy and hold AAPL from January 2025 through June 2026"
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="user",
+        content=failed_prompt,
+        metadata={},
+    )
+    failed_assistant = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Something went wrong. Your conversation is saved. Please try again.",
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "agent_runtime_failure",
+            "recovery": {
+                "code": "runtime_failure",
+                "retryable": True,
+                "language": "en",
+            },
+            "retry_last_turn": {
+                "message": failed_prompt,
+            },
+        },
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="user",
+        content="Now test buy and hold MSFT for 2025",
+        metadata={},
+    )
+    run_id = api_state.store.new_id()
+    api_state.store.backtest_runs[run_id] = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["MSFT"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 9.0}}},
+        config_snapshot={
+            "template": "buy_and_hold",
+            "symbols": ["MSFT"],
+            "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+        },
+        conversation_result_card={
+            "title": "MSFT buy and hold",
+            "status_label": "Simulation Complete",
+            "rows": [
+                {
+                    "key": "total_return_pct",
+                    "label": "Total Return",
+                    "value": "+9.0%",
+                }
+            ],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_run_owners[run_id] = user_id
+    completed_run = api_state.store.backtest_runs[run_id]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Here is the MSFT result.",
+        metadata={
+            "conversation_mode": "result_review",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "result_card": completed_run.conversation_result_card,
+            "result_run_id": run_id,
+            "latest_run_id": run_id,
+            "result_conversation_id": conversation["id"],
+        },
+    )
+
+    hydrated_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    failed_reload_message = next(
+        message
+        for message in hydrated_messages
+        if message["id"] == failed_assistant.id
+    )
+    failed_metadata = failed_reload_message["metadata"]
+    assert failed_metadata.get("agent_runtime_failure_superseded") is not True
+    assert failed_metadata["retry_last_turn"] == {"message": failed_prompt}
+    assert failed_metadata["recovery"]["retryable"] is True
+
+
+def test_late_artifact_from_failed_request_stays_suppressed_after_retry_user_turn(
+) -> None:
+    from argus.api import state as api_state
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    prompt = "Backtest buy and hold AAPL from January 2025 through June 2026"
+    failed_request_id = "failed-request-a"
+    retry_request_id = "retry-request-b"
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="user",
+        content=prompt,
+        metadata={
+            "agent_runtime_turn": {
+                "status": "started",
+                "conversation_id": conversation["id"],
+                "request_id": failed_request_id,
+            }
+        },
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Something went wrong. Your conversation is saved. Please try again.",
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "agent_runtime_failure",
+            "agent_runtime_turn": {
+                "status": "failed",
+                "terminal": True,
+                "conversation_id": conversation["id"],
+                "request_id": failed_request_id,
+            },
+            "recovery": {
+                "code": "runtime_failure",
+                "retryable": True,
+                "language": "en",
+            },
+            "retry_last_turn": {
+                "message": prompt,
+            },
+        },
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="user",
+        content=prompt,
+        metadata={
+            "agent_runtime_turn": {
+                "status": "started",
+                "conversation_id": conversation["id"],
+                "request_id": retry_request_id,
+            },
+            "chat_action": {
+                "type": "retry_last_turn",
+                "payload": {"message": prompt},
+            },
+        },
+    )
+
+    old_request_metadata = _confirmation_metadata()
+    old_request_metadata["agent_runtime_turn"] = {
+        "status": "succeeded",
+        "terminal": True,
+        "conversation_id": conversation["id"],
+        "request_id": failed_request_id,
+    }
+    suppressed = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Ready to test the old request.",
+        metadata=old_request_metadata,
+    )
+    persisted_ids = {
+        message.id for message in api_state.store.messages[conversation["id"]]
+    }
+    assert suppressed.id not in persisted_ids
+
+    retry_metadata = _confirmation_metadata()
+    retry_metadata["agent_runtime_turn"] = {
+        "status": "succeeded",
+        "terminal": True,
+        "conversation_id": conversation["id"],
+        "request_id": retry_request_id,
+    }
+    retry_artifact = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Ready to test the retry request.",
+        metadata=retry_metadata,
+    )
+    persisted_ids = {
+        message.id for message in api_state.store.messages[conversation["id"]]
+    }
+    assert retry_artifact.id in persisted_ids
+
+
+def test_late_artifact_guard_fails_closed_when_strict_supabase_read_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+
+    class FailingListGateway:
+        def list_messages(self, **_: Any) -> list[Any]:
+            raise RuntimeError("supabase read failed")
+
+        def create_message(self, **_: Any) -> Any:
+            raise AssertionError("late artifact write should not be attempted")
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
+    monkeypatch.setattr(api_state, "supabase_gateway", FailingListGateway())
+    metadata = _confirmation_metadata()
+    metadata["agent_runtime_turn"] = {
+        "status": "succeeded",
+        "terminal": True,
+        "conversation_id": conversation["id"],
+        "request_id": "request-a",
+    }
+
+    with pytest.raises(RuntimeError, match="supabase read failed"):
+        create_message(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            role="assistant",
+            content="Ready to test AAPL.",
+            metadata=metadata,
+        )
+
+
+def test_terminal_runtime_failure_reconciles_hidden_pending_checkpoint_before_action(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.graph.workflow import WorkflowStageOutcome
+    from argus.agent_runtime.runtime import build_workflow_input
+    from argus.agent_runtime.state.models import ConfirmationPayload, UserState
+    from argus.agent_runtime.workflow_contract import WorkflowNode
+    from argus.api import state as api_state
+
+    async def _runtime_should_not_run(**_: Any):
+        raise AssertionError("stale checkpoint should not reach runtime")
+        yield {}
+
+    monkeypatch.setattr(
+        "argus.api.routers.agent.stream_agent_turn_events",
+        _runtime_should_not_run,
+    )
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    prompt = "Backtest buy and hold AAPL from January 2025 through June 2026"
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="user",
+        content=prompt,
+        metadata={
+            "agent_runtime_turn": {
+                "status": "started",
+                "conversation_id": conversation["id"],
+                "request_id": "failed-request-a",
+            }
+        },
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Something went wrong. Your conversation is saved. Please try again.",
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "agent_runtime_failure",
+            "agent_runtime_turn": {
+                "status": "failed",
+                "terminal": True,
+                "conversation_id": conversation["id"],
+                "request_id": "failed-request-a",
+            },
+            "recovery": {
+                "code": "runtime_failure",
+                "retryable": True,
+                "language": "en",
+            },
+            "retry_last_turn": {
+                "message": prompt,
+            },
+        },
+    )
+    workflow = api_state.get_agent_runtime_workflow(SimpleNamespace(app=app))
+    hidden_values = build_workflow_input(
+        user=UserState(
+            user_id=user_id,
+            display_name="Mock Developer",
+            language_preference="en",
+        ),
+        message=prompt,
+    )
+    hidden_values["stage_outcome"] = WorkflowStageOutcome.AWAIT_APPROVAL
+    run_state = hidden_values["run_state"]
+    hidden_values["run_state"] = run_state.model_copy(
+        update={
+            "confirmation_payload": ConfirmationPayload.model_validate(
+                _confirmation_metadata()["confirmation_payload"]
+            )
+        }
+    )
+    asyncio.run(
+        workflow.aupdate_state(
+            {"configurable": {"thread_id": conversation["id"]}},
+            hidden_values,
+            as_node=WorkflowNode.CONFIRM.value,
+        )
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "confirmation_required"
 
 
 def test_save_strategy_action_without_canonical_run_id_does_not_save_latest() -> None:

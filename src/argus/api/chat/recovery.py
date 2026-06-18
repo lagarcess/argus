@@ -6,11 +6,14 @@ from typing import Any
 from loguru import logger
 
 from argus.agent_runtime.recovery_messages import recovery_message
+from argus.agent_runtime.runtime import build_workflow_input
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     StrategySummary,
     TaskSnapshot,
+    UserState,
 )
+from argus.agent_runtime.workflow_contract import WorkflowNode
 from argus.api import state as api_state
 from argus.api.chat.artifacts import (
     result_reference_from_run,
@@ -77,6 +80,52 @@ async def runtime_checkpoint_values(
         return {}
     values = getattr(state_snapshot, "values", None)
     return values if isinstance(values, dict) else {}
+
+
+async def mark_terminal_runtime_failure_checkpoint(
+    *,
+    workflow: Any,
+    conversation_id: str,
+    user: UserState,
+    message: str,
+    recent_thread_history: list[Any],
+    failure_metadata: dict[str, Any],
+) -> None:
+    from argus.agent_runtime.graph.workflow import WorkflowStageOutcome
+
+    try:
+        checkpoint_values = build_workflow_input(
+            user=user,
+            message=message,
+            recent_thread_history=recent_thread_history,
+        )
+        checkpoint_values.update(
+            {
+                "stage_outcome": WorkflowStageOutcome.AWAIT_USER_REPLY,
+                "assistant_prompt": None,
+                "assistant_response": None,
+                "confirmation_payload": None,
+                "backtest_job": None,
+                "latest_task_snapshot": None,
+                "artifact_references": [],
+                "selected_thread_metadata": {
+                    "conversation_mode": "recovery",
+                    "agent_runtime_stage_outcome": "agent_runtime_failure",
+                    "agent_runtime_turn": failure_metadata.get("agent_runtime_turn"),
+                },
+            }
+        )
+        await workflow.aupdate_state(
+            {"configurable": {"thread_id": conversation_id}},
+            checkpoint_values,
+            as_node=WorkflowNode.INTERPRET.value,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Agent runtime terminal failure checkpoint write failed",
+            error=str(exc),
+            conversation_id=conversation_id,
+        )
 
 
 def checkpoint_has_pending_confirmation(values: dict[str, Any]) -> bool:
