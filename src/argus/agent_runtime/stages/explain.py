@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -351,6 +350,7 @@ async def _llm_explanation(
         context=fact_context,
         result_payload=result_payload,
         explanation_context=explanation_context,
+        language=language,
     )
     relative_performance_truth = _quick_take_relative_truth(
         result_payload=result_payload,
@@ -466,6 +466,7 @@ def _quick_take_fact_bank(
     context: dict[str, Any],
     result_payload: dict[str, Any],
     explanation_context: dict[str, Any],
+    language: str,
 ) -> dict[str, str]:
     fact_bank: dict[str, str] = {}
     for key in (
@@ -506,9 +507,9 @@ def _quick_take_fact_bank(
         comparison = benchmark_comparison_from_delta(total_return - benchmark_return)
         fact_bank["benchmark_delta_magnitude"] = comparison.magnitude_points
         fact_bank["benchmark_comparison"] = comparison.user_phrase
-    fact_bank["caveat"] = fact_bank.get(
-        "caveat",
-        "Historical simulation evidence, not a prediction or trading recommendation",
+    fact_bank["caveat"] = fact_bank.get("caveat") or _caveat_summary(
+        explanation_context,
+        language=language,
     )
     return fact_bank
 
@@ -575,11 +576,6 @@ def _render_quick_take_draft(
             "tested_bullet": tested,
         }
     )
-    if not _quick_take_matches_requested_language(
-        draft=visible_response,
-        language=language,
-    ):
-        return None
     if not _quick_take_mentions_required_visible_facts(
         draft=visible_response,
         fact_bank=fact_bank,
@@ -596,11 +592,12 @@ def _render_quick_take_draft(
     lines = [_clean_quick_take_line(takeaway), ""]
     if tested:
         lines.append(f"{tested_label} {tested}")
-    for bullet in (
-        response.meaning_bullet,
-        response.assumption_bullet,
-        response.caveat_bullet,
-    ):
+    optional_bullets = (
+        (response.meaning_bullet, response.assumption_bullet, response.caveat_bullet)
+        if response.language_quality == "matches_prompt_language"
+        else (fact_bank.get("caveat"),)
+    )
+    for bullet in optional_bullets:
         line = _clean_quick_take_line(bullet)
         if line:
             lines.append(f"- {line}")
@@ -641,38 +638,6 @@ def _quick_take_mentions_required_visible_facts(
     if not _mentions_benchmark_comparison(text=text, fact_bank=fact_bank):
         return False
     return True
-
-
-def _quick_take_matches_requested_language(
-    *,
-    draft: QuickTakeDraft,
-    language: str,
-) -> bool:
-    if not _is_spanish(language):
-        return True
-    text = " ".join(
-        line
-        for line in (
-            draft.takeaway,
-            draft.tested_bullet,
-            draft.meaning_bullet or "",
-            draft.assumption_bullet or "",
-            draft.caveat_bullet or "",
-        )
-        if line
-    ).casefold()
-    english_fragments = (
-        " total return",
-        "tested ",
-        "what that means",
-        "keep in mind",
-        "entry rule",
-        "exit rule",
-        "buy and hold",
-        "same period",
-        "historical simulation only",
-    )
-    return not any(fragment in text for fragment in english_fragments)
 
 
 def _quick_take_mentions_signed_benchmark_delta(
@@ -734,20 +699,35 @@ def _first_numeric_token(value: str | None) -> str | None:
 
 
 def _numeric_tokens(value: str | None) -> list[str]:
-    normalized = str(value or "")
-    for separator in "%;:()[]{}":
-        normalized = normalized.replace(separator, " ")
+    normalized = str(value or "").replace("\u2212", "-")
     tokens: list[str] = []
-    for match in re.finditer(r"[-+]?\d[\d.,]*", normalized):
-        token = _normalize_numeric_token(match.group(0))
+
+    def flush(candidate: str) -> None:
+        token = _normalize_numeric_token(candidate)
         if token is None:
-            continue
+            return
         try:
             normalized_token = f"{float(token):.1f}"
         except ValueError:
-            continue
+            return
         if normalized_token not in tokens:
             tokens.append(normalized_token)
+
+    candidate = ""
+    for character in normalized:
+        if character.isdigit() or character in ".,":
+            candidate += character
+            continue
+        if character in "+-":
+            if candidate:
+                flush(candidate)
+            candidate = character
+            continue
+        if candidate:
+            flush(candidate)
+            candidate = ""
+    if candidate:
+        flush(candidate)
     return tokens
 
 

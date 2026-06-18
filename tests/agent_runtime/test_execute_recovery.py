@@ -1,3 +1,4 @@
+import inspect
 import json
 from datetime import date
 from types import SimpleNamespace
@@ -1819,7 +1820,7 @@ async def test_explain_stage_async_localizes_spanish_quick_take_heading(
 
 
 @pytest.mark.asyncio
-async def test_explain_stage_async_rejects_mixed_language_spanish_quick_take(
+async def test_explain_stage_async_drops_mixed_language_optional_spanish_quick_take(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import explain as explain_module
@@ -1876,13 +1877,9 @@ async def test_explain_stage_async_rejects_mixed_language_spanish_quick_take(
 
     assert response.startswith("**Resumen rápido**")
     assert "total return for" not in response
-    assert "- Probado:" in response
-    assert result.stage_patch["assistant_response_source"] == "deterministic_fallback"
-    assert result.stage_patch["assistant_response_fallback_used"] is True
-    assert (
-        result.stage_patch["assistant_response_failure_mode"]
-        == "quick_take_draft_rejected"
-    )
+    assert "Probado:" in response
+    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
+    assert result.stage_patch["assistant_response_fallback_used"] is False
 
 
 @pytest.mark.asyncio
@@ -2446,6 +2443,75 @@ async def test_explain_stage_async_accepts_clean_copy_with_wrong_language_self_r
     assert "lagged by 13.3 percentage points" in response
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
     assert result.stage_patch["assistant_response_fallback_used"] is False
+
+
+@pytest.mark.asyncio
+async def test_explain_stage_async_drops_optional_mixed_language_prose_without_fallback(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
+        return {
+            "relative_performance_claim": "lagged_benchmark",
+            "takeaway": "AAPL y MSFT quedaron por debajo de SPY.",
+            "tested_bullet": "total return for AAPL and MSFT",
+            "meaning_bullet": "Keep in mind this is historical simulation only.",
+            "next_check_bullet": None,
+            "assumption_bullet": "Same period benchmark comparison.",
+            "caveat_bullet": "Historical simulation only.",
+            "language_quality": "mixed_or_wrong_language",
+            "next_experiment_option_kinds": [],
+            "fact_ids": [
+                "tested_summary",
+                "total_return",
+                "benchmark_return",
+                "benchmark_comparison",
+                "benchmark_symbol",
+                "caveat",
+            ],
+        }
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_json_schema",
+        fake_quick_take_plan,
+    )
+    state = RunState.new(current_user_message="por que", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL", "MSFT"],
+            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
+        },
+        "optional_parameters": {},
+    }
+    state.final_response_payload = {
+        "result": {"total_return": 0.1284, "benchmark_return": 0.2614},
+        "explanation_context": {"benchmark_symbol": "SPY"},
+    }
+
+    result = await explain_stage_async(state=state, language="es-419")
+    response = result.stage_patch["assistant_response"]
+
+    assert "La estrategia rindió 12.8% mientras SPY rindió 26.1%" in response
+    assert "Probado:" in response
+    assert "total return for" not in response
+    assert "Keep in mind" not in response
+    assert "Same period" not in response
+    assert "Historical simulation only" not in response
+    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
+    assert result.stage_patch["assistant_response_fallback_used"] is False
+
+
+def test_explain_stage_quick_take_validation_has_no_language_fragment_blacklist() -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    source = inspect.getsource(explain_module)
+
+    assert "english_fragments" not in source
+    assert "_quick_take_matches_requested_language" not in source
+    assert "import re" not in source
 
 
 @pytest.mark.asyncio
