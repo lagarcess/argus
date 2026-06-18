@@ -563,18 +563,23 @@ def _render_quick_take_draft(
     response = _coerce_quick_take_draft(draft)
     if response is None:
         return None
-    if response.language_quality != "matches_prompt_language":
-        return None
     truth = relative_performance_truth
     if truth != "unknown" and response.relative_performance_claim != truth:
         return None
+    tested = _clean_quick_take_line(tested_line)
     # `fact_ids` is model self-report metadata. The visible copy checks below are
     # the authoritative guard for user-facing benchmark truth.
-    visible_response = (
-        response.model_copy(update={"takeaway": canonical_takeaway})
-        if canonical_takeaway
-        else response
+    visible_response = response.model_copy(
+        update={
+            "takeaway": canonical_takeaway or response.takeaway,
+            "tested_bullet": tested,
+        }
     )
+    if not _quick_take_matches_requested_language(
+        draft=visible_response,
+        language=language,
+    ):
+        return None
     if not _quick_take_mentions_required_visible_facts(
         draft=visible_response,
         fact_bank=fact_bank,
@@ -586,7 +591,6 @@ def _render_quick_take_draft(
     ):
         return None
 
-    tested = _clean_quick_take_line(tested_line)
     tested_label = "Probado:" if _is_spanish(language) else "Tested:"
     takeaway = canonical_takeaway or response.takeaway
     lines = [_clean_quick_take_line(takeaway), ""]
@@ -637,6 +641,38 @@ def _quick_take_mentions_required_visible_facts(
     if not _mentions_benchmark_comparison(text=text, fact_bank=fact_bank):
         return False
     return True
+
+
+def _quick_take_matches_requested_language(
+    *,
+    draft: QuickTakeDraft,
+    language: str,
+) -> bool:
+    if not _is_spanish(language):
+        return True
+    text = " ".join(
+        line
+        for line in (
+            draft.takeaway,
+            draft.tested_bullet,
+            draft.meaning_bullet or "",
+            draft.assumption_bullet or "",
+            draft.caveat_bullet or "",
+        )
+        if line
+    ).casefold()
+    english_fragments = (
+        " total return",
+        "tested ",
+        "what that means",
+        "keep in mind",
+        "entry rule",
+        "exit rule",
+        "buy and hold",
+        "same period",
+        "historical simulation only",
+    )
+    return not any(fragment in text for fragment in english_fragments)
 
 
 def _quick_take_mentions_signed_benchmark_delta(

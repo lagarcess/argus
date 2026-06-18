@@ -1832,7 +1832,7 @@ async def test_explain_stage_async_rejects_mixed_language_spanish_quick_take(
                 "23.6 puntos porcentuales."
             ),
             "tested_bullet": "total return for $AAPL",
-            "meaning_bullet": "La comparación sirve como evidencia histórica.",
+            "meaning_bullet": "La comparación muestra total return, no una predicción.",
             "next_check_bullet": None,
             "assumption_bullet": None,
             "caveat_bullet": "Simulación histórica solamente.",
@@ -2381,6 +2381,69 @@ async def test_explain_stage_async_uses_canonical_takeaway_for_visible_benchmark
     assert "SPY" in response
     assert "lagged by 3.1 percentage points" in response
     assert "directional evidence" in response
+    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
+    assert result.stage_patch["assistant_response_fallback_used"] is False
+
+
+@pytest.mark.asyncio
+async def test_explain_stage_async_accepts_clean_copy_with_wrong_language_self_report(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
+        return {
+            "relative_performance_claim": "lagged_benchmark",
+            "takeaway": (
+                "A simple buy-and-hold of AAPL and MSFT returned +12.8%. "
+                "That lagged SPY by 13.3 percentage points."
+            ),
+            "tested_bullet": (
+                "AAPL, MSFT buy and hold over 2025-01-01 to 2026-06-05"
+            ),
+            "meaning_bullet": None,
+            "next_check_bullet": None,
+            "assumption_bullet": None,
+            "caveat_bullet": None,
+            "language_quality": "mixed_or_wrong_language",
+            "next_experiment_option_kinds": [
+                "change_date_range",
+                "same_setup_peer_asset",
+            ],
+            "fact_ids": [
+                "tested_summary",
+                "total_return",
+                "benchmark_return",
+                "benchmark_comparison",
+                "benchmark_symbol",
+                "caveat",
+            ],
+        }
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_json_schema",
+        fake_quick_take_plan,
+    )
+    state = RunState.new(current_user_message="why", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL", "MSFT"],
+            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
+        },
+        "optional_parameters": {},
+    }
+    state.final_response_payload = {
+        "result": {"total_return": 0.1284, "benchmark_return": 0.2614},
+        "explanation_context": {"benchmark_symbol": "SPY"},
+    }
+
+    result = await explain_stage_async(state=state)
+    response = result.stage_patch["assistant_response"]
+
+    assert "SPY" in response
+    assert "lagged by 13.3 percentage points" in response
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
     assert result.stage_patch["assistant_response_fallback_used"] is False
 
