@@ -5,13 +5,17 @@ Created: 2026-06-18T03:57:26Z
 
 ## Candidate
 
-- Candidate SHA: `b0c7f559bd9cc4641b4533b5520e1ffd2fc38f4f`
+- Candidate SHA: Final PR head after review-response commits; record the exact
+  deployed SHA in the PR evidence, Render deploy-status output, and canary
+  evidence artifacts before tester exposure.
 - Candidate branch: `codex/private-alpha-next`
 - Promotion target: `main`
 - Release captain: Codex
 - Approver: Founder review pending
 - Rollback target: `6bd54656cdc7c0e5840fac5d04f8148e429d8309` (`origin/codex/private-alpha-next` before this candidate stack)
-- Decision record: Draft PR review requested. Do not invite testers until live Render warmup, English canary, Spanish canary, and workflow-service proof pass for this SHA.
+- Decision record: Draft PR review requested. Do not invite testers until live
+  Render warmup, English canary, Spanish canary, and workflow-service proof pass
+  for the exact branch-deployed PR head.
 
 ## Scope
 
@@ -30,11 +34,11 @@ this candidate.
 ## Deploy Proof
 
 - API service: `argus-api`
-- API deploy status: Pending live deployment for this SHA
-- API deployed SHA: Pending live deployment for this SHA
+- API deploy status: Pending live deployment for final PR head
+- API deployed SHA: Pending live deployment for final PR head
 - Web service: `argus-app`
-- Web deploy status: Pending live deployment for this SHA
-- Web deployed SHA: Pending live deployment for this SHA
+- Web deploy status: Pending live deployment for final PR head
+- Web deployed SHA: Pending live deployment for final PR head
 - Checked at: Local candidate verification only
 
 ## Environment Proof
