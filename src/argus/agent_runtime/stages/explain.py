@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -659,11 +660,13 @@ def _first_numeric_token(value: str | None) -> str | None:
 
 def _numeric_tokens(value: str | None) -> list[str]:
     normalized = str(value or "")
-    for separator in "%,;:()[]{}":
+    for separator in "%;:()[]{}":
         normalized = normalized.replace(separator, " ")
     tokens: list[str] = []
-    for raw_token in normalized.split():
-        token = raw_token.strip()
+    for match in re.finditer(r"[-+]?\d[\d.,]*", normalized):
+        token = _normalize_numeric_token(match.group(0))
+        if token is None:
+            continue
         try:
             normalized_token = f"{float(token):.1f}"
         except ValueError:
@@ -671,6 +674,33 @@ def _numeric_tokens(value: str | None) -> list[str]:
         if normalized_token not in tokens:
             tokens.append(normalized_token)
     return tokens
+
+
+def _normalize_numeric_token(value: str) -> str | None:
+    token = value.strip().strip(".,")
+    if not token or not any(character.isdigit() for character in token):
+        return None
+    if "." in token and "," in token:
+        decimal_separator = "." if token.rfind(".") > token.rfind(",") else ","
+        thousands_separator = "," if decimal_separator == "." else "."
+        token = token.replace(thousands_separator, "")
+        if decimal_separator == ",":
+            token = token.replace(",", ".")
+        return token
+    if "," in token:
+        return _normalize_single_separator_number(token, separator=",")
+    if "." in token:
+        return _normalize_single_separator_number(token, separator=".")
+    return token
+
+
+def _normalize_single_separator_number(value: str, *, separator: str) -> str:
+    pieces = value.split(separator)
+    if len(pieces) > 1 and all(len(piece) == 3 for piece in pieces[1:]):
+        return "".join(pieces)
+    if separator == ",":
+        return value.replace(",", ".")
+    return value
 
 
 def _next_check_kinds_are_supported(

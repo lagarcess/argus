@@ -1961,6 +1961,67 @@ async def test_explain_stage_async_renders_spanish_setup_from_canonical_facts(
 
 
 @pytest.mark.asyncio
+async def test_explain_stage_async_accepts_spanish_decimal_comma_benchmark_gap(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
+        return {
+            "relative_performance_claim": "lagged_benchmark",
+            "takeaway": (
+                "AAPL y MSFT rindieron 13,6% mientras SPY rindió 16,6%; "
+                "quedaron por debajo por 3,1 puntos porcentuales."
+            ),
+            "tested_bullet": (
+                "Se probó comprar y mantener AAPL y MSFT en la ventana confirmada."
+            ),
+            "meaning_bullet": "La comparación nombra SPY y la brecha frente a la referencia.",
+            "next_check_bullet": None,
+            "assumption_bullet": None,
+            "caveat_bullet": "Simulación histórica solamente.",
+            "language_quality": "matches_prompt_language",
+            "next_experiment_option_kinds": [],
+            "fact_ids": [
+                "tested_summary",
+                "total_return",
+                "benchmark_return",
+                "benchmark_comparison",
+                "benchmark_symbol",
+                "caveat",
+            ],
+        }
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_json_schema",
+        fake_quick_take_plan,
+    )
+    state = RunState.new(current_user_message="por que", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL", "MSFT"],
+            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
+        },
+        "optional_parameters": {},
+    }
+    state.final_response_payload = {
+        "result": {"total_return": 0.1356, "benchmark_return": 0.1663},
+        "explanation_context": {"benchmark_symbol": "SPY"},
+    }
+
+    result = await explain_stage_async(state=state, language="es-419")
+    response = result.stage_patch["assistant_response"]
+
+    assert response.startswith("**Resumen rápido**")
+    assert "SPY" in response
+    assert "puntos porcentuales" in response
+    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
+    assert result.stage_patch["assistant_response_fallback_used"] is False
+
+
+@pytest.mark.asyncio
 async def test_explain_stage_async_sends_benchmark_contract_for_grounded_comparison(
     monkeypatch,
 ) -> None:
