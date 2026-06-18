@@ -261,6 +261,17 @@ wait_for_url() {
 
   echo "Checking ${label}: ${url}"
   while true; do
+    local pid
+    for pid in "${PIDS[@]}"; do
+      if ! kill -0 "$pid" 2>/dev/null; then
+        echo "ERROR: Background process ${pid} died unexpectedly."
+        echo "--- api.log ---"
+        tail -80 "$API_LOG" 2>/dev/null || true
+        echo "--- web.log ---"
+        tail -80 "$WEB_LOG" 2>/dev/null || true
+        return 1
+      fi
+    done
     if curl -fsS --max-time 10 "$@" "$url" >/dev/null; then
       echo "${label}=ready"
       return 0

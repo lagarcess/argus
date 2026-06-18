@@ -66,3 +66,12 @@ def test_private_alpha_integration_doc_points_to_current_gate_and_later_memo() -
     assert "release manifest" in integration
     assert "Private Alpha Canary" in integration
     assert "local smoke" in integration
+
+
+def test_agents_guardrail_keeps_canary_evidence_before_main_promotion() -> None:
+    agents = _source("AGENTS.md")
+
+    assert "docs/specs/private-alpha-ci-cd-sota.md" in agents
+    assert "branch-deployed staging/private-alpha Render validation surface" in agents
+    assert "Do not treat merge to `main` as a prerequisite for canary" in agents
+    assert "`main` is the later promotion target" in agents

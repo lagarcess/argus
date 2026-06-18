@@ -17,6 +17,7 @@ from argus.agent_runtime.state.models import (
     ArtifactActionRecoveryFacts,
     ConversationMessage,
     ExtractedFieldValue,
+    ResolutionProvenance,
     ResponseProfileOverrides,
     RunState,
     SimplificationOption,
@@ -25,6 +26,7 @@ from argus.agent_runtime.state.models import (
     ThreadState,
     UnsupportedConstraint,
     UserState,
+    normalize_resolution_provenance_items,
 )
 from pydantic import ValidationError
 
@@ -93,6 +95,37 @@ def make_valid_contract_kwargs() -> dict:
             ),
         ),
     }
+
+
+def test_resolution_provenance_normalizer_skips_invalid_legacy_items() -> None:
+    normalized = normalize_resolution_provenance_items(
+        [
+            {
+                "field": "asset_universe",
+                "raw_text": "AAPL",
+                "source": "user_mention",
+                "candidate_kind": "asset",
+                "canonical_symbol": "AAPL",
+            },
+            {
+                "field": "asset_universe",
+                "raw_text": "legacy asset",
+                "source": "legacy_regex_router",
+                "candidate_kind": "asset",
+            },
+            "not-a-provenance-dict",
+        ]
+    )
+
+    assert normalized == [
+        ResolutionProvenance(
+            field="asset_universe",
+            raw_text="AAPL",
+            source="user_mention",
+            candidate_kind="asset",
+            canonical_symbol="AAPL",
+        )
+    ]
 
 
 def test_effective_response_profile_prefers_turn_override() -> None:

@@ -223,10 +223,15 @@ def test_canary_uses_confirmation_card_run_action_payload() -> None:
     assert 'json.loads(os.environ["RUN_ACTION"])' in source
 
 
-def test_canary_passes_json_arguments_after_python_stdin_marker() -> None:
+def test_canary_uses_temp_file_for_reload_messages_payload() -> None:
     source = _source(".github/canary-render.sh")
 
-    assert 'python3 - "$MESSAGES_JSON" <<' in source
+    assert 'temp_messages="$(mktemp' in source
+    assert 'printf \'%s\' "$MESSAGES_JSON" > "$temp_messages"' in source
+    assert 'python3 - "$temp_messages" <<' in source
+    assert "pathlib.Path(sys.argv[1]).read_text" in source
+    assert 'rm -f "$temp_messages"' in source
+    assert 'python3 - "$MESSAGES_JSON" <<' not in source
     assert (
         'python3 - "$BACKTEST_ROWS" "$RECEIPT_ROWS" "$JOB_ROWS" '
         '"$BACKTEST_JOB_ID" "$RESULT_RUN_ID" <<' in source

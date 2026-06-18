@@ -114,6 +114,10 @@ Integration guardrails:
   conditions. Subagent prompts must include lane-specific goals with allowed
   surfaces, forbidden surfaces, expected output, verification evidence, and
   cleanup expectation.
+- CI/CD SOTA warmup and canary evidence must be gathered against the
+  branch-deployed staging/private-alpha Render validation surface for the exact
+  candidate SHA. Do not treat merge to `main` as a prerequisite for canary
+  evidence; `main` is the later promotion target after founder approval.
 - Production deploys remain manual and founder-directed.
 - Perplexity Research Lab remains design-only until a later approved
   implementation milestone.

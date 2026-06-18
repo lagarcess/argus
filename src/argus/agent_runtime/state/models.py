@@ -4,7 +4,14 @@ from copy import deepcopy
 from types import MappingProxyType
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_serializer,
+    model_validator,
+)
 
 ToneName = Literal["friendly", "concise"]
 VerbosityName = Literal["low", "medium", "high"]
@@ -185,7 +192,7 @@ def normalize_resolution_provenance_items(
             continue
         try:
             normalized.append(ResolutionProvenance.model_validate(raw_item))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, ValidationError):
             continue
     return normalized
 

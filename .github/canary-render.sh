@@ -297,14 +297,19 @@ fetch_conversation_messages() {
 
 assert_reload_hydration_payload() {
   local require_success_messages="$1"
+  local temp_messages
+  temp_messages="$(mktemp)"
+  printf '%s' "$MESSAGES_JSON" > "$temp_messages"
+  local exit_code=0
   CANARY_JOB_ID="$BACKTEST_JOB_ID" \
   CANARY_REQUIRE_SUCCESS_MESSAGES="$require_success_messages" \
-  python3 - "$MESSAGES_JSON" <<'PY'
+  python3 - "$temp_messages" <<'PY' || exit_code=$?
 import json
 import os
+import pathlib
 import sys
 
-payload = json.loads(sys.argv[1])
+payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
 items = payload.get("items", [])
 require_success_messages = os.environ.get("CANARY_REQUIRE_SUCCESS_MESSAGES") == "true"
 
@@ -365,6 +370,8 @@ def assert_no_reload_contradiction(hydrated_items: list[dict]) -> None:
 
 assert_no_reload_contradiction(items)
 PY
+  rm -f "$temp_messages"
+  return "$exit_code"
 }
 
 handle_stream_failure() {

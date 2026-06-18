@@ -75,6 +75,11 @@ def test_local_smoke_script_is_disposable_predeploy_gate() -> None:
     assert "workflows.trigger_proof" in source
     assert "argus.api.chat import backtest_jobs" in source
     assert "ARGUS_LOCAL_SMOKE_SOURCE_ONLY" in source
+    assert 'for pid in "${PIDS[@]}"' in source
+    assert 'kill -0 "$pid"' in source
+    assert "Background process" in source
+    assert 'tail -80 "$API_LOG"' in source
+    assert 'tail -80 "$WEB_LOG"' in source
 
     assert "https://api.render.com" not in source
     assert "api-real-workflow-on" not in source
