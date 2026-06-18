@@ -2159,6 +2159,7 @@ export default function ChatInterface() {
                     onSend={handleSend}
                     disabled={isStreamingResponse}
                     placeholder={chatInputPlaceholder}
+                    onToast={showToast}
                   />
                 </div>
 
@@ -2338,6 +2339,7 @@ export default function ChatInterface() {
                       onSend={handleSend}
                       disabled={isStreamingResponse || isHydratingConversation}
                       placeholder={chatInputPlaceholder}
+                      onToast={showToast}
                     />
                     {showConversationDisclaimer && (
                       <p

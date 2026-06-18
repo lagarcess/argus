@@ -28,6 +28,7 @@ type ChatInputProps = {
   onSend: (text: string, mentions?: ChatMention[]) => void;
   disabled?: boolean;
   placeholder?: string;
+  onToast?: (message: string) => void;
 };
 
 export type DiscoverySection = {
@@ -38,11 +39,45 @@ export type DiscoverySection = {
 export const DISCOVERY_SEARCH_LIMIT = 20;
 
 const EMPTY_CHAT_PROMPTS: string[] = [];
+const COMPOSER_TEXT_TRANSFER_TYPES = new Set(["text/plain", "text/uri-list"]);
+const COMPOSER_RICH_TEXT_COMPANION_TYPES = new Set(["text/html"]);
+
+type ComposerDataTransferLike = {
+  readonly types?: ArrayLike<string>;
+  readonly files?: { readonly length: number };
+  getData: (format: string) => string;
+};
+
+export function plainTextComposerTransferPayload(
+  dataTransfer: ComposerDataTransferLike,
+) {
+  const types = Array.from(dataTransfer.types ?? [], (type) =>
+    type.toLowerCase().trim(),
+  ).filter(Boolean);
+  const text =
+    dataTransfer.getData("text/plain") ||
+    dataTransfer.getData("text/uri-list") ||
+    "";
+  const hasFiles = Boolean(dataTransfer.files?.length);
+  const hasUnsupportedType = types.some(
+    (type) =>
+      !COMPOSER_TEXT_TRANSFER_TYPES.has(type) &&
+      !COMPOSER_RICH_TEXT_COMPANION_TYPES.has(type),
+  );
+  const hasRichTextWithoutPlainText =
+    !text && types.some((type) => COMPOSER_RICH_TEXT_COMPANION_TYPES.has(type));
+
+  return {
+    text,
+    rejectedNonText: hasFiles || hasUnsupportedType || hasRichTextWithoutPlainText,
+  };
+}
 
 export default function ChatInput({
   onSend,
   disabled = false,
   placeholder,
+  onToast,
 }: ChatInputProps) {
   const { t } = useTranslation();
   const [segments, setSegments] = useState<ComposerSegment[]>([{ type: "text", text: "" }]);
@@ -105,6 +140,10 @@ export default function ChatInput({
     ? t("chat.message_empty", "Message is empty")
     : undefined;
   const sendButtonLabel = t("chat.send_message", "Send message");
+  const textOnlyInputMessage = t(
+    "chat.text_only_input",
+    "Argus can only accept text here right now.",
+  );
   const isMentionButtonHidden = shouldHideMentionButton(isDiscoveryOpen, composerRawText);
 
   useEffect(() => {
@@ -406,6 +445,18 @@ export default function ChatInput({
     updateDiscoveryState(current, cursor);
   };
 
+  const handleComposerDataTransfer = (dataTransfer: ComposerDataTransferLike) => {
+    const payload = plainTextComposerTransferPayload(dataTransfer);
+    if (payload.rejectedNonText) {
+      onToast?.(textOnlyInputMessage);
+    }
+    if (!payload.text) return;
+
+    editorRef.current?.focus();
+    document.execCommand("insertText", false, payload.text);
+    handleEditorInput();
+  };
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -527,7 +578,12 @@ export default function ChatInput({
           onInput={handleEditorInput}
           onPaste={(e) => {
             e.preventDefault();
-            document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+            handleComposerDataTransfer(e.clipboardData);
+          }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            handleComposerDataTransfer(e.dataTransfer);
           }}
           onKeyDown={(e) => {
             if (isDiscoveryOpen) {

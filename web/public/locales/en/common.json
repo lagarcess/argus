@@ -118,6 +118,7 @@
     "followup_placeholder": "Add a follow-up",
     "message_empty": "Message is empty",
     "send_message": "Send message",
+    "text_only_input": "Argus can only accept text here right now.",
     "disclaimer": "Argus can make mistakes. For education only. Not financial advice.",
     "trigger_create_strategy": "I want to create a new strategy.",
     "trigger_create_collection": "I want to create a new collection.",
