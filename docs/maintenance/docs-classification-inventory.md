@@ -40,7 +40,7 @@ only.
 | `docs/specs/private-alpha-backtest-execution-capacity.md` | unclear/needs owner decision | Draft from 2026-06-05, frames architecture questions before scaling. Not clearly an active spec for the current milestone, nor pure historical evidence. | Determine if this is an active spec or historical. |  |
 | `docs/specs/agent-architecture.md` | historical evidence | Proposed architecture from 2026-04-29. Predates the conversation trust milestone. | Add historical banner. | Stale date. |
 | `docs/CONVERSATIONAL_RUNTIME.md` | unclear/needs owner decision | Status is "Active Alpha implementation", but unclear if it's canon, active spec, or superseded by `docs/ARCHITECTURE.md`. | Decide if canon or stale/superseded. |  |
-| `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` | stale/superseded | Explicitly marked "> Historical plan. This document records an earlier launch-closure checklist and should not be treated as the current milestone source of truth." | Add superseded banner pointing to `docs/specs/private-alpha-conversation-trust.md`. | Explicitly stale. |
+| `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` | archived/superseded | Explicitly marked "> Historical plan. This document records an earlier launch-closure checklist and should not be treated as the current milestone source of truth." | Archived under `docs/archive/`; use `docs/specs/private-alpha-conversation-trust.md` for the completed trust checkpoint and `docs/specs/private-alpha-ci-cd-sota.md` for the active CI/CD gate. | Explicitly stale. |
 | `docs/ARGUS_SYSTEM_STEERING.md` | historical evidence | "Pre-private-launch steering reference... planning reference, not an implementation ticket" from 2026-05-19. | Add historical banner. |  |
 | `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md` | unclear/needs owner decision | QA script. Could be canon process, or an active spec, or archive if out of date. | Clarify if this QA process is still active. | Uses legacy orchestrator path? |
 | `docs/PRIVATE_LAUNCH_RUNBOOK.md` | branch/lane-specific active context | Current operational gate for the controlled private-alpha readiness sprint. Useful for release operations, but not the CI/CD SOTA spec source. | Keep as operational runbook context. | Readiness/runbook lane |
@@ -107,7 +107,7 @@ only.
 - `docs/superpowers/specs/2026-05-17-sidebar-revamp-runtime-parity-qa.md`
 
 ### Files receiving 'Superseded' banner:
-- `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` -> docs/specs/private-alpha-conversation-trust.md
+- `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` -> docs/specs/private-alpha-conversation-trust.md
 
 ### Files intentionally skipped (unclear/needs owner decision):
 - `docs/specs/private-alpha-backtest-execution-capacity.md`

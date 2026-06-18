@@ -135,7 +135,7 @@ Do not reopen these as debt unless a new bug is reproduced:
   `f17c8578-78b0-4bd6-82a2-24aaf17feff9`; and the canary confirmed the
   confirmation card, `run_backtest` action, async job/run result, LLM readout
   voice, and persisted messages.
-- `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is marked historical.
+- `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is archived historical context.
 
 ## Remaining High-Leverage Work
 

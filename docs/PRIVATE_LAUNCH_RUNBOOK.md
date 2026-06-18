@@ -21,7 +21,8 @@ integration staging branch until the founder approves promotion. Do not merge to
 approval, promotion still follows the gate below. Every candidate needs a
 release manifest before testers are invited; start from
 `docs/release-manifests/TEMPLATE.md` and fill it with the exact candidate SHA,
-env fingerprint, canary evidence, rollback target, and approver.
+API/web env fingerprint, workflow-service proof, canary evidence, rollback
+target, and approver.
 
 1. Confirm the local checkout is the candidate commit you intend to promote:
 
@@ -136,10 +137,13 @@ Secrets are scoped to the operational steps that need them; install and artifact
 upload steps do not receive canary credentials or service-role keys.
 
 After the gate passes, copy the relevant command output and canary evidence into
-a candidate manifest based on `docs/release-manifests/TEMPLATE.md`. The manifest
-must name the candidate SHA, deployed API/web SHAs, `env_fingerprint`,
-`workflow_task`, `real_workflow_task`, backtest service mode, canary evidence,
-rollback target, and approver.
+a candidate manifest based on `docs/release-manifests/TEMPLATE.md`. The
+`env_fingerprint` emitted by `.github/render-env-sync.sh release-config-audit`
+is the API/web environment fingerprint; record it as `api_web_env_fingerprint`
+and keep the raw script output for audit traceability. The manifest must also
+name the candidate SHA, deployed API/web SHAs, `workflow_task`,
+`real_workflow_task`, backtest service mode, workflow-service proof for
+`argus-backtests`, canary evidence, rollback target, and approver.
 
 If you need to run only the stale job scan during incident triage:
 

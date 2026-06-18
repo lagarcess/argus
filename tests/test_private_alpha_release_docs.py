@@ -27,6 +27,8 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "docs/release-manifests/TEMPLATE.md" in runbook
     assert "release manifest" in runbook
     assert "rollback target" in runbook
+    assert "api_web_env_fingerprint" in runbook
+    assert "workflow-service proof" in runbook
     assert "approver" in runbook
 
 
@@ -38,10 +40,13 @@ def test_private_alpha_release_manifest_template_has_required_audit_fields() -> 
         "Promotion target",
         "Rollback target",
         "Approver",
+        "api_web_env_fingerprint",
         "env_fingerprint",
         "workflow_task",
         "real_workflow_task",
         "Backtest service mode",
+        "Workflow service proof",
+        "Secret rotation / least-privilege owner",
         "Canary evidence",
         "English canary",
         "Spanish canary",

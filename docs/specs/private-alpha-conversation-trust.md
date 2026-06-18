@@ -478,7 +478,7 @@ New debt or smells from this milestone inventory:
   implemented before canon docs are updated.
 - docs hygiene still needs a future archive/move pass after this milestone
   lands. This branch added AGENTS taxonomy and marked
-  `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` as historical; remaining work is to
+  `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` as historical; remaining work is to
   physically reorganize or archive stale plans once the team is ready for a
   broader docs cleanup.
 
@@ -507,7 +507,7 @@ Addressed in this branch:
   retry-specific copy when both the job is retryable and the turn has an actual
   retry action.
 - docs hygiene now has an AGENTS taxonomy for canon docs, active milestone/spec
-  docs, and historical plans. `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is
+  docs, and historical plans. `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is
   explicitly marked historical, while future physical archive/move cleanup stays
   separate.
 - the header menu no longer exposes "copy conversation link" as a pseudo-share

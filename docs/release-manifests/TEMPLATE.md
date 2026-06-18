@@ -27,12 +27,18 @@ job ids; use the privacy-safe labels from canary evidence.
 ## Environment Proof
 
 - Expected mode:
-- env_fingerprint:
+- api_web_env_fingerprint:
+- env_fingerprint script output:
 - workflow_task:
 - real_workflow_task:
 - Backtest service mode:
+- Workflow service proof:
+  - `argus-backtests` latest deploy/status:
+  - active workflow task verified:
+  - real workflow task verified:
 - Feature flags:
 - Render config audit command:
+- Secret rotation / least-privilege owner:
 
 ## Gate Evidence
 
