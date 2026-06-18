@@ -26,6 +26,129 @@ def test_canary_requires_auth_inputs_without_echoing_password() -> None:
     assert "ARGUS_CANARY_PASSWORD" in source
     assert "ARGUS_CANARY_PASSWORD or MOCK_USER_PASSWORD is required" in source
     assert "set -x" not in source
+    assert 'echo "Logging in canary user: $EMAIL"' not in source
+
+
+def test_canary_captures_warmup_mode_fingerprint_and_commit_evidence() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert (
+        'EXPECT_MODE="${ARGUS_CANARY_EXPECT_MODE:-${ARGUS_WARMUP_EXPECT_MODE:-real-workflow}}"'
+        in source
+    )
+    assert 'CANDIDATE_SHA="${ARGUS_CANARY_SHA:-${GITHUB_SHA:-}}"' in source
+    assert 'CHECKED_OUT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"' in source
+    assert 'WARMUP_OUTPUT="$(.github/warmup-render.sh --expect-mode "$EXPECT_MODE")"' in source
+    assert "extract_warmup_value env_fingerprint" in source
+    assert "extract_warmup_value workflow_task" in source
+    assert "extract_warmup_value real_workflow_task" in source
+    assert 'canary_expected_mode=$EXPECT_MODE' in source
+    assert 'canary_env_fingerprint=$ENV_FINGERPRINT' in source
+    assert 'canary_workflow_task=$WORKFLOW_TASK' in source
+    assert 'canary_real_workflow_task=$REAL_WORKFLOW_TASK' in source
+    assert 'canary_expected_sha=$CANDIDATE_SHA' in source
+    assert 'canary_checked_out_sha=$CHECKED_OUT_SHA' in source
+    assert "canary commit mismatch" in source
+
+
+def test_canary_requires_render_deploy_shas_to_match_candidate() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert '"$SCRIPT_DIR/render-env-sync.sh" api-deploy-status' in source
+    assert '"$SCRIPT_DIR/render-env-sync.sh" web-deploy-status' in source
+    assert "extract_status_value" in source
+    assert "API_DEPLOY_SHA" in source
+    assert "WEB_DEPLOY_SHA" in source
+    assert 'fail_canary "deploy_status" "api_deploy_status_failed"' in source
+    assert 'fail_canary "deploy_status" "web_deploy_status_failed"' in source
+    assert 'fail_canary "deploy_status" "api_deploy_sha_mismatch"' in source
+    assert 'fail_canary "deploy_status" "web_deploy_sha_mismatch"' in source
+    assert 'fail_canary "deploy_status" "api_deploy_not_live"' in source
+    assert 'fail_canary "deploy_status" "web_deploy_not_live"' in source
+    assert 'canary_api_deploy_sha=$API_DEPLOY_SHA' in source
+    assert 'canary_web_deploy_sha=$WEB_DEPLOY_SHA' in source
+    assert '"api_deploy_sha":' in source
+    assert '"web_deploy_sha":' in source
+
+
+def test_canary_asserts_reload_hydration_does_not_contradict_runtime_result() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert "assert_no_reload_contradiction" in source
+    assert "reload hydration contradiction" in source
+    assert "agent_runtime_failure_superseded" in source
+    assert "retry_last_turn" in source
+    assert 'recovery.get("retryable") is True' in source
+    assert "authoritative_result_seen" in source
+    assert "stale_retryable_failure_seen" in source
+
+
+def test_canary_checks_reload_hydration_after_stream_failures() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert "handle_stream_failure" in source
+    assert "checking reload hydration after stream failure" in source
+    assert "fetch_conversation_messages" in source
+    assert "assert_reload_hydration_payload false" in source
+    assert 'handle_stream_failure "confirmation"' in source
+    assert 'handle_stream_failure "run"' in source
+
+
+def test_canary_writes_privacy_safe_release_evidence() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert 'EVIDENCE_PATH="${ARGUS_CANARY_EVIDENCE_PATH:-}"' in source
+    assert "write_canary_evidence" in source
+    assert "privacy_safe_id_label" in source
+    assert "conversation_label" in source
+    assert "backtest_job_label" in source
+    assert "result_label" in source
+    assert "privacy" in source
+    assert "no_raw_ids" in source
+    assert "canary_evidence_path=" in source
+    assert "ARGUS_CANARY_EVIDENCE_PATH" in source
+
+
+def test_canary_sanitizes_warmup_output_before_logging() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert "print_sanitized_warmup_output" in source
+    assert 'printf "%s\\n" "$WARMUP_OUTPUT"' not in source
+    assert "stale_job_scan_status=" in source
+    assert "unresolved_jobs" in source
+    assert "user_id" in source
+    assert "task_run_id" in source
+    assert "<redacted>" in source
+
+
+def test_canary_writes_failure_evidence_for_controlled_failures() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert 'CANARY_STATUS="running"' in source
+    assert 'CANARY_STATUS="failed"' in source
+    assert "fail_canary" in source
+    assert "CANARY_FAILURE_STAGE" in source
+    assert "CANARY_FAILURE_REASON" in source
+    assert '"failure_stage":' in source
+    assert '"failure_reason":' in source
+    assert 'fail_canary "commit" "canary_commit_mismatch"' in source
+    assert 'fail_canary "warmup" "warmup_probe_failed"' in source
+    assert 'fail_canary "${stream_name}_stream" "stream_transport_failed"' in source
+    assert 'fail_canary "reload_hydration" "reload_hydration_contract_failed"' in source
+    assert 'fail_canary "auth" "missing_canary_email"' in source
+    assert 'fail_canary "auth" "missing_canary_password"' in source
+    assert 'fail_canary "auth" "login_failed"' in source
+    assert 'fail_canary "conversation" "conversation_create_failed"' in source
+    assert "if ! write_canary_evidence; then" in source
+
+
+def test_canary_writes_failure_evidence_for_backtest_job_poll_errors() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert 'fail_canary "backtest_job" "backtest_job_fetch_failed"' in source
+    assert 'fail_canary "backtest_job" "backtest_job_parse_failed"' in source
+    assert 'if ! curl -fsS \\' in source
+    assert 'if ! poll_result="$(' in source
 
 
 def test_canary_loads_root_env_and_accepts_local_aliases() -> None:

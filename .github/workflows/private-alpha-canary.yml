@@ -18,14 +18,6 @@ jobs:
     timeout-minutes: 25
     env:
       ARGUS_WARMUP_EXPECT_MODE: real-workflow
-      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-      ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
-      ARGUS_CANARY_EMAIL: ${{ secrets.ARGUS_CANARY_EMAIL }}
-      ARGUS_CANARY_PASSWORD: ${{ secrets.ARGUS_CANARY_PASSWORD }}
-      ARGUS_CANARY_SUPABASE_URL: ${{ secrets.ARGUS_CANARY_SUPABASE_URL }}
-      ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY }}
-      ARGUS_STALE_JOBS_SUPABASE_URL: ${{ secrets.ARGUS_CANARY_SUPABASE_URL }}
-      ARGUS_STALE_JOBS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,6 +45,13 @@ jobs:
         run: .github/local-smoke.sh --expected-sha "$GITHUB_SHA"
 
       - name: Check required secrets
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
+          ARGUS_CANARY_EMAIL: ${{ secrets.ARGUS_CANARY_EMAIL }}
+          ARGUS_CANARY_PASSWORD: ${{ secrets.ARGUS_CANARY_PASSWORD }}
+          ARGUS_CANARY_SUPABASE_URL: ${{ secrets.ARGUS_CANARY_SUPABASE_URL }}
+          ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           missing=()
           for name in \
@@ -75,7 +74,76 @@ jobs:
           fi
 
       - name: Warm Render product path
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
         run: .github/warmup-render.sh --expect-mode real-workflow
 
-      - name: Run authenticated golden-path canary
-        run: .github/canary-render.sh
+      - name: Prepare canary evidence directory
+        run: mkdir -p temp/canary-evidence
+
+      - name: Run authenticated English golden-path canary
+        continue-on-error: true
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
+          ARGUS_CANARY_EMAIL: ${{ secrets.ARGUS_CANARY_EMAIL }}
+          ARGUS_CANARY_PASSWORD: ${{ secrets.ARGUS_CANARY_PASSWORD }}
+          ARGUS_CANARY_SUPABASE_URL: ${{ secrets.ARGUS_CANARY_SUPABASE_URL }}
+          ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set +e
+          ARGUS_CANARY_LANGUAGE=en \
+          ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/en.json \
+          .github/canary-render.sh
+          status=$?
+          echo "$status" > temp/canary-evidence/en.exit
+          exit "$status"
+
+      - name: Run authenticated Spanish golden-path canary
+        continue-on-error: true
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
+          ARGUS_CANARY_EMAIL: ${{ secrets.ARGUS_CANARY_EMAIL }}
+          ARGUS_CANARY_PASSWORD: ${{ secrets.ARGUS_CANARY_PASSWORD }}
+          ARGUS_CANARY_SUPABASE_URL: ${{ secrets.ARGUS_CANARY_SUPABASE_URL }}
+          ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set +e
+          ARGUS_CANARY_LANGUAGE=es-419 \
+          ARGUS_CANARY_PROMPT='Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 con 10000 dolares' \
+          ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json \
+          .github/canary-render.sh
+          status=$?
+          echo "$status" > temp/canary-evidence/es-419.exit
+          exit "$status"
+
+      - name: Require bilingual canary matrix
+        if: always()
+        run: |
+          failed=0
+          for locale in en es-419
+          do
+            status_file="temp/canary-evidence/${locale}.exit"
+            if [ ! -f "$status_file" ]; then
+              echo "canary_locale_${locale}_exit=missing"
+              failed=1
+              continue
+            fi
+            status="$(cat "$status_file")"
+            echo "canary_locale_${locale}_exit=$status"
+            if [ "$status" != "0" ]; then
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+      - name: Upload canary evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-alpha-canary-evidence
+          path: temp/canary-evidence/*
+          if-no-files-found: warn
+          retention-days: 30

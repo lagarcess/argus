@@ -119,6 +119,83 @@ def test_private_alpha_canary_workflow_runs_real_workflow_gate() -> None:
     assert "POSTHOG" not in CANARY_WORKFLOW_PATH.read_text(encoding="utf-8")
 
 
+def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> None:
+    workflow = _canary_workflow()
+    job = workflow["jobs"]["canary"]
+    steps = job["steps"]
+    secret_names = {
+        "RENDER_API_KEY",
+        "ARGUS_OPS_TOKEN",
+        "ARGUS_CANARY_EMAIL",
+        "ARGUS_CANARY_PASSWORD",
+        "ARGUS_CANARY_SUPABASE_URL",
+        "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY",
+    }
+
+    assert set(job["env"]) == {"ARGUS_WARMUP_EXPECT_MODE"}
+
+    secret_steps = {
+        step["name"]: set((step.get("env") or {}).keys()) & secret_names
+        for step in steps
+    }
+    assert secret_steps["Check required secrets"] == secret_names
+    assert secret_steps["Warm Render product path"] == {
+        "RENDER_API_KEY",
+        "ARGUS_OPS_TOKEN",
+    }
+    assert secret_steps["Run authenticated English golden-path canary"] == secret_names
+    assert secret_steps["Run authenticated Spanish golden-path canary"] == secret_names
+    assert secret_steps["Upload canary evidence"] == set()
+
+    for step in steps:
+        if step["name"] in {
+            "Check required secrets",
+            "Warm Render product path",
+            "Run authenticated English golden-path canary",
+            "Run authenticated Spanish golden-path canary",
+        }:
+            continue
+        assert not (set((step.get("env") or {}).keys()) & secret_names)
+
+
+def test_private_alpha_canary_workflow_runs_bilingual_evidence_matrix() -> None:
+    workflow = _canary_workflow()
+    job = workflow["jobs"]["canary"]
+    steps_by_name = {step["name"]: step for step in job["steps"]}
+    joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
+    uses_steps = "\n".join(str(step.get("uses", "")) for step in job["steps"])
+
+    assert "mkdir -p temp/canary-evidence" in joined_steps
+    assert (
+        steps_by_name["Run authenticated English golden-path canary"][
+            "continue-on-error"
+        ]
+        is True
+    )
+    assert (
+        steps_by_name["Run authenticated Spanish golden-path canary"][
+            "continue-on-error"
+        ]
+        is True
+    )
+    assert "ARGUS_CANARY_LANGUAGE=en" in joined_steps
+    assert "ARGUS_CANARY_LANGUAGE=es-419" in joined_steps
+    assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/en.json" in joined_steps
+    assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json" in joined_steps
+    assert "temp/canary-evidence/en.exit" in joined_steps
+    assert "temp/canary-evidence/es-419.exit" in joined_steps
+    assert "Require bilingual canary matrix" in steps_by_name
+    assert "canary_locale_${locale}_exit" in joined_steps
+    assert "Prueba una estrategia de comprar y mantener AAPL y MSFT" in joined_steps
+    assert "actions/upload-artifact@v4" in uses_steps
+    assert "private-alpha-canary-evidence" in CANARY_WORKFLOW_PATH.read_text(
+        encoding="utf-8"
+    )
+    assert "path: temp/canary-evidence/*\n" in CANARY_WORKFLOW_PATH.read_text(
+        encoding="utf-8"
+    )
+
+
 def test_private_alpha_smoke_workflow_runs_local_predeploy_gate() -> None:
     workflow = _smoke_workflow()
 
