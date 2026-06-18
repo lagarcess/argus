@@ -119,7 +119,7 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     "clarification": OpenRouterProfile("clarification", temperature=0, max_tokens=360),
     "chat_composer": OpenRouterProfile("chat_composer", temperature=0.2, max_tokens=1200),
     "result_summary": OpenRouterProfile(
-        "result_summary", temperature=0.2, max_tokens=700, timeout_seconds=20
+        "result_summary", temperature=0.2, max_tokens=700, timeout_seconds=30
     ),
     "result_breakdown": OpenRouterProfile(
         "result_breakdown",

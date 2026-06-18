@@ -357,7 +357,7 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     assert "ARGUS_WORKFLOW_PROOF_PLAN=" in env_example
     assert "POETRY_VERSION=2.1.3" in env_example
     assert "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS=300" in env_example
-    assert "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=20" in env_example
+    assert "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=30" in env_example
     assert "ARGUS_RENDER_WORKFLOW_PROOF_ENV=(" in env_contract
     assert "ARGUS_WORKFLOW_DATABASE_URL" in env_contract
     assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK" in env_contract
@@ -434,7 +434,7 @@ def test_render_env_sync_pushes_workflow_llm_readout_env() -> None:
     assert (
         'put_render_env "$WORKFLOW_SERVICE_ID" '
         'ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS '
-        '"${ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS:-20}"'
+        '"${ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS:-30}"'
     ) in workflow_block
     assert "ARGUS_WORKFLOW_DATABASE_URL" in source
     assert "require_local_env ALPACA_API_KEY" in source

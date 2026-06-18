@@ -283,8 +283,8 @@ def test_result_summary_timeout_budget_is_safe_for_render_workflows(
     model = openrouter.build_openrouter_model("result_summary")
 
     assert model is not None
-    assert FakeChatOpenRouter.calls[-1]["timeout"] == 20
-    assert openrouter.openrouter_task_timeout_seconds("result_summary") == 20
+    assert FakeChatOpenRouter.calls[-1]["timeout"] == 30
+    assert openrouter.openrouter_task_timeout_seconds("result_summary") == 30
 
 
 def test_openrouter_task_timeout_budget_can_be_overridden(
