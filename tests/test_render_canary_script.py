@@ -142,6 +142,32 @@ def test_canary_writes_failure_evidence_for_controlled_failures() -> None:
     assert "if ! write_canary_evidence; then" in source
 
 
+def test_canary_can_write_manual_failed_capture_artifact() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert 'CAPTURE_PATH="${ARGUS_CANARY_CAPTURE_PATH:-}"' in source
+    assert "write_canary_capture" in source
+    assert "CANARY_CAPTURE_PATH" in source
+    assert "launch_payload" in source
+    assert "result_card" in source
+    assert "explanation_context" in source
+    assert "route_receipt" in source
+    assert "failure" in source
+    assert "no_raw_ids" in source
+    assert "ARGUS_CANARY_CAPTURE_PATH" in source
+
+
+def test_canary_failure_capture_is_written_with_failure_evidence() -> None:
+    source = _source(".github/canary-render.sh")
+    fail_canary_body = source.split("fail_canary() {", maxsplit=1)[1].split(
+        "\n}",
+        maxsplit=1,
+    )[0]
+
+    assert "write_canary_evidence" in fail_canary_body
+    assert "write_canary_capture" in fail_canary_body
+
+
 def test_canary_writes_failure_evidence_for_backtest_job_poll_errors() -> None:
     source = _source(".github/canary-render.sh")
 

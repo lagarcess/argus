@@ -110,6 +110,21 @@ ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json \
 .github/canary-render.sh
 ```
 
+If a canary fails after warmup passed, do not redeploy one-off fixes in a loop.
+Set `ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-failed-capture.json`
+or the matching English path, rerun the failing locale once to write a
+sanitized failed-capture artifact, then replay the captured payload locally
+before redeploying:
+
+```bash
+poetry run python scripts/ops/canary_capture_replay.py \
+  temp/release-evidence/canary-es-419-failed-capture.json
+```
+
+Use the replay to identify the macro-pattern and make one coherent fix.
+Docker is optional for this step unless the production release path moves to
+container images; prefer the local smoke gate plus canary replay first.
+
 Before treating local UI changes as launch-ready, also run the browser recovery
 spec against the local app/API environment:
 
@@ -123,9 +138,9 @@ pass against the intended candidate commit. If either deploy-status reports a
 different commit, deploy the candidate branch before continuing. If warmup fails,
 do not invite testers yet. Check Render service status and redeploy only if the
 service is stuck. If warmup passes but a canary fails, treat it as an Argus
-product-path regression and inspect API logs, Supabase messages, backtest runs,
-and route receipts using the hashed labels and internal access controls from the
-canary evidence.
+product-path regression and inspect the failed-capture replay, API logs,
+Supabase messages, backtest runs, and route receipts using the hashed labels and
+internal access controls from the canary evidence.
 
 For the daily automated gate, configure GitHub repository secrets with the same
 canary variables above plus `RENDER_API_KEY`, then use the scheduled or manually

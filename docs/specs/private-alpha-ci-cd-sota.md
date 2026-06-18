@@ -347,14 +347,16 @@ Objective:
   tester invite.
 
 Scope:
-- Stand up a local ephemeral stack that mirrors the release-critical surfaces
-  needed for smoke testing: API, web, and the workflow/backtest integration
-  path.
-- Implement the stack with Docker Compose or an equivalent disposable local
-  container orchestration layer.
+- Stand up a local ephemeral smoke path that mirrors the release-critical
+  surfaces needed for smoke testing: API, web, and the workflow/backtest
+  integration path.
+- Keep Docker optional unless production deploys move to container images too;
+  use Docker Compose only when it is the smallest faithful way to mirror the
+  release path.
 - Use it to validate the candidate SHA, the current feature-flag set, and the
   intended workflow mode before the internet-reachable deploy is touched.
-- Treat the stack as disposable: create it, run the smoke checks, tear it down.
+- Treat any local stack as disposable: create it, run the smoke checks, tear it
+  down.
 - Keep the smoke gate fast enough that it can run on every candidate push
   without consuming the live canary budget.
 
@@ -410,9 +412,10 @@ custom bounded agent with this blueprint:
 
 Custom-agent examples:
 
-- Docker smoke-stack agent:
-  - Goal: design the disposable local smoke stack for Phase 7 and list the
-    exact commands and container layout needed to prove the release contract.
+- Local smoke-path agent:
+  - Goal: design the disposable local smoke path for Phase 7 and list the exact
+    commands needed to prove the release contract, using Docker only if it
+    removes more complexity than it adds.
   - Allowed surfaces: `docs/specs/private-alpha-ci-cd-sota.md`, `.github/dev.sh`,
     `.github/qa.sh`, `.github/local-smoke.sh`, `docker-compose.yml` or the
     equivalent local orchestration files.
@@ -439,6 +442,10 @@ Scope:
 - Include stream failure/reload/recovery behavior.
 - Include workflow mode verification.
 - Keep canary output privacy-safe.
+- When a canary fails after warmup passes, write a sanitized failed-capture
+  artifact and replay it locally before redeploying. The replay should exercise
+  canonical result rendering and route-receipt context, not LLM prose matching
+  or locale-specific phrase heuristics.
 
 Likely files:
 - `.github/canary-render.sh`
@@ -453,6 +460,9 @@ Verification:
   and env fingerprint can be audited later.
 - Canary evidence should note whether the backtest service is in proof or real
   workflow mode.
+- Failed-capture artifacts should be kept with release evidence only for failed
+  candidates and must not contain raw conversation, user, run, job, cookie, or
+  service-role values.
 
 ### Phase 9: Update Runbooks And Source-Of-Truth Docs
 

@@ -22,6 +22,7 @@ POLL_SLEEP_SECONDS="${ARGUS_CANARY_POLL_SLEEP_SECONDS:-5}"
 LANGUAGE="${ARGUS_CANARY_LANGUAGE:-en}"
 EXPECT_MODE="${ARGUS_CANARY_EXPECT_MODE:-${ARGUS_WARMUP_EXPECT_MODE:-real-workflow}}"
 EVIDENCE_PATH="${ARGUS_CANARY_EVIDENCE_PATH:-}"
+CAPTURE_PATH="${ARGUS_CANARY_CAPTURE_PATH:-}"
 CANDIDATE_SHA="${ARGUS_CANARY_SHA:-${GITHUB_SHA:-}}"
 CHECKED_OUT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
 PROMPT="${ARGUS_CANARY_PROMPT:-Test an equal-weight AAPL and MSFT buy-and-hold strategy from January 1, 2025 through June 5, 2026 with 10,000 dollars}"
@@ -280,12 +281,262 @@ print(f"canary_evidence_path={path}")
 PY
 }
 
+write_canary_capture() {
+  if [ -z "$CAPTURE_PATH" ]; then
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$CAPTURE_PATH")"
+  local temp_messages=""
+  local temp_receipts=""
+  if [ -n "${MESSAGES_JSON:-}" ]; then
+    temp_messages="$(mktemp)"
+    printf '%s' "$MESSAGES_JSON" > "$temp_messages"
+  fi
+  if [ -n "${RECEIPT_ROWS:-}" ]; then
+    temp_receipts="$(mktemp)"
+    printf '%s' "$RECEIPT_ROWS" > "$temp_receipts"
+  fi
+
+  local exit_code=0
+  CANARY_CAPTURE_PATH="$CAPTURE_PATH" \
+  CANARY_STATUS="$CANARY_STATUS" \
+  CANARY_FAILURE_STAGE="$CANARY_FAILURE_STAGE" \
+  CANARY_FAILURE_REASON="$CANARY_FAILURE_REASON" \
+  CANARY_EXPECTED_MODE="$EXPECT_MODE" \
+  CANARY_ENV_FINGERPRINT="$ENV_FINGERPRINT" \
+  CANARY_WORKFLOW_TASK="$WORKFLOW_TASK" \
+  CANARY_REAL_WORKFLOW_TASK="$REAL_WORKFLOW_TASK" \
+  CANARY_API_DEPLOY_SHA="$API_DEPLOY_SHA" \
+  CANARY_WEB_DEPLOY_SHA="$WEB_DEPLOY_SHA" \
+  CANARY_API_DEPLOY_STATUS="$API_DEPLOY_STATUS" \
+  CANARY_WEB_DEPLOY_STATUS="$WEB_DEPLOY_STATUS" \
+  CANARY_EXPECTED_SHA="$CANDIDATE_SHA" \
+  CANARY_CHECKED_OUT_SHA="$CHECKED_OUT_SHA" \
+  CANARY_LANGUAGE="$LANGUAGE" \
+  CANARY_PROMPT="$PROMPT" \
+  CANARY_RUN_ACTION="${RUN_ACTION:-}" \
+  CANARY_CONVERSATION_LABEL="$CONVERSATION_LABEL" \
+  CANARY_BACKTEST_JOB_LABEL="$BACKTEST_JOB_LABEL" \
+  CANARY_RESULT_LABEL="$RESULT_LABEL" \
+  CANARY_RESULT_KIND="$RESULT_KIND" \
+  CANARY_MESSAGES_FILE="$temp_messages" \
+  CANARY_JOB_RESPONSE_FILE="${JOB_RESPONSE:-}" \
+  CANARY_RECEIPT_ROWS_FILE="$temp_receipts" \
+  python3 - <<'PY' || exit_code=$?
+import hashlib
+import json
+import os
+import pathlib
+import uuid
+from typing import Any
+
+SECRET_KEY_PARTS = ("password", "token", "secret", "service_role", "apikey", "email")
+ID_KEY_NAMES = {
+    "id",
+    "conversation_id",
+    "run_id",
+    "result_run_id",
+    "backtest_job_id",
+    "message_id",
+    "user_id",
+}
+
+
+def read_json_file(path: str) -> Any:
+    if not path:
+        return None
+    file_path = pathlib.Path(path)
+    if not file_path.exists() or file_path.stat().st_size == 0:
+        return None
+    try:
+        return json.loads(file_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def hash_label(prefix: str, value: str) -> str:
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
+    return f"{prefix}_{digest}"
+
+
+def sanitize(value: Any, *, key: str = "") -> Any:
+    key_lower = key.lower()
+    if any(part in key_lower for part in SECRET_KEY_PARTS):
+        return "<redacted>"
+    if isinstance(value, dict):
+        return {str(k): sanitize(v, key=str(k)) for k, v in value.items()}
+    if isinstance(value, list):
+        return [sanitize(item, key=key) for item in value]
+    if isinstance(value, str):
+        stripped = value.strip()
+        try:
+            uuid.UUID(stripped)
+        except ValueError:
+            pass
+        else:
+            return hash_label("uuid", stripped)
+        if key_lower in ID_KEY_NAMES and stripped:
+            return hash_label(key_lower, stripped)
+    return value
+
+
+def first_dict(*values: Any) -> dict[str, Any] | None:
+    for value in values:
+        if isinstance(value, dict):
+            return value
+    return None
+
+
+def extract_message_artifacts(messages_payload: Any) -> dict[str, Any]:
+    artifacts: dict[str, Any] = {
+        "message_artifacts": [],
+        "result_card": None,
+        "explanation_context": None,
+        "final_response_payload": None,
+        "confirmation_payload": None,
+    }
+    if not isinstance(messages_payload, dict):
+        return artifacts
+    items = messages_payload.get("items")
+    if not isinstance(items, list):
+        return artifacts
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+        final_response_payload = metadata.get("final_response_payload")
+        artifacts["message_artifacts"].append(
+            {
+                "role": item.get("role"),
+                "metadata_keys": sorted(str(key) for key in metadata.keys()),
+                "has_result_card": isinstance(metadata.get("result_card"), dict)
+                or isinstance(metadata.get("conversation_result_card"), dict),
+                "has_backtest_job": isinstance(metadata.get("backtest_job"), dict),
+            }
+        )
+        if artifacts["result_card"] is None:
+            artifacts["result_card"] = first_dict(
+                metadata.get("result_card"),
+                metadata.get("conversation_result_card"),
+                (final_response_payload or {}).get("result_card")
+                if isinstance(final_response_payload, dict)
+                else None,
+            )
+        if artifacts["explanation_context"] is None:
+            artifacts["explanation_context"] = first_dict(
+                metadata.get("explanation_context"),
+                (final_response_payload or {}).get("explanation_context")
+                if isinstance(final_response_payload, dict)
+                else None,
+            )
+        if artifacts["final_response_payload"] is None and isinstance(
+            final_response_payload, dict
+        ):
+            artifacts["final_response_payload"] = final_response_payload
+        if artifacts["confirmation_payload"] is None:
+            artifacts["confirmation_payload"] = first_dict(
+                metadata.get("confirmation_payload"),
+                metadata.get("confirmation"),
+            )
+    return artifacts
+
+
+def receipt_summary(receipt_payload: Any) -> dict[str, Any]:
+    if not isinstance(receipt_payload, list):
+        return {"status": "missing", "count": 0}
+    tasks = sorted(
+        {
+            str(row.get("task"))
+            for row in receipt_payload
+            if isinstance(row, dict) and row.get("task")
+        }
+    )
+    return {
+        "status": "present" if receipt_payload else "missing",
+        "count": len(receipt_payload),
+        "tasks": tasks,
+    }
+
+
+messages_payload = read_json_file(os.environ["CANARY_MESSAGES_FILE"])
+message_artifacts = extract_message_artifacts(messages_payload)
+job_response = read_json_file(os.environ["CANARY_JOB_RESPONSE_FILE"])
+receipt_payload = read_json_file(os.environ["CANARY_RECEIPT_ROWS_FILE"])
+run_action = None
+if os.environ["CANARY_RUN_ACTION"]:
+    try:
+        run_action = json.loads(os.environ["CANARY_RUN_ACTION"])
+    except json.JSONDecodeError:
+        run_action = None
+
+launch_payload = {
+    "language": os.environ["CANARY_LANGUAGE"],
+    "message": os.environ["CANARY_PROMPT"],
+    "action": run_action,
+    "confirmation_payload": message_artifacts.get("confirmation_payload"),
+}
+if isinstance(run_action, dict) and not launch_payload["confirmation_payload"]:
+    payload = run_action.get("payload")
+    if isinstance(payload, dict):
+        launch_payload["confirmation_payload"] = payload
+
+payload = {
+    "schema_version": 1,
+    "status": os.environ["CANARY_STATUS"],
+    "failure": {
+        "stage": os.environ["CANARY_FAILURE_STAGE"] or None,
+        "reason": os.environ["CANARY_FAILURE_REASON"] or None,
+        "status": os.environ["CANARY_STATUS"],
+    },
+    "release": {
+        "expected_mode": os.environ["CANARY_EXPECTED_MODE"],
+        "env_fingerprint": os.environ["CANARY_ENV_FINGERPRINT"],
+        "workflow_task": os.environ["CANARY_WORKFLOW_TASK"],
+        "real_workflow_task": os.environ["CANARY_REAL_WORKFLOW_TASK"],
+        "api_deploy_sha": os.environ["CANARY_API_DEPLOY_SHA"] or None,
+        "web_deploy_sha": os.environ["CANARY_WEB_DEPLOY_SHA"] or None,
+        "api_deploy_status": os.environ["CANARY_API_DEPLOY_STATUS"] or None,
+        "web_deploy_status": os.environ["CANARY_WEB_DEPLOY_STATUS"] or None,
+        "candidate_sha": os.environ["CANARY_EXPECTED_SHA"],
+        "checked_out_sha": os.environ["CANARY_CHECKED_OUT_SHA"],
+    },
+    "labels": {
+        "conversation": os.environ["CANARY_CONVERSATION_LABEL"] or None,
+        "backtest_job": os.environ["CANARY_BACKTEST_JOB_LABEL"] or None,
+        "result": os.environ["CANARY_RESULT_LABEL"] or None,
+        "result_kind": os.environ["CANARY_RESULT_KIND"] or None,
+    },
+    "launch_payload": launch_payload,
+    "result_card": message_artifacts.get("result_card"),
+    "explanation_context": message_artifacts.get("explanation_context"),
+    "final_response_payload": message_artifacts.get("final_response_payload"),
+    "message_artifacts": message_artifacts.get("message_artifacts", []),
+    "job_response": job_response,
+    "route_receipt": receipt_summary(receipt_payload),
+    "privacy": "no_raw_ids; labels are sha256 prefixes; secrets redacted",
+}
+
+path = pathlib.Path(os.environ["CANARY_CAPTURE_PATH"])
+path.write_text(
+    json.dumps(sanitize(payload), indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
+print(f"canary_capture_path={path}")
+PY
+  rm -f "$temp_messages" "$temp_receipts"
+  return "$exit_code"
+}
+
 fail_canary() {
   CANARY_STATUS="failed"
   CANARY_FAILURE_STAGE="$1"
   CANARY_FAILURE_REASON="$2"
   if ! write_canary_evidence; then
     echo "ERROR: failed to write canary evidence."
+  fi
+  if ! write_canary_capture; then
+    echo "ERROR: failed to write canary capture."
   fi
   exit 1
 }
@@ -406,6 +657,7 @@ RESULT_LABEL=""
 RESULT_KIND=""
 BACKTEST_RUN_ID=""
 MESSAGES_JSON=""
+RECEIPT_ROWS="[]"
 CANARY_STATUS="running"
 CANARY_FAILURE_STAGE=""
 CANARY_FAILURE_REASON=""
@@ -732,7 +984,7 @@ PY
       curl -fsS \
         -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
         -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-        "${SUPABASE_URL}/rest/v1/route_receipts?select=id&conversation_id=eq.${CONVERSATION_ID}&run_id=eq.${RESULT_RUN_ID}&task=eq.result_summary&limit=1"
+        "${SUPABASE_URL}/rest/v1/route_receipts?select=id,task&conversation_id=eq.${CONVERSATION_ID}&run_id=eq.${RESULT_RUN_ID}&task=eq.result_summary&limit=1"
     )"; then
       fail_canary "supabase_verifier" "receipt_rows_fetch_failed"
     fi

@@ -49,9 +49,11 @@ job ids; use the privacy-safe labels from canary evidence.
 - Canary evidence artifact: `private-alpha-canary-evidence`
 - English canary:
   - JSON evidence:
+  - Failed-capture replay, if failed:
   - Exit status:
 - Spanish canary:
   - JSON evidence:
+  - Failed-capture replay, if failed:
   - Exit status:
 - Browser QA, if applicable:
 
@@ -67,5 +69,6 @@ job ids; use the privacy-safe labels from canary evidence.
 
 - No raw conversation, user, run, or job ids.
 - Canary labels are stable hashes for audit correlation only.
+- Failed-capture artifacts are sanitized replay inputs, not raw transcripts.
 - Service-role credentials, cookies, prompts, and route receipt payloads are not
   copied into this manifest.

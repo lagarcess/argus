@@ -22,6 +22,12 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
         "ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json"
         in runbook
     )
+    assert (
+        "ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-failed-capture.json"
+        in runbook
+    )
+    assert "scripts/ops/canary_capture_replay.py" in runbook
+    assert "Docker is optional" in runbook
     assert "private-alpha-canary-evidence" in runbook
     assert "Spanish readiness is a release criterion" in runbook
     assert "docs/release-manifests/TEMPLATE.md" in runbook
@@ -48,10 +54,12 @@ def test_private_alpha_release_manifest_template_has_required_audit_fields() -> 
         "Workflow service proof",
         "Secret rotation / least-privilege owner",
         "Canary evidence",
+        "Failed-capture replay",
         "English canary",
         "Spanish canary",
         "private-alpha-canary-evidence",
         "No raw conversation, user, run, or job ids",
+        "sanitized replay inputs",
     ):
         assert expected in template
 
