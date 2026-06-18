@@ -132,6 +132,7 @@ def test_resolve_asset_aliases_and_caches_universe(
     monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {})
 
     assert assets.resolve_asset("aapl").asset_class == "equity"
+    assert assets.resolve_asset("ApPLE").canonical_symbol == "AAPL"
     assert assets.resolve_asset("btc/usd").canonical_symbol == "BTC"
     assert assets.resolve_asset("BTCUSD").canonical_symbol == "BTC"
     assert calls["count"] == 1
@@ -432,6 +433,11 @@ def test_resolve_asset_does_not_fuzzy_replace_exact_ticker_like_query(
 
     assets.clear_asset_cache()
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    monkeypatch.setattr(
+        assets,
+        "_load_asset_from_alpaca_symbol",
+        lambda symbol: (_ for _ in ()).throw(ValueError("invalid_symbol")),
+    )
     monkeypatch.setattr(assets, "_load_assets_from_alpaca", lambda: {})
     monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: mapping)
 

@@ -5,6 +5,7 @@ def test_build_result_card_localization():
     config = {
         "template": "rsi_mean_reversion",
         "symbols": ["AAPL"],
+        "asset_class": "equity",
         "start_date": "2023-01-01",
         "end_date": "2023-12-31",
         "starting_capital": 100000,

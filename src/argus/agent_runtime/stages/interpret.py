@@ -601,7 +601,13 @@ async def _stage_result_from_interpretation(
             [*incoming_strategy.resolution_provenance, *state.context_hints]
         )
     strategy = (
-        _strategy_with_execution_defaults(_canonicalized_strategy(incoming_strategy))
+        _strategy_with_execution_defaults(
+            _canonicalized_strategy(
+                incoming_strategy,
+                current_user_message=state.current_user_message,
+                selected_thread_metadata=selected_thread_metadata,
+            )
+        )
         if expects_strategy_route
         else incoming_strategy
     )
@@ -3568,6 +3574,18 @@ def _strategy_with_contextual_merge(
         selected_thread_metadata=selected_thread_metadata,
         semantic_turn_act=semantic_turn_act,
     )
+    asset_field_requested = (
+        _field_base(str(selected_thread_metadata.get("requested_field") or ""))
+        == "asset_universe"
+    )
+    preserve_prior_asset_for_field_owned_indicator = bool(
+        prior.asset_universe
+        and _strategy_asset_universe_is_field_owned_indicator_context(
+            strategy,
+            current_user_message=current_user_message,
+            asset_field_requested=asset_field_requested,
+        )
+    )
     if preserve_prior_family:
         strategy_family_changed = False
         incoming_strategy_family = prior_strategy_family
@@ -3587,7 +3605,10 @@ def _strategy_with_contextual_merge(
             continue
         if key == "strategy_type" and preserve_prior_family:
             continue
-        if preserve_prior_asset_context and key in {
+        if (
+            preserve_prior_asset_context
+            or preserve_prior_asset_for_field_owned_indicator
+        ) and key in {
             "asset_universe",
             "asset_class",
             "resolution_provenance",
@@ -3825,6 +3846,128 @@ def _should_preserve_prior_asset_context(
     return selected_thread_metadata.get("last_stage_outcome") == "await_user_reply"
 
 
+def _strategy_asset_universe_is_field_owned_indicator_context(
+    strategy: StrategySummary,
+    *,
+    current_user_message: str | None,
+    asset_field_requested: bool,
+) -> bool:
+    if asset_field_requested or not strategy.asset_universe:
+        return False
+    if not _strategy_uses_rule_or_indicator_context(strategy):
+        return False
+    return all(
+        _is_field_owned_indicator_asset_candidate(
+            symbol,
+            strategy=strategy,
+            current_user_message=current_user_message,
+            asset_field_requested=asset_field_requested,
+        )
+        for symbol in strategy.asset_universe
+    )
+
+
+def _is_field_owned_indicator_asset_candidate(
+    symbol: str,
+    *,
+    strategy: StrategySummary,
+    current_user_message: str | None,
+    asset_field_requested: bool,
+) -> bool:
+    if asset_field_requested:
+        return False
+    if executable_indicator_spec(str(symbol or "")) is None:
+        return False
+    if not _strategy_uses_rule_or_indicator_context(strategy):
+        return False
+    return not _strategy_has_explicit_asset_evidence(
+        strategy,
+        symbol=str(symbol or ""),
+        current_user_message=current_user_message,
+    )
+
+
+def _strategy_uses_rule_or_indicator_context(strategy: StrategySummary) -> bool:
+    return bool(
+        executable_strategy_type(strategy) in {"indicator_threshold", "signal_strategy"}
+        or _indicator_key_from_strategy(strategy) is not None
+        or strategy.entry_rule
+        or strategy.exit_rule
+        or strategy.rule_spec
+    )
+
+
+def _strategy_has_explicit_asset_evidence(
+    strategy: StrategySummary,
+    *,
+    symbol: str,
+    current_user_message: str | None,
+) -> bool:
+    target = _compact_asset_evidence_token(symbol)
+    if not target:
+        return False
+    if _message_has_cashtag_for_asset(current_user_message, target=target):
+        return True
+
+    field_provenance = strategy.extra_parameters.get("field_provenance")
+    if isinstance(field_provenance, dict):
+        for field_name, source in field_provenance.items():
+            if _field_base(str(field_name)) != "asset_universe":
+                continue
+            if str(source or "").strip() in {
+                "asset_field",
+                "asset_mention",
+                "cashtag",
+                "composer_mention",
+                "explicit_user",
+                "user",
+                "user_mention",
+            }:
+                return True
+
+    evidence_spans = strategy.extra_parameters.get("evidence_spans")
+    if isinstance(evidence_spans, dict):
+        for field_name, evidence in evidence_spans.items():
+            if _field_base(str(field_name)) != "asset_universe":
+                continue
+            evidence_text = str(evidence or "")
+            if _message_has_cashtag_for_asset(evidence_text, target=target):
+                return True
+
+    for item in strategy.resolution_provenance:
+        if _field_base(_provenance_field(item)) != "asset_universe":
+            continue
+        source = getattr(item, "source", None)
+        raw_text = getattr(item, "raw_text", "")
+        canonical_symbol = getattr(item, "canonical_symbol", "")
+        if str(source or "") == "user_mention" and target in {
+            _compact_asset_evidence_token(raw_text),
+            _compact_asset_evidence_token(canonical_symbol),
+        }:
+            return True
+    return False
+
+
+def _message_has_cashtag_for_asset(message: str | None, *, target: str) -> bool:
+    for token in str(message or "").split():
+        cleaned = "".join(
+            character
+            for character in token.strip()
+            if character.isalnum() or character == "$"
+        )
+        if cleaned.startswith("$") and _compact_asset_evidence_token(cleaned[1:]) == target:
+            return True
+    return False
+
+
+def _compact_asset_evidence_token(value: Any) -> str:
+    return "".join(
+        character.casefold()
+        for character in str(value or "")
+        if character.isalnum()
+    )
+
+
 def _strategy_fills_pending_execution_context(
     *,
     prior: StrategySummary,
@@ -4045,14 +4188,32 @@ def _strategy_supplies_executable_rule_edit(strategy: StrategySummary) -> bool:
     )
 
 
-def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
+def _canonicalized_strategy(
+    strategy: StrategySummary,
+    *,
+    current_user_message: str | None,
+    selected_thread_metadata: dict[str, Any],
+) -> StrategySummary:
     updated = strategy.model_copy(deep=True)
     canonical_symbols: list[str] = []
     asset_classes: set[str] = set()
     invalid_symbols: list[str] = []
+    field_owned_indicator_symbols: list[str] = []
     provenance: list[ResolutionProvenance] = []
+    asset_field_requested = (
+        _field_base(str(selected_thread_metadata.get("requested_field") or ""))
+        == "asset_universe"
+    )
 
     for index, symbol in enumerate(updated.asset_universe):
+        if _is_field_owned_indicator_asset_candidate(
+            symbol,
+            strategy=updated,
+            current_user_message=current_user_message,
+            asset_field_requested=asset_field_requested,
+        ):
+            field_owned_indicator_symbols.append(symbol)
+            continue
         resolution = _resolve_asset_candidate(
             symbol,
             field=f"asset_universe[{index}]",
@@ -4072,6 +4233,8 @@ def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
 
     if canonical_symbols:
         updated.asset_universe = list(dict.fromkeys(canonical_symbols))
+    elif field_owned_indicator_symbols:
+        updated.asset_universe = []
     if len(asset_classes) == 1:
         updated.asset_class = next(iter(asset_classes))
     elif len(asset_classes) > 1:

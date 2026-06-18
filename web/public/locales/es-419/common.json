@@ -305,10 +305,11 @@
       "sections": {
         "results": "Resultados de búsqueda",
         "assets": "Activos populares",
-        "indicators": "Indicadores compatibles"
+        "indicators": "Indicadores"
       },
       "badges": {
         "asset": "activo",
+        "indicator": "indicador",
         "runnable": "compatible",
         "unavailable": "no disponible",
         "draft": "borrador"
@@ -316,7 +317,12 @@
       "descriptions": {
         "asset": "Activo",
         "indicator": "Indicador",
-        "currency_pair": "Par de divisas"
+        "currency_pair": "Par de divisas",
+        "asset_classes": {
+          "equity": "Acción",
+          "crypto": "Cripto",
+          "currency_pair": "Par de divisas"
+        }
       }
     },
     "status": {

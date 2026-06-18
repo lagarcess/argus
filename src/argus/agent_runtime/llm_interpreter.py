@@ -9537,6 +9537,103 @@ def _merge_prior_strategy(
     return None
 
 
+def _field_owned_indicator_asset_candidate(
+    *,
+    strategy: StrategySummary,
+    symbol: str,
+    request: InterpretationRequest,
+) -> bool:
+    if _selected_requested_field_base(request) == "asset_universe":
+        return False
+    if executable_indicator_spec(str(symbol or "")) is None:
+        return False
+    if not _strategy_uses_rule_or_indicator_context(strategy):
+        return False
+    return not _strategy_has_explicit_asset_evidence(
+        strategy,
+        symbol=symbol,
+        current_user_message=request.current_user_message,
+    )
+
+
+def _strategy_uses_rule_or_indicator_context(strategy: StrategySummary) -> bool:
+    return bool(
+        executable_strategy_type(strategy) in {"indicator_threshold", "signal_strategy"}
+        or _indicator_key_from_strategy(strategy) is not None
+        or strategy.entry_rule
+        or strategy.exit_rule
+        or strategy.rule_spec
+    )
+
+
+def _strategy_has_explicit_asset_evidence(
+    strategy: StrategySummary,
+    *,
+    symbol: str,
+    current_user_message: str | None,
+) -> bool:
+    target = _compact_asset_evidence_token(symbol)
+    if not target:
+        return False
+    if _message_has_cashtag_for_asset(current_user_message, target=target):
+        return True
+
+    field_provenance = strategy.extra_parameters.get("field_provenance")
+    if isinstance(field_provenance, dict):
+        for field_name, source in field_provenance.items():
+            if _field_path_base(field_name) != "asset_universe":
+                continue
+            if str(source or "").strip() in {
+                "asset_field",
+                "asset_mention",
+                "cashtag",
+                "composer_mention",
+                "explicit_user",
+                "user",
+                "user_mention",
+            }:
+                return True
+
+    evidence_spans = strategy.extra_parameters.get("evidence_spans")
+    if isinstance(evidence_spans, dict):
+        for field_name, evidence in evidence_spans.items():
+            if _field_path_base(field_name) != "asset_universe":
+                continue
+            evidence_text = str(evidence or "")
+            if _message_has_cashtag_for_asset(evidence_text, target=target):
+                return True
+
+    for item in strategy.resolution_provenance:
+        if _field_path_base(item.field) != "asset_universe":
+            continue
+        if item.source == "user_mention" and target in {
+            _compact_asset_evidence_token(item.raw_text),
+            _compact_asset_evidence_token(item.canonical_symbol),
+        }:
+            return True
+    return False
+
+
+def _message_has_cashtag_for_asset(message: str | None, *, target: str) -> bool:
+    for token in str(message or "").split():
+        cleaned = "".join(
+            character
+            for character in token.strip()
+            if character.isalnum() or character == "$"
+        )
+        if cleaned.startswith("$") and _compact_asset_evidence_token(cleaned[1:]) == target:
+            return True
+    return False
+
+
+def _compact_asset_evidence_token(value: Any) -> str:
+    return "".join(
+        character.casefold()
+        for character in str(value or "")
+        if character.isalnum()
+    )
+
+
 def _validate_capability_boundaries(
     *,
     strategy: StrategySummary,
@@ -9547,8 +9644,16 @@ def _validate_capability_boundaries(
     canonical_symbols: list[str] = []
     asset_classes = set()
     invalid_symbols: list[str] = []
+    field_owned_indicator_symbols: list[str] = []
     resolution_provenance = []
     for index, symbol in enumerate(symbols):
+        if _field_owned_indicator_asset_candidate(
+            strategy=strategy,
+            symbol=symbol,
+            request=request,
+        ):
+            field_owned_indicator_symbols.append(symbol)
+            continue
         resolution = _resolve_asset_candidate(
             symbol,
             field=f"asset_universe[{index}]",
@@ -9571,6 +9676,10 @@ def _validate_capability_boundaries(
         canonical_symbols.append(resolution.asset.canonical_symbol)
         asset_classes.add(resolution.asset.asset_class)
     strategy.asset_universe = list(dict.fromkeys(canonical_symbols))
+    if field_owned_indicator_symbols and (
+        "field_owned_indicator_asset_token_removed" not in response.reason_codes
+    ):
+        response.reason_codes.append("field_owned_indicator_asset_token_removed")
     strategy.resolution_provenance = _dedupe_resolution_provenance(
         [*strategy.resolution_provenance, *resolution_provenance]
     )

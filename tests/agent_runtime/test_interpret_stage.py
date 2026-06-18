@@ -6174,6 +6174,59 @@ def test_active_artifact_rule_answer_repairs_and_preserves_prior_asset(
     assert strategy.exit_logic == "Sell when RSI(14) rises to 60 or above"
 
 
+def test_active_artifact_indicator_token_asset_candidate_preserves_prior_asset(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="User wants to test Tesla.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        raw_user_phrasing="What if I bought Tesla?",
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Add MACD as the rule for the past 3 months.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={},
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="strategy_drafting",
+                task_relation="new_task",
+                requires_clarification=False,
+                user_goal_summary="User wants to add a MACD rule.",
+                candidate_strategy_draft=StrategySummary(
+                    raw_user_phrasing="Add MACD as the rule for the past 3 months.",
+                    strategy_type="indicator_threshold",
+                    strategy_thesis="Use MACD as an indicator rule.",
+                    asset_universe=["MACD"],
+                    asset_class="equity",
+                    date_range="last 3 months",
+                    extra_parameters={
+                        "indicator": "macd",
+                        "indicator_parameters": {"indicator": "macd"},
+                    },
+                ),
+                semantic_turn_act="new_idea",
+            )
+        ),
+    )
+
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["TSLA"]
+
+
 def test_result_refinement_reply_forks_latest_result_into_new_draft(
     monkeypatch,
 ) -> None:

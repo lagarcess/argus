@@ -305,10 +305,11 @@
       "sections": {
         "results": "Search results",
         "assets": "Popular assets",
-        "indicators": "Runnable indicators"
+        "indicators": "Indicators"
       },
       "badges": {
         "asset": "asset",
+        "indicator": "indicator",
         "runnable": "runnable",
         "unavailable": "unavailable",
         "draft": "draft"
@@ -316,7 +317,12 @@
       "descriptions": {
         "asset": "Asset",
         "indicator": "Indicator",
-        "currency_pair": "Currency Pair"
+        "currency_pair": "Currency Pair",
+        "asset_classes": {
+          "equity": "Stock",
+          "crypto": "Crypto",
+          "currency_pair": "Currency Pair"
+        }
       }
     },
     "status": {

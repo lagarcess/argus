@@ -52,6 +52,24 @@ const defaults: DiscoveryItem[] = [
 ];
 
 describe("chat composer display helpers", () => {
+  test("localizes discovery asset classes and uses type badges for indicators", () => {
+    const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+    const english = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const spanish = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    expect(input).toContain("chat.discovery.descriptions.asset_classes");
+    expect(input).toContain('if (item.type === "indicator") return "indicator";');
+    expect(input).not.toContain('if (item.support_status === "supported") return "runnable";');
+    expect(english.chat.discovery.badges.indicator).toBe("indicator");
+    expect(spanish.chat.discovery.badges.indicator).toBe("indicador");
+    expect(english.chat.discovery.descriptions.asset_classes.equity).toBe("Stock");
+    expect(spanish.chat.discovery.descriptions.asset_classes.equity).toBe("Acción");
+  });
+
   test("keeps empty @ discovery as an invitation to provider search", () => {
     const sections = discoverySectionsForDisplay([], "");
 

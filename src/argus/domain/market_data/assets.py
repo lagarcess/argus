@@ -524,13 +524,11 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
     _refresh_asset_cache_if_needed()
     assert _ASSET_ALIAS_MAP is not None
 
-    # 1. Direct ticker match
-    direct = None
-    if explicit_ticker_query:
-        direct = _ASSET_ALIAS_MAP.get(candidate) or _ASSET_ALIAS_MAP.get(
-            candidate.replace("/", "")
-        )
-    if direct is not None:
+    # 1. Exact catalog alias match, case-insensitive for ticker-like aliases.
+    direct = _ASSET_ALIAS_MAP.get(candidate) or _ASSET_ALIAS_MAP.get(
+        candidate.replace("/", "")
+    )
+    if direct is not None and _accepts_exact_catalog_alias(symbol, direct):
         return direct
 
     # 2. Case-insensitive ticker or name match
@@ -584,6 +582,20 @@ def _resolve_live_provider_ticker(symbol: str) -> ResolvedAsset | None:
         return asset
     except Exception:
         return None
+
+
+def _accepts_exact_catalog_alias(query: str, asset: ResolvedAsset) -> bool:
+    raw = str(query or "").strip()
+    if _is_explicit_ticker_query(raw):
+        return True
+    if "/" in raw or "-" in raw:
+        return True
+    compact = _compact_symbol(raw)
+    if asset.asset_class == "crypto":
+        return True
+    if compact and raw != raw.lower():
+        return True
+    return len(compact) >= 4
 
 
 def warm_asset_universe(

@@ -806,7 +806,7 @@ function discoverySectionLabelKey(label: string) {
 
 function discoveryBadgeLabel(item: DiscoveryItem) {
   if (item.type === "asset") return "asset";
-  if (item.support_status === "supported") return "runnable";
+  if (item.type === "indicator") return "indicator";
   if (item.support_status === "unavailable") return "unavailable";
   return "draft";
 }
@@ -857,6 +857,12 @@ function displayDiscoveryDescription(item: DiscoveryItem) {
 }
 
 function discoveryDescriptionLabel(item: DiscoveryItem, t: TFunction) {
+  if (item.type === "asset" && item.asset_class) {
+    return t(
+      `chat.discovery.descriptions.asset_classes.${item.asset_class}`,
+      displayDiscoveryDescription(item),
+    );
+  }
   const description = displayDiscoveryDescription(item);
   if (description === "Asset") {
     return t("chat.discovery.descriptions.asset", description);

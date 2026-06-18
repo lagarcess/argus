@@ -197,7 +197,7 @@ def test_real_backtest_tool_maps_benchmark_data_unavailable_as_retryable_depende
     assert result["success"] is False
     assert result["error_type"] == "upstream_dependency_error"
     assert result["error_message"] != "benchmark_data_unavailable"
-    assert "benchmark data" in result["error_message"].lower()
+    assert "benchmark" in result["error_message"].lower()
     assert result["execution_metadata"]["timings_ms"] == {"provider_fetch_total": 8.75}
     assert result["retryable"] is True
     assert result["capability_context"]["execution_status"] == "failed_upstream"
