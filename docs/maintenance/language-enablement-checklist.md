@@ -20,19 +20,20 @@ file.
   remains the primary preference.
 - Frontend i18next resources live in `web/public/locales/<language>/common.json`.
 - Enabled frontend languages are defined in `web/lib/language-features.ts`.
-- Spanish is registered behind `NEXT_PUBLIC_ENABLE_SPANISH`; do not claim it is
-  production-ready just because a locale file exists.
+- Spanish is registered behind `NEXT_PUBLIC_ENABLE_SPANISH`. For the private
+  alpha CI/CD SOTA candidate, this flag is enabled only after bilingual canary
+  and focused browser smoke evidence pass; future languages should follow the
+  same explicit gate.
 
 ## Current Spanish Readiness Decision
 
-Spanish work that only adds locale files, stable translation keys,
-documentation, and static UI tests is **scaffolding only** until a separate
-Codex-owned runtime readiness gate passes. `codex/private-alpha-readiness` now
-has local runtime-spine proof for a focused messy buy-and-hold shape in English
-and Spanish, but that proof is not a release signal by itself.
+Spanish is included in the private-alpha launch candidate once the release gate
+has bilingual canary evidence and a focused live browser smoke. It is still a
+controlled private-alpha launch, not a claim that every future-language shape is
+complete.
 
-Keep `NEXT_PUBLIC_ENABLE_SPANISH` disabled in production-like Render
-environments until all of these pass:
+Keep `NEXT_PUBLIC_ENABLE_SPANISH` enabled in production-like Render
+environments only while all of these remain true:
 
 - Spanish static UI smoke for the private-alpha surfaces.
 - Spanish production-parity chat QA covering at least one multi-turn
@@ -44,12 +45,10 @@ environments until all of these pass:
   continuation turns without depending on translated labels as executable truth.
 
 Previously, the known blocker was runtime-state normalization in Spanish
-continuation flows. The readiness branch now normalizes that state class and
-has focused local browser proof for messy English/Spanish buy-and-hold prompts
-with `100k`. The remaining blocker is broader coverage: multi-turn
-clarification, result execution, retry/recovery, indicator/DCA prompts, and a
-production-parity live canary still need to pass before enabling Spanish in
-Render.
+continuation flows. The private-alpha CI/CD SOTA candidate now requires Spanish
+canary evidence plus a focused live browser smoke before tester exposure. Track
+remaining natural-language continuity gaps as language-agnostic runtime debt
+rather than disabling Spanish by default.
 
 ## Frontend Responsibilities
 

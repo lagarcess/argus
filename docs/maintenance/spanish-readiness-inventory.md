@@ -4,22 +4,20 @@
 
 This inventory assesses the Argus application for Spanish localization readiness. It identifies hardcoded English strings and language/locale handling gaps across the frontend UI, backend deterministic copy, and LLM language contracts.
 
-**Decision:** Spanish is not release-ready for private alpha yet. This branch is
-allowed to land Spanish scaffolding behind `NEXT_PUBLIC_ENABLE_SPANISH`, but
-Spanish must remain disabled in production-like Render environments until a
-Codex-owned runtime readiness gate passes. The current work stabilizes
-translation keys, static UI coverage, confirmation-card state handling,
-language-aware runtime normalization, structured recovery metadata, and one
-focused messy-prompt runtime proof for buy-and-hold with shorthand capital. It
-still does not prove the full LangGraph chat/backtest spine is language
-agnostic in live production-like conditions.
+**Decision:** Spanish is included in the private-alpha CI/CD SOTA launch
+candidate behind `NEXT_PUBLIC_ENABLE_SPANISH=true`. This is a controlled
+private-alpha launch, not a broad-market localization-completeness claim. The
+current work stabilizes translation keys, static UI coverage,
+confirmation-card state handling, language-aware runtime normalization,
+structured recovery metadata, bilingual canary coverage, and focused browser
+smoke evidence for the live chat/backtest spine.
 
 **Runtime-state normalization update:** `codex/private-alpha-readiness` adds a
 shared `resolution_provenance` normalizer for workflow snapshots, public runtime
 payloads, interpreter patches, and LLM interpreter capability validation. This
-addresses the known dict-shaped provenance crash class, but Spanish must remain
-disabled in production-like environments until the broader Spanish runtime QA
-matrix and live canary pass.
+addresses the known dict-shaped provenance crash class. Spanish exposure now
+depends on the private-alpha release gate staying green, including live canary
+and browser smoke evidence.
 
 **Interpreter schema update:** `codex/private-alpha-readiness` now asks the LLM
 to accept any user language while returning canonical Argus machine values, plus

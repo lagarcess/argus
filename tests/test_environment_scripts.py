@@ -218,6 +218,7 @@ def test_render_blueprint_uses_current_env_contract_names_only() -> None:
         "ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT",
         "ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT",
         "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT",
+        "NEXT_PUBLIC_ENABLE_SPANISH",
         "NEXT_PUBLIC_ARGUS_API_URL",
         "NEXT_PUBLIC_MOCK_AUTH",
     ):

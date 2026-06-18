@@ -127,6 +127,8 @@ services:
         sync: false
       - key: NEXT_PUBLIC_MOCK_AUTH
         value: "false"
+      - key: NEXT_PUBLIC_ENABLE_SPANISH
+        value: "true"
       - key: NEXT_PUBLIC_ARGUS_API_URL
         value: https://argus-ohr5.onrender.com/api/v1
       - key: NEXT_PUBLIC_STRATEGIES_ENABLED
