@@ -567,14 +567,8 @@ def _render_quick_take_draft(
     truth = relative_performance_truth
     if truth != "unknown" and response.relative_performance_claim != truth:
         return None
-    used_fact_ids: set[str] = set()
-    for fact_id_value in response.fact_ids:
-        fact_id = str(fact_id_value or "").strip()
-        if fact_id not in fact_bank:
-            continue
-        used_fact_ids.add(fact_id)
-    if not required_fact_ids.issubset(used_fact_ids):
-        return None
+    # `fact_ids` is model self-report metadata. The visible copy checks below are
+    # the authoritative guard for user-facing benchmark truth.
     if not _quick_take_mentions_required_visible_facts(
         draft=response,
         fact_bank=fact_bank,
