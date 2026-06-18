@@ -7,6 +7,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci.yml"
 CANARY_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-canary.yml"
+SMOKE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-smoke.yml"
 
 
 def _workflow() -> dict:
@@ -15,6 +16,10 @@ def _workflow() -> dict:
 
 def _canary_workflow() -> dict:
     return yaml.safe_load(CANARY_WORKFLOW_PATH.read_text(encoding="utf-8"))
+
+
+def _smoke_workflow() -> dict:
+    return yaml.safe_load(SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8"))
 
 
 def test_ci_runs_on_main_codex_and_jules_without_deploying() -> None:
@@ -98,11 +103,38 @@ def test_private_alpha_canary_workflow_runs_real_workflow_gate() -> None:
     workflow = _canary_workflow()
     job = workflow["jobs"]["canary"]
 
-    assert job["timeout-minutes"] == 15
+    assert job["timeout-minutes"] == 25
     joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
+    assert "poetry install --with dev,workflows --no-interaction" in joined_steps
+    assert "cd web && bun install --frozen-lockfile" in joined_steps
+    assert ".github/local-smoke.sh --expected-sha \"$GITHUB_SHA\"" in joined_steps
+    assert joined_steps.index(".github/local-smoke.sh") < joined_steps.index(
+        ".github/warmup-render.sh"
+    )
     assert ".github/warmup-render.sh --expect-mode real-workflow" in joined_steps
     assert ".github/canary-render.sh" in joined_steps
     assert "ARGUS_WARMUP_EXPECT_MODE: real-workflow" in CANARY_WORKFLOW_PATH.read_text(
         encoding="utf-8"
     )
     assert "POSTHOG" not in CANARY_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+
+def test_private_alpha_smoke_workflow_runs_local_predeploy_gate() -> None:
+    workflow = _smoke_workflow()
+
+    assert workflow["name"] == "Private Alpha Local Smoke"
+    assert workflow["permissions"] == {"contents": "read"}
+    assert workflow["on"]["push"]["branches"] == ["codex/private-alpha-next"]
+    assert workflow["on"]["pull_request"]["branches"] == [
+        "codex/private-alpha-next",
+        "codex/private-alpha-next-jules-intake",
+    ]
+    assert "deploy" not in workflow["jobs"]
+
+    job = workflow["jobs"]["local-smoke"]
+    assert job["timeout-minutes"] == 10
+    joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
+    assert "poetry install --with dev,workflows --no-interaction" in joined_steps
+    assert "cd web && bun install --frozen-lockfile" in joined_steps
+    assert ".github/local-smoke.sh --expected-sha \"$GITHUB_SHA\"" in joined_steps
+    assert "RENDER_API_KEY" not in SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8")
