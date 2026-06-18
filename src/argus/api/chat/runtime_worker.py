@@ -4,6 +4,7 @@ import asyncio
 import os
 from collections.abc import AsyncIterator, Callable
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import suppress
 from contextvars import copy_context
 from threading import Event
 from typing import Any
@@ -41,16 +42,31 @@ async def _threaded_runtime_event_source(
     queue: asyncio.Queue[_QueueItem] = asyncio.Queue()
     context = copy_context()
     worker_loop_ready = Event()
+    accepting_events = Event()
+    accepting_events.set()
     worker_loop_box: dict[str, asyncio.AbstractEventLoop] = {}
     worker_task_box: dict[str, asyncio.Task[None]] = {}
 
-    def send(kind: str, payload: RuntimeEvent | Exception | None = None) -> None:
-        loop.call_soon_threadsafe(queue.put_nowait, (kind, payload))
+    def send(kind: str, payload: RuntimeEvent | Exception | None = None) -> bool:
+        if not accepting_events.is_set() or loop.is_closed():
+            return False
+        try:
+            loop.call_soon_threadsafe(queue.put_nowait, (kind, payload))
+        except RuntimeError:
+            return False
+        return True
 
     def run_runtime() -> None:
         async def consume() -> None:
-            async for event in runtime_event_factory():
-                send("event", event)
+            runtime_events = runtime_event_factory()
+            try:
+                async for event in runtime_events:
+                    if not send("event", event):
+                        break
+            finally:
+                close_runtime_events = getattr(runtime_events, "aclose", None)
+                if close_runtime_events is not None:
+                    await close_runtime_events()
 
         worker_loop = asyncio.new_event_loop()
         worker_loop_box["loop"] = worker_loop
@@ -71,6 +87,8 @@ async def _threaded_runtime_event_source(
             send("error", exc)
         finally:
             worker_loop_ready.set()
+            with suppress(Exception):
+                worker_loop.run_until_complete(worker_loop.shutdown_asyncgens())
             worker_loop.close()
             asyncio.set_event_loop(None)
             send("done")
@@ -90,6 +108,7 @@ async def _threaded_runtime_event_source(
             if kind == "done":
                 return
     finally:
+        accepting_events.clear()
         if not future.done():
             if not worker_loop_ready.is_set():
                 await asyncio.to_thread(worker_loop_ready.wait, 0.25)

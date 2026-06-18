@@ -124,6 +124,68 @@ async def test_threaded_runtime_event_source_cancels_worker_on_close() -> None:
 
 
 @pytest.mark.asyncio
+async def test_threaded_runtime_event_source_stops_when_consumer_loop_rejects_events(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.chat import runtime_worker
+
+    worker_can_continue = Event()
+    worker_finished = Event()
+    worker_exceptions: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+
+    class _Logger:
+        def debug(self, *_args: Any, **_kwargs: Any) -> None:
+            return None
+
+        def exception(self, *args: Any, **kwargs: Any) -> None:
+            worker_exceptions.append((args, kwargs))
+
+        def warning(self, *_args: Any, **_kwargs: Any) -> None:
+            return None
+
+    monkeypatch.setattr(runtime_worker, "logger", _Logger())
+
+    async def _runtime_events():
+        try:
+            yield {"type": "stage_start", "stage": "interpret"}
+            while not worker_can_continue.is_set():
+                await asyncio.sleep(0.01)
+            yield {"type": "final", "payload": {"stage_outcome": "await_approval"}}
+        finally:
+            worker_finished.set()
+
+    runtime_events = runtime_worker.threaded_runtime_event_source(_runtime_events)
+
+    assert await asyncio.wait_for(anext(runtime_events), timeout=1) == {
+        "type": "stage_start",
+        "stage": "interpret",
+    }
+
+    loop = asyncio.get_running_loop()
+    original_call_soon_threadsafe = loop.call_soon_threadsafe
+
+    def _reject_worker_send(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError("Event loop is closed")
+
+    monkeypatch.setattr(loop, "call_soon_threadsafe", _reject_worker_send)
+    try:
+        worker_can_continue.set()
+        deadline = time.monotonic() + 1
+        while (
+            time.monotonic() < deadline
+            and not worker_finished.is_set()
+            and not worker_exceptions
+        ):
+            await asyncio.sleep(0.01)
+    finally:
+        monkeypatch.setattr(loop, "call_soon_threadsafe", original_call_soon_threadsafe)
+        await runtime_events.aclose()
+
+    assert worker_finished.is_set()
+    assert worker_exceptions == []
+
+
+@pytest.mark.asyncio
 async def test_threaded_runtime_event_source_reports_stuck_worker_after_cancel(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
