@@ -1367,6 +1367,70 @@ def test_adapter_maps_market_data_failure_to_upstream_dependency(
     assert result.envelope.failure_category == "upstream_dependency_error"
 
 
+def test_adapter_explains_symbol_level_equity_data_window_unavailability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="SNDK",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=10000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    def classify_symbol_stub(symbol: str):
+        return type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )()
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        classify_symbol_stub,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        lambda config, **_: (_ for _ in ()).throw(
+            ValueError("market_data_unavailable")
+        ),
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "failed_upstream"
+    assert result.envelope.failure_category == "upstream_dependency_error"
+    assert result.envelope.failure_reason == "market_data_unavailable"
+    assert result.envelope.resolved_strategy["asset_universe"] == ["SNDK"]
+    assert result.envelope.resolved_parameters["date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-12-31",
+    }
+    assert result.envelope.provider_metadata["asset_class"] == "equity"
+    assert result.envelope.provider_metadata["symbols"] == ["SNDK"]
+    assert result.envelope.provider_metadata["date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-12-31",
+    }
+
+    message = user_safe_failure_message(
+        failure_reason=result.envelope.failure_reason,
+        failure_category=result.envelope.failure_category,
+    )
+    assert "price history" in message.lower()
+    assert "date" in message.lower()
+    assert "provider" not in message.lower()
+    assert "alpaca" not in message.lower()
+
+
 def test_adapter_maps_benchmark_coverage_failure_to_upstream_dependency(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

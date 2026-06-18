@@ -97,14 +97,16 @@ def run_launch_backtest(
                 recorder=recorder,
             )
     except ValueError as exc:
-        category, status = _normalize_value_error(str(exc))
+        failure_reason = str(exc)
+        category, status = _normalize_value_error(failure_reason)
         return _with_timings(
             LaunchExecutionAdapterResult(
                 envelope=build_failure_envelope(
                     request=request,
                     execution_status=status,
                     failure_category=category,
-                    failure_reason=str(exc),
+                    failure_reason=failure_reason,
+                    provider_metadata=_failure_provider_metadata(request),
                 )
             ),
             recorder=recorder,
@@ -536,6 +538,30 @@ def _provider_metadata(*, asset_class: str, timeframe: str) -> dict[str, Any]:
         "timeframe": timeframe,
         "feed": "iex",
     }
+
+
+def _failure_provider_metadata(request: LaunchBacktestRequest) -> dict[str, Any]:
+    resolved_symbols, asset_class = _safe_resolved_request_universe(request)
+    if asset_class is None:
+        return {}
+    metadata = _provider_metadata(asset_class=asset_class, timeframe=request.timeframe)
+    metadata.update(
+        {
+            "symbols": resolved_symbols or list(request.symbols),
+            "date_range": request.date_range.model_dump(mode="python"),
+        }
+    )
+    return metadata
+
+
+def _safe_resolved_request_universe(
+    request: LaunchBacktestRequest,
+) -> tuple[list[str], str | None]:
+    try:
+        symbols, asset_class = _resolve_request_symbols(request)
+    except Exception:
+        return list(request.symbols), request.asset_class
+    return symbols, asset_class
 
 
 def _build_periodic_config(
