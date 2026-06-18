@@ -4,11 +4,17 @@ import json
 import os
 import threading
 import time
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeVar
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+from loguru import logger
+
+T = TypeVar("T")
 
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 AssetProviderMode = Literal[
@@ -57,6 +63,7 @@ SYNTHETIC_UNIT_ASSETS: dict[str, tuple[AssetClass, str, str]] = {
 
 _ASSET_ALIAS_MAP: dict[str, ResolvedAsset] | None = None
 _ASSET_CACHE_TS: float = 0.0
+_ASSET_EXACT_LOOKUP_CACHE: dict[str, ResolvedAsset] = {}
 _ASSET_CACHE_LOCK = threading.Lock()
 KRAKEN_PUBLIC_API_BASE = "https://api.kraken.com/0"
 FIAT_CODES = {"USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"}
@@ -70,6 +77,15 @@ def _cache_ttl_seconds() -> int:
     except ValueError:
         value = 900
     return max(value, 60)
+
+
+def _asset_universe_loader_timeout_seconds() -> float:
+    raw = (os.getenv("ARGUS_ASSET_UNIVERSE_LOADER_TIMEOUT_SECONDS") or "20").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        return 20.0
+    return max(value, 0.01)
 
 
 def _asset_provider_mode() -> AssetProviderMode:
@@ -146,6 +162,9 @@ def _add_aliases(
         base_aliases.add(f"{canonical} USD")
         base_aliases.add(f"{canonical} dollar")
         if base_name:
+            base_aliases.update(
+                _crypto_base_name_aliases(base_name, raw_symbol=record.raw_symbol)
+            )
             base_aliases.add(f"{base_name} usd")
             base_aliases.add(f"{base_name}/usd")
             base_aliases.add(f"{base_name} dollar")
@@ -154,6 +173,31 @@ def _add_aliases(
 
     for alias in base_aliases:
         aliases[alias] = record
+
+
+def _crypto_base_name_aliases(name: str | None, *, raw_symbol: str) -> set[str]:
+    if not name:
+        return set()
+    normalized = name.lower().strip()
+    if not normalized:
+        return set()
+    aliases: set[str] = {normalized}
+    # Provider crypto names are often pair-shaped, for example "Bitcoin / USD".
+    # Only the primary USD quote owns the bare base alias; quote-specific pairs
+    # keep quote-specific aliases so "Bitcoin" does not resolve to BTC/USDC.
+    if "/" in normalized and _crypto_quote_symbol(raw_symbol) == "USD":
+        base, *_ = [part.strip() for part in normalized.split("/") if part.strip()]
+        if base:
+            aliases.add(base)
+    return aliases
+
+
+def _crypto_quote_symbol(raw_symbol: str) -> str | None:
+    normalized = _normalize_symbol(raw_symbol)
+    if "/" not in normalized:
+        return None
+    *_, quote = [part.strip().upper() for part in normalized.split("/") if part.strip()]
+    return quote or None
 
 
 def _load_assets_from_alpaca() -> dict[str, ResolvedAsset]:
@@ -177,33 +221,14 @@ def _load_assets_from_alpaca() -> dict[str, ResolvedAsset]:
 
     aliases: dict[str, ResolvedAsset] = {}
     for asset in active_assets:
-        raw_symbol = str(getattr(asset, "symbol", "") or "").upper()
-        raw_name = str(getattr(asset, "name", "") or "")
-        raw_asset_class = getattr(asset, "asset_class", "") or ""
-        row_class = str(getattr(raw_asset_class, "value", raw_asset_class) or "")
-        asset_class = _asset_class_for_row(row_class)
-        if not raw_symbol or asset_class is None:
+        parsed = _resolved_asset_from_alpaca_asset(asset)
+        if parsed is None:
             continue
-
-        canonical = (
-            _canonicalize_crypto_symbol(raw_symbol)
-            if asset_class == "crypto"
-            else _normalize_symbol(raw_symbol)
-        )
-        if not canonical:
-            continue
-
-        resolved = ResolvedAsset(
-            canonical_symbol=canonical,
-            asset_class=asset_class,
-            name=raw_name,
-            raw_symbol=raw_symbol,
-            provider="alpaca",
-        )
+        canonical, resolved = parsed
         _add_aliases(aliases, resolved, canonical=canonical)
 
         # Add name alias (lower-case, stripped)
-        name_alias = raw_name.lower().strip()
+        name_alias = resolved.name.lower().strip()
         if name_alias and name_alias not in aliases:
             aliases[name_alias] = resolved
 
@@ -211,6 +236,57 @@ def _load_assets_from_alpaca() -> dict[str, ResolvedAsset]:
         raise ValueError("asset_universe_unavailable")
 
     return aliases
+
+
+def _load_asset_from_alpaca_symbol(symbol: str) -> ResolvedAsset:
+    from alpaca.trading.client import TradingClient
+
+    key = (os.getenv("ALPACA_API_KEY") or "").strip()
+    secret = (os.getenv("ALPACA_SECRET_KEY") or "").strip()
+    if not key or not secret:
+        raise ValueError("asset_universe_unavailable")
+
+    paper = (os.getenv("ALPACA_PAPER_TRADING") or "true").strip().lower() != "false"
+    client = TradingClient(api_key=key, secret_key=secret, paper=paper)
+    parsed = _resolved_asset_from_alpaca_asset(client.get_asset(symbol))
+    if parsed is None:
+        raise ValueError("invalid_symbol")
+    _, resolved = parsed
+    return resolved
+
+
+def _resolved_asset_from_alpaca_asset(
+    asset: object,
+) -> tuple[str, ResolvedAsset] | None:
+    raw_status = getattr(asset, "status", None) or "active"
+    status = str(getattr(raw_status, "value", raw_status) or "").lower()
+    if status and status != "active":
+        return None
+
+    raw_symbol = str(getattr(asset, "symbol", "") or "").upper()
+    raw_name = str(getattr(asset, "name", "") or "")
+    raw_asset_class = getattr(asset, "asset_class", "") or ""
+    row_class = str(getattr(raw_asset_class, "value", raw_asset_class) or "")
+    asset_class = _asset_class_for_row(row_class)
+    if not raw_symbol or asset_class is None:
+        return None
+
+    canonical = (
+        _canonicalize_crypto_symbol(raw_symbol)
+        if asset_class == "crypto"
+        else _normalize_symbol(raw_symbol)
+    )
+    if not canonical:
+        return None
+
+    resolved = ResolvedAsset(
+        canonical_symbol=canonical,
+        asset_class=asset_class,
+        name=raw_name,
+        raw_symbol=raw_symbol,
+        provider="alpaca",
+    )
+    return canonical, resolved
 
 
 def _load_assets_from_kraken() -> dict[str, ResolvedAsset]:
@@ -348,15 +424,77 @@ def _load_asset_universe() -> dict[str, ResolvedAsset]:
 
     aliases: dict[str, ResolvedAsset] = {}
     first_error: Exception | None = None
-    for loader in (_load_assets_from_alpaca, _load_assets_from_kraken):
+    for provider, loader in (
+        ("alpaca", _load_assets_from_alpaca),
+        ("kraken", _load_assets_from_kraken),
+    ):
         try:
-            aliases.update(loader())
+            aliases.update(_load_live_provider_assets(loader, provider=provider))
         except Exception as exc:
             first_error = first_error or exc
 
     if not aliases:
         raise ValueError("asset_universe_unavailable") from first_error
     return aliases
+
+
+def _load_live_provider_assets(
+    loader: Callable[[], dict[str, ResolvedAsset]],
+    *,
+    provider: str,
+) -> dict[str, ResolvedAsset]:
+    return _run_live_provider_call(
+        loader,
+        provider=provider,
+        operation="asset_universe",
+    )
+
+
+def _run_live_provider_call(
+    loader: Callable[[], T],
+    *,
+    provider: str,
+    operation: str,
+) -> T:
+    timeout_seconds = _asset_universe_loader_timeout_seconds()
+    executor = ThreadPoolExecutor(
+        max_workers=1,
+        thread_name_prefix=f"argus-assets-{provider}",
+    )
+    future = executor.submit(loader)
+    try:
+        logger.debug(
+            "Asset provider call started "
+            f"provider={provider} operation={operation} "
+            f"timeout_seconds={timeout_seconds}",
+            provider=provider,
+            operation=operation,
+            timeout_seconds=timeout_seconds,
+        )
+        result = future.result(timeout=timeout_seconds)
+        logger.debug(
+            "Asset provider call completed "
+            f"provider={provider} operation={operation} "
+            f"result_type={type(result).__name__}",
+            provider=provider,
+            operation=operation,
+            result_type=type(result).__name__,
+            result_size=len(result) if hasattr(result, "__len__") else None,
+        )
+        return result
+    except TimeoutError as exc:
+        future.cancel()
+        logger.warning(
+            "Asset provider call timed out "
+            f"provider={provider} operation={operation} "
+            f"timeout_seconds={timeout_seconds}",
+            provider=provider,
+            operation=operation,
+            timeout_seconds=timeout_seconds,
+        )
+        raise ValueError("asset_universe_unavailable") from exc
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 def _refresh_asset_cache_if_needed(*, force: bool = False) -> None:
@@ -376,15 +514,21 @@ def _refresh_asset_cache_if_needed(*, force: bool = False) -> None:
 
 
 def resolve_asset(symbol: str) -> ResolvedAsset:
+    candidate = _normalize_symbol(symbol)
+    explicit_ticker_query = _is_explicit_ticker_query(symbol)
+    if explicit_ticker_query and _is_unresolved_ticker_like_query(symbol):
+        live_asset = _resolve_live_provider_ticker(candidate)
+        if live_asset is not None:
+            return live_asset
+
     _refresh_asset_cache_if_needed()
     assert _ASSET_ALIAS_MAP is not None
 
-    candidate = _normalize_symbol(symbol)
-    # 1. Direct ticker match
+    # 1. Exact catalog alias match, case-insensitive for ticker-like aliases.
     direct = _ASSET_ALIAS_MAP.get(candidate) or _ASSET_ALIAS_MAP.get(
         candidate.replace("/", "")
     )
-    if direct:
+    if direct is not None and _accepts_exact_catalog_alias(symbol, direct):
         return direct
 
     # 2. Case-insensitive ticker or name match
@@ -402,7 +546,9 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
 
     confident_name_matches = _high_confidence_name_matches(symbol)
     if len(confident_name_matches) == 1:
-        return confident_name_matches[0]
+        asset = confident_name_matches[0]
+        if _accepts_high_confidence_name_match(symbol, asset):
+            return asset
 
     if _is_unresolved_ticker_like_query(symbol):
         raise ValueError("invalid_symbol")
@@ -415,6 +561,41 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
         return matches[0]
 
     raise ValueError("invalid_symbol")
+
+
+def _resolve_live_provider_ticker(symbol: str) -> ResolvedAsset | None:
+    if _asset_provider_mode() != "live_provider":
+        return None
+    with _ASSET_CACHE_LOCK:
+        cached = _ASSET_EXACT_LOOKUP_CACHE.get(symbol)
+    if cached is not None:
+        logger.debug("Asset provider exact lookup cache hit symbol={}", symbol)
+        return cached
+    try:
+        asset = _run_live_provider_call(
+            lambda: _load_asset_from_alpaca_symbol(symbol),
+            provider="alpaca",
+            operation=f"symbol_lookup:{symbol}",
+        )
+        with _ASSET_CACHE_LOCK:
+            _ASSET_EXACT_LOOKUP_CACHE[symbol] = asset
+        return asset
+    except Exception:
+        return None
+
+
+def _accepts_exact_catalog_alias(query: str, asset: ResolvedAsset) -> bool:
+    raw = str(query or "").strip()
+    if _is_explicit_ticker_query(raw):
+        return True
+    if "/" in raw or "-" in raw:
+        return True
+    compact = _compact_symbol(raw)
+    if asset.asset_class == "crypto":
+        return True
+    if compact and raw != raw.lower():
+        return True
+    return len(compact) >= 4
 
 
 def warm_asset_universe(
@@ -453,6 +634,30 @@ def _is_unresolved_ticker_like_query(query: str) -> bool:
     if not compact.isalpha() or not 2 <= len(compact) <= 5:
         return False
     return "/" not in raw and " " not in raw
+
+
+def _is_explicit_ticker_query(query: str) -> bool:
+    raw = str(query or "").strip()
+    if not raw or " " in raw:
+        return False
+    if "/" in raw or "-" in raw:
+        return True
+    compact = raw.replace("/", "").replace("-", "")
+    return bool(compact and compact.isalpha() and compact == compact.upper())
+
+
+def _accepts_high_confidence_name_match(query: str, asset: ResolvedAsset) -> bool:
+    raw = str(query or "").strip()
+    compact = raw.replace("/", "").replace("-", "")
+    if (
+        compact.isalpha()
+        and 2 <= len(compact) <= 3
+        and compact == compact.lower()
+        and "/" not in raw
+        and " " not in raw
+    ):
+        return asset.asset_class == "crypto"
+    return True
 
 
 def is_ticker_like_query(query: str) -> bool:
@@ -526,7 +731,8 @@ def _name_match_score(query: str, record: ResolvedAsset) -> int:
 
 
 def clear_asset_cache() -> None:
-    global _ASSET_ALIAS_MAP, _ASSET_CACHE_TS
+    global _ASSET_ALIAS_MAP, _ASSET_CACHE_TS, _ASSET_EXACT_LOOKUP_CACHE
     with _ASSET_CACHE_LOCK:
         _ASSET_ALIAS_MAP = None
         _ASSET_CACHE_TS = 0.0
+        _ASSET_EXACT_LOOKUP_CACHE = {}

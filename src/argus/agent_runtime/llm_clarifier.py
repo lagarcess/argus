@@ -242,6 +242,9 @@ class OpenRouterClarificationGenerator:
                     "should happen too. Keep date guidance aligned with data "
                     "availability truth: equity launch history starts in 2016, and "
                     "currency-pair intraday history has a bounded recent-data window. "
+                    "For date-window clarifications, avoid arbitrary fixed calendar "
+                    "examples or stale years; prefer relative or rolling windows in "
+                    "the requested language unless the user already gave fixed dates. "
                     "For currency-pair tests, use 1h, 4h, or 1D rather than implying "
                     "every intermediate timeframe is available. If the user asks for an "
                     "hourly/intraday timeframe or a long historical window, do not "
@@ -315,13 +318,25 @@ def _render_clarification_response(
     request: ClarificationRequest,
 ) -> str:
     question = _collapse_adjacent_duplicate_sentences(response.question.strip())
-    contract_question = _contract_direct_question(request)
-    direct_question = contract_question or response.direct_question.strip()
+    direct_question = response.direct_question.strip()
     if direct_question:
+        direct_words = _content_word_set(direct_question)
+        sentences = _sentences(question)
+        if (
+            direct_words
+            and _is_embedded_direct_question(question, direct_words=direct_words)
+            and (
+                not sentences
+                or not _is_embedded_direct_question(
+                    sentences[-1],
+                    direct_words=direct_words,
+                )
+            )
+        ):
+            return question
         context = _clarification_context_without_embedded_question(
             question,
             direct_question=direct_question,
-            keep_first_sentence_only=bool(contract_question),
         )
         if context:
             return f"{context} {direct_question}".strip()
@@ -342,7 +357,29 @@ def _collapse_adjacent_duplicate_sentences(text: str) -> str:
             continue
         collapsed.append(sentence)
         previous_identity = identity
+    collapsed = _collapse_repeated_sentence_block(collapsed)
     return " ".join(collapsed).strip()
+
+
+def _collapse_repeated_sentence_block(sentences: list[str]) -> list[str]:
+    if len(sentences) < 2:
+        return sentences
+    identities = [_sentence_identity(sentence) for sentence in sentences]
+    for block_size in range(1, (len(sentences) // 2) + 1):
+        if len(sentences) % block_size != 0:
+            continue
+        block = identities[:block_size]
+        if not all(block):
+            continue
+        repeats = len(sentences) // block_size
+        if repeats < 2:
+            continue
+        if all(
+            identities[index : index + block_size] == block
+            for index in range(block_size, len(identities), block_size)
+        ):
+            return sentences[:block_size]
+    return sentences
 
 
 def _sentence_identity(sentence: str) -> str:
@@ -351,40 +388,11 @@ def _sentence_identity(sentence: str) -> str:
     )
 
 
-def _contract_direct_question(request: ClarificationRequest) -> str:
-    expected_detail_targets = _expected_detail_targets(request)
-    missing_fields = set(request.missing_required_fields)
-    if request.candidate_strategy_draft.strategy_type != "dca_accumulation":
-        return ""
-    if (
-        expected_detail_targets == {
-            "recurring_purchase_amount",
-            "purchase_cadence",
-        }
-        or (
-            {"capital_amount", "cadence"}.issubset(missing_fields)
-            and not {"asset_universe", "date_range"}.intersection(missing_fields)
-        )
-    ):
-        return (
-            "How much should each recurring purchase be, and how often should those "
-            "purchases happen?"
-        )
-    return ""
-
-
 def _clarification_context_without_embedded_question(
     question: str,
     *,
     direct_question: str,
-    keep_first_sentence_only: bool = False,
 ) -> str:
-    if keep_first_sentence_only:
-        context = _first_sentence(question)
-        direct_words = _content_word_set(direct_question)
-        if _is_embedded_direct_question(context, direct_words=direct_words):
-            return ""
-        return context if context != question else ""
     sentences = _sentences(question)
     if not sentences:
         return ""
@@ -491,17 +499,20 @@ def _content_word_set(text: str) -> set[str]:
     }
 
 
-def _first_sentence(question: str) -> str:
-    sentences = _sentences(question)
-    return sentences[0] if sentences else question.strip()
-
-
 def _expected_question_targets(request: ClarificationRequest) -> set[PendingNeedName]:
     raw_needs = request.response_intent.get("semantic_needs")
+    targets: set[PendingNeedName] = set()
     if not isinstance(raw_needs, list):
-        return set()
+        raw_needs = []
     valid_names = set(PendingNeedName.__args__)
-    return {value for value in raw_needs if value in valid_names}
+    targets.update(value for value in raw_needs if value in valid_names)
+    if request.candidate_strategy_draft.strategy_type == "dca_accumulation":
+        missing_fields = set(request.missing_required_fields)
+        if "capital_amount" in missing_fields:
+            targets.add("sizing_amount")
+        if "cadence" in missing_fields:
+            targets.add("schedule")
+    return targets
 
 
 def _expected_detail_targets(

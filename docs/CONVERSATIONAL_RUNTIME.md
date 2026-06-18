@@ -63,7 +63,10 @@ The runtime rejects assistant responses that are:
 - raw internal names such as `asset_universe`, `not specified`, or `requested_field`
 - generic starter guidance after a thread already has context
 
-When a response fails this gate, the runtime composes a grounded natural response from the current act, state, and validation result. This keeps deterministic truth in the system without making deterministic scaffolding the product voice.
+When a response fails this gate, normal ambiguity is sent back through the
+structured LLM clarifier with bounded facts and requested fields. Deterministic
+user-facing copy is reserved for explicit artifact-action recovery, such as a
+stale or non-retryable failed-run action, where code owns the safety boundary.
 
 ## Active Layers
 
@@ -176,7 +179,7 @@ empty state should expose Collections.
 - Strategy comparisons are interpreted conversationally. Execution should run supported strategies separately and explain the comparison from real result payloads.
 - DCA requests that include separate starting principal, total capital budget, or investment ceiling are understood conversationally, but those modifiers are not executable in the current DCA engine. Argus should offer a recurring-only run, an adjusted recurring contribution, or a buy-and-hold style test using starting capital.
 
-TODO(dca-engine): Add first-class support for DCA starting principal, investment ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation cards, result assumptions, and model capability wording.
+Deferred(dca-engine): Add first-class support for DCA starting principal, investment ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation cards, result assumptions, and model capability wording. This is broader unsupported DCA engine capability work and is outside the Spanish canary/chart attribution fix.
 
 ## Unsupported Handling
 

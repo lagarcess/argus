@@ -17,13 +17,18 @@ from argus.domain.benchmark_comparison import (
 from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
-    runnable_next_tests,
     structured_next_experiments,
 )
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema_sync,
     log_openrouter_failure,
 )
+
+Language = Literal["en", "es-419"]
+ResultBreakdownLanguageQuality = Literal[
+    "matches_prompt_language",
+    "mixed_or_wrong_language",
+]
 
 
 class ResultBreakdownPart(BaseModel):
@@ -38,6 +43,16 @@ class ResultBreakdownSection(BaseModel):
 
 
 class ResultBreakdownDraft(BaseModel):
+    language_quality: ResultBreakdownLanguageQuality = Field(
+        description=(
+            "Self-audit for every user-facing heading and text part. Use "
+            "matches_prompt_language only when prose is fully written in "
+            "product_language, allowing unchanged symbols, tickers, currency "
+            "codes, numbers, and percentages. Use mixed_or_wrong_language if any "
+            "user-facing phrase remains in a different language or copies internal "
+            "schema/fact-id wording."
+        )
+    )
     sections: list[ResultBreakdownSection] = Field(default_factory=list)
 
 
@@ -63,6 +78,7 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
         "config_snapshot": run.config_snapshot,
         "trades": run.trades or [],
     }
+    config_snapshot = run.config_snapshot if isinstance(run.config_snapshot, dict) else {}
     return {
         "run_id": run.id,
         "title": card.get("title") if isinstance(card, dict) else None,
@@ -78,17 +94,20 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
         "execution_note": execution_note(result_facts),
         "rule_summary": resolved_rule_summary(result_facts),
         "context_packets": card.get("context_packets") if isinstance(card, dict) else None,
+        "language": config_snapshot.get("language"),
     }
 
 
 def llm_result_breakdown_message(
     context: dict[str, Any],
     *,
+    language: str = "en",
     invoke_json_schema_func=invoke_openrouter_json_schema_sync,
     log_openrouter_failure_func=log_openrouter_failure,
     timeout_seconds: float = RESULT_BREAKDOWN_LLM_TIMEOUT_SECONDS,
 ) -> str | None:
-    fact_bank = result_breakdown_fact_bank(context)
+    resolved_language = _resolve_language(language or context.get("language"))
+    fact_bank = result_breakdown_fact_bank(context, language=resolved_language)
     required_fact_ids = _required_result_breakdown_fact_ids(fact_bank)
     context_packet_ids = _context_packet_ids_from_context(context)
     try:
@@ -97,6 +116,7 @@ def llm_result_breakdown_message(
             fact_bank=fact_bank,
             required_fact_ids=required_fact_ids,
             context_packet_ids=context_packet_ids,
+            language=resolved_language,
             timeout_seconds=timeout_seconds,
         )
     except FutureTimeoutError:
@@ -122,6 +142,7 @@ def llm_result_breakdown_message(
         draft=draft,
         fact_bank=fact_bank,
         required_fact_ids=required_fact_ids,
+        language=resolved_language,
     )
 
 
@@ -131,6 +152,7 @@ def _invoke_breakdown_llm_with_budget(
     fact_bank: dict[str, str],
     required_fact_ids: set[str],
     context_packet_ids: list[str],
+    language: Language,
     timeout_seconds: float,
 ) -> object:
     def _invoke() -> object:
@@ -139,6 +161,7 @@ def _invoke_breakdown_llm_with_budget(
             messages=_result_breakdown_llm_messages(
                 fact_bank=fact_bank,
                 required_fact_ids=required_fact_ids,
+                language=language,
             ),
             schema_model=ResultBreakdownDraft,
             schema_name="ResultBreakdownDraft",
@@ -160,7 +183,9 @@ def _result_breakdown_llm_messages(
     *,
     fact_bank: dict[str, str],
     required_fact_ids: set[str],
+    language: str = "en",
 ) -> list[dict[str, str]]:
+    resolved_language = _resolve_language(language)
     return [
         {
             "role": "system",
@@ -169,6 +194,13 @@ def _result_breakdown_llm_messages(
                 "You are Argus, an investing backtest copilot. Explain the stored "
                 "backtest result using only the supplied fact_bank. Write for a "
                 "normal person who is trying to keep exploring, not as a financial report. "
+                "Write every user-facing heading and text part in product_language. "
+                "If product_language starts with 'es', write user-facing prose in Spanish. "
+                "Symbols, tickers, currency codes, numbers, and percentages can stay "
+                "unchanged, but internal fact IDs and schema field names are never "
+                "user-facing copy. Set language_quality to mixed_or_wrong_language if "
+                "any rendered heading or text part mixes languages or copies internal "
+                "schema/fact-id wording. "
                 "Start with one warm takeaway before details. Return flexible, "
                 "non-template markdown sections and vary the section headings, "
                 "order, and phrasing. Do not fill a fixed outline. Build "
@@ -211,6 +243,7 @@ def _result_breakdown_llm_messages(
                 {
                     "fact_bank": fact_bank,
                     "required_fact_ids": sorted(required_fact_ids),
+                    "product_language": resolved_language,
                 },
                 default=str,
             ),
@@ -218,7 +251,12 @@ def _result_breakdown_llm_messages(
     ]
 
 
-def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
+def result_breakdown_fact_bank(
+    context: dict[str, Any],
+    *,
+    language: str = "en",
+) -> dict[str, str]:
+    resolved_language = _resolve_language(language or context.get("language"))
     fact_bank: dict[str, str] = {}
     title = str(context.get("title") or "").strip()
     if title:
@@ -237,11 +275,11 @@ def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
     if date_range:
         fact_bank["date_range"] = date_range
 
-    rule_summary = str(context.get("rule_summary") or "").strip()
+    rule_summary = _localized_rule_summary(context, language=resolved_language)
     if rule_summary:
         fact_bank["rule_summary"] = rule_summary
 
-    run_note = str(context.get("execution_note") or "").strip()
+    run_note = _localized_execution_note(context, language=resolved_language)
     if run_note:
         fact_bank["execution_note"] = run_note
 
@@ -273,7 +311,10 @@ def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
     if delta_vs_benchmark is not None:
         comparison = benchmark_comparison_from_delta(delta_vs_benchmark)
         fact_bank["benchmark_delta_magnitude"] = comparison.magnitude_points
-        fact_bank["benchmark_comparison"] = comparison.user_phrase
+        fact_bank["benchmark_comparison"] = _benchmark_comparison_phrase(
+            delta_vs_benchmark,
+            language=resolved_language,
+        )
 
     max_drawdown = _result_breakdown_metric(
         context,
@@ -302,28 +343,23 @@ def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
             symbols=_context_symbols(context),
         )
     )
-    fact_bank["caveat"] = (
-        "This is historical simulation evidence, not a prediction or trading "
-        "recommendation."
-    )
-    fact_bank["runnable_next_tests"] = runnable_next_tests(
+    fact_bank["caveat"] = _breakdown_caveat(language=resolved_language)
+    next_options = structured_next_experiments(
         {
             "config_snapshot": context.get("config_snapshot"),
             "symbols": context.get("symbols"),
         }
     )
+    fact_bank["runnable_next_tests"] = _runnable_next_tests_label(
+        next_options,
+        language=resolved_language,
+    )
     fact_bank["next_experiment_options"] = json.dumps(
-        structured_next_experiments(
-            {
-                "config_snapshot": context.get("config_snapshot"),
-                "symbols": context.get("symbols"),
-            }
-        ),
+        next_options,
         default=str,
     )
-    fact_bank["draft_only_or_future_tests"] = (
-        "Draft-only or future support: DCA with separate starting principal, "
-        "investment ceilings, and unsupported custom rules."
+    fact_bank["draft_only_or_future_tests"] = _draft_only_tests_label(
+        language=resolved_language
     )
     return fact_bank
 
@@ -360,9 +396,152 @@ def _context_packet_ids_from_context(context: dict[str, Any]) -> list[str]:
     return packet_ids
 
 
+def _resolve_language(language: object) -> Language:
+    return "es-419" if str(language or "en").lower().startswith("es") else "en"
+
+
+def _is_spanish(language: object) -> bool:
+    return _resolve_language(language) == "es-419"
+
+
+def _breakdown_caveat(*, language: str) -> str:
+    if _is_spanish(language):
+        return (
+            "Esto es evidencia de simulación histórica, no una predicción ni una "
+            "recomendación de inversión."
+        )
+    return (
+        "This is historical simulation evidence, not a prediction or trading "
+        "recommendation."
+    )
+
+
+def _benchmark_comparison_phrase(
+    delta_vs_benchmark: float | int | None,
+    *,
+    language: str,
+) -> str:
+    comparison = benchmark_comparison_from_delta(delta_vs_benchmark)
+    if not _is_spanish(language):
+        return comparison.user_phrase
+    if comparison.claim == "matched_benchmark":
+        return "En línea con la referencia"
+    magnitude = (
+        "desconocido"
+        if delta_vs_benchmark is None
+        else f"{abs(float(delta_vs_benchmark)):.1f} puntos porcentuales"
+    )
+    if comparison.claim == "beat_benchmark":
+        return f"Superó por {magnitude}"
+    if comparison.claim == "lagged_benchmark":
+        return f"Quedó por debajo por {magnitude}"
+    return "Comparado con la referencia"
+
+
+def _runnable_next_tests_label(
+    options: list[dict[str, Any]],
+    *,
+    language: str,
+) -> str:
+    if not _is_spanish(language):
+        if options:
+            labels = ", ".join(str(option["label"]) for option in options[:-1])
+            if len(options) > 1:
+                labels = f"{labels}, or {options[-1]['label']}"
+            else:
+                labels = str(options[0]["label"])
+            return f"Try next: {labels}"
+        return (
+            "Try next: change the date range, test the same supported setup on "
+            "a different same-class asset, or simplify the idea into a supported "
+            "RSI or SMA/EMA rule"
+        )
+
+    if not options:
+        return (
+            "Prueba siguiente: cambia el rango de fechas, prueba el mismo setup "
+            "compatible en otro activo de la misma clase, o simplifica la idea a una "
+            "regla RSI o SMA/EMA compatible"
+        )
+    labels = [_spanish_next_experiment_label(option) for option in options]
+    if len(labels) == 1:
+        return f"Prueba siguiente: {labels[0]}"
+    return f"Prueba siguiente: {', '.join(labels[:-1])}, o {labels[-1]}"
+
+
+def _spanish_next_experiment_label(option: dict[str, Any]) -> str:
+    kind = str(option.get("kind") or "").strip()
+    label = str(option.get("label") or "").strip()
+    if kind == "change_date_range":
+        return "cambia el rango de fechas"
+    if kind == "same_setup_peer_asset":
+        return "prueba el mismo setup en otro activo de la misma clase"
+    if kind == "supported_rsi_threshold":
+        return "prueba un umbral RSI compatible"
+    if kind == "supported_ma_crossover":
+        return "prueba un cruce SMA/EMA compatible"
+    if kind == "adjust_indicator_thresholds":
+        return "ajusta el periodo o los umbrales del indicador"
+    if kind == "compare_buy_and_hold":
+        return "compara con comprar y mantener"
+    if kind == "same_rule_peer_asset":
+        return "prueba la misma regla en otro activo de la misma clase"
+    if kind == "adjust_signal_periods":
+        return "ajusta los periodos o la dirección del cruce"
+    if kind == "adjust_contribution_cadence":
+        return "ajusta la cadencia de aportes"
+    return label or "prueba una variante compatible"
+
+
+def _draft_only_tests_label(*, language: str) -> str:
+    if _is_spanish(language):
+        return (
+            "Soporte futuro o solo borrador: DCA con capital inicial separado, "
+            "límites de inversión y reglas personalizadas no compatibles."
+        )
+    return (
+        "Draft-only or future support: DCA with separate starting principal, "
+        "investment ceilings, and unsupported custom rules."
+    )
+
+
+def _breakdown_fact_labels(language: str) -> dict[str, str]:
+    if _is_spanish(language):
+        return {
+            "test": "Prueba",
+            "rule": "Regla",
+            "performance": "Rendimiento",
+            "total_return": "rendimiento total",
+            "benchmark_return": "rendimiento de {benchmark} {value}",
+            "benchmark_symbol": "referencia {benchmark}",
+            "risk_marker": "Riesgo",
+            "max_drawdown": "peor caída",
+            "execution": "Ejecución",
+            "starting_capital": "Capital inicial",
+            "assumptions": "Supuestos",
+            "keep_in_mind": "Ten en cuenta",
+        }
+    return {
+        "test": "Test",
+        "rule": "Rule",
+        "performance": "Performance",
+        "total_return": "total return",
+        "benchmark_return": "{benchmark} benchmark return {value}",
+        "benchmark_symbol": "benchmark {benchmark}",
+        "risk_marker": "Risk marker",
+        "max_drawdown": "max drawdown",
+        "execution": "Execution",
+        "starting_capital": "Starting capital",
+        "assumptions": "Assumptions",
+        "keep_in_mind": "Keep in mind",
+    }
+
+
 def _coerce_result_breakdown_draft(value: Any) -> ResultBreakdownDraft | None:
     if isinstance(value, ResultBreakdownDraft):
         return value
+    if isinstance(value, dict) and "language_quality" not in value:
+        value = {**value, "language_quality": "matches_prompt_language"}
     try:
         return ResultBreakdownDraft.model_validate(value)
     except (TypeError, ValidationError):
@@ -374,7 +553,10 @@ def _render_result_breakdown_draft(
     draft: ResultBreakdownDraft,
     fact_bank: dict[str, str],
     required_fact_ids: set[str],
+    language: str = "en",
 ) -> str | None:
+    if draft.language_quality != "matches_prompt_language":
+        return None
     if not draft.sections or len(draft.sections) > 6:
         return None
 
@@ -387,6 +569,7 @@ def _render_result_breakdown_draft(
         body, section_fact_ids = _render_result_breakdown_parts(
             section.parts,
             fact_bank=fact_bank,
+            language=language,
         )
         if not body:
             return None
@@ -430,6 +613,7 @@ def _render_result_breakdown_parts(
     parts: list[ResultBreakdownPart],
     *,
     fact_bank: dict[str, str],
+    language: str = "en",
 ) -> tuple[str | None, set[str]]:
     body = ""
     fact_ids: list[str] = []
@@ -446,7 +630,11 @@ def _render_result_breakdown_parts(
             fact_ids.append(fact_id)
             used_fact_ids.add(fact_id)
     body = _normalize_result_breakdown_body(body)
-    fact_block = _render_result_breakdown_fact_block(fact_ids, fact_bank=fact_bank)
+    fact_block = _render_result_breakdown_fact_block(
+        fact_ids,
+        fact_bank=fact_bank,
+        language=language,
+    )
     if _result_breakdown_body_is_fragmentary(
         body,
         fact_ids,
@@ -462,6 +650,7 @@ def _render_result_breakdown_fact_block(
     fact_ids: list[str],
     *,
     fact_bank: dict[str, str],
+    language: str = "en",
 ) -> str:
     if not fact_ids:
         return ""
@@ -476,6 +665,7 @@ def _render_result_breakdown_fact_block(
             if fact_id in remaining:
                 remaining.remove(fact_id)
 
+    labels = _breakdown_fact_labels(language)
     if _has("title", "symbols", "date_range"):
         title = _sentence_fragment(fact_bank.get("title") or "Stored backtest")
         symbols = _sentence_fragment(fact_bank.get("symbols") or "")
@@ -485,11 +675,11 @@ def _render_result_breakdown_fact_block(
             test_text = f"{test_text} on {symbols}"
         if date_range:
             test_text = f"{test_text}, {date_range}"
-        lines.append(f"**Test:** {test_text}.")
+        lines.append(f"**{labels['test']}:** {test_text}.")
         _consume("title", "symbols", "date_range")
 
     if _has("rule_summary"):
-        lines.append(f"**Rule:** {fact_bank['rule_summary']}")
+        lines.append(f"**{labels['rule']}:** {fact_bank['rule_summary']}")
         _consume("rule_summary")
 
     if _has(
@@ -501,14 +691,19 @@ def _render_result_breakdown_fact_block(
     ):
         performance_parts: list[str] = []
         if "total_return" in remaining:
-            performance_parts.append(f"total return {fact_bank['total_return']}")
+            performance_parts.append(
+                f"{labels['total_return']} {fact_bank['total_return']}"
+            )
         benchmark = _sentence_fragment(fact_bank.get("benchmark_symbol") or "")
         if "benchmark_return" in remaining and benchmark:
             performance_parts.append(
-                f"{benchmark} benchmark return {fact_bank['benchmark_return']}"
+                labels["benchmark_return"].format(
+                    benchmark=benchmark,
+                    value=fact_bank["benchmark_return"],
+                )
             )
         elif "benchmark_symbol" in remaining and benchmark:
-            performance_parts.append(f"benchmark {benchmark}")
+            performance_parts.append(labels["benchmark_symbol"].format(benchmark=benchmark))
         if "benchmark_comparison" in remaining:
             performance_parts.append(fact_bank["benchmark_comparison"])
         elif "benchmark_delta" in remaining:
@@ -516,7 +711,7 @@ def _render_result_breakdown_fact_block(
                 f"relative performance {fact_bank['benchmark_delta']}"
             )
         if performance_parts:
-            lines.append(f"**Performance:** {'; '.join(performance_parts)}.")
+            lines.append(f"**{labels['performance']}:** {'; '.join(performance_parts)}.")
         _consume(
             "total_return",
             "benchmark_symbol",
@@ -526,23 +721,26 @@ def _render_result_breakdown_fact_block(
         )
 
     if _has("max_drawdown"):
-        lines.append(f"**Risk marker:** max drawdown {fact_bank['max_drawdown']}.")
+        lines.append(
+            f"**{labels['risk_marker']}:** "
+            f"{labels['max_drawdown']} {fact_bank['max_drawdown']}."
+        )
         _consume("max_drawdown")
 
     if _has("execution_note"):
-        lines.append(f"**Execution:** {fact_bank['execution_note']}")
+        lines.append(f"**{labels['execution']}:** {fact_bank['execution_note']}")
         _consume("execution_note")
 
     if _has("starting_capital"):
-        lines.append(f"**Starting capital:** {fact_bank['starting_capital']}.")
+        lines.append(f"**{labels['starting_capital']}:** {fact_bank['starting_capital']}.")
         _consume("starting_capital")
 
     if _has("assumptions"):
-        lines.append(f"**Assumptions:** {fact_bank['assumptions']}")
+        lines.append(f"**{labels['assumptions']}:** {fact_bank['assumptions']}")
         _consume("assumptions")
 
     if _has("caveat"):
-        lines.append(f"**Keep in mind:** {fact_bank['caveat']}")
+        lines.append(f"**{labels['keep_in_mind']}:** {fact_bank['caveat']}")
         _consume("caveat")
 
     if _has("runnable_next_tests"):
@@ -703,8 +901,13 @@ def _result_breakdown_starting_capital(context: dict[str, Any]) -> str:
     return ""
 
 
-def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
-    fact_bank = result_breakdown_fact_bank(context)
+def fallback_result_breakdown_message(
+    context: dict[str, Any],
+    *,
+    language: str = "en",
+) -> str:
+    resolved_language = _resolve_language(language or context.get("language"))
+    fact_bank = result_breakdown_fact_bank(context, language=resolved_language)
     total_return = _result_breakdown_metric(
         context,
         "total_return_pct",
@@ -751,18 +954,58 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
         else "the available benchmark return"
     )
     delta_text = (
-        benchmark_comparison_from_delta(delta_vs_benchmark).user_phrase
+        _benchmark_comparison_phrase(delta_vs_benchmark, language=resolved_language)
         if delta_vs_benchmark is not None
-        else "the stored benchmark spread"
+        else (
+            "la diferencia guardada contra la referencia"
+            if _is_spanish(resolved_language)
+            else "the stored benchmark spread"
+        )
     )
     drawdown_text = (
         _format_result_breakdown_percent(max_drawdown)
         if max_drawdown is not None
         else "the available risk data"
     )
-    rule_summary = str(context.get("rule_summary") or "").strip()
-    execution_summary = str(context.get("execution_note") or "").strip()
+    rule_summary = _localized_rule_summary(context, language=resolved_language)
+    execution_summary = _localized_execution_note(context, language=resolved_language)
     assumption_text = "; ".join(line.rstrip(".") for line in assumption_lines)
+    next_check_text = _strip_try_next_label(fact_bank["runnable_next_tests"])
+    if _is_spanish(resolved_language):
+        period_sentence = f" del {date_range}" if date_range else ""
+        setup_lines = [
+            (
+                f"{title} probó {symbols_text}{period_sentence} usando la "
+                "configuración guardada del backtest."
+            )
+        ]
+        if rule_summary:
+            setup_lines.append(rule_summary)
+
+        performance_lines = [
+            (
+                f"**Rendimiento total:** {total_return_text}. La referencia de "
+                f"comparación fue {benchmark or 'la referencia guardada'} con "
+                f"{benchmark_text}. {delta_text} frente a la referencia. Esto es "
+                "una comparación de retornos históricos, no una explicación causal "
+                "de por qué ocurrió el movimiento."
+            )
+        ]
+        if execution_summary:
+            performance_lines.append(execution_summary)
+
+        return (
+            "Aquí tienes una lectura más detallada de la simulación completada.\n\n"
+            f"**Configuración.** {' '.join(setup_lines)}\n\n"
+            f"**Cómo leerlo.** {' '.join(performance_lines)}\n\n"
+            f"**Riesgo y supuestos.** La peor caída fue {drawdown_text}, el mayor "
+            "descenso pico-a-valle capturado por la simulación. La prueba usó "
+            f"{assumption_text or 'la configuración guardada'}.\n\n"
+            f"**Siguiente prueba útil.** {_ensure_sentence(next_check_text)}\n\n"
+            "Úsalo como evidencia de simulación histórica, no como predicción ni "
+            "recomendación de inversión."
+        )
+
     period_sentence = f" over {date_range}" if date_range else ""
     setup_lines = [
         f"{title} tested {symbols_text}{period_sentence} using the stored backtest configuration."
@@ -780,8 +1023,6 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
     ]
     if execution_summary:
         performance_lines.append(execution_summary)
-
-    next_check_text = _strip_try_next_label(fact_bank["runnable_next_tests"])
     return (
         "Here's the deeper read on the completed run.\n\n"
         f"**Setup.** {' '.join(setup_lines)}\n\n"
@@ -797,10 +1038,90 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
 
 def _strip_try_next_label(value: str) -> str:
     text = str(value or "").strip()
-    prefix = "try next:"
-    if text.casefold().startswith(prefix):
-        return text[len(prefix) :].strip()
+    for prefix in ("try next:", "prueba siguiente:"):
+        if text.casefold().startswith(prefix):
+            return text[len(prefix) :].strip()
     return text
+
+
+def _localized_rule_summary(context: dict[str, Any], *, language: str) -> str | None:
+    raw_summary = str(context.get("rule_summary") or "").strip()
+    if not _is_spanish(language):
+        return raw_summary or None
+
+    strategy_type = _context_strategy_type(context)
+    if strategy_type == "buy_and_hold":
+        return "Regla: compra al inicio del periodo y mantén hasta el final."
+    if strategy_type == "dca_accumulation":
+        cadence = _localized_cadence_label(_context_cadence(context), language=language)
+        cadence_text = f" con frecuencia {cadence}" if cadence else ""
+        return f"Regla: compra{cadence_text} y mantén hasta el final."
+    if strategy_type in {"indicator_threshold", "signal_strategy"}:
+        return "Regla: se usó la regla técnica guardada de la simulación."
+    if raw_summary:
+        return "Regla: se usó la regla guardada de la simulación."
+    return None
+
+
+def _localized_execution_note(context: dict[str, Any], *, language: str) -> str | None:
+    raw_note = str(context.get("execution_note") or "").strip()
+    if not raw_note:
+        return None
+    if not _is_spanish(language):
+        return raw_note
+    return (
+        "No hubo operaciones de entrada; la estrategia permaneció en efectivo "
+        "porque la condición de entrada no se activó en ese periodo."
+    )
+
+
+def _context_strategy_type(context: dict[str, Any]) -> str | None:
+    candidates: list[Any] = [context.get("strategy_type")]
+    config = context.get("config_snapshot")
+    if isinstance(config, dict):
+        candidates.extend(
+            [
+                config.get("strategy_type"),
+                config.get("template"),
+            ]
+        )
+        resolved_strategy = config.get("resolved_strategy")
+        if isinstance(resolved_strategy, dict):
+            candidates.append(resolved_strategy.get("strategy_type"))
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
+    return None
+
+
+def _context_cadence(context: dict[str, Any]) -> str | None:
+    candidates: list[Any] = []
+    config = context.get("config_snapshot")
+    if isinstance(config, dict):
+        candidates.append(config.get("cadence"))
+        resolved_parameters = config.get("resolved_parameters")
+        if isinstance(resolved_parameters, dict):
+            candidates.append(resolved_parameters.get("cadence"))
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
+    return None
+
+
+def _localized_cadence_label(value: str | None, *, language: str) -> str | None:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return None
+    if not _is_spanish(language):
+        return normalized
+    labels = {
+        "daily": "diaria",
+        "weekly": "semanal",
+        "biweekly": "quincenal",
+        "monthly": "mensual",
+        "quarterly": "trimestral",
+    }
+    return labels.get(normalized, normalized)
 
 
 def _result_breakdown_metric(
@@ -869,14 +1190,32 @@ def _format_result_breakdown_date_range(value: Any) -> str:
     return ""
 
 
-def result_breakdown_message(run: BacktestRun | None) -> str:
-    return result_breakdown_message_with_metadata(run).text
+def result_breakdown_message(
+    run: BacktestRun | None,
+    *,
+    language: str = "en",
+) -> str:
+    return result_breakdown_message_with_metadata(run, language=language).text
 
 
 def result_breakdown_message_with_metadata(
     run: BacktestRun | None,
+    *,
+    language: str = "en",
 ) -> ResultBreakdownMessage:
+    resolved_language = _resolve_language(language)
     if run is None:
+        if _is_spanish(resolved_language):
+            return ResultBreakdownMessage(
+                text=(
+                    "No pude encontrar el resultado completado más reciente para "
+                    "esta conversación. Ejecuta el backtest de nuevo y puedo "
+                    "desglosar esas métricas."
+                ),
+                source="missing_result",
+                fallback_used=True,
+                failure_mode="missing_result",
+            )
         return ResultBreakdownMessage(
             text=(
                 "I could not find the latest completed result for this conversation. "
@@ -887,7 +1226,8 @@ def result_breakdown_message_with_metadata(
             failure_mode="missing_result",
         )
     context = result_breakdown_context(run)
-    llm_text = llm_result_breakdown_message(context)
+    context_language = _resolve_language(language or context.get("language"))
+    llm_text = llm_result_breakdown_message(context, language=context_language)
     if llm_text:
         return ResultBreakdownMessage(
             text=llm_text,
@@ -895,7 +1235,7 @@ def result_breakdown_message_with_metadata(
             fallback_used=False,
         )
     return ResultBreakdownMessage(
-        text=fallback_result_breakdown_message(context),
+        text=fallback_result_breakdown_message(context, language=context_language),
         source="deterministic_fallback",
         fallback_used=True,
         failure_mode="llm_unavailable_or_contract_rejected",

@@ -1,7 +1,10 @@
 # Private Launch Runbook
 
 > [!NOTE]
-> Historical context. This document is retained as implementation evidence. For current private-alpha direction, see docs/specs/private-alpha-conversation-trust.md.
+> Current operational gate for the Private Alpha CI/CD SOTA release path. Use
+> `docs/specs/private-alpha-ci-cd-sota.md` as the active roadmap for release
+> gating and `docs/specs/private-alpha-next-decision-memo.md` as a
+> later-context document, not part of this release gate.
 
 This runbook is for the first trusted-user internet tests on Render.
 
@@ -12,12 +15,33 @@ This runbook is for the first trusted-user internet tests on Render.
 
 ## Before Tester Sessions
 
-1. Merge the private-launch hardening PR into `main`.
-2. In Render, sync the Blueprint from `render.yaml`.
-3. Confirm Render is updating the existing `argus-app` and `argus-api` services.
+The promotion target is `main`, but `codex/private-alpha-next` remains the
+integration staging branch until the founder approves promotion. Do not merge to
+`main`, open a release PR, or deploy production automatically; after founder
+approval, promotion still follows the gate below. Every candidate needs a
+release manifest before testers are invited; start from
+`docs/release-manifests/TEMPLATE.md` and fill it with the exact candidate SHA,
+API/web env fingerprint, workflow-service proof, canary evidence, rollback
+target, and approver.
+
+1. Confirm the local checkout is the candidate commit you intend to promote:
+
+```bash
+git status --short
+git rev-parse HEAD
+```
+
+2. Run the local predeploy smoke gate before any internet-facing canary:
+
+```bash
+.github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"
+```
+
+3. In Render, sync the Blueprint from `render.yaml` only when service config
+   drift needs reconciliation.
+4. Confirm Render is updating the existing `argus-app` and `argus-api` services.
    Stop if Render proposes duplicate services.
-4. Confirm both services still have manual deploys enabled.
-5. Manually deploy `argus-api`, then `argus-app`.
+5. Confirm both services still have manual deploys enabled.
 6. Export local ops and canary secrets, or keep these in the root `.env` file
    and let the scripts load them:
 
@@ -29,33 +53,129 @@ export ARGUS_CANARY_SUPABASE_URL="https://lgdhvepyrzbnscqssgqq.supabase.co"
 export ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="..."
 ```
 
-7. Confirm the API is in the safe default tester mode. This mode does not
-   create shadow workflow jobs, does not dispatch proof jobs, and does not expose
-   a Render API key to `argus-api`:
+For local founder/operator runs, `.github/canary-render.sh` also accepts
+`MOCK_USER_EMAIL` / `MOCK_USER_PASSWORD` and `SUPABASE_URL` /
+`SUPABASE_SERVICE_ROLE_KEY` from the root `.env`. The `ARGUS_CANARY_*` names
+remain the preferred GitHub Actions secret names.
+
+7. Confirm the API is in real workflow tester mode. This mode keeps the API
+   lean and sends `Run backtest` through the durable Render Workflow job path:
 
 ```bash
-.github/render-env-sync.sh api-safe-off
+.github/render-env-sync.sh api-real-workflow-on
 ```
 
 Restart `argus-api` after changing Render env values.
 
-8. Run the product warmup script and verify the API stayed in safe mode:
+8. Manually deploy `argus-api`, then `argus-app` from the candidate commit.
+
+9. Confirm the live `argus-api` and `argus-app` deploy commits match the
+   candidate commit you intend to test and that both latest deploys are `live`:
 
 ```bash
-.github/warmup-render.sh --expect-mode safe-off
+ARGUS_RELEASE_SHA="$(git rev-parse HEAD)"
+.github/render-env-sync.sh api-deploy-status
+.github/render-env-sync.sh web-deploy-status
 ```
 
-9. Run the golden-path canary:
+If either commit is not `ARGUS_RELEASE_SHA`, stop and deploy the stale service
+before running the strict canaries. The canary script enforces the same deployed
+SHA/status check with `ARGUS_CANARY_SHA`.
+
+10. Run the product warmup script and verify the API stayed in real workflow
+   mode. When Supabase verifier credentials are present, this also runs the
+   stale queued/running job scan:
 
 ```bash
+.github/warmup-render.sh --expect-mode real-workflow
+```
+
+11. Run the strict English canary with privacy-safe release evidence:
+
+```bash
+mkdir -p temp/release-evidence
+ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
+ARGUS_CANARY_LANGUAGE=en \
+ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-en.json \
 .github/canary-render.sh
 ```
 
-Only send the app URL to testers after both scripts pass. If warmup fails, do
-not invite testers yet. Check Render service status and redeploy only if the
-service is stuck. If warmup passes but the canary fails, treat it as an Argus
-product-path regression and inspect API logs, Supabase messages, backtest runs,
-and route receipts for the canary conversation id.
+12. Run the same strict canary in Spanish. Spanish readiness is a release criterion, not a one-off test:
+
+```bash
+ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
+ARGUS_CANARY_LANGUAGE=es-419 \
+ARGUS_CANARY_PROMPT='Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 con 10000 dolares' \
+ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json \
+.github/canary-render.sh
+```
+
+If a canary fails after warmup passed, do not redeploy one-off fixes in a loop.
+Set `ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-failed-capture.json`
+or the matching English path, rerun the failing locale once to write a
+sanitized failed-capture artifact, then replay the captured payload locally
+before redeploying:
+
+```bash
+poetry run python scripts/ops/canary_capture_replay.py \
+  temp/release-evidence/canary-es-419-failed-capture.json
+```
+
+Use the replay to identify the macro-pattern and make one coherent fix.
+Docker is optional for this step unless the production release path moves to
+container images; prefer the local smoke gate plus canary replay first.
+
+Before treating local UI changes as launch-ready, also run the browser recovery
+spec against the local app/API environment:
+
+```bash
+cd web && bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium
+```
+
+Only send the app URL to testers after API deploy-status, app deploy-status,
+local smoke, warmup, English canary, Spanish canary, and the release manifest all
+pass against the intended candidate commit. If either deploy-status reports a
+different commit, deploy the candidate branch before continuing. If warmup fails,
+do not invite testers yet. Check Render service status and redeploy only if the
+service is stuck. If warmup passes but a canary fails, treat it as an Argus
+product-path regression and inspect the failed-capture replay, API logs,
+Supabase messages, backtest runs, and route receipts using the hashed labels and
+internal access controls from the canary evidence.
+
+For the daily automated gate, configure GitHub repository secrets with the same
+canary variables above plus `RENDER_API_KEY`, then use the scheduled or manually
+dispatched `Private Alpha Canary` workflow. That workflow runs the local smoke
+gate, warmup, English canary, Spanish canary, and a bilingual matrix check. It
+uploads the `private-alpha-canary-evidence` artifact containing per-locale JSON
+evidence plus exit-code files, and it does not deploy or configure analytics.
+Secrets are scoped to the operational steps that need them; install and artifact
+upload steps do not receive canary credentials or service-role keys.
+
+After the gate passes, copy the relevant command output and canary evidence into
+a candidate manifest based on `docs/release-manifests/TEMPLATE.md`. The
+`env_fingerprint` emitted by `.github/render-env-sync.sh release-config-audit`
+is the API/web environment fingerprint; record it as `api_web_env_fingerprint`
+and keep the raw script output for audit traceability. The manifest must also
+name the candidate SHA, deployed API/web SHAs, `workflow_task`,
+`real_workflow_task`, backtest service mode, workflow-service proof for
+`argus-backtests`, canary evidence, rollback target, and approver.
+
+If you need to run only the stale job scan during incident triage:
+
+```bash
+.github/stale-backtest-jobs.sh --json
+```
+
+For privacy-safe aggregate job health over the existing Supabase
+`backtest_jobs.execution_metadata` records:
+
+```bash
+poetry run python scripts/ops/alpha_readiness_metrics.py --json
+```
+
+This report is operational only. It summarizes job statuses, readout provenance,
+and timings without emitting user ids, conversation ids, prompt text, or product
+analytics events.
 
 ## Backtest Workflow Modes
 
@@ -74,11 +194,11 @@ Use explicit API modes instead of editing individual flags by hand:
 .github/render-env-sync.sh api-real-workflow-on
 ```
 
-`api-safe-off` is the default private-alpha tester mode until the frontend can
-render durable async job state. `api-proof-shadow-on` is only for proof dispatch
-validation. `api-real-workflow-on` is only for the async backtest product slice
-where `Run backtest` creates a durable real job and the UI reads
-queued/running/succeeded/failed state from Supabase.
+`api-real-workflow-on` is the controlled private-alpha tester mode: `Run
+backtest` creates a durable real job and the UI reads queued/running/succeeded/
+failed state from Supabase. `api-proof-shadow-on` is only for proof dispatch
+validation. `api-safe-off` is the emergency rollback mode that disables workflow
+dispatch/execution and removes the Render API key from `argus-api`.
 
 ## Render Environment Ownership
 
@@ -108,10 +228,44 @@ Use an allowlisted account and verify:
 
 - Login succeeds.
 - A new conversation can be created.
-- A messy investing idea reaches the chat runtime.
+- Cold-start starter chips are visible, feel current, and do not reference 2024
+  by default.
+- Clicking a cold-start starter chip submits a natural-language prompt into the
+  normal chat runtime.
+- A Spanish prompt reaches confirmation without coaching or manual translation.
+- Confirmation actions stay card-scoped and structured:
+  - `Run backtest` starts the supported job path.
+  - `Change dates` updates the confirmation/result period before execution, for
+    example Jan 1, 2025 to Apr 1, 2025.
+  - `Change asset` preserves the explicit period, capital, and benchmark while
+    changing the symbol.
+  - `Adjust assumptions` preserves the explicit period, symbol, and benchmark
+    while changing the assumption being edited.
+  - `Cancel` marks the draft canceled and removes the executable action.
 - A supported backtest completes and shows a result card.
-- Reloading the page preserves the conversation and result.
+- The result includes a readable Quick take.
+- Explain result opens a deeper card-scoped explanation without replacing the
+  Quick take.
+- Retry preserves the failed setup and recovers through a structured action, not
+  duplicated user text.
+- Reloading the page preserves the conversation, job state, and result.
 - Feedback can be submitted.
+
+## Founder-Facing Tester Notes
+
+Before sending the URL, make sure tester instructions say:
+
+- Argus Alpha provides educational historical simulations only, not investment,
+  tax, legal, brokerage, or execution advice.
+- Alpha backtests are intentionally narrow: same-asset runs only, long-only,
+  equal-weight multi-symbol logic, max 5 symbols, and daily bars.
+- Market or benchmark data can be unavailable. If that happens, retry the same
+  setup, change the dates, or choose a different supported asset/benchmark.
+- Feedback buttons and the feedback dialog are the primary first-session
+  listening channel. PostHog/product analytics stay disabled until the
+  privacy-safe event taxonomy, redaction, and consent posture are approved.
+- Terms, Privacy Policy, and explicit alpha consent remain a founder-owned gate
+  before inviting users outside the private circle.
 
 ## Supabase Persistence Check
 

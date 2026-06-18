@@ -18,36 +18,70 @@ SUPPORTED_GOALS = {
 }
 
 STARTER_PROMPTS = {
-    "learn_basics": [
-        "How do I start investing?",
-        "Explain a market term simply",
-        "What does buying every month mean?",
-        "How do I test an idea?",
-    ],
-    "test_stock_idea": [
-        "Buy Apple after big drops",
-        "Hold Tesla for a year",
-        "Compare Nvidia with Apple",
-        "Test Microsoft when it starts rising",
-    ],
-    "build_passive_strategy": [
-        "Buy SPY every month",
-        "Compare a fund with a stock",
-        "Test a simple long-term idea",
-        "Start with a low-maintenance idea",
-    ],
-    "explore_crypto": [
-        "Backtest Bitcoin halvings",
-        "Hold Bitcoin for a year",
-        "Compare Ethereum and Bitcoin",
-        "Buy Bitcoin after big drops",
-    ],
-    "surprise_me": [
-        "Show me something interesting",
-        "Show me a simple first idea",
-        "Test a familiar stock",
-        "Compare two familiar assets",
-    ],
+    "en": {
+        "learn_basics": [
+            "How do I start testing an investing idea?",
+            "Explain why people compare a stock to SPY.",
+            "What does buying every month mean?",
+            "How do I read a simple backtest?",
+        ],
+        "test_stock_idea": [
+            "Test buying Apple this year so far.",
+            "Hold Tesla over the last 12 months.",
+            "Compare Nvidia with Apple over the last 6 months.",
+            "Test buying Microsoft over the last 6 months.",
+        ],
+        "build_passive_strategy": [
+            "Buy SPY every month over the last year.",
+            "Compare SPY with Apple over the last 12 months.",
+            "Test a simple buy-and-hold idea this year so far.",
+            "Try weekly Nvidia buys over the last year.",
+        ],
+        "explore_crypto": [
+            "Hold Bitcoin this year so far.",
+            "Compare Ethereum and Bitcoin over the last 12 months.",
+            "Test buying Solana over the last 6 months.",
+            "Test a simple Bitcoin buy-and-hold over the last year.",
+        ],
+        "surprise_me": [
+            "Test Apple against SPY over the last 12 months.",
+            "Try Bitcoin this year so far.",
+            "Test weekly Nvidia buys over the last year.",
+            "Show me a simple first idea.",
+        ],
+    },
+    "es-419": {
+        "learn_basics": [
+            "¿Cómo empiezo a probar una idea de inversión?",
+            "Explícame por qué se compara una acción con SPY.",
+            "¿Qué significa comprar todos los meses?",
+            "¿Cómo leo un backtest simple?",
+        ],
+        "test_stock_idea": [
+            "Prueba comprar Apple en lo que va del año.",
+            "Mantén Tesla durante los últimos 12 meses.",
+            "Compara Nvidia con Apple durante los últimos 6 meses.",
+            "Prueba comprar Microsoft durante los últimos 6 meses.",
+        ],
+        "build_passive_strategy": [
+            "Compra SPY cada mes durante el último año.",
+            "Compara SPY con Apple durante los últimos 12 meses.",
+            "Prueba una idea simple de comprar y mantener este año.",
+            "Prueba compras semanales de Nvidia durante el último año.",
+        ],
+        "explore_crypto": [
+            "Mantén Bitcoin en lo que va del año.",
+            "Compara Ethereum y Bitcoin durante los últimos 12 meses.",
+            "Prueba comprar Solana durante los últimos 6 meses.",
+            "Prueba una idea simple de comprar y mantener Bitcoin durante el último año.",
+        ],
+        "surprise_me": [
+            "Compara Apple con SPY durante los últimos 12 meses.",
+            "Prueba Bitcoin en lo que va del año.",
+            "Prueba compras semanales de Nvidia durante el último año.",
+            "Muéstrame una primera idea simple.",
+        ],
+    },
 }
 
 
@@ -61,9 +95,14 @@ def resolve_language(language: str | None) -> Literal["en", "es-419"]:
     return "en"
 
 
-def get_starter_prompts(primary_goal: str | None) -> list[str]:
-    goal = primary_goal if primary_goal in STARTER_PROMPTS else "surprise_me"
-    return STARTER_PROMPTS[goal]
+def get_starter_prompts(
+    primary_goal: str | None,
+    language: str | None = None,
+) -> list[str]:
+    resolved = resolve_language(language)
+    prompts_by_goal = STARTER_PROMPTS[resolved]
+    goal = primary_goal if primary_goal in prompts_by_goal else "surprise_me"
+    return prompts_by_goal[goal]
 
 
 def suggest_entity_name(

@@ -5,12 +5,8 @@ import inspect
 from typing import Protocol
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
-from argus.agent_runtime.clarification_contract import OFFLINE_CLARIFICATION_FALLBACK
+from argus.agent_runtime.clarification_contract import offline_clarification_fallback
 from argus.agent_runtime.llm_clarifier import ClarificationRequest
-from argus.agent_runtime.stages.compose import (
-    compose_response_intent,
-    should_prefer_composed_intent,
-)
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
     PendingNeedName,
@@ -20,6 +16,7 @@ from argus.agent_runtime.state.models import (
 )
 
 OPTIONAL_PARAMETER_OPT_IN_LIMIT = 3
+ARTIFACT_EDIT_CLARIFICATION_FIELDS = {"assumption"}
 
 
 class StructuredClarificationGenerator(Protocol):
@@ -81,16 +78,12 @@ async def clarify_stage_async(
             semantic_needs=["simplification_choice"],
             facts={"unsupported_constraints": unsupported_constraints},
             options=options,
-        )
-        assistant_prompt = _composed_prompt_for_response_intent(
-            state=state,
-            response_intent=response_intent,
+            language=language,
         )
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": assistant_prompt
-                or await _generate_clarifying_question(
+                "assistant_prompt": await _generate_clarifying_question(
                     state=state,
                     response_intent=response_intent,
                     missing_required_fields=[],
@@ -115,6 +108,7 @@ async def clarify_stage_async(
             semantic_needs=_semantic_needs_from_fields(ambiguous_fields),
             requested_fields=requested_fields,
             facts={"ambiguous_fields": ambiguous_fields},
+            language=language,
         )
         return StageResult(
             outcome="await_user_reply",
@@ -145,6 +139,7 @@ async def clarify_stage_async(
             state=state,
             semantic_needs=_semantic_needs_from_required_fields(requested_fields),
             requested_fields=requested_fields,
+            language=language,
         )
         return StageResult(
             outcome="await_user_reply",
@@ -168,7 +163,11 @@ async def clarify_stage_async(
         )
 
     if _is_beginner_guidance_turn(state):
-        response_intent = _response_intent(kind="beginner_guidance", state=state)
+        response_intent = _response_intent(
+            kind="beginner_guidance",
+            state=state,
+            language=language,
+        )
         prefilled = _usable_prefilled_prompt(prefilled_assistant_prompt)
         return StageResult(
             outcome="await_user_reply",
@@ -190,7 +189,11 @@ async def clarify_stage_async(
         )
 
     if _needs_ambiguity_clarification(state):
-        response_intent = _response_intent(kind="ambiguity_check", state=state)
+        response_intent = _response_intent(
+            kind="ambiguity_check",
+            state=state,
+            language=language,
+        )
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
@@ -239,7 +242,13 @@ async def _generate_clarifying_question(
     language: str,
 ) -> str:
     if clarification_generator is None:
-        return OFFLINE_CLARIFICATION_FALLBACK
+        return offline_clarification_fallback(
+            language=language,
+            response_intent=response_intent,
+            strategy=state.candidate_strategy_draft
+            if state.candidate_strategy_draft is not None
+            else None,
+        )
     request = ClarificationRequest(
         current_user_message=state.current_user_message,
         recent_thread_history=state.recent_thread_history,
@@ -258,20 +267,13 @@ async def _generate_clarifying_question(
     else:
         result = clarification_generator(request)
         question = await result if inspect.isawaitable(result) else result
-    return question or OFFLINE_CLARIFICATION_FALLBACK
-
-
-def _composed_prompt_for_response_intent(
-    *,
-    state: RunState,
-    response_intent: dict[str, object],
-) -> str | None:
-    state_with_intent = state.model_copy(
-        update={"response_intent": ResponseIntent.model_validate(response_intent)}
+    return question or offline_clarification_fallback(
+        language=language,
+        response_intent=response_intent,
+        strategy=state.candidate_strategy_draft
+        if state.candidate_strategy_draft is not None
+        else None,
     )
-    if not should_prefer_composed_intent(state_with_intent):
-        return None
-    return compose_response_intent(state_with_intent)
 
 
 def _usable_prefilled_prompt(value: str | None) -> str | None:
@@ -289,6 +291,7 @@ def _response_intent(
     requested_fields: list[str] | None = None,
     facts: dict[str, object] | None = None,
     options: list[dict[str, object]] | None = None,
+    language: str = "en",
 ) -> dict[str, object]:
     strategy = state.candidate_strategy_draft
     semantic_needs = _expanded_semantic_needs(
@@ -309,6 +312,7 @@ def _response_intent(
         facts={
             "strategy": strategy_payload,
             "current_user_message": state.current_user_message,
+            "language": language,
             **(facts or {}),
         },
         options=options or [],
@@ -348,6 +352,12 @@ def _requested_fields(
             for field in ambiguous_fields
             if isinstance(field.get("field_name"), str)
         ]
+    requested_field = _field_base(state.requested_field or "")
+    if (
+        requested_field in ARTIFACT_EDIT_CLARIFICATION_FIELDS
+        and requested_field in state.missing_required_fields
+    ):
+        return [requested_field]
     first_missing = _first_missing_required_field(
         missing_required_fields=state.missing_required_fields,
         contract=contract,
@@ -398,6 +408,7 @@ def _semantic_needs_from_required_fields(fields: list[str]) -> list[PendingNeedN
         "date_range": "period",
         "entry_logic": "rule_definition",
         "exit_logic": "rule_definition",
+        "assumption": "assumption",
     }
     needs: list[PendingNeedName] = []
     for field in fields:

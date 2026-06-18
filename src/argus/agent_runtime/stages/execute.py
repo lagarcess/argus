@@ -7,6 +7,7 @@ from copy import deepcopy
 from typing import Any
 
 from argus.agent_runtime.recovery.policy import should_retry
+from argus.agent_runtime.recovery_messages import resolve_recovery_language
 from argus.agent_runtime.rule_specs import (
     executable_rule_spec_from_strategy,
     indicator_threshold_rule,
@@ -21,7 +22,7 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
-    resolve_date_range,
+    resolve_executable_date_range,
 )
 from argus.domain.engine_launch.results import (
     is_user_safe_failure_code,
@@ -149,6 +150,7 @@ def execute_stage(
                 error_type=failure_classification,
                 error_message=_as_optional_str(envelope.get("error_message")),
                 records=records,
+                language=language,
             )
             if recovery_prompt is not None:
                 return StageResult(
@@ -199,6 +201,7 @@ def execute_stage(
         error_type=last_error_type,
         error_message=retry_exhausted,
         records=records,
+        language=language,
     )
     if recovery_prompt is not None:
         return StageResult(
@@ -298,7 +301,10 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         "timeframe": _resolve_optional_value(
             optional_parameters, "timeframe", default="1D"
         ),
-        "date_range": _resolve_date_range(strategy.get("date_range")),
+        "date_range": _resolve_date_range(
+            strategy.get("date_range"),
+            extra_parameters=strategy.get("extra_parameters"),
+        ),
         "entry_rule": _resolve_entry_rule(strategy, strategy_type),
         "exit_rule": _resolve_exit_rule(strategy, strategy_type),
         "rule_spec": (
@@ -555,49 +561,90 @@ def _recoverable_execution_prompt(
     error_type: str | None,
     error_message: str | None,
     records: list[dict[str, Any]],
+    language: str = "en",
 ) -> str | None:
     if error_type != "upstream_dependency_error":
         return None
-    if not _is_market_data_unavailable_error(
+    unavailable_data_kind = _unavailable_data_kind(
         error_message=error_message,
         records=records,
-    ):
+    )
+    if unavailable_data_kind is None:
         return None
 
-    draft_label = _draft_label_from_payload(payload)
+    draft_label = _draft_label_from_payload(payload, language=language)
+    data_label = _unavailable_data_label(
+        data_kind=unavailable_data_kind,
+        language=language,
+    )
+    if resolve_recovery_language(language) == "es-419":
+        return (
+            f"La configuracion de {draft_label} sigue aqui, pero no pude obtener "
+            f"{data_label} para esa simulacion en este momento. Intentalo de nuevo, "
+            "cambia las fechas o elige otro activo compatible."
+        )
     return (
-        f"The {draft_label} setup is still here, but I could not get market data "
+        f"The {draft_label} setup is still here, but I could not get {data_label} "
         "for that run right now. Try again, change the dates, or choose a different "
         "supported asset."
     )
 
 
-def _is_market_data_unavailable_error(
+def _unavailable_data_kind(
     *,
     error_message: str | None,
     records: list[dict[str, Any]],
-) -> bool:
-    values = [error_message or ""]
-    values.extend(
-        str(record.get("error_message") or "")
-        for record in records
-        if isinstance(record, dict)
-    )
-    values.extend(
-        str((record.get("capability_context") or {}).get("failure_detail") or "")
-        for record in records
-        if isinstance(record, dict) and isinstance(record.get("capability_context"), dict)
-    )
-    return any("market_data" in value for value in values)
+) -> str | None:
+    values = [_normalized_failure_value(error_message)]
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        values.append(_normalized_failure_value(record.get("error_message")))
+        context = record.get("capability_context")
+        if not isinstance(context, dict):
+            continue
+        values.extend(
+            _normalized_failure_value(context.get(field_name))
+            for field_name in ("failure_detail", "failure_reason", "failure_code")
+        )
+
+    if any(
+        value in {"benchmark_data_unavailable", "benchmark_data_issue"}
+        for value in values
+    ):
+        return "benchmark"
+    if any(value in {"market_data_unavailable", "market_data_issue"} for value in values):
+        return "market"
+    return None
 
 
-def _draft_label_from_payload(payload: dict[str, Any]) -> str:
+def _normalized_failure_value(value: Any) -> str:
+    return str(value or "").strip().lower().replace("-", "_")
+
+
+def _unavailable_data_label(*, data_kind: str, language: str) -> str:
+    if resolve_recovery_language(language) == "es-419":
+        return "datos de referencia" if data_kind == "benchmark" else "datos de mercado"
+    return "benchmark data" if data_kind == "benchmark" else "market data"
+
+
+def _draft_label_from_payload(payload: dict[str, Any], *, language: str = "en") -> str:
     symbols = _resolve_symbols(_strategy_fields(payload))
     symbol = symbols[0] if symbols else str(payload.get("symbol") or "").strip().upper()
     symbol_prefix = f"{symbol} " if symbol else ""
     strategy_type = _normalize_strategy_type(
         str(payload.get("strategy_type") or "strategy")
     )
+    if resolve_recovery_language(language) == "es-419":
+        if strategy_type == "dca_accumulation":
+            return f"{symbol_prefix}compras recurrentes".strip()
+        if strategy_type == "buy_and_hold":
+            return f"{symbol_prefix}comprar y mantener".strip()
+        if strategy_type == "indicator_threshold":
+            return f"{symbol_prefix}regla de indicador".strip()
+        if strategy_type == "signal_strategy":
+            return f"{symbol_prefix}estrategia de senales".strip()
+        return f"{symbol_prefix}estrategia".strip()
     if strategy_type == "dca_accumulation":
         return f"{symbol_prefix}recurring-buys draft".strip()
     if strategy_type == "buy_and_hold":
@@ -899,8 +946,15 @@ def _resolve_symbols(strategy: dict[str, Any]) -> list[str]:
     return []
 
 
-def _resolve_date_range(value: Any) -> dict[str, str]:
-    return resolve_date_range(value).payload
+def _resolve_date_range(
+    value: Any,
+    *,
+    extra_parameters: Any = None,
+) -> dict[str, str]:
+    return resolve_executable_date_range(
+        value,
+        extra_parameters=extra_parameters if isinstance(extra_parameters, dict) else None,
+    ).payload
 
 
 def _resolve_entry_rule(

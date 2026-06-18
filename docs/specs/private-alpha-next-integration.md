@@ -5,6 +5,13 @@ Date: 2026-06-10
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
+Current note: for the 2026-06-17 CI/CD SOTA release-captain mission, use
+`docs/specs/private-alpha-ci-cd-sota.md` as the active execution roadmap. This
+document remains the staging and branch-process context for
+`codex/private-alpha-next`. `docs/specs/private-alpha-next-decision-memo.md` is
+later-context only for the next product/strategy session and must not steer the
+current CI/CD release gate.
+
 ## Purpose
 
 This document is the working source of truth for the next integration branch
@@ -14,6 +21,29 @@ starts from the current `main` reality, not from stale milestone debt.
 The integration branch is a staging lane. It is allowed to collect reviewed work
 before a future PR, but it is not a release branch and must not be merged or
 deployed automatically.
+
+## Current Release Gate
+
+The active private-alpha promotion path is the CI/CD SOTA gate in
+`docs/specs/private-alpha-ci-cd-sota.md` plus the operator instructions in
+`docs/PRIVATE_LAUNCH_RUNBOOK.md`.
+
+Before testers are invited, the release captain must prove:
+
+- local smoke passed for the candidate SHA;
+- `argus-api` and `argus-app` latest Render deploys are `live` at the candidate
+  SHA;
+- Render release config audit produced the expected `env_fingerprint`,
+  `workflow_task`, and `real_workflow_task`;
+- the `Private Alpha Canary` workflow or equivalent manual commands passed both
+  English and Spanish canaries;
+- the canary evidence artifact is retained as `private-alpha-canary-evidence`;
+- a release manifest exists from `docs/release-manifests/TEMPLATE.md` and names
+  SHA, env fingerprint, canary evidence, rollback target, approver, and
+  backtest service mode.
+
+Production deploys remain manual and founder-directed. No production deploy
+happens from this branch unless the founder explicitly asks for a deploy check.
 
 ## Branch Model
 
@@ -96,13 +126,48 @@ Do not reopen these as debt unless a new bug is reproduced:
   `e654ed96-efc0-44d6-86fe-033383c2d625`; and a deployed browser shell smoke
   rendered the unauthenticated front door without new console errors after
   reload.
-- `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is marked historical.
+- Post-merge main deploy passed on 2026-06-12 UTC for commit `f335d78`:
+  Render `argus-api` deploy `dep-d8lkvl48aovs73dmc1dg` and `argus-app` deploy
+  `dep-d8lkvnm7r5hc73d968k0` both reached `live`; warmup passed in
+  `real-workflow` mode; the authenticated developer canary conversation
+  `4ac80db0-5eb2-40cc-9a5b-a232c73ace01` completed durable job
+  `2d65a145-94b8-404e-a949-2f0e0907d51a` with run
+  `f17c8578-78b0-4bd6-82a2-24aaf17feff9`; and the canary confirmed the
+  confirmation card, `run_backtest` action, async job/run result, LLM readout
+  voice, and persisted messages.
+- `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is archived historical context.
 
 ## Remaining High-Leverage Work
 
 Codex should own or closely supervise this:
 
-1. **Research Lab product spec**
+1. **Controlled alpha readiness slice**
+   - Active worker branch: `codex/private-alpha-readiness`, targeting
+     `codex/private-alpha-next` after review.
+   - Current local checkpoint: the language-agnostic runtime spine has focused
+     backend tests for messy English/Spanish buy-and-hold prompts with shorthand
+     capital (`100k`) and Codex browser QA for the English and Spanish
+     confirmation-card edit paths. The latest browser pass proved the English
+     `Change dates -> calendar 2024` and Spanish
+     `Cambiar fechas -> calendario 2024` flows update the active card instead
+     of silently re-confirming the prior rolling range or leaking macro-context
+     prose. The English `Change asset -> make it google instead` and Spanish
+     `Cambiar activo -> ponlo con google mejor` flows now update the active
+     card to provider-canonical `GOOGL` while preserving the rest of the setup.
+     A Spanish local browser pass also proved the full happy-path action chain:
+     confirmation, run, result card, Quick take, Explain result, Refine idea,
+     messy refinement into a new `GOOGL`/`$50,000`/six-month confirmation, and
+     structured cancellation. The local Spanish transcript matrix now passes
+     for DCA, missing DCA amount clarification, mixed-asset clarification,
+     currency pairs, unsupported valuation recovery, setup edits, approval, and
+     result follow-ups. A Spanish browser recovery pass now proves unsupported
+     valuation (`P/E`) clarifies into supported proxies, then a messy
+     buy-and-hold follow-up re-enters the normal confirmation funnel.
+   - Remaining before merge/release readiness: production-parity Render canary
+     and the rest of the controlled readiness slices in
+     `docs/specs/private-alpha-controlled-readiness-panel.md`.
+
+2. **Research Lab product spec**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
      saved research, and monitoring belong in a dedicated spec before code.
    - The active refined draft is
@@ -111,6 +176,31 @@ Codex should own or closely supervise this:
      evidence, deep research, and monitoring lanes.
    - This branch may refine that spec, but it must not implement the
      evidence-aware idea loop without explicit approval.
+
+## Known Non-Blocking Debt
+
+Track these as future validation slices, not blockers for the current main
+deploy:
+
+1. **Composer paste and long copied-result handling**
+   - Live observation on 2026-06-11: `Copy Plain Text` can copy a non-empty
+     result breakdown into the Codex browser tab clipboard and show `Copied`,
+     but pasting back into `ChatInput` can fail when the browser does not
+     support or allow the current `document.execCommand("insertText")` paste
+     path after the paste handler calls `preventDefault`.
+   - Product concern: long copied result text can overwhelm the persistent
+     composer if pasted inline. Frontier chat products often promote long
+     copied content into file-like attachments, but Argus should not fake
+     `.txt` attachments while the current OpenRouter-backed chat path does not
+     support text-file inputs.
+   - Future validation should confirm normal-browser versus Codex-browser
+     behavior, define an Argus-scale long-text paste treatment such as capped
+     inline paste, paste preview, or explicit large-text handling, then replace
+     the `execCommand` paste path with a modern contenteditable or state
+     insertion path and add Bun plus browser QA.
+   - This is not Jules-ready implementation until the product behavior is
+     scoped. Jules may later run a read-only validation inventory or help draft
+     a GitHub task prompt.
 
 ## Low-Risk Work Suitable For External Async Agents
 

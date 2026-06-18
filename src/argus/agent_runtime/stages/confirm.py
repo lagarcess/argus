@@ -15,7 +15,7 @@ from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState, StrategySummary
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
-    resolve_date_range,
+    resolve_executable_date_range,
 )
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
@@ -28,12 +28,19 @@ from argus.domain.market_data.capabilities import (
     latest_complete_data_adjustment,
     market_data_window_violation,
 )
+from loguru import logger
 from pydantic import ValidationError
 
 
 def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResult:
+    logger.debug("Confirm stage started")
     strategy = _strategy_payload(state.candidate_strategy_draft)
     strategy = _strategy_with_latest_complete_data_adjustment(strategy)
+    logger.debug(
+        "Confirm stage latest complete data adjustment checked",
+        strategy_type=strategy.get("strategy_type"),
+        asset_class=strategy.get("asset_class"),
+    )
     date_limit_recovery = _date_limit_recovery_patch(
         strategy=strategy,
         optional_parameter_status=state.optional_parameter_status,
@@ -142,7 +149,10 @@ def _validated_launch_payload(
         launch_state = state.model_copy(
             update={"confirmation_payload": confirmation_payload}
         )
-        launch_payload = _launch_payload(launch_state)
+        launch_payload = _launch_payload(
+            launch_state,
+            language=_confirmation_payload_language(confirmation_payload),
+        )
         request = LaunchBacktestRequest.model_validate(launch_payload)
         validate_launch_supported(request)
     except ValidationError as exc:
@@ -158,6 +168,17 @@ def _validated_launch_payload(
         "requested_field": None,
         "assistant_prompt": None,
     }
+
+
+def _confirmation_payload_language(confirmation_payload: dict[str, Any]) -> str:
+    strategy = confirmation_payload.get("strategy")
+    if not isinstance(strategy, dict):
+        return "en"
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return "en"
+    language = str(extra_parameters.get("language") or "").strip()
+    return language or "en"
 
 
 def _validation_error_code(exc: ValidationError) -> str:
@@ -279,6 +300,11 @@ def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, A
     return dict(strategy)
 
 
+def _strategy_extra_parameters(strategy: dict[str, Any]) -> dict[str, Any] | None:
+    extra_parameters = strategy.get("extra_parameters")
+    return extra_parameters if isinstance(extra_parameters, dict) else None
+
+
 def _strategy_with_latest_complete_data_adjustment(
     strategy: dict[str, Any],
 ) -> dict[str, Any]:
@@ -288,9 +314,23 @@ def _strategy_with_latest_complete_data_adjustment(
         return strategy
     today = _today()
     try:
-        resolved = resolve_date_range(strategy.get("date_range"), today=today)
+        resolved = resolve_executable_date_range(
+            strategy.get("date_range"),
+            extra_parameters=_strategy_extra_parameters(strategy),
+            today=today,
+        )
     except (TypeError, ValueError):
+        logger.debug(
+            "Confirm stage skipped latest data adjustment after date resolution error",
+            asset_class=asset_class,
+        )
         return strategy
+    logger.debug(
+        "Confirm stage latest data adjustment started",
+        asset_class=asset_class,
+        timeframe=_strategy_timeframe(strategy),
+        end_date=resolved.end.isoformat(),
+    )
     adjustment = latest_complete_data_adjustment(
         asset_class=asset_class,
         timeframe=_strategy_timeframe(strategy),
@@ -299,6 +339,11 @@ def _strategy_with_latest_complete_data_adjustment(
         clock=_market_clock_for_strategy(asset_class),
     )
     if adjustment is None:
+        logger.debug(
+            "Confirm stage latest data adjustment not needed",
+            asset_class=asset_class,
+            end_date=resolved.end.isoformat(),
+        )
         return strategy
     extra_parameters = dict(strategy.get("extra_parameters") or {})
     return {
@@ -335,8 +380,15 @@ def _market_clock_for_strategy(asset_class: str) -> Any:
     if asset_class != "equity":
         return None
     try:
-        return fetch_alpaca_market_clock()
+        logger.debug("Confirm stage market clock fetch started", asset_class=asset_class)
+        clock = fetch_alpaca_market_clock()
+        logger.debug("Confirm stage market clock fetch completed", asset_class=asset_class)
+        return clock
     except Exception:
+        logger.opt(exception=True).debug(
+            "Confirm stage market clock fetch failed",
+            asset_class=asset_class,
+        )
         return None
 
 
@@ -383,7 +435,10 @@ def _date_limit_recovery_patch(
                 ],
             },
         )
-    resolved = resolve_date_range(raw_date_range)
+    resolved = resolve_executable_date_range(
+        raw_date_range,
+        extra_parameters=_strategy_extra_parameters(strategy),
+    )
     asset_class = _strategy_asset_class(strategy)
     timeframe = _strategy_timeframe(strategy)
     if asset_class is None:

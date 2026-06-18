@@ -1,4 +1,8 @@
 import type { StrategyResultPayload } from "@/components/chat/types";
+import type { AssetClass } from "@/lib/argus-types";
+import { assetClassDisplayLabel } from "@/lib/asset-class-display";
+import { cadenceDisplayLabel } from "@/lib/cadence-display";
+import { compactDateRangeDisplay } from "@/lib/date-range-display";
 
 type MetricLike = {
   key?: string;
@@ -31,15 +35,19 @@ export type ResultCardDisplayCopy = {
   inLineWith: (symbol: string) => string;
   beatBy: (value: string) => string;
   laggedBy: (value: string) => string;
+  assetClassLabel: (assetClass: AssetClass) => string;
   trustStrip: string;
   startingCapitalLabel: string;
   totalContributedLabel: string;
+  peakValueLabel: string;
+  lowestValueLabel: string;
   dateRangeLabel: string;
   timeframeLabel: string;
   sideLabel: string;
   allocationLabel: string;
   benchmarkLabel: string;
   cadenceLabel: string;
+  cadenceValueLabel: (cadence: string) => string;
   contributionLabel: string;
   entryRuleLabel: string;
   exitRuleLabel: string;
@@ -74,15 +82,19 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   inLineWith: (symbol) => `In line with ${symbol}`,
   beatBy: (value) => `Beat by ${value}`,
   laggedBy: (value) => `Lagged by ${value}`,
+  assetClassLabel: (assetClass) => assetClassDisplayLabel(assetClass) ?? assetClass,
   trustStrip: "Historical simulation · No fees/slippage · Not advice",
   startingCapitalLabel: "Starting capital",
   totalContributedLabel: "Total contributed",
+  peakValueLabel: "Peak value",
+  lowestValueLabel: "Lowest value",
   dateRangeLabel: "Date range",
   timeframeLabel: "Timeframe",
   sideLabel: "Side",
   allocationLabel: "Allocation",
   benchmarkLabel: "Benchmark",
   cadenceLabel: "Cadence",
+  cadenceValueLabel: (cadence) => cadenceDisplayLabel(cadence) ?? cadence,
   contributionLabel: "Contribution",
   entryRuleLabel: "Entry rule",
   exitRuleLabel: "Exit rule",
@@ -290,13 +302,19 @@ export function heroDeltaEvidenceView(
       value: worstDrop?.value ?? copy.unavailable,
     },
     timeframeDisplay: facts.timeframeDisplay,
-    trustGroups: compactTrustGroups(copy),
+    trustGroups: compactTrustGroups(copy, result.assetClass),
     details: facts.details,
   };
 }
 
-export function compactTrustGroups(copy = defaultResultCardDisplayCopy) {
-  return [copy.trustStrip];
+export function compactTrustGroups(
+  copy = defaultResultCardDisplayCopy,
+  assetClass?: AssetClass,
+) {
+  const assetClassLabel = assetClass ? copy.assetClassLabel(assetClass) : undefined;
+  return [
+    assetClassLabel ? `${assetClassLabel} · ${copy.trustStrip}` : copy.trustStrip,
+  ];
 }
 
 export function compactTrustStrip(copy = defaultResultCardDisplayCopy) {
@@ -348,6 +366,7 @@ function executionFacts(
     resolvedParameters,
     parameters,
     locale,
+    copy,
   );
   const entryRule = assumptionValue(assumptions, "Entry");
   const exitRule = assumptionValue(assumptions, "Exit");
@@ -357,17 +376,21 @@ function executionFacts(
   );
   const startingCapital =
     parsedStartingCapital ?? result.chart?.base_value ?? undefined;
+  const dateRangeDisplay =
+    compactDateRangeDisplay(result.dateRange, locale || "en-US") ?? result.period;
   const capitalBasisLabel = isRecurringContributionResult(
     result,
     resolvedParameters,
   )
     ? copy.totalContributedLabel
     : copy.startingCapitalLabel;
+  const valueSummaryDetails = portfolioValueSummaryDetails(result, copy, locale);
   const details: EvidenceMetric[] = [
     startingCapital == null
       ? undefined
       : { label: capitalBasisLabel, value: formatCurrency(startingCapital, locale) },
-    { label: copy.dateRangeLabel, value: result.period },
+    ...valueSummaryDetails,
+    { label: copy.dateRangeLabel, value: dateRangeDisplay },
     timeframe ? { label: copy.timeframeLabel, value: timeframe } : undefined,
     side ? { label: copy.sideLabel, value: side } : undefined,
     allocation ? { label: copy.allocationLabel, value: allocation } : undefined,
@@ -383,6 +406,44 @@ function executionFacts(
     benchmark,
     details,
   };
+}
+
+function portfolioValueSummaryDetails(
+  result: StrategyResultPayload,
+  copy: ResultCardDisplayCopy,
+  locale?: string,
+) {
+  const summary = recordValue(result.chart?.value_summary);
+  if (!summary) {
+    const legacyExtrema = chartValueExtrema(result.chart);
+    if (!legacyExtrema) {
+      return [];
+    }
+    return [
+      {
+        label: copy.peakValueLabel,
+        value: formatCurrency(legacyExtrema.peak, locale, legacyExtrema.currency),
+      },
+      {
+        label: copy.lowestValueLabel,
+        value: formatCurrency(legacyExtrema.lowest, locale, legacyExtrema.currency),
+      },
+    ];
+  }
+  const source = stringValue(summary.source);
+  if (source && source !== "strategy_portfolio_equity_close") {
+    return [];
+  }
+  const peakValue = numberValue(summary.peak_value);
+  const lowestValue = numberValue(summary.lowest_value);
+  return [
+    peakValue == null
+      ? undefined
+      : { label: copy.peakValueLabel, value: formatCurrency(peakValue, locale) },
+    lowestValue == null
+      ? undefined
+      : { label: copy.lowestValueLabel, value: formatCurrency(lowestValue, locale) },
+  ].filter((detail): detail is EvidenceMetric => Boolean(detail));
 }
 
 function isRecurringContributionResult(
@@ -427,12 +488,13 @@ function contributionFromStructuredFacts(
   resolvedParameters?: Record<string, unknown>,
   parameters?: Record<string, unknown>,
   locale?: string,
+  copy = defaultResultCardDisplayCopy,
 ) {
   const rawCadence =
     stringValue(resolvedParameters?.cadence) ?? stringValue(parameters?.dca_cadence);
   if (!rawCadence) return undefined;
 
-  const cadence = sentenceCase(rawCadence.replace(/_/g, " "));
+  const cadence = copy.cadenceValueLabel(rawCadence);
   const amount = numberValue(resolvedParameters?.capital_amount);
   return {
     cadence,
@@ -442,6 +504,17 @@ function contributionFromStructuredFacts(
 
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function chartValueExtrema(chart: StrategyResultPayload["chart"]) {
+  const peak = numberValue(chart?.value_extrema?.peak?.value);
+  const lowest = numberValue(chart?.value_extrema?.lowest?.value);
+  if (peak == null || lowest == null) return undefined;
+  return {
+    peak,
+    lowest,
+    currency: chart?.currency ?? "USD",
+  };
 }
 
 export function formatTimeframeForDisplay(
@@ -475,12 +548,6 @@ function timeframeUnitLabel(unit: string) {
   if (unit === "d") return "day";
   if (unit === "w") return "week";
   return "period";
-}
-
-function sentenceCase(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return trimmed;
-  return `${trimmed[0].toUpperCase()}${trimmed.slice(1).toLowerCase()}`;
 }
 
 function benchmarkFromMetric(result: StrategyResultPayload) {
@@ -598,10 +665,12 @@ function benchmarkDisplayValue(
     .replace(/\bpts\b/gi, "percentage points");
 }
 
-function formatCurrency(value: number, locale = "en-US") {
+function formatCurrency(value: number, locale = "en-US", currency = "USD") {
   return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "USD",
+    currency,
+    currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
 }

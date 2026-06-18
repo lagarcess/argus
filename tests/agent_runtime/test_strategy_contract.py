@@ -1,31 +1,39 @@
+import ast
+import inspect
+import textwrap
 from datetime import date
 
+import argus.agent_runtime.strategy_contract as strategy_contract_module
 from argus.agent_runtime.run_field_contract import (
-    current_message_date_range,
-    current_message_dca_cadence,
     current_message_execution_context_tokens,
 )
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import (
+    canonical_strategy_type,
     executable_strategy_type,
     executable_strategy_type_from_extracted_fields,
     normalize_date_range_candidate,
     resolve_date_range,
+    resolve_executable_date_range,
     strategy_can_be_approved,
 )
 from argus.agent_runtime.turn_execution_evidence import (
     current_turn_has_material_execution_evidence,
 )
+from argus.nlp.natural_time import (
+    resolve_date_range_intent,
+    resolve_rolling_window_intent_text,
+)
 
 
-def test_resolve_date_range_accepts_month_name_ranges() -> None:
+def test_resolve_date_range_requires_canonical_state_for_month_name_ranges() -> None:
     resolved = resolve_date_range(
         "Jan 1 2010 to Dec 31 2020",
         today=date(2026, 5, 3),
     )
 
-    assert resolved.payload == {"start": "2010-01-01", "end": "2020-12-31"}
-    assert resolved.display == "January 1, 2010 - December 31, 2020"
+    assert resolved.used_default is True
+    assert resolved.payload == {"start": "2025-05-03", "end": "2026-05-03"}
 
 
 def test_lump_sum_strategy_alias_executes_as_buy_and_hold() -> None:
@@ -35,6 +43,32 @@ def test_lump_sum_strategy_alias_executes_as_buy_and_hold() -> None:
     )
 
 
+def test_locale_strategy_phrases_do_not_canonicalize_through_runtime_contract() -> None:
+    assert canonical_strategy_type("compra y mantén") != "buy_and_hold"
+    assert canonical_strategy_type("comprar_y_mantener") != "buy_and_hold"
+
+
+def test_strategy_aliases_live_in_capability_registry_not_runtime_contract() -> None:
+    tree = ast.parse(
+        textwrap.dedent(
+            inspect.getsource(strategy_contract_module.canonical_strategy_type)
+        )
+    )
+
+    local_alias_dicts = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "aliases"
+            for target in node.targets
+        )
+        and isinstance(node.value, ast.Dict)
+    ]
+
+    assert local_alias_dicts == []
+
+
 def test_broad_investment_label_is_not_a_strategy_alias() -> None:
     assert (
         executable_strategy_type(StrategySummary(strategy_type="investment"))
@@ -42,46 +76,103 @@ def test_broad_investment_label_is_not_a_strategy_alias() -> None:
     )
 
 
-def test_resolve_date_range_accepts_month_span_with_shared_year() -> None:
+def test_month_span_with_shared_year_requires_canonical_intent() -> None:
     resolved = resolve_date_range(
         "march through october 2024",
         today=date(2026, 5, 3),
     )
 
-    assert resolved.payload == {"start": "2024-03-01", "end": "2024-10-31"}
-    assert resolved.display == "March 1, 2024 - October 31, 2024"
-    assert resolved.used_default is False
+    assert resolved.used_default is True
 
-
-def test_current_message_contract_does_not_broaden_explicit_month_ranges() -> None:
-    assert (
-        current_message_date_range(
-            "from March 1 2020 to August 1 2021",
-            today=date(2026, 5, 3),
-        )
-        is None
+    canonical = resolve_date_range_intent(
+        {
+            "kind": "explicit_range",
+            "start": "2024-03-01",
+            "end": "2024-10-31",
+            "evidence": "march through october 2024",
+        },
+        today=date(2026, 5, 3),
     )
 
+    assert canonical is not None
+    assert canonical.payload == {"start": "2024-03-01", "end": "2024-10-31"}
 
-def test_resolve_date_range_accepts_month_year_to_today() -> None:
+
+def test_bounded_evidence_can_recover_rolling_window_intent() -> None:
+    intent = resolve_rolling_window_intent_text(
+        "last 12 months",
+        today=date(2026, 6, 15),
+        languages=("en",),
+    )
+
+    assert intent == {
+        "kind": "rolling_window",
+        "count": 12,
+        "unit": "month",
+        "anchor": "today",
+        "confidence": 0.65,
+        "evidence": "last 12 months",
+    }
+
+
+def test_current_message_contract_preserves_canonical_explicit_day_ranges() -> None:
+    resolved = resolve_date_range_intent(
+        {
+            "kind": "explicit_range",
+            "start": "2020-03-01",
+            "end": "2021-08-01",
+            "evidence": "from March 1 2020 to August 1 2021",
+        },
+        today=date(2026, 5, 3),
+    )
+
+    assert resolved is not None
+    assert resolved.payload == {"start": "2020-03-01", "end": "2021-08-01"}
+
+
+def test_month_year_to_today_requires_canonical_intent() -> None:
     resolved = resolve_date_range(
         "January 2022 to today",
         today=date(2026, 5, 20),
     )
 
-    assert resolved.payload == {"start": "2022-01-01", "end": "2026-05-20"}
-    assert resolved.display == "January 1, 2022 - May 20, 2026"
-    assert resolved.used_default is False
+    assert resolved.used_default is True
+
+    canonical = resolve_date_range_intent(
+        {
+            "kind": "since",
+            "start": "2022-01-01",
+            "end": "2026-05-20",
+            "evidence": "January 2022 to today",
+        },
+        today=date(2026, 5, 20),
+    )
+
+    assert canonical is not None
+    assert canonical.payload == {"start": "2022-01-01", "end": "2026-05-20"}
 
 
-def test_resolve_date_range_accepts_relative_endpoint_tokens() -> None:
+def test_relative_endpoint_tokens_require_canonical_endpoint_intent() -> None:
     resolved = resolve_date_range(
         {"start": "2026-01-01", "end": "yesterday"},
         today=date(2026, 6, 3),
     )
 
-    assert resolved.payload == {"start": "2026-01-01", "end": "2026-06-02"}
-    assert resolved.used_default is False
+    assert resolved.used_default is True
+
+    canonical = resolve_date_range_intent(
+        {
+            "kind": "endpoint_patch",
+            "endpoint": "end",
+            "anchor": "today",
+            "day_offset": -1,
+            "evidence": "yesterday",
+        },
+        today=date(2026, 6, 3),
+    )
+
+    assert canonical is not None
+    assert canonical.payload == {"end": "2026-06-02"}
 
 
 def test_resolve_date_range_accepts_structured_iso_month_endpoints() -> None:
@@ -102,82 +193,171 @@ def test_resolve_date_range_accepts_structured_iso_month_endpoints() -> None:
     assert string_resolved.used_default is False
 
 
-def test_resolve_date_range_accepts_compact_month_year_spans() -> None:
+def test_compact_month_year_spans_require_nlp_boundary() -> None:
     resolved = resolve_date_range(
         "Jan 2021-Jan 2024",
         today=date(2026, 6, 3),
     )
 
-    assert resolved.payload == {"start": "2021-01-01", "end": "2024-01-31"}
-    assert resolved.display == "January 1, 2021 - January 31, 2024"
-    assert resolved.used_default is False
+    assert resolved.used_default is True
 
 
-def test_current_message_date_range_accepts_compact_month_year_spans() -> None:
-    resolved = current_message_date_range(
-        (
-            "Can you set a strategy where I buy AAPL GOOG at $200 every month "
-            "for Jan 2021-Jan 2024?"
-        ),
+def test_bounded_compact_month_year_spans_require_nlp_boundary() -> None:
+    resolved = resolve_date_range(
+        "Jan 2021-Jan 2024",
         today=date(2026, 6, 3),
     )
 
-    assert resolved == {"start": "2021-01-01", "end": "2024-01-31"}
+    assert resolved.used_default is True
 
 
-def test_resolve_date_range_accepts_calendar_year() -> None:
-    resolved = resolve_date_range("in 2024", today=date(2026, 5, 3))
-
-    assert resolved.label == "2024"
-    assert resolved.payload == {"start": "2024-01-01", "end": "2024-12-31"}
-    assert resolved.display == "2024 (January 1, 2024 - December 31, 2024)"
-    assert resolved.used_default is False
-
-
-def test_calendar_year_contract_preserves_multi_year_language() -> None:
-    resolved = resolve_date_range("over 2024 and 2025", today=date(2026, 5, 3))
-
-    assert resolved.payload == {"start": "2024-01-01", "end": "2025-12-31"}
-    assert resolved.used_default is False
-    assert current_message_date_range(
-        "how did apple perform over 2024 and 2025?",
+def test_calendar_year_intent_resolves_without_phrase_scan() -> None:
+    resolved = resolve_date_range_intent(
+        {
+            "kind": "calendar_year",
+            "year": 2024,
+            "evidence": "2024",
+        },
         today=date(2026, 5, 3),
-    ) == ({"start": "2024-01-01", "end": "2025-12-31"})
+    )
+
+    assert resolved is not None
+    assert resolved.payload == {"start": "2024-01-01", "end": "2024-12-31"}
 
 
-def test_resolve_date_range_accepts_current_year_so_far() -> None:
-    resolved = resolve_date_range("in 2026 so far", today=date(2026, 6, 1))
+def test_multi_year_contract_uses_explicit_range_intent() -> None:
+    resolved = resolve_date_range_intent(
+        {
+            "kind": "explicit_range",
+            "start": "2024-01-01",
+            "end": "2025-12-31",
+            "evidence": "2024 and 2025",
+        },
+        today=date(2026, 5, 3),
+    )
 
-    assert resolved.label == "2026 so far"
-    assert resolved.payload == {"start": "2026-01-01", "end": "2026-06-01"}
-    assert resolved.used_default is False
+    assert resolved is not None
+    assert resolved.payload == {"start": "2024-01-01", "end": "2025-12-31"}
 
 
-def test_current_message_date_range_accepts_current_year_so_far() -> None:
-    resolved = current_message_date_range(
-        "how did apple perform against QQQ in 2026 so far?",
+def test_current_year_so_far_uses_year_to_date_intent() -> None:
+    resolved = resolve_date_range_intent(
+        {
+            "kind": "year_to_date",
+            "year": 2026,
+            "evidence": "2026 so far",
+        },
         today=date(2026, 6, 1),
     )
 
-    assert resolved == {"start": "2026-01-01", "end": "2026-06-01"}
+    assert resolved is not None
+    assert resolved.payload == {"start": "2026-01-01", "end": "2026-06-01"}
 
 
-def test_current_message_date_range_accepts_relative_end_date_edit() -> None:
-    resolved = current_message_date_range(
-        "adjust the end date to yesterday",
+def test_canonical_year_to_date_intent_resolves_without_phrase_scan() -> None:
+    resolved = resolve_date_range_intent(
+        {
+            "kind": "year_to_date",
+            "year": 2026,
+            "evidence": "2026 so far",
+        },
+        today=date(2026, 6, 1),
+    )
+
+    assert resolved is not None
+    assert resolved.payload == {"start": "2026-01-01", "end": "2026-06-01"}
+
+
+def test_raw_semantic_date_windows_require_canonical_intent() -> None:
+    today = date(2026, 6, 1)
+
+    for phrase in (
+        "last month",
+        "last 3 months",
+        "over 2024 and 2025",
+        "in 2026 so far",
+        "use the past year instead",
+        "since 2021",
+    ):
+        resolved = resolve_date_range(phrase, today=today)
+        assert resolved.used_default is True
+
+    rolling = resolve_date_range_intent(
+        {
+            "kind": "rolling_window",
+            "count": 1,
+            "unit": "month",
+            "anchor": "today",
+        },
+        today=today,
+    )
+
+    assert rolling is not None
+    assert rolling.payload == {"start": "2026-05-01", "end": "2026-06-01"}
+
+
+def test_resolve_date_range_accepts_canonical_machine_tokens_only() -> None:
+    today = date(2026, 5, 3)
+
+    last_three_months = resolve_date_range("last_3_months", today=today)
+    ytd = resolve_date_range("year_to_date", today=today)
+
+    assert last_three_months.used_default is False
+    assert last_three_months.display == (
+        "past 3 months (February 3, 2026 - May 3, 2026)"
+    )
+    assert ytd.used_default is False
+    assert ytd.display == "year to date (January 1, 2026 - May 3, 2026)"
+
+
+def test_executable_date_range_prefers_canonical_intent_over_raw_semantic_text() -> None:
+    resolved = resolve_executable_date_range(
+        "last month",
+        extra_parameters={
+            "date_range_intent": {
+                "kind": "rolling_window",
+                "count": 1,
+                "unit": "month",
+                "anchor": "today",
+                "confidence": 0.9,
+                "evidence": "last month",
+            }
+        },
+        today=date(2026, 6, 1),
+    )
+
+    assert resolved.used_default is False
+    assert resolved.payload == {"start": "2026-05-01", "end": "2026-06-01"}
+
+
+def test_spanish_month_year_spans_require_nlp_boundary() -> None:
+    resolved = resolve_date_range(
+        "desde enero de 2021 hasta diciembre de 2024",
+        today=date(2026, 6, 1),
+    )
+
+    assert resolved.used_default is True
+
+
+def test_canonical_endpoint_intent_resolves_relative_end_date_edit() -> None:
+    resolved = resolve_date_range_intent(
+        {
+            "kind": "endpoint_patch",
+            "endpoint": "end",
+            "anchor": "today",
+            "day_offset": -1,
+            "evidence": "yesterday",
+        },
         today=date(2026, 6, 3),
     )
 
-    assert resolved == {"end": "2026-06-02"}
+    assert resolved is not None
+    assert resolved.payload == {"end": "2026-06-02"}
 
 
-def test_current_message_dca_cadence_uses_capability_aliases() -> None:
-    assert current_message_dca_cadence("buy $250 of NVDA every week in 2024") == (
-        "weekly"
-    )
-    assert current_message_dca_cadence("comprar 100 de BTC cada mes en 2024") == (
-        "monthly"
-    )
+def test_dca_cadence_phrases_do_not_bypass_llm_interpretation() -> None:
+    assert canonical_strategy_type(None, cadence="weekly") == "dca_accumulation"
+    assert canonical_strategy_type(None, cadence="semanal") != "dca_accumulation"
 
 
 def test_indicator_context_tokens_exclude_indicator_names_from_asset_grounding() -> None:
@@ -205,6 +385,19 @@ def test_active_context_asset_mentions_need_requested_field_context() -> None:
     )
 
 
+def test_numeric_execution_facts_route_to_llm_repair_without_parsing_language() -> None:
+    assert current_turn_has_material_execution_evidence(
+        "compra y manten eth ultimos 8 meses 100k",
+        has_provider_asset_mention=False,
+        active_strategy_context=False,
+    )
+    assert current_turn_has_material_execution_evidence(
+        "RSI entry 20 exit 60",
+        has_provider_asset_mention=False,
+        active_strategy_context=True,
+    )
+
+
 def test_normalize_date_range_preserves_structured_month_name_ranges() -> None:
     normalized = normalize_date_range_candidate(
         {"start": "2020-02-07", "end": "2024-02-07"},
@@ -224,29 +417,29 @@ def test_raw_phrase_no_longer_overrides_structured_date_range() -> None:
     assert normalized == "past year"
 
 
-def test_singular_relative_periods_do_not_fall_back_to_past_year() -> None:
+def test_relative_period_intents_resolve_without_phrase_scan() -> None:
     cases = {
-        "last month": ("past month", "2026-04-03", "2026-05-03"),
-        "past month": ("past month", "2026-04-03", "2026-05-03"),
-        "last week": ("past week", "2026-04-26", "2026-05-03"),
-        "past week": ("past week", "2026-04-26", "2026-05-03"),
-        "last quarter": ("past quarter", "2026-02-03", "2026-05-03"),
+        ("month", 1): ("2026-04-03", "2026-05-03"),
+        ("week", 1): ("2026-04-26", "2026-05-03"),
+        ("quarter", 1): ("2026-02-03", "2026-05-03"),
     }
 
-    for phrase, (label, start, end) in cases.items():
-        normalized = normalize_date_range_candidate(
-            phrase,
+    for (unit, count), (start, end) in cases.items():
+        resolved = resolve_date_range_intent(
+            {
+                "kind": "rolling_window",
+                "unit": unit,
+                "count": count,
+                "anchor": "today",
+            },
             today=date(2026, 5, 3),
         )
-        resolved = resolve_date_range(normalized, today=date(2026, 5, 3))
 
-        assert normalized == phrase
-        assert resolved.label == label
+        assert resolved is not None
         assert resolved.payload == {"start": start, "end": end}
-        assert resolved.used_default is False
 
 
-def test_embedded_singular_relative_periods_are_not_default_fallback() -> None:
+def test_embedded_raw_relative_periods_default_without_intent() -> None:
     resolved = resolve_date_range(
         "use the past year instead",
         today=date(2026, 5, 3),
@@ -254,7 +447,7 @@ def test_embedded_singular_relative_periods_are_not_default_fallback() -> None:
 
     assert resolved.label == "past year"
     assert resolved.payload == {"start": "2025-05-03", "end": "2026-05-03"}
-    assert resolved.used_default is False
+    assert resolved.used_default is True
 
 
 def test_resolve_date_range_exposes_default_fallback() -> None:

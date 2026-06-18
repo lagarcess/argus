@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -21,6 +23,91 @@ def _render_env(service_name: str) -> dict[str, dict[str, str | bool]]:
             return {env["key"]: env for env in service["envVars"]}
 
     raise AssertionError(f"{service_name} service missing from render.yaml")
+
+
+def _render_env_payload(
+    service_name: str,
+    *,
+    omit: set[str] | None = None,
+    extra: dict[str, str] | None = None,
+    overrides: dict[str, str] | None = None,
+) -> str:
+    omitted = omit or set()
+    extra = extra or {}
+    overrides = overrides or {}
+    rows: list[dict[str, dict[str, str]]] = []
+
+    for key, env in _render_env(service_name).items():
+        if key in omitted:
+            continue
+        value = overrides.get(key)
+        if value is None:
+            value = str(env.get("value", ""))
+            if not value and key != "NEXT_PUBLIC_POSTHOG_KEY":
+                value = f"fake-secret-{key.lower()}"
+        rows.append({"envVar": {"key": key, "value": value}})
+
+    for key, value in extra.items():
+        rows.append({"envVar": {"key": key, "value": value}})
+
+    return json.dumps(rows)
+
+
+def _run_render_release_audit(
+    tmp_path: Path,
+    *,
+    api_env_json: str,
+    web_env_json: str,
+    expect_mode: str = "safe-off",
+) -> subprocess.CompletedProcess[str]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    request_log = tmp_path / "curl-requests.log"
+    fake_curl = bin_dir / "curl"
+    fake_curl.write_text(
+        """#!/bin/bash
+printf "%s\\n" "$*" >> "$FAKE_CURL_REQUEST_LOG"
+case "$*" in
+  *"$FAKE_API_SERVICE_ID"*)
+    printf "%s" "$FAKE_API_ENV_JSON"
+    ;;
+  *"$FAKE_WEB_SERVICE_ID"*)
+    printf "%s" "$FAKE_WEB_ENV_JSON"
+    ;;
+  *)
+    echo "unexpected curl request: $*" >&2
+    exit 9
+    ;;
+esac
+""",
+    )
+    fake_curl.chmod(0o755)
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{bin_dir}:{env['PATH']}",
+            "RENDER_API_KEY": "fake-render-token",
+            "FAKE_API_SERVICE_ID": "srv-d78tanmuk2gs73e17nn0",
+            "FAKE_WEB_SERVICE_ID": "srv-d7ap6bmslomc73eqp8m0",
+            "FAKE_API_ENV_JSON": api_env_json,
+            "FAKE_WEB_ENV_JSON": web_env_json,
+            "FAKE_CURL_REQUEST_LOG": str(request_log),
+        }
+    )
+    return subprocess.run(
+        [
+            ".github/render-env-sync.sh",
+            "release-config-audit",
+            "--expect-mode",
+            expect_mode,
+        ],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 def _contract_array(name: str) -> list[str]:
@@ -69,6 +156,15 @@ def test_dev_script_ignores_database_urls_even_when_env_contains_them() -> None:
     assert "unset DATABASE_URL" in env_contract
     assert "SUPABASE_POSTGRES_SESSION_POOLER_URL" in combined
     assert "Database URLs: Ignored" in dev_script
+
+
+def test_dev_script_disables_disk_market_data_cache_for_stable_memory_qa() -> None:
+    dev_script = _source(".github/dev.sh")
+    env_contract = ENV_CONTRACT.read_text()
+
+    assert "Synthetic fixtures (no API calls)" in dev_script
+    assert "Disk market-data cache: Disabled" in dev_script
+    assert "export ENABLE_MARKET_DATA_CACHE=false" in env_contract
 
 
 def test_dev_and_qa_scripts_source_shared_env_contract() -> None:
@@ -122,6 +218,7 @@ def test_render_blueprint_uses_current_env_contract_names_only() -> None:
         "ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT",
         "ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT",
         "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT",
+        "NEXT_PUBLIC_ENABLE_SPANISH",
         "NEXT_PUBLIC_ARGUS_API_URL",
         "NEXT_PUBLIC_MOCK_AUTH",
     ):
@@ -261,7 +358,7 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     assert "ARGUS_WORKFLOW_PROOF_PLAN=" in env_example
     assert "POETRY_VERSION=2.1.3" in env_example
     assert "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS=300" in env_example
-    assert "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=20" in env_example
+    assert "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=30" in env_example
     assert "ARGUS_RENDER_WORKFLOW_PROOF_ENV=(" in env_contract
     assert "ARGUS_WORKFLOW_DATABASE_URL" in env_contract
     assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK" in env_contract
@@ -338,7 +435,7 @@ def test_render_env_sync_pushes_workflow_llm_readout_env() -> None:
     assert (
         'put_render_env "$WORKFLOW_SERVICE_ID" '
         'ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS '
-        '"${ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS:-20}"'
+        '"${ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS:-30}"'
     ) in workflow_block
     assert "ARGUS_WORKFLOW_DATABASE_URL" in source
     assert "require_local_env ALPACA_API_KEY" in source
@@ -364,6 +461,47 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
     assert "workflow-runtime" in source
     assert "https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}" in source
     assert "render_workflow_json" in source
+
+
+def test_render_env_sync_prints_api_deploy_status_without_mutation() -> None:
+    source = _source(".github/render-env-sync.sh")
+
+    assert ".github/render-env-sync.sh api-deploy-status" in source
+    assert "print_api_deploy_status()" in source
+    assert "/v1/services/${service_id}/deploys?limit=1" in source
+    assert 'print_deploy_status "$API_SERVICE_ID" "argus-api"' in source
+    assert "commit_short" in source
+    assert "deploy_id" in source
+
+    deploy_status_block = source.split(
+        "print_api_deploy_status() {",
+        maxsplit=1,
+    )[1].split("\n}", maxsplit=1)[0]
+
+    assert "put_render_env" not in deploy_status_block
+    assert "delete_render_env" not in deploy_status_block
+
+
+def test_render_env_sync_prints_web_deploy_status_without_mutation() -> None:
+    env_contract = ENV_CONTRACT.read_text()
+    source = _source(".github/render-env-sync.sh")
+
+    assert 'ARGUS_PRIVATE_LAUNCH_WEB_SERVICE_ID="srv-d7ap6bmslomc73eqp8m0"' in (
+        env_contract
+    )
+    assert ".github/render-env-sync.sh web-deploy-status" in source
+    assert "WEB_SERVICE_ID" in source
+    assert "print_web_deploy_status()" in source
+    assert "/v1/services/${service_id}/deploys?limit=1" in source
+    assert 'print_deploy_status "$WEB_SERVICE_ID" "argus-app"' in source
+
+    deploy_status_block = source.split(
+        "print_web_deploy_status() {",
+        maxsplit=1,
+    )[1].split("\n}", maxsplit=1)[0]
+
+    assert "put_render_env" not in deploy_status_block
+    assert "delete_render_env" not in deploy_status_block
 
 
 def test_render_env_sync_can_sync_api_runtime_config() -> None:
@@ -474,6 +612,108 @@ def test_render_env_sync_separates_proof_and_real_api_modes() -> None:
     )
 
 
+def test_render_env_sync_can_audit_release_config_without_mutation() -> None:
+    source = _source(".github/render-env-sync.sh")
+
+    assert ".github/render-env-sync.sh release-config-audit" in source
+    assert "--expect-mode <safe-off|proof-shadow|real-workflow>" in source
+    assert "audit_release_config()" in source
+    assert "audit_render_service_config" in source
+    assert "ARGUS_RENDER_API_ENV" in source
+    assert "ARGUS_RENDER_WEB_ENV" in source
+    assert "ARGUS_FORBIDDEN_LEGACY_ENV" in source
+    assert "render_env_fingerprint" in source
+    assert "env_fingerprint=" in source
+    assert "status=ready" in source
+    assert "ARGUS_BACKTEST_WORKFLOW_TASK" in source
+    assert "ARGUS_BACKTEST_REAL_WORKFLOW_TASK" in source
+    assert "NEXT_PUBLIC_COLLECTIONS_ENABLED=false" in source
+    assert "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false" in source
+    assert "ARGUS_CORS_ALLOW_ORIGINS" in source
+    assert "ARGUS_CHECKPOINTER_MODE=postgres" in source
+    assert "ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider" in source
+    assert "<redacted-present>" in source
+    assert "<missing-or-empty>" in source
+
+    audit_block = source.split("audit_release_config() {", maxsplit=1)[1].split(
+        "\n}",
+        maxsplit=1,
+    )[0]
+    assert "put_render_env" not in audit_block
+    assert "delete_render_env" not in audit_block
+    assert "curl -fsS" not in audit_block
+
+
+def test_render_env_sync_audit_uses_large_render_env_page(
+    tmp_path: Path,
+) -> None:
+    result = _run_render_release_audit(
+        tmp_path,
+        api_env_json=_render_env_payload(
+            "argus-api",
+            overrides={"RENDER_API_KEY": ""},
+        ),
+        web_env_json=_render_env_payload("argus-app"),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    request_log = tmp_path / "curl-requests.log"
+    assert "env-vars?limit=100" in request_log.read_text()
+
+
+def test_render_env_sync_audit_fails_when_contract_key_is_missing(
+    tmp_path: Path,
+) -> None:
+    result = _run_render_release_audit(
+        tmp_path,
+        api_env_json=_render_env_payload(
+            "argus-api",
+            omit={"MARKET_DATA_CACHE_TTL"},
+            overrides={"RENDER_API_KEY": ""},
+        ),
+        web_env_json=_render_env_payload("argus-app"),
+    )
+
+    assert result.returncode == 1
+    assert "drift argus-api:MARKET_DATA_CACHE_TTL" in result.stdout
+    assert "status=drift" in result.stdout
+
+
+def test_render_env_sync_audit_rejects_frontend_secrets_and_legacy_keys(
+    tmp_path: Path,
+) -> None:
+    result = _run_render_release_audit(
+        tmp_path,
+        api_env_json=_render_env_payload(
+            "argus-api",
+            overrides={"RENDER_API_KEY": ""},
+        ),
+        web_env_json=_render_env_payload(
+            "argus-app",
+            extra={
+                "SUPABASE_SERVICE_ROLE_KEY": "leaked-service-role",
+                "NEXT_PUBLIC_API_URL": "https://legacy.example.test",
+            },
+        ),
+    )
+
+    assert result.returncode == 1
+    assert "forbidden argus-app:SUPABASE_SERVICE_ROLE_KEY" in result.stdout
+    assert "forbidden argus-app:NEXT_PUBLIC_API_URL" in result.stdout
+    assert "status=drift" in result.stdout
+
+
+def test_render_env_sync_audit_declares_mode_specific_render_key_contract() -> None:
+    source = _source(".github/render-env-sync.sh")
+
+    assert "expected_api_mode_pairs()" in source
+    assert "safe-off)" in source
+    assert "proof-shadow)" in source
+    assert "real-workflow)" in source
+    assert "RENDER_API_KEY=<missing-or-empty>" in source
+    assert "RENDER_API_KEY=<redacted-present>" in source
+
+
 def test_render_blueprint_preserves_optional_posthog_key() -> None:
     env_contract = ENV_CONTRACT.read_text()
     web_env = _render_env("argus-app")
@@ -512,11 +752,69 @@ def test_warmup_script_can_assert_expected_api_mode_without_mutating_render() ->
 
     assert "--expect-mode <safe-off|proof-shadow|real-workflow>" in warmup
     assert "assert_api_mode()" in warmup
-    assert '"$SCRIPT_DIR/render-env-sync.sh" api-status' in warmup
-    assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=false" in warmup
-    assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=true" in warmup
-    assert "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true" in warmup
-    assert "ARGUS_BACKTEST_WORKFLOW_TASK=argus-backtests/workflow_proof" in warmup
-    assert "ARGUS_BACKTEST_REAL_WORKFLOW_TASK=argus-backtests/run_backtest_job" in warmup
+    assert '"$SCRIPT_DIR/render-env-sync.sh" release-config-audit' in warmup
+    assert '--expect-mode "$mode"' in warmup
+    assert 'if ! status="$(' in warmup
+    assert 'printf "%s\\n" "$status"' in warmup
+    assert "env_fingerprint=" in warmup
+    assert "status=ready" in warmup
     assert "put_render_env" not in warmup
     assert "delete_render_env" not in warmup
+
+
+def test_warmup_script_runs_stale_job_scan_when_supabase_verifier_env_exists() -> None:
+    warmup = _source(".github/warmup-render.sh")
+
+    assert ".github/stale-backtest-jobs.sh" in warmup
+    assert "ARGUS_STALE_JOBS_SUPABASE_URL" in warmup
+    assert "ARGUS_STALE_JOBS_SUPABASE_SERVICE_ROLE_KEY" in warmup
+    assert "Skipping stale backtest job scan" in warmup
+    assert "set -x" not in warmup
+
+
+def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    before_sessions = runbook.split("## Before Tester Sessions", maxsplit=1)[
+        1
+    ].split("## Backtest Workflow Modes", maxsplit=1)[0]
+    normalized_before_sessions = " ".join(before_sessions.split())
+
+    assert ".github/render-env-sync.sh api-real-workflow-on" in before_sessions
+    assert ".github/render-env-sync.sh api-deploy-status" in before_sessions
+    assert ".github/render-env-sync.sh web-deploy-status" in before_sessions
+    assert ".github/warmup-render.sh --expect-mode real-workflow" in before_sessions
+    assert ".github/canary-render.sh" in before_sessions
+    assert (
+        "API deploy-status, app deploy-status, local smoke, warmup, English "
+        "canary, Spanish canary, and the release manifest"
+        in normalized_before_sessions
+    )
+    assert "both scripts pass" not in before_sessions
+    assert ".github/stale-backtest-jobs.sh" in runbook
+    assert "api-safe-off` is the default private-alpha tester mode" not in runbook
+    assert "NEXT_PUBLIC_POSTHOG_KEY" in runbook
+
+
+def test_private_launch_runbook_smoke_covers_final_readiness_path() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    smoke_test = runbook.split("## Smoke Test", maxsplit=1)[1].split(
+        "## Supabase Persistence Check",
+        maxsplit=1,
+    )[0]
+
+    for expected in (
+        "Cold-start starter chips are visible",
+        "do not reference 2024",
+        "Spanish prompt",
+        "Run backtest",
+        "Change dates",
+        "Change asset",
+        "Adjust assumptions",
+        "Cancel",
+        "Quick take",
+        "Explain result",
+        "Retry",
+        "Reloading the page preserves the conversation, job state, and result",
+        "Feedback can be submitted",
+    ):
+        assert expected in smoke_test

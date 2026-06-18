@@ -6,6 +6,12 @@ from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 SlotPolicy = Literal["required", "defaultable", "clarify_if_missing"]
+ExecutionStrategyType = Literal[
+    "buy_and_hold",
+    "dca_accumulation",
+    "indicator_threshold",
+    "signal_strategy",
+]
 
 
 class ParameterSpec(BaseModel):
@@ -21,6 +27,7 @@ class StrategyCapability(BaseModel):
     template: str
     display_name: str
     aliases: list[str]
+    execution_strategy_type: ExecutionStrategyType | None = None
     supported_asset_classes: list[AssetClass]
     parameters: dict[str, ParameterSpec] = Field(default_factory=dict)
 
@@ -30,30 +37,21 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
         template="buy_and_hold",
         display_name="Buy and Hold",
         aliases=[
-            "buy and hold",
-            "comprar y mantener",
-            "mantener",
-            "hold",
-            "compra y mantener",
-            "lump sum",
             "lump_sum",
-            "lump sum investment",
             "lump_sum_investment",
-            "one time investment",
             "one_time_investment",
         ],
+        execution_strategy_type="buy_and_hold",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),
     "buy_the_dip": StrategyCapability(
         template="buy_the_dip",
         display_name="Buy the Dip",
         aliases=[
-            "buy the dip",
-            "buy dips",
-            "dip buying",
-            "compra en caidas",
-            "compra en bajadas",
+            "buy_dips",
+            "dip_buying",
         ],
+        execution_strategy_type="indicator_threshold",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),
     "rsi_mean_reversion": StrategyCapability(
@@ -61,11 +59,15 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
         display_name="RSI Threshold",
         aliases=[
             "rsi",
+            "rsi_threshold",
             "oversold",
-            "mean reversion",
-            "reversion a la media",
-            "sobreventa",
+            "mean_reversion",
+            "indicator",
+            "indicator_threshold",
+            "threshold",
+            "rule_based",
         ],
+        execution_strategy_type="indicator_threshold",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
         parameters={
             "indicator": ParameterSpec(
@@ -74,7 +76,7 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
                 default="rsi",
                 allowed_values=["rsi"],
                 description="Executable indicator for this threshold strategy.",
-                value_aliases={"rsi": ["rsi", "indice de fuerza relativa"]},
+                value_aliases={},
             ),
             "indicator_period": ParameterSpec(
                 key="indicator_period",
@@ -100,13 +102,13 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
         template="moving_average_crossover",
         display_name="Moving Average Crossover",
         aliases=[
-            "moving average",
-            "ma crossover",
-            "golden cross",
-            "death cross",
-            "cruce de medias",
-            "cruce de medias moviles",
+            "ma_crossover",
+            "signal",
+            "signal_strategy",
+            "golden_cross",
+            "death_cross",
         ],
+        execution_strategy_type="signal_strategy",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),
     "dca_accumulation": StrategyCapability(
@@ -114,11 +116,13 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
         display_name="DCA Accumulation",
         aliases=[
             "dca",
-            "dollar cost averaging",
             "accumulation",
-            "promedio de costo",
-            "acumulacion",
+            "dollar_cost_averaging",
+            "recurring_accumulation",
+            "recurring_buy",
+            "recurring_buys",
         ],
+        execution_strategy_type="dca_accumulation",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
         parameters={
             "dca_cadence": ParameterSpec(
@@ -127,65 +131,22 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
                 default="monthly",
                 allowed_values=list(SUPPORTED_DCA_CADENCE_VALUES),
                 description="How often Argus makes a fixed-dollar purchase.",
-                value_aliases={
-                    "daily": [
-                        "every day",
-                        "each day",
-                        "per day",
-                        "diario",
-                        "cada dia",
-                        "diariamente",
-                    ],
-                    "weekly": [
-                        "every week",
-                        "each week",
-                        "per week",
-                        "semanal",
-                        "cada semana",
-                        "semanalmente",
-                    ],
-                    "biweekly": [
-                        "biweekly",
-                        "every two weeks",
-                        "every other week",
-                        "quincenal",
-                        "cada dos semanas",
-                    ],
-                    "monthly": [
-                        "every month",
-                        "each month",
-                        "per month",
-                        "mensual",
-                        "cada mes",
-                        "mensualmente",
-                    ],
-                    "quarterly": [
-                        "quarterly",
-                        "every quarter",
-                        "each quarter",
-                        "per quarter",
-                        "trimestral",
-                        "cada trimestre",
-                    ],
-                },
+                value_aliases={},
             )
         },
     ),
     "momentum_breakout": StrategyCapability(
         template="momentum_breakout",
         display_name="Momentum Breakout",
-        aliases=["momentum", "breakout", "ruptura de momentum", "rompimiento"],
+        aliases=["momentum", "breakout"],
         supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),
     "trend_follow": StrategyCapability(
         template="trend_follow",
         display_name="Trend Follow",
         aliases=[
-            "trend follow",
-            "trend following",
+            "trend_following",
             "trend",
-            "seguimiento de tendencia",
-            "tendencia",
         ],
         supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),

@@ -25,33 +25,40 @@ def test_dca_accumulation_has_cadence_parameter():
     assert spec.allowed_values == list(SUPPORTED_DCA_CADENCE_VALUES)
 
 
-def test_strategy_aliases_are_present():
+def test_strategy_aliases_are_machine_identifiers():
     for cap in STRATEGY_CAPABILITIES.values():
         assert len(cap.aliases) > 0
         assert cap.display_name != ""
+        for alias in cap.aliases:
+            assert alias == alias.strip().casefold()
+            assert " " not in alias
+            assert "-" not in alias
 
 
-def test_buy_and_hold_aliases():
-    """Verify buy_and_hold can be found via Spanish aliases."""
+def test_buy_and_hold_aliases_are_machine_compatibility_not_nlu():
+    """Capability aliases are not the multilingual interpretation layer."""
     bah = STRATEGY_CAPABILITIES["buy_and_hold"]
     assert bah.display_name == "Buy and Hold"
-    assert "comprar y mantener" in bah.aliases
-    assert "buy and hold" in bah.aliases
-    assert "hold" in bah.aliases
+    assert "lump_sum_investment" in bah.aliases
+    assert "one_time_investment" in bah.aliases
+    assert "buy and hold" not in bah.aliases
+    assert "hold" not in bah.aliases
+    assert "comprar y mantener" not in bah.aliases
 
 
-def test_buy_and_hold_aliases_are_registry_data_not_orchestrator_nlu():
-    """The registry can expose aliases without restoring legacy extraction."""
+def test_registry_aliases_are_not_orchestrator_nlu():
+    """The registry exposes machine compatibility, not prose extraction."""
     import importlib.util
 
     assert importlib.util.find_spec("argus.domain.orchestrator") is None
-    assert "comprar y mantener" in STRATEGY_CAPABILITIES["buy_and_hold"].aliases
+    for capability in STRATEGY_CAPABILITIES.values():
+        assert capability.display_name not in capability.aliases
 
 
 def test_buy_and_hold_canonical_template():
-    """normalize_template_name() should resolve aliases to buy_and_hold."""
-    assert normalize_template_name("buy and hold") == "buy_and_hold"
-    assert normalize_template_name("comprar y mantener") == "buy_and_hold"
-    assert normalize_template_name("mantener") == "buy_and_hold"
-    assert normalize_template_name("hold") == "buy_and_hold"
-    assert normalize_template_name("buy and hold") != "buy_the_dip"
+    """normalize_template_name() resolves canonical/internal aliases only."""
+    assert normalize_template_name("buy_and_hold") == "buy_and_hold"
+    assert normalize_template_name("lump_sum_investment") == "buy_and_hold"
+    assert normalize_template_name("buy and hold") is None
+    assert normalize_template_name("hold") is None
+    assert normalize_template_name("comprar y mantener") is None

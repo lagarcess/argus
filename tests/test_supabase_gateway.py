@@ -2,6 +2,9 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
+from argus.api.schemas import BacktestRun
+from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
 
 
@@ -65,6 +68,8 @@ def test_create_message_writes_empty_metadata_object_when_omitted():
 def test_context_packet_and_route_receipt_persistence_payloads_are_explicit():
     client = _RecordingSupabaseClient()
     gateway = SupabaseGateway(client=client)
+    gateway.get_backtest_run = MagicMock(return_value=object())  # type: ignore[method-assign]
+    gateway._context_packet_owned_by_user = MagicMock(return_value=True)  # type: ignore[attr-defined,method-assign]
 
     packet_row = gateway.create_context_packet(
         user_id="user-1",
@@ -118,6 +123,114 @@ def test_context_packet_and_route_receipt_persistence_payloads_are_explicit():
     assert receipt_row["latency_ms"] == 123
     assert receipt_row["token_usage"] == {"prompt_tokens": 10, "completion_tokens": 5}
     assert receipt_row["context_packet_ids"] == ["packet-1"]
+
+
+def _completed_run(
+    *,
+    conversation_id: str | None = "conversation-1",
+    strategy_id: str | None = None,
+) -> BacktestRun:
+    return BacktestRun(
+        id="run-1",
+        conversation_id=conversation_id,
+        strategy_id=strategy_id,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 12.4}}},
+        config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "rows": [
+                {"key": "total_return_pct", "label": "Total Return", "value": "+12.4%"}
+            ],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+
+
+def test_create_backtest_run_rejects_unowned_parent_conversation() -> None:
+    client = _RecordingSupabaseClient()
+    gateway = SupabaseGateway(client=client)
+    gateway.get_conversation = MagicMock(return_value=None)  # type: ignore[method-assign]
+
+    with pytest.raises(ValueError, match="Conversation not found"):
+        gateway.create_backtest_run(user_id="user-1", run=_completed_run())
+
+    assert "backtest_runs" not in client.inserted_by_table
+
+
+def test_create_backtest_run_rejects_unowned_parent_strategy() -> None:
+    client = _RecordingSupabaseClient()
+    gateway = SupabaseGateway(client=client)
+    gateway.get_conversation = MagicMock(return_value=object())  # type: ignore[method-assign]
+    gateway.get_strategy = MagicMock(return_value=None)  # type: ignore[method-assign]
+
+    with pytest.raises(ValueError, match="Strategy not found"):
+        gateway.create_backtest_run(
+            user_id="user-1",
+            run=_completed_run(strategy_id="strategy-other"),
+        )
+
+    assert "backtest_runs" not in client.inserted_by_table
+
+
+def test_create_strategy_rejects_unowned_parent_conversation_before_insert() -> None:
+    client = _RecordingSupabaseClient()
+    gateway = SupabaseGateway(client=client)
+    gateway.get_conversation = MagicMock(return_value=None)  # type: ignore[method-assign]
+
+    with pytest.raises(ValueError, match="Conversation not found"):
+        gateway.create_strategy(
+            user_id="user-1",
+            payload={
+                "name": "AAPL idea",
+                "name_source": "user_renamed",
+                "template": "buy_and_hold",
+                "asset_class": "equity",
+                "symbols": ["AAPL"],
+                "parameters": {},
+                "metrics_preferences": ["total_return_pct"],
+                "benchmark_symbol": "SPY",
+                "conversation_id": "conversation-other",
+            },
+        )
+
+    assert "strategies" not in client.inserted_by_table
+
+
+def test_attach_context_packet_rejects_unowned_parent_run() -> None:
+    client = _RecordingSupabaseClient()
+    gateway = SupabaseGateway(client=client)
+    gateway.get_backtest_run = MagicMock(return_value=None)  # type: ignore[method-assign]
+
+    with pytest.raises(ValueError, match="Backtest run not found"):
+        gateway.attach_context_packet_to_run(
+            user_id="user-1",
+            attachment={"packet_id": "packet-1", "run_id": "run-other"},
+        )
+
+    assert "run_context_packets" not in client.inserted_by_table
+
+
+def test_attach_strategies_rejects_unowned_parent_collection_before_upsert() -> None:
+    client = MagicMock()
+    gateway = SupabaseGateway(client=client)
+    gateway.get_collection = MagicMock(return_value=None)  # type: ignore[method-assign]
+
+    result = gateway.attach_strategies(
+        user_id="user-1",
+        collection_id="collection-other",
+        strategy_ids=["strategy-1"],
+    )
+
+    assert result is None
+    client.table.assert_not_called()
 
 
 class _BacktestJobClient:
@@ -192,6 +305,7 @@ class _BacktestJobTable:
 def test_create_backtest_job_inserts_queued_shadow_payload() -> None:
     client = _BacktestJobClient()
     gateway = SupabaseGateway(client=client)
+    gateway.get_conversation = MagicMock(return_value=object())  # type: ignore[method-assign]
 
     row = gateway.create_backtest_job(
         user_id="user-1",
@@ -229,6 +343,22 @@ def test_create_backtest_job_inserts_queued_shadow_payload() -> None:
             "execution_metadata": {"shadow_mode": True, "source": "api_chat"},
         }
     ]
+
+
+def test_create_backtest_job_rejects_unowned_parent_conversation_before_insert() -> None:
+    client = _BacktestJobClient()
+    gateway = SupabaseGateway(client=client)
+    gateway.get_conversation = MagicMock(return_value=None)  # type: ignore[method-assign]
+
+    with pytest.raises(ValueError, match="Conversation not found"):
+        gateway.create_backtest_job(
+            user_id="user-1",
+            conversation_id="conversation-other",
+            payload_hash="sha256:abc",
+            launch_payload={"request": {"symbol": "AAPL"}},
+        )
+
+    assert client.inserted_jobs == []
 
 
 def test_create_backtest_job_reuses_existing_idempotency_key() -> None:

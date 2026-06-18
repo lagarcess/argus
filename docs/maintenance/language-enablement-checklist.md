@@ -20,33 +20,35 @@ file.
   remains the primary preference.
 - Frontend i18next resources live in `web/public/locales/<language>/common.json`.
 - Enabled frontend languages are defined in `web/lib/language-features.ts`.
-- Spanish is registered behind `NEXT_PUBLIC_ENABLE_SPANISH`; do not claim it is
-  production-ready just because a locale file exists.
+- Spanish is registered behind `NEXT_PUBLIC_ENABLE_SPANISH`. For the private
+  alpha CI/CD SOTA candidate, this flag is enabled only after bilingual canary
+  and focused browser smoke evidence pass; future languages should follow the
+  same explicit gate.
 
 ## Current Spanish Readiness Decision
 
-Spanish work on `codex/private-alpha-next-jules-intake` is **scaffolding only**
-until a separate Codex-owned runtime readiness gate passes. The branch may add
-locale files, stable translation keys, documentation, and static UI tests, but
-it must not be treated as a release signal for Spanish private-alpha users.
+Spanish is included in the private-alpha launch candidate once the release gate
+has bilingual canary evidence and a focused live browser smoke. It is still a
+controlled private-alpha launch, not a claim that every future-language shape is
+complete.
 
-Keep `NEXT_PUBLIC_ENABLE_SPANISH` disabled in production-like Render
-environments until all of these pass:
+Keep `NEXT_PUBLIC_ENABLE_SPANISH` enabled in production-like Render
+environments only while all of these remain true:
 
 - Spanish static UI smoke for the private-alpha surfaces.
 - Spanish production-parity chat QA covering at least one multi-turn
-  clarification and confirmation flow.
+  clarification and confirmation flow plus a direct supported prompt that
+  carries shorthand capital into the canonical confirmation card.
 - Spanish result/job/retry/recovery surfaces render without English happy-path
   or failure copy leaking into the user-facing transcript.
 - A live or local QA canary verifies that structured runtime state survives
   continuation turns without depending on translated labels as executable truth.
 
-The current known blocker is runtime-state normalization in Spanish
-continuation flows. A Spanish user can reach paths where serialized
-`resolution_provenance` entries rehydrate as dictionaries while runtime helpers
-expect model objects. That is a language-readiness blocker because it exposes
-that the chat/backtest spine is not yet fully presentation-language agnostic.
-Fixing this belongs to Codex-owned runtime work, not mechanical locale intake.
+Previously, the known blocker was runtime-state normalization in Spanish
+continuation flows. The private-alpha CI/CD SOTA candidate now requires Spanish
+canary evidence plus a focused live browser smoke before tester exposure. Track
+remaining natural-language continuity gaps as language-agnostic runtime debt
+rather than disabling Spanish by default.
 
 ## Frontend Responsibilities
 
@@ -108,6 +110,8 @@ Before enabling a language flag in Render:
 - Profile update QA confirms language and locale persist through `/me`.
 - Production-parity chat QA confirms assistant prose follows the selected
   language while still honoring Argus voice.
+- Supported messy prompt QA confirms canonical fields survive the LLM pass and
+  post-interpretation audits without phrase gates or chip-specific shortcuts.
 - Live canary passes before inviting users in that language.
 - Rollback is simple: turn the public language flag off without a migration.
 

@@ -98,6 +98,38 @@ def test_asset_language_with_provider_candidates_is_ambiguous(monkeypatch) -> No
     ]
 
 
+def test_lowercase_ticker_like_llm_fragment_is_unsupported_even_with_candidates(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution
+
+    def fail_resolve(_: str) -> AssetStub:
+        raise ValueError("invalid_symbol")
+
+    candidates = [
+        AssetStub("DE", "equity", "Deere & Company", "DE"),
+    ]
+
+    monkeypatch.setattr(resolution, "resolve_market_asset", fail_resolve)
+    monkeypatch.setattr(
+        resolution,
+        "search_market_assets",
+        lambda query, limit=5: candidates[:limit],
+    )
+
+    result = resolution.resolve_asset_candidate(
+        "de",
+        field="asset_universe[0]",
+        source="llm_extraction",
+    )
+
+    assert result.status == "unsupported"
+    assert result.asset is None
+    assert result.candidates == ()
+    assert result.provenance.raw_text == "de"
+    assert result.provenance.canonical_symbol is None
+
+
 def test_user_mention_asset_resolution_does_not_guess_company_alias_from_fuzzy_symbol(
     monkeypatch,
 ) -> None:

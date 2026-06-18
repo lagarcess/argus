@@ -1,5 +1,6 @@
 import type { AssetClass } from "@/lib/argus-types";
 import type { BacktestJob } from "@/lib/argus-api";
+import type { ConfirmationDisplayFacts } from "@/lib/confirmation-assumptions-display";
 
 export type StrategyResultMetric = {
   label: string;
@@ -18,12 +19,29 @@ export type ResultChartMarker = {
   symbols?: string[];
 };
 
+export type ResultChartValueSummary = {
+  peak_value?: number | null;
+  lowest_value?: number | null;
+  currency?: string | null;
+  source?: "strategy_portfolio_equity_close" | string;
+};
+
+export type ResultChartValuePoint = {
+  time: string;
+  value: number;
+};
+
 export type ResultChartPayload = {
   kind: "portfolio_equity";
   series: ResultChartPoint[];
   markers?: ResultChartMarker[];
   currency?: string;
   base_value?: number | null;
+  value_summary?: ResultChartValueSummary | null;
+  value_extrema?: {
+    peak?: ResultChartValuePoint | null;
+    lowest?: ResultChartValuePoint | null;
+  } | null;
   attribution?: string;
 };
 
@@ -82,6 +100,11 @@ export type StrategyResultPayload = {
   assetClass?: AssetClass;
   configSnapshot?: Record<string, unknown>;
   period: string;
+  dateRange?: {
+    start: string;
+    end: string;
+    display?: string;
+  };
   benchmarkNote?: string;
   statusLabel?: string;
   metrics: StrategyResultMetric[];
@@ -127,9 +150,16 @@ export type StrategyConfirmationRow = {
   value: string;
 };
 
+export type StrategyConfirmationDateRange = {
+  start: string;
+  end: string;
+  display?: string;
+};
+
 export type StrategyConfirmationPayload = {
   confirmation_id?: string;
   confirmation_state?: "active" | "superseded" | "cancelled";
+  asset_class?: AssetClass | null;
   artifactId?: string;
   artifactType?: ArtifactType;
   artifactStatus?: string;
@@ -139,6 +169,9 @@ export type StrategyConfirmationPayload = {
   status?: StrategyConfirmationStatus;
   statusLabel: string;
   summary: string;
+  strategy_type?: string;
+  display_facts?: ConfirmationDisplayFacts;
+  date_range?: StrategyConfirmationDateRange;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];
@@ -153,7 +186,10 @@ export type Message = {
     | "strategy_confirmation"
     | "backtest_job"
     | "action";
-  contentPresentation?: "result_breakdown" | "conversation_load_failure";
+  contentPresentation?:
+    | "result_breakdown"
+    | "conversation_load_failure"
+    | "superseded_runtime_failure";
   content?: string;
   mentions?: ChatMention[];
   selectedAction?: ChatActionOption;

@@ -11,41 +11,17 @@ from argus.domain.backtesting.rules import (
     rule_spec_from_signal_rule,
     validate_rule_spec,
 )
+from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 from argus.domain.indicators import executable_indicator_spec
 from argus.domain.slot_normalizer import normalize_template_name
+from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
+from argus.nlp.natural_time import resolve_date_range_intent, shift_months
 
 SUPPORTED_STRATEGY_TYPES = {
     "buy_and_hold",
     "dca_accumulation",
     "indicator_threshold",
     "signal_strategy",
-}
-
-MONTH_ALIASES = {
-    "jan": 1,
-    "january": 1,
-    "feb": 2,
-    "february": 2,
-    "mar": 3,
-    "march": 3,
-    "apr": 4,
-    "april": 4,
-    "may": 5,
-    "jun": 6,
-    "june": 6,
-    "jul": 7,
-    "july": 7,
-    "aug": 8,
-    "august": 8,
-    "sep": 9,
-    "sept": 9,
-    "september": 9,
-    "oct": 10,
-    "october": 10,
-    "nov": 11,
-    "november": 11,
-    "dec": 12,
-    "december": 12,
 }
 
 
@@ -82,46 +58,15 @@ def canonical_strategy_type(
 ) -> str:
     del entry_logic, exit_logic
     normalized = _normalize_token(raw_type)
+    if normalized in SUPPORTED_STRATEGY_TYPES:
+        return normalized
     template = normalize_template_name(normalized)
-    template_strategy_types = {
-        "buy_and_hold": "buy_and_hold",
-        "dca_accumulation": "dca_accumulation",
-        "buy_the_dip": "indicator_threshold",
-        "rsi_mean_reversion": "indicator_threshold",
-        "moving_average_crossover": "signal_strategy",
-    }
-    if template in template_strategy_types:
-        return template_strategy_types[template]
-    aliases = {
-        "buy_hold": "buy_and_hold",
-        "buy_and_hold": "buy_and_hold",
-        "buyandhold": "buy_and_hold",
-        "hold": "buy_and_hold",
-        "dca": "dca_accumulation",
-        "dollar_cost_averaging": "dca_accumulation",
-        "recurring_accumulation": "dca_accumulation",
-        "recurring_buys": "dca_accumulation",
-        "dca_accumulation": "dca_accumulation",
-        "rsi": "indicator_threshold",
-        "rsi_threshold": "indicator_threshold",
-        "rsi_mean_reversion": "indicator_threshold",
-        "dip_buying": "indicator_threshold",
-        "buy_the_dip": "indicator_threshold",
-        "buying_dips": "indicator_threshold",
-        "threshold": "indicator_threshold",
-        "indicator": "indicator_threshold",
-        "indicator_threshold": "indicator_threshold",
-        "rule_based": "indicator_threshold",
-        "signal": "signal_strategy",
-        "signal_strategy": "signal_strategy",
-        "moving_average_crossover": "signal_strategy",
-        "ma_crossover": "signal_strategy",
-        "golden_cross": "signal_strategy",
-        "death_cross": "signal_strategy",
-    }
-    if normalized in aliases:
-        return aliases[normalized]
-    if _has_value(cadence):
+    if template is not None:
+        capability = STRATEGY_CAPABILITIES.get(template)
+        if capability is not None and capability.execution_strategy_type:
+            return capability.execution_strategy_type
+        return template
+    if _has_canonical_dca_cadence(cadence):
         return "dca_accumulation"
     return normalized
 
@@ -232,6 +177,7 @@ def display_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
     }
     return labels.get(canonical, str(raw_type or "Strategy").replace("_", " ").title())
 
+
 def display_strategy_slug(strategy: StrategySummary | dict[str, Any]) -> str:
     return display_strategy_type(strategy).lower()
 
@@ -260,35 +206,27 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
         explicit = _explicit_iso_range(value)
         if explicit is not None:
             return explicit
-        normalized = _normalize_period_text(value)
-        if normalized in {"since_ipo", "since ipo", "max_available", "maximum available"}:
+        special_window = _normalize_token(value)
+        if special_window in {"since_ipo", "max_available", "maximum_available"}:
             return DateRangeResolution(
-                label="since IPO" if "ipo" in normalized else "maximum available history",
+                label=(
+                    "since IPO"
+                    if "ipo" in special_window
+                    else "maximum available history"
+                ),
                 start=date(1900, 1, 1),
                 end=current_date,
             )
-        natural_explicit = _explicit_natural_range(normalized, today=current_date)
-        if natural_explicit is not None:
-            return natural_explicit
-        multi_year = _multi_year_period(normalized, today=current_date)
-        if multi_year is not None:
-            return multi_year
-        ytd = _year_to_date(normalized, today=current_date)
-        if ytd is not None:
-            return ytd
-        since = _since_year(normalized, today=current_date)
-        if since is not None:
-            return since
-        calendar_year = _calendar_year(normalized)
-        if calendar_year is not None:
-            return calendar_year
-        beginning_last_year = _beginning_last_year(normalized, today=current_date)
-        if beginning_last_year is not None:
-            return beginning_last_year
-        relative = _relative_period(normalized, today=current_date)
-        if relative is not None:
-            return relative
-    start = _add_months(current_date, -12)
+        machine_resolution = _date_range_resolution_from_intent(
+            resolve_date_range_intent(
+                _canonical_machine_date_range_intent(value),
+                today=current_date,
+            ),
+            today=current_date,
+        )
+        if machine_resolution is not None:
+            return machine_resolution
+    start = shift_months(current_date, -12)
     return DateRangeResolution(
         label="past year",
         start=start,
@@ -297,20 +235,44 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
     )
 
 
+def resolve_executable_date_range(
+    value: Any,
+    *,
+    extra_parameters: Mapping[str, Any] | None = None,
+    today: date | None = None,
+) -> DateRangeResolution:
+    current_date = today or date.today()
+    explicit_resolution = resolve_date_range(value, today=current_date)
+    if not explicit_resolution.used_default:
+        return explicit_resolution
+
+    date_range_intent = (
+        extra_parameters.get("date_range_intent")
+        if isinstance(extra_parameters, Mapping)
+        else None
+    )
+    intent_resolution = resolve_date_range_intent(
+        date_range_intent,
+        today=current_date,
+    )
+    resolved_intent = _date_range_resolution_from_intent(
+        intent_resolution,
+        today=current_date,
+    )
+    if resolved_intent is not None:
+        return resolved_intent
+
+    return explicit_resolution
+
+
 def normalize_date_range_candidate(
     value: Any,
     *,
     raw_user_phrasing: str | None = None,
     today: date | None = None,
 ) -> Any:
+    del raw_user_phrasing, today
     if isinstance(value, dict):
-        if not _date_range_dict_uses_natural_endpoint(value):
-            relative_label = _relative_date_label_from_user_phrasing(
-                raw_user_phrasing,
-                today=today,
-            )
-            if relative_label is not None:
-                return relative_label
         return {
             key: nested_value
             for key, nested_value in value.items()
@@ -329,44 +291,61 @@ def has_partial_explicit_date_range(value: Any) -> bool:
     return (start is not None) != (end is not None)
 
 
+def _canonical_machine_date_range_intent(value: str) -> dict[str, Any] | None:
+    raw = value.strip().lower()
+    if raw == "year_to_date":
+        return {"kind": "year_to_date", "anchor": "today", "confidence": 1.0}
+    if " " in raw:
+        return None
+    parts = raw.split("_")
+    if len(parts) != 3 or parts[0] not in {"last", "past"}:
+        return None
+    count = _int_or_none(parts[1])
+    if count is None or count <= 0:
+        return None
+    unit = parts[2][:-1] if parts[2].endswith("s") else parts[2]
+    if unit not in {"day", "week", "month", "quarter", "year"}:
+        return None
+    return {
+        "kind": "rolling_window",
+        "count": count,
+        "unit": unit,
+        "anchor": "today",
+        "confidence": 1.0,
+    }
+
+
+def _date_range_resolution_from_intent(
+    intent_resolution: Any,
+    *,
+    today: date,
+) -> DateRangeResolution | None:
+    if intent_resolution is None:
+        return None
+    start = _parse_date_token(
+        intent_resolution.payload.get("start"),
+        today=today,
+        endpoint="start",
+    )
+    end = _parse_date_token(
+        intent_resolution.payload.get("end"),
+        today=today,
+        endpoint="end",
+    )
+    if start is None or end is None:
+        return None
+    return DateRangeResolution(
+        label=intent_resolution.label,
+        start=start,
+        end=end,
+    )
+
+
 def _first_present_endpoint(value: dict[Any, Any], *keys: str) -> Any | None:
     for key in keys:
         endpoint = value.get(key)
         if endpoint not in (None, "", [], {}):
             return endpoint
-    return None
-
-
-def _date_range_dict_uses_natural_endpoint(value: dict[Any, Any]) -> bool:
-    endpoints = [value.get(key) for key in ("start", "end", "from", "to")]
-    endpoint_values = [endpoint for endpoint in endpoints if endpoint not in (None, "")]
-    return any(
-        isinstance(endpoint, str) and _parse_iso_date(endpoint) is None
-        for endpoint in endpoint_values
-    )
-
-
-def _relative_date_label_from_user_phrasing(
-    raw_user_phrasing: str | None,
-    *,
-    today: date | None,
-) -> str | None:
-    if not isinstance(raw_user_phrasing, str) or not raw_user_phrasing.strip():
-        return None
-    current_date = today or date.today()
-    normalized = _normalize_period_text(raw_user_phrasing)
-    year_to_date = _year_to_date(normalized, today=current_date)
-    if year_to_date is not None:
-        return year_to_date.label
-    since_year = _find_since_year(_tokens(normalized))
-    if since_year is not None:
-        return f"since {since_year}"
-    beginning_last_year = _beginning_last_year(normalized, today=current_date)
-    if beginning_last_year is not None:
-        return beginning_last_year.label
-    relative = _relative_period(normalized, today=current_date)
-    if relative is not None:
-        return relative.label
     return None
 
 
@@ -396,53 +375,20 @@ def _normalize_token(value: Any) -> str:
     return "".join(parts).strip("_")
 
 
-def _normalize_period_text(value: str) -> str:
-    normalized = _tokens_to_text(value)
-    return _normalize_period_number_words(normalized)
-
-
-def _normalize_period_number_words(value: str) -> str:
-    number_words = {
-        "one": "1",
-        "two": "2",
-        "three": "3",
-        "four": "4",
-        "five": "5",
-        "six": "6",
-        "seven": "7",
-        "eight": "8",
-        "nine": "9",
-        "ten": "10",
-    }
-    period_units = {
-        "day",
-        "days",
-        "week",
-        "weeks",
-        "month",
-        "months",
-        "quarter",
-        "quarters",
-        "year",
-        "years",
-    }
-    tokens = _tokens(value)
-    normalized: list[str] = []
-    for index, token in enumerate(tokens):
-        next_token = tokens[index + 1] if index + 1 < len(tokens) else None
-        if token in number_words and next_token in period_units:
-            normalized.append(number_words[token])
-        else:
-            normalized.append(token)
-    return " ".join(normalized)
-
-
 def _has_value(value: Any) -> bool:
     if value is None or value == "":
         return False
     if isinstance(value, list):
         return bool(value)
     return True
+
+
+def _has_canonical_dca_cadence(value: Any) -> bool:
+    if isinstance(value, str):
+        return _normalize_token(value) in SUPPORTED_DCA_CADENCE_VALUES
+    if isinstance(value, list):
+        return any(_has_canonical_dca_cadence(item) for item in value)
+    return False
 
 
 def _explicit_strategy_type(payload: dict[str, Any]) -> str | None:
@@ -569,6 +515,11 @@ def _parse_date_token(
     today: date,
     endpoint: str | None = None,
 ) -> date | None:
+    if isinstance(value, str) and value.strip().casefold() in {
+        "today",
+        "current_date",
+    }:
+        return today
     parsed = _parse_iso_date(value)
     if parsed is not None:
         return parsed
@@ -576,46 +527,22 @@ def _parse_date_token(
         parsed_month = _parse_iso_month(value, endpoint=endpoint)
         if parsed_month is not None:
             return parsed_month
-    if not isinstance(value, str):
-        return None
-    normalized = _normalize_token(value)
-    relative = parse_relative_date_token(normalized, today=today)
-    if relative is not None:
-        return relative
-    natural = _parse_natural_date(normalized)
-    if natural is not None:
-        return natural
-    return None
-
-
-def parse_relative_date_token(value: Any, *, today: date | None = None) -> date | None:
-    current_date = today or date.today()
-    normalized = _normalize_token(value)
-    if normalized == "yesterday":
-        return current_date - timedelta(days=1)
-    if normalized in {"today", "now", "present", "current", "to_date", "current_date"}:
-        return current_date
     return None
 
 
 def _explicit_iso_range(value: str) -> DateRangeResolution | None:
     collapsed = _collapse_spaces(value.lower())
-    start: date | None = None
-    end: date | None = None
-    for connector in (" to ", " through ", " until ", " till "):
-        if connector not in collapsed:
-            continue
-        start_text, end_text = collapsed.split(connector, 1)
-        start = _parse_iso_date(start_text.strip()) or _parse_iso_month(
-            start_text.strip(),
-            endpoint="start",
-        )
-        end = _parse_iso_date(end_text.strip()) or _parse_iso_month(
-            end_text.strip(),
-            endpoint="end",
-        )
-        if start is not None and end is not None:
-            break
+    if " to " not in collapsed:
+        return None
+    start_text, end_text = collapsed.split(" to ", 1)
+    start = _parse_iso_date(start_text.strip()) or _parse_iso_month(
+        start_text.strip(),
+        endpoint="start",
+    )
+    end = _parse_iso_date(end_text.strip()) or _parse_iso_month(
+        end_text.strip(),
+        endpoint="end",
+    )
     if start is None or end is None:
         return None
     return DateRangeResolution(
@@ -623,160 +550,6 @@ def _explicit_iso_range(value: str) -> DateRangeResolution | None:
         start=start,
         end=end,
     )
-
-
-def _explicit_natural_range(
-    value: str,
-    *,
-    today: date,
-) -> DateRangeResolution | None:
-    tokens = _tokens(value)
-    shared_year_span = _month_span_with_shared_year(tokens)
-    if shared_year_span is not None:
-        return shared_year_span
-    month_year_span = _month_year_span(tokens)
-    if month_year_span is not None:
-        return month_year_span
-    start: date | None = None
-    end: date | None = None
-    connectors = {"to", "through", "until", "till"}
-    for index in range(0, len(tokens)):
-        start_candidate = _natural_endpoint_candidate(
-            tokens,
-            index,
-            today=today,
-            endpoint="start",
-        )
-        if start_candidate is None:
-            continue
-        candidate_start, next_index = start_candidate
-        if next_index >= len(tokens) or tokens[next_index] not in connectors:
-            continue
-        end_candidate = _natural_endpoint_candidate(
-            tokens,
-            next_index + 1,
-            today=today,
-            endpoint="end",
-        )
-        if end_candidate is None:
-            continue
-        candidate_end, _ = end_candidate
-        start = candidate_start
-        end = candidate_end
-        break
-    if start is None or end is None:
-        return None
-    return DateRangeResolution(
-        label=f"{format_display_date(start)} to {format_display_date(end)}",
-        start=start,
-        end=end,
-    )
-
-
-def _month_year_span(tokens: list[str]) -> DateRangeResolution | None:
-    connectors = {"to", "through", "until", "till"}
-    for index in range(0, len(tokens)):
-        start_candidate = _build_month_year_date(
-            tokens[index],
-            tokens[index + 1] if index + 1 < len(tokens) else None,
-            endpoint="start",
-        )
-        if start_candidate is None:
-            continue
-        end_index = index + 2
-        if end_index < len(tokens) and tokens[end_index] in connectors:
-            end_index += 1
-        end_candidate = _build_month_year_date(
-            tokens[end_index] if end_index < len(tokens) else None,
-            tokens[end_index + 1] if end_index + 1 < len(tokens) else None,
-            endpoint="end",
-        )
-        if end_candidate is None or end_candidate < start_candidate:
-            continue
-        return DateRangeResolution(
-            label=(
-                f"{format_display_date(start_candidate)} to "
-                f"{format_display_date(end_candidate)}"
-            ),
-            start=start_candidate,
-            end=end_candidate,
-        )
-    return None
-
-
-def _month_span_with_shared_year(tokens: list[str]) -> DateRangeResolution | None:
-    connectors = {"to", "through", "until", "till"}
-    for index, token in enumerate(tokens):
-        start_month = MONTH_ALIASES.get(token)
-        if start_month is None:
-            continue
-        connector_index = index + 1
-        end_month_index = index + 2
-        year_index = index + 3
-        if year_index >= len(tokens):
-            continue
-        if tokens[connector_index] not in connectors:
-            continue
-        end_month = MONTH_ALIASES.get(tokens[end_month_index])
-        if end_month is None:
-            continue
-        year = _int_or_none(tokens[year_index])
-        if year is None:
-            continue
-        if end_month < start_month:
-            continue
-        start = date(year, start_month, 1)
-        end = date(year, end_month, _last_day_of_month(year, end_month))
-        return DateRangeResolution(
-            label=f"{format_display_date(start)} to {format_display_date(end)}",
-            start=start,
-            end=end,
-        )
-    return None
-
-
-def _natural_endpoint_candidate(
-    tokens: list[str],
-    index: int,
-    *,
-    today: date,
-    endpoint: str,
-) -> tuple[date, int] | None:
-    if index >= len(tokens):
-        return None
-    token = tokens[index]
-    if token in {"today", "now", "present"}:
-        return today, index + 1
-    if index + 2 < len(tokens):
-        natural = _build_natural_date(tokens[index], tokens[index + 1], tokens[index + 2])
-        if natural is not None:
-            return natural, index + 3
-    if index + 1 < len(tokens):
-        month_year = _build_month_year_date(
-            tokens[index],
-            tokens[index + 1],
-            endpoint=endpoint,
-        )
-        if month_year is not None:
-            return month_year, index + 2
-    return None
-
-
-def _build_month_year_date(
-    month_value: Any,
-    year_value: Any,
-    *,
-    endpoint: str,
-) -> date | None:
-    month = MONTH_ALIASES.get(str(month_value or "").lower())
-    year = _int_or_none(year_value)
-    if month is None or year is None:
-        return None
-    day = 1 if endpoint == "start" else _last_day_of_month(year, month)
-    try:
-        return date(year, month, day)
-    except ValueError:
-        return None
 
 
 def _last_day_of_month(year: int, month: int) -> int:
@@ -787,32 +560,6 @@ def _last_day_of_month(year: int, month: int) -> int:
     return (next_month - timedelta(days=1)).day
 
 
-def _parse_natural_date(value: str) -> date | None:
-    tokens = _tokens(value)
-    if len(tokens) != 3:
-        return None
-    return _build_natural_date(tokens[0], tokens[1], tokens[2])
-
-
-def _build_natural_date(
-    month_value: Any,
-    day_value: Any,
-    year_value: Any,
-) -> date | None:
-    month = MONTH_ALIASES.get(str(month_value or "").lower())
-    if month is None:
-        return None
-    day_text = str(day_value or "").lower()
-    day = 1 if day_text == "first" else _int_or_none(day_text)
-    year = _int_or_none(year_value)
-    if day is None or year is None:
-        return None
-    try:
-        return date(year, month, day)
-    except ValueError:
-        return None
-
-
 def _int_or_none(value: Any) -> int | None:
     try:
         return int(str(value))
@@ -820,325 +567,5 @@ def _int_or_none(value: Any) -> int | None:
         return None
 
 
-def _year_to_date(value: str, *, today: date) -> DateRangeResolution | None:
-    tokens = _tokens(value)
-    if value in {"ytd", "year_to_date", "year to date"}:
-        return DateRangeResolution(
-            label="year to date",
-            start=date(today.year, 1, 1),
-            end=today,
-        )
-    if {"so", "far"} <= set(tokens):
-        if {"this", "year"} <= set(tokens):
-            return DateRangeResolution(
-                label="this year so far",
-                start=date(today.year, 1, 1),
-                end=today,
-            )
-        for token in tokens:
-            if _is_four_digit_year(token) and int(token) == today.year:
-                year = int(token)
-                return DateRangeResolution(
-                    label=f"{year} so far",
-                    start=date(year, 1, 1),
-                    end=today,
-                )
-    return None
-
-
-def _multi_year_period(value: str, *, today: date) -> DateRangeResolution | None:
-    tokens = _tokens(value)
-    years: list[int] = []
-    for token in tokens:
-        if _is_four_digit_year(token):
-            year = int(token)
-            if year <= today.year and year not in years:
-                years.append(year)
-    if len(years) != 2:
-        return None
-    if not (
-        set(tokens)
-        & {
-            "and",
-            "to",
-            "through",
-            "thru",
-            "until",
-            "till",
-            "from",
-            "between",
-            "over",
-            "during",
-        }
-    ):
-        return None
-    start_year, end_year = years
-    if end_year < start_year:
-        return None
-    if end_year == today.year and (
-        {"so", "far"} <= set(tokens)
-        or set(tokens) & {"today", "now", "present", "current"}
-    ):
-        end = today
-    else:
-        end = date(end_year, 12, 31)
-    return DateRangeResolution(
-        label=f"{start_year} to {end_year}",
-        start=date(start_year, 1, 1),
-        end=end,
-    )
-
-
-def _since_year(value: str, *, today: date) -> DateRangeResolution | None:
-    tokens = _tokens(value)
-    if len(tokens) != 2 or tokens[0] != "since" or not _is_four_digit_year(tokens[1]):
-        return None
-    year = int(tokens[1])
-    return DateRangeResolution(
-        label=f"since {year}",
-        start=date(year, 1, 1),
-        end=today,
-    )
-
-
-def _calendar_year(value: str) -> DateRangeResolution | None:
-    tokens = _tokens(value)
-    year_tokens = [token for token in tokens if _is_four_digit_year(token)]
-    if len(set(year_tokens)) != 1:
-        return None
-    for index, token in enumerate(tokens):
-        if not _is_four_digit_year(token):
-            continue
-        year = int(token)
-        previous = tokens[index - 1] if index > 0 else ""
-        if len(tokens) == 1 or previous in {
-            "in",
-            "during",
-            "throughout",
-            "for",
-            "over",
-        }:
-            return DateRangeResolution(
-                label=str(year),
-                start=date(year, 1, 1),
-                end=date(year, 12, 31),
-            )
-    return None
-
-
-def _beginning_last_year(value: str, *, today: date) -> DateRangeResolution | None:
-    if value not in {
-        "beginning of last year to now",
-        "from the beginning of last year to now",
-    }:
-        return None
-    return DateRangeResolution(
-        label="beginning of last year to now",
-        start=date(today.year - 1, 1, 1),
-        end=today,
-    )
-
-
-def _relative_period(value: str, *, today: date) -> DateRangeResolution | None:
-    tokens = _tokens(value)
-    if tokens in (["past", "year"], ["last", "year"]):
-        return DateRangeResolution(
-            label="past year",
-            start=_add_months(today, -12),
-            end=today,
-        )
-    singular_periods = {
-        "past day": ("day", 1),
-        "last day": ("day", 1),
-        "past week": ("week", 1),
-        "last week": ("week", 1),
-        "past month": ("month", 1),
-        "last month": ("month", 1),
-        "past quarter": ("quarter", 1),
-        "last quarter": ("quarter", 1),
-    }
-    singular_period = singular_periods.get(" ".join(tokens))
-    if singular_period is not None:
-        unit, count = singular_period
-        return DateRangeResolution(
-            label=f"past {unit}",
-            start=_subtract_period(today, count=count, unit=unit),
-            end=today,
-        )
-
-    relative_label = _extract_relative_period_label(tokens)
-    if relative_label is not None:
-        parts = relative_label.split()
-        if len(parts) == 2:
-            _, unit = parts
-            return DateRangeResolution(
-                label=_relative_label(count=1, unit=unit),
-                start=_subtract_period(today, count=1, unit=unit),
-                end=today,
-            )
-        if len(parts) != 3 or not parts[1].isdigit():
-            return None
-        count = int(parts[1])
-        unit = parts[2]
-        return DateRangeResolution(
-            label=_relative_label(count=count, unit=unit),
-            start=_subtract_period(today, count=count, unit=unit),
-            end=today,
-        )
-
-    compact = _split_compact_period_token(value)
-    if compact is not None:
-        count, unit = compact
-        return DateRangeResolution(
-            label=_relative_label(count=count, unit=unit),
-            start=_subtract_period(today, count=count, unit=unit),
-            end=today,
-        )
-    return None
-
-
-def _tokens(value: Any) -> list[str]:
-    if not isinstance(value, str):
-        return []
-    tokens: list[str] = []
-    current: list[str] = []
-    for char in value.lower():
-        if char.isalnum():
-            current.append(char)
-            continue
-        if current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
-
-
-def _tokens_to_text(value: str) -> str:
-    return " ".join(_tokens(value))
-
-
 def _collapse_spaces(value: str) -> str:
     return " ".join(value.split())
-
-
-def _contains_any_phrase(value: str, phrases: set[str]) -> bool:
-    return any(_contains_phrase(value, phrase) for phrase in phrases)
-
-
-def _contains_phrase(value: str, phrase: str) -> bool:
-    tokens = _tokens(value)
-    phrase_tokens = _tokens(phrase)
-    if not phrase_tokens:
-        return False
-    if len(phrase_tokens) > len(tokens):
-        return False
-    for index in range(0, len(tokens) - len(phrase_tokens) + 1):
-        if tokens[index : index + len(phrase_tokens)] == phrase_tokens:
-            return True
-    return False
-
-
-def _find_since_year(tokens: list[str]) -> str | None:
-    for index, token in enumerate(tokens[:-1]):
-        if token == "since" and _is_four_digit_year(tokens[index + 1]):
-            return tokens[index + 1]
-    return None
-
-
-def _extract_relative_period_label(tokens: list[str]) -> str | None:
-    period_units = {
-        "day",
-        "days",
-        "week",
-        "weeks",
-        "month",
-        "months",
-        "quarter",
-        "quarters",
-        "year",
-        "years",
-    }
-    singular_units = {"day", "week", "month", "quarter", "year"}
-    for index, token in enumerate(tokens):
-        if token not in {"past", "last"}:
-            continue
-        next_token = tokens[index + 1] if index + 1 < len(tokens) else None
-        following_token = tokens[index + 2] if index + 2 < len(tokens) else None
-        if next_token is not None and next_token.isdigit() and following_token in period_units:
-            return f"{token} {next_token} {following_token}"
-        if next_token in singular_units:
-            return f"{token} {next_token}"
-    return None
-
-
-def _extract_ago_to_now_label(tokens: list[str]) -> tuple[str, str] | None:
-    units = {"day", "days", "week", "weeks", "month", "months", "year", "years"}
-    connectors = {"to", "through", "until", "till"}
-    endpoints = {"now", "today", "present"}
-    for index in range(0, max(len(tokens) - 4, 0)):
-        count = tokens[index]
-        unit = tokens[index + 1]
-        if not count.isdigit() or unit not in units or tokens[index + 2] != "ago":
-            continue
-        if tokens[index + 3] in connectors and tokens[index + 4] in endpoints:
-            return count, unit
-    return None
-
-
-def _split_compact_period_token(value: str) -> tuple[int, str] | None:
-    tokens = _tokens(value)
-    if len(tokens) != 1:
-        return None
-    token = tokens[0]
-    unit_aliases = ("mo", "d", "w", "m", "q", "y")
-    for unit in unit_aliases:
-        if not token.endswith(unit):
-            continue
-        count_text = token[: -len(unit)]
-        if count_text.isdigit():
-            return int(count_text), unit
-    return None
-
-
-def _is_four_digit_year(value: str) -> bool:
-    return len(value) == 4 and value.isdigit()
-
-
-def _relative_label(*, count: int, unit: str) -> str:
-    unit_name = {
-        "d": "day",
-        "w": "week",
-        "m": "month",
-        "mo": "month",
-        "q": "quarter",
-        "y": "year",
-    }.get(unit, unit.removesuffix("s"))
-    return f"past {unit_name}" if count == 1 else f"past {count} {unit_name}s"
-
-
-def _subtract_period(today: date, *, count: int, unit: str) -> date:
-    if unit in {"d", "day", "days"}:
-        return today - timedelta(days=count)
-    if unit in {"w", "week", "weeks"}:
-        return today - timedelta(days=count * 7)
-    if unit in {"m", "mo", "month", "months"}:
-        return _add_months(today, -count)
-    if unit in {"q", "quarter", "quarters"}:
-        return _add_months(today, -(count * 3))
-    return _add_months(today, -(count * 12))
-
-
-def _add_months(value: date, months: int) -> date:
-    month_index = value.month - 1 + months
-    year = value.year + month_index // 12
-    month = month_index % 12 + 1
-    day = min(value.day, _days_in_month(year, month))
-    return date(year, month, day)
-
-
-def _days_in_month(year: int, month: int) -> int:
-    if month == 12:
-        return 31
-    next_month = date(year, month + 1, 1)
-    return (next_month - timedelta(days=1)).day

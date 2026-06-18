@@ -6,10 +6,20 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci.yml"
+CANARY_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-canary.yml"
+SMOKE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-smoke.yml"
 
 
 def _workflow() -> dict:
     return yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+
+
+def _canary_workflow() -> dict:
+    return yaml.safe_load(CANARY_WORKFLOW_PATH.read_text(encoding="utf-8"))
+
+
+def _smoke_workflow() -> dict:
+    return yaml.safe_load(SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8"))
 
 
 def test_ci_runs_on_main_codex_and_jules_without_deploying() -> None:
@@ -77,3 +87,131 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
         "backend-checks",
         "frontend-checks",
     ]
+
+
+def test_private_alpha_canary_workflow_is_manual_and_scheduled_only() -> None:
+    workflow = _canary_workflow()
+
+    assert workflow["name"] == "Private Alpha Canary"
+    assert set(workflow["on"]) == {"workflow_dispatch", "schedule"}
+    assert workflow["on"]["schedule"] == [{"cron": "30 14 * * *"}]
+    assert workflow["permissions"] == {"contents": "read"}
+    assert "deploy" not in workflow["jobs"]
+
+
+def test_private_alpha_canary_workflow_runs_real_workflow_gate() -> None:
+    workflow = _canary_workflow()
+    job = workflow["jobs"]["canary"]
+
+    assert job["timeout-minutes"] == 25
+    joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
+    assert "poetry install --with dev,workflows --no-interaction" in joined_steps
+    assert "cd web && bun install --frozen-lockfile" in joined_steps
+    assert ".github/local-smoke.sh --expected-sha \"$GITHUB_SHA\"" in joined_steps
+    assert joined_steps.index(".github/local-smoke.sh") < joined_steps.index(
+        ".github/warmup-render.sh"
+    )
+    assert ".github/warmup-render.sh --expect-mode real-workflow" in joined_steps
+    assert ".github/canary-render.sh" in joined_steps
+    assert "ARGUS_WARMUP_EXPECT_MODE: real-workflow" in CANARY_WORKFLOW_PATH.read_text(
+        encoding="utf-8"
+    )
+    assert "POSTHOG" not in CANARY_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+
+def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> None:
+    workflow = _canary_workflow()
+    job = workflow["jobs"]["canary"]
+    steps = job["steps"]
+    secret_names = {
+        "RENDER_API_KEY",
+        "ARGUS_OPS_TOKEN",
+        "ARGUS_CANARY_EMAIL",
+        "ARGUS_CANARY_PASSWORD",
+        "ARGUS_CANARY_SUPABASE_URL",
+        "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY",
+    }
+
+    assert set(job["env"]) == {"ARGUS_WARMUP_EXPECT_MODE"}
+
+    secret_steps = {
+        step["name"]: set((step.get("env") or {}).keys()) & secret_names
+        for step in steps
+    }
+    assert secret_steps["Check required secrets"] == secret_names
+    assert secret_steps["Warm Render product path"] == {
+        "RENDER_API_KEY",
+        "ARGUS_OPS_TOKEN",
+    }
+    assert secret_steps["Run authenticated English golden-path canary"] == secret_names
+    assert secret_steps["Run authenticated Spanish golden-path canary"] == secret_names
+    assert secret_steps["Upload canary evidence"] == set()
+
+    for step in steps:
+        if step["name"] in {
+            "Check required secrets",
+            "Warm Render product path",
+            "Run authenticated English golden-path canary",
+            "Run authenticated Spanish golden-path canary",
+        }:
+            continue
+        assert not (set((step.get("env") or {}).keys()) & secret_names)
+
+
+def test_private_alpha_canary_workflow_runs_bilingual_evidence_matrix() -> None:
+    workflow = _canary_workflow()
+    job = workflow["jobs"]["canary"]
+    steps_by_name = {step["name"]: step for step in job["steps"]}
+    joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
+    uses_steps = "\n".join(str(step.get("uses", "")) for step in job["steps"])
+
+    assert "mkdir -p temp/canary-evidence" in joined_steps
+    assert (
+        steps_by_name["Run authenticated English golden-path canary"][
+            "continue-on-error"
+        ]
+        is True
+    )
+    assert (
+        steps_by_name["Run authenticated Spanish golden-path canary"][
+            "continue-on-error"
+        ]
+        is True
+    )
+    assert "ARGUS_CANARY_LANGUAGE=en" in joined_steps
+    assert "ARGUS_CANARY_LANGUAGE=es-419" in joined_steps
+    assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/en.json" in joined_steps
+    assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json" in joined_steps
+    assert "temp/canary-evidence/en.exit" in joined_steps
+    assert "temp/canary-evidence/es-419.exit" in joined_steps
+    assert "Require bilingual canary matrix" in steps_by_name
+    assert "canary_locale_${locale}_exit" in joined_steps
+    assert "Prueba una estrategia de comprar y mantener AAPL y MSFT" in joined_steps
+    assert "actions/upload-artifact@v4" in uses_steps
+    assert "private-alpha-canary-evidence" in CANARY_WORKFLOW_PATH.read_text(
+        encoding="utf-8"
+    )
+    assert "path: temp/canary-evidence/*\n" in CANARY_WORKFLOW_PATH.read_text(
+        encoding="utf-8"
+    )
+
+
+def test_private_alpha_smoke_workflow_runs_local_predeploy_gate() -> None:
+    workflow = _smoke_workflow()
+
+    assert workflow["name"] == "Private Alpha Local Smoke"
+    assert workflow["permissions"] == {"contents": "read"}
+    assert workflow["on"]["push"]["branches"] == ["codex/private-alpha-next"]
+    assert workflow["on"]["pull_request"]["branches"] == [
+        "codex/private-alpha-next",
+        "codex/private-alpha-next-jules-intake",
+    ]
+    assert "deploy" not in workflow["jobs"]
+
+    job = workflow["jobs"]["local-smoke"]
+    assert job["timeout-minutes"] == 10
+    joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
+    assert "poetry install --with dev,workflows --no-interaction" in joined_steps
+    assert "cd web && bun install --frozen-lockfile" in joined_steps
+    assert ".github/local-smoke.sh --expected-sha \"$GITHUB_SHA\"" in joined_steps
+    assert "RENDER_API_KEY" not in SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8")

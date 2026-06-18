@@ -3,10 +3,10 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
-from argus.agent_runtime.clarification_contract import OFFLINE_CLARIFICATION_FALLBACK
-from argus.agent_runtime.stages.compose import (
-    compose_response_intent,
-    should_prefer_composed_intent,
+from loguru import logger
+
+from argus.agent_runtime.artifact_action_recovery import (
+    artifact_action_recovery_message,
 )
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -17,6 +17,7 @@ from argus.agent_runtime.state.models import (
     StrategySummary,
     TaskSnapshot,
     UserState,
+    dedupe_resolution_provenance_items,
 )
 from argus.agent_runtime.workflow_contract import (
     TOKEN_STREAM_NODES,
@@ -101,6 +102,7 @@ async def stream_agent_turn_events(
     config = {"configurable": {"thread_id": thread_id}}
     seen_stage_starts: set[str] = set()
     seen_stage_outcomes: set[str] = set()
+    logger.debug("Agent runtime stream started", thread_id=thread_id)
 
     async for event in workflow.astream_events(
         initial_state,
@@ -112,6 +114,11 @@ async def stream_agent_turn_events(
         if kind == "on_chain_start" and node_name in WORKFLOW_NODE_NAMES:
             if node_name not in seen_stage_starts:
                 seen_stage_starts.add(node_name)
+                logger.debug(
+                    "Agent runtime stage started",
+                    thread_id=thread_id,
+                    stage=node_name,
+                )
                 yield {"type": "stage_start", "stage": node_name}
             continue
         if kind == "on_chat_model_stream" and node_name in TOKEN_STREAM_NODES:
@@ -123,9 +130,17 @@ async def stream_agent_turn_events(
             outcome = _stage_outcome_from_event(event)
             if outcome is not None and outcome not in seen_stage_outcomes:
                 seen_stage_outcomes.add(outcome)
+                logger.debug(
+                    "Agent runtime stage outcome",
+                    thread_id=thread_id,
+                    stage=node_name,
+                    outcome=outcome,
+                )
                 yield {"type": "stage_outcome", "outcome": outcome}
 
+    logger.debug("Agent runtime final state fetch started", thread_id=thread_id)
     final_state = await _final_workflow_state(workflow=workflow, config=config)
+    logger.debug("Agent runtime final state fetch completed", thread_id=thread_id)
     yield {"type": "final", "payload": _public_result(final_state)}
 
 
@@ -223,20 +238,23 @@ def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
     if (
         isinstance(explicit_prompt, str)
         and explicit_prompt.strip()
-        and explicit_prompt != OFFLINE_CLARIFICATION_FALLBACK
-        and not should_prefer_composed_intent(run_state)
     ):
-        if result.get("assistant_response") == explicit_prompt:
+        assistant_response = result.get("assistant_response")
+        if assistant_response == explicit_prompt:
             return result
         patched = dict(result)
-        patched.setdefault("assistant_response", explicit_prompt)
+        if not isinstance(assistant_response, str) or not assistant_response.strip():
+            patched["assistant_response"] = explicit_prompt
         return patched
-    composed = compose_response_intent(run_state)
-    if composed is None:
+    intent = run_state.response_intent
+    if intent is None or intent.kind != "artifact_action_recovery":
+        return result
+    recovery = artifact_action_recovery_message(intent)
+    if recovery is None:
         return result
     patched = dict(result)
-    patched["assistant_prompt"] = composed
-    patched["assistant_response"] = composed
+    patched["assistant_prompt"] = recovery
+    patched["assistant_response"] = recovery
     return patched
 
 
@@ -257,6 +275,9 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "artifact_references",
         "latest_failed_action_reference",
         "result_fact_bank",
+        "result_action_request",
+        "retry_last_turn",
+        "recovery",
     }
     serialized = {
         key: _serialize_public_value(key, value)
@@ -290,7 +311,10 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
             run_state, "resolution_provenance", None
         ):
             serialized["resolution_provenance"] = [
-                item.model_dump(mode="python") for item in run_state.resolution_provenance
+                item.model_dump(mode="python")
+                for item in dedupe_resolution_provenance_items(
+                    run_state.resolution_provenance
+                )
             ]
         if "pending_strategy" not in serialized:
             pending_strategy = _pending_strategy_payload(result, run_state=run_state)

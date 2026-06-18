@@ -97,14 +97,16 @@ def run_launch_backtest(
                 recorder=recorder,
             )
     except ValueError as exc:
-        category, status = _normalize_value_error(str(exc))
+        failure_reason = str(exc)
+        category, status = _normalize_value_error(failure_reason)
         return _with_timings(
             LaunchExecutionAdapterResult(
                 envelope=build_failure_envelope(
                     request=request,
                     execution_status=status,
                     failure_category=category,
-                    failure_reason=str(exc),
+                    failure_reason=failure_reason,
+                    provider_metadata=_failure_provider_metadata(request),
                 )
             ),
             recorder=recorder,
@@ -237,6 +239,7 @@ def _run_indicator_threshold(
             "entry_threshold": indicator_parameters["entry_threshold"],
             "exit_threshold": indicator_parameters["exit_threshold"],
             "rule_spec": indicator_parameters["rule_spec"],
+            "engine_config": dict(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -328,6 +331,7 @@ def _run_signal_strategy(
             "cadence": request.cadence,
             "template": config["template"],
             "rule_spec": rule_spec,
+            "engine_config": dict(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -415,13 +419,11 @@ def _run_dca_accumulation(
             "starting_principal": 0.0,
             "position_size": request.position_size,
             "cadence": cadence,
+            "engine_config": dict(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
-        assumptions=[
-            f"Recurring allocation: ${recurring_allocation:,.0f}.",
-            f"Cadence: {cadence}.",
-        ],
+        assumptions=list(result_card.get("assumptions", [])),
         caveats=[
             format_timeframe_data_caveat(config["timeframe"], language=language),
             format_recurring_entry_caveat(config["timeframe"], language=language),
@@ -493,6 +495,7 @@ def _run_buy_and_hold(
             "capital_amount": starting_capital,
             "position_size": request.position_size,
             "cadence": request.cadence,
+            "engine_config": dict(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -535,6 +538,30 @@ def _provider_metadata(*, asset_class: str, timeframe: str) -> dict[str, Any]:
         "timeframe": timeframe,
         "feed": "iex",
     }
+
+
+def _failure_provider_metadata(request: LaunchBacktestRequest) -> dict[str, Any]:
+    resolved_symbols, asset_class = _safe_resolved_request_universe(request)
+    if asset_class is None:
+        return {}
+    metadata = _provider_metadata(asset_class=asset_class, timeframe=request.timeframe)
+    metadata.update(
+        {
+            "symbols": resolved_symbols or list(request.symbols),
+            "date_range": request.date_range.model_dump(mode="python"),
+        }
+    )
+    return metadata
+
+
+def _safe_resolved_request_universe(
+    request: LaunchBacktestRequest,
+) -> tuple[list[str], str | None]:
+    try:
+        symbols, asset_class = _resolve_request_symbols(request)
+    except Exception:
+        return list(request.symbols), request.asset_class
+    return symbols, asset_class
 
 
 def _build_periodic_config(
@@ -716,13 +743,13 @@ def _initial_price(
 
 
 def _resolve_request_symbols(request: LaunchBacktestRequest) -> tuple[list[str], str]:
-    if request.asset_class is not None:
-        if not request.symbols:
-            raise ValueError("invalid_symbol_count")
-        return [symbol.strip().upper() for symbol in request.symbols], request.asset_class
     assets = [classify_symbol(symbol) for symbol in request.symbols]
     if not assets:
         raise ValueError("invalid_symbol_count")
+    if request.asset_class is not None:
+        if any(asset.asset_class != request.asset_class for asset in assets):
+            raise ValueError("asset_class_conflict")
+        return [asset.symbol for asset in assets], request.asset_class
     asset_class = assets[0].asset_class
     if any(asset.asset_class != asset_class for asset in assets):
         raise ValueError("asset_class_conflict")
@@ -783,7 +810,7 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "unsupported_rule_operator",
         "provider_timeframe_unavailable",
     }
-    if error_code == "market_data_unavailable":
+    if error_code in {"market_data_unavailable", "benchmark_data_unavailable"}:
         return "upstream_dependency_error", "failed_upstream"
     if error_code in invalid_inputs:
         return "parameter_validation_error", "blocked_invalid_input"

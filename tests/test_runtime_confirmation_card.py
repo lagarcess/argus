@@ -41,6 +41,13 @@ def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None
     )
 
     assert card is not None
+    assert card["strategy_type"] == "dca_accumulation"
+    assert card["display_facts"] == {
+        "benchmark_symbol": "BTC",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "timeframe": "1D",
+    }
     assert any(
         row["key"] == "cadence"
         and row["labelKey"] == "chat.confirmation.rows.cadence"
@@ -126,6 +133,273 @@ def test_runtime_confirmation_card_uses_starting_capital_for_buy_and_hold() -> N
     )
     assert "$100,000 starting capital" in card["assumptions"]
     assert "$10,000 starting capital" not in card["assumptions"]
+
+
+def test_runtime_confirmation_card_promotes_default_starting_capital() -> None:
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold Apple.",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2025-06-13", "end": "2026-06-12"},
+                },
+                "optional_parameters": {
+                    "timeframe": {
+                        "label": "Timeframe",
+                        "source": "default",
+                        "value": "1D",
+                    },
+                    "fees": {"label": "Fees", "source": "default", "value": 0.0},
+                    "slippage": {
+                        "label": "Slippage",
+                        "source": "default",
+                        "value": 0.0,
+                    },
+                },
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbol": "AAPL",
+                    "symbols": ["AAPL"],
+                    "timeframe": "1D",
+                    "date_range": {"start": "2025-06-13", "end": "2026-06-12"},
+                    "sizing_mode": "capital_amount",
+                    "capital_amount": 1000,
+                    "position_size": None,
+                    "parameters": {},
+                    "risk_rules": [],
+                    "benchmark_symbol": "SPY",
+                },
+                "validation": {"executable": True},
+            },
+        }
+    )
+
+    assert card is not None
+    assert any(
+        row["key"] == "starting_capital"
+        and row["labelKey"] == "chat.confirmation.rows.starting_capital"
+        and row["value"] == "$1,000"
+        for row in card["rows"]
+    )
+    assert "$1,000 starting capital" not in card["assumptions"]
+    assert "Benchmark: SPY" in card["assumptions"]
+
+
+def test_runtime_confirmation_card_localizes_spanish_confirmation_artifact() -> None:
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Compra y mantén ETH.",
+                    "asset_universe": ["ETH"],
+                    "asset_class": "crypto",
+                    "capital_amount": 100000.0,
+                    "date_range": {"start": "2024-01-01", "end": "2024-03-31"},
+                },
+                "optional_parameters": {
+                    "timeframe": {
+                        "label": "Timeframe",
+                        "source": "default",
+                        "value": "1D",
+                    },
+                    "fees": {"label": "Fees", "source": "default", "value": 0.0},
+                    "slippage": {
+                        "label": "Slippage",
+                        "source": "default",
+                        "value": 0.0,
+                    },
+                },
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbol": "ETH",
+                    "symbols": ["ETH"],
+                    "timeframe": "1D",
+                    "date_range": {"start": "2024-01-01", "end": "2024-03-31"},
+                    "sizing_mode": "capital_amount",
+                    "capital_amount": 100000,
+                    "position_size": None,
+                    "parameters": {},
+                    "risk_rules": [],
+                    "benchmark_symbol": "BTC",
+                },
+                "validation": {"executable": True},
+            },
+        },
+        language="es-419",
+    )
+
+    assert card is not None
+    assert card["title"] == "ETH: Comprar y mantener"
+    assert card["statusLabel"] == "Listo para ejecutar"
+    assert (
+        card["summary"]
+        == "Listo para probar comprar y mantener ETH del 1 de enero de 2024 al 31 de marzo de 2024."
+    )
+    assert any(
+        row["key"] == "strategy" and row["value"] == "Comprar y mantener"
+        for row in card["rows"]
+    )
+    assert any(
+        row["key"] == "period"
+        and row["value"] == "1 de enero de 2024 al 31 de marzo de 2024"
+        for row in card["rows"]
+    )
+    assert "$100,000 capital inicial" in card["assumptions"]
+    assert "Datos diarios" in card["assumptions"]
+    assert "Sin comisiones" in card["assumptions"]
+    assert "Sin deslizamiento" in card["assumptions"]
+    assert "Referencia: BTC" in card["assumptions"]
+    assert all("starting capital" not in value for value in card["assumptions"])
+    assert all("Benchmark:" not in value for value in card["assumptions"])
+
+
+def test_runtime_confirmation_card_localizes_spanish_indicator_rules() -> None:
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "indicator_threshold",
+                    "strategy_thesis": "Usar RSI en ETH.",
+                    "asset_universe": ["ETH"],
+                    "asset_class": "crypto",
+                    "date_range": {"start": "2025-10-15", "end": "2026-06-14"},
+                    "entry_logic": "Buy when RSI(14) drops to 30 or below",
+                    "exit_logic": "Sell when RSI(14) rises to 70 or above",
+                    "extra_parameters": {
+                        "indicator": "rsi",
+                        "indicator_parameters": {
+                            "indicator": "rsi",
+                            "indicator_period": 14,
+                            "entry_threshold": 30,
+                            "exit_threshold": 70,
+                        },
+                    },
+                },
+                "optional_parameters": {
+                    "initial_capital": {
+                        "label": "Initial capital",
+                        "source": "user",
+                        "value": 100000,
+                    },
+                    "timeframe": {
+                        "label": "Timeframe",
+                        "source": "default",
+                        "value": "1D",
+                    },
+                },
+            },
+        },
+        language="es-419",
+    )
+
+    assert card is not None
+    buy_rule = next(row for row in card["rows"] if row["key"] == "buy_rule")
+    exit_rule = next(row for row in card["rows"] if row["key"] == "exit_rule")
+    assert buy_rule["value"] == "Comprar cuando RSI(14) cae a 30 o menos"
+    assert exit_rule["value"] == "Vender cuando RSI(14) sube a 70 o más"
+    assert "Buy when" not in buy_rule["value"]
+    assert "Sell when" not in exit_rule["value"]
+
+
+def test_runtime_confirmation_card_localizes_spanish_moving_average_rules() -> None:
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "signal_strategy",
+                    "strategy_thesis": "Cruce de medias para ETH.",
+                    "asset_universe": ["ETH"],
+                    "asset_class": "crypto",
+                    "date_range": {"start": "2025-10-15", "end": "2026-06-14"},
+                    "entry_logic": "50-day SMA crosses above 200-day SMA",
+                    "exit_logic": "50-day SMA crosses below 200-day SMA",
+                    "entry_rule": {
+                        "type": "moving_average_crossover",
+                        "fast_indicator": "sma",
+                        "slow_indicator": "sma",
+                        "fast_period": 50,
+                        "slow_period": 200,
+                        "direction": "bullish",
+                    },
+                    "exit_rule": {
+                        "type": "moving_average_crossover",
+                        "fast_indicator": "sma",
+                        "slow_indicator": "sma",
+                        "fast_period": 50,
+                        "slow_period": 200,
+                        "direction": "bearish",
+                    },
+                },
+                "optional_parameters": {},
+            },
+        },
+        language="es-419",
+    )
+
+    assert card is not None
+    buy_rule = next(row for row in card["rows"] if row["key"] == "buy_rule")
+    exit_rule = next(row for row in card["rows"] if row["key"] == "exit_rule")
+    assert (
+        buy_rule["value"]
+        == "Comprar cuando SMA de 50 días cruza por encima de SMA de 200 días"
+    )
+    assert (
+        exit_rule["value"]
+        == "Vender cuando SMA de 50 días cruza por debajo de SMA de 200 días"
+    )
+    assert "crosses above" not in buy_rule["value"]
+    assert "crosses below" not in exit_rule["value"]
+
+
+def test_runtime_confirmation_card_preserves_english_moving_average_word_order() -> None:
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "signal_strategy",
+                    "strategy_thesis": "50/200 moving-average crossover.",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2025-06-14", "end": "2026-06-14"},
+                    "entry_logic": "50-day SMA crosses above 200-day SMA",
+                    "exit_logic": "50-day SMA crosses below 200-day SMA",
+                    "entry_rule": {
+                        "type": "moving_average_crossover",
+                        "fast_indicator": "sma",
+                        "slow_indicator": "sma",
+                        "fast_period": 50,
+                        "slow_period": 200,
+                        "direction": "bullish",
+                    },
+                    "exit_rule": {
+                        "type": "moving_average_crossover",
+                        "fast_indicator": "sma",
+                        "slow_indicator": "sma",
+                        "fast_period": 50,
+                        "slow_period": 200,
+                        "direction": "bearish",
+                    },
+                },
+                "optional_parameters": {},
+            },
+        },
+        language="en",
+    )
+
+    assert card is not None
+    buy_rule = next(row for row in card["rows"] if row["key"] == "buy_rule")
+    exit_rule = next(row for row in card["rows"] if row["key"] == "exit_rule")
+    assert buy_rule["value"] == "Buy when 50-day SMA crosses above 200-day SMA"
+    assert exit_rule["value"] == "Sell when 50-day SMA crosses below 200-day SMA"
 
 
 def test_runtime_confirmation_card_uses_explicit_benchmark_assumption() -> None:

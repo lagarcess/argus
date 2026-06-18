@@ -118,19 +118,20 @@
     "followup_placeholder": "Add a follow-up",
     "message_empty": "Message is empty",
     "send_message": "Send message",
+    "text_only_input": "Argus can only accept text here right now.",
     "disclaimer": "Argus can make mistakes. For education only. Not financial advice.",
     "trigger_create_strategy": "I want to create a new strategy.",
     "trigger_create_collection": "I want to create a new collection.",
     "placeholder_prompts": [
-      "How did Apple perform against SPY in 2024?",
-      "What if I bought Bitcoin at the start of 2024?",
+      "How has Apple performed against SPY this year so far?",
+      "What if I bought Bitcoin this year so far?",
       "Explain a market term in simple words.",
-      "What happens if I hold Nvidia for a year?",
-      "Compare Ethereum and Bitcoin over the last year.",
-      "Test buying SPY at the start of 2024.",
+      "What happens if I hold Nvidia over the last 12 months?",
+      "Compare Ethereum and Bitcoin over the last 12 months.",
+      "Test buying SPY this year so far.",
       "How does buying strong stocks work?",
-      "What if I bought $250 of Nvidia every week in 2024?",
-      "Try a simple Solana buy-and-hold idea.",
+      "What if I bought $250 of Nvidia every week over the last 12 months?",
+      "Try a simple Solana buy-and-hold idea over the last 6 months.",
       "Why do people compare a stock to SPY?"
     ],
     "view_history": "View history",
@@ -140,15 +141,15 @@
     "starter_actions": {
       "tsla": {
         "label": "Test Apple vs SPY",
-        "value": "Test Apple against SPY from January 1, 2024 through December 31, 2024 and show me the result."
+        "value": "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
       },
       "btc": {
         "label": "Test Bitcoin (BTC) hold",
-        "value": "Test buying BTC (Bitcoin) on January 1, 2024 and holding it through December 31, 2024."
+        "value": "What if I bought Bitcoin this year so far?"
       },
       "dca": {
         "label": "Test weekly Nvidia buys",
-        "value": "Test this investing idea. Strategy: recurring buys. Asset: NVDA (Nvidia). Recurring contribution: $250 per week. Period: January 1, 2024 through December 31, 2024."
+        "value": "What if I bought $250 of Nvidia every week over the last 12 months?"
       }
     },
     "example_queries": {
@@ -161,8 +162,24 @@
     "error_load": "Could not load that conversation. Try again.",
     "error_backtest": "I couldn't finish that turn. Try once more, or start a fresh chat if this conversation was restored from an older local session.",
     "error_generic": "Something went wrong. Try again.",
+    "result_breakdown": {
+      "aria_label": "Result breakdown",
+      "label": "Breakdown"
+    },
     "result_trust_strip": "Historical simulation · No fees/slippage · Not advice",
     "result_trust_strip_label": "Result trust context",
+    "asset_class": {
+      "equity": "Stocks",
+      "crypto": "Crypto",
+      "currency_pair": "Currency Pair"
+    },
+    "cadence": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "biweekly": "Biweekly",
+      "monthly": "Monthly",
+      "quarterly": "Quarterly"
+    },
     "view_details": "View details",
     "new_chat_ready": "New chat ready. What idea should we test?",
     "resume_prompt": "Resuming \"{{title}}\". What would you like to explore next?",
@@ -243,7 +260,11 @@
       "lagged_by": "Lagged by {{value}}",
       "details": {
         "starting_capital": "Starting capital",
+        "peak_value": "Peak value",
+        "lowest_value": "Lowest value",
         "date_range": "Date range",
+        "peak_value": "Peak value",
+        "lowest_value": "Lowest value",
         "timeframe": "Timeframe",
         "side": "Side",
         "allocation": "Allocation",
@@ -260,6 +281,18 @@
         "generic": "{{value}} data"
       }
     },
+    "result_chart": {
+      "markers": {
+        "entry": "Buy",
+        "exit": "Sell"
+      }
+    },
+    "strategy_type": {
+      "buy_and_hold": "Buy and Hold",
+      "dca_accumulation": "Recurring Buys",
+      "indicator_threshold": "RSI Threshold",
+      "signal_strategy": "Moving Average Crossover"
+    },
     "discovery": {
       "prompt": "Mention an asset or indicator",
       "results": "Search results",
@@ -273,10 +306,11 @@
       "sections": {
         "results": "Search results",
         "assets": "Popular assets",
-        "indicators": "Runnable indicators"
+        "indicators": "Indicators"
       },
       "badges": {
         "asset": "asset",
+        "indicator": "indicator",
         "runnable": "runnable",
         "unavailable": "unavailable",
         "draft": "draft"
@@ -284,7 +318,12 @@
       "descriptions": {
         "asset": "Asset",
         "indicator": "Indicator",
-        "currency_pair": "Currency Pair"
+        "currency_pair": "Currency Pair",
+        "asset_classes": {
+          "equity": "Stock",
+          "crypto": "Crypto",
+          "currency_pair": "Currency Pair"
+        }
       }
     },
     "status": {
@@ -306,6 +345,7 @@
       "intent_unsupported_request": "Thinking..."
     },
     "confirmation": {
+      "asset_count": "{{count}} assets",
       "selected_asset": "Selected asset",
       "status": {
         "ready_to_run": "Ready to run",
@@ -335,6 +375,12 @@
         "change_asset": "Change asset",
         "adjust_assumptions": "Adjust assumptions",
         "cancel": "Cancel"
+      },
+      "assumptions": {
+        "through": "Through {{date}}",
+        "no_fees": "No fees",
+        "no_slippage": "No slippage",
+        "benchmark": "Benchmark: {{symbol}}"
       }
     }
   },

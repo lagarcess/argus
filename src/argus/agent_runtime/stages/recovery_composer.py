@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from argus.agent_runtime.response_language import response_language_instruction
 from argus.llm.openrouter import invoke_openrouter_chat_completion
 
 
@@ -9,6 +10,7 @@ async def compose_active_confirmation_interpreter_recovery(
     setup_phrase: str,
     assumptions_response: str | None,
     action_guidance: str,
+    language: str = "en",
 ) -> str | None:
     """Compose a user-facing recovery near an active confirmation artifact.
 
@@ -27,14 +29,17 @@ async def compose_active_confirmation_interpreter_recovery(
     ]
     if assumptions_response:
         facts.append(f"Visible-card assumptions: {assumptions_response}")
+    language_instruction = response_language_instruction(language)
     messages = [
         {
             "role": "system",
             "content": (
                 "You are Argus, a chat-first investing experimentation assistant. "
                 "The structured interpreter is unavailable for this turn, but a "
-                "confirmation card is visible and still ready. Answer the user's "
-                "message directly in warm, plain English. If they ask about the "
+                "confirmation card is visible and still ready. "
+                f"{language_instruction} "
+                "Answer the user's message directly in warm, plain language. "
+                "If they ask about the "
                 "visible card, use only the supplied card facts. If they ask a "
                 "general educational or side question, answer that question and "
                 "mention the confirmation only briefly when useful. Do not expose "

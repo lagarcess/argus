@@ -193,6 +193,7 @@ test("hides global sidebar search under private-alpha defaults", async ({ page }
 });
 
 test("signup and login expose persisted account entry", async ({ page }) => {
+  await mockChatBoot(page, "completed");
   await page.goto("/?auth=signup", { waitUntil: "networkidle" });
 
   await expect(page.getByPlaceholder("Name")).toBeVisible();
@@ -206,4 +207,66 @@ test("signup and login expose persisted account entry", async ({ page }) => {
   await expect(page.getByPlaceholder("Email address")).toBeVisible();
   await expect(page.getByPlaceholder("Password")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
+});
+
+test("real-auth signup submits invite identity and renders sanitized rejection", async ({
+  page,
+}) => {
+  test.skip(
+    process.env.NEXT_PUBLIC_MOCK_AUTH !== "false",
+    "Requires NEXT_PUBLIC_MOCK_AUTH=false so the browser exercises /auth/signup.",
+  );
+
+  const signupRequests: Array<Record<string, unknown>> = [];
+  await page.route("**/api/v1/me", async (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({
+        code: "unauthorized",
+        detail: "Invalid session.",
+      }),
+    }),
+  );
+  await page.route("**/api/v1/auth/signup", async (route) => {
+    signupRequests.push(route.request().postDataJSON() as Record<string, unknown>);
+    return route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({
+        code: "auth_signup_failed",
+        detail: "Signup failed. Please try again.",
+      }),
+    });
+  });
+
+  await page.goto("/?auth=signup", { waitUntil: "networkidle" });
+
+  await page.getByPlaceholder("Name").fill("Private Alpha Candidate");
+  await page.getByPlaceholder("Email address").fill("candidate@example.com");
+  await page.getByPlaceholder("Password").fill("launch-passphrase");
+  await page.getByRole("button", { name: "Sign up" }).click();
+
+  await expect
+    .poll(() => signupRequests.length, { timeout: 5_000 })
+    .toBe(1);
+  expect(signupRequests[0]).toMatchObject({
+    display_name: "Private Alpha Candidate",
+    email: "candidate@example.com",
+    password: "launch-passphrase",
+  });
+  await expect(page.getByText("Signup failed. Please try again.")).toBeVisible();
+  await expect(page.getByText(/allowlist|invite|supabase/i)).toHaveCount(0);
+});
+
+test("mock-auth login submits into the private-alpha chat", async ({ page }) => {
+  await mockChatBoot(page, "completed");
+  await page.goto("/?auth=login", { waitUntil: "networkidle" });
+
+  await page.getByPlaceholder("Email address").fill("dev@example.com");
+  await page.getByPlaceholder("Password").fill("local-password");
+  await page.getByRole("button", { name: "Sign In" }).click();
+
+  await expect(page).toHaveURL(/\/chat$/);
+  await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 15_000 });
 });

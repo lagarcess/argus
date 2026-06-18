@@ -26,6 +26,8 @@ DEFAULT_USER_RUNNING_LIMIT = 1
 DEFAULT_USER_QUEUED_LIMIT = 2
 DEFAULT_GLOBAL_RUNNING_LIMIT = 5
 DEFAULT_GLOBAL_QUEUED_LIMIT = 10
+DEFAULT_STALE_QUEUED_SECONDS = 15 * 60
+DEFAULT_STALE_RUNNING_SECONDS = 15 * 60
 
 
 @dataclass
@@ -367,6 +369,158 @@ def reconcile_terminal_render_task_run(
         ),
     )
     return dict(reconciled)
+
+
+def scan_stale_backtest_jobs(
+    *,
+    gateway: Any,
+    now: datetime | None = None,
+    queued_age_seconds: int = DEFAULT_STALE_QUEUED_SECONDS,
+    running_age_seconds: int = DEFAULT_STALE_RUNNING_SECONDS,
+    limit: int = 100,
+    task_run_client: RenderTaskRunClient | None = None,
+) -> dict[str, Any]:
+    list_jobs = getattr(gateway, "list_backtest_jobs", None)
+    if list_jobs is None:
+        raise RuntimeError("Gateway must support list_backtest_jobs for stale scan.")
+
+    now_utc = now or datetime.now(timezone.utc)
+    if now_utc.tzinfo is None:
+        now_utc = now_utc.replace(tzinfo=timezone.utc)
+    now_utc = now_utc.astimezone(timezone.utc)
+
+    report: dict[str, Any] = {
+        "status": "ready",
+        "scanned_count": 0,
+        "stale_count": 0,
+        "reconciled_count": 0,
+        "unresolved_count": 0,
+        "error_count": 0,
+        "unresolved_jobs": [],
+        "errors": [],
+        "thresholds": {
+            "queued_age_seconds": queued_age_seconds,
+            "running_age_seconds": running_age_seconds,
+        },
+    }
+    scan_plan = (
+        ("queued", queued_age_seconds, ("queued_at", "created_at", "updated_at")),
+        ("running", running_age_seconds, ("started_at", "updated_at", "queued_at", "created_at")),
+    )
+    max_jobs = max(1, limit)
+
+    for status, stale_after_seconds, timestamp_keys in scan_plan:
+        try:
+            jobs = list_jobs(
+                status=status,
+                user_id=None,
+                limit=max_jobs,
+                oldest_first=True,
+            )
+        except TypeError:
+            jobs = list_jobs(status=status, user_id=None, limit=max_jobs)
+        except Exception as exc:
+            report["errors"].append({"status": status, "error": str(exc)})
+            report["error_count"] += 1
+            continue
+
+        for job in jobs:
+            if not isinstance(job, dict):
+                continue
+            report["scanned_count"] += 1
+            age_seconds = _job_age_seconds(job, now=now_utc, timestamp_keys=timestamp_keys)
+            if age_seconds is not None and age_seconds < stale_after_seconds:
+                continue
+
+            report["stale_count"] += 1
+            before = str(job.get("status") or status).strip().lower()
+            user_id = str(job.get("user_id") or "").strip()
+            task_run_id = _task_run_id_from_job(job)
+            if not user_id:
+                report["unresolved_jobs"].append(
+                    _stale_job_report(job, before, age_seconds, task_run_id)
+                )
+                report["unresolved_count"] += 1
+                continue
+
+            try:
+                reconciled = reconcile_terminal_render_task_run(
+                    gateway=gateway,
+                    user_id=user_id,
+                    job=job,
+                    task_run_client=task_run_client,
+                )
+            except Exception as exc:
+                report["errors"].append(
+                    {
+                        "id": job.get("id"),
+                        "status": before,
+                        "user_id": user_id,
+                        "error": str(exc),
+                    }
+                )
+                report["error_count"] += 1
+                continue
+
+            after = str((reconciled or {}).get("status") or before).strip().lower()
+            if before in {"queued", "running"} and after not in {"queued", "running"}:
+                report["reconciled_count"] += 1
+                continue
+
+            report["unresolved_jobs"].append(
+                _stale_job_report(job, before, age_seconds, task_run_id)
+            )
+            report["unresolved_count"] += 1
+
+    if report["unresolved_count"] or report["error_count"]:
+        report["status"] = "degraded"
+    return report
+
+
+def _stale_job_report(
+    job: dict[str, Any],
+    status: str,
+    age_seconds: int | None,
+    task_run_id: str | None,
+) -> dict[str, Any]:
+    return {
+        "id": job.get("id"),
+        "status": status,
+        "user_id": job.get("user_id"),
+        "age_seconds": age_seconds,
+        "task_run_id": task_run_id,
+    }
+
+
+def _job_age_seconds(
+    job: dict[str, Any],
+    *,
+    now: datetime,
+    timestamp_keys: tuple[str, ...],
+) -> int | None:
+    timestamp = None
+    for key in timestamp_keys:
+        timestamp = _parse_timestamp(job.get(key))
+        if timestamp is not None:
+            break
+    if timestamp is None:
+        return None
+    return max(0, int((now - timestamp).total_seconds()))
+
+
+def _parse_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    raw = value.strip()
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _task_run_id_from_job(job: dict[str, Any]) -> str | None:

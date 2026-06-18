@@ -13,6 +13,28 @@ from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
 
 
+def test_chat_action_display_message_resolves_label_key_by_language() -> None:
+    from argus.api.chat.actions import chat_display_message
+    from argus.api.schemas import ChatStreamRequest
+
+    payload = ChatStreamRequest.model_validate(
+        {
+            "conversation_id": "conversation-1",
+            "language": "es-419",
+            "action": {
+                "type": "show_breakdown",
+                "label": "Explain result",
+                "labelKey": "chat.result_card.explain_result",
+                "presentation": "result",
+                "payload": {"run_id": "run-1"},
+            },
+        }
+    )
+
+    assert chat_display_message(payload, language="es-419") == "Explicar resultado"
+    assert chat_display_message(payload, language="en") == "Explain result"
+
+
 def _client() -> TestClient:
     client = TestClient(app)
     client.post("/api/v1/dev/reset")
@@ -254,6 +276,19 @@ def test_runtime_backtest_run_persists_explicit_benchmark_from_envelope(
 ) -> None:
     from argus.api.chat.persistence import build_runtime_backtest_run
 
+    engine_config = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "side": "long",
+        "starting_capital": 1000.0,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": benchmark_symbol,
+        "parameters": {},
+    }
     run = build_runtime_backtest_run(
         user_id="user-1",
         conversation_id="conversation-1",
@@ -274,6 +309,7 @@ def test_runtime_backtest_run_persists_explicit_benchmark_from_envelope(
                 "timeframe": "1D",
                 "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
                 "benchmark_symbol": benchmark_symbol,
+                "engine_config": engine_config,
             },
             "metrics": {"aggregate": {"performance": {"total_return_pct": 12.4}}},
             "benchmark_metrics": {
@@ -292,6 +328,101 @@ def test_runtime_backtest_run_persists_explicit_benchmark_from_envelope(
     assert run.config_snapshot["benchmark_symbol"] == benchmark_symbol
     assert run.config_snapshot["resolved_parameters"]["benchmark_symbol"] == (
         benchmark_symbol
+    )
+    assert run.config_snapshot["engine_config"] == engine_config
+
+
+def test_runtime_backtest_run_freezes_replay_snapshot_and_chart_payload() -> None:
+    from argus.api.chat.persistence import build_runtime_backtest_run
+
+    engine_config = {
+        "template": "rsi_mean_reversion",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2024-01-01",
+        "end_date": "2024-01-31",
+        "side": "long",
+        "starting_capital": 1000.0,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {"rsi_window": 14},
+    }
+    result_card = {
+        "title": "AAPL RSI",
+        "rows": [],
+        "metrics": [],
+        "assumptions": ["Benchmark: SPY"],
+        "chart": {
+            "kind": "portfolio_equity",
+            "series": [{"time": "2024-01-02", "value": 1000.0}],
+            "markers": [
+                {
+                    "time": "2024-01-02",
+                    "type": "entry",
+                    "label": "Buy AAPL",
+                    "symbols": ["AAPL"],
+                }
+            ],
+            "value_summary": {
+                "peak_value": 1000.0,
+                "lowest_value": 1000.0,
+                "currency": "USD",
+                "source": "strategy_portfolio_equity_close",
+            },
+        },
+        "actions": [
+            {
+                "type": "show_breakdown",
+                "payload": {"nested": {"source": "engine"}},
+            }
+        ],
+    }
+    envelope = {
+        "resolved_strategy": {
+            "strategy_type": "rsi_mean_reversion",
+            "symbol": "AAPL",
+            "asset_universe": ["AAPL"],
+        },
+        "resolved_parameters": {
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-01", "end": "2024-01-31"},
+            "benchmark_symbol": "SPY",
+            "engine_config": engine_config,
+        },
+        "metrics": {"aggregate": {"performance": {"total_return_pct": 4.2}}},
+        "benchmark_metrics": {"symbol": "SPY"},
+        "provider_metadata": {"provider": "alpaca", "coverage": {"bars": 21}},
+    }
+
+    run = build_runtime_backtest_run(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        result_card=result_card,
+        envelope=envelope,
+        classify_symbol_func=lambda symbol: SymbolAsset(
+            symbol=symbol.strip().upper(), asset_class="equity"
+        ),
+        default_benchmark_func=lambda _asset_class, _symbols: "SPY",
+    )
+    assert run is not None
+
+    engine_config["parameters"]["rsi_window"] = 21
+    envelope["resolved_parameters"]["date_range"]["start"] = "2023-01-01"
+    envelope["provider_metadata"]["coverage"]["bars"] = 0
+    result_card["chart"]["markers"][0]["label"] = "Mutated"
+    result_card["actions"][0]["payload"]["nested"]["source"] = "mutated"
+
+    assert run.config_snapshot["engine_config"]["parameters"]["rsi_window"] == 14
+    assert run.config_snapshot["resolved_parameters"]["date_range"]["start"] == (
+        "2024-01-01"
+    )
+    assert run.config_snapshot["provider_metadata"]["coverage"]["bars"] == 21
+    assert run.chart["markers"][0]["label"] == "Buy AAPL"
+    assert run.trades[0]["label"] == "Buy AAPL"
+    assert (
+        run.conversation_result_card["actions"][0]["payload"]["nested"]["source"]
+        == "engine"
     )
 
 
@@ -679,17 +810,15 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
         assert action["presentation"] == "confirmation"
         assert action["payload"]["confirmation_id"] == confirmation["confirmation_id"]
         assert action["payload"]["conversation_id"] == conversation["id"]
+    run_action = next(
+        action for action in confirmation["actions"] if action["type"] == "run_backtest"
+    )
 
     response = client.post(
         "/api/v1/chat/stream",
         json={
             "conversation_id": conversation["id"],
-            "action": {
-                "type": "run_backtest",
-                "label": "Run backtest",
-                "presentation": "confirmation",
-                "payload": {},
-            },
+            "action": run_action,
             "language": "en",
         },
     )
@@ -716,6 +845,92 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
         assert action["payload"]["run_id"] == run["id"]
         assert action["payload"]["strategy_id"] is None
         assert action["payload"]["conversation_id"] == conversation["id"]
+
+
+@pytest.mark.parametrize(
+    ("action_type", "localized_label"),
+    [
+        ("change_dates", "Cambiar fechas"),
+        ("change_asset", "Cambiar activo"),
+        ("adjust_assumptions", "Ajustar supuestos"),
+    ],
+)
+def test_confirmation_edit_actions_reenter_runtime_with_structured_context(
+    monkeypatch: pytest.MonkeyPatch,
+    action_type: str,
+    localized_label: str,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    seen_turns: list[dict[str, Any]] = []
+
+    def _runtime(**kwargs: Any) -> dict[str, Any]:
+        seen_turns.append(
+            {
+                "message": kwargs["message"],
+                "action_context": kwargs["action_context"],
+            }
+        )
+        if len(seen_turns) == 1:
+            return _confirmation_runtime_result()
+        return _pending_runtime_result()
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(_runtime),
+    )
+    client = _client()
+    conversation = _conversation(client)
+    create_confirmation = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Compra y manten AAPL ultimos 12 meses",
+            "language": "es-419",
+        },
+    )
+    assert create_confirmation.status_code == 200
+    confirmation = _stream_payloads(create_confirmation.text, "confirmation")[0][
+        "confirmation"
+    ]
+    action = next(
+        item for item in confirmation["actions"] if item["type"] == action_type
+    )
+    action["label"] = localized_label
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": action,
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    assert seen_turns[1]["message"] == localized_label
+    assert seen_turns[1]["message"] != "yes"
+    action_context = seen_turns[1]["action_context"]
+    assert action_context["type"] == action_type
+    assert action_context["presentation"] == "confirmation"
+    assert action_context["payload"]["confirmation_id"] == (
+        confirmation["confirmation_id"]
+    )
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    assert final["pending_strategy"]["requested_field"] == "asset_universe"
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant = messages[-1]
+    assert assistant["role"] == "assistant"
+    assert assistant["metadata"]["chat_action"]["type"] == action_type
+    assert assistant["metadata"]["pending_strategy"]["strategy"]["asset_universe"] == [
+        "AAPL"
+    ]
+    assert assistant["metadata"]["pending_strategy"]["requested_field"] == (
+        "asset_universe"
+    )
 
 
 def test_chat_stream_passes_and_persists_composer_mention_provenance(
@@ -762,6 +977,7 @@ def test_chat_stream_passes_and_persists_composer_mention_provenance(
     assert seen["context_hints"][0]["source"] == "user_mention"
     assert seen["context_hints"][0]["canonical_symbol"] == "BTC"
     assert seen["context_hints"][0]["asset_class"] == "crypto"
+    assert seen["context_hints"][0]["validated_by"] == "client_mention"
 
     user_message = client.get(
         f"/api/v1/conversations/{conversation['id']}/messages"
@@ -772,6 +988,10 @@ def test_chat_stream_passes_and_persists_composer_mention_provenance(
         "user_mention"
     )
     assert user_message["metadata"]["resolution_provenance"][0]["raw_text"] == "BTC"
+    assert (
+        user_message["metadata"]["resolution_provenance"][0]["validated_by"]
+        == "client_mention"
+    )
 
 
 def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
@@ -819,6 +1039,7 @@ def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
     assert seen["context_hints"][0]["source"] == "user_mention"
     assert seen["context_hints"][0]["canonical_symbol"] == "CVX"
     assert seen["context_hints"][0]["asset_class"] == "equity"
+    assert seen["context_hints"][0]["validated_by"] == "client_mention"
 
     user_message = client.get(
         f"/api/v1/conversations/{conversation['id']}/messages"
@@ -827,6 +1048,10 @@ def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
     assert user_message["metadata"]["mentions"][0]["provider"] == "alpaca"
     assert (
         user_message["metadata"]["resolution_provenance"][0]["asset_class"] == "equity"
+    )
+    assert (
+        user_message["metadata"]["resolution_provenance"][0]["validated_by"]
+        == "client_mention"
     )
 
 
@@ -849,6 +1074,20 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
         runtime_calls += 1
         return _result_runtime_result()
 
+    breakdown_languages: list[str] = []
+
+    def _forced_breakdown(run: Any, *, language: str = "en") -> ResultBreakdownMessage:
+        breakdown_languages.append(language)
+        return ResultBreakdownMessage(
+            text=fallback_result_breakdown_message(
+                result_breakdown_context(run),
+                language=language,
+            ),
+            source="deterministic_fallback",
+            fallback_used=True,
+            failure_mode="test_forced_fallback",
+        )
+
     monkeypatch.setattr(
         agent_router,
         "stream_agent_turn_events",
@@ -857,12 +1096,7 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     monkeypatch.setattr(
         agent_router,
         "result_breakdown_message_with_metadata",
-        lambda run: ResultBreakdownMessage(
-            text=fallback_result_breakdown_message(result_breakdown_context(run)),
-            source="deterministic_fallback",
-            fallback_used=True,
-            failure_mode="test_forced_fallback",
-        ),
+        _forced_breakdown,
     )
     client = _client()
     conversation = _conversation(client)
@@ -875,17 +1109,20 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
         },
     )
     assert confirmation.status_code == 200
+    confirmation_payload = _stream_payloads(confirmation.text, "confirmation")[0][
+        "confirmation"
+    ]
+    run_action = next(
+        action
+        for action in confirmation_payload["actions"]
+        if action["type"] == "run_backtest"
+    )
 
     first = client.post(
         "/api/v1/chat/stream",
         json={
             "conversation_id": conversation["id"],
-            "action": {
-                "type": "run_backtest",
-                "label": "Run backtest",
-                "presentation": "confirmation",
-                "payload": {},
-            },
+            "action": run_action,
             "language": "en",
         },
     )
@@ -928,19 +1165,17 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert assistant["metadata"]["result_fact_bank"]["run_id"] == run_id
     assert assistant["metadata"]["result_fact_bank"]["symbols"] == ["AAPL"]
     assert "result_card" not in assistant["metadata"]
+    assert breakdown_languages == ["en"]
 
 
 def test_breakdown_action_emits_working_stage_before_generating_text() -> None:
     from pathlib import Path
 
     source = Path("src/argus/api/routers/agent.py").read_text()
-    action_block = source.split('payload.action.type == "show_breakdown"', 1)[1].split(
-        "runtime_user = UserState", 1
-    )[0]
 
-    assert action_block.index(
+    assert source.index(
         'yield sse_data({"type": "stage_start", "stage": "explain"})'
-    ) < action_block.index("breakdown_message = result_breakdown_message_with_metadata(run)")
+    ) < source.index("breakdown_message = result_breakdown_message_with_metadata")
 
 
 def test_result_action_with_run_from_another_conversation_does_not_fallback() -> None:

@@ -89,7 +89,7 @@ services:
       - key: ARGUS_CHAT_FALLBACK_MODEL
         value: qwen/qwen3.5-9b
       - key: ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS
-        value: "20"
+        value: "30"
       - key: ARGUS_STRUCTURED_MODEL
         value: mistralai/mistral-small-2603
       - key: ARGUS_STRUCTURED_FALLBACK_MODEL
@@ -127,6 +127,8 @@ services:
         sync: false
       - key: NEXT_PUBLIC_MOCK_AUTH
         value: "false"
+      - key: NEXT_PUBLIC_ENABLE_SPANISH
+        value: "true"
       - key: NEXT_PUBLIC_ARGUS_API_URL
         value: https://argus-ohr5.onrender.com/api/v1
       - key: NEXT_PUBLIC_STRATEGIES_ENABLED

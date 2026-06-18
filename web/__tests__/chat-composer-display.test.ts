@@ -11,6 +11,7 @@ import {
   discoverySectionsForDisplay,
   mergeDiscoveryItems,
   nextDiscoveryItemId,
+  plainTextComposerTransferPayload,
   selectableDiscoveryItemsForQuery,
   shouldHideMentionButton,
 } from "../components/chat/ChatInput";
@@ -52,6 +53,82 @@ const defaults: DiscoveryItem[] = [
 ];
 
 describe("chat composer display helpers", () => {
+  test("normalizes dropped or pasted payloads to text-only composer content", () => {
+    const transfer = (
+      types: string[],
+      values: Record<string, string>,
+      fileCount = 0,
+    ) => ({
+      types,
+      files: { length: fileCount },
+      getData: (format: string) => values[format] ?? "",
+    });
+
+    expect(
+      plainTextComposerTransferPayload(
+        transfer(["text/plain"], { "text/plain": "Buy AAPL" }),
+      ),
+    ).toEqual({ text: "Buy AAPL", rejectedNonText: false });
+    expect(
+      plainTextComposerTransferPayload(
+        transfer(
+          ["text/html", "text/plain"],
+          { "text/html": "<b>Buy</b>", "text/plain": "Buy" },
+        ),
+      ),
+    ).toEqual({ text: "Buy", rejectedNonText: false });
+    expect(
+      plainTextComposerTransferPayload(
+        transfer(["Files"], {}, 1),
+      ),
+    ).toEqual({ text: "", rejectedNonText: true });
+    expect(
+      plainTextComposerTransferPayload(
+        transfer(["Files", "text/plain"], { "text/plain": "AAPL" }, 1),
+      ),
+    ).toEqual({ text: "AAPL", rejectedNonText: true });
+  });
+
+  test("chat input uses the shell toast for non-text composer payloads", () => {
+    const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+    const shell = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const english = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const spanish = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    expect(input).toContain("onToast?: (message: string) => void");
+    expect(input).toContain("chat.text_only_input");
+    expect(input).toContain("plainTextComposerTransferPayload(dataTransfer)");
+    expect(input).toContain("handleComposerDataTransfer(e.clipboardData)");
+    expect(input).toContain("handleComposerDataTransfer(e.dataTransfer)");
+    expect(input).toContain("onDrop={(e) =>");
+    expect(input).toContain("onDragOver={(e) => e.preventDefault()}");
+    expect(shell.match(/onToast={showToast}/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(english.chat.text_only_input).toContain("text");
+    expect(spanish.chat.text_only_input).toContain("texto");
+  });
+
+  test("localizes discovery asset classes and uses type badges for indicators", () => {
+    const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+    const english = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const spanish = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    expect(input).toContain("chat.discovery.descriptions.asset_classes");
+    expect(input).toContain('if (item.type === "indicator") return "indicator";');
+    expect(input).not.toContain('if (item.support_status === "supported") return "runnable";');
+    expect(english.chat.discovery.badges.indicator).toBe("indicator");
+    expect(spanish.chat.discovery.badges.indicator).toBe("indicador");
+    expect(english.chat.discovery.descriptions.asset_classes.equity).toBe("Stock");
+    expect(spanish.chat.discovery.descriptions.asset_classes.equity).toBe("Acción");
+  });
+
   test("keeps empty @ discovery as an invitation to provider search", () => {
     const sections = discoverySectionsForDisplay([], "");
 

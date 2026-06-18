@@ -95,8 +95,8 @@ def discovery_indicators(
         for indicator in search_indicators(query, limit=limit)
         if discovery_support_status(indicator.support_status) == "supported"
     ]
-    # TODO(private-alpha-discovery): decide whether unsupported indicators should
-    # appear as research/draft mentions once the research-lab flow exists.
+    # Deferred(private-alpha-discovery): unsupported indicator mentions belong to
+    # the future Research Lab/draft flow, not this launch discovery surface.
     return DiscoveryResponse(
         items=[
             DiscoveryItem(

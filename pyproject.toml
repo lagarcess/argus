@@ -19,14 +19,17 @@ loguru = "^0.7.3"
 # Data Analysis
 pandas = "^2.2.0"
 pandas-ta-classic = {git = "https://github.com/xgboosted/pandas-ta-classic.git", rev = "6e4cb10"}
+dateparser = "^1.4.0"
 # High-Performance Computing
 numba = {version = ">=0.60.0", python = ">=3.10"}
 joblib = "^1.5.3"
 vectorbt = "^0.28.5"
 # API Server
-fastapi = {version = "^0.115.0", extras = ["standard"]}
+fastapi = {version = "0.124.4", extras = ["standard"]}
+# Python 3.14-ready line; defer Starlette 1.x TestClient transport changes.
+starlette = ">=0.48.0,<1.0.0"
 uvicorn = {version = "^0.32.0", extras = ["standard"]}
-python-multipart = "^0.0.12"
+python-multipart = "^0.0.20"
 # Supabase Auth
 supabase = "^2.10.0"
 pyjwt = {version = "^2.9.0", extras = ["crypto"]}
@@ -37,6 +40,7 @@ langchain-openrouter = "^0.2.1"
 langgraph = ">=1.1.5,<1.2.0"
 langgraph-checkpoint-postgres = "^3.0.5"
 psycopg = {extras = ["binary", "pool"], version = "^3.3.4"}
+babel = "^2.17.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -46,7 +50,7 @@ build-backend = "poetry.core.masonry.api"
 pytest = ">=8.0,<9.0"
 pytest-mock = ">=3.15.1,<4.0.0"
 pytest-cov = ">=4.0.0"
-pytest-asyncio = "^0.23.6"
+pytest-asyncio = "^1.4.0"
 httpx = "^0.28.1"
 faker = "^30.0.0"
 pre-commit = "<4.0"
@@ -92,6 +96,7 @@ addopts = "-v --cov=src --cov-report=term-missing --cov-report=html:temp/coverag
 filterwarnings = [
     "ignore::DeprecationWarning:postgrest.*",
     "ignore::DeprecationWarning:supabase.*",
+    "ignore:Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.:UserWarning:langchain_core.*",
 ]
 markers = [
     "slow: marks tests as slow (performance benchmarks requiring large datasets)",

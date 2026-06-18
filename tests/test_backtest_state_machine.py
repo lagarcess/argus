@@ -189,5 +189,7 @@ def test_text_approval_uses_llm_turn_act_but_defers_to_card_action(
     )
 
     assert result.outcome == "ready_to_respond"
-    assert "visible card" in result.patch["assistant_response"]
+    response = result.patch["assistant_response"].lower()
+    assert "visible" in response
+    assert "confirmation" in response
     assert "start the simulation" in result.patch["assistant_response"]

@@ -144,6 +144,66 @@ def test_real_backtest_tool_maps_blocked_unsupported_failure(
     assert result["capability_context"]["failure_detail"] == "unsupported_rule"
 
 
+def test_real_backtest_tool_maps_benchmark_data_unavailable_as_retryable_dependency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tool = RealBacktestTool()
+
+    def fake_run_launch_backtest(
+        request,
+        *,
+        language: str = "en",
+    ) -> LaunchExecutionAdapterResult:
+        assert request.symbol == "TSLA"
+        return LaunchExecutionAdapterResult(
+            envelope=LaunchExecutionEnvelope(
+                execution_status="failed_upstream",
+                resolved_strategy={
+                    "strategy_type": "buy_and_hold",
+                    "symbol": "TSLA",
+                },
+                resolved_parameters={"timeframe": "1D"},
+                metrics={},
+                benchmark_metrics={},
+                failure_category="upstream_dependency_error",
+                failure_reason="benchmark_data_unavailable",
+            ),
+            timings_ms={"provider_fetch_total": 8.75},
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.tools.real_backtest.run_launch_backtest",
+        fake_run_launch_backtest,
+    )
+
+    result = tool.run(
+        {
+            "strategy_type": "buy_and_hold",
+            "symbol": "TSLA",
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            "entry_rule": None,
+            "exit_rule": None,
+            "sizing_mode": "capital_amount",
+            "capital_amount": 10000.0,
+            "position_size": None,
+            "cadence": None,
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+        }
+    )
+
+    assert result["success"] is False
+    assert result["error_type"] == "upstream_dependency_error"
+    assert result["error_message"] != "benchmark_data_unavailable"
+    assert "benchmark" in result["error_message"].lower()
+    assert result["execution_metadata"]["timings_ms"] == {"provider_fetch_total": 8.75}
+    assert result["retryable"] is True
+    assert result["capability_context"]["execution_status"] == "failed_upstream"
+    assert result["capability_context"]["failure_detail"] == "benchmark_data_issue"
+
+
 def test_real_backtest_tool_maps_validation_error() -> None:
     tool = RealBacktestTool()
 

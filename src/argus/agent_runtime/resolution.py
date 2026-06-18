@@ -275,7 +275,7 @@ def mention_to_provenance(
         canonical_symbol=canonical or None,
         asset_class=asset_class,
         validated_by=(
-            "provider_catalog" if candidate_kind == "asset" else "indicator_registry"
+            "client_mention" if candidate_kind == "asset" else "indicator_registry"
         ),
         confidence="high",
     )

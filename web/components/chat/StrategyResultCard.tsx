@@ -6,8 +6,12 @@ import {
   heroDeltaEvidenceView,
 } from "@/lib/result-card-display";
 import { artifactStatusToneClassName } from "@/lib/artifact-status-tones";
+import { assetClassDisplayLabel } from "@/lib/asset-class-display";
+import { cadenceDisplayLabel } from "@/lib/cadence-display";
+import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import { isVisibleResultAction } from "@/lib/chat-result-actions";
 import { strategiesEnabled } from "@/lib/private-alpha-flags";
+import { strategyDisplayLabel, strategyTypeFromResult } from "@/lib/strategy-display";
 import ResultEquityChart from "./ResultEquityChart";
 import type { ChatActionOption, StrategyResultPayload } from "./types";
 
@@ -62,6 +66,12 @@ export default function StrategyResultCard({
         ? "text-[#d66d75]"
         : "text-[#5a677d] dark:text-[#7da0ca]";
   const trustGroups = view.trustGroups;
+  const periodDisplay =
+    compactDateRangeDisplay(result.dateRange, i18n.language) ?? result.period;
+  const strategyLabel =
+    strategyDisplayLabel(strategyTypeFromResult(result), t, result.strategyLabel) ??
+    result.strategyLabel ??
+    result.strategyName;
 
   return (
     <section
@@ -73,18 +83,18 @@ export default function StrategyResultCard({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
             {symbols.length > 0 && <AssetSymbols symbols={symbols} />}
             <h3 className="font-display text-[18px] font-medium leading-tight tracking-[-0.18px] text-[#191c1f] dark:text-white">
-              {result.strategyLabel ?? result.strategyName}
+              {strategyLabel}
             </h3>
           </div>
           <p className="mt-1.5 text-[13px] leading-snug tracking-[0.16px] text-[#8d969e]">
             {view.timeframeDisplay
-              ? `${result.period} · ${view.timeframeDisplay}`
-              : result.period}
+              ? `${periodDisplay} · ${view.timeframeDisplay}`
+              : periodDisplay}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${artifactStatusToneClassName("neutral")}`}>
-            {result.statusLabel || t("chat.simulation_complete", "Simulation Complete")}
+            {t("chat.simulation_complete", result.statusLabel || "Simulation Complete")}
           </span>
         </div>
       </div>
@@ -114,7 +124,10 @@ export default function StrategyResultCard({
 
         <StatRail metrics={[view.benchmark, view.worstDrop]} />
 
-        <TrustRail groups={trustGroups} />
+        <TrustRail
+          groups={trustGroups}
+          label={t("chat.result_trust_strip_label", "Result trust context")}
+        />
 
         <ExecutionDetails
           details={view.details}
@@ -188,10 +201,10 @@ function StatItem({
   );
 }
 
-function TrustRail({ groups }: { groups: string[] }) {
+function TrustRail({ groups, label }: { groups: string[]; label: string }) {
   return (
     <div
-      aria-label="Result trust context"
+      aria-label={label}
       className="mt-3 flex flex-col gap-1 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] sm:flex-row sm:flex-wrap sm:gap-x-4 sm:gap-y-1"
     >
       {groups.map((group) => (
@@ -314,6 +327,8 @@ function resultDisplayCopy(t: ReturnType<typeof useTranslation>["t"]): ResultCar
         defaultValue: "Lagged by {{value}}",
         value,
       }),
+    assetClassLabel: (assetClass) =>
+      assetClassDisplayLabel(assetClass, t) ?? assetClass,
     trustStrip: t(
       "chat.result_trust_strip",
       "Historical simulation · No fees/slippage · Not advice",
@@ -326,12 +341,15 @@ function resultDisplayCopy(t: ReturnType<typeof useTranslation>["t"]): ResultCar
       "chat.result_card.details.total_contributed",
       "Total contributed",
     ),
+    peakValueLabel: t("chat.result_card.details.peak_value", "Peak value"),
+    lowestValueLabel: t("chat.result_card.details.lowest_value", "Lowest value"),
     dateRangeLabel: t("chat.result_card.details.date_range", "Date range"),
     timeframeLabel: t("chat.result_card.details.timeframe", "Timeframe"),
     sideLabel: t("chat.result_card.details.side", "Side"),
     allocationLabel: t("chat.result_card.details.allocation", "Allocation"),
     benchmarkLabel: t("chat.result_card.details.benchmark", "Benchmark"),
     cadenceLabel: t("chat.result_card.details.cadence", "Cadence"),
+    cadenceValueLabel: (cadence) => cadenceDisplayLabel(cadence, t) ?? cadence,
     contributionLabel: t(
       "chat.result_card.details.contribution",
       "Contribution",

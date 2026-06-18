@@ -4,15 +4,19 @@ from dataclasses import dataclass
 from typing import Any
 
 from argus.agent_runtime.artifacts.drafts import draft_from_result_metadata
+from argus.agent_runtime.recovery_messages import resolve_recovery_language
 from argus.agent_runtime.stages.artifact_context import latest_run_id_for_action
-from argus.agent_runtime.stages.compose import compose_response_intent
-from argus.agent_runtime.state.models import ResponseIntent, RunState
 from argus.api.chat.artifacts import result_reference_from_run
 from argus.api.schemas import BacktestRun, ChatActionPayload
 
 MISSING_REFINEMENT_RESULT_MESSAGE = (
     "I could not find the completed backtest to refine. Use Refine strategy from "
     "the latest result card, or run the strategy again."
+)
+MISSING_REFINEMENT_RESULT_MESSAGE_ES = (
+    "No pude encontrar el backtest completado para ajustar la idea. Usa Ajustar "
+    "idea desde la tarjeta de resultado más reciente, o ejecuta la estrategia "
+    "de nuevo."
 )
 
 
@@ -28,6 +32,7 @@ def refine_strategy_action_turn(
     *,
     run: BacktestRun,
     action: ChatActionPayload,
+    language: str = "en",
 ) -> ResultActionTurn:
     reference = result_reference_from_run(run)
     strategy = draft_from_result_metadata(reference.metadata)
@@ -47,11 +52,15 @@ def refine_strategy_action_turn(
     )
     response_intent = _refinement_response_intent(
         action=action,
+        language=language,
         latest_run_id=latest_run_id,
         pending_strategy=pending_strategy,
         reference=reference,
     )
-    assistant_text = _compose_refinement_prompt(response_intent)
+    assistant_text = _refinement_prompt(
+        strategy=pending_strategy["strategy"],
+        language=language,
+    )
     pending_strategy["response_intent"] = response_intent
     metadata = {
         "conversation_mode": "setup",
@@ -82,7 +91,13 @@ def refine_strategy_action_turn(
 def missing_refine_strategy_action_turn(
     *,
     action: ChatActionPayload,
+    language: str = "en",
 ) -> ResultActionTurn:
+    assistant_text = (
+        MISSING_REFINEMENT_RESULT_MESSAGE_ES
+        if str(language or "").lower().startswith("es")
+        else MISSING_REFINEMENT_RESULT_MESSAGE
+    )
     metadata = {
         "conversation_mode": "result_review",
         "agent_runtime_stage_outcome": "ready_to_respond",
@@ -90,11 +105,11 @@ def missing_refine_strategy_action_turn(
     }
     final_payload = {
         "stage_outcome": "ready_to_respond",
-        "assistant_response": MISSING_REFINEMENT_RESULT_MESSAGE,
+        "assistant_response": assistant_text,
     }
     return ResultActionTurn(
         stage="interpret",
-        assistant_text=MISSING_REFINEMENT_RESULT_MESSAGE,
+        assistant_text=assistant_text,
         metadata=metadata,
         final_payload=final_payload,
     )
@@ -103,6 +118,7 @@ def missing_refine_strategy_action_turn(
 def _refinement_response_intent(
     *,
     action: ChatActionPayload,
+    language: str,
     latest_run_id: str | None,
     pending_strategy: dict[str, Any],
     reference: Any,
@@ -116,15 +132,27 @@ def _refinement_response_intent(
             "structured_action": action.model_dump(mode="python"),
             "latest_run_id": latest_run_id,
             "latest_result_reference": reference.model_dump(mode="python"),
+            "language": language,
         },
         "options": [],
     }
 
 
-def _compose_refinement_prompt(response_intent: dict[str, Any]) -> str:
-    state = RunState.new(current_user_message="", recent_thread_history=[])
-    state.response_intent = ResponseIntent.model_validate(response_intent)
-    prompt = compose_response_intent(state)
-    if prompt is None:
-        raise RuntimeError("Refinement response intent did not compose.")
-    return prompt
+def _refinement_prompt(*, strategy: dict[str, Any], language: str) -> str:
+    resolved_language = resolve_recovery_language(language)
+    assets = strategy.get("asset_universe")
+    asset_text = (
+        ", ".join(str(asset) for asset in assets if str(asset).strip())
+        if isinstance(assets, list)
+        else ""
+    )
+    if resolved_language == "es-419":
+        if asset_text:
+            return (
+                "¿Qué quieres cambiar, comparar o poner a prueba ahora "
+                f"para {asset_text}?"
+            )
+        return "¿Qué quieres cambiar, comparar o poner a prueba ahora?"
+    if asset_text:
+        return f"What would you like to change, compare, or stress-test next for {asset_text}?"
+    return "What would you like to change, compare, or stress-test next?"

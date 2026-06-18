@@ -143,6 +143,34 @@ def render_markdown_summary(report: dict[str, Any]) -> str:
             )
             + " |"
         )
+    stream_timing_rows = _stream_timing_rows(report)
+    if stream_timing_rows:
+        lines.extend(
+            [
+                "",
+                "## Stream Phase Timings",
+                "",
+                "| Case | Iteration | Stream | Response Headers | First Byte | First SSE | First Token | Total |",
+                "| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for run, stream_name, stream_timings in stream_timing_rows:
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        str(run.get("case_id") or ""),
+                        str(run.get("iteration") or ""),
+                        stream_name,
+                        _format_seconds(stream_timings.get("response_headers")),
+                        _format_seconds(stream_timings.get("first_byte")),
+                        _format_seconds(stream_timings.get("first_sse_event")),
+                        _format_seconds(stream_timings.get("first_token")),
+                        _format_seconds(stream_timings.get("total")),
+                    ]
+                )
+                + " |"
+            )
     workflow_timing_rows = _workflow_timing_rows(report)
     if workflow_timing_rows:
         lines.extend(
@@ -434,6 +462,10 @@ def _run_live_case(
             "run_id": run_id,
             "task_run_id": task_run_id,
             "timings_ms": _rounded_timings(timings),
+            "stream_timings_ms": {
+                "confirmation": confirmation_stream["timings_ms"],
+                "run": run_stream["timings_ms"],
+            },
             "workflow_timings_ms": workflow_timings_ms,
             "stream_event_counts": {
                 "confirmation": len(confirmation_events.events),
@@ -511,12 +543,69 @@ def _stream_chat(
 ) -> dict[str, Any]:
     started = time.perf_counter()
     chunks: list[str] = []
+    timed_chunks: list[tuple[float, str]] = []
     timeout = httpx.Timeout(timeout_seconds, connect=20.0, read=timeout_seconds)
     with client.stream("POST", url, json=body, timeout=timeout) as response:
+        response_headers_ms = _elapsed_ms(started)
         response.raise_for_status()
         for chunk in response.iter_text():
             chunks.append(chunk)
-    return {"elapsed_ms": _elapsed_ms(started), "text": "".join(chunks)}
+            timed_chunks.append((_elapsed_ms(started), chunk))
+    elapsed_ms = _elapsed_ms(started)
+    return {
+        "elapsed_ms": elapsed_ms,
+        "text": "".join(chunks),
+        "timings_ms": _stream_phase_timings_from_chunks(
+            response_headers_ms=response_headers_ms,
+            chunks=timed_chunks,
+            total_ms=elapsed_ms,
+        ),
+    }
+
+
+def _stream_phase_timings_from_chunks(
+    *,
+    response_headers_ms: float,
+    chunks: list[tuple[float, str]],
+    total_ms: float,
+) -> dict[str, float]:
+    timings: dict[str, float] = {"response_headers": response_headers_ms}
+    buffer = ""
+    first_sse_event_seen = False
+    first_token_seen = False
+    for elapsed_ms, chunk in chunks:
+        if chunk and "first_byte" not in timings:
+            timings["first_byte"] = elapsed_ms
+        buffer += chunk
+        while "\n\n" in buffer:
+            raw_frame, buffer = buffer.split("\n\n", 1)
+            data_lines = [
+                line.removeprefix("data:").strip()
+                for line in raw_frame.splitlines()
+                if line.startswith("data:")
+            ]
+            if not data_lines:
+                continue
+            raw = "\n".join(data_lines).strip()
+            if not raw:
+                continue
+            if not first_sse_event_seen:
+                timings["first_sse_event"] = elapsed_ms
+                first_sse_event_seen = True
+            if first_token_seen or raw == "[DONE]":
+                continue
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(payload, dict):
+                continue
+            event_type = payload.get("type") or payload.get("event")
+            if event_type == "token":
+                timings["first_token"] = elapsed_ms
+                first_token_seen = True
+    timings["total"] = total_ms
+    return _rounded_timings(timings)
 
 
 def _poll_backtest_job(
@@ -795,6 +884,27 @@ def safe_job_summary(job: dict[str, Any]) -> dict[str, Any]:
         "timings_ms": _job_status_timings_ms(job),
         "workflow_timings_ms": workflow_timings_ms,
     }
+
+
+def _stream_timing_rows(
+    report: dict[str, Any],
+) -> list[tuple[dict[str, Any], str, dict[str, float]]]:
+    rows: list[tuple[dict[str, Any], str, dict[str, float]]] = []
+    stream_labels = {
+        "confirmation": "Confirmation",
+        "run": "Run",
+    }
+    for run in report.get("runs", []):
+        if not isinstance(run, dict):
+            continue
+        timings = run.get("stream_timings_ms")
+        if not isinstance(timings, dict):
+            continue
+        for stream_key, stream_label in stream_labels.items():
+            stream_timings = timings.get(stream_key)
+            if isinstance(stream_timings, dict) and stream_timings:
+                rows.append((run, stream_label, dict(stream_timings)))
+    return rows
 
 
 def _workflow_timing_rows(

@@ -135,6 +135,20 @@ def decision_requests_confirmation_card_action(
     )
 
 
+def decision_contains_material_strategy_patch(
+    *,
+    decision: InterpretDecision,
+    visible_strategy: StrategySummary,
+    interpretation: StructuredInterpretation | None = None,
+    interpreted_candidate_strategy: StrategySummary | None = None,
+) -> bool:
+    return _candidate_contains_material_strategy_patch(
+        candidate=interpreted_candidate_strategy or decision.candidate_strategy_draft,
+        visible=visible_strategy,
+        material_fields=_CARD_ACTION_REQUEST_FIELDS,
+    )
+
+
 def decision_replays_visible_confirmation_without_material_change(
     *,
     decision: InterpretDecision,

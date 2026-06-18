@@ -9,6 +9,7 @@ from argus.agent_runtime.confirmation_artifacts import (
     stable_payload_hash,
     validate_confirmation_execution_payload,
 )
+from argus.agent_runtime.presentation_i18n import confirmation_rule_display_value
 from argus.agent_runtime.strategy_contract import (
     display_strategy_slug,
     display_strategy_type,
@@ -17,6 +18,7 @@ from argus.agent_runtime.strategy_contract import (
 )
 from argus.domain.engine_launch.display import (
     format_data_through_label,
+    format_date_range_label,
     format_timeframe_data_label,
 )
 
@@ -47,20 +49,34 @@ def runtime_confirmation_card(
         if str(symbol).strip()
     ]
     assets = ", ".join(symbols) if symbols else "Selected asset"
-    strategy_type = display_strategy_slug(strategy)
-    strategy_label = display_strategy_type(strategy)
-    format_confirmation_period = (
-        format_confirmation_period_func or _format_confirmation_period
+    strategy_type = _localized_strategy_slug(strategy, language=language)
+    strategy_label = _localized_strategy_label(strategy, language=language)
+    if format_confirmation_period_func is not None:
+        date_range = format_confirmation_period_func(strategy.get("date_range"))
+    else:
+        date_range = _format_confirmation_period(
+            strategy.get("date_range"),
+            language=language,
+        )
+    canonical_date_range = _confirmation_date_range_payload(
+        strategy.get("date_range"),
+        display=date_range,
     )
-    date_range = format_confirmation_period(strategy.get("date_range"))
-    title = f"{assets} {strategy_type}".strip()
+    title = _confirmation_title(
+        assets=assets,
+        strategy_type=strategy_type,
+        language=language,
+    )
+    launch_payload = payload.get("launch_payload")
+    if not isinstance(launch_payload, dict):
+        launch_payload = {}
+    canonical_strategy_type = executable_strategy_type(strategy)
 
     rows = [
         _confirmation_row("strategy", "Strategy", strategy_label),
         _confirmation_row("assets", "Assets", assets),
         _confirmation_row("period", "Period", date_range),
     ]
-    canonical_strategy_type = executable_strategy_type(strategy)
     if strategy.get("cadence") and _strategy_type_uses_cadence(canonical_strategy_type):
         rows.append(
             _confirmation_row("cadence", "Cadence", str(strategy["cadence"]).title())
@@ -70,7 +86,12 @@ def runtime_confirmation_card(
             _confirmation_row(
                 "buy_rule",
                 "Buy rule",
-                _format_confirmation_value(strategy["entry_logic"]),
+                _format_confirmation_rule_value(
+                    strategy,
+                    side="entry",
+                    value=strategy["entry_logic"],
+                    language=language,
+                ),
             )
         )
     if strategy.get("exit_logic"):
@@ -78,10 +99,21 @@ def runtime_confirmation_card(
             _confirmation_row(
                 "exit_rule",
                 "Exit rule",
-                _format_confirmation_value(strategy["exit_logic"]),
+                _format_confirmation_rule_value(
+                    strategy,
+                    side="exit",
+                    value=strategy["exit_logic"],
+                    language=language,
+                ),
             )
         )
-    if strategy.get("capital_amount"):
+    display_capital = _confirmation_display_capital(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload,
+        strategy_type=canonical_strategy_type,
+    )
+    if display_capital is not None:
         capital_label = (
             "Contribution"
             if _strategy_type_uses_cadence(canonical_strategy_type)
@@ -93,18 +125,20 @@ def runtime_confirmation_card(
                 if _strategy_type_uses_cadence(canonical_strategy_type)
                 else "starting_capital",
                 capital_label,
-                f"${float(strategy['capital_amount']):,.0f}",
+                f"${display_capital:,.0f}",
             )
         )
 
-    launch_payload = payload.get("launch_payload")
-    if not isinstance(launch_payload, dict):
-        launch_payload = {}
     assumptions = _confirmation_assumptions(
         strategy=strategy,
         optional_parameters=optional_parameters,
         launch_payload=launch_payload,
         language=language,
+    )
+    display_facts = _confirmation_display_facts(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload,
     )
     summary_period = _confirmation_period_without_parentheses(date_range)
     summary = _confirmation_summary(
@@ -112,6 +146,7 @@ def runtime_confirmation_card(
         strategy=strategy,
         strategy_label=strategy_label,
         period=summary_period,
+        language=language,
     )
     active_confirmation_id = confirmation_id_from_payload(
         payload,
@@ -173,17 +208,36 @@ def runtime_confirmation_card(
                 "payload": action_payload,
             },
         )
-    return {
+    card = {
         "confirmation_id": active_confirmation_id,
         "confirmation_state": "active",
         "title": title,
         "status": "ready_to_run" if is_ready_to_run else "needs_change",
-        "statusLabel": "Ready to run" if is_ready_to_run else "Needs change",
+        "statusLabel": _confirmation_status_label(
+            is_ready_to_run=is_ready_to_run,
+            language=language,
+        ),
+        "strategy_type": canonical_strategy_type,
         "summary": summary,
         "rows": rows,
         "assumptions": assumptions,
         "actions": actions,
     }
+    if display_facts:
+        card["display_facts"] = display_facts
+    asset_class = _confirmation_asset_class(strategy)
+    if asset_class is not None:
+        card["asset_class"] = asset_class
+    if canonical_date_range is not None:
+        card["date_range"] = canonical_date_range
+    return card
+
+
+def _confirmation_asset_class(strategy: dict[str, Any]) -> str | None:
+    asset_class = strategy.get("asset_class")
+    if asset_class in {"equity", "crypto", "currency_pair"}:
+        return str(asset_class)
+    return None
 
 
 def _confirmation_row(key: str, label: str, value: str) -> dict[str, str]:
@@ -192,6 +246,49 @@ def _confirmation_row(key: str, label: str, value: str) -> dict[str, str]:
         "label": label,
         "labelKey": f"chat.confirmation.rows.{key}",
         "value": value,
+    }
+
+
+def _confirmation_display_capital(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, Any],
+    launch_payload: dict[str, Any],
+    strategy_type: str,
+) -> float | None:
+    strategy_capital = _numeric_money_value(strategy.get("capital_amount"))
+    if _strategy_type_uses_cadence(strategy_type):
+        return strategy_capital
+    return (
+        strategy_capital
+        or _numeric_money_value(
+            _optional_parameter_value(optional_parameters, "initial_capital")
+        )
+        or _numeric_money_value(launch_payload.get("capital_amount"))
+        or _numeric_money_value(launch_payload.get("starting_capital"))
+    )
+
+
+def _numeric_money_value(value: Any) -> float | None:
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        return None
+    amount = float(value)
+    return amount if amount > 0 else None
+
+
+def _confirmation_date_range_payload(
+    value: Any,
+    *,
+    display: str,
+) -> dict[str, str] | None:
+    try:
+        resolved = resolve_date_range(value, today=_confirmation_today())
+    except (TypeError, ValueError):
+        return None
+    return {
+        "start": resolved.start.isoformat(),
+        "end": resolved.end.isoformat(),
+        "display": display,
     }
 
 
@@ -207,19 +304,41 @@ def _confirmation_assumptions(
     strategy_capital = strategy.get("capital_amount")
     if isinstance(strategy_capital, int | float):
         if _strategy_type_uses_cadence(strategy_type):
-            assumptions.append(f"${float(strategy_capital):,.0f} recurring contribution")
+            assumptions.append(
+                _money_assumption(
+                    float(strategy_capital),
+                    role="recurring_contribution",
+                    language=language,
+                )
+            )
         else:
-            assumptions.append(f"${float(strategy_capital):,.0f} starting capital")
+            assumptions.append(
+                _money_assumption(
+                    float(strategy_capital),
+                    role="starting_capital",
+                    language=language,
+                )
+            )
     initial_capital = _optional_parameter_value(optional_parameters, "initial_capital")
     if isinstance(initial_capital, int | float) and not isinstance(
         strategy_capital, int | float
     ):
         if _strategy_type_uses_cadence(strategy_type) and strategy.get("capital_amount"):
             assumptions.append(
-                f"${float(strategy['capital_amount']):,.0f} recurring contribution"
+                _money_assumption(
+                    float(strategy["capital_amount"]),
+                    role="recurring_contribution",
+                    language=language,
+                )
             )
         else:
-            assumptions.append(f"${float(initial_capital):,.0f} starting capital")
+            assumptions.append(
+                _money_assumption(
+                    float(initial_capital),
+                    role="starting_capital",
+                    language=language,
+                )
+            )
     timeframe = _optional_parameter_value(optional_parameters, "timeframe")
     if timeframe:
         assumptions.append(format_timeframe_data_label(timeframe, language=language))
@@ -228,14 +347,17 @@ def _confirmation_assumptions(
         assumptions.append(data_through_assumption)
     fees = _optional_parameter_value(optional_parameters, "fees")
     if fees in (0, 0.0, "0", "0.0"):
-        assumptions.append("No fees")
+        assumptions.append("Sin comisiones" if _is_spanish(language) else "No fees")
     slippage = _optional_parameter_value(optional_parameters, "slippage")
     if slippage in (0, 0.0, "0", "0.0"):
-        assumptions.append("No slippage")
+        assumptions.append(
+            "Sin deslizamiento" if _is_spanish(language) else "No slippage"
+        )
     benchmark_assumption = _confirmation_benchmark_assumption(
         strategy=strategy,
         optional_parameters=optional_parameters,
         launch_payload=launch_payload or {},
+        language=language,
     )
     if benchmark_assumption:
         assumptions.append(benchmark_assumption)
@@ -251,6 +373,35 @@ def _data_through_assumption(
     if adjustment is None:
         return None
     return format_data_through_label(adjustment.get("through"), language=language) or None
+
+
+def _confirmation_display_facts(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, Any],
+    launch_payload: dict[str, Any],
+) -> dict[str, Any]:
+    facts: dict[str, Any] = {}
+    timeframe = _optional_parameter_value(optional_parameters, "timeframe")
+    if timeframe:
+        facts["timeframe"] = timeframe
+    data_adjustment = _data_availability_adjustment(strategy)
+    if data_adjustment is not None:
+        facts["data_through"] = data_adjustment.get("through")
+    fees = _optional_parameter_value(optional_parameters, "fees")
+    if fees is not None:
+        facts["fees"] = fees
+    slippage = _optional_parameter_value(optional_parameters, "slippage")
+    if slippage is not None:
+        facts["slippage"] = slippage
+    benchmark_symbol = _confirmation_benchmark_symbol(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload,
+    )
+    if benchmark_symbol:
+        facts["benchmark_symbol"] = benchmark_symbol
+    return facts
 
 
 def _data_availability_adjustment(strategy: dict[str, Any]) -> dict[str, Any] | None:
@@ -290,6 +441,21 @@ def _confirmation_benchmark_assumption(
     strategy: dict[str, Any],
     optional_parameters: dict[str, Any],
     launch_payload: dict[str, Any],
+    language: str = "en",
+) -> str | None:
+    symbol = _confirmation_benchmark_symbol(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload,
+    )
+    return _benchmark_assumption(symbol, language=language) if symbol else None
+
+
+def _confirmation_benchmark_symbol(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, Any],
+    launch_payload: dict[str, Any],
 ) -> str | None:
     for value in (
         strategy.get("comparison_baseline"),
@@ -298,12 +464,12 @@ def _confirmation_benchmark_assumption(
         launch_payload.get("benchmark_symbol"),
     ):
         if isinstance(value, str) and value.strip():
-            return f"Benchmark: {value.strip().upper()}"
+            return value.strip().upper()
     asset_class = strategy.get("asset_class")
     if asset_class == "crypto":
-        return "Benchmark: BTC"
+        return "BTC"
     if asset_class == "equity":
-        return "Benchmark: SPY"
+        return "SPY"
     return None
 
 
@@ -313,16 +479,38 @@ def _confirmation_summary(
     strategy: dict[str, Any],
     strategy_label: str,
     period: str,
+    language: str = "en",
 ) -> str:
     strategy_type = executable_strategy_type(strategy)
+    if _is_spanish(language):
+        if strategy_type == "buy_and_hold":
+            return f"Listo para probar comprar y mantener {assets} del {period}."
+        if _strategy_type_uses_cadence(strategy_type):
+            return f"Listo para probar compras recurrentes de {assets} del {period}."
+        return (
+            f"Listo para probar {assets} con "
+            f"{_summary_strategy_phrase(strategy_label, language=language)} del {period}."
+        )
     if strategy_type == "buy_and_hold":
         return f"Ready to test buy-and-hold for {assets} over {period}."
     if _strategy_type_uses_cadence(strategy_type):
         return f"Ready to test recurring buys for {assets} over {period}."
-    return f"Ready to test {assets} with {_summary_strategy_phrase(strategy_label)} over {period}."
+    return (
+        f"Ready to test {assets} with "
+        f"{_summary_strategy_phrase(strategy_label, language=language)} over {period}."
+    )
 
 
-def _summary_strategy_phrase(strategy_label: str) -> str:
+def _summary_strategy_phrase(strategy_label: str, *, language: str = "en") -> str:
+    if _is_spanish(language):
+        phrases = {
+            "Umbral RSI": "un umbral RSI",
+            "Compra en caidas": "una regla de compra en caidas",
+            "Umbral de indicador": "un umbral de indicador",
+            "Estrategia de senales": "una estrategia de senales",
+            "Cruce de medias moviles": "un cruce de medias moviles",
+        }
+        return phrases.get(strategy_label, strategy_label.strip().lower())
     phrases = {
         "RSI Threshold": "an RSI threshold",
         "Dip Buying": "a dip-buying rule",
@@ -353,8 +541,26 @@ def _format_confirmation_value(value: Any) -> str:
     return str(value)
 
 
-def _format_confirmation_period(value: Any) -> str:
-    return resolve_date_range(value, today=_confirmation_today()).display
+def _format_confirmation_rule_value(
+    strategy: dict[str, Any],
+    *,
+    side: str,
+    value: Any,
+    language: str,
+) -> str:
+    return confirmation_rule_display_value(
+        strategy,
+        side=side,
+        fallback_value=value,
+        language=language,
+    ) or _format_confirmation_value(value)
+
+
+def _format_confirmation_period(value: Any, *, language: str = "en") -> str:
+    resolved = resolve_date_range(value, today=_confirmation_today())
+    if _is_spanish(language):
+        return format_date_range_label(resolved.start, resolved.end, language=language)
+    return resolved.display
 
 
 def _confirmation_period_without_parentheses(value: str) -> str:
@@ -376,6 +582,70 @@ def _strategy_type_uses_cadence(strategy_type: str) -> bool:
 
 def _article_for(value: str) -> str:
     return "an" if value[:1].lower() in {"a", "e", "i", "o", "u"} else "a"
+
+
+def _localized_strategy_label(
+    strategy: dict[str, Any],
+    *,
+    language: str,
+) -> str:
+    if not _is_spanish(language):
+        return display_strategy_type(strategy)
+    labels = {
+        "buy_and_hold": "Comprar y mantener",
+        "dca_accumulation": "Compras recurrentes",
+        "indicator_threshold": "Umbral de indicador",
+        "signal_strategy": "Estrategia de senales",
+    }
+    return labels.get(executable_strategy_type(strategy), display_strategy_type(strategy))
+
+
+def _localized_strategy_slug(
+    strategy: dict[str, Any],
+    *,
+    language: str,
+) -> str:
+    if not _is_spanish(language):
+        return display_strategy_slug(strategy)
+    label = _localized_strategy_label(strategy, language=language)
+    return label[:1].lower() + label[1:]
+
+
+def _confirmation_title(*, assets: str, strategy_type: str, language: str) -> str:
+    if _is_spanish(language):
+        return f"{assets}: {strategy_type[:1].upper()}{strategy_type[1:]}".strip()
+    return f"{assets} {strategy_type}".strip()
+
+
+def _confirmation_status_label(*, is_ready_to_run: bool, language: str) -> str:
+    if _is_spanish(language):
+        return "Listo para ejecutar" if is_ready_to_run else "Necesita cambios"
+    return "Ready to run" if is_ready_to_run else "Needs change"
+
+
+def _money_assumption(value: float, *, role: str, language: str) -> str:
+    if _is_spanish(language):
+        label = (
+            "aporte recurrente"
+            if role == "recurring_contribution"
+            else "capital inicial"
+        )
+        return f"${value:,.0f} {label}"
+    label = (
+        "recurring contribution"
+        if role == "recurring_contribution"
+        else "starting capital"
+    )
+    return f"${value:,.0f} {label}"
+
+
+def _benchmark_assumption(symbol: str, *, language: str) -> str:
+    prefix = "Referencia" if _is_spanish(language) else "Benchmark"
+    return f"{prefix}: {symbol}"
+
+
+def _is_spanish(language: str) -> bool:
+    return (language or "en").lower().startswith("es")
 
 
 def _confirmation_today() -> date:

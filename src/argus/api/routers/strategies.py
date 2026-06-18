@@ -25,8 +25,29 @@ router = APIRouter(prefix="/api/v1", tags=["strategies"])
 @router.post("/strategies", response_model=StrategyResponse)
 def create_strategy(
     payload: StrategyCreate,
+    request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> StrategyResponse:
+    if payload.conversation_id:
+        conversation = None
+        if api_state.supabase_gateway is not None:
+            conversation = api_state.supabase_gateway.get_conversation(
+                user_id=user.id,
+                conversation_id=payload.conversation_id,
+            )
+        else:
+            owner_id = api_state.store.conversation_owners.get(payload.conversation_id)
+            if owner_id in {None, user.id}:
+                conversation = api_state.store.conversations.get(payload.conversation_id)
+        if conversation is None:
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Conversation not found.",
+            )
+
     strategy_name = payload.name
     if not strategy_name:
         suggested = suggest_entity_name(

@@ -358,6 +358,63 @@ def test_chat_stream_quota_exceeded(mock_gateway):
     assert response.headers.get("Retry-After") == "60"
 
 
+def test_chat_stream_checks_daily_and_hourly_quotas(mock_gateway):
+    now = utcnow()
+    conversation = Conversation(
+        id="conv-1",
+        title="New conversation",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview=None,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.create_backtest_run.side_effect = lambda *, user_id, run: run
+    mock_gateway.create_message.side_effect = lambda **kwargs: Message(
+        id="msg-1",
+        conversation_id=kwargs["conversation_id"],
+        role=kwargs["role"],  # type: ignore[arg-type]
+        content=kwargs["content"],
+        created_at=utcnow(),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={"conversation_id": "conv-1", "message": "Test TSLA dip idea"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    quota_calls = [
+        call.kwargs for call in mock_gateway.check_and_increment_usage.call_args_list
+    ]
+    assert {
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "resource": "chat_messages",
+        "period": "day",
+        "limit_count": 200,
+    } in quota_calls
+    assert {
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "resource": "chat_messages",
+        "period": "hour",
+        "limit_count": 60,
+    } in quota_calls
+
+
+def test_successful_api_response_omits_static_rate_limit_headers(mock_gateway):
+    response = client.get("/api/v1/me", headers={"Authorization": "Bearer test-token"})
+
+    assert response.status_code == 200
+    assert "X-RateLimit-Limit" not in response.headers
+    assert "X-RateLimit-Remaining" not in response.headers
+    assert "X-RateLimit-Reset" not in response.headers
+
+
 def test_me_reads_profile_from_supabase_gateway(mock_gateway):
     profile = _mock_profile(language="es-419")
     mock_gateway.get_user.return_value = profile
@@ -501,6 +558,53 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock
     called_run = mock_gateway.create_backtest_run.call_args.kwargs["run"]
     assert isinstance(called_run, BacktestRun)
     assert called_run.config_snapshot["starting_capital"] == 1000
+
+
+def test_run_backtest_rejects_unowned_parent_conversation(mock_gateway):
+    mock_gateway.get_conversation.return_value = None
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "conversation_id": "conversation-other",
+            "template": "rsi_mean_reversion",
+            "symbols": ["AAPL"],
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+    mock_gateway.create_backtest_run.assert_not_called()
+    mock_gateway.get_conversation.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        conversation_id="conversation-other",
+    )
+
+
+def test_create_strategy_rejects_unowned_parent_conversation(mock_gateway):
+    mock_gateway.get_conversation.return_value = None
+
+    response = client.post(
+        "/api/v1/strategies",
+        json={
+            "name": "Apple hold",
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "parameters": {},
+            "conversation_id": "conversation-other",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+    mock_gateway.create_strategy.assert_not_called()
+    mock_gateway.get_conversation.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        conversation_id="conversation-other",
+    )
 
 
 def test_get_backtest_supabase_reads_from_gateway(mock_gateway):
@@ -788,6 +892,32 @@ def test_login_sets_session_cookie_for_browser_auth(mock_gateway):
     assert response.cookies.get("sb-refresh-token") == "refresh-token-123"
 
 
+def test_login_forces_secure_session_cookies_in_production(
+    mock_gateway, monkeypatch
+):
+    monkeypatch.setenv("APP_ENV", "production")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.login.return_value = {
+        "session": {
+            "access_token": "access-token-123",
+            "refresh_token": "refresh-token-123",
+            "expires_in": 3600,
+        },
+        "user": {"id": "user-1", "email": "beta@example.com"},
+    }
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "beta@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 200
+    set_cookie = response.headers.get("set-cookie", "").lower()
+    assert "sb-auth-token" in set_cookie
+    assert "sb-refresh-token" in set_cookie
+    assert "secure" in set_cookie
+
+
 def test_feedback_submission_persists_with_user_ownership(mock_gateway):
     profile = _mock_profile()
     mock_gateway.get_or_create_mock_user.return_value = profile
@@ -803,12 +933,151 @@ def test_feedback_submission_persists_with_user_ownership(mock_gateway):
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
+    assert {
+        "user_id": profile.id,
+        "resource": "feedback",
+        "period": "day",
+        "limit_count": 50,
+    } in [call.kwargs for call in mock_gateway.check_and_increment_usage.call_args_list]
+    assert {
+        "user_id": profile.id,
+        "resource": "feedback",
+        "period": "hour",
+        "limit_count": 20,
+    } in [call.kwargs for call in mock_gateway.check_and_increment_usage.call_args_list]
     mock_gateway.create_feedback.assert_called_once_with(
         user_id=profile.id,
         feedback_type="general",
         message="The private alpha flow feels clear.",
-        context={"surface": "settings", "metadata": {"path": "/chat"}},
+        context={"surface": "settings", "page_path": "/chat"},
     )
+
+
+def test_feedback_submission_sanitizes_browser_context(mock_gateway):
+    profile = _mock_profile()
+    mock_gateway.get_or_create_mock_user.return_value = profile
+
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "bug",
+            "message": "The result card copy action felt broken.",
+            "context": {
+                "source": "message_more_menu",
+                "surface": "chat",
+                "message_id": "msg-1",
+                "conversation_id": "conv-1",
+                "artifact_type": "result_card",
+                "url": (
+                    "https://argus.example/chat?conversation=conv-1&auth=secret"
+                    "#private"
+                ),
+                "timestamp": "2026-06-15T08:00:00.000Z",
+                "rating": "negative",
+                "tags": ["incorrect", "slow"],
+                "hasAttachments": False,
+                "attachmentCount": 0,
+                "metadata": {"path": "/chat?conversation=conv-1", "token": "secret"},
+                "raw_prompt": "buy AAPL with my personal note",
+                "email": "person@example.com",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    context = mock_gateway.create_feedback.call_args.kwargs["context"]
+    assert context == {
+        "source": "message_more_menu",
+        "surface": "chat",
+        "message_id": "msg-1",
+        "conversation_id": "conv-1",
+        "artifact_type": "result_card",
+        "page_path": "/chat",
+        "timestamp": "2026-06-15T08:00:00.000Z",
+        "rating": "negative",
+        "tags": ["incorrect", "slow"],
+        "has_attachments": False,
+        "attachment_count": 0,
+    }
+
+
+def test_feedback_rejects_oversized_message(mock_gateway):
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "general",
+            "message": "x" * 5001,
+            "context": {"surface": "settings"},
+        },
+    )
+
+    assert response.status_code == 422
+    mock_gateway.create_feedback.assert_not_called()
+
+
+def test_feedback_rejects_oversized_context(mock_gateway):
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "general",
+            "message": "The private alpha flow feels clear.",
+            "context": {f"extra_{index}": "x" for index in range(40)},
+        },
+    )
+
+    assert response.status_code == 422
+    mock_gateway.create_feedback.assert_not_called()
+
+
+def test_feedback_rejects_deep_context(mock_gateway):
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "general",
+            "message": "The private alpha flow feels clear.",
+            "context": {"metadata": {"a": {"b": {"c": {"d": "too deep"}}}}},
+        },
+    )
+
+    assert response.status_code == 422
+    mock_gateway.create_feedback.assert_not_called()
+
+
+def test_feedback_rejects_large_serialized_context(mock_gateway):
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "general",
+            "message": "The private alpha flow feels clear.",
+            "context": {
+                "surface": "settings",
+                "metadata": {"path": "/chat", "blob": "x" * 9000},
+            },
+        },
+    )
+
+    assert response.status_code == 422
+    mock_gateway.create_feedback.assert_not_called()
+
+
+def test_feedback_quota_exceeded_returns_retry_after(mock_gateway):
+    mock_gateway.check_and_increment_usage.side_effect = QuotaExceededError(
+        "Quota exceeded for feedback (hour)"
+    )
+
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "general",
+            "message": "The private alpha flow feels clear.",
+            "context": {"surface": "settings"},
+        },
+    )
+
+    assert response.status_code == 429
+    assert response.json()["code"] == "too_many_requests"
+    assert response.headers.get("Retry-After") == "60"
+    mock_gateway.create_feedback.assert_not_called()
 
 
 def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatch):
@@ -853,9 +1122,10 @@ def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(
         json={"email": "stranger@example.com", "password": "password123"},
     )
 
-    assert response.status_code == 403
-    assert response.json()["code"] == "private_alpha_access_required"
-    assert "private alpha" in response.json()["detail"].lower()
+    assert response.status_code == 400
+    assert response.json()["code"] == "auth_signup_failed"
+    assert response.json()["detail"] == "Signup failed. Please try again."
+    assert "private alpha" not in response.text.lower()
     mock_gateway.signup.assert_not_called()
     mock_gateway.private_alpha_email_allowed.assert_called_once_with(
         "stranger@example.com"
@@ -865,7 +1135,26 @@ def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(
     ]
 
 
-def test_login_blocks_email_when_private_alpha_access_is_disabled(
+def test_signup_sanitizes_provider_errors(mock_gateway, monkeypatch):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.signup.side_effect = RuntimeError(
+        "Supabase provider leaked an internal auth reason"
+    )
+
+    response = client.post(
+        "/api/v1/auth/signup",
+        json={"email": "alpha@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "auth_signup_failed"
+    assert response.json()["detail"] == "Signup failed. Please try again."
+    assert "Supabase provider" not in response.text
+
+
+def test_login_normalizes_private_alpha_access_failures(
     mock_gateway,
     monkeypatch,
 ):
@@ -878,8 +1167,9 @@ def test_login_blocks_email_when_private_alpha_access_is_disabled(
         json={"email": "disabled@example.com", "password": "password123"},
     )
 
-    assert response.status_code == 403
-    assert response.json()["code"] == "private_alpha_access_required"
+    assert response.status_code == 401
+    assert response.json()["code"] == "unauthorized"
+    assert response.json()["detail"] == "Invalid email or password."
     mock_gateway.login.assert_not_called()
     mock_gateway.private_alpha_email_allowed.assert_called_once_with(
         "disabled@example.com"
@@ -887,6 +1177,95 @@ def test_login_blocks_email_when_private_alpha_access_is_disabled(
     assert "mark_private_alpha_login" not in [
         call[0] for call in mock_gateway.method_calls
     ]
+
+
+def test_login_normalizes_provider_auth_failures(mock_gateway, monkeypatch):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.login.side_effect = RuntimeError("invalid provider password")
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "alpha@example.com", "password": "wrong-password"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "unauthorized"
+    assert response.json()["detail"] == "Invalid email or password."
+    mock_gateway.login.assert_called_once_with(
+        email="alpha@example.com",
+        password="wrong-password",
+    )
+
+
+def test_login_rate_limit_blocks_extra_attempt_before_provider(
+    mock_gateway,
+    monkeypatch,
+):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.login.side_effect = RuntimeError("invalid provider password")
+    headers = {"X-Forwarded-For": "203.0.113.10"}
+
+    for _ in range(auth_router.AUTH_LOGIN_ATTEMPT_LIMIT):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "alpha@example.com", "password": "wrong-password"},
+            headers=headers,
+        )
+        assert response.status_code == 401
+
+    blocked = client.post(
+        "/api/v1/auth/login",
+        json={"email": "alpha@example.com", "password": "wrong-password"},
+        headers=headers,
+    )
+
+    assert blocked.status_code == 429
+    assert blocked.json()["code"] == "too_many_requests"
+    assert blocked.headers.get("Retry-After")
+    assert mock_gateway.login.call_count == auth_router.AUTH_LOGIN_ATTEMPT_LIMIT
+
+
+def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
+    mock_gateway,
+    monkeypatch,
+):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = False
+    headers = {"X-Forwarded-For": "203.0.113.11"}
+
+    for _ in range(auth_router.AUTH_SIGNUP_ATTEMPT_LIMIT):
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={"email": "stranger@example.com", "password": "password123"},
+            headers=headers,
+        )
+        assert response.status_code == 400
+        assert response.json()["code"] == "auth_signup_failed"
+
+    blocked = client.post(
+        "/api/v1/auth/signup",
+        json={"email": "stranger@example.com", "password": "password123"},
+        headers=headers,
+    )
+
+    assert blocked.status_code == 429
+    assert blocked.json()["code"] == "too_many_requests"
+    assert blocked.headers.get("Retry-After")
+    assert mock_gateway.private_alpha_email_allowed.call_count == (
+        auth_router.AUTH_SIGNUP_ATTEMPT_LIMIT
+    )
+    mock_gateway.signup.assert_not_called()
 
 
 def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):

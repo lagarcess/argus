@@ -4,7 +4,14 @@ from copy import deepcopy
 from types import MappingProxyType
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_serializer,
+    model_validator,
+)
 
 ToneName = Literal["friendly", "concise"]
 VerbosityName = Literal["low", "medium", "high"]
@@ -110,6 +117,13 @@ class StrategySummary(BaseModel):
     resolution_provenance: list["ResolutionProvenance"] = Field(default_factory=list)
     extra_parameters: dict[str, Any] = Field(default_factory=dict)
 
+    @field_serializer("resolution_provenance")
+    def serialize_resolution_provenance(self, value: list[Any]) -> list[dict[str, Any]]:
+        return [
+            item.model_dump(mode="python")
+            for item in dedupe_resolution_provenance_items(value)
+        ]
+
 
 class ExtractedFieldValue(BaseModel):
     raw_value: str | None = None
@@ -166,6 +180,35 @@ class ResolutionProvenance(BaseModel):
     asset_class: str | None = None
     validated_by: str | None = None
     confidence: ResolutionConfidence | None = None
+
+
+def normalize_resolution_provenance_items(
+    items: list[ResolutionProvenance | dict[str, Any]] | tuple[Any, ...] | None,
+) -> list[ResolutionProvenance]:
+    normalized: list[ResolutionProvenance] = []
+    for raw_item in items or []:
+        if isinstance(raw_item, ResolutionProvenance):
+            normalized.append(raw_item)
+            continue
+        try:
+            normalized.append(ResolutionProvenance.model_validate(raw_item))
+        except (TypeError, ValueError, ValidationError):
+            continue
+    return normalized
+
+
+def dedupe_resolution_provenance_items(
+    items: list[ResolutionProvenance | dict[str, Any]] | tuple[Any, ...] | None,
+) -> list[ResolutionProvenance]:
+    seen: set[tuple[str, str, str, str]] = set()
+    deduped: list[ResolutionProvenance] = []
+    for item in normalize_resolution_provenance_items(items):
+        key = (item.field, item.raw_text, item.source, item.candidate_kind)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped
 
 
 class ResponseIntent(BaseModel):

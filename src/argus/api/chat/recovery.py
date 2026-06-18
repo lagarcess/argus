@@ -5,11 +5,15 @@ from typing import Any
 
 from loguru import logger
 
+from argus.agent_runtime.recovery_messages import recovery_message
+from argus.agent_runtime.runtime import build_workflow_input
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     StrategySummary,
     TaskSnapshot,
+    UserState,
 )
+from argus.agent_runtime.workflow_contract import WorkflowNode
 from argus.api import state as api_state
 from argus.api.chat.artifacts import (
     result_reference_from_run,
@@ -18,10 +22,7 @@ from argus.api.chat.artifacts import (
 from argus.api.dependencies import dev_memory_fallback_enabled
 from argus.api.schemas import BacktestRun, Message
 
-LOST_CONFIRMATION_STATE_MESSAGE = (
-    "I lost the active confirmation state, but your conversation is saved. "
-    "I can restate the strategy so you can confirm it again."
-)
+LOST_CONFIRMATION_STATE_MESSAGE = recovery_message("confirmation_state_lost")
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,52 @@ async def runtime_checkpoint_values(
     return values if isinstance(values, dict) else {}
 
 
+async def mark_terminal_runtime_failure_checkpoint(
+    *,
+    workflow: Any,
+    conversation_id: str,
+    user: UserState,
+    message: str,
+    recent_thread_history: list[Any],
+    failure_metadata: dict[str, Any],
+) -> None:
+    from argus.agent_runtime.graph.workflow import WorkflowStageOutcome
+
+    try:
+        checkpoint_values = build_workflow_input(
+            user=user,
+            message=message,
+            recent_thread_history=recent_thread_history,
+        )
+        checkpoint_values.update(
+            {
+                "stage_outcome": WorkflowStageOutcome.AWAIT_USER_REPLY,
+                "assistant_prompt": None,
+                "assistant_response": None,
+                "confirmation_payload": None,
+                "backtest_job": None,
+                "latest_task_snapshot": None,
+                "artifact_references": [],
+                "selected_thread_metadata": {
+                    "conversation_mode": "recovery",
+                    "agent_runtime_stage_outcome": "agent_runtime_failure",
+                    "agent_runtime_turn": failure_metadata.get("agent_runtime_turn"),
+                },
+            }
+        )
+        await workflow.aupdate_state(
+            {"configurable": {"thread_id": conversation_id}},
+            checkpoint_values,
+            as_node=WorkflowNode.INTERPRET.value,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Agent runtime terminal failure checkpoint write failed",
+            error=str(exc),
+            conversation_id=conversation_id,
+        )
+
+
 def checkpoint_has_pending_confirmation(values: dict[str, Any]) -> bool:
     stage_outcome = values.get("stage_outcome")
     stage_outcome_value = str(getattr(stage_outcome, "value", stage_outcome or ""))
@@ -128,6 +175,8 @@ def confirmation_metadata_fallback_context(
     *,
     user_id: str,
     conversation_id: str,
+    recent_messages: list[Message] | None = None,
+    language: str | None = None,
 ) -> RuntimeFallbackContext | None:
     from argus.agent_runtime.confirmation_artifacts import (
         confirmation_artifact_reference,
@@ -135,10 +184,14 @@ def confirmation_metadata_fallback_context(
     )
     from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 
-    messages = _recent_messages_for_conversation(
-        user_id=user_id,
-        conversation_id=conversation_id,
-        limit=20,
+    messages = (
+        recent_messages
+        if recent_messages is not None
+        else _recent_messages_for_conversation(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            limit=20,
+        )
     )
     for message in reversed(messages):
         if message.role != "assistant" or not isinstance(message.metadata, dict):
@@ -151,22 +204,34 @@ def confirmation_metadata_fallback_context(
         payload = metadata.get("confirmation_payload")
         if not isinstance(payload, dict):
             return RuntimeFallbackContext(
-                recovery_message=LOST_CONFIRMATION_STATE_MESSAGE
+                recovery_message=recovery_message(
+                    "confirmation_state_lost",
+                    language=language,
+                )
             )
         strategy = payload.get("strategy")
         if not isinstance(strategy, dict):
             return RuntimeFallbackContext(
-                recovery_message=LOST_CONFIRMATION_STATE_MESSAGE
+                recovery_message=recovery_message(
+                    "confirmation_state_lost",
+                    language=language,
+                )
             )
         try:
             pending_strategy = StrategySummary.model_validate(strategy)
         except Exception:
             return RuntimeFallbackContext(
-                recovery_message=LOST_CONFIRMATION_STATE_MESSAGE
+                recovery_message=recovery_message(
+                    "confirmation_state_lost",
+                    language=language,
+                )
             )
         if not strategy_can_be_approved(pending_strategy):
             return RuntimeFallbackContext(
-                recovery_message=LOST_CONFIRMATION_STATE_MESSAGE
+                recovery_message=recovery_message(
+                    "confirmation_state_lost",
+                    language=language,
+                )
             )
         card = metadata.get("confirmation_card")
         confirmation_id = confirmation_id_from_payload(

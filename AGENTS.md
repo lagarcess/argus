@@ -69,13 +69,21 @@ Before making code changes, agents must review these source-of-truth docs in thi
 
 ---
 
-# 🧭 Current Milestone: Private Alpha Next Integration
+# 🧭 Current Milestone: Private Alpha CI/CD SOTA
 
-When working from `codex/private-alpha-next`, use
-`docs/specs/private-alpha-next-integration.md` as the active integration
-staging source of truth. That doc records what conversation-trust work is
-already closed, what remains high leverage, and what low-risk debt is safe for
-external async agents.
+When working from `codex/private-alpha-next` for the current release-captain
+mission, use `docs/specs/private-alpha-ci-cd-sota.md` as the active execution
+source of truth. That spec owns phase ordering, recommended agent lanes, release
+contract requirements, smoke/canary expectations, and the definition of done for
+this milestone.
+
+Use `docs/specs/private-alpha-next-integration.md` as staging and branch-process
+context only. It records useful closed work, integration-lane guardrails, and
+Jules boundaries, but it no longer owns the current execution order.
+
+Use `docs/specs/private-alpha-next-decision-memo.md` as future-context only. Do
+not implement decision-memo product work in this CI/CD SOTA milestone unless the
+founder explicitly starts that later goal.
 
 Integration guardrails:
 
@@ -90,13 +98,37 @@ Integration guardrails:
   down into the Jules intake branch when high-leverage integration work lands.
 - Codex reviews worker diffs before merging or cherry-picking them into the
   integration branch.
+- For Argus multi-agent work, the main Codex thread is the release captain and
+  owns subagent cleanup. Every spawned agent must have a bounded goal, expected
+  output, and cleanup expectation. After the run, the parent agent must
+  summarize outputs, close/archive completed agents, and leave open only agents
+  with an explicit active follow-up. Jules cleanup follows the
+  `argus-jules-intake` skill.
+- For horizon-spec work, follow the AI-native engineering cadence: delegate
+  code-aware planning/scoping, first-pass implementation, test generation,
+  review, and documentation support to bounded agents, but keep prioritization,
+  sequencing, architecture tradeoffs, release readiness, and merge/deploy
+  ownership with the main Codex release captain and founder. Before
+  implementation, the release captain should write or activate a Goal that names
+  the outcome, verification surface, constraints, no-touch areas, and stop
+  conditions. Subagent prompts must include lane-specific goals with allowed
+  surfaces, forbidden surfaces, expected output, verification evidence, and
+  cleanup expectation.
+- CI/CD SOTA warmup and canary evidence must be gathered against the
+  branch-deployed staging/private-alpha Render validation surface for the exact
+  candidate SHA. Do not treat merge to `main` as a prerequisite for canary
+  evidence; `main` is the later promotion target after founder approval.
 - Production deploys remain manual and founder-directed.
 - Perplexity Research Lab remains design-only until a later approved
   implementation milestone.
+- When working from `codex/private-alpha-readiness-clean`, use
+  `docs/specs/private-alpha-readiness-orchestration.md` as the active
+  release-captain/subagent coordination note before dispatching or executing
+  readiness work.
 
 ---
 
-# 🧭 Completed Checkpoint: Private Alpha Conversation Trust
+# 🧭 Historical Checkpoint: Private Alpha Conversation Trust
 
 When working on private-alpha conversation trust branches, including
 `codex/private-alpha-conversation-trust` and follow-up branches such as
@@ -104,6 +136,11 @@ When working on private-alpha conversation trust branches, including
 `docs/specs/private-alpha-conversation-trust.md` as the milestone source of
 truth for historical context. This milestone hardened the current private-alpha
 chat/backtest loop; it does not implement the Perplexity Research Lab thesis.
+
+This is a completed checkpoint, not the active command document for
+`codex/private-alpha-next`. For current CI/CD, release-gate, stream-failure, and
+reload-reconciliation work, start from `docs/specs/private-alpha-ci-cd-sota.md`
+after reading the canon docs.
 
 Milestone guardrails:
 
@@ -411,6 +448,16 @@ NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 - **Canon docs**: `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`,
   `docs/API_CONTRACT.md`, `docs/DATA_MODEL.md`, and
   `.agent/designs/argus/DESIGN.md`. These define intended Alpha direction.
+- **Current active goal**: for this branch mission,
+  `docs/specs/private-alpha-ci-cd-sota.md` owns execution sequencing,
+  subagent lane selection, release-contract gates, and acceptance criteria.
+- **Staging/process context**: `docs/specs/private-alpha-next-integration.md`
+  explains the integration branch, Jules quarantine lane, and closed work. Use
+  it for context, not as the active execution roadmap when it conflicts with
+  the CI/CD SOTA spec.
+- **Future-context docs**: `docs/specs/private-alpha-next-decision-memo.md` and
+  Research Lab / evidence-aware idea-loop specs are not implementation scope for
+  the current CI/CD SOTA milestone unless the founder starts that later goal.
 - **Active milestone/spec docs**: files under `docs/specs/` that explicitly
   name the current branch or milestone. Use them for scoped execution details
   after reading canon docs.
@@ -532,7 +579,7 @@ Never do this:
 
 ## 🛑 Never-Violate Standards
 
-1. **API Contract First**: Update `docs/api_contract.md` before implementation PRs.
+1. **API Contract First**: Update `docs/API_CONTRACT.md` before implementation PRs.
 2. **Structured Logging**: Use `loguru` (backend) + React Query logs (frontend). No `print()`.
 3. **TDD First**: Write failing test before fixing any bug.
 4. **JIT Warmup**: Changes to `src/argus/analysis/` require `warmup_jit()` in tests.

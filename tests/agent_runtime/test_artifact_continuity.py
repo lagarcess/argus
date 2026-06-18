@@ -69,6 +69,38 @@ def test_result_draft_preserves_dca_money_cadence_timeframe_and_benchmark() -> N
     assert draft.comparison_baseline == "SPY"
 
 
+def test_confirmation_edit_action_carries_product_language_to_response_intent() -> None:
+    state = RunState.new(
+        current_user_message="Cambiar fechas",
+        recent_thread_history=[],
+        action_context={
+            "type": "change_dates",
+            "label": "Cambiar fechas",
+            "presentation": "confirmation",
+            "payload": {"confirmation_id": "confirmation-1"},
+        },
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-06-14", "end": "2026-06-12"},
+        capital_amount=100000,
+    )
+
+    result = structured_action_stage_result_if_applicable(
+        state=state,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={},
+        language="es-419",
+    )
+
+    assert result is not None
+    assert result.outcome == "needs_clarification"
+    assert result.stage_patch["response_intent"]["semantic_needs"] == ["period"]
+    assert result.stage_patch["response_intent"]["facts"]["language"] == "es-419"
+
+
 def test_result_draft_preserves_buy_hold_defaults_from_config_snapshot() -> None:
     draft = draft_from_result_metadata(
         {
@@ -632,6 +664,7 @@ def test_retry_failed_action_rejects_stale_action_id() -> None:
             "status": "stale",
             "requested_failed_action_id": "failed-old",
             "latest_failed_action_id": "failed-new",
+            "language": "en",
         },
     }
 
@@ -685,5 +718,6 @@ def test_structured_retry_failed_action_requires_artifact_id() -> None:
             "status": "missing_artifact_id",
             "requested_failed_action_id": None,
             "latest_failed_action_id": "failed-new",
+            "language": "en",
         },
     }

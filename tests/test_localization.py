@@ -5,6 +5,7 @@ def test_build_result_card_localization():
     config = {
         "template": "rsi_mean_reversion",
         "symbols": ["AAPL"],
+        "asset_class": "equity",
         "start_date": "2023-01-01",
         "end_date": "2023-12-31",
         "starting_capital": 100000,
@@ -39,4 +40,7 @@ def test_build_result_card_localization():
     card_es = build_result_card(config, metrics, language="es-419")
     assert card_es["status_label"] == "Simulación Completa"
     assert any(row["label"] == "Retorno total" for row in card_es["rows"])
-    assert "al" in card_es["date_range"]["display"]
+    assert (
+        card_es["date_range"]["display"]
+        == "1 de enero de 2023 al 31 de diciembre de 2023"
+    )

@@ -16,9 +16,12 @@ from argus.domain.backtesting.execution import (
 from argus.domain.backtesting.metrics import (
     _compute_metrics,
     _compute_metrics_from_equity,
+    portfolio_value_summary,
 )
 from argus.domain.backtesting.signals import _build_signals
 from argus.domain.market_data import fetch_ohlcv, fetch_price_series
+
+_MIN_BENCHMARK_OBSERVATION_COVERAGE = 0.8
 
 
 def build_benchmark_curve(
@@ -35,7 +38,10 @@ def build_benchmark_curve(
         end_date=date.fromisoformat(config["end_date"]),
         timeframe=config["timeframe"],
     )
-    aligned = benchmark_series.reindex(target_index).ffill().bfill()
+    aligned, coverage = _align_benchmark_series(
+        benchmark_series,
+        target_index,
+    )
     if aligned.empty:
         raise ValueError("market_data_unavailable")
     normalized = aligned / float(aligned.iloc[0])
@@ -43,7 +49,64 @@ def build_benchmark_curve(
         "symbol": benchmark_symbol,
         "equity_curve": normalized.tolist(),
         "total_return_pct": round((float(normalized.iloc[-1]) - 1.0) * 100.0, 2),
+        "coverage": coverage,
     }
+
+
+def _align_benchmark_series(
+    benchmark_series: pd.Series,
+    target_index: pd.DatetimeIndex,
+) -> tuple[pd.Series, dict[str, Any]]:
+    target = pd.DatetimeIndex(target_index)
+    if target.empty:
+        raise ValueError("market_data_unavailable")
+    target = target.unique().sort_values()
+
+    benchmark = pd.Series(benchmark_series).dropna().astype(float)
+    if benchmark.empty:
+        raise ValueError("market_data_unavailable")
+    benchmark.index = _coerce_index_timezone(benchmark.index, target)
+    benchmark = benchmark[~benchmark.index.duplicated(keep="last")].sort_index()
+
+    first_target = target[0]
+    last_target = target[-1]
+    if benchmark.index[0] > first_target or benchmark.index[-1] < last_target:
+        raise ValueError("benchmark_data_unavailable")
+
+    observed_points = int(benchmark.reindex(target).notna().sum())
+    target_points = int(len(target))
+    observed_ratio = observed_points / target_points
+    min_ratio = 1.0 if target_points <= 2 else _MIN_BENCHMARK_OBSERVATION_COVERAGE
+    if observed_ratio < min_ratio:
+        raise ValueError("benchmark_data_unavailable")
+
+    aligned = (
+        benchmark.reindex(benchmark.index.union(target))
+        .sort_index()
+        .ffill()
+        .reindex(target)
+    )
+    if aligned.isna().any():
+        raise ValueError("benchmark_data_unavailable")
+    return aligned, {
+        "observed_points": observed_points,
+        "target_points": target_points,
+        "observed_ratio": round(observed_ratio, 4),
+    }
+
+
+def _coerce_index_timezone(
+    index: pd.Index,
+    target: pd.DatetimeIndex,
+) -> pd.DatetimeIndex:
+    coerced = pd.DatetimeIndex(index)
+    if target.tz is None:
+        if coerced.tz is not None:
+            return coerced.tz_convert("UTC").tz_localize(None)
+        return coerced
+    if coerced.tz is None:
+        return coerced.tz_localize(target.tz)
+    return coerced.tz_convert(target.tz)
 
 
 def compute_alpha_metrics(
@@ -165,6 +228,11 @@ def compute_alpha_metrics(
             periods_per_year=periods_per_year,
             trade_count=trade_count,
         )
+    value_summary = portfolio_value_summary(aggregate_strategy_equity)
+    if value_summary is not None:
+        aggregate_metrics.setdefault("performance", {})[
+            "portfolio_value_range"
+        ] = value_summary
 
     return {
         "aggregate": aggregate_metrics,

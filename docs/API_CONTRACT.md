@@ -104,7 +104,18 @@ All list endpoints must use cursor-based pagination.
 
 ## Rate Limiting
 
-Every API response should include rate-limit headers where applicable:
+Every API response must include `X-Request-Id`. Rate-limit headers are emitted
+only when they are backed by an active limiter for that response; the API must
+not emit static placeholder quota values on successful responses.
+
+When a request exceeds a quota or short-window limit, the API returns `429`
+Problem Details and includes `Retry-After`.
+
+Unauthenticated `/auth/login` and `/auth/signup` attempts are also protected by
+short-window alpha throttles before allowlist or provider calls. These limits
+return the same `429` Problem Details shape with `code: "too_many_requests"`.
+
+Supported rate-limit headers where applicable:
 - `X-RateLimit-Limit`
 - `X-RateLimit-Remaining`
 - `X-RateLimit-Reset`
@@ -191,6 +202,9 @@ Machine-readable values must remain ISO 8601 (YYYY-MM-DD). User-facing cards and
 **Examples:**
 - `en-US`: "January 1, 2022 to December 31, 2024"
 - `es-419`: "1 de enero de 2022 al 31 de diciembre de 2024"
+- Compact cards may derive shorter locale-aware labels from the same ISO fields
+  instead of parsing the long `display` string; for example `Jan 1, 2024 → Mar
+  31, 2024` in `en-US` and `1 ene 2024 → 31 mar 2024` in `es-419`.
 
 ```json
 {
@@ -296,12 +310,13 @@ messages may store `pending_strategy`, `confirmation_card`,
 `result_strategy_id`, and `result_conversation_id`. Additive artifact metadata
 may also include `artifact_id`, `artifact_type`, `artifact_status`,
 `active_artifact_id`, `supersedes_artifact_id`, `saved_strategy_id`,
-`failed_action`, and `result_fact_bank`. User messages created by action chips
-may store `chat_action` so the transcript can hydrate the selected chip as an
-action item after reload. Action chip requests and persisted `chat_action`
-metadata should preserve `label` plus `labelKey` so localized transcript chips
-survive reload. Clients use these fields to hydrate cards and actions after
-reload. Runtime execution still validates against the LangGraph checkpoint
+`failed_action`, `retry_last_turn`, `recovery`, and `result_fact_bank`. User
+messages created by action chips may store `chat_action` so the transcript can hydrate
+the selected chip as an action item after reload. Action chip requests and
+persisted `chat_action` metadata should preserve `label` plus `labelKey` so
+localized transcript chips survive reload. Clients use these fields to hydrate
+cards and actions after reload. Runtime execution still validates against the
+LangGraph checkpoint
 first. A confirmation card may include `confirmation_id` and
 `confirmation_state`; only the latest active confirmation can execute, and older
 cards are transcript history. Confirmation cards should include stable
@@ -313,6 +328,14 @@ machine-readable fields alongside display labels:
   persisted cards.
 - `rows[].key`: stable row identity such as `strategy`, `assets`, or `period`.
 - `rows[].label` / `rows[].labelKey`: display fallback plus frontend i18n key.
+- `asset_class`: optional stable run universe class such as `equity`,
+  `crypto`, or `currency_pair`; clients may render this as muted trust metadata.
+- `date_range`: optional canonical `{ start, end, display }` range for cards
+  whose period row is visually compacted from ISO fields.
+- `display_facts`: optional canonical facts for localized card metadata, such as
+  `timeframe`, `data_through`, `fees`, `slippage`, and `benchmark_symbol`.
+  Clients should render these facts through locale-aware presentation code and
+  use legacy `assumptions` strings only as fallback for older persisted cards.
 - `actions[].label` / `actions[].labelKey`: display fallback plus frontend i18n key.
 
 Clients must use `status` and `rows[].key` for behavior. They must not infer
@@ -431,6 +454,17 @@ A lightweight grouping of related strategies.
 
 Immutable simulation result.
 
+Ownership hardening:
+
+- Because the backend uses a Supabase service-role client, any supplied
+  `conversation_id` or `strategy_id` parent reference must be checked against
+  the current authenticated user before a `backtest_runs` row is inserted.
+- Direct `/backtests/run` requests with an explicit unowned or missing
+  `conversation_id` return `404 not_found` rather than creating an orphaned or
+  cross-tenant child row.
+- Durable `backtest_jobs` and run context-packet attachments follow the same
+  service-role parent ownership rule before inserting child rows.
+
 ```json
 {
   "id": "uuid",
@@ -460,6 +494,7 @@ Immutable simulation result.
   },
   "conversation_result_card": {
     "title": "Moon Mission (Momentum Breakout)",
+    "asset_class": "equity",
     "date_range": {
       "start": "2022-01-01",
       "end": "2024-12-31",
@@ -554,6 +589,12 @@ Immutable simulation result.
       ],
       "currency": "USD",
       "base_value": 10000.0,
+      "value_summary": {
+        "peak_value": 12042.5,
+        "lowest_value": 9875.0,
+        "currency": "USD",
+        "source": "strategy_portfolio_equity_close"
+      },
       "attribution": "TradingView Lightweight Charts"
     }
   },
@@ -572,8 +613,22 @@ Immutable simulation result.
 **Result chart contract:**
 - `chart.kind` is currently `portfolio_equity`.
 - `chart.series` is the aggregate portfolio equity curve. Multi-symbol runs must use the equal-weight portfolio curve, not a symbol comparison chart.
+- `chart.value_summary` mirrors aggregate strategy portfolio equity close values for result-card details. It is not an asset OHLC high/low and does not describe the benchmark.
+- Legacy persisted `chart.value_extrema` may be read as a fallback only; new writers must emit `chart.value_summary` as the canonical shape.
 - `chart.markers` contains capped entry/exit events derived from executed fills only. Raw strategy signals, blocked exits while flat, and duplicate blocked entries must not appear as chart markers.
 - The frontend must keep TradingView attribution visible when rendering Lightweight Charts.
+
+**Reproducibility contract:**
+- Direct `/backtests/run` records store the normalized engine config directly in
+  `config_snapshot`.
+- Chat-launched runtime runs may also include
+  `config_snapshot.engine_config`, which is the exact normalized engine config
+  executed by the launch adapter. Readers should prefer this replay payload when
+  present and must not reconstruct run inputs from result-card display copy.
+- Benchmark comparisons require sufficient benchmark observations over the
+  selected window. If the benchmark starts late, ends early, or is too sparse to
+  support a trustworthy aligned curve, the backend returns
+  `503 benchmark_data_unavailable` instead of silently backfilling a comparison.
 
 ## Backtest Job
 
@@ -680,6 +735,7 @@ Metrics are grouped into categories.
 - `_pct` means percent value (e.g., `18.4` = 18.4%).
 - Ratio fields are decimal ratios (e.g., `win_rate: 0.57`).
 - Currency-like `profit` depends on configured starting capital.
+- `metrics.aggregate.performance.portfolio_value_range` stores the aggregate strategy portfolio equity close peak/lowest values during the run period. These values must match `chart.value_summary` when chart data is available.
 - Conversation result cards use fixed beginner-friendly defaults.
 - All supported engine metrics are persisted in `metrics`.
 - AI may answer follow-up questions using `metrics.aggregate` and `metrics.by_symbol`.
@@ -722,6 +778,8 @@ The canonical backtest config used by the engine for execution and reproducibili
 - `allocation_method`: "equal_weight"
 - `benchmark_symbol`: `SPY` (equity), `BTC` (crypto), tested pair (`currency_pair`)
 - `parameters`: Template-specific defaults
+- Benchmark data must cover the selected comparison window with enough
+  observations to avoid future-looking backfill or sparse synthetic comparisons.
 
 ## Constraints & Validation (Alpha MVP)
 
@@ -744,7 +802,7 @@ The canonical backtest config used by the engine for execution and reproducibili
 - **Not currently executable in DCA:** separate starting principal, total capital budget, contribution ceiling, or maximum invested cap.
 - If the user supplies both a recurring contribution and a starting/total capital amount, Argus must preserve the distinction conversationally, but must not show `Ready to run` as if both amounts will execute in the DCA engine.
 - The supported recovery path is to ask whether the user wants to run the recurring-buy simulation only, adjust the recurring contribution, or switch to a supported buy-and-hold style test using starting capital.
-- TODO(dca-engine): Add explicit support for DCA starting principal, contribution ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation card display, result assumptions, and model capability wording.
+- Deferred(dca-engine): Add explicit support for DCA starting principal, contribution ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation card display, result assumptions, and model capability wording. This is broader unsupported DCA engine capability work and is outside the Spanish canary/chart attribution fix.
 
 ### Symbol Constraints
 - **Minimum:** 1 symbol
@@ -767,6 +825,7 @@ The canonical backtest config used by the engine for execution and reproducibili
 - **Format:** ISO 8601 (YYYY-MM-DD)
 - **Rules:** `start_date` must be before `end_date`. `end_date` cannot be in the future beyond latest market data.
 - *Normalization:* Backend computes rolling 12 months only when dates are omitted. If the user supplies an explicit temporal phrase, that phrase must be normalized, preserved, or clarified before confirmation; it must not silently fall back to the 12-month default.
+- *Language-agnostic temporal contract:* Normal chat interpretation must not use localized regex/phrase gates to decide executable date intent before the LLM. The interpreter should emit canonical `date_range` values when confident, canonical `date_range_intent` for relative or semantic windows such as rolling windows, year-to-date, calendar-year, since, or endpoint patches, and bounded `date_range_raw_text` only as evidence for the natural-time wrapper. Endpoint patches must use ISO dates or canonical offset math such as `anchor=today` plus `day_offset=-1`, not localized relative words. Deterministic code may resolve canonical intent and bounded evidence, then apply provider/data-availability validation.
 
 ## Reality Gap (Deferred)
 Argus Alpha is a "perfect world" simulation. The following are explicitly excluded from Alpha MVP:
@@ -788,6 +847,12 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - Authenticated API requests must also reject users whose email is missing from the allowlist or has been disabled, so an existing session cannot keep using hidden private-alpha access indefinitely.
 - The allowlist is intentionally minimal: `email`, `role`, `disabled_at`, `created_at`, and `updated_at`. Real invite email tracking is deferred until there is an invite workflow.
 - Access is not controlled by a frontend flag or comma-separated deployed env var.
+
+**Browser session cookies:**
+- Auth cookies are `HttpOnly`, `SameSite=Lax`, and path-scoped to `/`.
+- Cookies must be `Secure` for HTTPS requests, trusted `x-forwarded-proto:
+  https` requests, and production-like backend environments such as
+  `APP_ENV=production`.
 
 **Potential later modes:**
 - username + password mapped to email-backed identity
@@ -816,14 +881,19 @@ Create account.
 }
 ```
 
-**Private-alpha blocked response:**
+**Private-alpha blocked response:** signup intentionally returns the same
+generic `400 auth_signup_failed` shape used for provider signup failures, while
+still checking the allowlist before calling Supabase Auth signup. Public signup
+attempts must not distinguish unlisted/disabled private-alpha emails from
+listed emails that fail provider signup.
+
 ```json
 {
-  "type": "https://api.argus.app/problems/private-alpha-access-required",
-  "title": "Private Alpha Access",
-  "status": 403,
-  "detail": "Argus is in private alpha right now. Use the email that was invited, or ask the Argus team for access.",
-  "code": "private_alpha_access_required",
+  "type": "https://api.argus.app/problems/auth-signup-failed",
+  "title": "Signup Failed",
+  "status": 400,
+  "detail": "Signup failed. Please try again.",
+  "code": "auth_signup_failed",
   "request_id": "uuid"
 }
 ```
@@ -847,7 +917,21 @@ Create account.
 }
 ```
 
-**Private-alpha blocked response:** same `403 private_alpha_access_required` shape as signup.
+**Private-alpha blocked response:** login intentionally returns the same generic
+`401 unauthorized` shape used for invalid credentials, so public login attempts
+cannot distinguish unlisted/disabled private-alpha emails from listed emails
+with wrong passwords.
+
+```json
+{
+  "type": "https://api.argus.app/problems/unauthorized",
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "Invalid email or password.",
+  "code": "unauthorized",
+  "request_id": "uuid"
+}
+```
 
 ## `POST /auth/logout`
 
@@ -952,6 +1036,13 @@ Argus supports English and Spanish (Latin America) in Alpha.
 - **locale:** `en-US`, `es-419`
 
 *Note: `language` controls the AI response language and the static UI preference. `locale` controls formatting (dates, numbers, currency).*
+
+## Runtime Language Contract
+- User input may arrive in any supported language, currently English or Spanish (Latin America).
+- LLM interpretation owns natural-language semantics and must return canonical machine fields; runtime code must not branch on localized whole-turn phrases before interpretation.
+- User-facing assistant prose should follow the resolved `language`, while executable fields such as `strategy_type`, `asset_class`, `timeframe`, `cadence`, `date_range`, `date_range_intent`, and `comparison_baseline` remain language-neutral.
+- Locale-specific rendering, such as compact dates and currency/number formats, belongs in locale-aware presentation code, not backend prose contracts.
+- Capability registries may keep machine compatibility aliases such as snake_case legacy identifiers, but they must not become natural-language phrasebooks in English, Spanish, or future languages.
 
 ## Source of Truth Rules
 - **Authenticated Users**: `profiles.language` and `profiles.locale` are the persisted source of truth. Profile preference wins over browser detection.
@@ -1309,6 +1400,33 @@ completed in-stream run, the final payload includes `backtest_job` and omits
 }
 ```
 
+When a turn reaches a recoverable assistant response without a completed card,
+the final payload and persisted assistant message metadata may include
+`retry_last_turn` and `recovery`. `recovery` is a typed status object with a
+stable `code`, `retryable`, and normalized `language`. User-facing recovery copy
+is presentation only; clients must render retry affordances from structured
+metadata, not by matching assistant prose.
+
+Recoverable streaming error frames may also include the same structured fields
+so live clients can render retry controls immediately, before reload hydration:
+
+```json
+{
+  "type": "error",
+  "code": "agent_runtime_failure",
+  "message": "Something went wrong. Your conversation is saved. Please try again.",
+  "message_id": "uuid",
+  "recovery": {
+    "code": "runtime_failure",
+    "retryable": true,
+    "language": "en"
+  },
+  "retry_last_turn": {
+    "message": "What if I bought BTC last year?"
+  }
+}
+```
+
 When a pending strategy exists for `await_user_reply`, `ready_for_confirmation`,
 or `await_approval`, the final payload may include:
 
@@ -1480,6 +1598,9 @@ Soft delete.
 ## `POST /collections/{id}/strategies`
 
 Attach strategies.
+
+Ownership hardening: the collection parent and every attached strategy must be
+owned by the current user before any `collection_strategies` upsert occurs.
 
 **Request:**
 ```json
@@ -1826,6 +1947,21 @@ Search is limited to:
 - `feature`
 - `general`
 - `account_deletion_request`
+
+`message` is capped at 5,000 characters.
+
+Authenticated feedback submissions are quota protected through Supabase usage
+counters: 50 submissions per day and 20 submissions per hour. Exceeding either
+limit returns `429` with `code: "too_many_requests"` and `Retry-After`.
+
+Feedback context is privacy-sanitized by the backend before persistence. The
+backend keeps only known scalar artifact/app keys such as `source`, `surface`,
+`message_id`, `conversation_id`, `artifact_id`, `artifact_type`, result,
+confirmation, backtest-job, rating, tag, timestamp, and attachment-count
+metadata. Raw browser URLs are not persisted; when a URL or legacy
+`metadata.path` is provided, the backend stores only a queryless `page_path`
+with UUID-like path segments redacted. Unknown nested blobs, prompts, emails,
+tokens, and arbitrary browser metadata are dropped.
 
 For `account_deletion_request`, clients send a one-click support request from
 the account surface. The backend enriches `context` with authenticated account

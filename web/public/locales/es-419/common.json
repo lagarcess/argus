@@ -118,19 +118,20 @@
     "followup_placeholder": "Haz una pregunta de seguimiento...",
     "message_empty": "El mensaje está vacío",
     "send_message": "Enviar mensaje",
+    "text_only_input": "Argus solo puede aceptar texto aquí por ahora.",
     "disclaimer": "Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
     "trigger_create_strategy": "Quiero crear una nueva estrategia.",
     "trigger_create_collection": "Quiero crear una nueva colección.",
     "placeholder_prompts": [
-      "¿Cómo le fue a Apple contra SPY en 2024?",
-      "¿Y si comprara Bitcoin al inicio de 2024?",
+      "¿Cómo le ha ido a Apple contra SPY en lo que va del año?",
+      "¿Qué habría pasado si compraba Bitcoin en lo que va del año?",
       "Explícame un término del mercado en palabras simples.",
-      "¿Qué pasa si mantengo Nvidia durante un año?",
-      "Compara mantener ETH frente a BTC el último año.",
-      "Prueba comprar SPY al inicio de 2024.",
-      "¿Cómo funciona el trading de momentum para tecnológicas?",
-      "¿Y si comprara $250 de Nvidia cada semana en 2024?",
-      "Prueba una idea simple de comprar y mantener Solana.",
+      "¿Qué pasa si mantengo Nvidia durante los últimos 12 meses?",
+      "Compara Ethereum y Bitcoin durante los últimos 12 meses.",
+      "Prueba comprar SPY en lo que va del año.",
+      "¿Cómo funciona comprar acciones fuertes?",
+      "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?",
+      "Prueba una idea simple de comprar y mantener Solana en los últimos 6 meses.",
       "¿Por qué la gente compara una acción con SPY?"
     ],
     "view_history": "Ver historial",
@@ -140,15 +141,15 @@
     "starter_actions": {
       "tsla": {
         "label": "Prueba Apple vs SPY",
-        "value": "Prueba Apple contra SPY del 1 de enero de 2024 al 31 de diciembre de 2024 y muéstrame el resultado."
+        "value": "Compra y mantén AAPL durante los últimos 12 meses con SPY como referencia."
       },
       "btc": {
         "label": "Prueba mantener Bitcoin (BTC)",
-        "value": "Prueba comprar BTC (Bitcoin) el 1 de enero de 2024 y mantenerlo hasta el 31 de diciembre de 2024."
+        "value": "¿Qué habría pasado si compraba Bitcoin en lo que va del año?"
       },
       "dca": {
         "label": "Prueba compras semanales de Nvidia",
-        "value": "Prueba esta idea de inversión. Estrategia: compras recurrentes. Activo: NVDA (Nvidia). Aporte recurrente: $250 por semana. Periodo: del 1 de enero de 2024 al 31 de diciembre de 2024."
+        "value": "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?"
       }
     },
     "example_queries": {
@@ -161,8 +162,24 @@
     "error_load": "No se pudo cargar esa conversación. Inténtalo de nuevo.",
     "error_backtest": "No pude terminar ese turno. Inténtalo otra vez o inicia un chat nuevo si esta conversación venía de una sesión local anterior.",
     "error_generic": "Algo salió mal. Inténtalo de nuevo.",
+    "result_breakdown": {
+      "aria_label": "Desglose del resultado",
+      "label": "Desglose"
+    },
     "result_trust_strip": "Simulación histórica · Sin comisiones/deslizamiento · No es asesoría",
     "result_trust_strip_label": "Contexto de confianza del resultado",
+    "asset_class": {
+      "equity": "Acciones",
+      "crypto": "Cripto",
+      "currency_pair": "Par de divisas"
+    },
+    "cadence": {
+      "daily": "Diaria",
+      "weekly": "Semanal",
+      "biweekly": "Quincenal",
+      "monthly": "Mensual",
+      "quarterly": "Trimestral"
+    },
     "view_details": "Ver detalles",
     "new_chat_ready": "Nuevo chat listo. ¿Qué idea deberíamos probar?",
     "resume_prompt": "Reanudando \"{{title}}\". ¿Qué te gustaría explorar ahora?",
@@ -243,7 +260,11 @@
       "lagged_by": "Quedó por debajo por {{value}}",
       "details": {
         "starting_capital": "Capital inicial",
+        "peak_value": "Valor máximo",
+        "lowest_value": "Valor mínimo",
         "date_range": "Rango de fechas",
+        "peak_value": "Valor máximo",
+        "lowest_value": "Valor mínimo",
         "timeframe": "Temporalidad",
         "side": "Dirección",
         "allocation": "Asignación",
@@ -260,6 +281,18 @@
         "generic": "Datos {{value}}"
       }
     },
+    "result_chart": {
+      "markers": {
+        "entry": "Comprar",
+        "exit": "Vender"
+      }
+    },
+    "strategy_type": {
+      "buy_and_hold": "Comprar y mantener",
+      "dca_accumulation": "Compras recurrentes",
+      "indicator_threshold": "Umbral RSI",
+      "signal_strategy": "Cruce de medias móviles"
+    },
     "discovery": {
       "prompt": "Menciona un activo o indicador",
       "results": "Resultados de búsqueda",
@@ -273,10 +306,11 @@
       "sections": {
         "results": "Resultados de búsqueda",
         "assets": "Activos populares",
-        "indicators": "Indicadores compatibles"
+        "indicators": "Indicadores"
       },
       "badges": {
         "asset": "activo",
+        "indicator": "indicador",
         "runnable": "compatible",
         "unavailable": "no disponible",
         "draft": "borrador"
@@ -284,7 +318,12 @@
       "descriptions": {
         "asset": "Activo",
         "indicator": "Indicador",
-        "currency_pair": "Par de divisas"
+        "currency_pair": "Par de divisas",
+        "asset_classes": {
+          "equity": "Acción",
+          "crypto": "Cripto",
+          "currency_pair": "Par de divisas"
+        }
       }
     },
     "status": {
@@ -306,6 +345,7 @@
       "intent_unsupported_request": "Pensando..."
     },
     "confirmation": {
+      "asset_count": "{{count}} activos",
       "selected_asset": "Activo seleccionado",
       "status": {
         "ready_to_run": "Listo para ejecutar",
@@ -335,6 +375,12 @@
         "change_asset": "Cambiar activo",
         "adjust_assumptions": "Ajustar supuestos",
         "cancel": "Cancelar"
+      },
+      "assumptions": {
+        "through": "Hasta {{date}}",
+        "no_fees": "Sin comisiones",
+        "no_slippage": "Sin deslizamiento",
+        "benchmark": "Referencia: {{symbol}}"
       }
     }
   },

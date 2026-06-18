@@ -42,8 +42,14 @@ USER_SAFE_FAILURE_MESSAGES = {
         "inside the indicator scale and I can run the same idea."
     ),
     "market_data_unavailable": (
-        "Market data was unavailable for that run. Try again, change the dates, "
-        "or choose a different supported asset."
+        "I could not find enough price history for the selected asset over that "
+        "date range. Keep the strategy intact and choose a shorter or more recent "
+        "window, or try another supported asset."
+    ),
+    "benchmark_data_unavailable": (
+        "I could not find enough benchmark history over that date range. Keep the "
+        "strategy intact and choose a shorter or more recent window, or use a "
+        "supported benchmark."
     ),
     "invalid_date_range": (
         "That date range is not valid for a backtest. Choose a start and end date "
@@ -70,6 +76,7 @@ USER_SAFE_FAILURE_DETAILS = {
     "indicator_period_out_of_bounds": "invalid_parameter",
     "indicator_threshold_out_of_bounds": "invalid_parameter",
     "market_data_unavailable": "market_data_issue",
+    "benchmark_data_unavailable": "benchmark_data_issue",
     "invalid_date_range": "invalid_date_window",
     "invalid_chronological_date_range": "invalid_date_window",
     "future_end_date": "future_date_window",
@@ -168,6 +175,7 @@ def build_failure_envelope(
     execution_status: str,
     failure_category: str,
     failure_reason: str,
+    provider_metadata: dict[str, Any] | None = None,
 ) -> LaunchExecutionEnvelope:
     return LaunchExecutionEnvelope(
         execution_status=execution_status,
@@ -187,7 +195,7 @@ def build_failure_envelope(
         assumptions=[],
         caveats=[],
         artifact_references=[],
-        provider_metadata={},
+        provider_metadata=provider_metadata or {},
         failure_category=failure_category,
         failure_reason=failure_reason,
     )

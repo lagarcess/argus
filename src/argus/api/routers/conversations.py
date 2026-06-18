@@ -7,7 +7,10 @@ from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
-from argus.api.message_store import memory_conversation
+from argus.api.message_store import (
+    memory_conversation,
+    reconcile_reload_message_metadata,
+)
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
     BulkConversationDeleteResponse,
@@ -338,6 +341,7 @@ def list_messages(
         items = api_state.store.messages.get(conversation_id, [])
 
     items.sort(key=lambda item: (item.created_at, item.id))
+    items = reconcile_reload_message_metadata(items)
     filtered = items
     if cursor:
         cursor_created_at, cursor_id = decode_cursor(cursor, request)

@@ -1,3 +1,5 @@
+import re
+
 import pandas as pd
 import pytest
 from argus.domain.engine import _build_signals, build_result_card, compute_alpha_metrics
@@ -80,6 +82,7 @@ def test_dca_metrics_account_for_each_recurring_contribution(monkeypatch):
         {
             "template": "dca_accumulation",
             "symbols": ["AAPL"],
+            "asset_class": "equity",
             "start_date": "2024-01-01",
             "end_date": "2024-02-29",
             "starting_capital": 500.0,
@@ -88,9 +91,22 @@ def test_dca_metrics_account_for_each_recurring_contribution(monkeypatch):
         metrics,
     )
     cash_row = next(row for row in card["rows"] if row["key"] == "cash_value")
-    assert cash_row["label"] == "Final Value ($)"
-    assert cash_row["value"] == "$1.0k -> $1.5k"
-    assert "Recurring contribution: $500." in card["assumptions"]
+    assert "value" in cash_row["label"].lower()
+    value_text = cash_row["value"]
+    left, right = [part.strip() for part in value_text.split("->", 1)]
+
+    def parse_money(text: str) -> float:
+        match = re.search(r"\$([0-9][0-9.,]*)(k)?", text.lower())
+        assert match is not None
+        number = float(match.group(1).replace(",", ""))
+        return number * (1000 if match.group(2) else 1)
+
+    assert parse_money(left) == 1000.0
+    assert parse_money(right) == 1500.0
+    assert any(
+        assumption.startswith("Recurring contribution: $500")
+        for assumption in card["assumptions"]
+    )
 
 
 def test_dca_accumulation_signals_monthly():
