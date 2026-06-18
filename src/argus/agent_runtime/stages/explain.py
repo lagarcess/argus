@@ -570,14 +570,19 @@ def _render_quick_take_draft(
         return None
     # `fact_ids` is model self-report metadata. The visible copy checks below are
     # the authoritative guard for user-facing benchmark truth.
+    visible_response = (
+        response.model_copy(update={"takeaway": canonical_takeaway})
+        if canonical_takeaway
+        else response
+    )
     if not _quick_take_mentions_required_visible_facts(
-        draft=response,
+        draft=visible_response,
         fact_bank=fact_bank,
     ):
         return None
-    if not _next_check_kinds_are_supported(
-        draft=response,
-        allowed_next_experiments=allowed_next_experiments,
+    if _quick_take_mentions_signed_benchmark_delta(
+        draft=visible_response,
+        fact_bank=fact_bank,
     ):
         return None
 
@@ -632,6 +637,40 @@ def _quick_take_mentions_required_visible_facts(
     if not _mentions_benchmark_comparison(text=text, fact_bank=fact_bank):
         return False
     return True
+
+
+def _quick_take_mentions_signed_benchmark_delta(
+    *,
+    draft: QuickTakeDraft,
+    fact_bank: dict[str, str],
+) -> bool:
+    magnitude = fact_bank.get("benchmark_delta_magnitude")
+    magnitude_number = _first_numeric_token(magnitude)
+    if not magnitude_number:
+        return False
+    text = " ".join(
+        line
+        for line in (
+            draft.takeaway,
+            draft.tested_bullet,
+            draft.meaning_bullet or "",
+            draft.assumption_bullet or "",
+            draft.caveat_bullet or "",
+        )
+        if line
+    ).casefold()
+    if "percentage point" not in text and "puntos porcentual" not in text:
+        return False
+    localized_number = magnitude_number.replace(".", ",")
+    return any(
+        signed_number in text
+        for signed_number in (
+            f"-{magnitude_number}",
+            f"+{magnitude_number}",
+            f"-{localized_number}",
+            f"+{localized_number}",
+        )
+    )
 
 
 def _mentions_benchmark_comparison(
