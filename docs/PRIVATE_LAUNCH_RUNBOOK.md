@@ -1,9 +1,10 @@
 # Private Launch Runbook
 
 > [!NOTE]
-> Current operational gate for the controlled private-alpha readiness sprint. For
-> sprint scope and no-touch boundaries, see
-> `docs/specs/private-alpha-controlled-readiness-panel.md`.
+> Current operational gate for the Private Alpha CI/CD SOTA release path. Use
+> `docs/specs/private-alpha-ci-cd-sota.md` as the active roadmap for release
+> gating and `docs/specs/private-alpha-next-decision-memo.md` as a
+> later-context document, not part of this release gate.
 
 This runbook is for the first trusted-user internet tests on Render.
 
@@ -14,12 +15,32 @@ This runbook is for the first trusted-user internet tests on Render.
 
 ## Before Tester Sessions
 
-1. Merge the private-launch hardening PR into `main`.
-2. In Render, sync the Blueprint from `render.yaml`.
-3. Confirm Render is updating the existing `argus-app` and `argus-api` services.
+The promotion target is `main`, but `codex/private-alpha-next` remains the
+integration staging branch until the founder approves promotion. Do not merge to
+`main`, open a release PR, or deploy production automatically; after founder
+approval, promotion still follows the gate below. Every candidate needs a
+release manifest before testers are invited; start from
+`docs/release-manifests/TEMPLATE.md` and fill it with the exact candidate SHA,
+env fingerprint, canary evidence, rollback target, and approver.
+
+1. Confirm the local checkout is the candidate commit you intend to promote:
+
+```bash
+git status --short
+git rev-parse HEAD
+```
+
+2. Run the local predeploy smoke gate before any internet-facing canary:
+
+```bash
+.github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"
+```
+
+3. In Render, sync the Blueprint from `render.yaml` only when service config
+   drift needs reconciliation.
+4. Confirm Render is updating the existing `argus-app` and `argus-api` services.
    Stop if Render proposes duplicate services.
-4. Confirm both services still have manual deploys enabled.
-5. Manually deploy `argus-api`, then `argus-app`.
+5. Confirm both services still have manual deploys enabled.
 6. Export local ops and canary secrets, or keep these in the root `.env` file
    and let the scripts load them:
 
@@ -45,18 +66,22 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-8. Confirm the live `argus-api` and `argus-app` deploy commits match the
-   readiness commit you intend to test:
+8. Manually deploy `argus-api`, then `argus-app` from the candidate commit.
+
+9. Confirm the live `argus-api` and `argus-app` deploy commits match the
+   candidate commit you intend to test and that both latest deploys are `live`:
 
 ```bash
+ARGUS_RELEASE_SHA="$(git rev-parse HEAD)"
 .github/render-env-sync.sh api-deploy-status
 .github/render-env-sync.sh web-deploy-status
 ```
 
-If either commit is not the readiness branch commit, stop and deploy the stale
-service before running the strict canaries.
+If either commit is not `ARGUS_RELEASE_SHA`, stop and deploy the stale service
+before running the strict canaries. The canary script enforces the same deployed
+SHA/status check with `ARGUS_CANARY_SHA`.
 
-9. Run the product warmup script and verify the API stayed in real workflow
+10. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
    stale queued/running job scan:
 
@@ -64,16 +89,24 @@ service before running the strict canaries.
 .github/warmup-render.sh --expect-mode real-workflow
 ```
 
-10. Run the golden-path canary:
+11. Run the strict English canary with privacy-safe release evidence:
 
 ```bash
+mkdir -p temp/release-evidence
+ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
+ARGUS_CANARY_LANGUAGE=en \
+ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-en.json \
 .github/canary-render.sh
 ```
 
-After the readiness branch is deployed, rerun the same strict canary in Spanish:
+12. Run the same strict canary in Spanish. Spanish readiness is a release criterion, not a one-off test:
 
 ```bash
-ARGUS_CANARY_LANGUAGE=es-419 ARGUS_CANARY_PROMPT='Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 con 10000 dolares' .github/canary-render.sh
+ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
+ARGUS_CANARY_LANGUAGE=es-419 \
+ARGUS_CANARY_PROMPT='Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 con 10000 dolares' \
+ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json \
+.github/canary-render.sh
 ```
 
 Before treating local UI changes as launch-ready, also run the browser recovery
@@ -84,19 +117,29 @@ cd web && bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium
 ```
 
 Only send the app URL to testers after API deploy-status, app deploy-status,
-warmup, English canary, and Spanish canary all pass against the intended
-readiness commit. If either deploy-status reports a different commit, deploy the
-readiness branch before continuing. If warmup fails, do not invite testers yet.
-Check Render service status and redeploy only if the service is stuck. If
-warmup passes but a canary fails, treat it as an Argus product-path regression
-and inspect API logs, Supabase messages, backtest runs, and route receipts for
-the canary conversation id.
+local smoke, warmup, English canary, Spanish canary, and the release manifest all
+pass against the intended candidate commit. If either deploy-status reports a
+different commit, deploy the candidate branch before continuing. If warmup fails,
+do not invite testers yet. Check Render service status and redeploy only if the
+service is stuck. If warmup passes but a canary fails, treat it as an Argus
+product-path regression and inspect API logs, Supabase messages, backtest runs,
+and route receipts using the hashed labels and internal access controls from the
+canary evidence.
 
 For the daily automated gate, configure GitHub repository secrets with the same
 canary variables above plus `RENDER_API_KEY`, then use the scheduled or manually
-dispatched `Private Alpha Canary` workflow. That workflow runs
-`.github/warmup-render.sh --expect-mode real-workflow` and
-`.github/canary-render.sh`; it does not deploy or configure analytics.
+dispatched `Private Alpha Canary` workflow. That workflow runs the local smoke
+gate, warmup, English canary, Spanish canary, and a bilingual matrix check. It
+uploads the `private-alpha-canary-evidence` artifact containing per-locale JSON
+evidence plus exit-code files, and it does not deploy or configure analytics.
+Secrets are scoped to the operational steps that need them; install and artifact
+upload steps do not receive canary credentials or service-role keys.
+
+After the gate passes, copy the relevant command output and canary evidence into
+a candidate manifest based on `docs/release-manifests/TEMPLATE.md`. The manifest
+must name the candidate SHA, deployed API/web SHAs, `env_fingerprint`,
+`workflow_task`, `real_workflow_task`, backtest service mode, canary evidence,
+rollback target, and approver.
 
 If you need to run only the stale job scan during incident triage:
 

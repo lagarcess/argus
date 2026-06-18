@@ -8,7 +8,9 @@ Audience: Founder, Codex, external async agents, reviewers
 Current note: for the 2026-06-17 CI/CD SOTA release-captain mission, use
 `docs/specs/private-alpha-ci-cd-sota.md` as the active execution roadmap. This
 document remains the staging and branch-process context for
-`codex/private-alpha-next`.
+`codex/private-alpha-next`. `docs/specs/private-alpha-next-decision-memo.md` is
+later-context only for the next product/strategy session and must not steer the
+current CI/CD release gate.
 
 ## Purpose
 
@@ -19,6 +21,29 @@ starts from the current `main` reality, not from stale milestone debt.
 The integration branch is a staging lane. It is allowed to collect reviewed work
 before a future PR, but it is not a release branch and must not be merged or
 deployed automatically.
+
+## Current Release Gate
+
+The active private-alpha promotion path is the CI/CD SOTA gate in
+`docs/specs/private-alpha-ci-cd-sota.md` plus the operator instructions in
+`docs/PRIVATE_LAUNCH_RUNBOOK.md`.
+
+Before testers are invited, the release captain must prove:
+
+- local smoke passed for the candidate SHA;
+- `argus-api` and `argus-app` latest Render deploys are `live` at the candidate
+  SHA;
+- Render release config audit produced the expected `env_fingerprint`,
+  `workflow_task`, and `real_workflow_task`;
+- the `Private Alpha Canary` workflow or equivalent manual commands passed both
+  English and Spanish canaries;
+- the canary evidence artifact is retained as `private-alpha-canary-evidence`;
+- a release manifest exists from `docs/release-manifests/TEMPLATE.md` and names
+  SHA, env fingerprint, canary evidence, rollback target, approver, and
+  backtest service mode.
+
+Production deploys remain manual and founder-directed. No production deploy
+happens from this branch unless the founder explicitly asks for a deploy check.
 
 ## Branch Model
 

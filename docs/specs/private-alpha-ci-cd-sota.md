@@ -12,6 +12,11 @@ preserving that document as staging and branch-process context. The promoted
 decision memo in `docs/specs/private-alpha-next-decision-memo.md` is future
 context only for this run.
 
+Implementation note: the release gate now centers on local smoke, Render
+release-config audit, live API/web deploy SHA checks, bilingual canary evidence,
+and a per-candidate release manifest. Keep this document as the active CI/CD
+roadmap until the founder explicitly starts the later decision memo session.
+
 ## Purpose
 
 This spec defines the long-term release and validation system Argus needs to

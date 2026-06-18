@@ -784,7 +784,8 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     assert ".github/warmup-render.sh --expect-mode real-workflow" in before_sessions
     assert ".github/canary-render.sh" in before_sessions
     assert (
-        "API deploy-status, app deploy-status, warmup, English canary, and Spanish canary"
+        "API deploy-status, app deploy-status, local smoke, warmup, English "
+        "canary, Spanish canary, and the release manifest"
         in normalized_before_sessions
     )
     assert "both scripts pass" not in before_sessions
