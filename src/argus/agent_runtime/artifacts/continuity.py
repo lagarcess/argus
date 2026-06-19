@@ -3,12 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
+from argus.agent_runtime.artifacts.asset_edits import (
+    normalized_asset_universe_operation,
+)
 from argus.agent_runtime.artifacts.drafts import (
     draft_from_confirmation_payload,
     draft_from_failed_launch_payload,
     draft_from_result_metadata,
 )
-from argus.agent_runtime.artifacts.patches import (
+from argus.agent_runtime.artifacts.strategy_edits import (
     ArtifactPatch,
     PatchSource,
     apply_artifact_patch,
@@ -107,6 +110,13 @@ def patched_draft_from_candidate(
         if _equivalent_strategy_value(field_name, candidate_value, anchored_value):
             continue
         patch_values[field_name] = candidate_value
+    operation = normalized_asset_universe_operation(
+        _dict(candidate.extra_parameters).get("asset_universe_operation")
+    )
+    if "asset_universe" in patch_values:
+        if operation is None:
+            return None
+        patch_values["asset_universe_operation"] = operation
     if not patch_values:
         return None
     patch = ArtifactPatch(source=source, **patch_values)
@@ -125,7 +135,7 @@ def _equivalent_strategy_value(
 
 def _comparable_strategy_value(field_name: str, value: Any) -> Any:
     if field_name == "asset_universe" and isinstance(value, list):
-        return tuple(_normalized_symbol(item) for item in value if _normalized_symbol(item))
+        return tuple(sorted(_normalized_symbols(value)))
     if field_name == "comparison_baseline":
         return _normalized_symbol(value)
     if isinstance(value, str):
@@ -172,6 +182,14 @@ def _normalized_symbol(value: Any) -> str | None:
         return None
     symbol = value.strip().upper().replace("-", "/")
     return symbol or None
+
+
+def _normalized_symbols(values: list[Any]) -> set[str]:
+    return {
+        symbol
+        for value in values
+        if (symbol := _normalized_symbol(value)) is not None
+    }
 
 
 def _blank(value: Any) -> bool:

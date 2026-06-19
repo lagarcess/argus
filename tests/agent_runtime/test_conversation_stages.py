@@ -1768,6 +1768,61 @@ def test_confirm_stage_preserves_explicit_benchmark_in_card_assumptions() -> Non
     )
 
 
+def test_confirm_stage_persists_default_benchmark_in_strategy_payload() -> None:
+    state = RunState.new(
+        current_user_message=(
+            "Let's test holding AAPL, MSFT, and TSLA from 2023 to date with 100k."
+        ),
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold a large-cap tech basket.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2023-01-01", "end": "2026-06-19"},
+        capital_amount=100000,
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_approval"
+    confirmation_payload = result.patch["confirmation_payload"]
+    strategy = confirmation_payload["strategy"]
+    assert strategy["asset_universe"] == ["AAPL", "MSFT", "TSLA"]
+    assert strategy["comparison_baseline"] == "SPY"
+    assert confirmation_payload["launch_payload"]["benchmark_symbol"] == "SPY"
+    assert "Benchmark: SPY" in strategy["assumptions"]
+
+
+def test_confirm_stage_persists_runtime_language_in_launch_payload() -> None:
+    state = RunState.new(
+        current_user_message="Prueba comprar y mantener AMZN y NFLX desde 2023.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Comprar y mantener AMZN y NFLX.",
+        asset_universe=["AMZN", "NFLX"],
+        asset_class="equity",
+        date_range={"start": "2023-01-01", "end": "2026-06-19"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+
+    result = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        language="es-419",
+    )
+
+    strategy = result.patch["confirmation_payload"]["strategy"]
+    launch_payload = result.patch["confirmation_payload"]["launch_payload"]
+    assert result.outcome == "await_approval"
+    assert strategy["extra_parameters"]["language"] == "es-419"
+    assert launch_payload["language"] == "es-419"
+
+
 def test_confirm_stage_resolves_structured_month_range_into_launch_payload() -> None:
     state = RunState.new(
         current_user_message=(

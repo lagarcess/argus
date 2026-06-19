@@ -44,6 +44,56 @@ export function shouldStartConversationForVisibleEmptyChat({
   );
 }
 
+export function shouldApplyConversationScopedUpdate({
+  targetConversationId,
+  activeConversationId,
+  currentView,
+  routeState,
+}: {
+  targetConversationId: string | null | undefined;
+  activeConversationId: string | null | undefined;
+  currentView: string;
+  routeState: ActiveConversationRouteState;
+}) {
+  const target = targetConversationId?.trim();
+  if (
+    !shouldApplyConversationOwnedUpdate({
+      targetConversationId: target,
+      activeConversationId,
+    })
+  ) {
+    return false;
+  }
+  return (
+    currentView === "chat" &&
+    routeState.isChatRoute &&
+    routeState.conversationId?.trim() === target
+  );
+}
+
+export function shouldApplyConversationOwnedUpdate({
+  targetConversationId,
+  activeConversationId,
+}: {
+  targetConversationId: string | null | undefined;
+  activeConversationId: string | null | undefined;
+}) {
+  const target = targetConversationId?.trim();
+  return Boolean(target && activeConversationId?.trim() === target);
+}
+
+export function shouldRetireActiveStreamForNavigation({
+  activeStreamConversationId,
+  nextConversationId,
+}: {
+  activeStreamConversationId: string | null | undefined;
+  nextConversationId: string | null | undefined;
+}) {
+  const activeStream = activeStreamConversationId?.trim();
+  if (!activeStream) return false;
+  return activeStream !== (nextConversationId?.trim() ?? "");
+}
+
 export function actionConversationId(action: ChatActionOption | null | undefined) {
   const rawConversationId =
     action?.payload?.conversation_id ?? action?.payload?.conversationId;

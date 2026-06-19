@@ -46,16 +46,19 @@ class AssetUniverseWarmupResult:
 
 SYNTHETIC_UNIT_ASSETS: dict[str, tuple[AssetClass, str, str]] = {
     "AAPL": ("equity", "Apple Inc.", "AAPL"),
+    "AMD": ("equity", "Advanced Micro Devices Inc.", "AMD"),
     "AMZN": ("equity", "Amazon.com Inc.", "AMZN"),
     "BTC": ("crypto", "Bitcoin", "BTC/USD"),
     "ETH": ("crypto", "Ethereum", "ETH/USD"),
     "EURUSD": ("currency_pair", "EUR/USD", "EURUSD"),
     "GOOG": ("equity", "Alphabet Inc. Class C", "GOOG"),
     "GOOGL": ("equity", "Alphabet Inc. Class A", "GOOGL"),
+    "INTC": ("equity", "Intel Corporation", "INTC"),
     "META": ("equity", "Meta Platforms Inc.", "META"),
     "MSFT": ("equity", "Microsoft Corporation", "MSFT"),
     "NFLX": ("equity", "Netflix Inc.", "NFLX"),
     "NVDA": ("equity", "NVIDIA Corporation", "NVDA"),
+    "QQQ": ("equity", "Invesco QQQ Trust", "QQQ"),
     "SPY": ("equity", "SPDR S&P 500 ETF Trust", "SPY"),
     "TSLA": ("equity", "Tesla Inc.", "TSLA"),
 }

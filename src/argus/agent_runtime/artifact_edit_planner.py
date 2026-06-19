@@ -4,6 +4,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from argus.agent_runtime.artifacts.asset_edits import (
+    AssetUniverseOperation,
+    normalized_asset_universe_operation,
+    same_asset_universe,
+)
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema,
     openrouter_structured_model_candidates,
@@ -13,6 +18,9 @@ from argus.llm.openrouter import (
 class ArtifactAssumptionEditPlan(BaseModel):
     outcome: Literal["ready_to_confirm", "needs_clarification", "unsupported"]
     user_goal_summary: str | None = None
+    asset_universe: list[str] = Field(default_factory=list)
+    asset_universe_operation: AssetUniverseOperation | None = None
+    comparison_baseline: str | None = None
     initial_capital: float | None = None
     recurring_contribution_amount: float | None = None
     cadence: str | None = None
@@ -54,7 +62,11 @@ async def plan_artifact_assumption_edit(
             continue
         if not isinstance(plan, ArtifactAssumptionEditPlan):
             continue
-        if plan.outcome == "ready_to_confirm" and not _has_supported_edit(plan):
+        if plan.outcome == "ready_to_confirm" and not _has_supported_edit(
+            plan,
+            prior_strategy=prior_strategy,
+            active_confirmation=active_confirmation,
+        ):
             continue
         if plan.outcome != "ready_to_confirm" and not plan.assistant_response:
             continue
@@ -78,7 +90,16 @@ def _artifact_assumption_edit_messages(
                 "execute a backtest. Do not infer hidden strategy changes. Return "
                 "ready_to_confirm only when the message clearly changes a supported "
                 "assumption.\n\n"
-                "Supported assumption edits for this planner:\n"
+                "Supported visible artifact edits for this planner:\n"
+                "- traded assets -> asset_universe as ticker/symbol values. Use "
+                "asset_universe_operation=append when the user adds assets while "
+                "keeping existing traded assets, and replace when the user swaps "
+                "the traded assets. For append/add, include only the newly added "
+                "assets in asset_universe.\n"
+                "- benchmark / reference / comparison asset -> comparison_baseline "
+                "as a ticker/symbol value. Do not put this asset in asset_universe "
+                "unless the user explicitly says to buy, hold, or test it as a "
+                "traded asset.\n"
                 "- starting capital / initial capital -> initial_capital as a number\n"
                 "- DCA or recurring-buy per-purchase contribution -> "
                 "recurring_contribution_amount as a number; do not put it in "
@@ -91,8 +112,9 @@ def _artifact_assumption_edit_messages(
                 "If the user asks what assumptions are currently visible, return "
                 "needs_clarification with a concise assistant_response instead of "
                 "inventing an edit. If the user asks for an unsupported assumption "
-                "or a strategy change, return unsupported or needs_clarification and "
-                "name what can be changed. Return only JSON matching the schema."
+                "or unsupported strategy change, return unsupported or "
+                "needs_clarification and name what can be changed. Return only JSON "
+                "matching the schema."
             ),
         },
         {
@@ -108,10 +130,36 @@ def _artifact_assumption_edit_messages(
     ]
 
 
-def _has_supported_edit(plan: ArtifactAssumptionEditPlan) -> bool:
+def _has_supported_edit(
+    plan: ArtifactAssumptionEditPlan,
+    *,
+    prior_strategy: dict[str, Any] | None = None,
+    active_confirmation: dict[str, Any] | None = None,
+) -> bool:
+    asset_operation = normalized_asset_universe_operation(
+        plan.asset_universe_operation
+    )
+    if plan.asset_universe and asset_operation is None:
+        if not same_asset_universe(
+            plan.asset_universe,
+            _reference_asset_universe(
+                prior_strategy=prior_strategy,
+                active_confirmation=active_confirmation,
+            ),
+        ):
+            return False
+        asset_universe_edit = None
+    else:
+        asset_universe_edit = (
+            plan.asset_universe
+            if asset_operation is not None
+            else None
+        )
     return any(
         value is not None
         for value in (
+            asset_universe_edit,
+            plan.comparison_baseline,
             plan.initial_capital,
             plan.recurring_contribution_amount,
             plan.cadence,
@@ -120,6 +168,22 @@ def _has_supported_edit(plan: ArtifactAssumptionEditPlan) -> bool:
             plan.slippage,
         )
     )
+
+
+def _reference_asset_universe(
+    *,
+    prior_strategy: dict[str, Any] | None,
+    active_confirmation: dict[str, Any] | None,
+) -> Any:
+    if isinstance(prior_strategy, dict) and prior_strategy.get("asset_universe"):
+        return prior_strategy.get("asset_universe")
+    if isinstance(active_confirmation, dict):
+        strategy = active_confirmation.get("strategy")
+        if isinstance(strategy, dict) and strategy.get("asset_universe"):
+            return strategy.get("asset_universe")
+        if active_confirmation.get("asset_universe"):
+            return active_confirmation.get("asset_universe")
+    return []
 
 
 def _unique_models(preferred_model: str) -> list[str]:

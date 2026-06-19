@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import pytest
 from argus.agent_runtime.artifacts.continuity import (
     apply_patch_to_anchor,
+    patched_draft_from_candidate,
     resolve_artifact_anchor,
 )
 from argus.agent_runtime.artifacts.drafts import (
@@ -13,7 +15,7 @@ from argus.agent_runtime.artifacts.lifecycle import (
     RetryLifecycleDecision,
     retry_lifecycle_after_artifact_event,
 )
-from argus.agent_runtime.artifacts.patches import (
+from argus.agent_runtime.artifacts.strategy_edits import (
     ArtifactPatch,
     apply_artifact_patch,
 )
@@ -296,6 +298,7 @@ def test_asset_patch_preserves_period_money_timeframe_and_benchmark() -> None:
         ArtifactPatch(
             source="user_patch",
             asset_universe=["nvda"],
+            asset_universe_operation="replace",
             asset_class="equity",
         ),
     )
@@ -306,6 +309,271 @@ def test_asset_patch_preserves_period_money_timeframe_and_benchmark() -> None:
     assert merged.capital_amount == 500
     assert merged.timeframe == "1D"
     assert merged.comparison_baseline == "SPY"
+
+
+def test_asset_patch_requires_explicit_operation() -> None:
+    base = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=500,
+        timeframe="1D",
+        comparison_baseline="SPY",
+    )
+
+    with pytest.raises(ValueError, match="asset_universe_operation"):
+        apply_artifact_patch(
+            base,
+            ArtifactPatch(
+                source="user_patch",
+                asset_universe=["nvda"],
+            ),
+        )
+
+
+def test_asset_append_patch_preserves_canonical_setup_and_explicit_benchmark() -> None:
+    base = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2023-01-01", "end": "2026-06-15"},
+        capital_amount=100000,
+        timeframe="1D",
+        comparison_baseline="QQQ",
+    )
+
+    merged = apply_artifact_patch(
+        base,
+        ArtifactPatch(
+            source="user_patch",
+            asset_universe=["googl", "NVDA"],
+            asset_universe_operation="append",
+        ),
+    )
+
+    assert merged.asset_universe == ["AAPL", "MSFT", "TSLA", "GOOGL", "NVDA"]
+    assert merged.date_range == {"start": "2023-01-01", "end": "2026-06-15"}
+    assert merged.capital_amount == 100000
+    assert merged.timeframe == "1D"
+    assert merged.comparison_baseline == "QQQ"
+
+
+def test_asset_replace_patch_preserves_explicit_benchmark() -> None:
+    base = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2023-01-01", "end": "2026-06-15"},
+        capital_amount=100000,
+        timeframe="1D",
+        comparison_baseline="QQQ",
+        extra_parameters={"asset_universe_operation": "append"},
+    )
+
+    merged = apply_artifact_patch(
+        base,
+        ArtifactPatch(
+            source="user_patch",
+            asset_universe=["amd", "intc"],
+            asset_universe_operation="replace",
+        ),
+    )
+
+    assert merged.asset_universe == ["AMD", "INTC"]
+    assert merged.date_range == {"start": "2023-01-01", "end": "2026-06-15"}
+    assert merged.capital_amount == 100000
+    assert merged.timeframe == "1D"
+    assert merged.comparison_baseline == "QQQ"
+    assert merged.extra_parameters["artifact_patch"][
+        "asset_universe_operation"
+    ] == "replace"
+    assert "asset_universe_operation" not in merged.extra_parameters
+
+
+def test_explicit_benchmark_patch_never_enters_asset_universe() -> None:
+    base = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2023-01-01", "end": "2026-06-15"},
+        capital_amount=100000,
+        timeframe="1D",
+        comparison_baseline="SPY",
+    )
+
+    merged = apply_artifact_patch(
+        base,
+        ArtifactPatch(source="user_patch", comparison_baseline="qqq"),
+    )
+
+    assert merged.asset_universe == ["AAPL", "MSFT", "TSLA"]
+    assert merged.comparison_baseline == "QQQ"
+    assert merged.date_range == {"start": "2023-01-01", "end": "2026-06-15"}
+    assert merged.capital_amount == 100000
+
+
+def test_crypto_asset_append_preserves_default_btc_benchmark() -> None:
+    base = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold ETH.",
+        asset_universe=["ETH"],
+        asset_class="crypto",
+        date_range={"start": "2024-01-01", "end": "2026-06-15"},
+        capital_amount=100000,
+        timeframe="1D",
+        comparison_baseline="BTC",
+    )
+
+    merged = apply_artifact_patch(
+        base,
+        ArtifactPatch(
+            source="user_patch",
+            asset_universe=["sol"],
+            asset_universe_operation="append",
+        ),
+    )
+
+    assert merged.asset_universe == ["ETH", "SOL"]
+    assert merged.comparison_baseline == "BTC"
+    assert merged.asset_class == "crypto"
+
+
+def test_candidate_append_patch_preserves_anchor_setup() -> None:
+    anchor = resolve_artifact_anchor(
+        snapshot=TaskSnapshot(
+            active_confirmation_reference=ArtifactReference(
+                artifact_kind="confirmation",
+                artifact_id="confirmation-test",
+                artifact_status="active",
+                metadata={
+                    "confirmation_id": "confirmation-test",
+                    "confirmation_payload": {
+                        "strategy": {
+                            "strategy_type": "buy_and_hold",
+                            "strategy_thesis": "Buy and hold AAPL, MSFT, and TSLA.",
+                            "asset_universe": ["AAPL", "MSFT", "TSLA"],
+                            "asset_class": "equity",
+                            "date_range": {
+                                "start": "2023-01-01",
+                                "end": "2026-06-15",
+                            },
+                            "capital_amount": 100000,
+                            "timeframe": "1D",
+                            "comparison_baseline": "QQQ",
+                        },
+                        "launch_payload": {
+                            "strategy_type": "buy_and_hold",
+                            "symbol": "AAPL",
+                            "symbols": ["AAPL", "MSFT", "TSLA"],
+                            "timeframe": "1D",
+                            "date_range": {
+                                "start": "2023-01-01",
+                                "end": "2026-06-15",
+                            },
+                            "sizing_mode": "capital_amount",
+                            "capital_amount": 100000,
+                            "benchmark_symbol": "QQQ",
+                        },
+                    },
+                },
+            )
+        )
+    )
+
+    patched = patched_draft_from_candidate(
+        anchor=anchor,
+        candidate=StrategySummary(
+            asset_universe=["GOOGL", "NVDA"],
+            extra_parameters={"asset_universe_operation": "append"},
+        ),
+    )
+
+    assert patched is not None
+    assert patched.asset_universe == ["AAPL", "MSFT", "TSLA", "GOOGL", "NVDA"]
+    assert patched.date_range == {"start": "2023-01-01", "end": "2026-06-15"}
+    assert patched.capital_amount == 100000
+    assert patched.timeframe == "1D"
+    assert patched.comparison_baseline == "QQQ"
+
+
+def test_patched_draft_rejects_asset_universe_without_operation() -> None:
+    base = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2023-01-01", "end": "2026-06-15"},
+        capital_amount=100000,
+        timeframe="1D",
+        comparison_baseline="QQQ",
+    )
+    anchor = resolve_artifact_anchor(
+        snapshot=TaskSnapshot(
+            active_confirmation_reference=ArtifactReference(
+                artifact_kind="confirmation",
+                artifact_id="confirmation-test",
+                artifact_status="active",
+                metadata={
+                    "confirmation_payload": {
+                        "strategy": base.model_dump(mode="json"),
+                    },
+                },
+            )
+        )
+    )
+
+    patched = patched_draft_from_candidate(
+        anchor=anchor,
+        candidate=StrategySummary(asset_universe=["GOOGL", "NVDA"]),
+    )
+
+    assert patched is None
+
+
+def test_candidate_reordered_assets_do_not_require_asset_operation() -> None:
+    base = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2023-01-01", "end": "2026-06-15"},
+        capital_amount=100000,
+        timeframe="1D",
+        comparison_baseline="SPY",
+    )
+    anchor = resolve_artifact_anchor(
+        snapshot=TaskSnapshot(
+            active_confirmation_reference=ArtifactReference(
+                artifact_kind="confirmation",
+                artifact_id="confirmation-test",
+                artifact_status="active",
+                metadata={
+                    "confirmation_payload": {
+                        "strategy": base.model_dump(mode="json"),
+                    },
+                },
+            )
+        )
+    )
+
+    patched = patched_draft_from_candidate(
+        anchor=anchor,
+        candidate=StrategySummary(
+            asset_universe=["TSLA", "AAPL", "MSFT"],
+            comparison_baseline="QQQ",
+        ),
+    )
+
+    assert patched is not None
+    assert patched.asset_universe == ["AAPL", "MSFT", "TSLA"]
+    assert patched.comparison_baseline == "QQQ"
+    assert patched.date_range == {"start": "2023-01-01", "end": "2026-06-15"}
+    assert patched.capital_amount == 100000
 
 
 def test_patch_clears_fields_only_when_explicitly_requested() -> None:
@@ -330,6 +598,29 @@ def test_patch_clears_fields_only_when_explicitly_requested() -> None:
     assert cleared.comparison_baseline is None
     assert cleared.asset_universe == ["AAPL"]
     assert cleared.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+
+
+def test_patch_clear_fields_cannot_clear_asset_universe() -> None:
+    base = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=500,
+        timeframe="1D",
+        comparison_baseline="SPY",
+    )
+
+    cleared = apply_artifact_patch(
+        base,
+        ArtifactPatch(source="user_patch", clear_fields=["asset_universe"]),
+    )
+
+    assert cleared.asset_universe == ["AAPL"]
+    assert "asset_universe" not in cleared.extra_parameters["artifact_patch"][
+        "changed_fields"
+    ]
 
 
 def test_anchor_resolution_prefers_targeted_active_confirmation() -> None:

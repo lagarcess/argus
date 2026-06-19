@@ -78,8 +78,6 @@ def test_resolves_language_agnostic_year_windows_to_rolling_intent() -> None:
         ("last 2 years", ("en",), 2),
         ("last year", ("en",), 1),
         ("últimos 2 años", ("es", "en"), 2),
-        ("ultimo año", ("es", "en"), 1),
-        ("último año", ("es", "en"), 1),
     ]
 
     for text, languages, count in cases:
@@ -97,6 +95,19 @@ def test_resolves_language_agnostic_year_windows_to_rolling_intent() -> None:
         }
 
 
+def test_unparsed_spanish_singular_year_does_not_become_day_window() -> None:
+    today = date(2026, 6, 16)
+
+    assert (
+        resolve_rolling_window_intent_text(
+            "último año",
+            today=today,
+            languages=("es", "en"),
+        )
+        is None
+    )
+
+
 def test_resolves_relative_year_windows_before_strategy_semantics() -> None:
     today = date(2026, 6, 16)
 
@@ -104,7 +115,6 @@ def test_resolves_relative_year_windows_before_strategy_semantics() -> None:
         ("buy_and_hold", "last 2 years", ("en",), "2024-06-16"),
         ("dca_accumulation", "last year", ("en",), "2025-06-16"),
         ("buy_and_hold", "últimos 2 años", ("es", "en"), "2024-06-16"),
-        ("dca_accumulation", "último año", ("es", "en"), "2025-06-16"),
     ]
 
     for strategy_type, text, languages, expected_start in cases:
@@ -293,12 +303,47 @@ def test_date_parser_resolves_library_weekday_evidence_without_phrase_tables() -
         )
         == date(2026, 6, 12)
     )
+
+
+def test_date_parser_treats_previous_weekday_as_prior_week_when_today_matches() -> None:
+    today = date(2026, 6, 19)
+
+    assert (
+        parse_date_text(
+            "next friday",
+            today=today,
+            endpoint="end",
+            languages=dateparser_languages_for_user_language("en"),
+        )
+        == date(2026, 6, 19)
+    )
+    assert (
+        parse_date_text(
+            "last friday",
+            today=today,
+            endpoint="end",
+            languages=dateparser_languages_for_user_language("en"),
+            prefer_dates_from="past",
+        )
+        == date(2026, 6, 12)
+    )
+    assert (
+        parse_date_text(
+            "viernes pasado",
+            today=today,
+            endpoint="end",
+            languages=dateparser_languages_for_user_language("es-419"),
+            prefer_dates_from="past",
+        )
+        == date(2026, 6, 12)
+    )
     assert (
         parse_date_text(
             "el viernes pasado",
             today=today,
             endpoint="end",
             languages=dateparser_languages_for_user_language("es-419"),
+            prefer_dates_from="past",
         )
         == date(2026, 6, 12)
     )

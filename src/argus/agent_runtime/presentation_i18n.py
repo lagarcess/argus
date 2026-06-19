@@ -109,6 +109,19 @@ def optional_parameter_display_label(
     return fallback or catalog.unknown_setting_label
 
 
+def asset_universe_operation_clarification_message(*, language: str | None) -> str:
+    locale = runtime_locale(language)
+    if locale == "es-419":
+        return (
+            "¿Quieres agregar esos activos a la estrategia actual o reemplazar "
+            "los activos actuales con ellos?"
+        )
+    return (
+        "Do you want to add those assets to the current strategy, or replace "
+        "the current assets with them?"
+    )
+
+
 def confirmation_rule_display_value(
     strategy: StrategySummary | dict[str, Any],
     *,

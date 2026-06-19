@@ -1894,6 +1894,108 @@ async def test_unprovenanced_stale_date_range_uses_focused_date_window_intent(
         "los últimos 12 meses"
     )
 
+
+@pytest.mark.asyncio
+async def test_unprovenanced_calendar_year_intent_uses_focused_date_window_audit(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="from 2023 to date",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="explicit_range",
+                    start="2023-01-01",
+                    end="today",
+                    anchor="today",
+                    confidence=0.95,
+                    evidence="from 2023 to date",
+                ),
+                confidence=0.95,
+                evidence="from 2023 to date",
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(
+                capital_amount=100000,
+                confidence=0.9,
+            )
+        if schema_name == "StatedStartingCapitalAudit":
+            return interpreter_module.StatedStartingCapitalAudit(
+                starting_capital=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_request_current_turn_has_material_execution_evidence",
+        lambda _request: True,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    current_message = (
+        "ok let's test holding AAPL, MSFT and TSLA from 2023 to date with 100k"
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=current_message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=current_message,
+            language="en",
+            strategy_type="buy_and_hold",
+            strategy_thesis=current_message,
+            asset_universe=["AAPL", "MSFT", "TSLA"],
+            asset_class="equity",
+            date_range={"start": "2023-01-01", "end": "2023-12-31"},
+            date_range_intent=interpreter_module.LLMDateRangeIntent(
+                kind="calendar_year",
+                year=2023,
+            ),
+            capital_amount=100000,
+            evidence_spans={
+                "asset_universe": "AAPL, MSFT and TSLA",
+                "capital_amount": "100k",
+                "strategy_type": "holding",
+            },
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=current_message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="en"),
+        ),
+    )
+
+    assert "FocusedDateWindowExtraction" in calls
+    assert ready_response.candidate_strategy_draft.date_range == {
+        "start": "2023-01-01",
+        "end": date.today().isoformat(),
+    }
+    assert ready_response.candidate_strategy_draft.date_range_raw_text == (
+        "from 2023 to date"
+    )
+
+
 @pytest.mark.asyncio
 async def test_missing_date_clarification_uses_focused_date_window_intent(
     monkeypatch,
