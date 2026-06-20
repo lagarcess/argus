@@ -1391,6 +1391,98 @@ def test_decision_endpoint_returns_success_when_card_enrichment_fails(
     mock_gateway.mark_result_card_decision_for_run.assert_called_once()
 
 
+def test_decision_endpoint_missing_evidence_returns_404_problem_details(
+    mock_gateway,
+):
+    mock_gateway.get_evidence_artifact.return_value = None
+
+    response = client.post(
+        "/api/v1/evidence-artifacts/missing-artifact/decision",
+        json={"decision_state": "watching"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 404
+    body = response.json()
+    assert body["type"] == "https://api.argus.app/problems/not-found"
+    assert body["title"] == "Not Found"
+    assert body["status"] == 404
+    assert body["code"] == "not_found"
+    assert body["request_id"]
+
+
+def test_decision_endpoint_integrity_failure_returns_500_problem_details(
+    mock_gateway,
+):
+    now = utcnow()
+    user_id = "00000000-0000-0000-0000-000000000001"
+    idea = Idea(
+        id="idea-integrity-fail",
+        source_conversation_id="conversation-integrity-fail",
+        title="AAPL evidence idea",
+        summary="AAPL evidence summary",
+        lifecycle="captured",
+        active_version_id="version-integrity-fail",
+        created_at=now,
+        updated_at=now,
+    )
+    version = IdeaVersion(
+        id="version-integrity-fail",
+        idea_id=idea.id,
+        source_conversation_id="conversation-integrity-fail",
+        source_run_id="run-integrity-fail",
+        version_number=1,
+        canonical_spec={"symbols": ["AAPL"], "benchmark_symbol": "SPY"},
+        strategy_snapshot={"symbols": ["AAPL"]},
+        title=idea.title,
+        summary=idea.summary,
+        lifecycle="captured",
+        created_at=now,
+    )
+    artifact = EvidenceArtifact(
+        id="artifact-integrity-fail",
+        idea_id=idea.id,
+        idea_version_id=version.id,
+        source_conversation_id="conversation-integrity-fail",
+        source_run_id="run-integrity-fail",
+        artifact_type="backtest",
+        lifecycle="captured",
+        title="AAPL evidence",
+        digest="AAPL backtest versus SPY.",
+        payload={
+            "provenance": {
+                "symbols": ["AAPL"],
+                "benchmark_symbol": "SPY",
+            }
+        },
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.ideas[idea.id] = idea
+    api_state.store.idea_owners[idea.id] = user_id
+    api_state.store.idea_versions[version.id] = version
+    api_state.store.idea_version_owners[version.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+    mock_gateway.capture_current_decision_note.side_effect = ValueError(
+        "Decision capture did not return durable artifact state."
+    )
+
+    response = client.post(
+        f"/api/v1/evidence-artifacts/{artifact.id}/decision",
+        json={"decision_state": "promising", "note": "Keep watching."},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["type"] == "https://api.argus.app/problems/internal-error"
+    assert body["title"] == "Decision Capture Failed"
+    assert body["status"] == 500
+    assert body["code"] == "internal_error"
+    assert body["request_id"]
+
+
 def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
     now = utcnow()
     mock_gateway.search_rows.return_value = {

@@ -1317,6 +1317,24 @@ def test_decision_endpoint_is_idempotent_per_evidence_artifact() -> None:
     assert len(decisions_for_artifact) == 1
 
 
+def test_decision_endpoint_invalid_body_returns_problem_details() -> None:
+    client = _client()
+    response = client.post(
+        "/api/v1/evidence-artifacts/artifact-1/decision",
+        json={},
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["type"] == "https://api.argus.app/problems/validation-error"
+    assert body["title"] == "Validation Error"
+    assert body["status"] == 422
+    assert body["code"] == "validation_error"
+    assert body["request_id"]
+    assert isinstance(body["context"]["errors"], list)
+    assert "decision_state" in str(body["context"]["errors"])
+
+
 def test_search_returns_typed_p1_artifacts() -> None:
     client = _client()
     _set_onboarding_ready(client, primary_goal="test_stock_idea")

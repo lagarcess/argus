@@ -35,6 +35,10 @@ class QuotaExceededError(Exception):
     pass
 
 
+class DecisionCaptureIntegrityError(RuntimeError):
+    """Raised when the decision RPC does not return the committed object spine."""
+
+
 _USAGE_COUNTER_LOCK = threading.Lock()
 
 
@@ -851,7 +855,9 @@ class SupabaseGateway:
         ).execute()
         row = _row_one(result)
         if row is None:
-            raise ValueError("Decision capture did not return durable artifact state.")
+            raise DecisionCaptureIntegrityError(
+                "Decision capture did not return durable artifact state."
+            )
         return (
             DecisionNote.model_validate(row["decision"]),
             EvidenceArtifact.model_validate(row["evidence_artifact"]),

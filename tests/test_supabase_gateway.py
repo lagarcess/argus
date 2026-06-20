@@ -6,7 +6,7 @@ import pytest
 from argus.api.schemas import BacktestRun
 from argus.domain.evidence import build_backtest_evidence_capture, build_decision_note
 from argus.domain.store import utcnow
-from argus.domain.supabase_gateway import SupabaseGateway
+from argus.domain.supabase_gateway import DecisionCaptureIntegrityError, SupabaseGateway
 
 
 def test_batched_fetch_helper_exists_for_unbounded_queries():
@@ -671,6 +671,7 @@ class _P1EvidenceClient:
         self.raise_on_next_idea_active_update = False
         self.raise_on_next_artifact_insert = False
         self.commit_artifact_before_insert_error = False
+        self.return_empty_decision_rpc = False
         self.concurrent_rows_on_artifact_insert_error: dict[
             str, list[dict[str, Any]]
         ] = {}
@@ -790,6 +791,8 @@ class _P1EvidenceRpc:
 
     def execute(self):
         assert self.function_name == "upsert_current_decision_note"
+        if self.client.return_empty_decision_rpc:
+            return SimpleNamespace(data=[])
         user_id = self.params["p_user_id"]
         artifact_id = self.params["p_evidence_artifact_id"]
         artifact = next(
@@ -1102,6 +1105,40 @@ def test_p1_decision_gateway_rpc_marks_full_object_spine_decided() -> None:
     assert client.rows_by_table["ideas"][0]["lifecycle"] == "decided"
     assert client.rows_by_table["idea_versions"][0]["lifecycle"] == "decided"
     assert client.rows_by_table["evidence_artifacts"][0]["lifecycle"] == "decided"
+
+
+def test_capture_current_decision_note_raises_integrity_error_when_rpc_returns_empty() -> (
+    None
+):
+    client = _P1EvidenceClient()
+    client.return_empty_decision_rpc = True
+    gateway = _gateway_for_p1_client(client)
+    captured = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-1",
+        idea_version_id="version-1",
+        evidence_artifact_id="artifact-1",
+        now=utcnow(),
+    )
+    client.rows_by_table["ideas"].append(
+        {"user_id": "user-1", **captured.idea.model_dump(mode="json")}
+    )
+    client.rows_by_table["idea_versions"].append(
+        {"user_id": "user-1", **captured.idea_version.model_dump(mode="json")}
+    )
+    client.rows_by_table["evidence_artifacts"].append(
+        {"user_id": "user-1", **captured.evidence_artifact.model_dump(mode="json")}
+    )
+    decision = build_decision_note(
+        evidence_artifact=captured.evidence_artifact,
+        decision_id="decision-1",
+        decision_state="watching",
+        note="Track it.",
+        now=utcnow(),
+    )
+
+    with pytest.raises(DecisionCaptureIntegrityError, match="Decision capture"):
+        gateway.capture_current_decision_note(user_id="user-1", decision=decision)
 
 
 def test_p1_decision_gateway_upsert_keeps_one_current_decision() -> None:

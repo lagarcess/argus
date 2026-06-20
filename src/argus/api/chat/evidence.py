@@ -25,6 +25,14 @@ from argus.domain.evidence import (
 from argus.domain.store import utcnow
 
 
+class EvidenceArtifactNotFoundError(LookupError):
+    """Raised when an evidence artifact is absent or not owned by the user."""
+
+
+class EvidenceDecisionCaptureError(RuntimeError):
+    """Raised when a decision cannot be durably captured."""
+
+
 def auto_capture_completed_backtest(
     *,
     user: User,
@@ -97,15 +105,20 @@ def create_decision_for_evidence_artifact(
     idea_version: IdeaVersion | None = None
 
     if api_state.supabase_gateway is not None:
-        (
-            decision,
-            artifact,
-            idea,
-            idea_version,
-        ) = api_state.supabase_gateway.capture_current_decision_note(
-            user_id=user.id,
-            decision=decision,
-        )
+        try:
+            (
+                decision,
+                artifact,
+                idea,
+                idea_version,
+            ) = api_state.supabase_gateway.capture_current_decision_note(
+                user_id=user.id,
+                decision=decision,
+            )
+        except Exception as exc:
+            raise EvidenceDecisionCaptureError(
+                "Decision capture failed before the decision could be committed."
+            ) from exc
 
     _store_decision_in_memory(
         user_id=user.id,
@@ -341,4 +354,6 @@ def _evidence_artifact_for_user(*, user_id: str, artifact_id: str) -> EvidenceAr
             api_state.store.evidence_artifacts[fetched.id] = fetched
             api_state.store.evidence_artifact_owners[fetched.id] = user_id
             return fetched
-    raise ValueError("Evidence artifact not found or not owned by user.")
+    raise EvidenceArtifactNotFoundError(
+        "Evidence artifact not found or not owned by user."
+    )

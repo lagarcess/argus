@@ -5,6 +5,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
@@ -113,6 +114,29 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # type:
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
     return JSONResponse(body, status_code=exc.status_code, headers=headers)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(  # type: ignore[no-untyped-def]
+    request: Request,
+    exc: RequestValidationError,
+):
+    body = {
+        "type": "https://api.argus.app/problems/validation-error",
+        "title": "Validation Error",
+        "status": 422,
+        "detail": "The request body or parameters did not match the API contract.",
+        "code": "validation_error",
+        "request_id": getattr(request.state, "request_id", api_state.store.new_id()),
+        "context": {"errors": exc.errors()},
+    }
+
+    origin = request.headers.get("origin")
+    headers: dict[str, str] = {}
+    if origin in cors_allow_origins():
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(body, status_code=422, headers=headers)
 
 
 @app.get("/health")
