@@ -4471,7 +4471,7 @@ def _response_needs_focused_date_window_intent_repair(
         resolve_date_range_intent(draft.date_range_intent) is not None
         and has_semantic_date_evidence
     ):
-        return False
+        return True
     has_complete_date_range = _has_complete_date_range_payload(
         normalize_date_range_candidate(draft.date_range)
     )
@@ -6980,6 +6980,11 @@ def _response_has_current_message_date_range_reconciliation(
     if _llm_value_is_empty(draft.date_range):
         return True
     if has_partial_explicit_date_range(draft.date_range):
+        return True
+    if (
+        resolve_date_range_intent(draft.date_range_intent) is not None
+        and _draft_has_semantic_date_window_evidence(draft)
+    ):
         return True
     if not isinstance(draft.date_range, dict):
         return False

@@ -190,9 +190,11 @@ def resolve_date_range_intent(
         year = _positive_int(payload.get("year")) or current_date.year
         if year > current_date.year:
             return None
-        end = _intent_date(payload.get("end"), today=current_date) or current_date
-        if end.year != year:
-            end = date(year, 12, 31) if year < current_date.year else current_date
+        end = _intent_date(payload.get("end"), today=current_date)
+        if end is None:
+            end = current_date if year == current_date.year else date(year, 12, 31)
+        if end < date(year, 1, 1):
+            return None
         return DateRangeIntentResolution(
             label="year to date" if year == current_date.year else f"{year} so far",
             payload={"start": date(year, 1, 1).isoformat(), "end": end.isoformat()},
@@ -242,9 +244,7 @@ def resolve_date_range_intent(
                 return None
             patch = {endpoint: endpoint_value.isoformat()}
         if not patch or (
-            patch.get("start")
-            and patch.get("end")
-            and patch["end"] < patch["start"]
+            patch.get("start") and patch.get("end") and patch["end"] < patch["start"]
         ):
             return None
         label = (
@@ -323,9 +323,7 @@ def resolve_date_range_endpoint_patch(
         return None
     if str(patch.get("kind") or "").strip() != "endpoint_patch":
         return None
-    if not _intent_confidence_is_usable(base) or not _intent_confidence_is_usable(
-        patch
-    ):
+    if not _intent_confidence_is_usable(base) or not _intent_confidence_is_usable(patch):
         return None
 
     count = _positive_int(base.get("count"))

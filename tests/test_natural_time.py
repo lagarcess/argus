@@ -235,6 +235,22 @@ def test_resolves_canonical_year_to_date_intent_without_language_tokens() -> Non
     assert resolved.evidence_spans == ("en lo que va del año",)
 
 
+def test_past_year_to_date_intent_preserves_explicit_today_endpoint() -> None:
+    resolved = resolve_date_range_intent(
+        {
+            "kind": "year_to_date",
+            "year": 2023,
+            "end": "today",
+            "anchor": "today",
+            "evidence": "canonical range ending today",
+        },
+        today=date(2026, 6, 1),
+    )
+
+    assert resolved is not None
+    assert resolved.payload == {"start": "2023-01-01", "end": "2026-06-01"}
+
+
 def test_natural_time_does_not_grow_locale_phrase_alias_tables() -> None:
     from pathlib import Path
 
@@ -294,59 +310,44 @@ def test_relative_endpoint_parser_rejects_calendar_name_false_positive() -> None
 def test_date_parser_resolves_library_weekday_evidence_without_phrase_tables() -> None:
     today = date(2026, 6, 15)
 
-    assert (
-        parse_date_text(
-            "last friday",
-            today=today,
-            endpoint="end",
-            languages=dateparser_languages_for_user_language("en"),
-        )
-        == date(2026, 6, 12)
-    )
+    assert parse_date_text(
+        "last friday",
+        today=today,
+        endpoint="end",
+        languages=dateparser_languages_for_user_language("en"),
+    ) == date(2026, 6, 12)
 
 
 def test_date_parser_treats_previous_weekday_as_prior_week_when_today_matches() -> None:
     today = date(2026, 6, 19)
 
-    assert (
-        parse_date_text(
-            "next friday",
-            today=today,
-            endpoint="end",
-            languages=dateparser_languages_for_user_language("en"),
-        )
-        == date(2026, 6, 19)
-    )
-    assert (
-        parse_date_text(
-            "last friday",
-            today=today,
-            endpoint="end",
-            languages=dateparser_languages_for_user_language("en"),
-            prefer_dates_from="past",
-        )
-        == date(2026, 6, 12)
-    )
-    assert (
-        parse_date_text(
-            "viernes pasado",
-            today=today,
-            endpoint="end",
-            languages=dateparser_languages_for_user_language("es-419"),
-            prefer_dates_from="past",
-        )
-        == date(2026, 6, 12)
-    )
-    assert (
-        parse_date_text(
-            "el viernes pasado",
-            today=today,
-            endpoint="end",
-            languages=dateparser_languages_for_user_language("es-419"),
-            prefer_dates_from="past",
-        )
-        == date(2026, 6, 12)
-    )
+    assert parse_date_text(
+        "next friday",
+        today=today,
+        endpoint="end",
+        languages=dateparser_languages_for_user_language("en"),
+    ) == date(2026, 6, 19)
+    assert parse_date_text(
+        "last friday",
+        today=today,
+        endpoint="end",
+        languages=dateparser_languages_for_user_language("en"),
+        prefer_dates_from="past",
+    ) == date(2026, 6, 12)
+    assert parse_date_text(
+        "viernes pasado",
+        today=today,
+        endpoint="end",
+        languages=dateparser_languages_for_user_language("es-419"),
+        prefer_dates_from="past",
+    ) == date(2026, 6, 12)
+    assert parse_date_text(
+        "el viernes pasado",
+        today=today,
+        endpoint="end",
+        languages=dateparser_languages_for_user_language("es-419"),
+        prefer_dates_from="past",
+    ) == date(2026, 6, 12)
 
 
 def test_explicit_date_parser_uses_language_hint_without_locale_phrase_tables() -> None:
@@ -354,24 +355,18 @@ def test_explicit_date_parser_uses_language_hint_without_locale_phrase_tables() 
 
     assert dateparser_languages_for_user_language("es-419") == ("es", "en")
     assert dateparser_languages_for_user_language("pt-BR") == ("pt", "en")
-    assert (
-        parse_explicit_date_text(
-            "marzo de 2024",
-            today=today,
-            endpoint="end",
-            languages=dateparser_languages_for_user_language("es-419"),
-        )
-        == date(2024, 3, 31)
-    )
-    assert (
-        parse_explicit_date_text(
-            "março de 2024",
-            today=today,
-            endpoint="end",
-            languages=dateparser_languages_for_user_language("pt-BR"),
-        )
-        == date(2024, 3, 31)
-    )
+    assert parse_explicit_date_text(
+        "marzo de 2024",
+        today=today,
+        endpoint="end",
+        languages=dateparser_languages_for_user_language("es-419"),
+    ) == date(2024, 3, 31)
+    assert parse_explicit_date_text(
+        "março de 2024",
+        today=today,
+        endpoint="end",
+        languages=dateparser_languages_for_user_language("pt-BR"),
+    ) == date(2024, 3, 31)
     assert (
         parse_explicit_date_text(
             "last month",
