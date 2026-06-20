@@ -66,9 +66,13 @@ def _run() -> BacktestRun:
                 }
             ],
             "assumptions": ["Benchmark: SPY", "No fees"],
-            "quick_take": "AAPL, MSFT, and TSLA beat SPY in this window.",
+            "quick_take": (
+                "**Quick take**\n\n"
+                "AAPL, MSFT, and TSLA beat SPY in this window.\n\n"
+                "- This is evidence, not advice."
+            ),
             "breakdown": {
-                "summary": "The equal-weight basket led the benchmark.",
+                "summary": "**The equal-weight basket led the benchmark.**",
                 "sections": ["Setup", "Benchmark comparison"],
             },
             "context_packets": [{"provider": "internal", "raw": "not preview-safe"}],
@@ -107,7 +111,8 @@ def test_completed_backtest_auto_captures_idea_version_and_evidence() -> None:
     assert captured.evidence_artifact.digest
     assert (
         captured.evidence_artifact.payload["quick_take"]
-        == "AAPL, MSFT, and TSLA beat SPY in this window."
+        == "Quick take AAPL, MSFT, and TSLA beat SPY in this window. "
+        "This is evidence, not advice."
     )
     assert captured.evidence_artifact.payload["breakdown"] == {
         "summary": "The equal-weight basket led the benchmark.",
@@ -121,7 +126,12 @@ def test_completed_backtest_auto_captures_idea_version_and_evidence() -> None:
     assert "context_packets" not in captured.evidence_artifact.payload["result_card"]
     assert "actions" not in captured.evidence_artifact.payload["result_card"]
     preview = evidence_preview_from_artifact(captured.evidence_artifact)
-    assert preview["quick_take"] == "AAPL, MSFT, and TSLA beat SPY in this window."
+    assert (
+        preview["quick_take"]
+        == "Quick take AAPL, MSFT, and TSLA beat SPY in this window. "
+        "This is evidence, not advice."
+    )
+    assert "**" not in preview["quick_take"]
     assert preview["breakdown"] == {
         "summary": "The equal-weight basket led the benchmark.",
         "sections": ["Setup", "Benchmark comparison"],

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -12,6 +13,11 @@ from argus.api.schemas import (
     Idea,
     IdeaVersion,
 )
+
+_MARKDOWN_HEADING_PREFIX_RE = re.compile(r"(?m)^\s{0,3}#{1,6}\s+")
+_MARKDOWN_BULLET_PREFIX_RE = re.compile(r"(?m)^\s*[-*]\s+")
+_MARKDOWN_EMPHASIS_RE = re.compile(r"[*`]+")
+_WHITESPACE_RE = re.compile(r"\s+")
 
 
 @dataclass(frozen=True)
@@ -162,7 +168,9 @@ def evidence_preview_from_payload(
         ),
         "metrics_summary": _metrics_summary(payload.get("metrics")),
     }
-    quick_take = _safe_text(payload.get("quick_take") or result_card.get("quick_take"))
+    quick_take = _safe_preview_text(
+        payload.get("quick_take") or result_card.get("quick_take")
+    )
     if quick_take is not None:
         preview["quick_take"] = quick_take
     breakdown = _safe_breakdown(
@@ -222,7 +230,7 @@ def _payload_from_run(run: BacktestRun, *, digest: str) -> dict[str, Any]:
         )
         if key in card
     }
-    quick_take = _safe_text(card.get("quick_take"))
+    quick_take = _safe_preview_text(card.get("quick_take"))
     breakdown = _safe_breakdown(card.get("breakdown"))
     return {
         "artifact_type": "backtest",
@@ -266,6 +274,17 @@ def _safe_text(value: object) -> str | None:
     return normalized or None
 
 
+def _safe_preview_text(value: object) -> str | None:
+    normalized = _safe_text(value)
+    if normalized is None:
+        return None
+    normalized = _MARKDOWN_HEADING_PREFIX_RE.sub("", normalized)
+    normalized = _MARKDOWN_BULLET_PREFIX_RE.sub("", normalized)
+    normalized = _MARKDOWN_EMPHASIS_RE.sub("", normalized)
+    normalized = _WHITESPACE_RE.sub(" ", normalized).strip()
+    return normalized or None
+
+
 def _safe_text_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
@@ -279,14 +298,14 @@ def _safe_text_list(value: object) -> list[str]:
 
 def _safe_breakdown(value: object) -> object | None:
     if isinstance(value, str):
-        return _safe_text(value)
+        return _safe_preview_text(value)
     if isinstance(value, dict):
         safe: dict[str, object] = {}
         for key, raw in value.items():
             if not isinstance(key, str) or key.endswith("_id"):
                 continue
             if isinstance(raw, str):
-                normalized = _safe_text(raw)
+                normalized = _safe_preview_text(raw)
                 if normalized is not None:
                     safe[key] = normalized
             elif isinstance(raw, list):
