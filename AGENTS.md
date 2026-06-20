@@ -69,26 +69,38 @@ Before making code changes, agents must review these source-of-truth docs in thi
 
 ---
 
-# 🧭 Current Milestone: Private Alpha CI/CD SOTA
+# 🧭 Current Milestone: Private Alpha Next P1
 
-When working from `codex/private-alpha-next` for the current release-captain
-mission, use `docs/specs/private-alpha-ci-cd-sota.md` as the active execution
-source of truth. That spec owns phase ordering, recommended agent lanes, release
-contract requirements, smoke/canary expectations, and the definition of done for
-this milestone.
+When working from `codex/private-alpha-next` or its clean reintegration lane,
+use `docs/specs/private-alpha-next-roadmap.md` as the active execution board
+after reading the mandatory canon docs above. That roadmap owns the current
+P0/P1 board, done/next/deferred labels, slice stop criteria, and integration
+criteria.
+
+Use `docs/specs/private-alpha-next-decision-memo.md` as the strategic north
+star and task-onboarding source for Private Alpha Next product work. Any
+subagent working on a roadmap slice must first read the decision memo details
+and addenda related to that slice before planning or changing code.
+
+Use `docs/specs/private-alpha-ci-cd-sota.md`,
+`docs/PRIVATE_LAUNCH_RUNBOOK.md`, and
+`docs/release-manifests/TEMPLATE.md` as release-discipline references. They
+still own smoke/canary/release-manifest expectations, but they no longer own
+Private Alpha Next product sequencing.
 
 Use `docs/specs/private-alpha-next-integration.md` as staging and branch-process
-context only. It records useful closed work, integration-lane guardrails, and
-Jules boundaries, but it no longer owns the current execution order.
-
-Use `docs/specs/private-alpha-next-decision-memo.md` as future-context only. Do
-not implement decision-memo product work in this CI/CD SOTA milestone unless the
-founder explicitly starts that later goal.
+context. It records integration-lane guardrails, closed work, and Jules
+boundaries, but it should not override the active roadmap or decision memo.
 
 Integration guardrails:
 
 - Worker branches start from `codex/private-alpha-next`, not directly from
   `main`, unless the task is an urgent hotfix.
+- `codex/private-alpha-next` is the clean integration gate. Quarantine branches
+  such as `codex/private-alpha-next-quarantine-fc231e8` are read-only reference
+  material unless the founder explicitly approves a surgical promotion.
+- Do not broad cherry-pick or merge runtime code from quarantine into the clean
+  integration branch. Reintegrate in small, reviewable, revertable slices.
 - External async agent Jules must work on focused `jules/**` branches and must
   not push directly to `main` or to the integration branch.
 - Jules PRs should target `codex/private-alpha-next-jules-intake`; CI is
@@ -114,13 +126,15 @@ Integration guardrails:
   conditions. Subagent prompts must include lane-specific goals with allowed
   surfaces, forbidden surfaces, expected output, verification evidence, and
   cleanup expectation.
-- CI/CD SOTA warmup and canary evidence must be gathered against the
-  branch-deployed staging/private-alpha Render validation surface for the exact
-  candidate SHA. Do not treat merge to `main` as a prerequisite for canary
-  evidence; `main` is the later promotion target after founder approval.
+- CI/CD SOTA warmup and canary evidence should be gathered for release
+  candidates against the exact candidate SHA. For local reintegration slices,
+  pass focused backend/frontend tests and live browser QA before promotion to
+  `codex/private-alpha-next`; use Render canary evidence when preparing a
+  tester-facing or deploy-facing checkpoint.
 - Production deploys remain manual and founder-directed.
-- Perplexity Research Lab remains design-only until a later approved
-  implementation milestone.
+- Perplexity Research Lab, generic memory/RAG, public excerpts, voice provider
+  integration, and broker/export execution remain design-only until the roadmap
+  explicitly starts those slices.
 - When working from `codex/private-alpha-readiness-clean`, use
   `docs/specs/private-alpha-readiness-orchestration.md` as the active
   release-captain/subagent coordination note before dispatching or executing
@@ -138,9 +152,10 @@ truth for historical context. This milestone hardened the current private-alpha
 chat/backtest loop; it does not implement the Perplexity Research Lab thesis.
 
 This is a completed checkpoint, not the active command document for
-`codex/private-alpha-next`. For current CI/CD, release-gate, stream-failure, and
-reload-reconciliation work, start from `docs/specs/private-alpha-ci-cd-sota.md`
-after reading the canon docs.
+`codex/private-alpha-next`. For current P1 product sequencing, start from
+`docs/specs/private-alpha-next-roadmap.md` and the decision memo after reading
+the canon docs. For release-gate, canary, and manifest work, use
+`docs/specs/private-alpha-ci-cd-sota.md` as the release-discipline reference.
 
 Milestone guardrails:
 
@@ -448,16 +463,23 @@ NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 - **Canon docs**: `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`,
   `docs/API_CONTRACT.md`, `docs/DATA_MODEL.md`, and
   `.agent/designs/argus/DESIGN.md`. These define intended Alpha direction.
-- **Current active goal**: for this branch mission,
-  `docs/specs/private-alpha-ci-cd-sota.md` owns execution sequencing,
-  subagent lane selection, release-contract gates, and acceptance criteria.
+- **Current active roadmap**: `docs/specs/private-alpha-next-roadmap.md` owns
+  the P0/P1 board, done/next/deferred labels, slice stop criteria, and
+  integration criteria.
+- **Current strategic source**:
+  `docs/specs/private-alpha-next-decision-memo.md` is the north star for the
+  Private Alpha Next product direction. Read the relevant memo sections and
+  addenda before any slice-specific planning or implementation.
+- **Release-discipline references**: `docs/specs/private-alpha-ci-cd-sota.md`,
+  `docs/PRIVATE_LAUNCH_RUNBOOK.md`, and
+  `docs/release-manifests/TEMPLATE.md` own release gates, canaries, manifests,
+  and deployment discipline. They do not own the current product roadmap.
 - **Staging/process context**: `docs/specs/private-alpha-next-integration.md`
-  explains the integration branch, Jules quarantine lane, and closed work. Use
-  it for context, not as the active execution roadmap when it conflicts with
-  the CI/CD SOTA spec.
-- **Future-context docs**: `docs/specs/private-alpha-next-decision-memo.md` and
-  Research Lab / evidence-aware idea-loop specs are not implementation scope for
-  the current CI/CD SOTA milestone unless the founder starts that later goal.
+  explains the integration branch, Jules quarantine lane, closed work, and
+  branch process. Use it for context, not as the active product roadmap.
+- **Future/design-only docs**: Research Lab, voice, public excerpt, broker,
+  memory-control, and evidence-aware idea-loop specs remain design/reference
+  material until the active roadmap starts a bounded slice.
 - **Active milestone/spec docs**: files under `docs/specs/` that explicitly
   name the current branch or milestone. Use them for scoped execution details
   after reading canon docs.

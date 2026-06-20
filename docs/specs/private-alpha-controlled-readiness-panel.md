@@ -6,9 +6,9 @@
 **Purpose:** Define what must be true before Argus is placed in the hands of a
 small controlled alpha cohort, especially Spanish-first users.
 
-Scope note: this is readiness-lane context, not the active execution roadmap for
-the 2026-06-17 CI/CD SOTA release-captain mission. Use
-`docs/specs/private-alpha-ci-cd-sota.md` for current release-gate sequencing.
+Scope note: this is readiness-lane context, not the active P1 product roadmap.
+Use `docs/specs/private-alpha-next-roadmap.md` for current product sequencing
+and `docs/specs/private-alpha-ci-cd-sota.md` for release-gate discipline.
 
 This report is the technical readiness counterpart to the evidence-aware idea
 loop product trial. The product trial asked what behavior Argus must prove. This

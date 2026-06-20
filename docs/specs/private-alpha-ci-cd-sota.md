@@ -1,21 +1,25 @@
 # Private Alpha CI/CD SOTA Plan
 
-Status: Active execution roadmap
+Status: Completed release-discipline reference
 Date: 2026-06-17
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, reviewers, release-captains
 
-This is the current source of truth for the `codex/private-alpha-next`
-release-captain mission. It supersedes
-`docs/specs/private-alpha-next-integration.md` for execution sequencing while
-preserving that document as staging and branch-process context. The promoted
-decision memo in `docs/specs/private-alpha-next-decision-memo.md` is future
-context only for this run.
+This document is the release-discipline reference for
+`codex/private-alpha-next`. It owns smoke/canary/release-manifest expectations,
+Render validation posture, and deployment discipline. It no longer owns the
+Private Alpha Next product roadmap.
+
+For current product sequencing, use
+`docs/specs/private-alpha-next-roadmap.md` and onboard every slice through the
+relevant details and addenda in
+`docs/specs/private-alpha-next-decision-memo.md`.
 
 Implementation note: the release gate now centers on local smoke, Render
 release-config audit, live API/web deploy SHA checks, bilingual canary evidence,
-and a per-candidate release manifest. Keep this document as the active CI/CD
-roadmap until the founder explicitly starts the later decision memo session.
+and a per-candidate release manifest. Keep this document as the release gate
+contract whenever a candidate is promoted toward tester-facing validation or
+deployment.
 
 ## Purpose
 
