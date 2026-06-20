@@ -38,6 +38,7 @@ import {
   commandPaletteItemFromSearch,
   commandPaletteOpenFallback,
   commandPaletteOpenLabelKey,
+  commandPalettePreviewFields,
   commandPaletteSelectedPreview,
   commandPaletteTypeFallback,
   commandPaletteTypeLabelKey,
@@ -242,6 +243,19 @@ export default function ChatCommandPalette({
     [displayItems, t],
   );
   const selectedPreview = commandPaletteSelectedPreview(previewItem, displayItems);
+  const selectedPreviewFields = useMemo(
+    () =>
+      selectedPreview
+        ? commandPalettePreviewFields(selectedPreview, {
+            decisionStateLabel: (state) =>
+              t(
+                `chat.result_card.decision_states.${state}`,
+                commandPaletteDecisionStateFallback(state),
+              ),
+          })
+        : [],
+    [selectedPreview, t],
+  );
 
   const updateLocalTitle = useCallback(
     (conversationId: string, title: string) => {
@@ -753,13 +767,28 @@ export default function ChatCommandPalette({
                     <p className="text-[12px] font-semibold uppercase tracking-wider text-black/35 dark:text-white/35">
                       {t("command_palette.preview", "Preview")}
                     </p>
-                    <p className="mt-2 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
-                      {selectedPreview.snippet ||
+                    {selectedPreviewFields.length > 0 ? (
+                      <div className="mt-3 space-y-3">
+                        {selectedPreviewFields.map((field) => (
+                          <div key={field.id}>
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-black/30 dark:text-white/30">
+                              {t(field.labelKey, field.labelFallback)}
+                            </p>
+                            <p className="mt-1 text-[13px] leading-relaxed text-black/60 dark:text-white/60">
+                              {field.value}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
+                        {selectedPreview.snippet ||
                         t(
                           "command_palette.preview_empty",
                           "Open this conversation to view its messages.",
                         )}
-                    </p>
+                      </p>
+                    )}
                   </div>
                   <button
                     type="button"

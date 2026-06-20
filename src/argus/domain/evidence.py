@@ -232,6 +232,13 @@ def _payload_from_run(run: BacktestRun, *, digest: str) -> dict[str, Any]:
     }
     quick_take = _safe_preview_text(card.get("quick_take"))
     breakdown = _safe_breakdown(card.get("breakdown"))
+    assumptions = _safe_text_list(card.get("assumptions"))
+    if assumptions:
+        safe_card["assumptions"] = assumptions
+    if quick_take is not None:
+        safe_card["quick_take"] = quick_take
+    if breakdown is not None:
+        safe_card["breakdown"] = breakdown
     return {
         "artifact_type": "backtest",
         "digest": digest,
@@ -240,7 +247,7 @@ def _payload_from_run(run: BacktestRun, *, digest: str) -> dict[str, Any]:
             "conversation_id": run.conversation_id,
             "strategy_id": run.strategy_id,
         },
-        "assumptions": list(card.get("assumptions") or []),
+        "assumptions": assumptions,
         "metrics": run.metrics,
         "quick_take": quick_take,
         "breakdown": breakdown,
@@ -290,7 +297,7 @@ def _safe_text_list(value: object) -> list[str]:
         return []
     safe_values: list[str] = []
     for item in value:
-        normalized = _safe_text(item)
+        normalized = _safe_preview_text(item)
         if normalized is not None:
             safe_values.append(normalized)
     return safe_values

@@ -4,6 +4,7 @@ import {
   commandPaletteItemFromSearch,
   commandPaletteOpenFallback,
   commandPaletteOpenLabelKey,
+  commandPalettePreviewFields,
   commandPaletteSelectedPreview,
   commandPaletteTypeFallback,
 } from "../lib/command-palette-items";
@@ -36,6 +37,20 @@ describe("command palette items", () => {
       activation: "select_preview",
     });
     expect(display?.preview).not.toHaveProperty("source_run_id");
+    expect(commandPalettePreviewFields(display!)).toEqual([
+      {
+        id: "digest",
+        labelKey: "command_palette.preview_fields.digest",
+        labelFallback: "Digest",
+        value: "AAPL and MSFT beat SPY in this window.",
+      },
+      {
+        id: "assets",
+        labelKey: "command_palette.preview_fields.assets",
+        labelFallback: "Assets",
+        value: "AAPL, MSFT",
+      },
+    ]);
     expect(commandPaletteOpenLabelKey(display!)).toBe(
       "command_palette.open_source_conversation",
     );
@@ -92,6 +107,68 @@ describe("command palette items", () => {
       canManageConversation: false,
     });
     expect(display?.snippet).not.toContain("promising raw fallback");
+  });
+
+  test("builds rich artifact preview fields without raw internals", () => {
+    const item: SearchItem = {
+      type: "decision",
+      id: "decision-1",
+      title: "AAPL evidence",
+      matched_text: "raw fallback",
+      updated_at: "2026-06-19T00:00:00.000Z",
+      conversation_id: "conversation-1",
+      lifecycle: "decided",
+      preview: {
+        quick_take: "AAPL beat SPY.",
+        digest: "AAPL buy and hold evidence.",
+        symbols: ["AAPL"],
+        benchmark_symbol: "SPY",
+        decision_state: "promising",
+        metrics_summary: {
+          total_return_pct: 12.34,
+          delta_vs_benchmark_pct: 4.56,
+          source_run_id: "run-1",
+        },
+        assumptions: ["No fees", "No slippage"],
+        breakdown: {
+          summary: "The basket led the benchmark.",
+          sections: ["Setup", "Comparison"],
+        },
+        evidence_artifact_id: "artifact-1",
+      },
+    };
+    const display = commandPaletteItemFromSearch(item, {
+      decisionStateLabel: (state) =>
+        state === "promising" ? "Promising" : state,
+    });
+
+    const fields = commandPalettePreviewFields(display!, {
+      decisionStateLabel: (state) =>
+        state === "promising" ? "Promising" : state,
+    });
+
+    expect(fields.map((field) => field.id)).toEqual([
+      "quick_take",
+      "digest",
+      "assets",
+      "benchmark",
+      "decision",
+      "metrics",
+      "assumptions",
+      "breakdown",
+    ]);
+    expect(fields.find((field) => field.id === "decision")?.value).toBe(
+      "Promising",
+    );
+    expect(fields.find((field) => field.id === "metrics")?.value).toBe(
+      "Total return 12.3% · Against benchmark 4.6%",
+    );
+    expect(fields.map((field) => field.value).join(" ")).not.toContain(
+      "source_run_id",
+    );
+    expect(fields.map((field) => field.value).join(" ")).not.toContain(
+      "artifact-1",
+    );
   });
 
   test("falls back to the first visible result when preview selection is stale", () => {

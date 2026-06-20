@@ -573,6 +573,17 @@
     "open_conversation": "Abrir conversación",
     "open_source_conversation": "Abrir conversación fuente",
     "select_preview": "Selecciona una conversación para ver sus metadatos.",
+    "preview_fields": {
+      "assets": "Activos",
+      "assumptions": "Supuestos",
+      "benchmark": "Referencia",
+      "breakdown": "Desglose",
+      "decision": "Decisión",
+      "digest": "Resumen",
+      "metrics": "Métricas",
+      "preview": "Vista previa",
+      "quick_take": "Lectura rápida"
+    },
     "conversation_count_one": "{{count}} conversación",
     "conversation_count_other": "{{count}} conversaciones",
     "result_count_one": "{{count}} resultado",

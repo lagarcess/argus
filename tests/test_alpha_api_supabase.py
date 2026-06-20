@@ -1476,10 +1476,10 @@ def test_decision_endpoint_integrity_failure_returns_500_problem_details(
 
     assert response.status_code == 500
     body = response.json()
-    assert body["type"] == "https://api.argus.app/problems/internal-error"
+    assert body["type"] == "https://api.argus.app/problems/decision-capture-failed"
     assert body["title"] == "Decision Capture Failed"
     assert body["status"] == 500
-    assert body["code"] == "internal_error"
+    assert body["code"] == "decision_capture_failed"
     assert body["request_id"]
 
 

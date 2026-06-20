@@ -14,6 +14,13 @@ export type CommandPaletteDisplayItem = {
   activation: "open_conversation" | "select_preview";
 };
 
+export type CommandPalettePreviewField = {
+  id: string;
+  labelKey: string;
+  labelFallback: string;
+  value: string;
+};
+
 export type CommandPaletteItemCopy = {
   decisionStateLabel?: (state: string) => string;
 };
@@ -142,6 +149,59 @@ export function commandPaletteDecisionStateFallback(state: string) {
   }
 }
 
+export function commandPalettePreviewFields(
+  item: CommandPaletteDisplayItem,
+  copy: CommandPaletteItemCopy = {},
+): CommandPalettePreviewField[] {
+  const preview = item.preview ?? {};
+  const fields: CommandPalettePreviewField[] = [];
+  const addField = (
+    id: string,
+    labelFallback: string,
+    value: string | null,
+  ) => {
+    if (!value) return;
+    fields.push({
+      id,
+      labelKey: `command_palette.preview_fields.${id}`,
+      labelFallback,
+      value,
+    });
+  };
+
+  const quickTake = safePreviewString(preview.quick_take);
+  const digest = safePreviewString(preview.digest);
+  addField("quick_take", "Quick take", quickTake);
+  if (digest && digest !== quickTake) {
+    addField("digest", "Digest", digest);
+  }
+
+  const symbols = safePreviewStringList(preview.symbols);
+  addField("assets", "Assets", symbols.join(", ") || null);
+  addField("benchmark", "Benchmark", safePreviewString(preview.benchmark_symbol));
+
+  if (item.type === "decision") {
+    const state = safePreviewString(preview.decision_state);
+    const label = state
+      ? (copy.decisionStateLabel?.(state) ??
+        commandPaletteDecisionStateFallback(state))
+      : null;
+    addField("decision", "Decision", label);
+  }
+
+  addField("metrics", "Metrics", metricsSummaryText(preview.metrics_summary));
+
+  const assumptions = safePreviewStringList(preview.assumptions);
+  addField("assumptions", "Assumptions", assumptions.join(" · ") || null);
+
+  addField("breakdown", "Breakdown", breakdownPreviewText(preview.breakdown));
+
+  if (fields.length === 0) {
+    addField("preview", "Preview", item.snippet || null);
+  }
+  return fields;
+}
+
 function commandPaletteSnippet(item: SearchItem, copy: CommandPaletteItemCopy) {
   const digest = item.preview?.digest;
   const quickTake = item.preview?.quick_take;
@@ -177,4 +237,68 @@ function safeCommandPalettePreview(
     safe[key] = value;
   }
   return safe;
+}
+
+function safePreviewString(value: unknown) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+}
+
+function safePreviewStringList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const text = safePreviewString(item);
+    return text ? [text] : [];
+  });
+}
+
+function metricsSummaryText(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const summary = value as Record<string, unknown>;
+  const fields: Array<[string, string]> = [
+    ["total_return_pct", "Total return"],
+    ["benchmark_return_pct", "Benchmark return"],
+    ["delta_vs_benchmark_pct", "Against benchmark"],
+    ["excess_return_pct", "Against benchmark"],
+    ["max_drawdown_pct", "Worst drop"],
+    ["volatility_pct", "Volatility"],
+    ["sharpe_ratio", "Sharpe"],
+  ];
+  const parts = fields.flatMap(([key, label]) => {
+    const raw = summary[key];
+    const formatted = formatMetricValue(key, raw);
+    return formatted ? [`${label} ${formatted}`] : [];
+  });
+  return parts.join(" · ") || null;
+}
+
+function formatMetricValue(key: string, value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (key.endsWith("_pct")) return `${value.toFixed(1)}%`;
+    return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  }
+  const text = safePreviewString(value);
+  if (!text) return null;
+  if (key.endsWith("_pct") && !text.includes("%")) return `${text}%`;
+  return text;
+}
+
+function breakdownPreviewText(value: unknown) {
+  const direct = safePreviewString(value);
+  if (direct) return direct;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const breakdown = value as Record<string, unknown>;
+  const parts = [
+    safePreviewString(breakdown.summary),
+    safePreviewString(breakdown.what_this_means),
+    safePreviewString(breakdown.what_it_means),
+    safePreviewStringList(breakdown.sections).join(" · ") || null,
+  ].filter((part): part is string => Boolean(part));
+  return parts.join(" · ") || null;
 }

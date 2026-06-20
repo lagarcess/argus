@@ -1,6 +1,6 @@
 # Private Alpha Next Roadmap
 
-Status: P1 local recovery candidate on reintegration branch; final review pending
+Status: P1 local recovery candidate on reintegration branch; Codex-browser gate pending
 Date: 2026-06-20
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
@@ -116,7 +116,7 @@ Before promotion to `codex/private-alpha-next`:
 - [x] Focused backend tests pass for the final candidate SHA.
 - [x] Focused frontend tests pass for the final candidate SHA.
 - [ ] Live Codex browser QA passes locally for the final candidate SHA.
-- [ ] Internal code review has no release-blocking findings.
+- [x] Internal code review has no release-blocking findings.
 - [x] Docs reflect the shipped behavior, not aspirational behavior.
 - [x] No broad quarantine runtime diff was imported.
 
@@ -147,18 +147,25 @@ Current verification evidence for this recovery candidate:
   web/__tests__/alpha-frontend.test.ts web/__tests__/chat-backtest-jobs.test.ts
   web/__tests__/chat-artifact-history.test.ts
   web/__tests__/chat-retry-action-history.test.ts
-  web/__tests__/chat-turn-artifact-ux.test.ts` passed with 127 tests.
-- Lint: `poetry run ruff check src/argus/api/main.py
-  src/argus/domain/evidence.py tests/test_p1_evidence_spine.py` passed.
+  web/__tests__/chat-turn-artifact-ux.test.ts` passed with 128 tests.
+- Lint: `poetry run ruff check src/argus/api/routers/evidence.py
+  src/argus/domain/evidence.py tests/test_p1_evidence_spine.py
+  tests/test_alpha_api_supabase.py` passed.
   `bun run --cwd web lint` passed with one pre-existing warning in
   `web/components/chat/artifact-history.ts`.
 - Local browser QA: headed Playwright on `http://127.0.0.1:3001/chat`
   completed messy prompt -> confirmation -> run -> decision save -> reload ->
   Omnisearch recall. Evidence, Backtest, Decision, Idea, and Conversation rows
   appeared as first-class search results; artifact row click updated the preview
-  without navigation; no duplicate ready/result cards appeared; direct search
-  payload checks found no Markdown markers, internal ids, `context_packets`,
-  `actions`, route receipts, or provider metadata.
+  without navigation; preview rendered Quick take, Digest, Assets, Benchmark,
+  Metrics, and Assumptions from backend preview data; no duplicate ready/result
+  cards appeared; direct search payload checks found no Markdown markers,
+  internal ids, `context_packets`, `actions`, route receipts, or provider
+  metadata.
+- Internal review: fallback reviewer found no Critical issues and two Important
+  issues. Both were fixed in this candidate: decision-capture failures now use
+  `decision_capture_failed` Problem Details, and Omnisearch previews now render
+  compact artifact fields instead of a digest-only panel.
 - Codex in-app browser QA is still unchecked because the browser connector
   failed before exposing a tab with a tool metadata error. The local product QA
   above used the Playwright fallback, so the dedicated Codex-browser gate must

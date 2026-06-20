@@ -175,6 +175,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "422":
+          description: Malformed decision payload or unsupported decision state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                type: https://api.argus.app/problems/validation-error
+                title: Validation Error
+                status: 422
+                detail: Request validation failed.
+                code: validation_error
+                request_id: req_123
+                context:
+                  errors: []
+        "500":
+          description: Decision capture failed after request validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                type: https://api.argus.app/problems/decision-capture-failed
+                title: Decision Capture Failed
+                status: 500
+                detail: Argus could not safely record that decision. Please retry in a moment.
+                code: decision_capture_failed
+                request_id: req_123
   /api/v1/feedback:
     post:
       requestBody:

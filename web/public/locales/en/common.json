@@ -573,6 +573,17 @@
     "open_conversation": "Open conversation",
     "open_source_conversation": "Open source conversation",
     "select_preview": "Select a conversation to preview its metadata.",
+    "preview_fields": {
+      "assets": "Assets",
+      "assumptions": "Assumptions",
+      "benchmark": "Benchmark",
+      "breakdown": "Breakdown",
+      "decision": "Decision",
+      "digest": "Digest",
+      "metrics": "Metrics",
+      "preview": "Preview",
+      "quick_take": "Quick take"
+    },
     "conversation_count_one": "{{count}} conversation",
     "conversation_count_other": "{{count}} conversations",
     "result_count_one": "{{count}} result",

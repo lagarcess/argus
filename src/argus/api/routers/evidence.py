@@ -38,7 +38,7 @@ def create_decision(
         raise problem(
             request,
             status_code=500,
-            code="internal_error",
+            code="decision_capture_failed",
             title="Decision Capture Failed",
             detail=(
                 "Argus could not safely record that decision. "

@@ -65,7 +65,7 @@ def _run() -> BacktestRun:
                     "value": "+12.3%",
                 }
             ],
-            "assumptions": ["Benchmark: SPY", "No fees"],
+            "assumptions": ["**Benchmark:** SPY", "- No fees"],
             "quick_take": (
                 "**Quick take**\n\n"
                 "AAPL, MSFT, and TSLA beat SPY in this window.\n\n"
