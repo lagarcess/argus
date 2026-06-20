@@ -1999,8 +1999,6 @@ Global omni-search across conversations and typed recall objects.
       "lifecycle": "captured",
       "preview": {
         "digest": "AAPL and MSFT were tested against SPY.",
-        "artifact_type": "backtest",
-        "source_run_id": "uuid",
         "symbols": ["AAPL", "MSFT"],
         "benchmark_symbol": "SPY"
       }
@@ -2042,7 +2040,10 @@ Search is limited to:
 
 P1 previews must be sanitized owner-only summaries. They must not expose raw
 context packets, route receipts, provider/model metadata, retry payloads,
-conversation transcripts, or private memory.
+conversation transcripts, private memory, internal source-run ids, or internal
+artifact implementation fields. Object identity and product type are carried by
+the top-level `id`, `type`, `conversation_id`, and `lifecycle` fields; `preview`
+is reserved for grounded display context such as digest, symbols, and benchmark.
 
 For typed P1 objects, Omnisearch treats artifacts as first-class results and
 the source conversation as provenance. Evidence-like objects do not expose chat

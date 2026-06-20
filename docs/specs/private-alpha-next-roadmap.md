@@ -1,6 +1,6 @@
 # Private Alpha Next Roadmap
 
-Status: Active P1 roadmap board
+Status: P1 verified on reintegration branch; awaiting promotion decision
 Date: 2026-06-20
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
@@ -102,23 +102,27 @@ Out of scope until explicitly started:
 
 Before code:
 
-- [ ] Update spec/API/data-model docs for the exact P1 object contract.
-- [ ] Identify migrations, if any, and make them reversible and minimal.
-- [ ] Write failing backend tests for evidence capture, decision capture,
+- [x] Update spec/API/data-model docs for the exact P1 object contract.
+- [x] Identify migrations, if any, and make them reversible and minimal.
+- [x] Write failing backend tests for evidence capture, decision capture,
       hydration, reload, and search retrieval.
-- [ ] Write or update focused frontend tests for visible artifact states.
-- [ ] Define browser QA prompts before implementation, including messy language,
+- [x] Write or update focused frontend tests for visible artifact states.
+- [x] Define browser QA prompts before implementation, including messy language,
       reload, locale switch, and navigation during async changes.
-- [ ] Confirm rollback can be described as one clean commit revert per slice.
+- [x] Confirm rollback can be described as one clean commit revert per slice.
 
 Before promotion to `codex/private-alpha-next`:
 
-- [ ] Focused backend tests pass.
-- [ ] Focused frontend tests pass.
-- [ ] Live Codex browser QA passes locally.
-- [ ] Internal code review has no release-blocking findings.
-- [ ] Docs reflect the shipped behavior, not aspirational behavior.
-- [ ] No broad quarantine runtime diff was imported.
+- [x] Focused backend tests pass.
+- [x] Focused frontend tests pass.
+- [x] Live Codex browser QA passes locally.
+- [x] Internal code review has no release-blocking findings.
+- [x] Docs reflect the shipped behavior, not aspirational behavior.
+- [x] No broad quarantine runtime diff was imported.
+
+Verification note: these boxes describe the current
+`codex/private-alpha-next-reintegration` candidate only. Promotion to
+`codex/private-alpha-next` remains a separate founder-directed action.
 
 Stop immediately if:
 

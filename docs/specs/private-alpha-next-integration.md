@@ -10,6 +10,8 @@ Current note: for Private Alpha Next P1 product work, use
 `docs/specs/private-alpha-next-decision-memo.md` as the strategic north star.
 This document remains staging and branch-process context for
 `codex/private-alpha-next`.
+For release-gate and canary decisions, the decision memo is later-context only;
+use the CI/CD SOTA spec, launch runbook, and release manifest template instead.
 
 For smoke, canary, manifest, and deployment discipline, use
 `docs/specs/private-alpha-ci-cd-sota.md`, `docs/PRIVATE_LAUNCH_RUNBOOK.md`, and

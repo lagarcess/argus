@@ -6,6 +6,7 @@
 > `docs/specs/private-alpha-next-decision-memo.md` for product sequencing; use
 > this runbook with `docs/specs/private-alpha-ci-cd-sota.md` and
 > `docs/release-manifests/TEMPLATE.md` for release gating.
+> For CI/CD promotion decisions, the decision memo is a later-context document, not part of this release gate.
 
 This runbook is for the first trusted-user internet tests on Render.
 
