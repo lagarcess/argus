@@ -562,6 +562,7 @@
   },
   "command_palette": {
     "close": "Close search",
+    "search_placeholder": "Search Argus...",
     "no_results": "No results found",
     "no_conversations": "No conversations yet",
     "rename_conversation": "Rename conversation",

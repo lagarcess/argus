@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from argus.api import state as api_state
 from argus.api.schemas import BacktestRun, Conversation, User
-from argus.domain.evidence import build_backtest_evidence_capture
+from argus.domain.evidence import (
+    build_backtest_evidence_capture,
+    evidence_preview_from_artifact,
+)
 from argus.domain.store import utcnow
 
 
@@ -63,6 +66,11 @@ def _run() -> BacktestRun:
                 }
             ],
             "assumptions": ["Benchmark: SPY", "No fees"],
+            "quick_take": "AAPL, MSFT, and TSLA beat SPY in this window.",
+            "breakdown": {
+                "summary": "The equal-weight basket led the benchmark.",
+                "sections": ["Setup", "Benchmark comparison"],
+            },
             "context_packets": [{"provider": "internal", "raw": "not preview-safe"}],
             "actions": [],
         },
@@ -97,7 +105,32 @@ def test_completed_backtest_auto_captures_idea_version_and_evidence() -> None:
     assert captured.evidence_artifact.artifact_type == "backtest"
     assert captured.evidence_artifact.source_run_id == run.id
     assert captured.evidence_artifact.digest
+    assert (
+        captured.evidence_artifact.payload["quick_take"]
+        == "AAPL, MSFT, and TSLA beat SPY in this window."
+    )
+    assert captured.evidence_artifact.payload["breakdown"] == {
+        "summary": "The equal-weight basket led the benchmark.",
+        "sections": ["Setup", "Benchmark comparison"],
+    }
+    assert captured.evidence_artifact.payload["assumptions"] == [
+        "Benchmark: SPY",
+        "No fees",
+    ]
+    assert captured.evidence_artifact.payload["metrics"] == run.metrics
     assert "context_packets" not in captured.evidence_artifact.payload["result_card"]
+    assert "actions" not in captured.evidence_artifact.payload["result_card"]
+    preview = evidence_preview_from_artifact(captured.evidence_artifact)
+    assert preview["quick_take"] == "AAPL, MSFT, and TSLA beat SPY in this window."
+    assert preview["breakdown"] == {
+        "summary": "The equal-weight basket led the benchmark.",
+        "sections": ["Setup", "Benchmark comparison"],
+    }
+    assert preview["assumptions"] == ["Benchmark: SPY", "No fees"]
+    assert preview["metrics_summary"] == {"total_return_pct": 12.3}
+    assert preview["symbols"] == ["AAPL", "MSFT", "TSLA"]
+    assert preview["benchmark_symbol"] == "SPY"
+    assert not any(key.endswith("_id") for key in preview)
     assert (
         run.conversation_result_card["evidence_artifact_id"]
         == captured.evidence_artifact.id

@@ -129,13 +129,51 @@ def evidence_digest_from_run(run: BacktestRun) -> str:
 
 
 def evidence_preview_from_artifact(artifact: EvidenceArtifact) -> dict[str, Any]:
-    provenance = artifact.payload.get("provenance")
+    return evidence_preview_from_payload(
+        digest=artifact.digest,
+        title=artifact.title,
+        payload=artifact.payload,
+    )
+
+
+def evidence_preview_from_payload(
+    *,
+    digest: object,
+    title: object = None,
+    payload: dict[str, Any] | None,
+) -> dict[str, Any]:
+    payload = payload if isinstance(payload, dict) else {}
+    provenance = payload.get("provenance")
     if not isinstance(provenance, dict):
         provenance = {}
+    result_card = payload.get("result_card")
+    if not isinstance(result_card, dict):
+        result_card = {}
+    preview: dict[str, Any] = {
+        "digest": _safe_text(digest) or _safe_text(title),
+        "symbols": _safe_text_list(
+            provenance.get("symbols") or result_card.get("symbols")
+        ),
+        "benchmark_symbol": _safe_text(
+            provenance.get("benchmark_symbol") or result_card.get("benchmark_symbol")
+        ),
+        "assumptions": _safe_text_list(
+            payload.get("assumptions") or result_card.get("assumptions")
+        ),
+        "metrics_summary": _metrics_summary(payload.get("metrics")),
+    }
+    quick_take = _safe_text(payload.get("quick_take") or result_card.get("quick_take"))
+    if quick_take is not None:
+        preview["quick_take"] = quick_take
+    breakdown = _safe_breakdown(
+        payload.get("breakdown") or result_card.get("breakdown")
+    )
+    if breakdown is not None:
+        preview["breakdown"] = breakdown
     return {
-        "digest": artifact.digest,
-        "symbols": provenance.get("symbols") if isinstance(provenance, dict) else [],
-        "benchmark_symbol": provenance.get("benchmark_symbol"),
+        key: value
+        for key, value in preview.items()
+        if value is not None and value != [] and value != {}
     }
 
 
@@ -179,9 +217,13 @@ def _payload_from_run(run: BacktestRun, *, digest: str) -> dict[str, Any]:
             "rows",
             "benchmark_note",
             "assumptions",
+            "quick_take",
+            "breakdown",
         )
         if key in card
     }
+    quick_take = _safe_text(card.get("quick_take"))
+    breakdown = _safe_breakdown(card.get("breakdown"))
     return {
         "artifact_type": "backtest",
         "digest": digest,
@@ -192,6 +234,8 @@ def _payload_from_run(run: BacktestRun, *, digest: str) -> dict[str, Any]:
         },
         "assumptions": list(card.get("assumptions") or []),
         "metrics": run.metrics,
+        "quick_take": quick_take,
+        "breakdown": breakdown,
         "result_card": safe_card,
         "chart_summary": _chart_summary(run.chart),
         "provenance": {
@@ -213,3 +257,63 @@ def _chart_summary(chart: dict[str, Any] | None) -> dict[str, Any] | None:
         "currency": chart.get("currency"),
         "value_summary": chart.get("value_summary"),
     }
+
+
+def _safe_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _safe_text_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    safe_values: list[str] = []
+    for item in value:
+        normalized = _safe_text(item)
+        if normalized is not None:
+            safe_values.append(normalized)
+    return safe_values
+
+
+def _safe_breakdown(value: object) -> object | None:
+    if isinstance(value, str):
+        return _safe_text(value)
+    if isinstance(value, dict):
+        safe: dict[str, object] = {}
+        for key, raw in value.items():
+            if not isinstance(key, str) or key.endswith("_id"):
+                continue
+            if isinstance(raw, str):
+                normalized = _safe_text(raw)
+                if normalized is not None:
+                    safe[key] = normalized
+            elif isinstance(raw, list):
+                values = _safe_text_list(raw)
+                if values:
+                    safe[key] = values
+        return safe or None
+    return None
+
+
+def _metrics_summary(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    performance = value.get("aggregate")
+    if isinstance(performance, dict):
+        performance = performance.get("performance")
+    if not isinstance(performance, dict):
+        return {}
+    summary: dict[str, object] = {}
+    for key in (
+        "total_return_pct",
+        "benchmark_return_pct",
+        "delta_vs_benchmark_pct",
+        "max_drawdown_pct",
+        "sharpe_ratio",
+    ):
+        metric = performance.get(key)
+        if isinstance(metric, int | float | str) and metric != "":
+            summary[key] = metric
+    return summary

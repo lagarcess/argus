@@ -1364,6 +1364,11 @@ def test_search_returns_typed_p1_artifacts() -> None:
     evidence = next(item for item in payload["items"] if item["type"] == "evidence")
     assert evidence["conversation_id"] == conversation["id"]
     assert evidence["preview"]["digest"]
+    assert evidence["preview"]["quick_take"] == "I tested that idea with TSLA."
+    assert evidence["preview"]["assumptions"] == ["Starting capital: $10,000."]
+    assert evidence["preview"]["metrics_summary"] == {"total_return_pct": 12.5}
+    assert evidence["preview"]["symbols"] == ["TSLA"]
+    assert evidence["preview"]["benchmark_symbol"] == "SPY"
     assert "context_packets" not in evidence["preview"]
     assert not any(key.endswith("_id") for key in evidence["preview"])
     idea = next(item for item in payload["items"] if item["type"] == "idea")

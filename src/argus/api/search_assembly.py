@@ -4,7 +4,10 @@ from argus.api import state as api_state
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import SearchItem, User
 from argus.api.search_utils import score_search_item
-from argus.domain.evidence import evidence_preview_from_artifact
+from argus.domain.evidence import (
+    evidence_preview_from_artifact,
+    evidence_preview_from_payload,
+)
 
 ScoredSearchItem = tuple[int, SearchItem]
 
@@ -456,22 +459,11 @@ def _scored_decision_row(*, row: dict[str, object], query: str) -> ScoredSearchI
 
 def _evidence_preview_from_search_row(row: dict[str, object]) -> dict[str, object]:
     payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
-    result_card = (
-        payload.get("result_card")
-        if isinstance(payload, dict) and isinstance(payload.get("result_card"), dict)
-        else {}
+    return evidence_preview_from_payload(
+        digest=row.get("digest"),
+        title=row.get("title"),
+        payload=payload,
     )
-    provenance = (
-        payload.get("provenance")
-        if isinstance(payload, dict) and isinstance(payload.get("provenance"), dict)
-        else {}
-    )
-    return {
-        "digest": row.get("digest") or row.get("title"),
-        "symbols": list(provenance.get("symbols") or result_card.get("symbols") or []),
-        "benchmark_symbol": provenance.get("benchmark_symbol")
-        or result_card.get("benchmark_symbol"),
-    }
 
 
 def _decision_preview_digest(

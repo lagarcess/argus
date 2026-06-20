@@ -15,6 +15,7 @@ import {
   Edit2,
   Loader2,
   Maximize2,
+  MessageSquare,
   Minimize2,
   Search,
   Trash2,
@@ -308,13 +309,24 @@ export default function ChatCommandPalette({
     }
   };
 
-  const openItem = useCallback(
+  const openSourceConversation = useCallback(
     (item: CommandPaletteDisplayItem) => {
       if (!item.conversationId) return;
       onOpenConversation(item.conversationId);
       onClose();
     },
     [onClose, onOpenConversation],
+  );
+
+  const activateItem = useCallback(
+    (item: CommandPaletteDisplayItem) => {
+      if (item.activation === "select_preview") {
+        setPreviewItem(item);
+        return;
+      }
+      openSourceConversation(item);
+    },
+    [openSourceConversation],
   );
 
   const startRename = useCallback((item: CommandPaletteDisplayItem) => {
@@ -409,12 +421,12 @@ export default function ChatCommandPalette({
       }
       if (!editingId && event.key === "Enter" && selectedPreview) {
         event.preventDefault();
-        openItem(selectedPreview);
+        activateItem(selectedPreview);
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [cancelRename, editingId, onClose, openItem, selectedPreview]);
+  }, [activateItem, cancelRename, editingId, onClose, selectedPreview]);
 
   const toggleLayout = () => {
     setLayoutMode((current) => {
@@ -449,7 +461,7 @@ export default function ChatCommandPalette({
             type="text"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={t("common.search", "Search conversations...")}
+            placeholder={t("command_palette.search_placeholder", "Search Argus...")}
             className="w-full bg-transparent font-display text-[15px] font-medium text-black outline-none placeholder:text-black/35 dark:text-white dark:placeholder:text-white/35"
           />
           {query && (
@@ -464,11 +476,11 @@ export default function ChatCommandPalette({
           )}
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
           <div
             className={`flex-1 overflow-y-auto ${
               layoutMode === "expanded"
-                ? "border-r border-black/5 dark:border-white/5"
+                ? "border-b border-black/5 dark:border-white/5 md:border-b-0 md:border-r"
                 : ""
             }`}
           >
@@ -508,13 +520,13 @@ export default function ChatCommandPalette({
                         if (isEditing) return;
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
-                          openItem(item);
+                          activateItem(item);
                         }
                       };
                       return (
                         <div
                           key={`${item.source}:${item.id}`}
-                          onClick={() => openItem(item)}
+                          onClick={() => activateItem(item)}
                           onKeyDown={handleRowKeyDown}
                           onMouseEnter={() => setPreviewItem(item)}
                           onFocus={() => setPreviewItem(item)}
@@ -659,6 +671,38 @@ export default function ChatCommandPalette({
                               </Tooltip>
                             </div>
                           )}
+                          {!isEditing &&
+                            !item.canManageConversation &&
+                            item.conversationId && (
+                              <div
+                                className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                data-row-action
+                              >
+                                <Tooltip
+                                  content={t(
+                                    "command_palette.open_source_conversation",
+                                    "Open source conversation",
+                                  )}
+                                  side="top"
+                                  delay={120}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openSourceConversation(item);
+                                    }}
+                                    className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
+                                    aria-label={t(
+                                      "command_palette.open_source_conversation",
+                                      "Open source conversation",
+                                    )}
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5" />
+                                  </button>
+                                </Tooltip>
+                              </div>
+                            )}
                         </div>
                       );
                     })}
@@ -681,11 +725,11 @@ export default function ChatCommandPalette({
           </div>
 
           {layoutMode === "expanded" && (
-            <div className="hidden w-[44%] flex-col bg-black/[0.02] p-6 dark:bg-white/[0.02] md:flex">
+            <div className="flex max-h-[42%] w-full shrink-0 flex-col bg-black/[0.02] p-5 dark:bg-white/[0.02] md:max-h-none md:w-[44%] md:p-6">
               {selectedPreview ? (
                 <div className="flex h-full flex-col">
                   <div className="mb-6">
-                    <span className="mb-3 inline-flex rounded-full bg-[#5ba897]/15 px-2.5 py-1 text-[11px] font-semibold text-[#5ba897]">
+                    <span className="mb-3 inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
                       {selectedPreview.type === "chat" &&
                       activeConversationId === selectedPreview.conversationId
                         ? t("common.current", "Current")
@@ -717,7 +761,12 @@ export default function ChatCommandPalette({
                         )}
                     </p>
                   </div>
-                  <div className="mt-auto flex items-center justify-between border-t border-black/5 pt-4 text-[12px] text-black/35 dark:border-white/5 dark:text-white/35">
+                  <button
+                    type="button"
+                    onClick={() => openSourceConversation(selectedPreview)}
+                    disabled={!selectedPreview.conversationId}
+                    className="mt-auto flex items-center justify-between border-t border-black/5 pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-default disabled:hover:text-black/35 dark:border-white/5 dark:text-white/35 dark:hover:text-white dark:disabled:hover:text-white/35"
+                  >
                     <span>
                       {t(
                         commandPaletteOpenLabelKey(selectedPreview),
@@ -725,7 +774,7 @@ export default function ChatCommandPalette({
                       )}
                     </span>
                     <ChevronRight className="h-4 w-4" />
-                  </div>
+                  </button>
                 </div>
               ) : (
                 <div className="flex flex-1 items-center justify-center text-center">

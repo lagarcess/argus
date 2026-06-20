@@ -1029,6 +1029,7 @@ async def chat_stream(
                         conversation=conversation,
                         result_card=result_card,
                         envelope=envelope,
+                        quick_take=assistant_text,
                     )
                     persist_onboarding_update(
                         current_user_profile,

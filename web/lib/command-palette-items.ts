@@ -11,6 +11,7 @@ export type CommandPaletteDisplayItem = {
   lifecycle?: string | null;
   preview?: Record<string, unknown> | null;
   canManageConversation: boolean;
+  activation: "open_conversation" | "select_preview";
 };
 
 export type CommandPaletteItemCopy = {
@@ -32,6 +33,7 @@ export function commandPaletteItemFromHistory(
     lifecycle: null,
     preview: null,
     canManageConversation: true,
+    activation: "open_conversation",
   };
 }
 
@@ -39,6 +41,7 @@ export function commandPaletteItemFromSearch(
   item: SearchItem,
   copy: CommandPaletteItemCopy = {},
 ): CommandPaletteDisplayItem | null {
+  if (!commandPaletteSupportsSearchType(item.type)) return null;
   const conversationId =
     item.type === "chat"
       ? (item.conversation_id ?? item.id)
@@ -52,8 +55,9 @@ export function commandPaletteItemFromSearch(
     updatedAt: item.updated_at,
     source: "search",
     lifecycle: item.lifecycle ?? null,
-    preview: item.preview ?? null,
+    preview: safeCommandPalettePreview(item.preview),
     canManageConversation: item.type === "chat" && Boolean(conversationId),
+    activation: item.type === "chat" ? "open_conversation" : "select_preview",
   };
 }
 
@@ -113,6 +117,16 @@ export function commandPaletteOpenFallback(item: CommandPaletteDisplayItem) {
     : "Open source conversation";
 }
 
+export function commandPaletteSupportsSearchType(type: SearchItem["type"]) {
+  return (
+    type === "chat" ||
+    type === "backtest" ||
+    type === "decision" ||
+    type === "evidence" ||
+    type === "idea"
+  );
+}
+
 export function commandPaletteDecisionStateFallback(state: string) {
   switch (state) {
     case "promising":
@@ -130,6 +144,7 @@ export function commandPaletteDecisionStateFallback(state: string) {
 
 function commandPaletteSnippet(item: SearchItem, copy: CommandPaletteItemCopy) {
   const digest = item.preview?.digest;
+  const quickTake = item.preview?.quick_take;
   if (item.type === "decision") {
     const state =
       typeof item.preview?.decision_state === "string"
@@ -142,8 +157,24 @@ function commandPaletteSnippet(item: SearchItem, copy: CommandPaletteItemCopy) {
     const digestText = typeof digest === "string" ? digest.trim() : "";
     return [stateLabel, digestText].filter(Boolean).join(" · ");
   }
+  if (typeof quickTake === "string" && quickTake.trim()) {
+    return quickTake;
+  }
   if (typeof digest === "string" && digest.trim()) {
     return digest;
   }
   return item.matched_text ?? "";
+}
+
+function safeCommandPalettePreview(
+  preview: Record<string, unknown> | null | undefined,
+) {
+  if (!preview) return null;
+  const safe: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(preview)) {
+    if (key.endsWith("_id")) continue;
+    if (key === "context_packets" || key === "actions") continue;
+    safe[key] = value;
+  }
+  return safe;
 }

@@ -33,7 +33,9 @@ describe("command palette items", () => {
       conversationId: "conversation-1",
       snippet: "AAPL and MSFT beat SPY in this window.",
       canManageConversation: false,
+      activation: "select_preview",
     });
+    expect(display?.preview).not.toHaveProperty("source_run_id");
     expect(commandPaletteOpenLabelKey(display!)).toBe(
       "command_palette.open_source_conversation",
     );
@@ -56,6 +58,7 @@ describe("command palette items", () => {
 
     expect(display?.conversationId).toBe("conversation-1");
     expect(display?.canManageConversation).toBe(true);
+    expect(display?.activation).toBe("open_conversation");
     expect(commandPaletteOpenLabelKey(display!)).toBe(
       "command_palette.open_conversation",
     );
@@ -103,6 +106,7 @@ describe("command palette items", () => {
       lifecycle: null,
       preview: null,
       canManageConversation: true,
+      activation: "open_conversation",
     } as const;
     const evidenceResult = {
       id: "artifact-1",
@@ -115,6 +119,7 @@ describe("command palette items", () => {
       lifecycle: "captured",
       preview: { digest: "AAPL backtest evidence" },
       canManageConversation: false,
+      activation: "select_preview",
     } as const;
 
     expect(commandPaletteSelectedPreview(staleConversation, [evidenceResult])).toBe(
@@ -124,5 +129,17 @@ describe("command palette items", () => {
       evidenceResult,
     );
     expect(commandPaletteSelectedPreview(staleConversation, [])).toBeNull();
+  });
+
+  test("does not promote unsupported legacy search rows as first-class P1 recall", () => {
+    const unsupported: SearchItem = {
+      type: "run",
+      id: "run-1",
+      title: "Internal run",
+      matched_text: "Internal run",
+      updated_at: "2026-06-19T00:00:00.000Z",
+    };
+
+    expect(commandPaletteItemFromSearch(unsupported)).toBeNull();
   });
 });

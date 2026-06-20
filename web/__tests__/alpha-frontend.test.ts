@@ -1229,6 +1229,15 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).toContain("commandPaletteSelectedPreview(previewItem, displayItems)");
     expect(palette).toContain("setPreviewItem(null)");
     expect(adapter).toContain("command_palette.open_source_conversation");
+    expect(adapter).toContain('activation: item.type === "chat" ? "open_conversation" : "select_preview"');
+    expect(palette).toContain("const activateItem = useCallback");
+    expect(palette).toContain('item.activation === "select_preview"');
+    expect(palette).toContain("setPreviewItem(item)");
+    expect(palette).toContain("const openSourceConversation = useCallback");
+    expect(palette).toContain("MessageSquare");
+    expect(palette).toContain("md:flex-row");
+    expect(palette).not.toContain("hidden w-[44%]");
+    expect(palette).toContain('t("command_palette.search_placeholder", "Search Argus...")');
     expect(palette).toContain("loadMoreSearch");
     expect(api).toContain("cursor?: string");
     expect(api).toContain("export async function searchGlobal");

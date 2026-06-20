@@ -562,6 +562,7 @@
   },
   "command_palette": {
     "close": "Cerrar búsqueda",
+    "search_placeholder": "Buscar en Argus...",
     "no_results": "No se encontraron resultados",
     "no_conversations": "No hay conversaciones aún",
     "rename_conversation": "Renombrar conversación",
