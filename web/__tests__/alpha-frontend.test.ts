@@ -1226,6 +1226,8 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(palette).toContain("searchGlobal({ q: trimmed, limit: 30 })");
     expect(palette).toContain("commandPaletteItemFromSearch");
+    expect(palette).toContain("commandPaletteSelectedPreview(previewItem, displayItems)");
+    expect(palette).toContain("setPreviewItem(null)");
     expect(adapter).toContain("command_palette.open_source_conversation");
     expect(palette).toContain("loadMoreSearch");
     expect(api).toContain("cursor?: string");

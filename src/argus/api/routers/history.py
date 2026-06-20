@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user
+from argus.api.memory_ownership import memory_object_visible
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
     BacktestRun,
@@ -84,8 +85,11 @@ def history(
     else:
         items = []
         for run_id, run in api_state.store.backtest_runs.items():
-            owner_id = api_state.store.backtest_run_owners.get(run_id)
-            if owner_id is not None and owner_id != user.id:
+            if not memory_object_visible(
+                owner_map=api_state.store.backtest_run_owners,
+                object_id=run_id,
+                user_id=user.id,
+            ):
                 continue
             if _run_matches_history_filters(
                 run,
@@ -104,6 +108,12 @@ def history(
                     )
                 )
         for conversation in api_state.store.conversations.values():
+            if not memory_object_visible(
+                owner_map=api_state.store.conversation_owners,
+                object_id=conversation.id,
+                user_id=user.id,
+            ):
+                continue
             if (
                 conversation.deleted_at is not None
                 if deleted
@@ -120,6 +130,12 @@ def history(
                     )
                 )
         for strategy in api_state.store.strategies.values():
+            if not memory_object_visible(
+                owner_map=api_state.store.strategy_owners,
+                object_id=strategy.id,
+                user_id=user.id,
+            ):
+                continue
             if (
                 strategy.deleted_at is not None
                 if deleted
@@ -136,6 +152,12 @@ def history(
                     )
                 )
         for collection in api_state.store.collections.values():
+            if not memory_object_visible(
+                owner_map=api_state.store.collection_owners,
+                object_id=collection.id,
+                user_id=user.id,
+            ):
+                continue
             if (
                 collection.deleted_at is not None
                 if deleted

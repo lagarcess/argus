@@ -9,7 +9,9 @@ import pytest
 from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.message_store import memory_conversation, memory_message
+from argus.api.schemas import BacktestRun, Collection, Strategy
 from argus.domain.market_data.assets import ResolvedAsset
+from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
 
 
@@ -1171,6 +1173,64 @@ def test_search_supports_cursor_and_mixed_types() -> None:
     assert first_ids.isdisjoint(second_ids)
 
 
+def test_search_memory_mode_excludes_other_users_owned_objects() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    other_user_id = "00000000-0000-0000-0000-000000000099"
+    now = utcnow()
+    memory_conversation(
+        title="Leaky Tesla alpha chat",
+        title_source="user_renamed",
+        language="en",
+        user_id=other_user_id,
+    )
+    strategy = Strategy(
+        id="other-strategy",
+        name="Leaky Tesla strategy",
+        name_source="user_renamed",
+        template="rsi_mean_reversion",
+        asset_class="equity",
+        symbols=["TSLA"],
+        parameters={},
+        metrics_preferences=["total_return_pct"],
+        benchmark_symbol="SPY",
+        created_at=now,
+        updated_at=now,
+    )
+    collection = Collection(
+        id="other-collection",
+        name="Leaky Tesla collection",
+        name_source="user_renamed",
+        created_at=now,
+        updated_at=now,
+    )
+    run = BacktestRun(
+        id="other-run",
+        conversation_id=None,
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["TSLA"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={},
+        config_snapshot={"template": "rsi_mean_reversion"},
+        conversation_result_card={"title": "Leaky Tesla backtest"},
+        created_at=now,
+    )
+    api_state.store.strategies[strategy.id] = strategy
+    api_state.store.collections[collection.id] = collection
+    api_state.store.backtest_runs[run.id] = run
+    api_state.store.backtest_run_owners[run.id] = other_user_id
+    api_state.store.strategy_owners = {strategy.id: other_user_id}
+    api_state.store.collection_owners = {collection.id: other_user_id}
+
+    response = client.get("/api/v1/search?q=leaky&limit=20")
+
+    assert response.status_code == 200
+    assert response.json()["items"] == []
+
+
 def test_decision_endpoint_marks_evidence_artifact_decided() -> None:
     client = _client()
     _set_onboarding_ready(client, primary_goal="test_stock_idea")
@@ -1287,8 +1347,10 @@ def test_search_returns_typed_p1_artifacts() -> None:
     assert evidence["conversation_id"] == conversation["id"]
     assert evidence["preview"]["digest"]
     assert "context_packets" not in evidence["preview"]
+    assert not any(key.endswith("_id") for key in evidence["preview"])
     decision = next(item for item in payload["items"] if item["type"] == "decision")
     assert decision["preview"]["decision_state"] == "watching"
+    assert not any(key.endswith("_id") for key in decision["preview"])
     assert decision["matched_text"].startswith("Track it.")
     assert "TSLA backtest versus SPY" in decision["matched_text"]
     assert "watching" not in decision["matched_text"]

@@ -134,8 +134,6 @@ def evidence_preview_from_artifact(artifact: EvidenceArtifact) -> dict[str, Any]
         provenance = {}
     return {
         "digest": artifact.digest,
-        "artifact_type": artifact.artifact_type,
-        "source_run_id": artifact.source_run_id,
         "symbols": provenance.get("symbols") if isinstance(provenance, dict) else [],
         "benchmark_symbol": provenance.get("benchmark_symbol"),
     }

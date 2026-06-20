@@ -440,6 +440,59 @@ describe("chat artifact history", () => {
     expect(normalizedConfirmation.actions).toEqual([]);
   });
 
+  test("normalization closes active run-complete confirmations with stale actions", () => {
+    const activeComplete: Message = {
+      ...confirmationMessage(),
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_state: "active",
+        status: "run_complete",
+        statusLabel: "Run complete",
+      },
+    };
+    const result: Message = {
+      id: "assistant-result",
+      role: "ai",
+      kind: "strategy_result",
+      result: {
+        strategyName: "AAPL buy and hold",
+        period: "past year",
+        metrics: [],
+      },
+    };
+
+    const [normalizedConfirmation] = normalizeConfirmationHistory([
+      activeComplete,
+      result,
+    ]);
+
+    expect(normalizedConfirmation.confirmation?.confirmation_state).toBe("superseded");
+    expect(normalizedConfirmation.confirmation?.status).toBe("run_complete");
+    expect(normalizedConfirmation.confirmation?.statusLabel).toBe("Run complete");
+    expect(normalizedConfirmation.confirmation?.actions).toEqual([]);
+    expect(normalizedConfirmation.actions).toEqual([]);
+  });
+
+  test("normalization treats active run-complete status as terminal without waiting for a result", () => {
+    const activeComplete: Message = {
+      ...confirmationMessage(),
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_state: "active",
+        status: "run_complete",
+        statusLabel: "Run complete",
+      },
+    };
+
+    const [normalizedConfirmation] = normalizeConfirmationHistory([activeComplete]);
+
+    expect(normalizedConfirmation.confirmation?.confirmation_state).toBe("superseded");
+    expect(normalizedConfirmation.confirmation?.status).toBe("run_complete");
+    expect(normalizedConfirmation.confirmation?.statusLabel).toBe("Run complete");
+    expect(normalizedConfirmation.confirmation?.actions).toEqual([]);
+    expect(normalizedConfirmation.actions).toEqual([]);
+  });
+
   test("failed run finalization does not leave confirmation status running", () => {
     const [running] = applyConfirmationActionEffects([confirmationMessage()], [
       {

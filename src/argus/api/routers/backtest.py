@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Header, Request
 from argus.api import state as api_state
 from argus.api.chat.backtest_jobs import reconcile_terminal_render_task_run
 from argus.api.dependencies import current_user, problem
+from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import (
     BacktestJob,
     BacktestJobResponse,
@@ -83,7 +84,12 @@ def run_backtest(
                 strategy_id=payload.strategy_id,
             )
         else:
-            strategy = api_state.store.strategies.get(payload.strategy_id)
+            if memory_object_visible(
+                owner_map=api_state.store.strategy_owners,
+                object_id=payload.strategy_id,
+                user_id=user.id,
+            ):
+                strategy = api_state.store.strategies.get(payload.strategy_id)
 
         if not strategy:
             raise problem(

@@ -124,6 +124,10 @@ import {
   settleOpenConfirmationsAfterStreamError,
   settleOpenConfirmationsAfterTextFinal,
 } from "./artifact-history";
+import {
+  confirmationStatusAllowsActions,
+  confirmationStatusFromPayload,
+} from "./confirmation-display";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -255,6 +259,10 @@ function hasActiveArtifactActionSet(messages: Message[]) {
         message.confirmation.confirmation_state &&
         message.confirmation.confirmation_state !== "active"
       ) {
+        return false;
+      }
+      const confirmationStatus = confirmationStatusFromPayload(message.confirmation);
+      if (!confirmationStatusAllowsActions(confirmationStatus)) {
         return false;
       }
       const activeActions = message.confirmation.actions ?? message.actions ?? [];
@@ -1908,6 +1916,14 @@ export default function ChatInterface() {
     if (isFailedActionRetry(action)) {
       void handleSend(action.label || value, action);
       return;
+    }
+    const confirmationEffect = confirmationActionEffectFromAction(action);
+    if (confirmationEffect) {
+      setMessages((prev) =>
+        normalizeConfirmationHistory(
+          applyConfirmationActionEffects(prev, [confirmationEffect]),
+        ),
+      );
     }
     setInputActions(consumeInputAction(action, inputActions));
     void handleSend(action.label || value, action.type ? action : undefined);

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from argus.api import state as api_state
+from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import SearchItem, User
 from argus.api.search_utils import score_search_item
 from argus.domain.evidence import evidence_preview_from_artifact
@@ -88,7 +89,6 @@ def scored_supabase_search_items(
             lifecycle=row.get("lifecycle"),
             preview={
                 "digest": row.get("summary"),
-                "active_version_id": row.get("active_version_id"),
             },
         )
         scored_items.append(
@@ -137,6 +137,12 @@ def scored_supabase_search_items(
 def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchItem]:
     scored_items: list[ScoredSearchItem] = []
     for conversation in api_state.store.conversations.values():
+        if not memory_object_visible(
+            owner_map=api_state.store.conversation_owners,
+            object_id=conversation.id,
+            user_id=user.id,
+        ):
+            continue
         if conversation.deleted_at:
             continue
         haystack = f"{conversation.title} {conversation.last_message_preview or ''}"
@@ -160,6 +166,12 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
                 )
             )
     for strategy in api_state.store.strategies.values():
+        if not memory_object_visible(
+            owner_map=api_state.store.strategy_owners,
+            object_id=strategy.id,
+            user_id=user.id,
+        ):
+            continue
         if strategy.deleted_at:
             continue
         haystack = f"{strategy.name} {' '.join(strategy.symbols)} {strategy.template}"
@@ -187,6 +199,12 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
                 )
             )
     for collection in api_state.store.collections.values():
+        if not memory_object_visible(
+            owner_map=api_state.store.collection_owners,
+            object_id=collection.id,
+            user_id=user.id,
+        ):
+            continue
         if collection.deleted_at:
             continue
         if query in collection.name.lower():
@@ -209,6 +227,12 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
                 )
             )
     for run in api_state.store.backtest_runs.values():
+        if not memory_object_visible(
+            owner_map=api_state.store.backtest_run_owners,
+            object_id=run.id,
+            user_id=user.id,
+        ):
+            continue
         title = run.conversation_result_card.get("title", "Backtest run")
         haystack = f"{title} {' '.join(run.symbols)} {run.config_snapshot.get('template', '')}"
         if query in haystack.lower():
@@ -299,7 +323,6 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
                 preview={
                     "digest": matched_text,
                     "decision_state": decision.decision_state,
-                    "evidence_artifact_id": decision.evidence_artifact_id,
                 },
             )
             scored_items.append(
@@ -337,8 +360,6 @@ def _scored_supabase_run(*, row: dict[str, object], query: str) -> ScoredSearchI
         lifecycle=card.get("evidence_lifecycle"),
         preview={
             "digest": title,
-            "artifact_type": "backtest",
-            "source_run_id": row["id"],
             "symbols": symbols,
             "benchmark_symbol": row.get("benchmark_symbol"),
         }
@@ -377,8 +398,6 @@ def _scored_memory_run(*, run, query: str) -> ScoredSearchItem:  # noqa: ANN001
         lifecycle=card.get("evidence_lifecycle"),
         preview={
             "digest": title,
-            "artifact_type": "backtest",
-            "source_run_id": run.id,
             "symbols": list(run.symbols),
             "benchmark_symbol": run.benchmark_symbol,
         }
@@ -423,7 +442,6 @@ def _scored_decision_row(*, row: dict[str, object], query: str) -> ScoredSearchI
         preview={
             "digest": matched_text,
             "decision_state": row.get("decision_state"),
-            "evidence_artifact_id": row.get("evidence_artifact_id"),
         },
     )
     return (
@@ -451,8 +469,6 @@ def _evidence_preview_from_search_row(row: dict[str, object]) -> dict[str, objec
     )
     return {
         "digest": row.get("digest") or row.get("title"),
-        "artifact_type": row.get("artifact_type") or "backtest",
-        "source_run_id": row.get("source_run_id"),
         "symbols": list(provenance.get("symbols") or result_card.get("symbols") or []),
         "benchmark_symbol": provenance.get("benchmark_symbol")
         or result_card.get("benchmark_symbol"),

@@ -670,6 +670,7 @@ class _P1EvidenceClient:
         self.raise_on_next_idea_version_insert = False
         self.raise_on_next_idea_active_update = False
         self.raise_on_next_artifact_insert = False
+        self.commit_artifact_before_insert_error = False
         self.concurrent_rows_on_artifact_insert_error: dict[
             str, list[dict[str, Any]]
         ] = {}
@@ -731,6 +732,10 @@ class _P1EvidenceTable:
                 and self.client.raise_on_next_artifact_insert
             ):
                 self.client.raise_on_next_artifact_insert = False
+                if self.client.commit_artifact_before_insert_error:
+                    self.client.rows_by_table[self.table_name].append(
+                        dict(self.payload)
+                    )
                 for table_name, rows in (
                     self.client.concurrent_rows_on_artifact_insert_error.items()
                 ):
@@ -1016,6 +1021,34 @@ def test_p1_evidence_capture_gateway_cleans_sidecars_after_source_run_race() -> 
         ("delete", "idea_versions", {"user_id": "user-1", "id": "version-new"}),
         ("delete", "ideas", {"user_id": "user-1", "id": "idea-new"}),
     ]
+
+
+def test_p1_evidence_capture_gateway_reuses_post_commit_artifact_insert_failure() -> (
+    None
+):
+    client = _P1EvidenceClient()
+    client.raise_on_next_artifact_insert = True
+    client.commit_artifact_before_insert_error = True
+    gateway = _gateway_for_p1_client(client)
+    captured = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-new",
+        idea_version_id="version-new",
+        evidence_artifact_id="artifact-new",
+        now=utcnow(),
+    )
+
+    persisted = gateway.create_backtest_evidence_capture(
+        user_id="user-1",
+        captured=captured,
+    )
+
+    assert persisted.evidence_artifact.id == "artifact-new"
+    assert persisted.idea.id == "idea-new"
+    assert persisted.idea_version.id == "version-new"
+    assert [
+        operation for operation in client.operations if operation[0] == "delete"
+    ] == []
 
 
 def test_p1_decision_gateway_rpc_marks_full_object_spine_decided() -> None:

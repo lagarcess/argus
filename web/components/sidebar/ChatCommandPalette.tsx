@@ -37,6 +37,7 @@ import {
   commandPaletteItemFromSearch,
   commandPaletteOpenFallback,
   commandPaletteOpenLabelKey,
+  commandPaletteSelectedPreview,
   commandPaletteTypeFallback,
   commandPaletteTypeLabelKey,
   type CommandPaletteDisplayItem,
@@ -191,6 +192,7 @@ export default function ChatCommandPalette({
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const trimmed = query.trim();
+    setPreviewItem(null);
     if (!trimmed) {
       setSearchResults([]);
       setSearchNextCursor(null);
@@ -238,7 +240,7 @@ export default function ChatCommandPalette({
     () => groupItems(displayItems, t),
     [displayItems, t],
   );
-  const selectedPreview = previewItem ?? displayItems[0] ?? null;
+  const selectedPreview = commandPaletteSelectedPreview(previewItem, displayItems);
 
   const updateLocalTitle = useCallback(
     (conversationId: string, title: string) => {

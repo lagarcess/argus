@@ -4,6 +4,7 @@ import {
   commandPaletteItemFromSearch,
   commandPaletteOpenFallback,
   commandPaletteOpenLabelKey,
+  commandPaletteSelectedPreview,
   commandPaletteTypeFallback,
 } from "../lib/command-palette-items";
 import type { SearchItem } from "../lib/argus-api";
@@ -88,5 +89,40 @@ describe("command palette items", () => {
       canManageConversation: false,
     });
     expect(display?.snippet).not.toContain("promising raw fallback");
+  });
+
+  test("falls back to the first visible result when preview selection is stale", () => {
+    const staleConversation = {
+      id: "conversation-1",
+      type: "chat",
+      conversationId: "conversation-1",
+      title: "Old conversation",
+      snippet: "Old preview",
+      updatedAt: "2026-06-18T00:00:00.000Z",
+      source: "recent",
+      lifecycle: null,
+      preview: null,
+      canManageConversation: true,
+    } as const;
+    const evidenceResult = {
+      id: "artifact-1",
+      type: "evidence",
+      conversationId: "conversation-2",
+      title: "AAPL evidence",
+      snippet: "AAPL backtest evidence",
+      updatedAt: "2026-06-19T00:00:00.000Z",
+      source: "search",
+      lifecycle: "captured",
+      preview: { digest: "AAPL backtest evidence" },
+      canManageConversation: false,
+    } as const;
+
+    expect(commandPaletteSelectedPreview(staleConversation, [evidenceResult])).toBe(
+      evidenceResult,
+    );
+    expect(commandPaletteSelectedPreview(evidenceResult, [evidenceResult])).toBe(
+      evidenceResult,
+    );
+    expect(commandPaletteSelectedPreview(staleConversation, [])).toBeNull();
   });
 });

@@ -1440,14 +1440,14 @@ def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
     evidence = next(item for item in items if item["type"] == "evidence")
     assert evidence["preview"] == {
         "digest": "AAPL MSFT beat SPY in the test window.",
-        "artifact_type": "backtest",
-        "source_run_id": "run-1",
         "symbols": ["AAPL", "MSFT"],
         "benchmark_symbol": "SPY",
     }
     assert "context_packets" not in evidence["preview"]
+    assert not any(key.endswith("_id") for key in evidence["preview"])
     decision = next(item for item in items if item["type"] == "decision")
     assert decision["preview"]["decision_state"] == "promising"
+    assert not any(key.endswith("_id") for key in decision["preview"])
     assert decision["matched_text"] == (
         "Worth revisiting. · AAPL MSFT beat SPY in the test window."
     )

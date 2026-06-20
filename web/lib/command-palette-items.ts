@@ -57,6 +57,24 @@ export function commandPaletteItemFromSearch(
   };
 }
 
+export function commandPaletteSelectedPreview(
+  previewItem: CommandPaletteDisplayItem | null,
+  displayItems: readonly CommandPaletteDisplayItem[],
+): CommandPaletteDisplayItem | null {
+  if (
+    previewItem &&
+    displayItems.some(
+      (item) =>
+        item.id === previewItem.id &&
+        item.type === previewItem.type &&
+        item.source === previewItem.source,
+    )
+  ) {
+    return previewItem;
+  }
+  return displayItems[0] ?? null;
+}
+
 export function commandPaletteTypeLabelKey(type: SearchItem["type"]) {
   return `command_palette.type.${type}`;
 }

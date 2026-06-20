@@ -697,12 +697,28 @@ class SupabaseGateway:
                 artifact=captured.evidence_artifact,
             )
         except Exception:
+            existing_after_error = None
+            if run_id is not None:
+                existing_after_error = self.get_evidence_capture_by_run(
+                    user_id=user_id,
+                    run_id=run_id,
+                )
+                if (
+                    existing_after_error is not None
+                    and idea is not None
+                    and version is not None
+                    and existing_after_error.idea.id == idea.id
+                    and existing_after_error.idea_version.id == version.id
+                ):
+                    return existing_after_error
             if idea is not None:
                 self._discard_transient_evidence_sidecars(
                     user_id=user_id,
                     idea_id=idea.id,
                     idea_version_id=version.id if version is not None else None,
                 )
+            if existing_after_error is not None:
+                return existing_after_error
             if run_id is not None:
                 existing = self.get_evidence_capture_by_run(
                     user_id=user_id,

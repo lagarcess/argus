@@ -38,6 +38,7 @@ import {
   confirmationActionLabelKey,
   confirmationRowKey,
   confirmationRowLabelKey,
+  confirmationStatusAllowsActions,
   confirmationStatusFromPayload,
   confirmationStatusLabel,
   confirmationStatusLabelKey,
@@ -84,10 +85,10 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
   const { t, i18n } = useTranslation();
   const displayState = confirmationDisplayState(confirmation, t);
   const viewModel = confirmationCardViewModel(confirmation, t, i18n.language);
-  const activeActions =
-    confirmation.confirmation_state === "active" || !confirmation.confirmation_state
-      ? confirmation.actions ?? []
-      : [];
+  const canShowActions =
+    (confirmation.confirmation_state === "active" || !confirmation.confirmation_state) &&
+    confirmationStatusAllowsActions(displayState.status);
+  const activeActions = canShowActions ? confirmation.actions ?? [] : [];
   const StatusIcon = displayState.icon;
 
   return (

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user, problem
+from argus.api.memory_ownership import memory_object_visible
 from argus.api.naming import suggest_entity_name
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
@@ -86,6 +87,7 @@ def create_strategy(
             updated_at=now,
         )
         api_state.store.strategies[strategy.id] = strategy
+        api_state.store.strategy_owners[strategy.id] = user.id
     return StrategyResponse(strategy=strategy)
 
 
@@ -106,6 +108,12 @@ def list_strategies(
     else:
         items = []
         for item in api_state.store.strategies.values():
+            if not memory_object_visible(
+                owner_map=api_state.store.strategy_owners,
+                object_id=item.id,
+                user_id=user.id,
+            ):
+                continue
             if deleted:
                 if item.deleted_at is None:
                     continue
@@ -157,7 +165,12 @@ def patch_strategy(
             strategy_id=strategy_id,
         )
     else:
-        strategy = api_state.store.strategies.get(strategy_id)
+        if memory_object_visible(
+            owner_map=api_state.store.strategy_owners,
+            object_id=strategy_id,
+            user_id=user.id,
+        ):
+            strategy = api_state.store.strategies.get(strategy_id)
 
     if not strategy:
         raise problem(
@@ -200,7 +213,12 @@ def delete_strategy(
             strategy_id=strategy_id,
         )
     else:
-        strategy = api_state.store.strategies.get(strategy_id)
+        if memory_object_visible(
+            owner_map=api_state.store.strategy_owners,
+            object_id=strategy_id,
+            user_id=user.id,
+        ):
+            strategy = api_state.store.strategies.get(strategy_id)
 
     if not strategy:
         raise problem(

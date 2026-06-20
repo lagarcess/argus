@@ -72,6 +72,7 @@ def save_strategy_from_run(*, user: User, run: BacktestRun) -> Strategy:
             updated_at=now,
         )
         api_state.store.strategies[strategy.id] = strategy
+        api_state.store.strategy_owners[strategy.id] = user.id
     run.strategy_id = strategy.id
     _mark_run_saved(run=run, strategy_id=strategy.id)
     return strategy
