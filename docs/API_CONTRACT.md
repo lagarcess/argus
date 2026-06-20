@@ -1928,6 +1928,13 @@ Server behavior:
 - `404 Not Found`: evidence artifact is missing or not owned by the user. The
   response follows the standard RFC 9457 Problem Details shape with
   `code = "not_found"`.
+- `422 Validation Error`: malformed body or unsupported `decision_state`. The
+  response follows the standard RFC 9457 Problem Details shape with
+  `code = "validation_error"` and validation details in `context.errors`.
+- `500 Decision Capture Failed`: durable decision capture failed after request
+  validation. The response follows the standard RFC 9457 Problem Details shape
+  with `code = "decision_capture_failed"`. Clients should show a retryable
+  failure state and must not invent a saved decision locally.
 
 ---
 
@@ -2000,7 +2007,12 @@ Global omni-search across conversations and typed recall objects.
       "preview": {
         "digest": "AAPL and MSFT were tested against SPY.",
         "symbols": ["AAPL", "MSFT"],
-        "benchmark_symbol": "SPY"
+        "benchmark_symbol": "SPY",
+        "assumptions": ["Benchmark: SPY", "No fees"],
+        "metrics_summary": {
+          "total_return_pct": 12.5
+        },
+        "quick_take": "AAPL and MSFT beat SPY in this historical test."
       }
     }
   ],
@@ -2043,13 +2055,65 @@ context packets, route receipts, provider/model metadata, retry payloads,
 conversation transcripts, private memory, internal source-run ids, or internal
 artifact implementation fields. Object identity and product type are carried by
 the top-level `id`, `type`, `conversation_id`, and `lifecycle` fields; `preview`
-is reserved for grounded display context such as digest, symbols, and benchmark.
+is reserved for grounded display context such as digest, symbols, benchmark,
+assumptions, compact metrics summaries, quick take, and breakdown context when
+available.
 
 For typed P1 objects, Omnisearch treats artifacts as first-class results and
 the source conversation as provenance. Evidence-like objects do not expose chat
 owner actions such as rename, archive, or delete.
 
 *Future semantic retrieval may extend this endpoint.*
+
+---
+
+# 17.1 Private Alpha Observability Envelope
+
+P1 defines a stable measurement envelope for future analytics, cost, and eval
+readiness. This is a contract-only surface in the current slice: Argus can build
+and sanitize event envelopes, but live analytics emission remains disabled.
+
+Event envelope schema version: `argus_observability_event/v1`.
+
+Core fields:
+- `schema_version`
+- `event_id`
+- `occurred_at`
+- `environment`
+- `privacy_mode`
+- `event_type`
+- `event_action`
+- `feature_area`
+- `actor_hash`
+- `session_id`
+- `conversation_id`
+- `turn_id`
+- `message_id`
+- `job_id`
+- `backtest_run_id`
+- `route_receipt_id`
+- `provider`
+- `model`
+- `provider_request_id`
+- `upstream_id`
+- `status`
+- `latency_ms`
+- `usage`
+- `cost`
+- `error_category`
+- `sampling_rate`
+- `retention_class`
+- `attributes`
+
+Privacy posture:
+- Default mode is `metadata_only`.
+- The sanitizer removes raw prompts, transcripts, context packets, route
+  receipts, provider/model metadata, auth tokens, API keys, broker credentials,
+  account balances, exact holdings, payment identifiers, and similar sensitive
+  payloads before capture.
+- `capture_event` returns a suppressed result with
+  `reason = "p1_measurement_only"` in this slice. PostHog, cost-ledger tables,
+  and eval-result persistence are future implementation surfaces.
 
 ---
 

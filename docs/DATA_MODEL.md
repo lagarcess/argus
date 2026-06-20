@@ -437,6 +437,13 @@ Payload rules:
 - `payload.result_card` is sanitized for recall and must not expose context
   packets, provider/model metadata, route receipts, retry payloads, or raw
   conversation transcripts.
+- `payload.assumptions`, `payload.metrics`, `payload.provenance`,
+  `payload.digest`, and when available `payload.quick_take` and
+  `payload.breakdown` are first-class evidence context, not frontend-only copy.
+- Search previews derive from this sanitized evidence payload and may expose
+  digest, symbols, benchmark, assumptions, compact metric summaries, quick take,
+  and breakdown context. Search previews must not expose internal ids inside
+  `preview`; object identity remains on the top-level search result fields.
 - `UNIQUE(user_id, source_run_id)` keeps completed-run capture idempotent.
   Replays or worker restarts must reuse the existing sidecar instead of
   creating another evidence artifact for the same completed run.
@@ -477,6 +484,29 @@ Durable decision capture:
 All four P1 tables are owner-scoped by `user_id`. Select, insert, update, and
 delete policies require `auth.uid() = user_id`. Backend P1 persistence uses the
 service role server-side; service-role grants do not relax frontend/client RLS.
+
+## 12.1.1 P1 Observability Envelope
+
+P1 defines the private-alpha observability envelope in code without adding a new
+durable analytics or cost table in this slice.
+
+Current behavior:
+- `argus_observability_event/v1` is the canonical event-envelope schema.
+- Default privacy mode is `metadata_only`.
+- Event categories include chat interpretation, continuity, evidence capture,
+  decision capture, recall, cost-ledger entries, and eval-suite readiness.
+- The sanitizer strips raw prompts, transcripts, context packets, route
+  receipts, provider/model metadata, auth tokens, API keys, broker credentials,
+  account balances, exact holdings, payment identifiers, and similar sensitive
+  payloads.
+- Live analytics capture is suppressed with `reason = "p1_measurement_only"`.
+
+Deferred durable surfaces:
+- PostHog product analytics wiring.
+- Append-only provider cost ledger.
+- Eval run/case result persistence.
+- Route-receipt to cost/eval/product-event joins beyond existing product
+  records.
 
 ## 12.2 backtest_jobs
 

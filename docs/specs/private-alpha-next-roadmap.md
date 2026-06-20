@@ -1,6 +1,6 @@
 # Private Alpha Next Roadmap
 
-Status: P1 verified on reintegration branch; awaiting promotion decision
+Status: P1 recovery candidate on reintegration branch; final QA/review pending
 Date: 2026-06-20
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
@@ -113,16 +113,17 @@ Before code:
 
 Before promotion to `codex/private-alpha-next`:
 
-- [x] Focused backend tests pass.
-- [x] Focused frontend tests pass.
-- [x] Live Codex browser QA passes locally.
-- [x] Internal code review has no release-blocking findings.
-- [x] Docs reflect the shipped behavior, not aspirational behavior.
+- [ ] Focused backend tests pass for the final candidate SHA.
+- [ ] Focused frontend tests pass for the final candidate SHA.
+- [ ] Live Codex browser QA passes locally for the final candidate SHA.
+- [ ] Internal code review has no release-blocking findings.
+- [ ] Docs reflect the shipped behavior, not aspirational behavior.
 - [x] No broad quarantine runtime diff was imported.
 
-Verification note: these boxes describe the current
-`codex/private-alpha-next-reintegration` candidate only. Promotion to
-`codex/private-alpha-next` remains a separate founder-directed action.
+Verification note: these boxes must be checked only against the exact
+`codex/private-alpha-next-reintegration` candidate SHA being considered for
+promotion. Promotion to `codex/private-alpha-next` remains a separate
+founder-directed action.
 
 Stop immediately if:
 
@@ -170,6 +171,9 @@ Stop immediately if:
    - Define event schema for evidence capture, decision capture, recall,
      continuity mismatches, cost, and eval readiness.
    - Keep analytics measurement-only unless a later slice starts live reporting.
+   - Current P1 implements the non-emitting `argus_observability_event/v1`
+     envelope and privacy sanitizer; PostHog wiring, durable cost-ledger tables,
+     and eval-result persistence remain deferred.
 
 ### Design-Only Until Later
 
