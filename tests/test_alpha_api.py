@@ -1348,6 +1348,10 @@ def test_search_returns_typed_p1_artifacts() -> None:
     assert evidence["preview"]["digest"]
     assert "context_packets" not in evidence["preview"]
     assert not any(key.endswith("_id") for key in evidence["preview"])
+    idea = next(item for item in payload["items"] if item["type"] == "idea")
+    assert idea["conversation_id"] == conversation["id"]
+    assert idea["preview"]["digest"]
+    assert not any(key.endswith("_id") for key in idea["preview"])
     decision = next(item for item in payload["items"] if item["type"] == "decision")
     assert decision["preview"]["decision_state"] == "watching"
     assert not any(key.endswith("_id") for key in decision["preview"])

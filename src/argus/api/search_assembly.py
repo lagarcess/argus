@@ -252,7 +252,6 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
                 lifecycle=idea.lifecycle,
                 preview={
                     "digest": idea.summary,
-                    "active_version_id": idea.active_version_id,
                 },
             )
             scored_items.append(

@@ -7,7 +7,16 @@ import pandas as pd
 import pytest
 from argus.api import state as api_state
 from argus.api.main import app
-from argus.api.schemas import BacktestRun, Conversation, Message, OnboardingState, User
+from argus.api.schemas import (
+    BacktestRun,
+    Conversation,
+    EvidenceArtifact,
+    Idea,
+    IdeaVersion,
+    Message,
+    OnboardingState,
+    User,
+)
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
@@ -1303,6 +1312,85 @@ def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
     mock_gateway.signup.assert_not_called()
 
 
+def test_decision_endpoint_returns_success_when_card_enrichment_fails(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
+    now = utcnow()
+    user_id = "00000000-0000-0000-0000-000000000001"
+    idea = Idea(
+        id="idea-card-fail",
+        source_conversation_id="conversation-card-fail",
+        title="AAPL evidence idea",
+        summary="AAPL evidence summary",
+        lifecycle="captured",
+        active_version_id="version-card-fail",
+        created_at=now,
+        updated_at=now,
+    )
+    version = IdeaVersion(
+        id="version-card-fail",
+        idea_id=idea.id,
+        source_conversation_id="conversation-card-fail",
+        source_run_id="run-card-fail",
+        version_number=1,
+        canonical_spec={"symbols": ["AAPL"], "benchmark_symbol": "SPY"},
+        strategy_snapshot={"symbols": ["AAPL"]},
+        title=idea.title,
+        summary=idea.summary,
+        lifecycle="captured",
+        created_at=now,
+    )
+    artifact = EvidenceArtifact(
+        id="artifact-card-fail",
+        idea_id=idea.id,
+        idea_version_id=version.id,
+        source_conversation_id="conversation-card-fail",
+        source_run_id="run-card-fail",
+        artifact_type="backtest",
+        lifecycle="captured",
+        title="AAPL evidence",
+        digest="AAPL backtest versus SPY.",
+        payload={
+            "provenance": {
+                "symbols": ["AAPL"],
+                "benchmark_symbol": "SPY",
+            }
+        },
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.ideas[idea.id] = idea
+    api_state.store.idea_owners[idea.id] = user_id
+    api_state.store.idea_versions[version.id] = version
+    api_state.store.idea_version_owners[version.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+    mock_gateway.mark_result_card_decision_for_run.side_effect = RuntimeError(
+        "card enrichment failed"
+    )
+
+    response = client.post(
+        f"/api/v1/evidence-artifacts/{artifact.id}/decision",
+        json={"decision_state": "promising", "note": "Keep watching."},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["decision"]["decision_state"] == "promising"
+    assert body["evidence_artifact"]["lifecycle"] == "decided"
+    decisions = [
+        decision
+        for decision in api_state.store.decision_notes.values()
+        if decision.evidence_artifact_id == artifact.id
+    ]
+    assert len(decisions) == 1
+    mock_gateway.capture_current_decision_note.assert_called_once()
+    mock_gateway.mark_result_card_decision_for_run.assert_called_once()
+
+
 def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
     now = utcnow()
     mock_gateway.search_rows.return_value = {
@@ -1445,6 +1533,9 @@ def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
     }
     assert "context_packets" not in evidence["preview"]
     assert not any(key.endswith("_id") for key in evidence["preview"])
+    idea = next(item for item in items if item["type"] == "idea")
+    assert idea["preview"]["digest"] == "Test AAPL and MSFT against SPY."
+    assert not any(key.endswith("_id") for key in idea["preview"])
     decision = next(item for item in items if item["type"] == "decision")
     assert decision["preview"]["decision_state"] == "promising"
     assert not any(key.endswith("_id") for key in decision["preview"])

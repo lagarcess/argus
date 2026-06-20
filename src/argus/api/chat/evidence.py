@@ -130,10 +130,8 @@ def create_decision_for_evidence_artifact(
                 decision_state=decision.decision_state,
             )
         except Exception as exc:
-            if not dev_memory_fallback_enabled():
-                raise
             logger.warning(
-                "Supabase decision card enrichment failed; using in-memory state",
+                "Supabase decision card enrichment failed after decision commit",
                 error=str(exc),
                 run_id=artifact.source_run_id,
                 evidence_artifact_id=artifact.id,
