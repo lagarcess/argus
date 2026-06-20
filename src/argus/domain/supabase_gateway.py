@@ -4,6 +4,7 @@ import os
 import threading
 import time
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -16,11 +17,16 @@ from argus.api.schemas import (
     BacktestRun,
     Collection,
     Conversation,
+    DecisionNote,
+    EvidenceArtifact,
+    Idea,
+    IdeaVersion,
     Message,
     OnboardingState,
     Strategy,
     User,
 )
+from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
 from argus.domain.store import utcnow
 from supabase import Client, ClientOptions, create_client
 
@@ -179,6 +185,10 @@ class SupabaseGateway:
             "feedback",
             "usage_counters",
             "collection_strategies",
+            "decision_notes",
+            "evidence_artifacts",
+            "idea_versions",
+            "ideas",
             "backtest_runs",
             "messages",
             "strategies",
@@ -482,6 +492,377 @@ class SupabaseGateway:
         created = self.client.table("backtest_runs").insert(payload).execute()
         return BacktestRun.model_validate(_row_one(created))
 
+    def update_backtest_run_result_card(
+        self,
+        *,
+        user_id: str,
+        run_id: str,
+        conversation_result_card: dict[str, Any],
+    ) -> BacktestRun:
+        self._require_owned_backtest_run_if_present(user_id=user_id, run_id=run_id)
+        updated = (
+            self.client.table("backtest_runs")
+            .update(
+                {
+                    "conversation_result_card": conversation_result_card,
+                }
+            )
+            .eq("user_id", user_id)
+            .eq("id", run_id)
+            .execute()
+        )
+        return BacktestRun.model_validate(_row_one(updated))
+
+    def mark_result_card_decision_for_run(
+        self,
+        *,
+        user_id: str,
+        run_id: str,
+        evidence_artifact_id: str,
+        decision_id: str,
+        decision_state: str,
+    ) -> None:
+        run = self.get_backtest_run(user_id=user_id, run_id=run_id)
+        if run is None:
+            raise ValueError("Backtest run not found or not owned by user.")
+        enriched_card = attach_decision_to_result_card(
+            dict(run.conversation_result_card),
+            decision_id=decision_id,
+            decision_state=decision_state,  # type: ignore[arg-type]
+        )
+        self.update_backtest_run_result_card(
+            user_id=user_id,
+            run_id=run_id,
+            conversation_result_card=enriched_card,
+        )
+        if not run.conversation_id:
+            return
+        for message in self.list_messages(
+            user_id=user_id,
+            conversation_id=run.conversation_id,
+            limit=None,
+        ):
+            metadata = dict(message.metadata or {})
+            result_card = metadata.get("result_card")
+            if not isinstance(result_card, dict):
+                continue
+            is_matching_run = (
+                metadata.get("result_run_id") == run_id
+                or metadata.get("latest_run_id") == run_id
+            )
+            is_matching_artifact = (
+                result_card.get("evidence_artifact_id") == evidence_artifact_id
+            )
+            if not is_matching_run and not is_matching_artifact:
+                continue
+            metadata["result_card"] = attach_decision_to_result_card(
+                result_card,
+                decision_id=decision_id,
+                decision_state=decision_state,  # type: ignore[arg-type]
+            )
+            metadata["decision_note_id"] = decision_id
+            metadata["decision_state"] = decision_state
+            self.client.table("messages").update({"metadata": metadata}).eq(
+                "user_id", user_id
+            ).eq("id", message.id).execute()
+
+    def create_idea(self, *, user_id: str, idea: Idea) -> Idea:
+        self._require_owned_conversation(
+            user_id=user_id,
+            conversation_id=idea.source_conversation_id,
+        )
+        payload = idea.model_dump(mode="json")
+        payload["user_id"] = user_id
+        created = self.client.table("ideas").insert(payload).execute()
+        return Idea.model_validate(_row_one(created))
+
+    def update_idea_active_version(
+        self, *, user_id: str, idea_id: str, active_version_id: str
+    ) -> Idea:
+        self._require_owned_idea(user_id=user_id, idea_id=idea_id)
+        self._require_owned_idea_version(
+            user_id=user_id,
+            idea_version_id=active_version_id,
+        )
+        updated = (
+            self.client.table("ideas")
+            .update({"active_version_id": active_version_id, "updated_at": _now_iso()})
+            .eq("user_id", user_id)
+            .eq("id", idea_id)
+            .execute()
+        )
+        return Idea.model_validate(_row_one(updated))
+
+    def create_idea_version(self, *, user_id: str, version: IdeaVersion) -> IdeaVersion:
+        self._require_owned_idea(user_id=user_id, idea_id=version.idea_id)
+        self._require_owned_conversation(
+            user_id=user_id,
+            conversation_id=version.source_conversation_id,
+        )
+        self._require_owned_backtest_run_if_present(
+            user_id=user_id,
+            run_id=version.source_run_id,
+        )
+        payload = version.model_dump(mode="json")
+        payload["user_id"] = user_id
+        created = self.client.table("idea_versions").insert(payload).execute()
+        return IdeaVersion.model_validate(_row_one(created))
+
+    def create_evidence_artifact(
+        self, *, user_id: str, artifact: EvidenceArtifact
+    ) -> EvidenceArtifact:
+        self._require_owned_idea(user_id=user_id, idea_id=artifact.idea_id)
+        self._require_owned_idea_version(
+            user_id=user_id,
+            idea_version_id=artifact.idea_version_id,
+        )
+        self._require_owned_conversation(
+            user_id=user_id,
+            conversation_id=artifact.source_conversation_id,
+        )
+        self._require_owned_backtest_run_if_present(
+            user_id=user_id,
+            run_id=artifact.source_run_id,
+        )
+        payload = artifact.model_dump(mode="json")
+        payload["user_id"] = user_id
+        created = self.client.table("evidence_artifacts").insert(payload).execute()
+        return EvidenceArtifact.model_validate(_row_one(created))
+
+    def get_evidence_capture_by_run(
+        self, *, user_id: str, run_id: str
+    ) -> CapturedEvidence | None:
+        artifact_result = (
+            self.client.table("evidence_artifacts")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("source_run_id", run_id)
+            .limit(1)
+            .execute()
+        )
+        artifact_row = _row_one(artifact_result)
+        if artifact_row is None:
+            return None
+        artifact = EvidenceArtifact.model_validate(artifact_row)
+        idea_result = (
+            self.client.table("ideas")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("id", artifact.idea_id)
+            .limit(1)
+            .execute()
+        )
+        version_result = (
+            self.client.table("idea_versions")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("id", artifact.idea_version_id)
+            .limit(1)
+            .execute()
+        )
+        idea_row = _row_one(idea_result)
+        version_row = _row_one(version_result)
+        if idea_row is None or version_row is None:
+            raise ValueError("Evidence artifact sidecar records are incomplete.")
+        return CapturedEvidence(
+            idea=Idea.model_validate(idea_row),
+            idea_version=IdeaVersion.model_validate(version_row),
+            evidence_artifact=artifact,
+        )
+
+    def create_backtest_evidence_capture(
+        self, *, user_id: str, captured: CapturedEvidence
+    ) -> CapturedEvidence:
+        run_id = captured.evidence_artifact.source_run_id
+        if run_id is not None:
+            existing = self.get_evidence_capture_by_run(user_id=user_id, run_id=run_id)
+            if existing is not None:
+                return existing
+
+        idea_for_insert = captured.idea.model_copy(update={"active_version_id": None})
+        idea: Idea | None = None
+        version: IdeaVersion | None = None
+        try:
+            idea = self.create_idea(user_id=user_id, idea=idea_for_insert)
+            version = self.create_idea_version(
+                user_id=user_id, version=captured.idea_version
+            )
+            idea = self.update_idea_active_version(
+                user_id=user_id,
+                idea_id=idea.id,
+                active_version_id=version.id,
+            )
+            artifact = self.create_evidence_artifact(
+                user_id=user_id,
+                artifact=captured.evidence_artifact,
+            )
+        except Exception:
+            if idea is not None:
+                self._discard_transient_evidence_sidecars(
+                    user_id=user_id,
+                    idea_id=idea.id,
+                    idea_version_id=version.id if version is not None else None,
+                )
+            if run_id is not None:
+                existing = self.get_evidence_capture_by_run(
+                    user_id=user_id,
+                    run_id=run_id,
+                )
+                if existing is not None:
+                    return existing
+            raise
+        return CapturedEvidence(
+            idea=idea,
+            idea_version=version,
+            evidence_artifact=artifact,
+        )
+
+    def _discard_transient_evidence_sidecars(
+        self,
+        *,
+        user_id: str,
+        idea_id: str,
+        idea_version_id: str | None,
+    ) -> None:
+        with suppress(Exception):
+            self.client.table("ideas").update({"active_version_id": None}).eq(
+                "user_id", user_id
+            ).eq("id", idea_id).execute()
+        if idea_version_id is not None:
+            with suppress(Exception):
+                self.client.table("idea_versions").delete().eq("user_id", user_id).eq(
+                    "id", idea_version_id
+                ).execute()
+        with suppress(Exception):
+            self.client.table("ideas").delete().eq("user_id", user_id).eq(
+                "id", idea_id
+            ).execute()
+
+    def get_evidence_artifact(
+        self, *, user_id: str, artifact_id: str
+    ) -> EvidenceArtifact | None:
+        rows = (
+            self.client.table("evidence_artifacts")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("id", artifact_id)
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(rows)
+        return EvidenceArtifact.model_validate(row) if row else None
+
+    def get_decision_note_by_artifact(
+        self, *, user_id: str, artifact_id: str
+    ) -> DecisionNote | None:
+        rows = (
+            self.client.table("decision_notes")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("evidence_artifact_id", artifact_id)
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(rows)
+        return DecisionNote.model_validate(row) if row else None
+
+    def create_decision_note(
+        self, *, user_id: str, decision: DecisionNote
+    ) -> DecisionNote:
+        self._require_owned_idea(user_id=user_id, idea_id=decision.idea_id)
+        self._require_owned_idea_version(
+            user_id=user_id,
+            idea_version_id=decision.idea_version_id,
+        )
+        self._require_owned_evidence_artifact(
+            user_id=user_id,
+            artifact_id=decision.evidence_artifact_id,
+        )
+        self._require_owned_conversation(
+            user_id=user_id,
+            conversation_id=decision.source_conversation_id,
+        )
+        payload = decision.model_dump(mode="json")
+        payload["user_id"] = user_id
+        created = self.client.table("decision_notes").insert(payload).execute()
+        return DecisionNote.model_validate(_row_one(created))
+
+    def upsert_decision_note(
+        self, *, user_id: str, decision: DecisionNote
+    ) -> DecisionNote:
+        existing = self.get_decision_note_by_artifact(
+            user_id=user_id,
+            artifact_id=decision.evidence_artifact_id,
+        )
+        if existing is None:
+            try:
+                return self.create_decision_note(user_id=user_id, decision=decision)
+            except Exception:
+                existing = self.get_decision_note_by_artifact(
+                    user_id=user_id,
+                    artifact_id=decision.evidence_artifact_id,
+                )
+                if existing is None:
+                    raise
+
+        updated = (
+            self.client.table("decision_notes")
+            .update(
+                {
+                    "decision_state": decision.decision_state,
+                    "note": decision.note,
+                    "updated_at": _now_iso(),
+                }
+            )
+            .eq("user_id", user_id)
+            .eq("id", existing.id)
+            .execute()
+        )
+        return DecisionNote.model_validate(_row_one(updated))
+
+    def capture_current_decision_note(
+        self, *, user_id: str, decision: DecisionNote
+    ) -> tuple[DecisionNote, EvidenceArtifact, Idea, IdeaVersion]:
+        result = self.client.rpc(
+            "upsert_current_decision_note",
+            {
+                "p_user_id": user_id,
+                "p_evidence_artifact_id": decision.evidence_artifact_id,
+                "p_decision_id": decision.id,
+                "p_decision_state": decision.decision_state,
+                "p_note": decision.note,
+            },
+        ).execute()
+        row = _row_one(result)
+        if row is None:
+            raise ValueError("Decision capture did not return durable artifact state.")
+        return (
+            DecisionNote.model_validate(row["decision"]),
+            EvidenceArtifact.model_validate(row["evidence_artifact"]),
+            Idea.model_validate(row["idea"]),
+            IdeaVersion.model_validate(row["idea_version"]),
+        )
+
+    def mark_evidence_artifact_lifecycle(
+        self,
+        *,
+        user_id: str,
+        artifact_id: str,
+        lifecycle: str,
+    ) -> EvidenceArtifact:
+        self._require_owned_evidence_artifact(
+            user_id=user_id,
+            artifact_id=artifact_id,
+        )
+        updated = (
+            self.client.table("evidence_artifacts")
+            .update({"lifecycle": lifecycle, "updated_at": _now_iso()})
+            .eq("user_id", user_id)
+            .eq("id", artifact_id)
+            .execute()
+        )
+        return EvidenceArtifact.model_validate(_row_one(updated))
+
     def create_backtest_job(
         self,
         *,
@@ -766,6 +1147,62 @@ class SupabaseGateway:
             return
         raise ValueError("Backtest run not found or not owned by user.")
 
+    def _require_owned_backtest_run_if_present(
+        self, *, user_id: str, run_id: str | None
+    ) -> None:
+        if run_id is None:
+            return
+        self._require_owned_backtest_run(user_id=user_id, run_id=run_id)
+
+    def _require_owned_idea(self, *, user_id: str, idea_id: str | None) -> None:
+        if idea_id is None:
+            return
+        rows = (
+            self.client.table("ideas")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("id", idea_id)
+            .limit(1)
+            .execute()
+        )
+        if _row_one(rows) is not None:
+            return
+        raise ValueError("Idea not found or not owned by user.")
+
+    def _require_owned_idea_version(
+        self, *, user_id: str, idea_version_id: str | None
+    ) -> None:
+        if idea_version_id is None:
+            return
+        rows = (
+            self.client.table("idea_versions")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("id", idea_version_id)
+            .limit(1)
+            .execute()
+        )
+        if _row_one(rows) is not None:
+            return
+        raise ValueError("Idea version not found or not owned by user.")
+
+    def _require_owned_evidence_artifact(
+        self, *, user_id: str, artifact_id: str | None
+    ) -> None:
+        if artifact_id is None:
+            return
+        rows = (
+            self.client.table("evidence_artifacts")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("id", artifact_id)
+            .limit(1)
+            .execute()
+        )
+        if _row_one(rows) is not None:
+            return
+        raise ValueError("Evidence artifact not found or not owned by user.")
+
     def _context_packet_owned_by_user(self, *, user_id: str, packet_id: str) -> bool:
         rows = (
             self.client.table("context_packets")
@@ -1037,10 +1474,40 @@ class SupabaseGateway:
         )
         runs_query = (
             self.client.table("backtest_runs")
-            .select("id,conversation_result_card,created_at,status")
+            .select(
+                "id,conversation_id,conversation_result_card,created_at,status,"
+                "asset_class,benchmark_symbol"
+            )
             .eq("user_id", user_id)
             .eq("status", "completed")
             .order("created_at", desc=True)
+        )
+        ideas_query = (
+            self.client.table("ideas")
+            .select(
+                "id,title,summary,lifecycle,active_version_id,"
+                "source_conversation_id,updated_at"
+            )
+            .eq("user_id", user_id)
+            .order("updated_at", desc=True)
+        )
+        evidence_query = (
+            self.client.table("evidence_artifacts")
+            .select(
+                "id,title,digest,lifecycle,artifact_type,payload,source_run_id,"
+                "source_conversation_id,updated_at"
+            )
+            .eq("user_id", user_id)
+            .order("updated_at", desc=True)
+        )
+        decisions_query = (
+            self.client.table("decision_notes")
+            .select(
+                "id,decision_state,note,evidence_artifact_id,"
+                "source_conversation_id,updated_at"
+            )
+            .eq("user_id", user_id)
+            .order("updated_at", desc=True)
         )
 
         if limit is None:
@@ -1056,11 +1523,23 @@ class SupabaseGateway:
             runs_raw = self._fetch_all_rows(
                 lambda start, end: runs_query.range(start, end)
             )
+            ideas_raw = self._fetch_all_rows(
+                lambda start, end: ideas_query.range(start, end)
+            )
+            evidence_raw = self._fetch_all_rows(
+                lambda start, end: evidence_query.range(start, end)
+            )
+            decisions_raw = self._fetch_all_rows(
+                lambda start, end: decisions_query.range(start, end)
+            )
         else:
             conversations_raw = conversations_query.limit(limit).execute().data or []
             strategies_raw = strategies_query.limit(limit).execute().data or []
             collections_raw = collections_query.limit(limit).execute().data or []
             runs_raw = runs_query.limit(limit).execute().data or []
+            ideas_raw = ideas_query.limit(limit).execute().data or []
+            evidence_raw = evidence_query.limit(limit).execute().data or []
+            decisions_raw = decisions_query.limit(limit).execute().data or []
 
         conversations = [
             row
@@ -1085,13 +1564,52 @@ class SupabaseGateway:
             row
             for row in runs_raw
             if normalized_query
-            in str((row.get("conversation_result_card") or {}).get("title", "")).lower()
+            in (
+                f"{(row.get('conversation_result_card') or {}).get('title', '')} "
+                f"{' '.join((row.get('conversation_result_card') or {}).get('symbols') or [])} "
+                f"{(row.get('conversation_result_card') or {}).get('strategy_label', '')} "
+                f"{row.get('benchmark_symbol') or ''}"
+            ).lower()
         ]
+        ideas = [
+            row
+            for row in ideas_raw
+            if normalized_query
+            in f"{row.get('title', '')} {row.get('summary') or ''}".lower()
+        ]
+        evidence = [
+            row
+            for row in evidence_raw
+            if normalized_query
+            in (
+                f"{row.get('title', '')} {row.get('digest') or ''} "
+                f"{' '.join(((row.get('payload') or {}).get('result_card') or {}).get('symbols') or [])}"
+            ).lower()
+        ]
+        evidence_by_id = {str(row.get("id")): row for row in evidence_raw}
+        decisions = []
+        for row in decisions_raw:
+            artifact = evidence_by_id.get(str(row.get("evidence_artifact_id"))) or {}
+            haystack = (
+                f"{row.get('decision_state', '')} {row.get('note') or ''} "
+                f"{artifact.get('title', '')} {artifact.get('digest', '')}"
+            )
+            if normalized_query in haystack.lower():
+                decisions.append(
+                    {
+                        **row,
+                        "artifact_title": artifact.get("title"),
+                        "artifact_digest": artifact.get("digest"),
+                    }
+                )
         return {
             "conversations": conversations,
             "strategies": strategies,
             "collections": collections,
             "runs": runs,
+            "ideas": ideas,
+            "evidence": evidence,
+            "decisions": decisions,
         }
 
     def create_strategy(self, *, user_id: str, payload: dict[str, Any]) -> Strategy:

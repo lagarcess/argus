@@ -6,6 +6,7 @@ from typing import Any
 
 import pandas as pd
 import pytest
+from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.message_store import memory_conversation, memory_message
 from argus.domain.market_data.assets import ResolvedAsset
@@ -568,7 +569,9 @@ def test_delete_all_conversations_soft_deletes_active_and_archived_chats() -> No
         ).status_code
         == 200
     )
-    assert client.delete(f"/api/v1/conversations/{already_deleted['id']}").status_code == 200
+    assert (
+        client.delete(f"/api/v1/conversations/{already_deleted['id']}").status_code == 200
+    )
 
     response = client.delete("/api/v1/conversations")
 
@@ -587,9 +590,9 @@ def test_delete_all_conversations_soft_deletes_active_and_archived_chats() -> No
     }
     deleted_archived_chat_ids = {
         item["id"]
-        for item in client.get(
-            "/api/v1/history?deleted=true&archived=true"
-        ).json()["items"]
+        for item in client.get("/api/v1/history?deleted=true&archived=true").json()[
+            "items"
+        ]
         if item["type"] == "chat"
     }
 
@@ -1166,6 +1169,129 @@ def test_search_supports_cursor_and_mixed_types() -> None:
     first_ids = {(item["type"], item["id"]) for item in payload["items"]}
     second_ids = {(item["type"], item["id"]) for item in second_payload["items"]}
     assert first_ids.isdisjoint(second_ids)
+
+
+def test_decision_endpoint_marks_evidence_artifact_decided() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "chat-p1-evidence"},
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest TSLA from 2025 to 2025",
+            "language": "en",
+        },
+    )
+    payload = _final_payload(response.text)
+    artifact_id = payload["run"]["conversation_result_card"]["evidence_artifact_id"]
+
+    decision = client.post(
+        f"/api/v1/evidence-artifacts/{artifact_id}/decision",
+        json={"decision_state": "promising", "note": "Worth revisiting."},
+    )
+
+    assert decision.status_code == 200
+    body = decision.json()
+    assert body["decision"]["decision_state"] == "promising"
+    assert body["decision"]["note"] == "Worth revisiting."
+    assert body["evidence_artifact"]["lifecycle"] == "decided"
+    artifact = api_state.store.evidence_artifacts[artifact_id]
+    assert api_state.store.ideas[artifact.idea_id].lifecycle == "decided"
+    assert api_state.store.idea_versions[artifact.idea_version_id].lifecycle == "decided"
+    assistant_result_cards = [
+        message.metadata.get("result_card")
+        for messages in api_state.store.messages.values()
+        for message in messages
+        if message.role == "assistant"
+        and isinstance(message.metadata.get("result_card"), dict)
+    ]
+    assert any(
+        card.get("evidence_artifact_id") == artifact_id
+        and card.get("decision_state") == "promising"
+        for card in assistant_result_cards
+    )
+
+
+def test_decision_endpoint_is_idempotent_per_evidence_artifact() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "chat-p1-decision-idempotent"},
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest TSLA from 2025 to 2025",
+            "language": "en",
+        },
+    )
+    artifact_id = _final_payload(response.text)["run"]["conversation_result_card"][
+        "evidence_artifact_id"
+    ]
+
+    first = client.post(
+        f"/api/v1/evidence-artifacts/{artifact_id}/decision",
+        json={"decision_state": "watching", "note": "Track it."},
+    )
+    second = client.post(
+        f"/api/v1/evidence-artifacts/{artifact_id}/decision",
+        json={"decision_state": "promising", "note": "Still promising."},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    first_body = first.json()
+    second_body = second.json()
+    assert second_body["decision"]["id"] == first_body["decision"]["id"]
+    assert second_body["decision"]["decision_state"] == "promising"
+    assert second_body["decision"]["note"] == "Still promising."
+    decisions_for_artifact = [
+        decision
+        for decision in api_state.store.decision_notes.values()
+        if decision.evidence_artifact_id == artifact_id
+    ]
+    assert len(decisions_for_artifact) == 1
+
+
+def test_search_returns_typed_p1_artifacts() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "chat-p1-search"},
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest TSLA from 2025 to 2025",
+            "language": "en",
+        },
+    )
+    artifact_id = _final_payload(response.text)["run"]["conversation_result_card"][
+        "evidence_artifact_id"
+    ]
+    client.post(
+        f"/api/v1/evidence-artifacts/{artifact_id}/decision",
+        json={"decision_state": "watching", "note": "Track it."},
+    )
+
+    payload = client.get("/api/v1/search?q=TSLA&limit=20").json()
+
+    types = {item["type"] for item in payload["items"]}
+    assert {"chat", "backtest", "evidence", "idea", "decision"}.issubset(types)
+    evidence = next(item for item in payload["items"] if item["type"] == "evidence")
+    assert evidence["conversation_id"] == conversation["id"]
+    assert evidence["preview"]["digest"]
+    assert "context_packets" not in evidence["preview"]
+    decision = next(item for item in payload["items"] if item["type"] == "decision")
+    assert decision["preview"]["decision_state"] == "watching"
+    assert decision["matched_text"].startswith("Track it.")
+    assert "TSLA backtest versus SPY" in decision["matched_text"]
+    assert "watching" not in decision["matched_text"]
 
 
 def test_invalid_cursor_returns_problem_details() -> None:

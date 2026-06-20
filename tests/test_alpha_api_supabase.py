@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.schemas import BacktestRun, Conversation, Message, OnboardingState, User
 from argus.domain.market_data.assets import ResolvedAsset
@@ -320,6 +321,46 @@ def mock_gateway():
     gateway.private_alpha_email_allowed.return_value = True
     gateway.count_completed_runs.return_value = 1
     gateway.list_messages.return_value = []
+    gateway.get_evidence_capture_by_run.return_value = None
+    gateway.create_backtest_evidence_capture.side_effect = (
+        lambda *, user_id, captured: captured
+    )
+    gateway.create_idea.side_effect = lambda *, user_id, idea: idea
+    gateway.create_idea_version.side_effect = lambda *, user_id, version: version
+    gateway.create_evidence_artifact.side_effect = lambda *, user_id, artifact: artifact
+    gateway.get_decision_note_by_artifact.return_value = None
+    gateway.upsert_decision_note.side_effect = lambda *, user_id, decision: decision
+    gateway.capture_current_decision_note.side_effect = (
+        lambda *,
+        user_id,
+        decision: (
+            decision,
+            api_state.store.evidence_artifacts[decision.evidence_artifact_id].model_copy(
+                update={"lifecycle": "decided"}
+            ),
+            api_state.store.ideas[decision.idea_id].model_copy(
+                update={"lifecycle": "decided"}
+            ),
+            api_state.store.idea_versions[decision.idea_version_id].model_copy(
+                update={"lifecycle": "decided"}
+            ),
+        )
+    )
+    gateway.create_decision_note.side_effect = lambda *, user_id, decision: decision
+    gateway.mark_evidence_artifact_lifecycle.side_effect = (
+        lambda *, user_id, artifact_id, lifecycle: api_state.store.evidence_artifacts[
+            artifact_id
+        ].model_copy(update={"lifecycle": lifecycle})
+    )
+    gateway.update_backtest_run_result_card.side_effect = (
+        lambda *,
+        user_id,
+        run_id,
+        conversation_result_card: api_state.store.backtest_runs[run_id].model_copy(
+            update={"conversation_result_card": conversation_result_card}
+        )
+    )
+    gateway.mark_result_card_decision_for_run.return_value = None
     with patch("argus.api.state.supabase_gateway", gateway):
         yield gateway
 
@@ -687,9 +728,7 @@ def test_chat_stream_supabase_rejects_memory_only_conversation(mock_gateway):
         created_at=now,
         updated_at=now,
     )
-    api_state.store.conversations[memory_only_conversation.id] = (
-        memory_only_conversation
-    )
+    api_state.store.conversations[memory_only_conversation.id] = memory_only_conversation
     api_state.store.messages[memory_only_conversation.id] = []
     mock_gateway.get_conversation.return_value = None
 
@@ -892,9 +931,7 @@ def test_login_sets_session_cookie_for_browser_auth(mock_gateway):
     assert response.cookies.get("sb-refresh-token") == "refresh-token-123"
 
 
-def test_login_forces_secure_session_cookies_in_production(
-    mock_gateway, monkeypatch
-):
+def test_login_forces_secure_session_cookies_in_production(mock_gateway, monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     mock_gateway.private_alpha_email_allowed.return_value = True
     mock_gateway.login.return_value = {
@@ -1099,9 +1136,7 @@ def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatc
     )
 
     assert response.status_code == 200
-    mock_gateway.private_alpha_email_allowed.assert_called_once_with(
-        "beta@example.com"
-    )
+    mock_gateway.private_alpha_email_allowed.assert_called_once_with("beta@example.com")
     mock_gateway.signup.assert_called_once()
     assert "mark_private_alpha_signup_accepted" not in [
         call[0] for call in mock_gateway.method_calls
@@ -1319,6 +1354,104 @@ def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
     assert {item["type"] for item in payload["items"]}.issubset(
         {"chat", "strategy", "collection", "run"}
     )
+
+
+def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
+    now = utcnow()
+    mock_gateway.search_rows.return_value = {
+        "conversations": [],
+        "strategies": [],
+        "collections": [],
+        "runs": [
+            {
+                "id": "run-1",
+                "conversation_id": "conversation-1",
+                "conversation_result_card": {
+                    "title": "AAPL MSFT evidence run",
+                    "symbols": ["AAPL", "MSFT"],
+                    "artifact_type": "backtest",
+                    "evidence_artifact_id": "artifact-1",
+                    "evidence_lifecycle": "captured",
+                    "context_packets": [{"raw": "do not expose"}],
+                },
+                "created_at": now.isoformat(),
+                "benchmark_symbol": "SPY",
+            }
+        ],
+        "ideas": [
+            {
+                "id": "idea-1",
+                "title": "AAPL MSFT Buy and Hold",
+                "summary": "Test AAPL and MSFT against SPY.",
+                "lifecycle": "captured",
+                "active_version_id": "version-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+            }
+        ],
+        "evidence": [
+            {
+                "id": "artifact-1",
+                "title": "AAPL MSFT evidence run",
+                "digest": "AAPL MSFT beat SPY in the test window.",
+                "lifecycle": "captured",
+                "artifact_type": "backtest",
+                "source_run_id": "run-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+                "payload": {
+                    "result_card": {
+                        "context_packets": [{"raw": "do not expose"}],
+                    },
+                    "provenance": {
+                        "symbols": ["AAPL", "MSFT"],
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+            }
+        ],
+        "decisions": [
+            {
+                "id": "decision-1",
+                "decision_state": "promising",
+                "note": "Worth revisiting.",
+                "evidence_artifact_id": "artifact-1",
+                "artifact_title": "AAPL MSFT evidence run",
+                "artifact_digest": "AAPL MSFT beat SPY in the test window.",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+            }
+        ],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=aapl&limit=20",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert {item["type"] for item in items} == {
+        "backtest",
+        "idea",
+        "evidence",
+        "decision",
+    }
+    evidence = next(item for item in items if item["type"] == "evidence")
+    assert evidence["preview"] == {
+        "digest": "AAPL MSFT beat SPY in the test window.",
+        "artifact_type": "backtest",
+        "source_run_id": "run-1",
+        "symbols": ["AAPL", "MSFT"],
+        "benchmark_symbol": "SPY",
+    }
+    assert "context_packets" not in evidence["preview"]
+    decision = next(item for item in items if item["type"] == "decision")
+    assert decision["preview"]["decision_state"] == "promising"
+    assert decision["matched_text"] == (
+        "Worth revisiting. · AAPL MSFT beat SPY in the test window."
+    )
+    assert "promising" not in decision["matched_text"]
 
 
 def test_history_supabase_requests_non_archived_rows_by_default(mock_gateway):

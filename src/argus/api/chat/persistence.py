@@ -130,6 +130,23 @@ def persist_runtime_backtest_run(
             }
         )
 
+    from argus.api.chat.evidence import auto_capture_completed_backtest
+
+    try:
+        auto_capture_completed_backtest(
+            user=user,
+            conversation=conversation,
+            run=run,
+        )
+    except Exception as exc:
+        if not dev_memory_fallback_enabled():
+            raise
+        logger.warning(
+            "Evidence auto-capture failed; result run remains persisted",
+            error=str(exc),
+            run_id=run.id,
+        )
+
     return run
 
 

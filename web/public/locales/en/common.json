@@ -246,6 +246,17 @@
       "worst_drop": "Worst drop",
       "explain_result": "Explain result",
       "refine_idea": "Refine idea",
+      "add_decision": "Add decision",
+      "decision": "Decision: {{state}}",
+      "decision_note_placeholder": "Optional note for future you",
+      "save_decision": "Save decision",
+      "decision_saved": "Decision saved",
+      "decision_states": {
+        "watching": "Watching",
+        "promising": "Promising",
+        "rejected": "Rejected",
+        "revisit_later": "Revisit later"
+      },
       "save": "Save",
       "unavailable": "Unavailable",
       "return_unavailable": "return unavailable",
@@ -559,9 +570,22 @@
     "preview": "Preview",
     "preview_empty": "Open this conversation to view its messages.",
     "open_conversation": "Open conversation",
+    "open_source_conversation": "Open source conversation",
     "select_preview": "Select a conversation to preview its metadata.",
     "conversation_count_one": "{{count}} conversation",
-    "conversation_count_other": "{{count}} conversations"
+    "conversation_count_other": "{{count}} conversations",
+    "result_count_one": "{{count}} result",
+    "result_count_other": "{{count}} results",
+    "type": {
+      "backtest": "Backtest",
+      "chat": "Conversation",
+      "collection": "Collection",
+      "decision": "Decision",
+      "evidence": "Evidence",
+      "idea": "Idea",
+      "run": "Run",
+      "strategy": "Strategy"
+    }
   },
   "onboarding": {
     "prompt": "What is your current primary goal? Don't worry, you can change it later.",

@@ -4,6 +4,10 @@ from __future__ import annotations
 def search_type_rank(kind: str) -> int:
     ranks = {
         "chat": 4,
+        "decision": 4,
+        "evidence": 3,
+        "backtest": 3,
+        "idea": 3,
         "strategy": 3,
         "collection": 2,
         "run": 1,

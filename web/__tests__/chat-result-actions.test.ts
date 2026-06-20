@@ -4,6 +4,7 @@ import {
   hydrateResultActions,
   isVisibleResultAction,
 } from "../lib/chat-result-actions";
+import { resultCardFromConversationCard } from "../lib/argus-api";
 import type { ChatActionOption } from "../components/chat/types";
 
 describe("chat result actions", () => {
@@ -72,12 +73,42 @@ describe("chat result actions", () => {
         type: "try_next" as ChatActionOption["type"],
       }),
     ).toBe(false);
-    expect(isVisibleResultAction({ label: "Explain result", type: "show_breakdown" })).toBe(
-      true,
-    );
-    expect(isVisibleResultAction({ label: "Refine idea", type: "refine_strategy" })).toBe(
-      true,
-    );
-    expect(isVisibleResultAction({ label: "Save", type: "save_strategy" })).toBe(true);
+    expect(
+      isVisibleResultAction({
+        label: "Explain result",
+        type: "show_breakdown",
+      }),
+    ).toBe(true);
+    expect(
+      isVisibleResultAction({ label: "Refine idea", type: "refine_strategy" }),
+    ).toBe(true);
+    expect(
+      isVisibleResultAction({ label: "Save", type: "save_strategy" }),
+    ).toBe(true);
+  });
+
+  test("hydrates evidence and decision metadata without parsing display prose", () => {
+    const card = resultCardFromConversationCard({
+      title: "AAPL Buy and Hold",
+      symbols: ["AAPL"],
+      date_range: {
+        start: "2025-01-01",
+        end: "2025-12-31",
+        display: "Jan 1, 2025 -> Dec 31, 2025",
+      },
+      status_label: "Simulation Complete",
+      rows: [],
+      assumptions: [],
+      actions: [],
+      evidence_artifact_id: "artifact-1",
+      evidence_lifecycle: "decided",
+      decision_note_id: "decision-1",
+      decision_state: "promising",
+    });
+
+    expect(card.evidenceArtifactId).toBe("artifact-1");
+    expect(card.evidenceLifecycle).toBe("decided");
+    expect(card.decisionNoteId).toBe("decision-1");
+    expect(card.decisionState).toBe("promising");
   });
 });

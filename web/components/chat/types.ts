@@ -1,5 +1,9 @@
 import type { AssetClass } from "@/lib/argus-types";
-import type { BacktestJob } from "@/lib/argus-api";
+import type {
+  ArtifactLifecycle,
+  BacktestJob,
+  DecisionState,
+} from "@/lib/argus-api";
 import type { ConfirmationDisplayFacts } from "@/lib/confirmation-assumptions-display";
 
 export type StrategyResultMetric = {
@@ -111,6 +115,10 @@ export type StrategyResultPayload = {
   assumptions?: string[];
   runId?: string;
   strategyId?: string | null;
+  evidenceArtifactId?: string | null;
+  evidenceLifecycle?: ArtifactLifecycle | null;
+  decisionNoteId?: string | null;
+  decisionState?: DecisionState | null;
   artifactId?: string;
   artifactType?: ArtifactType;
   artifactStatus?: string;

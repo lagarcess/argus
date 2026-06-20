@@ -246,6 +246,17 @@
       "worst_drop": "Peor caída",
       "explain_result": "Explicar resultado",
       "refine_idea": "Ajustar idea",
+      "add_decision": "Agregar decisión",
+      "decision": "Decisión: {{state}}",
+      "decision_note_placeholder": "Nota opcional para tu yo futuro",
+      "save_decision": "Guardar decisión",
+      "decision_saved": "Decisión guardada",
+      "decision_states": {
+        "watching": "Observando",
+        "promising": "Prometedora",
+        "rejected": "Rechazada",
+        "revisit_later": "Revisar luego"
+      },
       "save": "Guardar",
       "unavailable": "No disponible",
       "return_unavailable": "rendimiento no disponible",
@@ -559,9 +570,22 @@
     "preview": "Vista previa",
     "preview_empty": "Abre esta conversación para ver sus mensajes.",
     "open_conversation": "Abrir conversación",
+    "open_source_conversation": "Abrir conversación fuente",
     "select_preview": "Selecciona una conversación para ver sus metadatos.",
     "conversation_count_one": "{{count}} conversación",
-    "conversation_count_other": "{{count}} conversaciones"
+    "conversation_count_other": "{{count}} conversaciones",
+    "result_count_one": "{{count}} resultado",
+    "result_count_other": "{{count}} resultados",
+    "type": {
+      "backtest": "Backtest",
+      "chat": "Conversación",
+      "collection": "Colección",
+      "decision": "Decisión",
+      "evidence": "Evidencia",
+      "idea": "Idea",
+      "run": "Ejecución",
+      "strategy": "Estrategia"
+    }
   },
   "onboarding": {
     "prompt": "¿Cuál es tu objetivo principal ahora? No te preocupes, puedes cambiarlo después.",

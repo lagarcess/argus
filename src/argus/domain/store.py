@@ -8,6 +8,10 @@ from uuid import uuid4
 from argus.api.schemas import (
     Collection,
     Conversation,
+    DecisionNote,
+    EvidenceArtifact,
+    Idea,
+    IdeaVersion,
     Message,
     OnboardingState,
     Strategy,
@@ -30,6 +34,14 @@ class AlphaStore:
     collection_strategies: dict[str, set[str]] = field(default_factory=dict)
     backtest_runs: dict[str, Any] = field(default_factory=dict)
     backtest_run_owners: dict[str, str] = field(default_factory=dict)
+    ideas: dict[str, Idea] = field(default_factory=dict)
+    idea_owners: dict[str, str] = field(default_factory=dict)
+    idea_versions: dict[str, IdeaVersion] = field(default_factory=dict)
+    idea_version_owners: dict[str, str] = field(default_factory=dict)
+    evidence_artifacts: dict[str, EvidenceArtifact] = field(default_factory=dict)
+    evidence_artifact_owners: dict[str, str] = field(default_factory=dict)
+    decision_notes: dict[str, DecisionNote] = field(default_factory=dict)
+    decision_note_owners: dict[str, str] = field(default_factory=dict)
     idempotency: dict[tuple[str, str, str], Any] = field(default_factory=dict)
     feedback: list[dict[str, Any]] = field(default_factory=list)
 
@@ -43,6 +55,14 @@ class AlphaStore:
         self.collection_strategies.clear()
         self.backtest_runs.clear()
         self.backtest_run_owners.clear()
+        self.ideas.clear()
+        self.idea_owners.clear()
+        self.idea_versions.clear()
+        self.idea_version_owners.clear()
+        self.evidence_artifacts.clear()
+        self.evidence_artifact_owners.clear()
+        self.decision_notes.clear()
+        self.decision_note_owners.clear()
         self.idempotency.clear()
         self.feedback.clear()
 
