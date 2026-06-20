@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import os
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -116,6 +117,33 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # type:
     return JSONResponse(body, status_code=exc.status_code, headers=headers)
 
 
+def _json_safe_validation_error(value: Any) -> Any:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if isinstance(value, BaseException):
+        return str(value)
+    if isinstance(value, dict):
+        return {
+            str(key): _json_safe_validation_error(nested)
+            for key, nested in value.items()
+        }
+    if isinstance(value, list | tuple):
+        return [_json_safe_validation_error(nested) for nested in value]
+    return str(value)
+
+
+def _json_safe_validation_errors(
+    errors: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            str(key): _json_safe_validation_error(value)
+            for key, value in error.items()
+        }
+        for error in errors
+    ]
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(  # type: ignore[no-untyped-def]
     request: Request,
@@ -128,7 +156,7 @@ async def validation_exception_handler(  # type: ignore[no-untyped-def]
         "detail": "The request body or parameters did not match the API contract.",
         "code": "validation_error",
         "request_id": getattr(request.state, "request_id", api_state.store.new_id()),
-        "context": {"errors": exc.errors()},
+        "context": {"errors": _json_safe_validation_errors(exc.errors())},
     }
 
     origin = request.headers.get("origin")
