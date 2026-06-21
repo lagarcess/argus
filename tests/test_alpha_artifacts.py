@@ -27,6 +27,19 @@ def test_active_openapi_uses_alpha_contract_names() -> None:
     assert "summary:" not in text.lower()
 
 
+def test_backtests_run_openapi_requires_idempotency_key() -> None:
+    openapi = ROOT / "docs" / "api" / "openapi.yaml"
+
+    text = openapi.read_text(encoding="utf-8")
+    start = text.index("  /api/v1/backtests/run:")
+    end = text.index("  /api/v1/backtest-jobs/{id}:")
+    backtest_run_contract = text[start:end]
+
+    assert "name: Idempotency-Key" in backtest_run_contract
+    assert "in: header" in backtest_run_contract
+    assert "required: true" in backtest_run_contract
+
+
 def test_supabase_migration_matches_alpha_data_model() -> None:
     migration = ROOT / "supabase" / "migrations" / "20260424000001_alpha_core.sql"
 
@@ -50,6 +63,59 @@ def test_supabase_migration_matches_alpha_data_model() -> None:
     assert "unique(user_id, resource, period, period_start)" in text
     assert "simulations" not in text
     assert "portfolios" not in text
+
+
+def test_p1_evidence_spine_migration_freezes_immutable_fields_only() -> None:
+    text = "\n".join(
+        path.read_text(encoding="utf-8").lower()
+        for path in sorted((ROOT / "supabase" / "migrations").glob("*.sql"))
+    )
+
+    assert (
+        "create or replace function public.prevent_idea_version_immutable_update"
+        in text
+    )
+    assert "create trigger prevent_idea_versions_immutable_update" in text
+    assert "before update on public.idea_versions" in text
+    assert (
+        "create or replace function public.prevent_evidence_artifact_immutable_update"
+        in text
+    )
+    assert "create trigger prevent_evidence_artifacts_immutable_update" in text
+    assert "before update on public.evidence_artifacts" in text
+
+    for column in (
+        "id",
+        "user_id",
+        "idea_id",
+        "source_conversation_id",
+        "source_run_id",
+        "version_number",
+        "canonical_spec",
+        "strategy_snapshot",
+        "title",
+        "summary",
+        "created_at",
+    ):
+        assert f"new.{column} is distinct from old.{column}" in text
+
+    for column in (
+        "id",
+        "user_id",
+        "idea_id",
+        "idea_version_id",
+        "source_conversation_id",
+        "source_run_id",
+        "artifact_type",
+        "title",
+        "digest",
+        "payload",
+        "created_at",
+    ):
+        assert f"new.{column} is distinct from old.{column}" in text
+
+    assert "new.lifecycle is distinct from old.lifecycle" not in text
+    assert "new.updated_at is distinct from old.updated_at" not in text
 
 
 def test_usage_counter_resource_constraint_covers_quota_callers() -> None:

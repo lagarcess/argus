@@ -27,6 +27,7 @@ from argus.api.schemas import (
     User,
 )
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
+from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
 from supabase import Client, ClientOptions, create_client
 
@@ -1472,7 +1473,7 @@ class SupabaseGateway:
     def search_rows(
         self, *, user_id: str, query: str, limit: int | None
     ) -> dict[str, list[dict[str, Any]]]:
-        normalized_query = query.strip().lower()
+        normalized_query = normalize_search_text(query)
         conversations_query = (
             self.client.table("conversations")
             .select("id,title,last_message_preview,updated_at,deleted_at,pinned")
@@ -1566,47 +1567,61 @@ class SupabaseGateway:
         conversations = [
             row
             for row in conversations_raw
-            if normalized_query
-            in (f"{row.get('title', '')} {row.get('last_message_preview') or ''}").lower()
+            if search_text_matches_query(
+                query=normalized_query,
+                text=f"{row.get('title', '')} {row.get('last_message_preview') or ''}",
+            )
         ]
         strategies = [
             row
             for row in strategies_raw
-            if normalized_query
-            in (
-                f"{row.get('name', '')} {' '.join(row.get('symbols') or [])} {row.get('template') or ''}"
-            ).lower()
+            if search_text_matches_query(
+                query=normalized_query,
+                text=(
+                    f"{row.get('name', '')} {' '.join(row.get('symbols') or [])} "
+                    f"{row.get('template') or ''}"
+                ),
+            )
         ]
         collections = [
             row
             for row in collections_raw
-            if normalized_query in str(row.get("name", "")).lower()
+            if search_text_matches_query(
+                query=normalized_query,
+                text=row.get("name", ""),
+            )
         ]
         runs = [
             row
             for row in runs_raw
-            if normalized_query
-            in (
-                f"{(row.get('conversation_result_card') or {}).get('title', '')} "
-                f"{' '.join((row.get('conversation_result_card') or {}).get('symbols') or [])} "
-                f"{(row.get('conversation_result_card') or {}).get('strategy_label', '')} "
-                f"{row.get('benchmark_symbol') or ''}"
-            ).lower()
+            if search_text_matches_query(
+                query=normalized_query,
+                text=(
+                    f"{(row.get('conversation_result_card') or {}).get('title', '')} "
+                    f"{' '.join((row.get('conversation_result_card') or {}).get('symbols') or [])} "
+                    f"{(row.get('conversation_result_card') or {}).get('strategy_label', '')} "
+                    f"{row.get('benchmark_symbol') or ''}"
+                ),
+            )
         ]
         ideas = [
             row
             for row in ideas_raw
-            if normalized_query
-            in f"{row.get('title', '')} {row.get('summary') or ''}".lower()
+            if search_text_matches_query(
+                query=normalized_query,
+                text=f"{row.get('title', '')} {row.get('summary') or ''}",
+            )
         ]
         evidence = [
             row
             for row in evidence_raw
-            if normalized_query
-            in (
-                f"{row.get('title', '')} {row.get('digest') or ''} "
-                f"{' '.join(((row.get('payload') or {}).get('result_card') or {}).get('symbols') or [])}"
-            ).lower()
+            if search_text_matches_query(
+                query=normalized_query,
+                text=(
+                    f"{row.get('title', '')} {row.get('digest') or ''} "
+                    f"{' '.join(((row.get('payload') or {}).get('result_card') or {}).get('symbols') or [])}"
+                ),
+            )
         ]
         evidence_by_id = {str(row.get("id")): row for row in evidence_raw}
         decisions = []
@@ -1616,7 +1631,7 @@ class SupabaseGateway:
                 f"{row.get('decision_state', '')} {row.get('note') or ''} "
                 f"{artifact.get('title', '')} {artifact.get('digest', '')}"
             )
-            if normalized_query in haystack.lower():
+            if search_text_matches_query(query=normalized_query, text=haystack):
                 decisions.append(
                     {
                         **row,

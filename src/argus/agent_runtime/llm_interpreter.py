@@ -119,6 +119,7 @@ from argus.llm.openrouter import (
     record_openrouter_route_receipt,
 )
 from argus.nlp.natural_time import (
+    date_range_evidence_has_explicit_endpoints,
     dateparser_languages_for_user_language,
     resolve_date_range_intent,
     resolve_date_range_text,
@@ -9604,6 +9605,18 @@ def _date_range_from_intent_or_bounded_evidence(
     language: str | None = None,
 ) -> dict[str, str] | None:
     intent_resolution = resolve_date_range_intent(draft.date_range_intent)
+    explicit_bounded = _date_range_from_bounded_evidence(
+        draft,
+        language=language,
+        require_explicit_endpoint_evidence=True,
+    )
+    if (
+        intent_resolution is not None
+        and explicit_bounded is not None
+        and _normalized_stated_field(intent_resolution.payload)
+        != _normalized_stated_field(explicit_bounded)
+    ):
+        return explicit_bounded
     if intent_resolution is not None:
         return intent_resolution.payload
     bounded = _date_range_from_bounded_evidence(draft, language=language)
@@ -9616,6 +9629,7 @@ def _date_range_from_bounded_evidence(
     draft: LLMStrategyDraft,
     *,
     language: str | None = None,
+    require_explicit_endpoint_evidence: bool = False,
 ) -> dict[str, str] | None:
     evidence_candidates = _bounded_date_evidence_candidates(draft)
     if not evidence_candidates:
@@ -9628,6 +9642,13 @@ def _date_range_from_bounded_evidence(
         for languages in language_candidates:
             resolved = resolve_date_range_text(candidate, languages=languages)
             if resolved is not None:
+                if (
+                    require_explicit_endpoint_evidence
+                    and not date_range_evidence_has_explicit_endpoints(
+                        resolved.evidence_spans
+                    )
+                ):
+                    continue
                 return resolved.payload
     return None
 

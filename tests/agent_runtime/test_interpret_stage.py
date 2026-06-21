@@ -5126,6 +5126,12 @@ def test_pending_rolling_window_patch_resolves_bounded_endpoint_evidence(
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
+    class FrozenDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return cls(2026, 6, 15)
+
+    monkeypatch.setattr(interpret_module, "date", FrozenDate)
     monkeypatch.setattr(
         interpret_module,
         "resolve_asset",

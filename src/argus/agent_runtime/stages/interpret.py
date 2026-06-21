@@ -152,6 +152,7 @@ from argus.domain.indicators import (
 from argus.domain.market_data import resolve_asset
 from argus.llm.openrouter import invoke_openrouter_chat_completion
 from argus.nlp.natural_time import (
+    date_range_evidence_has_explicit_endpoints,
     dateparser_languages_for_user_language,
     parse_date_text,
     resolve_date_range_endpoint_patch,
@@ -164,6 +165,11 @@ _DEFAULT_RESOLVE_ASSET = resolve_asset
 _STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
 _LATEST_RESULT_SAVE_REQUESTED_REASON = "latest_result_save_requested"
 _BACKTEST_ASSET_CLASSES = frozenset(get_args(BacktestAssetClass))
+_DATE_RANGE_EVIDENCE_KEYS = (
+    "date_range",
+    "date_range_raw_text",
+    "date_range_intent",
+)
 _USER_GROUNDED_CAPITAL_SOURCES = frozenset(
     {
         "explicit_user",
@@ -1095,7 +1101,10 @@ def _strategy_with_current_message_run_field_contract(
     language: str,
 ) -> tuple[StrategySummary, StructuredInterpretation]:
     del current_user_message
-    raw_date_range = _explicit_date_range_from_strategy_for_repair(strategy)
+    raw_date_range = _explicit_date_range_from_strategy_for_repair(
+        strategy,
+        language=language,
+    )
     date_range, date_endpoint_patch_applied = (
         _complete_current_message_date_endpoint_patch(
             strategy=strategy,
@@ -1192,12 +1201,14 @@ def _complete_current_message_date_endpoint_patch(
 ) -> tuple[dict[str, str] | None, bool]:
     if date_range is None:
         return date_range, False
+    current_date = date.today()
     rolling_patch = _rolling_window_range_from_endpoint_patch(
         strategy.extra_parameters.get("date_range_intent"),
         date_range=date_range,
         prior_date_range=prior_date_range,
         date_range_raw_text=strategy.extra_parameters.get("date_range_raw_text"),
         language=language,
+        today=current_date,
     )
     if rolling_patch is not None:
         return rolling_patch, True
@@ -1229,6 +1240,7 @@ def _rolling_window_range_from_endpoint_patch(
     prior_date_range: Any = None,
     date_range_raw_text: Any = None,
     language: str | None = None,
+    today: date | None = None,
 ) -> dict[str, str] | None:
     if not isinstance(date_range_intent, dict):
         return None
@@ -1241,10 +1253,12 @@ def _rolling_window_range_from_endpoint_patch(
         prior_date_range=prior_date_range,
         date_range_raw_text=date_range_raw_text,
         language=language,
+        today=today,
     )
     resolved = resolve_date_range_endpoint_patch(
         base_intent,
         endpoint_patch,
+        today=today,
     )
     return resolved.payload if resolved is not None else None
 
@@ -1256,6 +1270,7 @@ def _endpoint_patch_with_inferred_endpoint(
     prior_date_range: Any,
     date_range_raw_text: Any,
     language: str | None,
+    today: date | None,
 ) -> dict[str, Any]:
     endpoint = str(date_range_intent.get("endpoint") or "").strip()
     if endpoint in {"start", "end"}:
@@ -1264,6 +1279,7 @@ def _endpoint_patch_with_inferred_endpoint(
         endpoint_value = _endpoint_date_from_bounded_text(
             date_range_raw_text,
             language=language,
+            today=today,
         )
         if endpoint_value is None:
             return date_range_intent
@@ -1287,12 +1303,14 @@ def _endpoint_date_from_bounded_text(
     value: Any,
     *,
     language: str | None,
+    today: date | None,
 ) -> str | None:
     text = str(value or "").strip()
     if not text:
         return None
     parsed = parse_date_text(
         text,
+        today=today,
         languages=dateparser_languages_for_user_language(language),
         prefer_dates_from="past",
     )
@@ -1328,12 +1346,37 @@ def _changed_date_endpoint(
 
 def _explicit_date_range_from_strategy_for_repair(
     strategy: StrategySummary,
+    *,
+    language: str | None,
 ) -> dict[str, str] | None:
+    current_date = date.today()
     intent = strategy.extra_parameters.get("date_range_intent")
+    intent_kind = (
+        str(intent.get("kind") or "").strip() if isinstance(intent, dict) else ""
+    )
+    bounded_evidence_range = (
+        None
+        if intent_kind == "endpoint_patch"
+        else _date_range_from_strategy_bounded_evidence(
+            strategy,
+            language=language,
+            today=current_date,
+        )
+    )
+    intent_range: dict[str, str] | None = None
     if isinstance(intent, dict):
-        resolved = resolve_date_range_intent(intent)
+        resolved = resolve_date_range_intent(intent, today=current_date)
         if resolved is not None:
-            return resolved.payload
+            intent_range = resolved.payload
+    if bounded_evidence_range is not None:
+        if intent_range is None:
+            return bounded_evidence_range
+        if _date_range_endpoints(bounded_evidence_range) != _date_range_endpoints(
+            intent_range
+        ):
+            return bounded_evidence_range
+    if intent_range is not None:
+        return intent_range
     if isinstance(strategy.date_range, dict):
         payload = {
             key: str(value)
@@ -1342,6 +1385,46 @@ def _explicit_date_range_from_strategy_for_repair(
         }
         return payload or None
     return None
+
+
+def _date_range_from_strategy_bounded_evidence(
+    strategy: StrategySummary,
+    *,
+    language: str | None,
+    today: date,
+) -> dict[str, str] | None:
+    candidates = _strategy_date_evidence_candidates(strategy)
+    if not candidates:
+        return None
+    languages = dateparser_languages_for_user_language(language)
+    for candidate in candidates:
+        resolved = resolve_date_range_text(candidate, today=today, languages=languages)
+        if resolved is None:
+            continue
+        if not date_range_evidence_has_explicit_endpoints(resolved.evidence_spans):
+            continue
+        return resolved.payload
+    return None
+
+
+def _strategy_date_evidence_candidates(strategy: StrategySummary) -> list[str]:
+    candidates: list[str] = []
+    extra_parameters = dict(strategy.extra_parameters or {})
+    raw_text = extra_parameters.get("date_range_raw_text")
+    if raw_text not in (None, "", [], {}):
+        candidates.append(str(raw_text))
+    intent = extra_parameters.get("date_range_intent")
+    if isinstance(intent, dict):
+        evidence = intent.get("evidence")
+        if evidence not in (None, "", [], {}):
+            candidates.append(str(evidence))
+    evidence_spans = extra_parameters.get("evidence_spans")
+    if isinstance(evidence_spans, dict):
+        for key in _DATE_RANGE_EVIDENCE_KEYS:
+            value = evidence_spans.get(key)
+            if value not in (None, "", [], {}):
+                candidates.append(str(value))
+    return list(dict.fromkeys(candidate.strip() for candidate in candidates if candidate.strip()))
 
 
 def _strategy_date_range_needs_current_message_repair(

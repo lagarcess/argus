@@ -122,6 +122,9 @@ def evidence_digest_from_run(run: BacktestRun) -> str:
         if isinstance(run.conversation_result_card, dict)
         else {}
     )
+    quick_take = _safe_preview_text(card.get("quick_take"))
+    if quick_take is not None:
+        return quick_take
     row_text = " ".join(
         str(row.get("value") or "")
         for row in card.get("rows", [])

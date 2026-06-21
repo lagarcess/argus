@@ -1,7 +1,7 @@
 # Private Alpha Next Roadmap
 
-Status: P1 local recovery candidate on reintegration branch; Codex-browser gate pending
-Date: 2026-06-20
+Status: P1 local recovery candidate on reintegration branch; Codex-browser QA passed
+Date: 2026-06-21
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
 
@@ -115,7 +115,7 @@ Before promotion to `codex/private-alpha-next`:
 
 - [x] Focused backend tests pass for the final candidate SHA.
 - [x] Focused frontend tests pass for the final candidate SHA.
-- [ ] Live Codex browser QA passes locally for the final candidate SHA.
+- [x] Live Codex browser QA passes locally for the final candidate SHA.
 - [x] Internal code review has no release-blocking findings.
 - [x] Docs reflect the shipped behavior, not aspirational behavior.
 - [x] No broad quarantine runtime diff was imported.
@@ -127,49 +127,30 @@ founder-directed action.
 
 Current verification evidence for this recovery candidate:
 
-- Backend: `poetry run pytest -q tests/test_p1_evidence_spine.py
+- Backend P1/API: `poetry run pytest tests/test_alpha_api.py
   tests/test_alpha_api_supabase.py tests/test_supabase_gateway.py
-  tests/test_observability_envelope.py
-  tests/test_alpha_api.py::test_decision_endpoint_marks_evidence_artifact_decided
-  tests/test_alpha_api.py::test_decision_endpoint_is_idempotent_per_evidence_artifact
-  tests/test_alpha_api.py::test_decision_endpoint_invalid_body_returns_problem_details
-  tests/test_alpha_api.py::test_search_returns_typed_p1_artifacts
-  tests/agent_runtime/test_interpret_stage.py::test_initial_multi_symbol_equity_defaults_to_spy_benchmark
-  tests/agent_runtime/test_interpret_stage.py::test_contextual_benchmark_edit_preserves_traded_assets_and_setup
-  tests/agent_runtime/test_interpret_stage.py::test_contextual_same_asset_universe_without_operation_is_noop
-  tests/agent_runtime/test_interpret_stage.py::test_contextual_asset_append_preserves_benchmark_and_setup
-  tests/agent_runtime/test_interpret_stage.py::test_contextual_asset_replace_preserves_explicit_benchmark_and_setup
-  tests/agent_runtime/test_interpret_stage.py::test_spanish_contextual_asset_edits_use_structured_operation_not_phrase_gates
-  tests/agent_runtime/test_interpret_stage.py::test_crypto_contextual_asset_append_preserves_btc_default_benchmark
-  tests/agent_runtime/test_interpret_stage.py::test_contextual_asset_append_over_five_symbols_requires_correction`
-  passed with 97 tests.
-- Frontend: `bun test web/__tests__/command-palette-items.test.ts
-  web/__tests__/alpha-frontend.test.ts web/__tests__/chat-backtest-jobs.test.ts
-  web/__tests__/chat-artifact-history.test.ts
-  web/__tests__/chat-retry-action-history.test.ts
-  web/__tests__/chat-turn-artifact-ux.test.ts` passed with 128 tests.
-- Lint: `poetry run ruff check src/argus/api/routers/evidence.py
-  src/argus/domain/evidence.py tests/test_p1_evidence_spine.py
-  tests/test_alpha_api_supabase.py` passed.
-  `bun run --cwd web lint` passed with one pre-existing warning in
-  `web/components/chat/artifact-history.ts`.
-- Local browser QA: headed Playwright on `http://127.0.0.1:3001/chat`
-  completed messy prompt -> confirmation -> run -> decision save -> reload ->
-  Omnisearch recall. Evidence, Backtest, Decision, Idea, and Conversation rows
-  appeared as first-class search results; artifact row click updated the preview
-  without navigation; preview rendered Quick take, Digest, Assets, Benchmark,
-  Metrics, and Assumptions from backend preview data; no duplicate ready/result
-  cards appeared; direct search payload checks found no Markdown markers,
-  internal ids, `context_packets`, `actions`, route receipts, or provider
-  metadata.
-- Internal review: fallback reviewer found no Critical issues and two Important
-  issues. Both were fixed in this candidate: decision-capture failures now use
-  `decision_capture_failed` Problem Details, and Omnisearch previews now render
-  compact artifact fields instead of a digest-only panel.
-- Codex in-app browser QA is still unchecked because the browser connector
-  failed before exposing a tab with a tool metadata error. The local product QA
-  above used the Playwright fallback, so the dedicated Codex-browser gate must
-  be retried before promotion if that gate remains mandatory.
+  tests/test_alpha_artifacts.py tests/test_p1_evidence_spine.py -q` passed
+  with 146 tests.
+- Backend P0/date continuity: `poetry run pytest
+  tests/agent_runtime/test_artifact_continuity.py
+  tests/agent_runtime/test_llm_interpreter_date_window_repairs.py
+  tests/agent_runtime/test_interpret_stage.py
+  tests/agent_runtime/test_workflow.py -q` passed with 239 tests.
+- Frontend: `cd web && bun test __tests__/alpha-frontend.test.ts
+  __tests__/command-palette-items.test.ts __tests__/spanish-ui-smoke.test.ts`
+  passed with 82 tests.
+- Static checks: focused `poetry run ruff check ...` passed for touched backend
+  files and focused tests; `git diff --check` passed.
+- Codex in-app browser QA: `http://127.0.0.1:3031/chat` completed reload of a
+  messy Spanish AAPL/MSFT/TSLA vs SPY result, verified one completed result
+  card, no ready/failed duplicate card, saved decision hydration, Spanish
+  period and benchmark prose, no raw internal search leaks, and Omnisearch rows
+  ordered as Decision, Evidence, Idea, Backtest before Conversation for the
+  `AAPL MSFT TSLA` ledger query.
+- Internal review: two read-only reviewers found the same Omnisearch ranking
+  blocker. The fix preserves pinned, exact, and symbol relevance ahead of P1
+  artifact priority while keeping artifacts ahead of source conversation
+  wrappers within the same relevance tier.
 
 Stop immediately if:
 

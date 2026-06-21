@@ -1229,14 +1229,23 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).toContain("commandPaletteSelectedPreview(previewItem, displayItems)");
     expect(palette).toContain("setPreviewItem(null)");
     expect(adapter).toContain("command_palette.open_source_conversation");
-    expect(adapter).toContain('activation: item.type === "chat" ? "open_conversation" : "select_preview"');
+    expect(adapter).toContain('activation: "open_conversation"');
+    expect(adapter).toContain("export function commandPaletteStatusLabelKey");
+    expect(adapter).toContain("export function commandPaletteStatusFallback");
     expect(adapter).toContain("export function commandPalettePreviewFields");
     expect(palette).toContain("const selectedPreviewFields = useMemo");
     expect(palette).toContain("selectedPreviewFields.map");
     expect(palette).toContain("t(field.labelKey, field.labelFallback)");
     expect(palette).toContain("const activateItem = useCallback");
-    expect(palette).toContain('item.activation === "select_preview"');
-    expect(palette).toContain("setPreviewItem(item)");
+    expect(palette).not.toContain('item.activation === "select_preview"');
+    expect(palette).toContain("onMouseEnter={() => setPreviewItem(item)}");
+    expect(palette).toContain("onFocus={() => setPreviewItem(item)}");
+    expect(palette).toContain("commandPaletteStatusLabelKey(item)");
+    expect(palette).toContain("commandPaletteStatusFallback(item)");
+    expect(palette).toContain('t("command_palette.clear_search", "Clear search")');
+    expect(palette).toContain(
+      '"Select a result to preview its details."',
+    );
     expect(palette).toContain("const openSourceConversation = useCallback");
     expect(palette).toContain("MessageSquare");
     expect(palette).toContain("md:flex-row");

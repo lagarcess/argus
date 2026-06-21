@@ -40,6 +40,8 @@ import {
   commandPaletteOpenLabelKey,
   commandPalettePreviewFields,
   commandPaletteSelectedPreview,
+  commandPaletteStatusFallback,
+  commandPaletteStatusLabelKey,
   commandPaletteTypeFallback,
   commandPaletteTypeLabelKey,
   type CommandPaletteDisplayItem,
@@ -231,6 +233,8 @@ export default function ChatCommandPalette({
                 `chat.result_card.decision_states.${state}`,
                 commandPaletteDecisionStateFallback(state),
               ),
+            metricLabel: (id, fallback) =>
+              t(`command_palette.metric_labels.${id}`, fallback),
           }),
         )
       : recentItems.map(commandPaletteItemFromHistory);
@@ -252,10 +256,18 @@ export default function ChatCommandPalette({
                 `chat.result_card.decision_states.${state}`,
                 commandPaletteDecisionStateFallback(state),
               ),
+            metricLabel: (id, fallback) =>
+              t(`command_palette.metric_labels.${id}`, fallback),
           })
         : [],
     [selectedPreview, t],
   );
+  const selectedPreviewStatusLabelKey = selectedPreview
+    ? commandPaletteStatusLabelKey(selectedPreview)
+    : null;
+  const selectedPreviewStatusFallback = selectedPreview
+    ? commandPaletteStatusFallback(selectedPreview)
+    : null;
 
   const updateLocalTitle = useCallback(
     (conversationId: string, title: string) => {
@@ -334,10 +346,6 @@ export default function ChatCommandPalette({
 
   const activateItem = useCallback(
     (item: CommandPaletteDisplayItem) => {
-      if (item.activation === "select_preview") {
-        setPreviewItem(item);
-        return;
-      }
       openSourceConversation(item);
     },
     [openSourceConversation],
@@ -483,7 +491,7 @@ export default function ChatCommandPalette({
               type="button"
               onClick={() => setQuery("")}
               className="shrink-0 rounded-full p-1 hover:bg-black/5 dark:hover:bg-white/10"
-              aria-label="Clear search"
+              aria-label={t("command_palette.clear_search", "Clear search")}
             >
               <X className="h-3.5 w-3.5 text-black/40 dark:text-white/40" />
             </button>
@@ -528,6 +536,8 @@ export default function ChatCommandPalette({
                         item.type === "chat" &&
                         activeConversationId === item.conversationId;
                       const isEditing = editingId === item.conversationId;
+                      const statusLabelKey = commandPaletteStatusLabelKey(item);
+                      const statusFallback = commandPaletteStatusFallback(item);
                       const handleRowKeyDown = (
                         event: ReactKeyboardEvent<HTMLDivElement>,
                       ) => {
@@ -604,6 +614,11 @@ export default function ChatCommandPalette({
                                   commandPaletteTypeFallback(item.type),
                                 )}
                               </span>
+                              {!isCurrent && statusLabelKey && statusFallback && (
+                                <span className="shrink-0 rounded-full border border-black/8 px-2 py-0.5 text-[10px] font-semibold text-black/40 dark:border-white/10 dark:text-white/40">
+                                  {t(statusLabelKey, statusFallback)}
+                                </span>
+                              )}
                             </div>
                             {item.snippet && (
                               <span className="mt-0.5 line-clamp-1 text-[12px] leading-relaxed text-black/40 dark:text-white/40">
@@ -743,15 +758,29 @@ export default function ChatCommandPalette({
               {selectedPreview ? (
                 <div className="flex h-full flex-col">
                   <div className="mb-6">
-                    <span className="mb-3 inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+                    <div className="mb-3 flex flex-wrap gap-2">
                       {selectedPreview.type === "chat" &&
-                      activeConversationId === selectedPreview.conversationId
-                        ? t("common.current", "Current")
-                        : t(
-                            commandPaletteTypeLabelKey(selectedPreview.type),
-                            commandPaletteTypeFallback(selectedPreview.type),
+                        activeConversationId === selectedPreview.conversationId && (
+                          <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+                            {t("common.current", "Current")}
+                          </span>
+                        )}
+                      <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+                        {t(
+                          commandPaletteTypeLabelKey(selectedPreview.type),
+                          commandPaletteTypeFallback(selectedPreview.type),
+                        )}
+                      </span>
+                      {selectedPreviewStatusLabelKey &&
+                        selectedPreviewStatusFallback && (
+                        <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+                          {t(
+                            selectedPreviewStatusLabelKey,
+                            selectedPreviewStatusFallback,
                           )}
-                    </span>
+                        </span>
+                      )}
+                    </div>
                     <h2 className="font-display text-[24px] font-medium leading-tight text-black dark:text-white">
                       {selectedPreview.title}
                     </h2>
@@ -785,7 +814,7 @@ export default function ChatCommandPalette({
                         {selectedPreview.snippet ||
                         t(
                           "command_palette.preview_empty",
-                          "Open this conversation to view its messages.",
+                          "Select a result to preview its details.",
                         )}
                       </p>
                     )}
@@ -810,7 +839,7 @@ export default function ChatCommandPalette({
                   <p className="text-[13px] text-black/30 dark:text-white/30">
                     {t(
                       "command_palette.select_preview",
-                      "Select a conversation to preview its metadata.",
+                      "Select a result to preview its details.",
                     )}
                   </p>
                 </div>

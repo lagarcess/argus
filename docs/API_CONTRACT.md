@@ -1631,6 +1631,7 @@ Detach strategy.
 
 **Required Header:**
 - `Idempotency-Key`: `uuid` (Required to prevent duplicate engine runs)
+- Missing or blank keys return `400 idempotency_key_required`.
 
 Run directly from saved strategy or inline config.
 
@@ -2035,8 +2036,10 @@ Results are ranked by:
 1. **Pinned Boost**: Pinned items always appear first.
 2. **Exact Match**: Full title/name match.
 3. **Symbol Match**: Match against symbols in strategies/backtests.
-4. **Recency**: Sorted by `updated_at` within same relevance tier.
-5. **Basic Text Relevance**: Keyword matching in metadata.
+4. **P1 Artifact Priority**: Backtest, Evidence, Decision, and Idea results
+   rank ahead of source conversation wrappers within the same relevance tier.
+5. **Recency**: Sorted by `updated_at` within same relevance and type tier.
+6. **Basic Text Relevance**: Keyword matching in metadata.
 
 **Search Scope:**
 Search is limited to:

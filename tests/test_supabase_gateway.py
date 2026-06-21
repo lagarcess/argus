@@ -1,3 +1,4 @@
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -5,13 +6,68 @@ from unittest.mock import MagicMock
 import pytest
 from argus.api.schemas import BacktestRun
 from argus.domain.evidence import build_backtest_evidence_capture, build_decision_note
+from argus.domain.search_text import search_text_matches_query
 from argus.domain.store import utcnow
-from argus.domain.supabase_gateway import DecisionCaptureIntegrityError, SupabaseGateway
+from argus.domain.supabase_gateway import (
+    DecisionCaptureIntegrityError,
+    SupabaseGateway,
+)
 
 
 def test_batched_fetch_helper_exists_for_unbounded_queries():
     gateway = SupabaseGateway(client=MagicMock())
     assert hasattr(gateway, "_fetch_all_rows")
+
+
+def test_supabase_search_matcher_handles_punctuation_and_multi_token_queries():
+    assert search_text_matches_query(
+        query="AAPL MSFT TSLA",
+        text="AAPL, MSFT, TSLA comprar y mantener contra SPY.",
+    )
+    assert search_text_matches_query(
+        query="aap",
+        text="AAPL, MSFT, TSLA comprar y mantener contra SPY.",
+    )
+    assert not search_text_matches_query(
+        query="AAPL NVDA",
+        text="AAPL, MSFT, TSLA comprar y mantener contra SPY.",
+    )
+
+
+def test_p1_spine_migration_enforces_artifact_truth_immutability() -> None:
+    migration = (
+        Path(__file__).resolve().parents[1]
+        / "supabase/migrations/20260621053126_enforce_p1_evidence_immutability.sql"
+    ).read_text()
+
+    assert "prevent_idea_version_immutable_update" in migration
+    assert "prevent_evidence_artifact_immutable_update" in migration
+    assert (
+        "create trigger prevent_idea_versions_immutable_update" in migration
+    )
+    assert (
+        "create trigger prevent_evidence_artifacts_immutable_update" in migration
+    )
+
+    for field in (
+        "canonical_spec",
+        "strategy_snapshot",
+        "source_run_id",
+        "version_number",
+    ):
+        assert f"new.{field} is distinct from old.{field}" in migration
+
+    for field in (
+        "artifact_type",
+        "digest",
+        "payload",
+        "source_run_id",
+        "title",
+    ):
+        assert f"new.{field} is distinct from old.{field}" in migration
+
+    assert "new.lifecycle is distinct from old.lifecycle" not in migration
+    assert "new.updated_at is distinct from old.updated_at" not in migration
 
 
 class _RecordingSupabaseClient:

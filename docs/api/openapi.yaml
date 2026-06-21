@@ -119,9 +119,18 @@ paths:
           description: Detached strategy from collection.
   /api/v1/backtests/run:
     post:
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Stable client key for deduplicating direct backtest runs.
+          schema:
+            type: string
       responses:
         "200":
           description: Completed Alpha backtest run.
+        "400":
+          description: Missing required Idempotency-Key header.
         "422":
           description: Problem Details for unsupported Alpha requests.
   /api/v1/backtest-jobs/{id}:

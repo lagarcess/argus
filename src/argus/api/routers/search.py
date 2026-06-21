@@ -12,7 +12,7 @@ from argus.api.search_assembly import (
     scored_memory_search_items,
     scored_supabase_search_items,
 )
-from argus.api.search_utils import search_type_rank
+from argus.api.search_utils import search_rank_key
 
 router = APIRouter(prefix="/api/v1", tags=["search"])
 
@@ -40,11 +40,11 @@ def search(
         scored_items.extend(scored_memory_search_items(user=user, query=query))
 
     scored_items.sort(
-        key=lambda pair: (
-            pair[0],
-            pair[1].updated_at,
-            search_type_rank(pair[1].type),
-            pair[1].id,
+        key=lambda pair: search_rank_key(
+            score=pair[0],
+            kind=pair[1].type,
+            updated_at=pair[1].updated_at,
+            item_id=pair[1].id,
         ),
         reverse=True,
     )
@@ -66,20 +66,20 @@ def search(
         if cursor_pair is None:
             raise invalid_cursor_problem(request)
         cursor_score, cursor_item = cursor_pair
-        cursor_key = (
-            cursor_score,
-            cursor_dt,
-            search_type_rank(cursor_item.type),
-            cursor_id,
+        cursor_key = search_rank_key(
+            score=cursor_score,
+            kind=cursor_item.type,
+            updated_at=cursor_dt,
+            item_id=cursor_id,
         )
         filtered = [
             pair
             for pair in scored_items
-            if (
-                pair[0],
-                pair[1].updated_at,
-                search_type_rank(pair[1].type),
-                pair[1].id,
+            if search_rank_key(
+                score=pair[0],
+                kind=pair[1].type,
+                updated_at=pair[1].updated_at,
+                item_id=pair[1].id,
             )
             < cursor_key
         ]

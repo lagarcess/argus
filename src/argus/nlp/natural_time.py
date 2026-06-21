@@ -32,6 +32,17 @@ class DateRangeIntentResolution:
     evidence_spans: tuple[str, ...] = ()
 
 
+def date_range_evidence_has_explicit_endpoints(
+    evidence_spans: tuple[str, ...],
+) -> bool:
+    """Return true when natural-time evidence came from two user-visible endpoints."""
+
+    spans = tuple(str(span or "").strip() for span in evidence_spans if str(span or "").strip())
+    if len(spans) < 2:
+        return False
+    return not any(_is_generated_time_span_endpoint(span) for span in spans)
+
+
 @dataclass(frozen=True)
 class _ParsedDate:
     value: date
@@ -762,6 +773,11 @@ def _strip_time_span_suffix(value: str) -> str:
         if lowered.endswith(suffix):
             return stripped[: -len(suffix)].rstrip()
     return stripped
+
+
+def _is_generated_time_span_endpoint(value: str) -> bool:
+    lowered = str(value or "").strip().casefold()
+    return lowered.endswith("(start)") or lowered.endswith("(end)")
 
 
 def _span_has_explicit_year(value: str) -> bool:

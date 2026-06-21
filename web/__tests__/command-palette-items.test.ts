@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   commandPaletteItemFromSearch,
+  commandPaletteStatusFallback,
+  commandPaletteStatusLabelKey,
   commandPaletteOpenFallback,
   commandPaletteOpenLabelKey,
   commandPalettePreviewFields,
@@ -11,6 +15,19 @@ import {
 import type { SearchItem } from "../lib/argus-api";
 
 describe("command palette items", () => {
+  test("localizes decided lifecycle status for English and Spanish", () => {
+    const root = process.cwd();
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    expect(en.command_palette.status.decided).toBe("Decided");
+    expect(es.command_palette.status.decided).toBe("Decidido");
+  });
+
   test("keeps typed evidence recall attached to source conversation provenance", () => {
     const item: SearchItem = {
       type: "evidence",
@@ -34,7 +51,7 @@ describe("command palette items", () => {
       conversationId: "conversation-1",
       snippet: "AAPL and MSFT beat SPY in this window.",
       canManageConversation: false,
-      activation: "select_preview",
+      activation: "open_conversation",
     });
     expect(display?.preview).not.toHaveProperty("source_run_id");
     expect(commandPalettePreviewFields(display!)).toEqual([
@@ -58,6 +75,30 @@ describe("command palette items", () => {
       "Open source conversation",
     );
     expect(commandPaletteTypeFallback(display!.type)).toBe("Evidence");
+    expect(commandPaletteStatusLabelKey(display!)).toBe(
+      "command_palette.status.captured",
+    );
+    expect(commandPaletteStatusFallback(display!)).toBe("Captured");
+  });
+
+  test("renders decided artifact lifecycle separately from decision row type", () => {
+    const item: SearchItem = {
+      type: "evidence",
+      id: "artifact-1",
+      title: "AAPL evidence",
+      matched_text: "AAPL evidence",
+      updated_at: "2026-06-19T00:00:00.000Z",
+      conversation_id: "conversation-1",
+      lifecycle: "decided",
+      preview: { digest: "AAPL evidence." },
+    };
+
+    const display = commandPaletteItemFromSearch(item);
+
+    expect(commandPaletteStatusLabelKey(display!)).toBe(
+      "command_palette.status.decided",
+    );
+    expect(commandPaletteStatusFallback(display!)).toBe("Decided");
   });
 
   test("keeps conversation results manageable but does not promote non-chat actions", () => {
@@ -105,8 +146,13 @@ describe("command palette items", () => {
       conversationId: "conversation-1",
       snippet: "Promising · AAPL beat SPY in this window.",
       canManageConversation: false,
+      activation: "open_conversation",
     });
     expect(display?.snippet).not.toContain("promising raw fallback");
+    expect(commandPaletteStatusLabelKey(display!)).toBe(
+      "command_palette.status.decided",
+    );
+    expect(commandPaletteStatusFallback(display!)).toBe("Decided");
   });
 
   test("builds rich artifact preview fields without raw internals", () => {
@@ -196,7 +242,7 @@ describe("command palette items", () => {
       lifecycle: "captured",
       preview: { digest: "AAPL backtest evidence" },
       canManageConversation: false,
-      activation: "select_preview",
+      activation: "open_conversation",
     } as const;
 
     expect(commandPaletteSelectedPreview(staleConversation, [evidenceResult])).toBe(
@@ -218,5 +264,33 @@ describe("command palette items", () => {
     };
 
     expect(commandPaletteItemFromSearch(unsupported)).toBeNull();
+  });
+
+  test("localizes command palette metric labels through display copy", () => {
+    const item: SearchItem = {
+      type: "evidence",
+      id: "artifact-1",
+      title: "AAPL evidence",
+      matched_text: "raw fallback",
+      updated_at: "2026-06-19T00:00:00.000Z",
+      conversation_id: "conversation-1",
+      lifecycle: "captured",
+      preview: {
+        metrics_summary: {
+          total_return_pct: 12.34,
+          benchmark_return_pct: 8.12,
+        },
+      },
+    };
+    const display = commandPaletteItemFromSearch(item);
+
+    const fields = commandPalettePreviewFields(display!, {
+      metricLabel: (id, fallback) =>
+        id === "total_return_pct" ? "Rendimiento total" : fallback,
+    });
+
+    expect(fields.find((field) => field.id === "metrics")?.value).toBe(
+      "Rendimiento total 12.3% · Benchmark return 8.1%",
+    );
   });
 });

@@ -4000,6 +4000,63 @@ def test_current_message_run_field_repair_uses_user_language_for_bounded_date_ev
     assert repaired.missing_required_fields == []
     assert repaired.candidate_strategy_draft.date_range == expected_range.payload
 
+
+def test_current_message_run_field_repair_prefers_explicit_bounded_range_over_mismatched_intent() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    current_turn = (
+        "probemos algo medio simple: comprar y mantener AAPL, MSFT y TSLA, "
+        "pesos iguales, desde enero 1 2025 hasta junio 5 2026, con 10000 "
+        "dolares, comparalo con SPY, sin fees ni deslizamiento"
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=current_turn,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=current_turn,
+            language="es-419",
+            strategy_type="buy_and_hold",
+            strategy_thesis=current_turn,
+            asset_universe=["AAPL", "MSFT", "TSLA"],
+            asset_class="equity",
+            date_range={"start": "2025-01-01", "end": "2025-12-31"},
+            date_range_raw_text="desde enero 1 2025 hasta junio 5 2026",
+            date_range_intent=LLMDateRangeIntent(
+                kind="calendar_year",
+                year=2025,
+                confidence=0.9,
+                evidence="desde enero 1 2025 hasta junio 5 2026",
+            ),
+            capital_amount=10000,
+            comparison_baseline="SPY",
+            evidence_spans={
+                "date_range": "desde enero 1 2025 hasta junio 5 2026",
+            },
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    repaired = interpreter_module._response_from_current_message_run_field_contract(
+        response=response,
+        request=InterpretationRequest(
+            current_user_message=current_turn,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert repaired is not None
+    assert repaired.candidate_strategy_draft.date_range == {
+        "start": "2025-01-01",
+        "end": "2026-06-05",
+    }
+    assert "current_message_run_field_contract_repair" in repaired.reason_codes
+
+
 @pytest.mark.asyncio
 async def test_supported_partial_date_clarification_gets_direct_date_audit(
     monkeypatch,

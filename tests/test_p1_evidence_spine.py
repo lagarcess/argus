@@ -110,6 +110,13 @@ def test_completed_backtest_auto_captures_idea_version_and_evidence() -> None:
     assert captured.evidence_artifact.source_run_id == run.id
     assert captured.evidence_artifact.digest
     assert (
+        captured.evidence_artifact.digest
+        == "Quick take AAPL, MSFT, and TSLA beat SPY in this window. "
+        "This is evidence, not advice."
+    )
+    assert captured.idea.summary == captured.evidence_artifact.digest
+    assert captured.idea_version.summary == captured.evidence_artifact.digest
+    assert (
         captured.evidence_artifact.payload["quick_take"]
         == "Quick take AAPL, MSFT, and TSLA beat SPY in this window. "
         "This is evidence, not advice."

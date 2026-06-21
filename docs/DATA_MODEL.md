@@ -413,6 +413,14 @@ Fields:
 - `lifecycle`: `text`
 - `created_at`: `timestamptz`
 
+DB immutability:
+- After insert, immutable fields are enforced by a database trigger:
+  `id`, `user_id`, `idea_id`, `source_conversation_id`, `source_run_id`,
+  `version_number`, `canonical_spec`, `strategy_snapshot`, `title`, `summary`,
+  and `created_at`.
+- `lifecycle` may change for review, save, archive/discard, and decision
+  transitions without creating a new version row.
+
 ### evidence_artifacts
 
 Immutable proof package. P1 writes `artifact_type = "backtest"` from completed
@@ -432,6 +440,14 @@ Fields:
 - `payload`: `jsonb`
 - `created_at`: `timestamptz`
 - `updated_at`: `timestamptz`
+
+DB immutability:
+- After insert, immutable fields are enforced by a database trigger:
+  `id`, `user_id`, `idea_id`, `idea_version_id`, `source_conversation_id`,
+  `source_run_id`, `artifact_type`, `title`, `digest`, `payload`, and
+  `created_at`.
+- `lifecycle` and `updated_at` may change for lifecycle transitions and
+  timestamp bookkeeping.
 
 Payload rules:
 - `payload.result_card` is sanitized for recall and must not expose context

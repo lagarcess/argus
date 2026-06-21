@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import pandas as pd
@@ -9,7 +9,16 @@ import pytest
 from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.message_store import memory_conversation, memory_message
-from argus.api.schemas import BacktestRun, Collection, Strategy
+from argus.api.schemas import (
+    BacktestRun,
+    Collection,
+    Conversation,
+    DecisionNote,
+    EvidenceArtifact,
+    Idea,
+    IdeaVersion,
+    Strategy,
+)
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
@@ -396,11 +405,30 @@ def test_backtest_rejects_mixed_asset_symbols_with_problem_details() -> None:
     ]
 
 
+def test_backtest_run_requires_idempotency_key_header() -> None:
+    client = _client()
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "rsi_mean_reversion",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+        },
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["code"] == "idempotency_key_required"
+    assert payload["request_id"]
+
+
 def test_backtest_rejects_explicit_asset_class_conflict() -> None:
     client = _client()
 
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "asset-class-conflict"},
         json={
             "template": "rsi_mean_reversion",
             "asset_class": "crypto",
@@ -757,6 +785,7 @@ def test_backtest_accepts_supported_timeframes(timeframe: str) -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": f"timeframe-{timeframe.lower()}"},
         json={
             "template": "dca_accumulation",
             "asset_class": "equity",
@@ -773,6 +802,7 @@ def test_backtest_rejects_stablecoin_symbol() -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "stablecoin-rejected"},
         json={
             "template": "dca_accumulation",
             "asset_class": "crypto",
@@ -788,6 +818,7 @@ def test_backtest_rejects_unsupported_parameters_payload() -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "unsupported-parameters"},
         json={
             "template": "rsi_mean_reversion",
             "asset_class": "equity",
@@ -803,6 +834,7 @@ def test_backtest_allows_equity_lookback_beyond_three_years() -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "equity-long-lookback"},
         json={
             "template": "dca_accumulation",
             "asset_class": "equity",
@@ -819,6 +851,7 @@ def test_backtest_rejects_equity_start_before_provider_history() -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "provider-history-start"},
         json={
             "template": "buy_and_hold",
             "asset_class": "equity",
@@ -835,6 +868,7 @@ def test_backtest_rejects_unknown_symbol() -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "unknown-symbol"},
         json={
             "template": "dca_accumulation",
             "asset_class": "equity",
@@ -1146,6 +1180,7 @@ def test_search_supports_cursor_and_mixed_types() -> None:
     client.post("/api/v1/collections", json={"name": "Tesla collection"})
     run = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "search-mixed-types-run"},
         json={
             "conversation_id": conversation["id"],
             "template": "rsi_mean_reversion",
@@ -1171,6 +1206,195 @@ def test_search_supports_cursor_and_mixed_types() -> None:
     first_ids = {(item["type"], item["id"]) for item in payload["items"]}
     second_ids = {(item["type"], item["id"]) for item in second_payload["items"]}
     assert first_ids.isdisjoint(second_ids)
+
+
+def test_search_orders_p1_artifacts_before_source_conversation() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    conversation = Conversation(
+        id="conversation-evidence-order",
+        title="AAPL evidence source conversation",
+        title_source="user_renamed",
+        pinned=False,
+        archived=False,
+        deleted_at=None,
+        created_at=now - timedelta(minutes=5),
+        updated_at=now + timedelta(minutes=5),
+        last_message_preview="AAPL evidence chat wrapper",
+        language="en",
+    )
+    run = BacktestRun(
+        id="run-evidence-order",
+        conversation_id=conversation.id,
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {}, "by_symbol": {}},
+        config_snapshot={"symbols": ["AAPL"], "benchmark_symbol": "SPY"},
+        conversation_result_card={
+            "title": "AAPL evidence backtest",
+            "artifact_type": "backtest",
+            "evidence_artifact_id": "artifact-evidence-order",
+            "evidence_lifecycle": "captured",
+        },
+        created_at=now,
+    )
+    idea = Idea(
+        id="idea-evidence-order",
+        source_conversation_id=conversation.id,
+        title="AAPL evidence idea",
+        summary="AAPL evidence summary",
+        lifecycle="captured",
+        active_version_id="version-evidence-order",
+        created_at=now,
+        updated_at=now,
+    )
+    version = IdeaVersion(
+        id="version-evidence-order",
+        idea_id=idea.id,
+        source_conversation_id=conversation.id,
+        source_run_id=run.id,
+        version_number=1,
+        canonical_spec={"symbols": ["AAPL"], "benchmark_symbol": "SPY"},
+        strategy_snapshot={"symbols": ["AAPL"]},
+        title=idea.title,
+        summary=idea.summary,
+        lifecycle="captured",
+        created_at=now,
+    )
+    artifact = EvidenceArtifact(
+        id="artifact-evidence-order",
+        idea_id=idea.id,
+        idea_version_id=version.id,
+        source_conversation_id=conversation.id,
+        source_run_id=run.id,
+        artifact_type="backtest",
+        lifecycle="captured",
+        title="AAPL evidence artifact",
+        digest="AAPL evidence artifact digest.",
+        payload={"provenance": {"symbols": ["AAPL"], "benchmark_symbol": "SPY"}},
+        created_at=now,
+        updated_at=now,
+    )
+    decision = DecisionNote(
+        id="decision-evidence-order",
+        idea_id=idea.id,
+        idea_version_id=version.id,
+        evidence_artifact_id=artifact.id,
+        source_conversation_id=conversation.id,
+        decision_state="promising",
+        note="AAPL evidence decision note.",
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.conversations[conversation.id] = conversation
+    api_state.store.conversation_owners[conversation.id] = user_id
+    api_state.store.backtest_runs[run.id] = run
+    api_state.store.backtest_run_owners[run.id] = user_id
+    api_state.store.ideas[idea.id] = idea
+    api_state.store.idea_owners[idea.id] = user_id
+    api_state.store.idea_versions[version.id] = version
+    api_state.store.idea_version_owners[version.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+    api_state.store.decision_notes[decision.id] = decision
+    api_state.store.decision_note_owners[decision.id] = user_id
+
+    response = client.get("/api/v1/search?q=evidence&limit=10")
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    chat_index = ordered_types.index("chat")
+    for artifact_type in ("backtest", "evidence", "idea", "decision"):
+        assert ordered_types.index(artifact_type) < chat_index
+
+
+def test_search_preserves_pinned_chat_above_p1_artifacts() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    conversation = Conversation(
+        id="conversation-pinned-search-order",
+        title="AAPL pinned conversation",
+        title_source="user_renamed",
+        pinned=True,
+        archived=False,
+        deleted_at=None,
+        created_at=now - timedelta(minutes=5),
+        updated_at=now + timedelta(minutes=10),
+        last_message_preview="AAPL pinned source",
+        language="en",
+    )
+    artifact = EvidenceArtifact(
+        id="artifact-pinned-search-order",
+        idea_id="idea-pinned-search-order",
+        idea_version_id="version-pinned-search-order",
+        source_conversation_id=conversation.id,
+        source_run_id="run-pinned-search-order",
+        artifact_type="backtest",
+        lifecycle="captured",
+        title="AAPL evidence artifact",
+        digest="AAPL evidence artifact digest.",
+        payload={"provenance": {"symbols": ["AAPL"], "benchmark_symbol": "SPY"}},
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.conversations[conversation.id] = conversation
+    api_state.store.conversation_owners[conversation.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+
+    response = client.get("/api/v1/search?q=aapl&limit=10")
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    assert ordered_types.index("chat") < ordered_types.index("evidence")
+
+
+def test_search_preserves_exact_chat_above_lower_relevance_p1_artifacts() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    conversation = Conversation(
+        id="conversation-exact-search-order",
+        title="AAPL",
+        title_source="user_renamed",
+        pinned=False,
+        archived=False,
+        deleted_at=None,
+        created_at=now - timedelta(minutes=5),
+        updated_at=now + timedelta(minutes=10),
+        last_message_preview="AAPL exact source",
+        language="en",
+    )
+    artifact = EvidenceArtifact(
+        id="artifact-exact-search-order",
+        idea_id="idea-exact-search-order",
+        idea_version_id="version-exact-search-order",
+        source_conversation_id=conversation.id,
+        source_run_id="run-exact-search-order",
+        artifact_type="backtest",
+        lifecycle="captured",
+        title="AAPL evidence artifact",
+        digest="AAPL evidence artifact digest.",
+        payload={"provenance": {"symbols": ["AAPL"], "benchmark_symbol": "SPY"}},
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.conversations[conversation.id] = conversation
+    api_state.store.conversation_owners[conversation.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+
+    response = client.get("/api/v1/search?q=aapl&limit=10")
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    assert ordered_types.index("chat") < ordered_types.index("evidence")
 
 
 def test_search_memory_mode_excludes_other_users_owned_objects() -> None:
@@ -1379,7 +1603,8 @@ def test_search_returns_typed_p1_artifacts() -> None:
     assert decision["preview"]["decision_state"] == "watching"
     assert not any(key.endswith("_id") for key in decision["preview"])
     assert decision["matched_text"].startswith("Track it.")
-    assert "TSLA backtest versus SPY" in decision["matched_text"]
+    assert "I tested that idea with TSLA." in decision["matched_text"]
+    assert "backtest versus" not in decision["matched_text"]
     assert "watching" not in decision["matched_text"]
 
 

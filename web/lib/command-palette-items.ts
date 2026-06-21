@@ -11,7 +11,7 @@ export type CommandPaletteDisplayItem = {
   lifecycle?: string | null;
   preview?: Record<string, unknown> | null;
   canManageConversation: boolean;
-  activation: "open_conversation" | "select_preview";
+  activation: "open_conversation";
 };
 
 export type CommandPalettePreviewField = {
@@ -23,6 +23,7 @@ export type CommandPalettePreviewField = {
 
 export type CommandPaletteItemCopy = {
   decisionStateLabel?: (state: string) => string;
+  metricLabel?: (id: string, fallback: string) => string;
 };
 
 export function commandPaletteItemFromHistory(
@@ -64,7 +65,7 @@ export function commandPaletteItemFromSearch(
     lifecycle: item.lifecycle ?? null,
     preview: safeCommandPalettePreview(item.preview),
     canManageConversation: item.type === "chat" && Boolean(conversationId),
-    activation: item.type === "chat" ? "open_conversation" : "select_preview",
+    activation: "open_conversation",
   };
 }
 
@@ -109,6 +110,30 @@ export function commandPaletteTypeFallback(type: SearchItem["type"]) {
     case "chat":
     default:
       return "Conversation";
+  }
+}
+
+export function commandPaletteStatusLabelKey(item: CommandPaletteDisplayItem) {
+  const status = commandPaletteStatusId(item);
+  return status ? `command_palette.status.${status}` : null;
+}
+
+export function commandPaletteStatusFallback(item: CommandPaletteDisplayItem) {
+  switch (commandPaletteStatusId(item)) {
+    case "archived":
+      return "Archived";
+    case "captured":
+      return "Captured";
+    case "decided":
+      return "Decided";
+    case "discarded":
+      return "Discarded";
+    case "reviewed":
+      return "Reviewed";
+    case "saved":
+      return "Saved";
+    default:
+      return null;
   }
 }
 
@@ -189,7 +214,7 @@ export function commandPalettePreviewFields(
     addField("decision", "Decision", label);
   }
 
-  addField("metrics", "Metrics", metricsSummaryText(preview.metrics_summary));
+  addField("metrics", "Metrics", metricsSummaryText(preview.metrics_summary, copy));
 
   const assumptions = safePreviewStringList(preview.assumptions);
   addField("assumptions", "Assumptions", assumptions.join(" · ") || null);
@@ -200,6 +225,21 @@ export function commandPalettePreviewFields(
     addField("preview", "Preview", item.snippet || null);
   }
   return fields;
+}
+
+function commandPaletteStatusId(item: CommandPaletteDisplayItem) {
+  const lifecycle = safePreviewString(item.lifecycle);
+  switch (lifecycle) {
+    case "archived":
+    case "captured":
+    case "decided":
+    case "discarded":
+    case "reviewed":
+    case "saved":
+      return lifecycle;
+    default:
+      return null;
+  }
 }
 
 function commandPaletteSnippet(item: SearchItem, copy: CommandPaletteItemCopy) {
@@ -258,7 +298,7 @@ function safePreviewStringList(value: unknown) {
   });
 }
 
-function metricsSummaryText(value: unknown) {
+function metricsSummaryText(value: unknown, copy: CommandPaletteItemCopy) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const summary = value as Record<string, unknown>;
   const fields: Array<[string, string]> = [
@@ -273,7 +313,8 @@ function metricsSummaryText(value: unknown) {
   const parts = fields.flatMap(([key, label]) => {
     const raw = summary[key];
     const formatted = formatMetricValue(key, raw);
-    return formatted ? [`${label} ${formatted}`] : [];
+    const displayLabel = copy.metricLabel?.(key, label) ?? label;
+    return formatted ? [`${displayLabel} ${formatted}`] : [];
   });
   return parts.join(" · ") || null;
 }

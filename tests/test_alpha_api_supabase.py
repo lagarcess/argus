@@ -1,5 +1,5 @@
 import json
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -382,7 +382,10 @@ def test_run_backtest_quota_exceeded(mock_gateway):
     response = client.post(
         "/api/v1/backtests/run",
         json={"symbols": ["AAPL"]},
-        headers={"Authorization": "Bearer test-token"},
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "quota-exceeded",
+        },
     )
     assert response.status_code == 429
     data = response.json()
@@ -593,7 +596,10 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock
     response = client.post(
         "/api/v1/backtests/run",
         json={"template": "rsi_mean_reversion", "symbols": ["TSLA"]},
-        headers={"Authorization": "Bearer test-token"},
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "supabase-normalized-snapshot",
+        },
     )
 
     assert response.status_code == 200
@@ -620,7 +626,10 @@ def test_run_backtest_rejects_unowned_parent_conversation(mock_gateway):
             "template": "rsi_mean_reversion",
             "symbols": ["AAPL"],
         },
-        headers={"Authorization": "Bearer test-token"},
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "unowned-parent-conversation",
+        },
     )
 
     assert response.status_code == 404
@@ -662,7 +671,10 @@ def test_get_backtest_supabase_reads_from_gateway(mock_gateway):
     create = client.post(
         "/api/v1/backtests/run",
         json={"template": "rsi_mean_reversion", "symbols": ["AAPL"]},
-        headers={"Authorization": "Bearer test-token"},
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "supabase-get-backtest",
+        },
     )
     assert create.status_code == 200
     created_run = create.json()["run"]
@@ -1635,6 +1647,239 @@ def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
         "Worth revisiting. · AAPL MSFT beat SPY in the test window."
     )
     assert "promising" not in decision["matched_text"]
+
+
+def test_search_supabase_orders_p1_artifacts_before_source_conversation(
+    mock_gateway,
+):
+    now = utcnow()
+    newer = (now + timedelta(minutes=5)).replace(microsecond=0)
+    mock_gateway.search_rows.return_value = {
+            "conversations": [
+                {
+                    "id": "conversation-1",
+                    "title": "AAPL MSFT TSLA source wrapper",
+                    "last_message_preview": "AAPL MSFT TSLA chat wrapper",
+                    "updated_at": newer.isoformat(),
+                    "pinned": False,
+                }
+        ],
+        "strategies": [],
+        "collections": [],
+        "runs": [
+            {
+                "id": "run-1",
+                "conversation_id": "conversation-1",
+                "conversation_result_card": {
+                    "title": "AAPL, MSFT, TSLA evidence backtest",
+                    "symbols": ["AAPL", "MSFT", "TSLA"],
+                    "artifact_type": "backtest",
+                    "evidence_artifact_id": "artifact-1",
+                    "evidence_lifecycle": "captured",
+                },
+                "created_at": (now.replace(microsecond=0)).isoformat(),
+                "benchmark_symbol": "SPY",
+            }
+        ],
+        "ideas": [
+            {
+                "id": "idea-1",
+                "title": "AAPL, MSFT, TSLA evidence idea",
+                "summary": "AAPL, MSFT, TSLA evidence summary.",
+                "lifecycle": "captured",
+                "active_version_id": "version-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+            }
+        ],
+        "evidence": [
+            {
+                "id": "artifact-1",
+                "title": "AAPL, MSFT, TSLA evidence artifact",
+                "digest": "AAPL, MSFT, TSLA evidence artifact digest.",
+                "lifecycle": "captured",
+                "artifact_type": "backtest",
+                "source_run_id": "run-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+                "payload": {
+                    "provenance": {
+                        "symbols": ["AAPL", "MSFT", "TSLA"],
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+            }
+        ],
+        "decisions": [
+            {
+                "id": "decision-1",
+                "decision_state": "promising",
+                "note": "AAPL, MSFT, TSLA evidence decision note.",
+                "evidence_artifact_id": "artifact-1",
+                "artifact_title": "AAPL, MSFT, TSLA evidence artifact",
+                "artifact_digest": "AAPL, MSFT, TSLA evidence artifact digest.",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+            }
+        ],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=AAPL%20MSFT%20TSLA&limit=10",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    chat_index = ordered_types.index("chat")
+    for artifact_type in ("backtest", "evidence", "idea", "decision"):
+        assert ordered_types.index(artifact_type) < chat_index
+
+
+def test_search_supabase_preserves_pinned_chat_above_p1_artifacts(mock_gateway):
+    now = utcnow().replace(microsecond=0)
+    mock_gateway.search_rows.return_value = {
+        "conversations": [
+            {
+                "id": "conversation-1",
+                "title": "AAPL pinned conversation",
+                "last_message_preview": "AAPL pinned source",
+                "updated_at": (now + timedelta(minutes=5)).isoformat(),
+                "pinned": True,
+            }
+        ],
+        "strategies": [],
+        "collections": [],
+        "runs": [],
+        "ideas": [],
+        "evidence": [
+            {
+                "id": "artifact-1",
+                "title": "AAPL evidence artifact",
+                "digest": "AAPL evidence artifact digest.",
+                "lifecycle": "captured",
+                "artifact_type": "backtest",
+                "source_run_id": "run-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+                "payload": {
+                    "provenance": {
+                        "symbols": ["AAPL"],
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+            }
+        ],
+        "decisions": [],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=aapl&limit=10",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    assert ordered_types.index("chat") < ordered_types.index("evidence")
+
+
+def test_search_supabase_preserves_exact_chat_above_lower_relevance_p1_artifacts(
+    mock_gateway,
+):
+    now = utcnow().replace(microsecond=0)
+    mock_gateway.search_rows.return_value = {
+        "conversations": [
+            {
+                "id": "conversation-1",
+                "title": "AAPL",
+                "last_message_preview": "AAPL exact source",
+                "updated_at": (now + timedelta(minutes=5)).isoformat(),
+                "pinned": False,
+            }
+        ],
+        "strategies": [],
+        "collections": [],
+        "runs": [],
+        "ideas": [],
+        "evidence": [
+            {
+                "id": "artifact-1",
+                "title": "AAPL evidence artifact",
+                "digest": "AAPL evidence artifact digest.",
+                "lifecycle": "captured",
+                "artifact_type": "backtest",
+                "source_run_id": "run-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+                "payload": {
+                    "provenance": {
+                        "symbols": ["AAPL"],
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+            }
+        ],
+        "decisions": [],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=aapl&limit=10",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    assert ordered_types.index("chat") < ordered_types.index("evidence")
+
+
+def test_search_supabase_preserves_symbol_match_above_lower_relevance_p1_artifact(
+    mock_gateway,
+):
+    now = utcnow().replace(microsecond=0)
+    mock_gateway.search_rows.return_value = {
+        "conversations": [],
+        "strategies": [
+            {
+                "id": "strategy-1",
+                "name": "Saved alpha strategy",
+                "symbols": ["AAPL"],
+                "template": "buy_hold",
+                "updated_at": now.isoformat(),
+                "pinned": False,
+            }
+        ],
+        "collections": [],
+        "runs": [],
+        "ideas": [],
+        "evidence": [
+            {
+                "id": "artifact-1",
+                "title": "AAPL evidence artifact",
+                "digest": "AAPL evidence artifact digest.",
+                "lifecycle": "captured",
+                "artifact_type": "backtest",
+                "source_run_id": "run-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": (now + timedelta(minutes=5)).isoformat(),
+                "payload": {
+                    "provenance": {
+                        "symbols": ["MSFT"],
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+            }
+        ],
+        "decisions": [],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=aapl&limit=10",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    assert ordered_types.index("strategy") < ordered_types.index("evidence")
 
 
 def test_history_supabase_requests_non_archived_rows_by_default(mock_gateway):

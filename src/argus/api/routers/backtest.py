@@ -26,10 +26,15 @@ def run_backtest(
     user: User = Depends(current_user),  # noqa: B008
 ) -> BacktestRunResponse:
     endpoint = "/api/v1/backtests/run"
-    if idempotency_key:
-        cached = api_state.store.idempotency.get((user.id, endpoint, idempotency_key))
-        if cached:
-            return BacktestRunResponse(run=cached)
+    clean_idempotency_key = _clean_required_idempotency_key(
+        request=request,
+        idempotency_key=idempotency_key,
+    )
+    cached = api_state.store.idempotency.get(
+        (user.id, endpoint, clean_idempotency_key)
+    )
+    if cached:
+        return BacktestRunResponse(run=cached)
 
     if api_state.supabase_gateway is not None:
         try:
@@ -123,9 +128,26 @@ def run_backtest(
     )
     if api_state.supabase_gateway is not None:
         run = api_state.supabase_gateway.create_backtest_run(user_id=user.id, run=run)
-    if idempotency_key:
-        api_state.store.idempotency[(user.id, endpoint, idempotency_key)] = run
+    api_state.store.idempotency[(user.id, endpoint, clean_idempotency_key)] = run
     return BacktestRunResponse(run=run)
+
+
+def _clean_required_idempotency_key(
+    *,
+    request: Request,
+    idempotency_key: str | None,
+) -> str:
+    if isinstance(idempotency_key, str):
+        stripped = idempotency_key.strip()
+        if stripped:
+            return stripped
+    raise problem(
+        request,
+        status_code=400,
+        code="idempotency_key_required",
+        title="Idempotency Key Required",
+        detail="POST /backtests/run requires an Idempotency-Key header.",
+    )
 
 
 @router.get("/backtest-jobs/{job_id}", response_model=BacktestJobResponse)
