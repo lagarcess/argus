@@ -33,17 +33,10 @@ def feedback(
 
     if api_state.supabase_gateway is not None:
         try:
-            api_state.supabase_gateway.check_and_increment_usage(
+            api_state.supabase_gateway.check_and_increment_usage_limits(
                 user_id=user.id,
                 resource="feedback",
-                period="day",
-                limit_count=50,
-            )
-            api_state.supabase_gateway.check_and_increment_usage(
-                user_id=user.id,
-                resource="feedback",
-                period="hour",
-                limit_count=20,
+                limits=[("day", 50), ("hour", 20)],
             )
         except QuotaExceededError as exc:
             raise problem(

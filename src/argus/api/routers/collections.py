@@ -254,12 +254,19 @@ def attach_strategies(
         )
     attached = api_state.store.collection_strategies.setdefault(collection_id, set())
     for strategy_id in payload.strategy_ids:
-        if strategy_id in api_state.store.strategies and memory_object_visible(
+        if strategy_id not in api_state.store.strategies or not memory_object_visible(
             owner_map=api_state.store.strategy_owners,
             object_id=strategy_id,
             user_id=user.id,
         ):
-            attached.add(strategy_id)
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Strategy not found.",
+            )
+        attached.add(strategy_id)
     updated = collection.model_copy(
         update={"strategy_count": len(attached), "updated_at": utcnow()}
     )

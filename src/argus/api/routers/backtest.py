@@ -38,17 +38,10 @@ def run_backtest(
 
     if api_state.supabase_gateway is not None:
         try:
-            api_state.supabase_gateway.check_and_increment_usage(
+            api_state.supabase_gateway.check_and_increment_usage_limits(
                 user_id=user.id,
                 resource="backtest_runs",
-                period="day",
-                limit_count=50,
-            )
-            api_state.supabase_gateway.check_and_increment_usage(
-                user_id=user.id,
-                resource="backtest_runs",
-                period="hour",
-                limit_count=10,
+                limits=[("day", 50), ("hour", 10)],
             )
         except QuotaExceededError as exc:
             raise problem(

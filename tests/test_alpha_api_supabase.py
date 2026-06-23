@@ -375,7 +375,7 @@ def mock_gateway():
 
 
 def test_run_backtest_quota_exceeded(mock_gateway):
-    mock_gateway.check_and_increment_usage.side_effect = QuotaExceededError(
+    mock_gateway.check_and_increment_usage_limits.side_effect = QuotaExceededError(
         "Quota exceeded for backtest_runs (day)"
     )
 
@@ -395,7 +395,7 @@ def test_run_backtest_quota_exceeded(mock_gateway):
 
 
 def test_chat_stream_quota_exceeded(mock_gateway):
-    mock_gateway.check_and_increment_usage.side_effect = QuotaExceededError(
+    mock_gateway.check_and_increment_usage_limits.side_effect = QuotaExceededError(
         "Quota exceeded for chat_messages (day)"
     )
 
@@ -442,21 +442,11 @@ def test_chat_stream_checks_daily_and_hourly_quotas(mock_gateway):
     )
 
     assert response.status_code == 200
-    quota_calls = [
-        call.kwargs for call in mock_gateway.check_and_increment_usage.call_args_list
-    ]
-    assert {
-        "user_id": "00000000-0000-0000-0000-000000000001",
-        "resource": "chat_messages",
-        "period": "day",
-        "limit_count": 200,
-    } in quota_calls
-    assert {
-        "user_id": "00000000-0000-0000-0000-000000000001",
-        "resource": "chat_messages",
-        "period": "hour",
-        "limit_count": 60,
-    } in quota_calls
+    mock_gateway.check_and_increment_usage_limits.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        resource="chat_messages",
+        limits=[("day", 200), ("hour", 60)],
+    )
 
 
 def test_successful_api_response_omits_static_rate_limit_headers(mock_gateway):
@@ -991,18 +981,11 @@ def test_feedback_submission_persists_with_user_ownership(mock_gateway):
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
-    assert {
-        "user_id": profile.id,
-        "resource": "feedback",
-        "period": "day",
-        "limit_count": 50,
-    } in [call.kwargs for call in mock_gateway.check_and_increment_usage.call_args_list]
-    assert {
-        "user_id": profile.id,
-        "resource": "feedback",
-        "period": "hour",
-        "limit_count": 20,
-    } in [call.kwargs for call in mock_gateway.check_and_increment_usage.call_args_list]
+    mock_gateway.check_and_increment_usage_limits.assert_called_once_with(
+        user_id=profile.id,
+        resource="feedback",
+        limits=[("day", 50), ("hour", 20)],
+    )
     mock_gateway.create_feedback.assert_called_once_with(
         user_id=profile.id,
         feedback_type="general",
@@ -1119,7 +1102,7 @@ def test_feedback_rejects_large_serialized_context(mock_gateway):
 
 
 def test_feedback_quota_exceeded_returns_retry_after(mock_gateway):
-    mock_gateway.check_and_increment_usage.side_effect = QuotaExceededError(
+    mock_gateway.check_and_increment_usage_limits.side_effect = QuotaExceededError(
         "Quota exceeded for feedback (hour)"
     )
 
@@ -1322,6 +1305,40 @@ def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
         auth_router.AUTH_SIGNUP_ATTEMPT_LIMIT
     )
     mock_gateway.signup.assert_not_called()
+
+
+def test_auth_attempt_limiter_compacts_expired_keys(monkeypatch):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setattr(auth_router, "_AUTH_ATTEMPT_COMPACT_THRESHOLD", 1)
+    monkeypatch.setattr(auth_router, "monotonic", lambda: 0.0)
+
+    assert (
+        auth_router._AUTH_ATTEMPT_LIMITER.record_or_retry_after(
+            keys=("login:ip:stale",),
+            limit=auth_router.AUTH_LOGIN_ATTEMPT_LIMIT,
+            window_seconds=auth_router._AUTH_ATTEMPT_WINDOW_SECONDS,
+        )
+        is None
+    )
+
+    monkeypatch.setattr(
+        auth_router,
+        "monotonic",
+        lambda: float(auth_router._AUTH_ATTEMPT_WINDOW_SECONDS + 1),
+    )
+    assert (
+        auth_router._AUTH_ATTEMPT_LIMITER.record_or_retry_after(
+            keys=("login:ip:fresh",),
+            limit=auth_router.AUTH_LOGIN_ATTEMPT_LIMIT,
+            window_seconds=auth_router._AUTH_ATTEMPT_WINDOW_SECONDS,
+        )
+        is None
+    )
+
+    assert "login:ip:stale" not in auth_router._AUTH_ATTEMPT_LIMITER._attempts
+    assert "login:ip:fresh" in auth_router._AUTH_ATTEMPT_LIMITER._attempts
 
 
 def test_decision_endpoint_returns_success_when_card_enrichment_fails(

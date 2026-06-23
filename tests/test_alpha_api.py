@@ -914,6 +914,38 @@ def test_collections_are_organizational_and_can_mix_strategy_asset_classes() -> 
     assert attached.json()["collection"]["strategy_count"] == 2
 
 
+def test_collection_attach_rejects_unowned_memory_strategy() -> None:
+    client = _client()
+    now = utcnow()
+    collection = client.post(
+        "/api/v1/collections", json={"name": "Ideas to revisit"}
+    ).json()["collection"]
+    other_strategy = Strategy(
+        id="other-strategy",
+        name="Other user's strategy",
+        name_source="user_renamed",
+        template="buy_and_hold",
+        asset_class="equity",
+        symbols=["AAPL"],
+        parameters={},
+        metrics_preferences=["total_return_pct"],
+        benchmark_symbol="SPY",
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.strategies[other_strategy.id] = other_strategy
+    api_state.store.strategy_owners[other_strategy.id] = "other-user"
+
+    response = client.post(
+        f"/api/v1/collections/{collection['id']}/strategies",
+        json={"strategy_ids": [other_strategy.id]},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+    assert api_state.store.collection_strategies[collection["id"]] == set()
+
+
 def test_chat_stream_persists_messages_and_emits_contract_events() -> None:
     client = _client()
     _set_onboarding_ready(client, primary_goal="test_stock_idea")

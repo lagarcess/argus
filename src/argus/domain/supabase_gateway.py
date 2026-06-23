@@ -1840,47 +1840,40 @@ class SupabaseGateway:
     def check_and_increment_usage(
         self, *, user_id: str, resource: str, period: str, limit_count: int
     ) -> None:
+        self.check_and_increment_usage_limits(
+            user_id=user_id,
+            resource=resource,
+            limits=[(period, limit_count)],
+        )
+
+    def check_and_increment_usage_limits(
+        self,
+        *,
+        user_id: str,
+        resource: str,
+        limits: list[tuple[str, int]],
+    ) -> None:
+        if not limits:
+            return
         now = datetime.now(timezone.utc)
-        start, end = _align_period(now, period)
-        start_iso = start.isoformat()
-        end_iso = end.isoformat()
         with _USAGE_COUNTER_LOCK:
-            for _ in range(5):
-                rows = (
-                    self.client.table("usage_counters")
-                    .select("*")
-                    .eq("user_id", user_id)
-                    .eq("resource", resource)
-                    .eq("period", period)
-                    .eq("period_start", start_iso)
-                    .limit(1)
-                    .execute()
+            checked_rows: list[tuple[dict[str, Any], int, int, str]] = []
+            for period, limit_count in limits:
+                row = self._get_or_create_usage_counter_row(
+                    user_id=user_id,
+                    resource=resource,
+                    period=period,
+                    limit_count=limit_count,
+                    now=now,
                 )
-                row = _row_one(rows)
-
-                if row is None:
-                    try:
-                        self.client.table("usage_counters").insert(
-                            {
-                                "user_id": user_id,
-                                "resource": resource,
-                                "period": period,
-                                "period_start": start_iso,
-                                "period_end": end_iso,
-                                "used_count": 0,
-                                "limit_count": limit_count,
-                                "created_at": _now_iso(),
-                                "updated_at": _now_iso(),
-                            }
-                        ).execute()
-                    except Exception:
-                        pass
-                    continue
-
                 current_used = int(row.get("used_count", 0))
                 if current_used >= limit_count:
-                    raise QuotaExceededError(f"Quota exceeded for {resource} ({period})")
+                    raise QuotaExceededError(
+                        f"Quota exceeded for {resource} ({period})"
+                    )
+                checked_rows.append((row, current_used, limit_count, period))
 
+            for row, current_used, limit_count, period in checked_rows:
                 updated = (
                     self.client.table("usage_counters")
                     .update(
@@ -1895,11 +1888,59 @@ class SupabaseGateway:
                     .execute()
                 )
                 if updated.data:
-                    return
+                    continue
 
-            raise RuntimeError(
-                f"Failed to increment usage counter for {resource} ({period})."
+                raise RuntimeError(
+                    f"Failed to increment usage counter for {resource} ({period})."
+                )
+
+    def _get_or_create_usage_counter_row(
+        self,
+        *,
+        user_id: str,
+        resource: str,
+        period: str,
+        limit_count: int,
+        now: datetime,
+    ) -> dict[str, Any]:
+        start, end = _align_period(now, period)
+        start_iso = start.isoformat()
+        end_iso = end.isoformat()
+        for _ in range(5):
+            rows = (
+                self.client.table("usage_counters")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("resource", resource)
+                .eq("period", period)
+                .eq("period_start", start_iso)
+                .limit(1)
+                .execute()
             )
+            row = _row_one(rows)
+            if row is not None:
+                return row
+
+            try:
+                self.client.table("usage_counters").insert(
+                    {
+                        "user_id": user_id,
+                        "resource": resource,
+                        "period": period,
+                        "period_start": start_iso,
+                        "period_end": end_iso,
+                        "used_count": 0,
+                        "limit_count": limit_count,
+                        "created_at": _now_iso(),
+                        "updated_at": _now_iso(),
+                    }
+                ).execute()
+            except Exception:
+                pass
+
+        raise RuntimeError(
+            f"Failed to initialize usage counter for {resource} ({period})."
+        )
 
     def get_auth_user_from_token(self, token: str) -> dict[str, Any]:
         response = self.client.auth.get_user(token)

@@ -10,6 +10,7 @@ from argus.domain.search_text import search_text_matches_query
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import (
     DecisionCaptureIntegrityError,
+    QuotaExceededError,
     SupabaseGateway,
 )
 
@@ -288,6 +289,29 @@ def test_attach_strategies_rejects_unowned_parent_collection_before_upsert() -> 
 
     assert result is None
     client.table.assert_not_called()
+
+
+def test_usage_limits_check_all_windows_before_incrementing() -> None:
+    client = MagicMock()
+    table = MagicMock()
+    client.table.return_value = table
+    table.select.return_value = table
+    table.eq.return_value = table
+    table.limit.return_value = table
+    table.execute.side_effect = [
+        SimpleNamespace(data=[{"id": "day-counter", "used_count": 1}]),
+        SimpleNamespace(data=[{"id": "hour-counter", "used_count": 60}]),
+    ]
+    gateway = SupabaseGateway(client=client)
+
+    with pytest.raises(QuotaExceededError, match="chat_messages \\(hour\\)"):
+        gateway.check_and_increment_usage_limits(
+            user_id="user-1",
+            resource="chat_messages",
+            limits=[("day", 200), ("hour", 60)],
+        )
+
+    table.update.assert_not_called()
 
 
 class _BacktestJobClient:

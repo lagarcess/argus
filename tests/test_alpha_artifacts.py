@@ -155,6 +155,7 @@ def _usage_counter_resources_from_api_code() -> set[str]:
 
 
 def _is_check_and_increment_usage_call(node: ast.Call) -> bool:
+    names = {"check_and_increment_usage", "check_and_increment_usage_limits"}
     if isinstance(node.func, ast.Attribute):
-        return node.func.attr == "check_and_increment_usage"
-    return isinstance(node.func, ast.Name) and node.func.id == "check_and_increment_usage"
+        return node.func.attr in names
+    return isinstance(node.func, ast.Name) and node.func.id in names
