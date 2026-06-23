@@ -564,10 +564,6 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
 
 def test_render_env_sync_workflow_proof_forces_live_provider_mode() -> None:
     source = _source(".github/render-env-sync.sh")
-    workflow_block = source.split("sync_workflow_proof() {", maxsplit=1)[1].split(
-        "\n}",
-        maxsplit=1,
-    )[0]
 
     value_block = source.split("workflow_render_env_value() {", maxsplit=1)[1].split(
         "\n}",
