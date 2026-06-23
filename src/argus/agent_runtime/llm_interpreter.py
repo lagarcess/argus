@@ -15,6 +15,9 @@ from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     plan_artifact_assumption_edit,
 )
+from argus.agent_runtime.artifacts.asset_edits import (
+    normalized_asset_universe_operation,
+)
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
@@ -33,6 +36,9 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMRiskRule,
     LLMStrategyDraft,
     LLMUnsupportedConstraint,
+)
+from argus.agent_runtime.presentation_i18n import (
+    asset_universe_operation_clarification_message,
 )
 from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
@@ -113,6 +119,7 @@ from argus.llm.openrouter import (
     record_openrouter_route_receipt,
 )
 from argus.nlp.natural_time import (
+    date_range_evidence_has_explicit_endpoints,
     dateparser_languages_for_user_language,
     resolve_date_range_intent,
     resolve_date_range_text,
@@ -556,6 +563,7 @@ class OpenRouterStructuredInterpreter:
             repaired_response = await _plan_pending_artifact_assumption_edit(
                 request=request,
                 preferred_model=candidate_models[0] if candidate_models else "",
+                require_failure_edit_evidence=True,
             )
             if repaired_response is not None:
                 self.last_status = "fallback_used"
@@ -691,6 +699,7 @@ class OpenRouterStructuredInterpreter:
         repaired_response = await _plan_pending_artifact_assumption_edit(
             request=request,
             preferred_model=fallback_model_name or primary_model_name,
+            require_failure_edit_evidence=True,
         )
         if repaired_response is not None:
             self.last_status = "fallback_used"
@@ -1680,6 +1689,29 @@ def _response_needs_requested_asset_answer_candidate_audit(
     if _draft_has_valid_requested_asset_update(response.candidate_strategy_draft, request):
         return False
     return bool(_prior_strategy_symbols(request))
+
+
+def _response_is_audited_requested_asset_answer_patch(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if _selected_requested_field_base(request) != "asset_universe":
+        return False
+    if "requested_asset_answer_candidate_audit" not in response.reason_codes:
+        return False
+    if response.semantic_turn_act != "answer_pending_need":
+        return False
+    if response.intent != "backtest_execution":
+        return False
+    if response.assistant_response:
+        return False
+    if response.candidate_strategy_draft is None:
+        return False
+    return _draft_has_valid_requested_asset_update(
+        response.candidate_strategy_draft,
+        request,
+    )
 
 
 def _draft_has_valid_requested_asset_update(
@@ -3229,6 +3261,13 @@ async def _response_ready_for_runtime(
 ) -> LLMInterpretationResponse:
     response = _normalize_response_for_runtime_context(response, request=request)
     _log_runtime_readiness_step("started", response=response)
+    planned_artifact_edit = await _ready_active_artifact_edit_planned_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if planned_artifact_edit is not None:
+        return planned_artifact_edit
     if _response_can_skip_optional_runtime_readiness_audits(
         response=response,
         request=request,
@@ -3279,6 +3318,11 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
     )
+    if _response_is_audited_requested_asset_answer_patch(
+        response=response,
+        request=request,
+    ):
+        return response
     response = await _latest_result_routing_audited_response(
         response=response,
         preferred_model=preferred_model,
@@ -3649,6 +3693,114 @@ async def _response_ready_for_runtime(
             request=request,
         )
     raise ValueError("OpenRouter interpretation returned an incomplete strategy draft")
+
+
+async def _ready_active_artifact_edit_planned_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _request_targets_pending_artifact_assumption_edit(request):
+        return None
+    if response.semantic_turn_act in {
+        "approval",
+        "retry_failed_action",
+    }:
+        return None
+    if (
+        response.semantic_turn_act == "result_followup"
+        and not _request_has_planner_edit_candidate_after_model_failure(request)
+    ):
+        return None
+    if _active_artifact_asset_universe_operation_needs_planner(
+        response=response,
+        request=request,
+    ):
+        planned = await _plan_pending_artifact_assumption_edit(
+            request=request,
+            preferred_model=preferred_model,
+        )
+        if planned is not None:
+            return planned
+        return _asset_universe_operation_clarification_response(
+            response=response,
+            request=request,
+        )
+    if _llm_strategy_draft_has_supported_artifact_assumption_edit(
+        response.candidate_strategy_draft
+    ):
+        return None
+    planned = await _plan_pending_artifact_assumption_edit(
+        request=request,
+        preferred_model=preferred_model,
+    )
+    if planned is None or planned.requires_clarification:
+        return None
+    return planned
+
+
+def _active_artifact_asset_universe_operation_needs_planner(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    draft = response.candidate_strategy_draft
+    if not draft.asset_universe:
+        return False
+    if normalized_asset_universe_operation(draft.asset_universe_operation) is not None:
+        return False
+    snapshot = request.latest_task_snapshot
+    prior = (
+        snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+        if snapshot is not None
+        else None
+    )
+    if prior is None:
+        return False
+    candidate_symbols = {
+        symbol
+        for value in draft.asset_universe
+        if (symbol := _normalized_ticker_symbol(value)) is not None
+    }
+    prior_symbols = {
+        symbol
+        for value in prior.asset_universe
+        if (symbol := _normalized_ticker_symbol(value)) is not None
+    }
+    return bool(candidate_symbols and candidate_symbols != prior_symbols)
+
+
+def _asset_universe_operation_clarification_response(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    return response.model_copy(
+        update={
+            "intent": "conversation_followup",
+            "task_relation": "continue",
+            "requires_clarification": True,
+            "assistant_response": asset_universe_operation_clarification_message(
+                language=request.user.language_preference
+            ),
+            "candidate_strategy_draft": LLMStrategyDraft(
+                raw_user_phrasing=request.current_user_message
+            ),
+            "missing_required_fields": [],
+            "ambiguous_fields": [],
+            "unsupported_constraints": [],
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "asset_universe_operation_needs_clarification",
+                    ]
+                )
+            ),
+            "semantic_turn_act": "answer_pending_need",
+        }
+    )
 
 
 def _log_runtime_readiness_step(
@@ -4344,8 +4496,11 @@ def _response_needs_focused_date_window_intent_repair(
         and not _supported_partial_draft_has_repairable_shape(draft)
     ):
         return False
-    if resolve_date_range_intent(draft.date_range_intent) is not None:
-        return False
+    if (
+        resolve_date_range_intent(draft.date_range_intent) is not None
+        and has_semantic_date_evidence
+    ):
+        return True
     has_complete_date_range = _has_complete_date_range_payload(
         normalize_date_range_candidate(draft.date_range)
     )
@@ -4415,10 +4570,11 @@ def _complete_date_range_needs_current_turn_date_audit(
         return False
     if not _llm_strategy_draft_has_concrete_execution_target(draft):
         return False
-    if _draft_has_semantic_date_window_evidence(draft):
+    has_semantic_date_evidence = _draft_has_semantic_date_window_evidence(draft)
+    if has_semantic_date_evidence:
         return False
     if resolve_date_range_intent(draft.date_range_intent) is not None:
-        return False
+        return True
     return True
 
 
@@ -4672,8 +4828,14 @@ async def _plan_pending_artifact_assumption_edit(
     *,
     request: InterpretationRequest,
     preferred_model: str,
+    require_failure_edit_evidence: bool = False,
 ) -> LLMInterpretationResponse | None:
     if not _request_targets_pending_artifact_assumption_edit(request):
+        return None
+    if (
+        require_failure_edit_evidence
+        and not _request_has_planner_edit_candidate_after_model_failure(request)
+    ):
         return None
     snapshot = request.latest_task_snapshot
     prior_strategy = _prior_strategy_payload(request)
@@ -4693,22 +4855,92 @@ async def _plan_pending_artifact_assumption_edit(
     return _response_from_artifact_assumption_edit_plan(plan=plan, request=request)
 
 
+def _request_has_planner_edit_candidate_after_model_failure(
+    request: InterpretationRequest,
+) -> bool:
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
+    if requested_field in {"assumption", "asset_universe", "comparison_baseline"}:
+        return True
+
+    snapshot = request.latest_task_snapshot
+    prior = (
+        snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+        if snapshot is not None
+        else None
+    )
+    if prior is None:
+        return False
+
+    def _resolve_candidate(query: str) -> AssetResolution | None:
+        try:
+            return _resolve_asset_candidate(
+                query,
+                field="asset_universe[0]",
+                source="user_mention",
+            )
+        except ValueError:
+            return None
+
+    current_symbols = {
+        symbol
+        for asset in provider_ticker_assets_from_text(
+            request.current_user_message,
+            resolve_candidate=_resolve_candidate,
+            limit=10,
+        )
+        if (
+            symbol := _normalized_ticker_symbol(
+                getattr(asset, "canonical_symbol", None)
+            )
+        )
+        is not None
+    }
+    if not current_symbols:
+        return False
+    prior_symbols = {
+        symbol
+        for value in prior.asset_universe
+        if (symbol := _normalized_ticker_symbol(value)) is not None
+    }
+    prior_benchmark = _normalized_ticker_symbol(prior.comparison_baseline)
+    if prior_benchmark is not None:
+        prior_symbols.add(prior_benchmark)
+    return not current_symbols <= prior_symbols
+
+
+def _normalized_ticker_symbol(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    symbol = value.strip().upper()
+    return symbol or None
+
+
 def _request_targets_pending_artifact_assumption_edit(
     request: InterpretationRequest,
 ) -> bool:
     requested_field = _field_path_base(
         request.selected_thread_metadata.get("requested_field")
     )
-    if requested_field != "assumption":
-        return False
     snapshot = request.latest_task_snapshot
-    return bool(
+    has_artifact_context = bool(
         snapshot
         and (
             snapshot.pending_strategy_summary
             or snapshot.confirmed_strategy_summary
             or snapshot.active_confirmation_reference
         )
+    )
+    if not has_artifact_context:
+        return False
+    if requested_field in {"assumption", "asset_universe", "comparison_baseline"}:
+        return True
+    return bool(
+        not requested_field
+        and snapshot is not None
+        and snapshot.active_confirmation_reference is not None
+        and request.current_user_message.strip()
     )
 
 
@@ -4720,6 +4952,20 @@ def _response_from_artifact_assumption_edit_plan(
     draft = LLMStrategyDraft(raw_user_phrasing=request.current_user_message)
     field_provenance: dict[str, str] = {}
     extra_parameters: dict[str, Any] = {}
+    if plan.asset_universe:
+        operation = normalized_asset_universe_operation(
+            plan.asset_universe_operation
+        )
+        draft.asset_universe = list(plan.asset_universe)
+        if operation is not None:
+            draft.asset_universe_operation = operation
+            extra_parameters["asset_universe_operation"] = operation
+        field_provenance["asset_universe"] = "explicit_user"
+    if plan.comparison_baseline is not None:
+        benchmark = str(plan.comparison_baseline or "").strip().upper()
+        if benchmark:
+            draft.comparison_baseline = benchmark
+            field_provenance["comparison_baseline"] = "explicit_user"
     if plan.initial_capital is not None:
         draft.capital_amount = plan.initial_capital
         field_provenance["capital_amount"] = "starting_capital"
@@ -4738,10 +4984,13 @@ def _response_from_artifact_assumption_edit_plan(
             extra_parameters["recurring_cadence"] = cadence
     if plan.timeframe is not None:
         draft.timeframe = plan.timeframe
+        field_provenance["timeframe"] = "explicit_user"
     if plan.fee_rate is not None:
         extra_parameters["fee_rate"] = plan.fee_rate
+        field_provenance["fee_rate"] = "explicit_user"
     if plan.slippage is not None:
         extra_parameters["slippage"] = plan.slippage
+        field_provenance["slippage"] = "explicit_user"
     if extra_parameters:
         draft.extra_parameters.update(extra_parameters)
     if field_provenance:
@@ -6761,8 +7010,22 @@ def _response_has_current_message_date_range_reconciliation(
         return True
     if has_partial_explicit_date_range(draft.date_range):
         return True
+    if (
+        resolve_date_range_intent(draft.date_range_intent) is not None
+        and _draft_has_semantic_date_window_evidence(draft)
+    ):
+        return True
     if not isinstance(draft.date_range, dict):
         return False
+    has_complete_date_range = _has_complete_date_range_payload(
+        normalize_date_range_candidate(draft.date_range)
+    )
+    if _complete_date_range_needs_current_turn_date_audit(
+        response=response,
+        request=request,
+        has_complete_date_range=has_complete_date_range,
+    ):
+        return True
     return _normalized_stated_field(draft.date_range) != _normalized_stated_field(
         date_range
     )
@@ -8824,9 +9087,17 @@ def _llm_strategy_draft_has_supported_artifact_assumption_edit(
             draft.recurring_contribution is not None
             and field_provenance.get("recurring_contribution")
             == "recurring_contribution",
-            bool(draft.timeframe),
-            "fee_rate" in extra_parameters,
-            "slippage" in extra_parameters,
+            bool(draft.asset_universe)
+            and normalized_asset_universe_operation(draft.asset_universe_operation)
+            is not None,
+            bool(draft.comparison_baseline)
+            and field_provenance.get("comparison_baseline") == "explicit_user",
+            bool(draft.timeframe)
+            and field_provenance.get("timeframe") == "explicit_user",
+            "fee_rate" in extra_parameters
+            and field_provenance.get("fee_rate") == "explicit_user",
+            "slippage" in extra_parameters
+            and field_provenance.get("slippage") == "explicit_user",
         ]
     )
 
@@ -9163,6 +9434,13 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload.pop("date_range_intent", None)
     )
     evidence_spans = _clean_evidence_spans(payload.pop("evidence_spans", {}) or {})
+    asset_universe_operation = normalized_asset_universe_operation(
+        payload.pop("asset_universe_operation", None)
+    )
+    if asset_universe_operation is not None:
+        payload.setdefault("extra_parameters", {})["asset_universe_operation"] = (
+            asset_universe_operation
+        )
     if not date_range_intent:
         date_range_intent = _date_range_intent_from_bounded_evidence(draft)
     initial_capital = payload.pop("initial_capital", None)
@@ -9355,6 +9633,18 @@ def _date_range_from_intent_or_bounded_evidence(
     language: str | None = None,
 ) -> dict[str, str] | None:
     intent_resolution = resolve_date_range_intent(draft.date_range_intent)
+    explicit_bounded = _date_range_from_bounded_evidence(
+        draft,
+        language=language,
+        require_explicit_endpoint_evidence=True,
+    )
+    if (
+        intent_resolution is not None
+        and explicit_bounded is not None
+        and _normalized_stated_field(intent_resolution.payload)
+        != _normalized_stated_field(explicit_bounded)
+    ):
+        return explicit_bounded
     if intent_resolution is not None:
         return intent_resolution.payload
     bounded = _date_range_from_bounded_evidence(draft, language=language)
@@ -9367,6 +9657,7 @@ def _date_range_from_bounded_evidence(
     draft: LLMStrategyDraft,
     *,
     language: str | None = None,
+    require_explicit_endpoint_evidence: bool = False,
 ) -> dict[str, str] | None:
     evidence_candidates = _bounded_date_evidence_candidates(draft)
     if not evidence_candidates:
@@ -9379,6 +9670,13 @@ def _date_range_from_bounded_evidence(
         for languages in language_candidates:
             resolved = resolve_date_range_text(candidate, languages=languages)
             if resolved is not None:
+                if (
+                    require_explicit_endpoint_evidence
+                    and not date_range_evidence_has_explicit_endpoints(
+                        resolved.evidence_spans
+                    )
+                ):
+                    continue
                 return resolved.payload
     return None
 

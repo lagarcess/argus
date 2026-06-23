@@ -13,7 +13,7 @@ from argus.agent_runtime.artifacts.lifecycle import (
     RetryLifecycleDecision,
     retry_lifecycle_after_artifact_event,
 )
-from argus.agent_runtime.artifacts.patches import (
+from argus.agent_runtime.artifacts.strategy_edits import (
     ArtifactPatch,
     apply_artifact_patch,
     patchable_strategy_fields,

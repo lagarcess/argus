@@ -32,9 +32,15 @@ from loguru import logger
 from pydantic import ValidationError
 
 
-def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResult:
+def confirm_stage(
+    *,
+    state: RunState,
+    contract: CapabilityContract,
+    language: str | None = None,
+) -> StageResult:
     logger.debug("Confirm stage started")
     strategy = _strategy_payload(state.candidate_strategy_draft)
+    strategy = _strategy_with_runtime_language(strategy, language=language)
     strategy = _strategy_with_latest_complete_data_adjustment(strategy)
     logger.debug(
         "Confirm stage latest complete data adjustment checked",
@@ -85,16 +91,8 @@ def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             outcome="needs_clarification",
             stage_patch=unsupported_assumption,
         )
-    card_assumptions = _visible_card_assumptions(
-        strategy=strategy,
-        optional_parameters=optional_parameters,
-    )
-    strategy_with_assumptions = {
-        **strategy,
-        "assumptions": card_assumptions,
-    }
     confirmation_payload = {
-        "strategy": strategy_with_assumptions,
+        "strategy": strategy,
         "optional_parameters": optional_parameters,
     }
     confirmation_id = new_confirmation_id()
@@ -112,9 +110,23 @@ def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             outcome=str(validation_result["outcome"]),
             stage_patch=stage_patch,
         )
+    launch_payload = validation_result["launch_payload"]
+    canonical_strategy = _strategy_with_launch_benchmark(
+        strategy,
+        launch_payload=launch_payload,
+    )
+    card_assumptions = _visible_card_assumptions(
+        strategy=canonical_strategy,
+        optional_parameters=optional_parameters,
+    )
+    strategy_with_assumptions = {
+        **canonical_strategy,
+        "assumptions": card_assumptions,
+    }
+    confirmation_payload["strategy"] = strategy_with_assumptions
     confirmation_payload["confirmation_id"] = confirmation_id
     confirmation_payload["artifact_id"] = confirmation_id
-    confirmation_payload["launch_payload"] = validation_result["launch_payload"]
+    confirmation_payload["launch_payload"] = launch_payload
     confirmation_payload["validation"] = {
         "status": "ready_to_run",
         "executable": True,
@@ -298,6 +310,33 @@ def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, A
     if isinstance(strategy, StrategySummary):
         return strategy.model_dump(mode="python")
     return dict(strategy)
+
+
+def _strategy_with_launch_benchmark(
+    strategy: dict[str, Any],
+    *,
+    launch_payload: dict[str, Any],
+) -> dict[str, Any]:
+    benchmark = launch_payload.get("benchmark_symbol")
+    if not isinstance(benchmark, str) or not benchmark.strip():
+        return strategy
+    return {
+        **strategy,
+        "comparison_baseline": benchmark.strip().upper(),
+    }
+
+
+def _strategy_with_runtime_language(
+    strategy: dict[str, Any],
+    *,
+    language: str | None,
+) -> dict[str, Any]:
+    normalized = str(language or "").strip()
+    if not normalized:
+        return strategy
+    extra_parameters = dict(strategy.get("extra_parameters") or {})
+    extra_parameters["language"] = normalized
+    return {**strategy, "extra_parameters": extra_parameters}
 
 
 def _strategy_extra_parameters(strategy: dict[str, Any]) -> dict[str, Any] | None:

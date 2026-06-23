@@ -1,16 +1,74 @@
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from argus.api.schemas import BacktestRun
+from argus.domain.evidence import build_backtest_evidence_capture, build_decision_note
+from argus.domain.search_text import search_text_matches_query
 from argus.domain.store import utcnow
-from argus.domain.supabase_gateway import SupabaseGateway
+from argus.domain.supabase_gateway import (
+    DecisionCaptureIntegrityError,
+    QuotaExceededError,
+    SupabaseGateway,
+)
 
 
 def test_batched_fetch_helper_exists_for_unbounded_queries():
     gateway = SupabaseGateway(client=MagicMock())
     assert hasattr(gateway, "_fetch_all_rows")
+
+
+def test_supabase_search_matcher_handles_punctuation_and_multi_token_queries():
+    assert search_text_matches_query(
+        query="AAPL MSFT TSLA",
+        text="AAPL, MSFT, TSLA comprar y mantener contra SPY.",
+    )
+    assert search_text_matches_query(
+        query="aap",
+        text="AAPL, MSFT, TSLA comprar y mantener contra SPY.",
+    )
+    assert not search_text_matches_query(
+        query="AAPL NVDA",
+        text="AAPL, MSFT, TSLA comprar y mantener contra SPY.",
+    )
+
+
+def test_p1_spine_migration_enforces_artifact_truth_immutability() -> None:
+    migration = (
+        Path(__file__).resolve().parents[1]
+        / "supabase/migrations/20260621053126_enforce_p1_evidence_immutability.sql"
+    ).read_text()
+
+    assert "prevent_idea_version_immutable_update" in migration
+    assert "prevent_evidence_artifact_immutable_update" in migration
+    assert (
+        "create trigger prevent_idea_versions_immutable_update" in migration
+    )
+    assert (
+        "create trigger prevent_evidence_artifacts_immutable_update" in migration
+    )
+
+    for field in (
+        "canonical_spec",
+        "strategy_snapshot",
+        "source_run_id",
+        "version_number",
+    ):
+        assert f"new.{field} is distinct from old.{field}" in migration
+
+    for field in (
+        "artifact_type",
+        "digest",
+        "payload",
+        "source_run_id",
+        "title",
+    ):
+        assert f"new.{field} is distinct from old.{field}" in migration
+
+    assert "new.lifecycle is distinct from old.lifecycle" not in migration
+    assert "new.updated_at is distinct from old.updated_at" not in migration
 
 
 class _RecordingSupabaseClient:
@@ -231,6 +289,29 @@ def test_attach_strategies_rejects_unowned_parent_collection_before_upsert() -> 
 
     assert result is None
     client.table.assert_not_called()
+
+
+def test_usage_limits_check_all_windows_before_incrementing() -> None:
+    client = MagicMock()
+    table = MagicMock()
+    client.table.return_value = table
+    table.select.return_value = table
+    table.eq.return_value = table
+    table.limit.return_value = table
+    table.execute.side_effect = [
+        SimpleNamespace(data=[{"id": "day-counter", "used_count": 1}]),
+        SimpleNamespace(data=[{"id": "hour-counter", "used_count": 60}]),
+    ]
+    gateway = SupabaseGateway(client=client)
+
+    with pytest.raises(QuotaExceededError, match="chat_messages \\(hour\\)"):
+        gateway.check_and_increment_usage_limits(
+            user_id="user-1",
+            resource="chat_messages",
+            limits=[("day", 200), ("hour", 60)],
+        )
+
+    table.update.assert_not_called()
 
 
 class _BacktestJobClient:
@@ -654,6 +735,532 @@ def test_mock_user_lookup_preserves_existing_profile_onboarding():
     assert client.upserted_profile is None
     assert user.onboarding.completed is True
     assert user.onboarding.primary_goal == "test_stock_idea"
+
+
+class _P1EvidenceClient:
+    def __init__(self) -> None:
+        self.rows_by_table: dict[str, list[dict[str, Any]]] = {
+            "ideas": [],
+            "idea_versions": [],
+            "evidence_artifacts": [],
+            "decision_notes": [],
+        }
+        self.operations: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = []
+        self.rpc_calls: list[tuple[str, dict[str, Any]]] = []
+        self.raise_on_next_idea_version_insert = False
+        self.raise_on_next_idea_active_update = False
+        self.raise_on_next_artifact_insert = False
+        self.commit_artifact_before_insert_error = False
+        self.return_empty_decision_rpc = False
+        self.concurrent_rows_on_artifact_insert_error: dict[
+            str, list[dict[str, Any]]
+        ] = {}
+
+    def table(self, table_name: str):
+        return _P1EvidenceTable(self, table_name)
+
+    def rpc(self, function_name: str, params: dict[str, Any]):
+        self.rpc_calls.append((function_name, params))
+        return _P1EvidenceRpc(self, function_name, params)
+
+
+class _P1EvidenceTable:
+    def __init__(self, client: _P1EvidenceClient, table_name: str) -> None:
+        self.client = client
+        self.table_name = table_name
+        self.action = "select"
+        self.payload: dict[str, Any] = {}
+        self.filters: dict[str, Any] = {}
+
+    def select(self, *_args: object, **_kwargs: object):
+        self.action = "select"
+        return self
+
+    def insert(self, payload: dict[str, Any]):
+        self.action = "insert"
+        self.payload = dict(payload)
+        return self
+
+    def update(self, payload: dict[str, Any]):
+        self.action = "update"
+        self.payload = dict(payload)
+        return self
+
+    def delete(self):
+        self.action = "delete"
+        return self
+
+    def eq(self, key: str, value: object):
+        self.filters[key] = value
+        return self
+
+    def limit(self, *_args: object):
+        return self
+
+    def execute(self):
+        if self.action == "insert":
+            self.client.operations.append(
+                ("insert", self.table_name, dict(self.payload), {})
+            )
+            if (
+                self.table_name == "idea_versions"
+                and self.client.raise_on_next_idea_version_insert
+            ):
+                self.client.raise_on_next_idea_version_insert = False
+                raise RuntimeError("idea version insert failed")
+            if (
+                self.table_name == "evidence_artifacts"
+                and self.client.raise_on_next_artifact_insert
+            ):
+                self.client.raise_on_next_artifact_insert = False
+                if self.client.commit_artifact_before_insert_error:
+                    self.client.rows_by_table[self.table_name].append(
+                        dict(self.payload)
+                    )
+                for table_name, rows in (
+                    self.client.concurrent_rows_on_artifact_insert_error.items()
+                ):
+                    self.client.rows_by_table[table_name].extend(dict(row) for row in rows)
+                raise RuntimeError("duplicate source_run_id")
+            self.client.rows_by_table[self.table_name].append(dict(self.payload))
+            return SimpleNamespace(data=[dict(self.payload)])
+
+        rows = [
+            row
+            for row in self.client.rows_by_table[self.table_name]
+            if all(row.get(key) == value for key, value in self.filters.items())
+        ]
+        if self.action == "delete":
+            self.client.operations.append(
+                ("delete", self.table_name, {}, dict(self.filters))
+            )
+            self.client.rows_by_table[self.table_name] = [
+                row
+                for row in self.client.rows_by_table[self.table_name]
+                if not all(row.get(key) == value for key, value in self.filters.items())
+            ]
+            return SimpleNamespace(data=[dict(row) for row in rows])
+        if self.action == "update":
+            self.client.operations.append(
+                ("update", self.table_name, dict(self.payload), dict(self.filters))
+            )
+            if (
+                self.table_name == "ideas"
+                and "active_version_id" in self.payload
+                and self.payload["active_version_id"] is not None
+                and self.client.raise_on_next_idea_active_update
+            ):
+                self.client.raise_on_next_idea_active_update = False
+                raise RuntimeError("idea active version update failed")
+            for row in rows:
+                row.update(self.payload)
+            return SimpleNamespace(data=[dict(row) for row in rows])
+        return SimpleNamespace(data=[dict(row) for row in rows])
+
+
+class _P1EvidenceRpc:
+    def __init__(
+        self,
+        client: _P1EvidenceClient,
+        function_name: str,
+        params: dict[str, Any],
+    ) -> None:
+        self.client = client
+        self.function_name = function_name
+        self.params = params
+
+    def execute(self):
+        assert self.function_name == "upsert_current_decision_note"
+        if self.client.return_empty_decision_rpc:
+            return SimpleNamespace(data=[])
+        user_id = self.params["p_user_id"]
+        artifact_id = self.params["p_evidence_artifact_id"]
+        artifact = next(
+            row
+            for row in self.client.rows_by_table["evidence_artifacts"]
+            if row.get("user_id") == user_id and row.get("id") == artifact_id
+        )
+        idea = next(
+            row
+            for row in self.client.rows_by_table["ideas"]
+            if row.get("user_id") == user_id and row.get("id") == artifact["idea_id"]
+        )
+        version = next(
+            row
+            for row in self.client.rows_by_table["idea_versions"]
+            if row.get("user_id") == user_id
+            and row.get("id") == artifact["idea_version_id"]
+        )
+        existing = next(
+            (
+                row
+                for row in self.client.rows_by_table["decision_notes"]
+                if row.get("user_id") == user_id
+                and row.get("evidence_artifact_id") == artifact_id
+            ),
+            None,
+        )
+        if existing is None:
+            existing = {
+                "id": self.params["p_decision_id"],
+                "user_id": user_id,
+                "idea_id": artifact["idea_id"],
+                "idea_version_id": artifact["idea_version_id"],
+                "evidence_artifact_id": artifact_id,
+                "source_conversation_id": artifact["source_conversation_id"],
+                "decision_state": self.params["p_decision_state"],
+                "note": self.params["p_note"],
+                "created_at": utcnow().isoformat(),
+                "updated_at": utcnow().isoformat(),
+            }
+            self.client.rows_by_table["decision_notes"].append(existing)
+        else:
+            existing.update(
+                {
+                    "decision_state": self.params["p_decision_state"],
+                    "note": self.params["p_note"],
+                    "updated_at": utcnow().isoformat(),
+                }
+            )
+
+        artifact["lifecycle"] = "decided"
+        idea["lifecycle"] = "decided"
+        version["lifecycle"] = "decided"
+        return SimpleNamespace(
+            data=[
+                {
+                    "decision": dict(existing),
+                    "evidence_artifact": dict(artifact),
+                    "idea": dict(idea),
+                    "idea_version": dict(version),
+                }
+            ]
+        )
+
+
+def _gateway_for_p1_client(client: _P1EvidenceClient) -> SupabaseGateway:
+    gateway = SupabaseGateway(client=client)
+    gateway._require_owned_conversation = MagicMock()  # type: ignore[method-assign]
+    gateway._require_owned_backtest_run_if_present = MagicMock()  # type: ignore[method-assign]
+    gateway._require_owned_idea = MagicMock()  # type: ignore[method-assign]
+    gateway._require_owned_idea_version = MagicMock()  # type: ignore[method-assign]
+    gateway._require_owned_evidence_artifact = MagicMock()  # type: ignore[method-assign]
+    return gateway
+
+
+def test_p1_evidence_capture_gateway_satisfies_active_version_fk_order() -> None:
+    client = _P1EvidenceClient()
+    gateway = _gateway_for_p1_client(client)
+    captured = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-1",
+        idea_version_id="version-1",
+        evidence_artifact_id="artifact-1",
+        now=utcnow(),
+    )
+
+    persisted = gateway.create_backtest_evidence_capture(
+        user_id="user-1",
+        captured=captured,
+    )
+
+    assert persisted.idea.active_version_id == "version-1"
+    assert [
+        (operation, table)
+        for operation, table, _payload, _filters in client.operations
+    ] == [
+        ("insert", "ideas"),
+        ("insert", "idea_versions"),
+        ("update", "ideas"),
+        ("insert", "evidence_artifacts"),
+    ]
+    idea_insert = client.operations[0][2]
+    idea_update = client.operations[2][2]
+    assert idea_insert["active_version_id"] is None
+    assert idea_update["active_version_id"] == "version-1"
+
+
+def test_p1_evidence_capture_gateway_reuses_existing_source_run() -> None:
+    client = _P1EvidenceClient()
+    existing = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-existing",
+        idea_version_id="version-existing",
+        evidence_artifact_id="artifact-existing",
+        now=utcnow(),
+    )
+    client.rows_by_table["ideas"].append(
+        {"user_id": "user-1", **existing.idea.model_dump(mode="json")}
+    )
+    client.rows_by_table["idea_versions"].append(
+        {"user_id": "user-1", **existing.idea_version.model_dump(mode="json")}
+    )
+    client.rows_by_table["evidence_artifacts"].append(
+        {"user_id": "user-1", **existing.evidence_artifact.model_dump(mode="json")}
+    )
+    gateway = _gateway_for_p1_client(client)
+    candidate = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-new",
+        idea_version_id="version-new",
+        evidence_artifact_id="artifact-new",
+        now=utcnow(),
+    )
+
+    persisted = gateway.create_backtest_evidence_capture(
+        user_id="user-1",
+        captured=candidate,
+    )
+
+    assert persisted.evidence_artifact.id == "artifact-existing"
+    assert client.operations == []
+
+
+def test_p1_evidence_capture_gateway_cleans_sidecars_after_version_failure() -> None:
+    client = _P1EvidenceClient()
+    client.raise_on_next_idea_version_insert = True
+    gateway = _gateway_for_p1_client(client)
+    captured = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-new",
+        idea_version_id="version-new",
+        evidence_artifact_id="artifact-new",
+        now=utcnow(),
+    )
+
+    with pytest.raises(RuntimeError, match="idea version insert failed"):
+        gateway.create_backtest_evidence_capture(user_id="user-1", captured=captured)
+
+    assert client.rows_by_table["ideas"] == []
+    assert client.rows_by_table["idea_versions"] == []
+    assert client.rows_by_table["evidence_artifacts"] == []
+
+
+def test_p1_evidence_capture_gateway_cleans_sidecars_after_active_version_failure() -> (
+    None
+):
+    client = _P1EvidenceClient()
+    client.raise_on_next_idea_active_update = True
+    gateway = _gateway_for_p1_client(client)
+    captured = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-new",
+        idea_version_id="version-new",
+        evidence_artifact_id="artifact-new",
+        now=utcnow(),
+    )
+
+    with pytest.raises(RuntimeError, match="idea active version update failed"):
+        gateway.create_backtest_evidence_capture(user_id="user-1", captured=captured)
+
+    assert client.rows_by_table["ideas"] == []
+    assert client.rows_by_table["idea_versions"] == []
+    assert client.rows_by_table["evidence_artifacts"] == []
+
+
+def test_p1_evidence_capture_gateway_cleans_sidecars_after_source_run_race() -> None:
+    client = _P1EvidenceClient()
+    existing = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-existing",
+        idea_version_id="version-existing",
+        evidence_artifact_id="artifact-existing",
+        now=utcnow(),
+    )
+    client.raise_on_next_artifact_insert = True
+    client.concurrent_rows_on_artifact_insert_error = {
+        "ideas": [{"user_id": "user-1", **existing.idea.model_dump(mode="json")}],
+        "idea_versions": [
+            {"user_id": "user-1", **existing.idea_version.model_dump(mode="json")}
+        ],
+        "evidence_artifacts": [
+            {"user_id": "user-1", **existing.evidence_artifact.model_dump(mode="json")}
+        ],
+    }
+    gateway = _gateway_for_p1_client(client)
+    candidate = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-new",
+        idea_version_id="version-new",
+        evidence_artifact_id="artifact-new",
+        now=utcnow(),
+    )
+
+    persisted = gateway.create_backtest_evidence_capture(
+        user_id="user-1",
+        captured=candidate,
+    )
+
+    assert persisted.evidence_artifact.id == "artifact-existing"
+    assert all(row["id"] != "idea-new" for row in client.rows_by_table["ideas"])
+    assert all(
+        row["id"] != "version-new" for row in client.rows_by_table["idea_versions"]
+    )
+    assert [
+        (operation, table, filters)
+        for operation, table, _payload, filters in client.operations
+        if operation == "delete"
+    ] == [
+        ("delete", "idea_versions", {"user_id": "user-1", "id": "version-new"}),
+        ("delete", "ideas", {"user_id": "user-1", "id": "idea-new"}),
+    ]
+
+
+def test_p1_evidence_capture_gateway_reuses_post_commit_artifact_insert_failure() -> (
+    None
+):
+    client = _P1EvidenceClient()
+    client.raise_on_next_artifact_insert = True
+    client.commit_artifact_before_insert_error = True
+    gateway = _gateway_for_p1_client(client)
+    captured = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-new",
+        idea_version_id="version-new",
+        evidence_artifact_id="artifact-new",
+        now=utcnow(),
+    )
+
+    persisted = gateway.create_backtest_evidence_capture(
+        user_id="user-1",
+        captured=captured,
+    )
+
+    assert persisted.evidence_artifact.id == "artifact-new"
+    assert persisted.idea.id == "idea-new"
+    assert persisted.idea_version.id == "version-new"
+    assert [
+        operation for operation in client.operations if operation[0] == "delete"
+    ] == []
+
+
+def test_p1_decision_gateway_rpc_marks_full_object_spine_decided() -> None:
+    client = _P1EvidenceClient()
+    gateway = _gateway_for_p1_client(client)
+    captured = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-1",
+        idea_version_id="version-1",
+        evidence_artifact_id="artifact-1",
+        now=utcnow(),
+    )
+    client.rows_by_table["ideas"].append(
+        {"user_id": "user-1", **captured.idea.model_dump(mode="json")}
+    )
+    client.rows_by_table["idea_versions"].append(
+        {"user_id": "user-1", **captured.idea_version.model_dump(mode="json")}
+    )
+    client.rows_by_table["evidence_artifacts"].append(
+        {"user_id": "user-1", **captured.evidence_artifact.model_dump(mode="json")}
+    )
+    first_decision = build_decision_note(
+        evidence_artifact=captured.evidence_artifact,
+        decision_id="decision-1",
+        decision_state="watching",
+        note="Track it.",
+        now=utcnow(),
+    )
+    second_decision = build_decision_note(
+        evidence_artifact=captured.evidence_artifact,
+        decision_id="decision-2",
+        decision_state="promising",
+        note="Still promising.",
+        now=utcnow(),
+    )
+
+    first = gateway.capture_current_decision_note(
+        user_id="user-1", decision=first_decision
+    )
+    second = gateway.capture_current_decision_note(
+        user_id="user-1", decision=second_decision
+    )
+
+    assert first[0].id == "decision-1"
+    assert second[0].id == "decision-1"
+    assert second[0].decision_state == "promising"
+    assert second[1].lifecycle == "decided"
+    assert second[2].lifecycle == "decided"
+    assert second[3].lifecycle == "decided"
+    assert len(client.rows_by_table["decision_notes"]) == 1
+    assert client.rows_by_table["ideas"][0]["lifecycle"] == "decided"
+    assert client.rows_by_table["idea_versions"][0]["lifecycle"] == "decided"
+    assert client.rows_by_table["evidence_artifacts"][0]["lifecycle"] == "decided"
+
+
+def test_capture_current_decision_note_raises_integrity_error_when_rpc_returns_empty() -> (
+    None
+):
+    client = _P1EvidenceClient()
+    client.return_empty_decision_rpc = True
+    gateway = _gateway_for_p1_client(client)
+    captured = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-1",
+        idea_version_id="version-1",
+        evidence_artifact_id="artifact-1",
+        now=utcnow(),
+    )
+    client.rows_by_table["ideas"].append(
+        {"user_id": "user-1", **captured.idea.model_dump(mode="json")}
+    )
+    client.rows_by_table["idea_versions"].append(
+        {"user_id": "user-1", **captured.idea_version.model_dump(mode="json")}
+    )
+    client.rows_by_table["evidence_artifacts"].append(
+        {"user_id": "user-1", **captured.evidence_artifact.model_dump(mode="json")}
+    )
+    decision = build_decision_note(
+        evidence_artifact=captured.evidence_artifact,
+        decision_id="decision-1",
+        decision_state="watching",
+        note="Track it.",
+        now=utcnow(),
+    )
+
+    with pytest.raises(DecisionCaptureIntegrityError, match="Decision capture"):
+        gateway.capture_current_decision_note(user_id="user-1", decision=decision)
+
+
+def test_p1_decision_gateway_upsert_keeps_one_current_decision() -> None:
+    client = _P1EvidenceClient()
+    gateway = _gateway_for_p1_client(client)
+    captured = build_backtest_evidence_capture(
+        run=_completed_run(),
+        idea_id="idea-1",
+        idea_version_id="version-1",
+        evidence_artifact_id="artifact-1",
+        now=utcnow(),
+    )
+    client.rows_by_table["ideas"].append(captured.idea.model_dump(mode="json"))
+    client.rows_by_table["idea_versions"].append(
+        captured.idea_version.model_dump(mode="json")
+    )
+    client.rows_by_table["evidence_artifacts"].append(
+        captured.evidence_artifact.model_dump(mode="json")
+    )
+    first_decision = build_decision_note(
+        evidence_artifact=captured.evidence_artifact,
+        decision_id="decision-1",
+        decision_state="watching",
+        note="Track it.",
+        now=utcnow(),
+    )
+    second_decision = build_decision_note(
+        evidence_artifact=captured.evidence_artifact,
+        decision_id="decision-2",
+        decision_state="promising",
+        note="Still promising.",
+        now=utcnow(),
+    )
+
+    first = gateway.upsert_decision_note(user_id="user-1", decision=first_decision)
+    second = gateway.upsert_decision_note(user_id="user-1", decision=second_decision)
+
+    assert first.id == "decision-1"
+    assert second.id == "decision-1"
+    assert second.decision_state == "promising"
+    assert second.note == "Still promising."
+    assert len(client.rows_by_table["decision_notes"]) == 1
 
 
 class _HistoryClient:

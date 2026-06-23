@@ -343,17 +343,10 @@ async def chat_stream(
     }
     if api_state.supabase_gateway is not None:
         try:
-            api_state.supabase_gateway.check_and_increment_usage(
+            api_state.supabase_gateway.check_and_increment_usage_limits(
                 user_id=user.id,
                 resource="chat_messages",
-                period="day",
-                limit_count=200,
-            )
-            api_state.supabase_gateway.check_and_increment_usage(
-                user_id=user.id,
-                resource="chat_messages",
-                period="hour",
-                limit_count=60,
+                limits=[("day", 200), ("hour", 60)],
             )
         except QuotaExceededError as exc:
             raise problem(
@@ -1029,6 +1022,7 @@ async def chat_stream(
                         conversation=conversation,
                         result_card=result_card,
                         envelope=envelope,
+                        quick_take=assistant_text,
                     )
                     persist_onboarding_update(
                         current_user_profile,

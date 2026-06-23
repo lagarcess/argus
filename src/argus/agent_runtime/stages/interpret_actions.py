@@ -12,7 +12,7 @@ from argus.agent_runtime.artifacts.patch_policy import (
     executable_artifact_patch_missing_fields,
     relevant_unsupported_constraints_for_artifact_patch,
 )
-from argus.agent_runtime.artifacts.patches import ArtifactPatch
+from argus.agent_runtime.artifacts.strategy_edits import ArtifactPatch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.clarification_contract import offline_clarification_fallback
 from argus.agent_runtime.recovery_messages import (

@@ -3,8 +3,10 @@ from __future__ import annotations
 import functools
 import os
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
@@ -20,6 +22,7 @@ from argus.api.routers import (
     conversations,
     dev,
     discovery,
+    evidence,
     feedback,
     history,
     ops,
@@ -114,6 +117,56 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # type:
     return JSONResponse(body, status_code=exc.status_code, headers=headers)
 
 
+def _json_safe_validation_error(value: Any) -> Any:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if isinstance(value, BaseException):
+        return str(value)
+    if isinstance(value, dict):
+        return {
+            str(key): _json_safe_validation_error(nested)
+            for key, nested in value.items()
+        }
+    if isinstance(value, list | tuple):
+        return [_json_safe_validation_error(nested) for nested in value]
+    return str(value)
+
+
+def _json_safe_validation_errors(
+    errors: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            str(key): _json_safe_validation_error(value)
+            for key, value in error.items()
+        }
+        for error in errors
+    ]
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(  # type: ignore[no-untyped-def]
+    request: Request,
+    exc: RequestValidationError,
+):
+    body = {
+        "type": "https://api.argus.app/problems/validation-error",
+        "title": "Validation Error",
+        "status": 422,
+        "detail": "The request body or parameters did not match the API contract.",
+        "code": "validation_error",
+        "request_id": getattr(request.state, "request_id", api_state.store.new_id()),
+        "context": {"errors": _json_safe_validation_errors(exc.errors())},
+    }
+
+    origin = request.headers.get("origin")
+    headers: dict[str, str] = {}
+    if origin in cors_allow_origins():
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(body, status_code=422, headers=headers)
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "healthy", "version": "1.0.0-alpha"}
@@ -126,6 +179,7 @@ for api_router in (
     strategies.router,
     collections.router,
     backtest.router,
+    evidence.router,
     agent.router,
     history.router,
     search.router,

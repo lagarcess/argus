@@ -78,6 +78,14 @@ class LLMStrategyDraft(BaseModel):
     strategy_type: str | None = None
     strategy_thesis: str | None = None
     asset_universe: list[str] = Field(default_factory=list)
+    asset_universe_operation: Literal["append", "add", "replace"] | None = Field(
+        default=None,
+        description=(
+            "Patch operation for asset_universe when editing an anchored artifact. "
+            "Use append/add when the user adds traded assets to the current setup, "
+            "and replace when the user swaps the traded assets."
+        ),
+    )
     asset_class: str | None = None
     timeframe: str | None = None
     cadence: str | None = None

@@ -1,16 +1,21 @@
 # Private Alpha Next Integration
 
-Status: Active integration staging baseline
+Status: Active integration staging/process context
 Date: 2026-06-10
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Current note: for the 2026-06-17 CI/CD SOTA release-captain mission, use
-`docs/specs/private-alpha-ci-cd-sota.md` as the active execution roadmap. This
-document remains the staging and branch-process context for
-`codex/private-alpha-next`. `docs/specs/private-alpha-next-decision-memo.md` is
-later-context only for the next product/strategy session and must not steer the
-current CI/CD release gate.
+Current note: for Private Alpha Next P1 product work, use
+`docs/specs/private-alpha-next-roadmap.md` as the active execution board and
+`docs/specs/private-alpha-next-decision-memo.md` as the strategic north star.
+This document remains staging and branch-process context for
+`codex/private-alpha-next`.
+For release-gate and canary decisions, the decision memo is later-context only;
+use the CI/CD SOTA spec, launch runbook, and release manifest template instead.
+
+For smoke, canary, manifest, and deployment discipline, use
+`docs/specs/private-alpha-ci-cd-sota.md`, `docs/PRIVATE_LAUNCH_RUNBOOK.md`, and
+`docs/release-manifests/TEMPLATE.md`.
 
 ## Purpose
 
@@ -22,9 +27,9 @@ The integration branch is a staging lane. It is allowed to collect reviewed work
 before a future PR, but it is not a release branch and must not be merged or
 deployed automatically.
 
-## Current Release Gate
+## Current Release Gate Reference
 
-The active private-alpha promotion path is the CI/CD SOTA gate in
+The private-alpha promotion path still uses the CI/CD SOTA gate in
 `docs/specs/private-alpha-ci-cd-sota.md` plus the operator instructions in
 `docs/PRIVATE_LAUNCH_RUNBOOK.md`.
 
@@ -136,6 +141,17 @@ Do not reopen these as debt unless a new bug is reproduced:
   confirmation card, `run_backtest` action, async job/run result, LLM readout
   voice, and persisted messages.
 - `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is archived historical context.
+
+## P0 Reintegration Checkpoint
+
+The clean reintegration strategy is now part of the process model:
+
+- `codex/private-alpha-next` remained the clean integration gate.
+- contaminated autonomous work was preserved under
+  `codex/private-alpha-next-quarantine-fc231e8` for read-only reference.
+- P0 continuity was rebuilt as a focused clean slice at `bbd9f10`.
+- quarantine commits may be inspected for ideas, tests, and failure evidence,
+  but runtime code should not be broadly cherry-picked.
 
 ## Remaining High-Leverage Work
 

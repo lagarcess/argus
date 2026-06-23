@@ -5,7 +5,10 @@ import type {
   ChatMention,
   StrategyConfirmationPayload,
 } from "@/components/chat/types";
-import { normalizeEnabledLanguage, type ArgusLocale } from "./language-features";
+import {
+  normalizeEnabledLanguage,
+  type ArgusLocale,
+} from "./language-features";
 import {
   displayResultActionLabel,
   displayResultBenchmarkNote,
@@ -75,6 +78,13 @@ export type ConversationResultCard = {
   symbols?: string[];
   strategy_label?: string;
   asset_class?: AssetClass | null;
+  idea_id?: string | null;
+  idea_version_id?: string | null;
+  evidence_artifact_id?: string | null;
+  evidence_lifecycle?: ArtifactLifecycle | null;
+  artifact_type?: "backtest" | string | null;
+  decision_note_id?: string | null;
+  decision_state?: DecisionState | null;
   date_range: {
     start: string;
     end: string;
@@ -236,13 +246,64 @@ export type HistoryItem = {
   conversation_id?: string | null;
 };
 
+export type ArtifactLifecycle =
+  | "captured"
+  | "reviewed"
+  | "saved"
+  | "decided"
+  | "archived"
+  | "discarded";
+
+export type DecisionState =
+  | "watching"
+  | "promising"
+  | "rejected"
+  | "revisit_later";
+
+export type EvidenceArtifact = {
+  id: string;
+  idea_id: string;
+  idea_version_id: string;
+  source_conversation_id?: string | null;
+  source_run_id?: string | null;
+  artifact_type: "backtest";
+  lifecycle: ArtifactLifecycle;
+  title: string;
+  digest: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DecisionNote = {
+  id: string;
+  idea_id: string;
+  idea_version_id: string;
+  evidence_artifact_id: string;
+  source_conversation_id?: string | null;
+  decision_state: DecisionState;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type SearchItem = {
-  type: "chat" | "strategy" | "collection" | "run";
+  type:
+    | "chat"
+    | "strategy"
+    | "collection"
+    | "run"
+    | "backtest"
+    | "evidence"
+    | "decision"
+    | "idea";
   id: string;
   title: string;
   matched_text: string;
   updated_at: string;
   conversation_id?: string | null;
+  lifecycle?: ArtifactLifecycle | null;
+  preview?: Record<string, unknown> | null;
 };
 
 // ─── Chat stream event types ──────────────────────────────────────────────────
@@ -254,7 +315,10 @@ export type ChatStreamEvent =
   | { event: "stage_start"; data: { stage: string } }
   | { event: "stage_outcome"; data: { outcome: string } }
   | { event: "final"; data: ChatFinalPayload }
-  | { event: "confirmation"; data: { confirmation: StrategyConfirmationPayload } }
+  | {
+      event: "confirmation";
+      data: { confirmation: StrategyConfirmationPayload };
+    }
   | { event: "result"; data: { run: BacktestRun } }
   | {
       event: "error";
@@ -414,6 +478,10 @@ export function resultCardFromConversationCard(
     configSnapshot: run?.config_snapshot,
     runId: run?.id,
     strategyId: run?.strategy_id ?? null,
+    evidenceArtifactId: card.evidence_artifact_id ?? null,
+    evidenceLifecycle: card.evidence_lifecycle ?? null,
+    decisionNoteId: card.decision_note_id ?? null,
+    decisionState: card.decision_state ?? null,
     actions: card.actions.map((action) => ({
       ...action,
       label: displayResultActionLabel(action),
@@ -463,10 +531,7 @@ export function formatRelativeDate(
 
 // ─── Generic fetch helper ─────────────────────────────────────────────────────
 
-async function apiFetch<T>(
-  path: string,
-  options?: RequestInit,
-): Promise<T> {
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const authHeaders: Record<string, string> = {};
 
@@ -482,23 +547,28 @@ async function apiFetch<T>(
   }
 
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...authHeaders, ...(options?.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders,
+      ...(options?.headers || {}),
+    },
     credentials: "include",
     ...options,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     const detail = (body as { detail?: unknown }).detail;
-    const errorMsg = typeof detail === 'object' && detail !== null
-      ? (detail as { title?: unknown }).title as string
-      : detail;
+    const errorMsg =
+      typeof detail === "object" && detail !== null
+        ? ((detail as { title?: unknown }).title as string)
+        : detail;
 
     const error = new Error(
       (errorMsg as string) ?? `API error ${response.status}`,
     ) as Error & { status: number; code: string };
     (error as Error & { status: number }).status = response.status;
     (error as Error & { code: string }).code =
-      (body as Record<string, unknown>).code as string ?? "unknown";
+      ((body as Record<string, unknown>).code as string) ?? "unknown";
     throw error;
   }
   return response.json() as Promise<T>;
@@ -525,7 +595,10 @@ async function unauthenticatedApiFetch<T>(
         : typeof detail === "string"
           ? detail
           : `API error ${response.status}`;
-    const error = new Error(message) as Error & { status: number; code: string };
+    const error = new Error(message) as Error & {
+      status: number;
+      code: string;
+    };
     error.status = response.status;
     error.code = String((body as Record<string, unknown>).code ?? "unknown");
     throw error;
@@ -575,7 +648,9 @@ export async function patchMe(patch: ProfilePatch) {
 }
 
 export async function getStarterPrompts() {
-  const response = await apiFetch<{ prompts: string[] }>("/chat/starter-prompts");
+  const response = await apiFetch<{ prompts: string[] }>(
+    "/chat/starter-prompts",
+  );
   return response.prompts;
 }
 
@@ -587,28 +662,41 @@ export async function signupWithEmail(payload: {
   display_name?: string | null;
   username?: string | null;
 }) {
-  const response = await unauthenticatedApiFetch<AuthResponsePayload>("/auth/signup", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  const response = await unauthenticatedApiFetch<AuthResponsePayload>(
+    "/auth/signup",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
   await persistBrowserSession(response);
   return response;
 }
 
-export async function loginWithEmail(payload: { email: string; password: string }) {
-  const response = await unauthenticatedApiFetch<AuthResponsePayload>("/auth/login", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+export async function loginWithEmail(payload: {
+  email: string;
+  password: string;
+}) {
+  const response = await unauthenticatedApiFetch<AuthResponsePayload>(
+    "/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
   await persistBrowserSession(response);
   return response;
 }
 
 export async function logoutFromApi() {
   try {
-    return await apiFetch<{ success: boolean }>("/auth/logout", { method: "POST" });
+    return await apiFetch<{ success: boolean }>("/auth/logout", {
+      method: "POST",
+    });
   } finally {
-    await getSupabaseClient()?.auth.signOut().catch(() => null);
+    await getSupabaseClient()
+      ?.auth.signOut()
+      .catch(() => null);
   }
 }
 
@@ -626,7 +714,14 @@ export async function createConversation(language?: string | null) {
 
 // ─── Conversations ────────────────────────────────────────────────────────────
 
-export async function listConversations(params: { limit?: number; cursor?: string; archived?: boolean; deleted?: boolean } = {}) {
+export async function listConversations(
+  params: {
+    limit?: number;
+    cursor?: string;
+    archived?: boolean;
+    deleted?: boolean;
+  } = {},
+) {
   const { limit = 20, cursor, archived, deleted } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (cursor) searchParams.append("cursor", cursor);
@@ -652,7 +747,12 @@ export async function getConversationMessages(
 
 export async function patchConversation(
   conversationId: string,
-  patch: { title?: string; pinned?: boolean; archived?: boolean; deleted_at?: string | null },
+  patch: {
+    title?: string;
+    pinned?: boolean;
+    archived?: boolean;
+    deleted_at?: string | null;
+  },
 ) {
   return apiFetch<{ conversation: Conversation }>(
     `/conversations/${conversationId}`,
@@ -667,14 +767,24 @@ export async function deleteConversation(conversationId: string) {
 }
 
 export async function deleteAllConversations() {
-  return apiFetch<{ success: boolean; deleted_count: number }>("/conversations", {
-    method: "DELETE",
-  });
+  return apiFetch<{ success: boolean; deleted_count: number }>(
+    "/conversations",
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 // ─── History ──────────────────────────────────────────────────────────────────
 
-export async function listHistory(params: { limit?: number; cursor?: string; archived?: boolean; deleted?: boolean } = {}) {
+export async function listHistory(
+  params: {
+    limit?: number;
+    cursor?: string;
+    archived?: boolean;
+    deleted?: boolean;
+  } = {},
+) {
   const { limit = 20, cursor, archived, deleted } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (cursor) searchParams.append("cursor", cursor);
@@ -688,7 +798,9 @@ export async function listHistory(params: { limit?: number; cursor?: string; arc
 
 // ─── Strategies ───────────────────────────────────────────────────────────────
 
-export async function listStrategies(params: { limit?: number; cursor?: string; deleted?: boolean } = {}) {
+export async function listStrategies(
+  params: { limit?: number; cursor?: string; deleted?: boolean } = {},
+) {
   const { limit = 50, cursor, deleted } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (cursor) searchParams.append("cursor", cursor);
@@ -744,7 +856,11 @@ export async function listCollections(
   );
 }
 
-export async function searchGlobal(params: { q: string; limit?: number; cursor?: string }) {
+export async function searchGlobal(params: {
+  q: string;
+  limit?: number;
+  cursor?: string;
+}) {
   const { q, limit = 20, cursor } = params;
   const searchParams = new URLSearchParams({
     q,
@@ -754,6 +870,19 @@ export async function searchGlobal(params: { q: string; limit?: number; cursor?:
   return apiFetch<{ items: SearchItem[]; next_cursor: string | null }>(
     `/search?${searchParams.toString()}`,
   );
+}
+
+export async function createEvidenceDecision(
+  artifactId: string,
+  payload: { decision_state: DecisionState; note?: string | null },
+) {
+  return apiFetch<{
+    decision: DecisionNote;
+    evidence_artifact: EvidenceArtifact;
+  }>(`/evidence-artifacts/${artifactId}/decision`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function createCollection(name?: string) {
@@ -865,7 +994,9 @@ export async function streamChatMessage(
       typeof detail === "string"
         ? detail
         : typeof detail === "object" && detail !== null && "title" in detail
-          ? String((detail as { title?: unknown }).title ?? "Chat stream failed")
+          ? String(
+              (detail as { title?: unknown }).title ?? "Chat stream failed",
+            )
           : "Chat stream failed";
     throw new ChatStreamError(
       message,
@@ -945,7 +1076,10 @@ export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
 
   const type = payload.type;
   if (type === "stage_start") {
-    return { event: "stage_start", data: { stage: String(payload.stage ?? "") } };
+    return {
+      event: "stage_start",
+      data: { stage: String(payload.stage ?? "") },
+    };
   }
   if (type === "stage_outcome") {
     return {
@@ -960,7 +1094,10 @@ export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
     };
   }
   if (type === "final") {
-    return { event: "final", data: (payload.payload ?? {}) as ChatFinalPayload };
+    return {
+      event: "final",
+      data: (payload.payload ?? {}) as ChatFinalPayload,
+    };
   }
   if (type === "title") {
     return {
@@ -976,9 +1113,13 @@ export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
       event: "error",
       data: {
         code: typeof payload.code === "string" ? payload.code : undefined,
-        detail: String(payload.message ?? payload.detail ?? "Chat stream failed"),
+        detail: String(
+          payload.message ?? payload.detail ?? "Chat stream failed",
+        ),
         message_id:
-          typeof payload.message_id === "string" ? payload.message_id : undefined,
+          typeof payload.message_id === "string"
+            ? payload.message_id
+            : undefined,
         recovery: recordFromPayload(payload.recovery),
         retry_last_turn: recordFromPayload(payload.retry_last_turn),
       },
@@ -987,7 +1128,9 @@ export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
   return null;
 }
 
-function recordFromPayload(value: unknown): Record<string, unknown> | undefined {
+function recordFromPayload(
+  value: unknown,
+): Record<string, unknown> | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return undefined;
   }

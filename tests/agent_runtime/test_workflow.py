@@ -36,6 +36,7 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
 )
+from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.nlp.natural_time import resolve_date_range_intent
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -351,6 +352,41 @@ class SpanishDateAnswerInterpreter:
             ),
             confidence=0.94,
             semantic_turn_act="answer_pending_need",
+        )
+
+
+class SpanishExplicitDayRangeDriftInterpreter:
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="El usuario quiere comprar y mantener AAPL, MSFT y TSLA.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                language="es-419",
+                strategy_type="buy_and_hold",
+                strategy_thesis=request.current_user_message,
+                asset_universe=["AAPL", "MSFT", "TSLA"],
+                asset_class="equity",
+                date_range={"start": "2025-01-01", "end": "2025-12-31"},
+                capital_amount=10000,
+                comparison_baseline="SPY",
+                extra_parameters={
+                    "date_range_raw_text": "desde enero 1 2025 hasta junio 5 2026",
+                    "date_range_intent": {
+                        "kind": "calendar_year",
+                        "year": 2025,
+                        "confidence": 0.9,
+                        "evidence": "desde enero 1 2025 hasta junio 5 2026",
+                    },
+                    "evidence_spans": {
+                        "date_range": "desde enero 1 2025 hasta junio 5 2026",
+                    },
+                },
+            ),
+            confidence=0.9,
+            semantic_turn_act="new_idea",
         )
 
 
@@ -1326,6 +1362,54 @@ async def test_workflow_typed_approval_after_card_edit_defers_to_card_action(
 
 
 @pytest.mark.asyncio
+async def test_spanish_explicit_day_range_survives_confirmation_payload(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    monkeypatch.setattr(
+        resolution_module,
+        "resolve_market_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    prompt = (
+        "probemos algo medio simple: comprar y mantener AAPL, MSFT y TSLA, "
+        "pesos iguales, desde enero 1 2025 hasta junio 5 2026, con 10000 "
+        "dolares, comparalo con SPY, sin fees ni deslizamiento"
+    )
+    workflow = build_workflow(
+        structured_interpreter=SpanishExplicitDayRangeDriftInterpreter(),
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1", language_preference="es-419"),
+        thread_id="thread-spanish-explicit-day-range",
+        message=prompt,
+    )
+
+    expected_range = {"start": "2025-01-01", "end": "2026-06-05"}
+    assert result["stage_outcome"] == "await_approval"
+    assert result["confirmation_payload"]["strategy"]["date_range"] == expected_range
+    assert (
+        result["confirmation_payload"]["launch_payload"]["date_range"]
+        == expected_range
+    )
+
+    card = runtime_confirmation_card(result, language="es-419")
+    assert card is not None
+    assert card["date_range"]["start"] == "2025-01-01"
+    assert card["date_range"]["end"] == "2026-06-05"
+    assert "5 de junio de 2026" in card["date_range"]["display"]
+    assert any(
+        row["key"] == "period" and "5 de junio de 2026" in row["value"]
+        for row in card["rows"]
+    )
+
+
+@pytest.mark.asyncio
 async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
     monkeypatch,
 ) -> None:
@@ -1337,11 +1421,13 @@ async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
         "resolve_market_asset",
         lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
     )
-    monkeypatch.setattr(
-        interpret_module,
-        "resolve_date_range_intent",
-        lambda value: resolve_date_range_intent(value, today=date(2026, 6, 15)),
-    )
+
+    class FrozenDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return cls(2026, 6, 15)
+
+    monkeypatch.setattr(interpret_module, "date", FrozenDate)
 
     interpreter = SpanishDateAnswerInterpreter()
     workflow = build_workflow(

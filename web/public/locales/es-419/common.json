@@ -246,6 +246,17 @@
       "worst_drop": "Peor caída",
       "explain_result": "Explicar resultado",
       "refine_idea": "Ajustar idea",
+      "add_decision": "Agregar decisión",
+      "decision": "Decisión: {{state}}",
+      "decision_note_placeholder": "Nota opcional para tu yo futuro",
+      "save_decision": "Guardar decisión",
+      "decision_saved": "Decisión guardada",
+      "decision_states": {
+        "watching": "Observando",
+        "promising": "Prometedora",
+        "rejected": "Rechazada",
+        "revisit_later": "Revisar luego"
+      },
       "save": "Guardar",
       "unavailable": "No disponible",
       "return_unavailable": "rendimiento no disponible",
@@ -551,17 +562,61 @@
   },
   "command_palette": {
     "close": "Cerrar búsqueda",
+    "search_placeholder": "Buscar en Argus...",
     "no_results": "No se encontraron resultados",
     "no_conversations": "No hay conversaciones aún",
+    "clear_search": "Borrar búsqueda",
     "rename_conversation": "Renombrar conversación",
     "archive_conversation": "Archivar conversación",
     "delete_conversation": "Eliminar conversación",
     "preview": "Vista previa",
-    "preview_empty": "Abre esta conversación para ver sus mensajes.",
+    "preview_empty": "Abre la conversación fuente para ver más contexto.",
     "open_conversation": "Abrir conversación",
-    "select_preview": "Selecciona una conversación para ver sus metadatos.",
+    "open_source_conversation": "Abrir conversación fuente",
+    "select_preview": "Selecciona un resultado para ver sus detalles.",
+    "status": {
+      "archived": "Archivado",
+      "captured": "Capturado",
+      "decided": "Decidido",
+      "decision": "Decisión",
+      "discarded": "Descartado",
+      "reviewed": "Revisado",
+      "saved": "Guardado"
+    },
+    "metric_labels": {
+      "benchmark_return_pct": "Rendimiento de referencia",
+      "delta_vs_benchmark_pct": "Contra referencia",
+      "excess_return_pct": "Contra referencia",
+      "max_drawdown_pct": "Peor caída",
+      "sharpe_ratio": "Sharpe",
+      "total_return_pct": "Rendimiento total",
+      "volatility_pct": "Volatilidad"
+    },
+    "preview_fields": {
+      "assets": "Activos",
+      "assumptions": "Supuestos",
+      "benchmark": "Referencia",
+      "breakdown": "Desglose",
+      "decision": "Decisión",
+      "digest": "Resumen",
+      "metrics": "Métricas",
+      "preview": "Vista previa",
+      "quick_take": "Lectura rápida"
+    },
     "conversation_count_one": "{{count}} conversación",
-    "conversation_count_other": "{{count}} conversaciones"
+    "conversation_count_other": "{{count}} conversaciones",
+    "result_count_one": "{{count}} resultado",
+    "result_count_other": "{{count}} resultados",
+    "type": {
+      "backtest": "Backtest",
+      "chat": "Conversación",
+      "collection": "Colección",
+      "decision": "Decisión",
+      "evidence": "Evidencia",
+      "idea": "Idea",
+      "run": "Ejecución",
+      "strategy": "Estrategia"
+    }
   },
   "onboarding": {
     "prompt": "¿Cuál es tu objetivo principal ahora? No te preocupes, puedes cambiarlo después.",

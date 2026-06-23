@@ -37,6 +37,12 @@ const IN_FLIGHT_ACTION_STATUSES = new Set<StrategyConfirmationStatus>([
   "request_sent",
   "running",
 ]);
+const TERMINAL_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
+  "could_not_run",
+  "draft_canceled",
+  "not_completed",
+  "run_complete",
+]);
 
 export function confirmationActionStatusLabel(
   actionOrType: ChatActionOption | NonNullable<ChatActionOption["type"]> | undefined,
@@ -306,12 +312,14 @@ export function normalizeConfirmationHistory(messages: Message[]): Message[] {
       return message;
     }
     if (isTerminalConfirmation(message)) {
+      const status = completedRunConfirmationStatus(message, index, lastResultIndex);
       return {
         ...message,
         confirmation: {
           ...message.confirmation,
-          status: completedRunConfirmationStatus(message, index, lastResultIndex),
-          statusLabel: completedRunConfirmationStatusLabel(message, index, lastResultIndex),
+          confirmation_state: terminalConfirmationState(message, status),
+          status,
+          statusLabel: confirmationStatusLabel(status),
           actions: [],
         },
         actions: [],
@@ -572,9 +580,26 @@ function stringOrNull(value: unknown) {
 }
 
 function isTerminalConfirmation(message: Message) {
+  const status = message.confirmation
+    ? confirmationStatusFromPayload(message.confirmation)
+    : null;
   return (
     message.kind === "strategy_confirmation" &&
     (message.confirmation?.confirmation_state === "cancelled" ||
-      message.confirmation?.confirmation_state === "superseded")
+      message.confirmation?.confirmation_state === "superseded" ||
+      (status !== null && TERMINAL_CONFIRMATION_STATUSES.has(status)))
   );
+}
+
+function terminalConfirmationState(
+  message: Message,
+  status: StrategyConfirmationStatus,
+): "cancelled" | "superseded" {
+  if (
+    message.confirmation?.confirmation_state === "cancelled" ||
+    status === "draft_canceled"
+  ) {
+    return "cancelled";
+  }
+  return "superseded";
 }

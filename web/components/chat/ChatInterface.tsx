@@ -65,6 +65,9 @@ import {
 } from "@/lib/chat-retry-actions";
 import {
   activeConversationRouteStateFromUrl,
+  shouldApplyConversationOwnedUpdate,
+  shouldApplyConversationScopedUpdate,
+  shouldRetireActiveStreamForNavigation,
   shouldStartConversationForVisibleEmptyChat,
   targetConversationIdForSend,
   type ActiveConversationRouteState,
@@ -121,6 +124,10 @@ import {
   settleOpenConfirmationsAfterStreamError,
   settleOpenConfirmationsAfterTextFinal,
 } from "./artifact-history";
+import {
+  confirmationStatusAllowsActions,
+  confirmationStatusFromPayload,
+} from "./confirmation-display";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -252,6 +259,10 @@ function hasActiveArtifactActionSet(messages: Message[]) {
         message.confirmation.confirmation_state &&
         message.confirmation.confirmation_state !== "active"
       ) {
+        return false;
+      }
+      const confirmationStatus = confirmationStatusFromPayload(message.confirmation);
+      if (!confirmationStatusAllowsActions(confirmationStatus)) {
         return false;
       }
       const activeActions = message.confirmation.actions ?? message.actions ?? [];
@@ -651,8 +662,27 @@ export default function ChatInterface() {
   const chatOptionsRef = useRef<HTMLDivElement>(null);
   const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
   const activeConversationIdRef = useRef<string | null>(null);
+  const activeStreamConversationIdRef = useRef<string | null>(null);
   const currentViewRef = useRef<View>("chat");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const canApplyConversationScopedUpdate = useCallback(
+    (targetConversationId?: string | null) =>
+      shouldApplyConversationScopedUpdate({
+        targetConversationId,
+        activeConversationId: activeConversationIdRef.current,
+        currentView: currentViewRef.current,
+        routeState: readActiveConversationRouteState(),
+      }),
+    [],
+  );
+  const canApplyConversationOwnedUpdate = useCallback(
+    (targetConversationId?: string | null) =>
+      shouldApplyConversationOwnedUpdate({
+        targetConversationId,
+        activeConversationId: activeConversationIdRef.current,
+      }),
+    [],
+  );
   const pendingBacktestJobKey = useMemo(
     () => pendingBacktestJobIds(messages).join("|"),
     [messages],
@@ -660,6 +690,9 @@ export default function ChatInterface() {
 
   const applyDurableBacktestJobResponse = useCallback(
     (response: BacktestJobResponse) => {
+      if (!canApplyConversationOwnedUpdate(response.job.conversation_id)) {
+        return;
+      }
       setMessages((prev) =>
         normalizeRetryActionHistory(
           normalizeConfirmationHistory(
@@ -668,7 +701,7 @@ export default function ChatInterface() {
         ),
       );
     },
-    [],
+    [canApplyConversationOwnedUpdate],
   );
 
   // ── Toast helper ───────────────────────────────────────────────────────────
@@ -695,6 +728,31 @@ export default function ChatInterface() {
     [],
   );
 
+  function clearPostTurnHistoryRefreshTimers() {
+    for (const timerId of postTurnHistoryRefreshTimersRef.current) {
+      window.clearTimeout(timerId);
+    }
+    postTurnHistoryRefreshTimersRef.current = [];
+  }
+
+  const retireActiveStreamForNavigation = useCallback(
+    (nextConversationId?: string | null) => {
+      if (
+        !shouldRetireActiveStreamForNavigation({
+          activeStreamConversationId: activeStreamConversationIdRef.current,
+          nextConversationId,
+        })
+      ) {
+        return;
+      }
+      activeStreamConversationIdRef.current = null;
+      setStreamStatus(null);
+      setIsStreamingResponse(false);
+      clearPostTurnHistoryRefreshTimers();
+    },
+    [],
+  );
+
   useEffect(() => {
     activeConversationIdRef.current = conversationId;
     currentViewRef.current = currentView;
@@ -704,10 +762,13 @@ export default function ChatInterface() {
   }, [clearConversationAttention, conversationId, currentView]);
 
   const resetToEmptyChatSurface = useCallback(() => {
+    retireActiveStreamForNavigation(null);
     const clearedRoute = clearActiveConversationPointer();
     if (clearedRoute) {
       router.replace(clearedRoute, { scroll: false });
     }
+    activeConversationIdRef.current = null;
+    currentViewRef.current = "chat";
     setConversationId(null);
     setMessages([]);
     setInputActions([]);
@@ -718,7 +779,7 @@ export default function ChatInterface() {
     setIsRenamingHeaderChat(false);
     setHeaderRenameValue("");
     setCurrentView("chat");
-  }, [router]);
+  }, [retireActiveStreamForNavigation, router]);
 
   const mergeHistoryItems = (existing: HistoryItem[], incoming: HistoryItem[]) => {
     const seen = new Set(existing.map((item) => `${item.type}:${item.id}`));
@@ -753,13 +814,6 @@ export default function ChatInterface() {
   const refreshHistory = useCallback(() => {
     loadHistoryPage(null, false).catch(() => undefined);
   }, [loadHistoryPage]);
-
-  function clearPostTurnHistoryRefreshTimers() {
-    for (const timerId of postTurnHistoryRefreshTimersRef.current) {
-      window.clearTimeout(timerId);
-    }
-    postTurnHistoryRefreshTimersRef.current = [];
-  }
 
   function schedulePostTurnHistoryRefresh(targetConversationId?: string | null) {
     clearPostTurnHistoryRefreshTimers();
@@ -1034,6 +1088,7 @@ export default function ChatInterface() {
   // ── Load existing conversation ─────────────────────────────────────────────
 
   const loadConversation = async (convId: string) => {
+    retireActiveStreamForNavigation(convId);
     closeTransientSidebar();
     closeChatOptions();
     setCurrentView("chat");
@@ -1227,6 +1282,8 @@ export default function ChatInterface() {
       rememberActiveConversationId(targetConversationId);
       setConversationId(targetConversationId);
     }
+    activeConversationIdRef.current = targetConversationId;
+    currentViewRef.current = "chat";
 
     closeTransientSidebar();
     shouldAutoScrollRef.current = true;
@@ -1273,17 +1330,30 @@ export default function ChatInterface() {
     });
     setInputActions([]);
     setStreamStatus(null);
+    activeStreamConversationIdRef.current = targetConversationId;
     setIsStreamingResponse(true);
 
     const streamInput: string | ChatActionRequest = action?.type
       ? chatActionRequestFromAction(action)
       : trimmed;
+    let activeStreamTargetConversationId = targetConversationId;
+
+    const canApplyVisibleStreamUpdate = () =>
+      activeStreamConversationIdRef.current === activeStreamTargetConversationId &&
+      canApplyConversationScopedUpdate(activeStreamTargetConversationId);
+    const canApplyOwnedStreamUpdate = () =>
+      activeStreamConversationIdRef.current === activeStreamTargetConversationId &&
+      canApplyConversationOwnedUpdate(activeStreamTargetConversationId);
 
     const handleStreamEvent = (event: ChatStreamEvent) => {
+      const canApplyVisibleUpdate = canApplyVisibleStreamUpdate();
+      const canApplyOwnedUpdate = canApplyOwnedStreamUpdate();
       if (event.event === "stage_start") {
+        if (!canApplyVisibleUpdate) return;
         setStreamStatus(t(`chat.status.${event.data.stage}`) || t('chat.status.preparing'));
       }
       if (event.event === "token") {
+        if (!canApplyVisibleUpdate) return;
         setStreamStatus(null);
         setMessages((prev) =>
           prev.map((m) =>
@@ -1294,6 +1364,9 @@ export default function ChatInterface() {
         );
       }
       if (event.event === "error") {
+        if (!canApplyOwnedUpdate) {
+          return;
+        }
         const errorPayload = event.data as typeof event.data & Record<string, unknown>;
         const persistedErrorMessageId = event.data.message_id?.trim();
         const metadataRetryAction = retryLastTurnActionFromMetadata(errorPayload, {
@@ -1309,6 +1382,7 @@ export default function ChatInterface() {
         setInputActions([]);
         setStreamStatus(null);
         setIsStreamingResponse(false);
+        activeStreamConversationIdRef.current = null;
         setMessages((prev) =>
           normalizeRetryActionHistory(
             settleOpenConfirmationsAfterStreamError(
@@ -1329,9 +1403,12 @@ export default function ChatInterface() {
             ),
           ),
         );
-        markConversationAttentionIfOutOfFocus(targetConversationId);
+        markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
       }
       if (event.event === "final") {
+        if (!canApplyOwnedUpdate) {
+          return;
+        }
         setStreamStatus(null);
         setIsStreamingResponse(false);
         const finalPayload = event.data as typeof event.data & Record<string, unknown>;
@@ -1485,6 +1562,9 @@ export default function ChatInterface() {
         }
       }
       if (event.event === "title") {
+        if (!canApplyOwnedUpdate) {
+          return;
+        }
         setHistoryItems((prev) =>
           prev.map((item) =>
             item.id === event.data.conversation_id
@@ -1494,21 +1574,28 @@ export default function ChatInterface() {
         );
       }
       if (event.event === "done") {
+        if (!canApplyOwnedUpdate) {
+          return;
+        }
         setStreamStatus(null);
         setIsStreamingResponse(false);
-        schedulePostTurnHistoryRefresh(targetConversationId);
-        markConversationAttentionIfOutOfFocus(targetConversationId);
+        activeStreamConversationIdRef.current = null;
+        schedulePostTurnHistoryRefresh(activeStreamTargetConversationId);
+        markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
       }
     };
 
-    const streamToConversation = (targetConversationId: string) =>
-      streamChatMessage(
-        targetConversationId,
+    const streamToConversation = (nextTargetConversationId: string) => {
+      activeStreamTargetConversationId = nextTargetConversationId;
+      activeStreamConversationIdRef.current = nextTargetConversationId;
+      return streamChatMessage(
+        nextTargetConversationId,
         streamInput,
         i18n.language,
         handleStreamEvent,
         action?.type ? [] : mentions,
       );
+    };
 
     try {
       await streamToConversation(targetConversationId);
@@ -1525,34 +1612,42 @@ export default function ChatInterface() {
           err = retryErr;
         }
       }
-      setInputActions([]);
-      setStreamStatus(null);
-      setIsStreamingResponse(false);
+      const canApplyOwnedUpdate = canApplyConversationOwnedUpdate(
+        activeStreamTargetConversationId,
+      );
+      if (canApplyOwnedUpdate) {
+        setInputActions([]);
+        setStreamStatus(null);
+        setIsStreamingResponse(false);
+        activeStreamConversationIdRef.current = null;
+      }
       const status = (err as { status?: number }).status;
       const isRateLimit = status === 429;
       const fallbackMessage =
         err instanceof ChatStreamError && err.message
           ? err.message
           : t('chat.error_backtest');
-      setMessages((prev) =>
-        normalizeRetryActionHistory(
-          settleConfirmationAfterActionTransportError(
-            prev.map((m) =>
-              m.id === assistantId
-                ? {
-                    ...m,
-                    content: isRateLimit
-                      ? t('chat.rate_limit_error')
-                      : fallbackMessage,
-                    actions: retryLastTurnAction ? [retryLastTurnAction] : m.actions,
-                  }
-                : m,
+      if (canApplyOwnedUpdate) {
+        setMessages((prev) =>
+          normalizeRetryActionHistory(
+            settleConfirmationAfterActionTransportError(
+              prev.map((m) =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      content: isRateLimit
+                        ? t('chat.rate_limit_error')
+                        : fallbackMessage,
+                      actions: retryLastTurnAction ? [retryLastTurnAction] : m.actions,
+                    }
+                  : m,
+              ),
+              action,
             ),
-            action,
           ),
-        ),
-      );
-      markConversationAttentionIfOutOfFocus(targetConversationId);
+        );
+      }
+      markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
     }
   };
 
@@ -1821,6 +1916,14 @@ export default function ChatInterface() {
     if (isFailedActionRetry(action)) {
       void handleSend(action.label || value, action);
       return;
+    }
+    const confirmationEffect = confirmationActionEffectFromAction(action);
+    if (confirmationEffect) {
+      setMessages((prev) =>
+        normalizeConfirmationHistory(
+          applyConfirmationActionEffects(prev, [confirmationEffect]),
+        ),
+      );
     }
     setInputActions(consumeInputAction(action, inputActions));
     void handleSend(action.label || value, action.type ? action : undefined);

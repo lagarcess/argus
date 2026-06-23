@@ -1,14 +1,26 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import pandas as pd
 import pytest
+from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.message_store import memory_conversation, memory_message
+from argus.api.schemas import (
+    BacktestRun,
+    Collection,
+    Conversation,
+    DecisionNote,
+    EvidenceArtifact,
+    Idea,
+    IdeaVersion,
+    Strategy,
+)
 from argus.domain.market_data.assets import ResolvedAsset
+from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
 
 
@@ -393,11 +405,30 @@ def test_backtest_rejects_mixed_asset_symbols_with_problem_details() -> None:
     ]
 
 
+def test_backtest_run_requires_idempotency_key_header() -> None:
+    client = _client()
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "rsi_mean_reversion",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+        },
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["code"] == "idempotency_key_required"
+    assert payload["request_id"]
+
+
 def test_backtest_rejects_explicit_asset_class_conflict() -> None:
     client = _client()
 
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "asset-class-conflict"},
         json={
             "template": "rsi_mean_reversion",
             "asset_class": "crypto",
@@ -568,7 +599,9 @@ def test_delete_all_conversations_soft_deletes_active_and_archived_chats() -> No
         ).status_code
         == 200
     )
-    assert client.delete(f"/api/v1/conversations/{already_deleted['id']}").status_code == 200
+    assert (
+        client.delete(f"/api/v1/conversations/{already_deleted['id']}").status_code == 200
+    )
 
     response = client.delete("/api/v1/conversations")
 
@@ -587,9 +620,9 @@ def test_delete_all_conversations_soft_deletes_active_and_archived_chats() -> No
     }
     deleted_archived_chat_ids = {
         item["id"]
-        for item in client.get(
-            "/api/v1/history?deleted=true&archived=true"
-        ).json()["items"]
+        for item in client.get("/api/v1/history?deleted=true&archived=true").json()[
+            "items"
+        ]
         if item["type"] == "chat"
     }
 
@@ -752,6 +785,7 @@ def test_backtest_accepts_supported_timeframes(timeframe: str) -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": f"timeframe-{timeframe.lower()}"},
         json={
             "template": "dca_accumulation",
             "asset_class": "equity",
@@ -768,6 +802,7 @@ def test_backtest_rejects_stablecoin_symbol() -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "stablecoin-rejected"},
         json={
             "template": "dca_accumulation",
             "asset_class": "crypto",
@@ -783,6 +818,7 @@ def test_backtest_rejects_unsupported_parameters_payload() -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "unsupported-parameters"},
         json={
             "template": "rsi_mean_reversion",
             "asset_class": "equity",
@@ -798,6 +834,7 @@ def test_backtest_allows_equity_lookback_beyond_three_years() -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "equity-long-lookback"},
         json={
             "template": "dca_accumulation",
             "asset_class": "equity",
@@ -814,6 +851,7 @@ def test_backtest_rejects_equity_start_before_provider_history() -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "provider-history-start"},
         json={
             "template": "buy_and_hold",
             "asset_class": "equity",
@@ -830,6 +868,7 @@ def test_backtest_rejects_unknown_symbol() -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "unknown-symbol"},
         json={
             "template": "dca_accumulation",
             "asset_class": "equity",
@@ -873,6 +912,38 @@ def test_collections_are_organizational_and_can_mix_strategy_asset_classes() -> 
 
     assert attached.status_code == 200
     assert attached.json()["collection"]["strategy_count"] == 2
+
+
+def test_collection_attach_rejects_unowned_memory_strategy() -> None:
+    client = _client()
+    now = utcnow()
+    collection = client.post(
+        "/api/v1/collections", json={"name": "Ideas to revisit"}
+    ).json()["collection"]
+    other_strategy = Strategy(
+        id="other-strategy",
+        name="Other user's strategy",
+        name_source="user_renamed",
+        template="buy_and_hold",
+        asset_class="equity",
+        symbols=["AAPL"],
+        parameters={},
+        metrics_preferences=["total_return_pct"],
+        benchmark_symbol="SPY",
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.strategies[other_strategy.id] = other_strategy
+    api_state.store.strategy_owners[other_strategy.id] = "other-user"
+
+    response = client.post(
+        f"/api/v1/collections/{collection['id']}/strategies",
+        json={"strategy_ids": [other_strategy.id]},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+    assert api_state.store.collection_strategies[collection["id"]] == set()
 
 
 def test_chat_stream_persists_messages_and_emits_contract_events() -> None:
@@ -1141,6 +1212,7 @@ def test_search_supports_cursor_and_mixed_types() -> None:
     client.post("/api/v1/collections", json={"name": "Tesla collection"})
     run = client.post(
         "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "search-mixed-types-run"},
         json={
             "conversation_id": conversation["id"],
             "template": "rsi_mean_reversion",
@@ -1166,6 +1238,406 @@ def test_search_supports_cursor_and_mixed_types() -> None:
     first_ids = {(item["type"], item["id"]) for item in payload["items"]}
     second_ids = {(item["type"], item["id"]) for item in second_payload["items"]}
     assert first_ids.isdisjoint(second_ids)
+
+
+def test_search_orders_p1_artifacts_before_source_conversation() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    conversation = Conversation(
+        id="conversation-evidence-order",
+        title="AAPL evidence source conversation",
+        title_source="user_renamed",
+        pinned=False,
+        archived=False,
+        deleted_at=None,
+        created_at=now - timedelta(minutes=5),
+        updated_at=now + timedelta(minutes=5),
+        last_message_preview="AAPL evidence chat wrapper",
+        language="en",
+    )
+    run = BacktestRun(
+        id="run-evidence-order",
+        conversation_id=conversation.id,
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {}, "by_symbol": {}},
+        config_snapshot={"symbols": ["AAPL"], "benchmark_symbol": "SPY"},
+        conversation_result_card={
+            "title": "AAPL evidence backtest",
+            "artifact_type": "backtest",
+            "evidence_artifact_id": "artifact-evidence-order",
+            "evidence_lifecycle": "captured",
+        },
+        created_at=now,
+    )
+    idea = Idea(
+        id="idea-evidence-order",
+        source_conversation_id=conversation.id,
+        title="AAPL evidence idea",
+        summary="AAPL evidence summary",
+        lifecycle="captured",
+        active_version_id="version-evidence-order",
+        created_at=now,
+        updated_at=now,
+    )
+    version = IdeaVersion(
+        id="version-evidence-order",
+        idea_id=idea.id,
+        source_conversation_id=conversation.id,
+        source_run_id=run.id,
+        version_number=1,
+        canonical_spec={"symbols": ["AAPL"], "benchmark_symbol": "SPY"},
+        strategy_snapshot={"symbols": ["AAPL"]},
+        title=idea.title,
+        summary=idea.summary,
+        lifecycle="captured",
+        created_at=now,
+    )
+    artifact = EvidenceArtifact(
+        id="artifact-evidence-order",
+        idea_id=idea.id,
+        idea_version_id=version.id,
+        source_conversation_id=conversation.id,
+        source_run_id=run.id,
+        artifact_type="backtest",
+        lifecycle="captured",
+        title="AAPL evidence artifact",
+        digest="AAPL evidence artifact digest.",
+        payload={"provenance": {"symbols": ["AAPL"], "benchmark_symbol": "SPY"}},
+        created_at=now,
+        updated_at=now,
+    )
+    decision = DecisionNote(
+        id="decision-evidence-order",
+        idea_id=idea.id,
+        idea_version_id=version.id,
+        evidence_artifact_id=artifact.id,
+        source_conversation_id=conversation.id,
+        decision_state="promising",
+        note="AAPL evidence decision note.",
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.conversations[conversation.id] = conversation
+    api_state.store.conversation_owners[conversation.id] = user_id
+    api_state.store.backtest_runs[run.id] = run
+    api_state.store.backtest_run_owners[run.id] = user_id
+    api_state.store.ideas[idea.id] = idea
+    api_state.store.idea_owners[idea.id] = user_id
+    api_state.store.idea_versions[version.id] = version
+    api_state.store.idea_version_owners[version.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+    api_state.store.decision_notes[decision.id] = decision
+    api_state.store.decision_note_owners[decision.id] = user_id
+
+    response = client.get("/api/v1/search?q=evidence&limit=10")
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    chat_index = ordered_types.index("chat")
+    for artifact_type in ("backtest", "evidence", "idea", "decision"):
+        assert ordered_types.index(artifact_type) < chat_index
+
+
+def test_search_preserves_pinned_chat_above_p1_artifacts() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    conversation = Conversation(
+        id="conversation-pinned-search-order",
+        title="AAPL pinned conversation",
+        title_source="user_renamed",
+        pinned=True,
+        archived=False,
+        deleted_at=None,
+        created_at=now - timedelta(minutes=5),
+        updated_at=now + timedelta(minutes=10),
+        last_message_preview="AAPL pinned source",
+        language="en",
+    )
+    artifact = EvidenceArtifact(
+        id="artifact-pinned-search-order",
+        idea_id="idea-pinned-search-order",
+        idea_version_id="version-pinned-search-order",
+        source_conversation_id=conversation.id,
+        source_run_id="run-pinned-search-order",
+        artifact_type="backtest",
+        lifecycle="captured",
+        title="AAPL evidence artifact",
+        digest="AAPL evidence artifact digest.",
+        payload={"provenance": {"symbols": ["AAPL"], "benchmark_symbol": "SPY"}},
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.conversations[conversation.id] = conversation
+    api_state.store.conversation_owners[conversation.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+
+    response = client.get("/api/v1/search?q=aapl&limit=10")
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    assert ordered_types.index("chat") < ordered_types.index("evidence")
+
+
+def test_search_preserves_exact_chat_above_lower_relevance_p1_artifacts() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    conversation = Conversation(
+        id="conversation-exact-search-order",
+        title="AAPL",
+        title_source="user_renamed",
+        pinned=False,
+        archived=False,
+        deleted_at=None,
+        created_at=now - timedelta(minutes=5),
+        updated_at=now + timedelta(minutes=10),
+        last_message_preview="AAPL exact source",
+        language="en",
+    )
+    artifact = EvidenceArtifact(
+        id="artifact-exact-search-order",
+        idea_id="idea-exact-search-order",
+        idea_version_id="version-exact-search-order",
+        source_conversation_id=conversation.id,
+        source_run_id="run-exact-search-order",
+        artifact_type="backtest",
+        lifecycle="captured",
+        title="AAPL evidence artifact",
+        digest="AAPL evidence artifact digest.",
+        payload={"provenance": {"symbols": ["AAPL"], "benchmark_symbol": "SPY"}},
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.conversations[conversation.id] = conversation
+    api_state.store.conversation_owners[conversation.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+
+    response = client.get("/api/v1/search?q=aapl&limit=10")
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    assert ordered_types.index("chat") < ordered_types.index("evidence")
+
+
+def test_search_memory_mode_excludes_other_users_owned_objects() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    other_user_id = "00000000-0000-0000-0000-000000000099"
+    now = utcnow()
+    memory_conversation(
+        title="Leaky Tesla alpha chat",
+        title_source="user_renamed",
+        language="en",
+        user_id=other_user_id,
+    )
+    strategy = Strategy(
+        id="other-strategy",
+        name="Leaky Tesla strategy",
+        name_source="user_renamed",
+        template="rsi_mean_reversion",
+        asset_class="equity",
+        symbols=["TSLA"],
+        parameters={},
+        metrics_preferences=["total_return_pct"],
+        benchmark_symbol="SPY",
+        created_at=now,
+        updated_at=now,
+    )
+    collection = Collection(
+        id="other-collection",
+        name="Leaky Tesla collection",
+        name_source="user_renamed",
+        created_at=now,
+        updated_at=now,
+    )
+    run = BacktestRun(
+        id="other-run",
+        conversation_id=None,
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["TSLA"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={},
+        config_snapshot={"template": "rsi_mean_reversion"},
+        conversation_result_card={"title": "Leaky Tesla backtest"},
+        created_at=now,
+    )
+    api_state.store.strategies[strategy.id] = strategy
+    api_state.store.collections[collection.id] = collection
+    api_state.store.backtest_runs[run.id] = run
+    api_state.store.backtest_run_owners[run.id] = other_user_id
+    api_state.store.strategy_owners = {strategy.id: other_user_id}
+    api_state.store.collection_owners = {collection.id: other_user_id}
+
+    response = client.get("/api/v1/search?q=leaky&limit=20")
+
+    assert response.status_code == 200
+    assert response.json()["items"] == []
+
+
+def test_decision_endpoint_marks_evidence_artifact_decided() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "chat-p1-evidence"},
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest TSLA from 2025 to 2025",
+            "language": "en",
+        },
+    )
+    payload = _final_payload(response.text)
+    artifact_id = payload["run"]["conversation_result_card"]["evidence_artifact_id"]
+
+    decision = client.post(
+        f"/api/v1/evidence-artifacts/{artifact_id}/decision",
+        json={"decision_state": "promising", "note": "Worth revisiting."},
+    )
+
+    assert decision.status_code == 200
+    body = decision.json()
+    assert body["decision"]["decision_state"] == "promising"
+    assert body["decision"]["note"] == "Worth revisiting."
+    assert body["evidence_artifact"]["lifecycle"] == "decided"
+    artifact = api_state.store.evidence_artifacts[artifact_id]
+    assert api_state.store.ideas[artifact.idea_id].lifecycle == "decided"
+    assert api_state.store.idea_versions[artifact.idea_version_id].lifecycle == "decided"
+    assistant_result_cards = [
+        message.metadata.get("result_card")
+        for messages in api_state.store.messages.values()
+        for message in messages
+        if message.role == "assistant"
+        and isinstance(message.metadata.get("result_card"), dict)
+    ]
+    assert any(
+        card.get("evidence_artifact_id") == artifact_id
+        and card.get("decision_state") == "promising"
+        for card in assistant_result_cards
+    )
+
+
+def test_decision_endpoint_is_idempotent_per_evidence_artifact() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "chat-p1-decision-idempotent"},
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest TSLA from 2025 to 2025",
+            "language": "en",
+        },
+    )
+    artifact_id = _final_payload(response.text)["run"]["conversation_result_card"][
+        "evidence_artifact_id"
+    ]
+
+    first = client.post(
+        f"/api/v1/evidence-artifacts/{artifact_id}/decision",
+        json={"decision_state": "watching", "note": "Track it."},
+    )
+    second = client.post(
+        f"/api/v1/evidence-artifacts/{artifact_id}/decision",
+        json={"decision_state": "promising", "note": "Still promising."},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    first_body = first.json()
+    second_body = second.json()
+    assert second_body["decision"]["id"] == first_body["decision"]["id"]
+    assert second_body["decision"]["decision_state"] == "promising"
+    assert second_body["decision"]["note"] == "Still promising."
+    decisions_for_artifact = [
+        decision
+        for decision in api_state.store.decision_notes.values()
+        if decision.evidence_artifact_id == artifact_id
+    ]
+    assert len(decisions_for_artifact) == 1
+
+
+def test_decision_endpoint_invalid_body_returns_problem_details() -> None:
+    client = _client()
+    response = client.post(
+        "/api/v1/evidence-artifacts/artifact-1/decision",
+        json={},
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["type"] == "https://api.argus.app/problems/validation-error"
+    assert body["title"] == "Validation Error"
+    assert body["status"] == 422
+    assert body["code"] == "validation_error"
+    assert body["request_id"]
+    assert isinstance(body["context"]["errors"], list)
+    assert "decision_state" in str(body["context"]["errors"])
+
+
+def test_search_returns_typed_p1_artifacts() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "chat-p1-search"},
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest TSLA from 2025 to 2025",
+            "language": "en",
+        },
+    )
+    artifact_id = _final_payload(response.text)["run"]["conversation_result_card"][
+        "evidence_artifact_id"
+    ]
+    client.post(
+        f"/api/v1/evidence-artifacts/{artifact_id}/decision",
+        json={"decision_state": "watching", "note": "Track it."},
+    )
+
+    payload = client.get("/api/v1/search?q=TSLA&limit=20").json()
+
+    types = {item["type"] for item in payload["items"]}
+    assert {"chat", "backtest", "evidence", "idea", "decision"}.issubset(types)
+    evidence = next(item for item in payload["items"] if item["type"] == "evidence")
+    assert evidence["conversation_id"] == conversation["id"]
+    assert evidence["preview"]["digest"]
+    assert evidence["preview"]["quick_take"] == "I tested that idea with TSLA."
+    assert evidence["preview"]["assumptions"] == ["Starting capital: $10,000."]
+    assert evidence["preview"]["metrics_summary"] == {"total_return_pct": 12.5}
+    assert evidence["preview"]["symbols"] == ["TSLA"]
+    assert evidence["preview"]["benchmark_symbol"] == "SPY"
+    assert "context_packets" not in evidence["preview"]
+    assert not any(key.endswith("_id") for key in evidence["preview"])
+    idea = next(item for item in payload["items"] if item["type"] == "idea")
+    assert idea["conversation_id"] == conversation["id"]
+    assert idea["preview"]["digest"]
+    assert not any(key.endswith("_id") for key in idea["preview"])
+    decision = next(item for item in payload["items"] if item["type"] == "decision")
+    assert decision["preview"]["decision_state"] == "watching"
+    assert not any(key.endswith("_id") for key in decision["preview"])
+    assert decision["matched_text"].startswith("Track it.")
+    assert "I tested that idea with TSLA." in decision["matched_text"]
+    assert "backtest versus" not in decision["matched_text"]
+    assert "watching" not in decision["matched_text"]
 
 
 def test_invalid_cursor_returns_problem_details() -> None:

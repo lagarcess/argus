@@ -162,6 +162,7 @@ def build_workflow(
             confirm_stage(
                 state=_run_state(state),
                 contract=active_contract,
+                language=_user(state).language_preference,
             ),
         ),
     )

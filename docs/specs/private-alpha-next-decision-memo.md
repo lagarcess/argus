@@ -2,11 +2,16 @@
 
 Date: 2026-06-14
 
-Status: Promoted decision memo
+Status: Active strategic north star
 
 Audience: Founder, Codex, future product/spec work
 
-Scope: Side-conversation synthesis only. This document does not modify the active implementation plan by itself. It captures the full reasoning cycle triggered by the Robinhood/Alpaca/ChatGPT agentic trading discovery and translates it into product, architecture, leverage, and roadmap implications for Argus.
+Scope: Strategic source for Private Alpha Next product work. It captures the
+full reasoning cycle triggered by the Robinhood/Alpaca/ChatGPT agentic trading
+discovery and translates it into product, architecture, leverage, and roadmap
+implications for Argus. Use `docs/specs/private-alpha-next-roadmap.md` for the
+current execution board and use this memo, including the addenda, for
+slice-specific onboarding before planning or implementation.
 
 Related product-thesis trial: source context only; not required reading for specs.
 

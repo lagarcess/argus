@@ -42,10 +42,17 @@ def build_runtime_backtest_run(
     conversation_id: str,
     result_card: dict[str, Any],
     envelope: dict[str, Any],
+    quick_take: str | None = None,
+    breakdown: Any = None,
     classify_symbol_func: Any = classify_symbol,
     default_benchmark_func: Any = default_benchmark,
 ) -> BacktestRun | None:
     del user_id
+    result_card = _result_card_with_evidence_context(
+        result_card=result_card,
+        quick_take=quick_take,
+        breakdown=breakdown,
+    )
     return backtest_run_builder.build_backtest_run_from_result(
         conversation_id=conversation_id,
         result_card=result_card,
@@ -63,6 +70,8 @@ def persist_runtime_backtest_run(
     conversation: Conversation,
     result_card: dict[str, Any],
     envelope: dict[str, Any],
+    quick_take: str | None = None,
+    breakdown: Any = None,
     classify_symbol_func: Any = classify_symbol,
     default_benchmark_func: Any = default_benchmark,
 ) -> BacktestRun | None:
@@ -71,6 +80,8 @@ def persist_runtime_backtest_run(
         conversation_id=conversation.id,
         result_card=result_card,
         envelope=envelope,
+        quick_take=quick_take,
+        breakdown=breakdown,
         classify_symbol_func=classify_symbol_func,
         default_benchmark_func=default_benchmark_func,
     )
@@ -130,7 +141,42 @@ def persist_runtime_backtest_run(
             }
         )
 
+    from argus.api.chat.evidence import auto_capture_completed_backtest
+
+    try:
+        auto_capture_completed_backtest(
+            user=user,
+            conversation=conversation,
+            run=run,
+        )
+    except Exception as exc:
+        if not dev_memory_fallback_enabled():
+            raise
+        logger.warning(
+            "Evidence auto-capture failed; result run remains persisted",
+            error=str(exc),
+            run_id=run.id,
+        )
+
     return run
+
+
+def _result_card_with_evidence_context(
+    *,
+    result_card: dict[str, Any],
+    quick_take: str | None,
+    breakdown: Any,
+) -> dict[str, Any]:
+    enriched = dict(result_card)
+    if (
+        "quick_take" not in enriched
+        and isinstance(quick_take, str)
+        and quick_take.strip()
+    ):
+        enriched["quick_take"] = quick_take.strip()
+    if "breakdown" not in enriched and breakdown is not None:
+        enriched["breakdown"] = breakdown
+    return enriched
 
 
 def count_completed_runs_for_user(user_id: str) -> int:

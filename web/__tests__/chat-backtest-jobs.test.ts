@@ -249,6 +249,9 @@ describe("chat backtest jobs", () => {
 
     expect(completedMessages[0].confirmation?.statusLabel).toBe("Run complete");
     expect(completedMessages[0].confirmation?.status).toBe("run_complete");
+    expect(completedMessages[0].confirmation?.confirmation_state).toBe("superseded");
+    expect(completedMessages[0].confirmation?.actions).toEqual([]);
+    expect(completedMessages[0].actions).toEqual([]);
     expect(completedMessages[1].kind).toBe("strategy_result");
   });
 

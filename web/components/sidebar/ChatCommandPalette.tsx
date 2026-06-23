@@ -15,6 +15,7 @@ import {
   Edit2,
   Loader2,
   Maximize2,
+  MessageSquare,
   Minimize2,
   Search,
   Trash2,
@@ -31,6 +32,20 @@ import {
   type HistoryItem,
   type SearchItem,
 } from "@/lib/argus-api";
+import {
+  commandPaletteDecisionStateFallback,
+  commandPaletteItemFromHistory,
+  commandPaletteItemFromSearch,
+  commandPaletteOpenFallback,
+  commandPaletteOpenLabelKey,
+  commandPalettePreviewFields,
+  commandPaletteSelectedPreview,
+  commandPaletteStatusFallback,
+  commandPaletteStatusLabelKey,
+  commandPaletteTypeFallback,
+  commandPaletteTypeLabelKey,
+  type CommandPaletteDisplayItem,
+} from "@/lib/command-palette-items";
 
 type ChatCommandPaletteProps = {
   onClose: () => void;
@@ -42,15 +57,6 @@ type ChatCommandPaletteProps = {
 
 type LayoutMode = "expanded" | "collapsed";
 
-type DisplayItem = {
-  id: string;
-  conversationId: string;
-  title: string;
-  snippet: string;
-  updatedAt: string;
-  source: "recent" | "search";
-};
-
 function formatRelativeDate(
   value: string,
   t: ReturnType<typeof useTranslation>["t"],
@@ -58,30 +64,48 @@ function formatRelativeDate(
 ) {
   const date = new Date(value);
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const todayStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
   const time = date.getTime();
 
   if (time >= todayStart) return t("chat.history.today", "Today");
-  if (time >= todayStart - 86400000) return t("chat.history.yesterday", "Yesterday");
-  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(date);
+  if (time >= todayStart - 86400000)
+    return t("chat.history.yesterday", "Yesterday");
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+  }).format(date);
 }
 
 function dateGroup(value: string, t: ReturnType<typeof useTranslation>["t"]) {
   const date = new Date(value);
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const todayStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
   const time = date.getTime();
 
   if (time >= todayStart) return t("chat.history.today", "Today");
-  if (time >= todayStart - 86400000) return t("chat.history.yesterday", "Yesterday");
-  if (time >= todayStart - 86400000 * 6) return t("chat.history.last_7_days", "Last 7 days");
-  if (time >= todayStart - 86400000 * 29) return t("chat.history.last_30_days", "Last 30 days");
+  if (time >= todayStart - 86400000)
+    return t("chat.history.yesterday", "Yesterday");
+  if (time >= todayStart - 86400000 * 6)
+    return t("chat.history.last_7_days", "Last 7 days");
+  if (time >= todayStart - 86400000 * 29)
+    return t("chat.history.last_30_days", "Last 30 days");
   return t("chat.history.earlier", "Earlier");
 }
 
-function groupItems(items: DisplayItem[], t: ReturnType<typeof useTranslation>["t"]) {
-  const groups: { label: string; items: DisplayItem[] }[] = [];
-  const buckets = new Map<string, DisplayItem[]>();
+function groupItems(
+  items: CommandPaletteDisplayItem[],
+  t: ReturnType<typeof useTranslation>["t"],
+) {
+  const groups: { label: string; items: CommandPaletteDisplayItem[] }[] = [];
+  const buckets = new Map<string, CommandPaletteDisplayItem[]>();
 
   for (const item of items) {
     const label = dateGroup(item.updatedAt, t);
@@ -107,7 +131,7 @@ function highlightText(text: string, query: string): ReactNode {
   if (!trimmed) return text;
 
   const parts = text.split(new RegExp(`(${escapeRegExp(trimmed)})`, "gi"));
-  return parts.map((part, index) => (
+  return parts.map((part, index) =>
     part.toLowerCase() === trimmed.toLowerCase() ? (
       <mark
         key={`${part}-${index}`}
@@ -117,36 +141,12 @@ function highlightText(text: string, query: string): ReactNode {
       </mark>
     ) : (
       <span key={`${part}-${index}`}>{part}</span>
-    )
-  ));
-}
-
-function fromHistory(item: HistoryItem): DisplayItem | null {
-  if (item.type !== "chat") return null;
-  return {
-    id: item.id,
-    conversationId: item.conversation_id ?? item.id,
-    title: item.title,
-    snippet: item.subtitle ?? "",
-    updatedAt: item.created_at,
-    source: "recent",
-  };
+    ),
+  );
 }
 
 function rawConversationId(item: HistoryItem | SearchItem) {
   return item.conversation_id ?? item.id;
-}
-
-function fromSearch(item: SearchItem): DisplayItem | null {
-  if (item.type !== "chat") return null;
-  return {
-    id: item.id,
-    conversationId: item.conversation_id ?? item.id,
-    title: item.title,
-    snippet: item.matched_text ?? "",
-    updatedAt: item.updated_at,
-    source: "search",
-  };
 }
 
 export default function ChatCommandPalette({
@@ -164,11 +164,13 @@ export default function ChatCommandPalette({
   const [isColdStartLoading, setIsColdStartLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingMoreSearch, setIsLoadingMoreSearch] = useState(false);
-  const [previewItem, setPreviewItem] = useState<DisplayItem | null>(null);
+  const [previewItem, setPreviewItem] =
+    useState<CommandPaletteDisplayItem | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
-  const [pendingDeleteItem, setPendingDeleteItem] = useState<DisplayItem | null>(null);
+  const [pendingDeleteItem, setPendingDeleteItem] =
+    useState<CommandPaletteDisplayItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -194,6 +196,7 @@ export default function ChatCommandPalette({
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const trimmed = query.trim();
+    setPreviewItem(null);
     if (!trimmed) {
       setSearchResults([]);
       setSearchNextCursor(null);
@@ -205,7 +208,7 @@ export default function ChatCommandPalette({
     debounceRef.current = setTimeout(() => {
       searchGlobal({ q: trimmed, limit: 30 })
         .then(({ items, next_cursor }) => {
-          setSearchResults(items.filter((item) => item.type === "chat"));
+          setSearchResults(items);
           setSearchNextCursor(next_cursor);
         })
         .catch(() => {
@@ -223,28 +226,73 @@ export default function ChatCommandPalette({
   const isFiltering = query.trim().length > 0;
   const displayItems = useMemo(() => {
     const items = isFiltering
-      ? searchResults.map(fromSearch)
-      : recentItems.map(fromHistory);
-    return items.filter((item): item is DisplayItem => Boolean(item));
-  }, [isFiltering, recentItems, searchResults]);
-  const groupedItems = useMemo(() => groupItems(displayItems, t), [displayItems, t]);
-  const selectedPreview = previewItem ?? displayItems[0] ?? null;
+      ? searchResults.map((item) =>
+          commandPaletteItemFromSearch(item, {
+            decisionStateLabel: (state) =>
+              t(
+                `chat.result_card.decision_states.${state}`,
+                commandPaletteDecisionStateFallback(state),
+              ),
+            metricLabel: (id, fallback) =>
+              t(`command_palette.metric_labels.${id}`, fallback),
+          }),
+        )
+      : recentItems.map(commandPaletteItemFromHistory);
+    return items.filter((item): item is CommandPaletteDisplayItem =>
+      Boolean(item),
+    );
+  }, [isFiltering, recentItems, searchResults, t]);
+  const groupedItems = useMemo(
+    () => groupItems(displayItems, t),
+    [displayItems, t],
+  );
+  const selectedPreview = commandPaletteSelectedPreview(previewItem, displayItems);
+  const selectedPreviewFields = useMemo(
+    () =>
+      selectedPreview
+        ? commandPalettePreviewFields(selectedPreview, {
+            decisionStateLabel: (state) =>
+              t(
+                `chat.result_card.decision_states.${state}`,
+                commandPaletteDecisionStateFallback(state),
+              ),
+            metricLabel: (id, fallback) =>
+              t(`command_palette.metric_labels.${id}`, fallback),
+          })
+        : [],
+    [selectedPreview, t],
+  );
+  const selectedPreviewStatusLabelKey = selectedPreview
+    ? commandPaletteStatusLabelKey(selectedPreview)
+    : null;
+  const selectedPreviewStatusFallback = selectedPreview
+    ? commandPaletteStatusFallback(selectedPreview)
+    : null;
 
-  const updateLocalTitle = useCallback((conversationId: string, title: string) => {
-    setRecentItems((current) =>
-      current.map((item) =>
-        rawConversationId(item) === conversationId ? { ...item, title } : item,
-      ),
-    );
-    setSearchResults((current) =>
-      current.map((item) =>
-        rawConversationId(item) === conversationId ? { ...item, title } : item,
-      ),
-    );
-    setPreviewItem((current) =>
-      current?.conversationId === conversationId ? { ...current, title } : current,
-    );
-  }, []);
+  const updateLocalTitle = useCallback(
+    (conversationId: string, title: string) => {
+      setRecentItems((current) =>
+        current.map((item) =>
+          rawConversationId(item) === conversationId
+            ? { ...item, title }
+            : item,
+        ),
+      );
+      setSearchResults((current) =>
+        current.map((item) =>
+          rawConversationId(item) === conversationId
+            ? { ...item, title }
+            : item,
+        ),
+      );
+      setPreviewItem((current) =>
+        current?.conversationId === conversationId
+          ? { ...current, title }
+          : current,
+      );
+    },
+    [],
+  );
 
   const removeLocalConversation = useCallback((conversationId: string) => {
     setRecentItems((current) =>
@@ -274,7 +322,7 @@ export default function ChatCommandPalette({
         const next = [...current];
         for (const item of items) {
           const key = `${item.type}:${item.id}`;
-          if (item.type === "chat" && !seen.has(key)) {
+          if (!seen.has(key)) {
             seen.add(key);
             next.push(item);
           }
@@ -287,12 +335,24 @@ export default function ChatCommandPalette({
     }
   };
 
-  const openItem = useCallback((item: DisplayItem) => {
-    onOpenConversation(item.conversationId);
-    onClose();
-  }, [onClose, onOpenConversation]);
+  const openSourceConversation = useCallback(
+    (item: CommandPaletteDisplayItem) => {
+      if (!item.conversationId) return;
+      onOpenConversation(item.conversationId);
+      onClose();
+    },
+    [onClose, onOpenConversation],
+  );
 
-  const startRename = useCallback((item: DisplayItem) => {
+  const activateItem = useCallback(
+    (item: CommandPaletteDisplayItem) => {
+      openSourceConversation(item);
+    },
+    [openSourceConversation],
+  );
+
+  const startRename = useCallback((item: CommandPaletteDisplayItem) => {
+    if (!item.canManageConversation || !item.conversationId) return;
     setEditingId(item.conversationId);
     setEditingTitle(item.title.slice(0, 80));
     setPreviewItem(item);
@@ -303,35 +363,44 @@ export default function ChatCommandPalette({
     setEditingTitle("");
   }, []);
 
-  const handleRenameSave = useCallback(async (item: DisplayItem) => {
-    if (isSubmittingEdit) return;
+  const handleRenameSave = useCallback(
+    async (item: CommandPaletteDisplayItem) => {
+      if (isSubmittingEdit) return;
+      if (!item.canManageConversation || !item.conversationId) return;
 
-    const nextTitle = editingTitle.trim();
-    if (!nextTitle || nextTitle === item.title) {
-      cancelRename();
-      return;
-    }
+      const nextTitle = editingTitle.trim();
+      if (!nextTitle || nextTitle === item.title) {
+        cancelRename();
+        return;
+      }
 
-    setIsSubmittingEdit(true);
-    try {
-      await patchConversation(item.conversationId, { title: nextTitle });
-      updateLocalTitle(item.conversationId, nextTitle);
+      setIsSubmittingEdit(true);
+      try {
+        await patchConversation(item.conversationId, { title: nextTitle });
+        updateLocalTitle(item.conversationId, nextTitle);
+        onMutated?.();
+        setEditingId(null);
+        setEditingTitle("");
+      } finally {
+        setIsSubmittingEdit(false);
+      }
+    },
+    [cancelRename, editingTitle, isSubmittingEdit, onMutated, updateLocalTitle],
+  );
+
+  const handleArchive = useCallback(
+    async (item: CommandPaletteDisplayItem) => {
+      if (!item.canManageConversation || !item.conversationId) return;
+      removeLocalConversation(item.conversationId);
+      onConversationRemoved?.(item.conversationId);
+      await patchConversation(item.conversationId, { archived: true });
       onMutated?.();
-      setEditingId(null);
-      setEditingTitle("");
-    } finally {
-      setIsSubmittingEdit(false);
-    }
-  }, [cancelRename, editingTitle, isSubmittingEdit, onMutated, updateLocalTitle]);
+    },
+    [onConversationRemoved, onMutated, removeLocalConversation],
+  );
 
-  const handleArchive = useCallback(async (item: DisplayItem) => {
-    removeLocalConversation(item.conversationId);
-    onConversationRemoved?.(item.conversationId);
-    await patchConversation(item.conversationId, { archived: true });
-    onMutated?.();
-  }, [onConversationRemoved, onMutated, removeLocalConversation]);
-
-  const handleDelete = useCallback((item: DisplayItem) => {
+  const handleDelete = useCallback((item: CommandPaletteDisplayItem) => {
+    if (!item.canManageConversation) return;
     setPendingDeleteItem(item);
   }, []);
 
@@ -341,6 +410,8 @@ export default function ChatCommandPalette({
 
   const handleConfirmDelete = useCallback(async () => {
     if (!pendingDeleteItem || isDeleting) return;
+    if (!pendingDeleteItem.conversationId) return;
+
     setIsDeleting(true);
     removeLocalConversation(pendingDeleteItem.conversationId);
     onConversationRemoved?.(pendingDeleteItem.conversationId);
@@ -351,7 +422,13 @@ export default function ChatCommandPalette({
     } finally {
       setIsDeleting(false);
     }
-  }, [isDeleting, onConversationRemoved, onMutated, pendingDeleteItem, removeLocalConversation]);
+  }, [
+    isDeleting,
+    onConversationRemoved,
+    onMutated,
+    pendingDeleteItem,
+    removeLocalConversation,
+  ]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -366,12 +443,12 @@ export default function ChatCommandPalette({
       }
       if (!editingId && event.key === "Enter" && selectedPreview) {
         event.preventDefault();
-        openItem(selectedPreview);
+        activateItem(selectedPreview);
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [cancelRename, editingId, onClose, openItem, selectedPreview]);
+  }, [activateItem, cancelRename, editingId, onClose, selectedPreview]);
 
   const toggleLayout = () => {
     setLayoutMode((current) => {
@@ -406,7 +483,7 @@ export default function ChatCommandPalette({
             type="text"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={t("common.search", "Search conversations...")}
+            placeholder={t("command_palette.search_placeholder", "Search Argus...")}
             className="w-full bg-transparent font-display text-[15px] font-medium text-black outline-none placeholder:text-black/35 dark:text-white dark:placeholder:text-white/35"
           />
           {query && (
@@ -414,17 +491,19 @@ export default function ChatCommandPalette({
               type="button"
               onClick={() => setQuery("")}
               className="shrink-0 rounded-full p-1 hover:bg-black/5 dark:hover:bg-white/10"
-              aria-label="Clear search"
+              aria-label={t("command_palette.clear_search", "Clear search")}
             >
               <X className="h-3.5 w-3.5 text-black/40 dark:text-white/40" />
             </button>
           )}
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
           <div
             className={`flex-1 overflow-y-auto ${
-              layoutMode === "expanded" ? "border-r border-black/5 dark:border-white/5" : ""
+              layoutMode === "expanded"
+                ? "border-b border-black/5 dark:border-white/5 md:border-b-0 md:border-r"
+                : ""
             }`}
           >
             {isLoading ? (
@@ -437,7 +516,10 @@ export default function ChatCommandPalette({
                 <p className="text-[14px] text-black/30 dark:text-white/30">
                   {isFiltering
                     ? t("command_palette.no_results", "No results found")
-                    : t("command_palette.no_conversations", "No conversations yet")}
+                    : t(
+                        "command_palette.no_conversations",
+                        "No conversations yet",
+                      )}
                 </p>
               </div>
             ) : (
@@ -450,26 +532,33 @@ export default function ChatCommandPalette({
                       </span>
                     </div>
                     {group.items.map((item) => {
-                      const isCurrent = activeConversationId === item.conversationId;
+                      const isCurrent =
+                        item.type === "chat" &&
+                        activeConversationId === item.conversationId;
                       const isEditing = editingId === item.conversationId;
-                      const handleRowKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+                      const statusLabelKey = commandPaletteStatusLabelKey(item);
+                      const statusFallback = commandPaletteStatusFallback(item);
+                      const handleRowKeyDown = (
+                        event: ReactKeyboardEvent<HTMLDivElement>,
+                      ) => {
                         if (isEditing) return;
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
-                          openItem(item);
+                          activateItem(item);
                         }
                       };
                       return (
                         <div
                           key={`${item.source}:${item.id}`}
-                          onClick={() => openItem(item)}
+                          onClick={() => activateItem(item)}
                           onKeyDown={handleRowKeyDown}
                           onMouseEnter={() => setPreviewItem(item)}
                           onFocus={() => setPreviewItem(item)}
                           role="button"
                           tabIndex={0}
                           className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left transition-colors ${
-                            selectedPreview?.id === item.id
+                            selectedPreview?.id === item.id &&
+                            selectedPreview.type === item.type
                               ? "bg-black/5 dark:bg-white/5"
                               : "hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
                           }`}
@@ -481,9 +570,13 @@ export default function ChatCommandPalette({
                                   autoFocus
                                   value={editingTitle}
                                   maxLength={80}
-                                  onChange={(event) => setEditingTitle(event.target.value)}
+                                  onChange={(event) =>
+                                    setEditingTitle(event.target.value)
+                                  }
                                   onClick={(event) => event.stopPropagation()}
-                                  onFocus={(event) => event.currentTarget.select()}
+                                  onFocus={(event) =>
+                                    event.currentTarget.select()
+                                  }
                                   onBlur={() => {
                                     void handleRenameSave(item);
                                   }}
@@ -500,7 +593,10 @@ export default function ChatCommandPalette({
                                     }
                                   }}
                                   className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-2 py-1 font-display text-[14px] font-medium text-black outline-none focus:border-black/30 dark:border-white/10 dark:bg-[#24272b] dark:text-white dark:focus:border-white/30"
-                                  aria-label={t("command_palette.rename_conversation", "Rename conversation")}
+                                  aria-label={t(
+                                    "command_palette.rename_conversation",
+                                    "Rename conversation",
+                                  )}
                                 />
                               ) : (
                                 <span className="truncate font-display text-[14px] font-medium text-black dark:text-white">
@@ -512,6 +608,17 @@ export default function ChatCommandPalette({
                                   {t("common.current", "Current")}
                                 </span>
                               )}
+                              <span className="shrink-0 rounded-full border border-black/8 px-2 py-0.5 text-[10px] font-semibold text-black/40 dark:border-white/10 dark:text-white/40">
+                                {t(
+                                  commandPaletteTypeLabelKey(item.type),
+                                  commandPaletteTypeFallback(item.type),
+                                )}
+                              </span>
+                              {!isCurrent && statusLabelKey && statusFallback && (
+                                <span className="shrink-0 rounded-full border border-black/8 px-2 py-0.5 text-[10px] font-semibold text-black/40 dark:border-white/10 dark:text-white/40">
+                                  {t(statusLabelKey, statusFallback)}
+                                </span>
+                              )}
                             </div>
                             {item.snippet && (
                               <span className="mt-0.5 line-clamp-1 text-[12px] leading-relaxed text-black/40 dark:text-white/40">
@@ -520,14 +627,22 @@ export default function ChatCommandPalette({
                             )}
                           </div>
                           <span className="absolute right-3 top-3 text-[11px] text-black/30 dark:text-white/30">
-                            {formatRelativeDate(item.updatedAt, t, i18n.language)}
+                            {formatRelativeDate(
+                              item.updatedAt,
+                              t,
+                              i18n.language,
+                            )}
                           </span>
-                          {!isEditing && (
+                          {!isEditing && item.canManageConversation && (
                             <div
                               className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
                               data-row-action
                             >
-                              <Tooltip content={t("common.rename", "Rename")} side="top" delay={120}>
+                              <Tooltip
+                                content={t("common.rename", "Rename")}
+                                side="top"
+                                delay={120}
+                              >
                                 <button
                                   type="button"
                                   onClick={(event) => {
@@ -535,12 +650,19 @@ export default function ChatCommandPalette({
                                     startRename(item);
                                   }}
                                   className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-                                  aria-label={t("command_palette.rename_conversation", "Rename conversation")}
+                                  aria-label={t(
+                                    "command_palette.rename_conversation",
+                                    "Rename conversation",
+                                  )}
                                 >
                                   <Edit2 className="h-3.5 w-3.5" />
                                 </button>
                               </Tooltip>
-                              <Tooltip content={t("common.archive", "Archive")} side="top" delay={120}>
+                              <Tooltip
+                                content={t("common.archive", "Archive")}
+                                side="top"
+                                delay={120}
+                              >
                                 <button
                                   type="button"
                                   onClick={(event) => {
@@ -548,12 +670,19 @@ export default function ChatCommandPalette({
                                     void handleArchive(item);
                                   }}
                                   className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-                                  aria-label={t("command_palette.archive_conversation", "Archive conversation")}
+                                  aria-label={t(
+                                    "command_palette.archive_conversation",
+                                    "Archive conversation",
+                                  )}
                                 >
                                   <Archive className="h-3.5 w-3.5" />
                                 </button>
                               </Tooltip>
-                              <Tooltip content={t("common.delete", "Delete")} side="top" delay={120}>
+                              <Tooltip
+                                content={t("common.delete", "Delete")}
+                                side="top"
+                                delay={120}
+                              >
                                 <button
                                   type="button"
                                   onClick={(event) => {
@@ -561,13 +690,48 @@ export default function ChatCommandPalette({
                                     handleDelete(item);
                                   }}
                                   className="rounded-full p-1.5 text-[#d66d75]/75 transition-colors hover:bg-[#d66d75]/10 hover:text-[#d66d75]"
-                                  aria-label={t("command_palette.delete_conversation", "Delete conversation")}
+                                  aria-label={t(
+                                    "command_palette.delete_conversation",
+                                    "Delete conversation",
+                                  )}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </Tooltip>
                             </div>
                           )}
+                          {!isEditing &&
+                            !item.canManageConversation &&
+                            item.conversationId && (
+                              <div
+                                className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                data-row-action
+                              >
+                                <Tooltip
+                                  content={t(
+                                    "command_palette.open_source_conversation",
+                                    "Open source conversation",
+                                  )}
+                                  side="top"
+                                  delay={120}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openSourceConversation(item);
+                                    }}
+                                    className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
+                                    aria-label={t(
+                                      "command_palette.open_source_conversation",
+                                      "Open source conversation",
+                                    )}
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5" />
+                                  </button>
+                                </Tooltip>
+                              </div>
+                            )}
                         </div>
                       );
                     })}
@@ -580,7 +744,9 @@ export default function ChatCommandPalette({
                     disabled={isLoadingMoreSearch}
                     className="mx-2 rounded-[12px] border border-black/10 px-3 py-2 text-[12px] font-medium text-black/60 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white/60 dark:hover:bg-white/5"
                   >
-                    {isLoadingMoreSearch ? t("common.loading") : t("common.more", "More")}
+                    {isLoadingMoreSearch
+                      ? t("common.loading")
+                      : t("common.more", "More")}
                   </button>
                 )}
               </div>
@@ -588,45 +754,92 @@ export default function ChatCommandPalette({
           </div>
 
           {layoutMode === "expanded" && (
-            <div className="hidden w-[44%] flex-col bg-black/[0.02] p-6 dark:bg-white/[0.02] md:flex">
+            <div className="flex max-h-[42%] w-full shrink-0 flex-col bg-black/[0.02] p-5 dark:bg-white/[0.02] md:max-h-none md:w-[44%] md:p-6">
               {selectedPreview ? (
                 <div className="flex h-full flex-col">
                   <div className="mb-6">
-                    <span className="mb-3 inline-flex rounded-full bg-[#5ba897]/15 px-2.5 py-1 text-[11px] font-semibold text-[#5ba897]">
-                      {activeConversationId === selectedPreview.conversationId
-                        ? t("common.current", "Current")
-                        : t("common.conversation", "Conversation")}
-                    </span>
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {selectedPreview.type === "chat" &&
+                        activeConversationId === selectedPreview.conversationId && (
+                          <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+                            {t("common.current", "Current")}
+                          </span>
+                        )}
+                      <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+                        {t(
+                          commandPaletteTypeLabelKey(selectedPreview.type),
+                          commandPaletteTypeFallback(selectedPreview.type),
+                        )}
+                      </span>
+                      {selectedPreviewStatusLabelKey &&
+                        selectedPreviewStatusFallback && (
+                        <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+                          {t(
+                            selectedPreviewStatusLabelKey,
+                            selectedPreviewStatusFallback,
+                          )}
+                        </span>
+                      )}
+                    </div>
                     <h2 className="font-display text-[24px] font-medium leading-tight text-black dark:text-white">
                       {selectedPreview.title}
                     </h2>
                     <p className="mt-2 text-[13px] text-black/40 dark:text-white/40">
-                      {formatRelativeDate(selectedPreview.updatedAt, t, i18n.language)}
+                      {formatRelativeDate(
+                        selectedPreview.updatedAt,
+                        t,
+                        i18n.language,
+                      )}
                     </p>
                   </div>
                   <div className="rounded-[14px] border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-[#1f2225]/70">
                     <p className="text-[12px] font-semibold uppercase tracking-wider text-black/35 dark:text-white/35">
                       {t("command_palette.preview", "Preview")}
                     </p>
-                    <p className="mt-2 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
-                      {selectedPreview.snippet ||
+                    {selectedPreviewFields.length > 0 ? (
+                      <div className="mt-3 space-y-3">
+                        {selectedPreviewFields.map((field) => (
+                          <div key={field.id}>
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-black/30 dark:text-white/30">
+                              {t(field.labelKey, field.labelFallback)}
+                            </p>
+                            <p className="mt-1 text-[13px] leading-relaxed text-black/60 dark:text-white/60">
+                              {field.value}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
+                        {selectedPreview.snippet ||
                         t(
                           "command_palette.preview_empty",
-                          "Open this conversation to view its messages.",
+                          "Select a result to preview its details.",
                         )}
-                    </p>
+                      </p>
+                    )}
                   </div>
-                  <div className="mt-auto flex items-center justify-between border-t border-black/5 pt-4 text-[12px] text-black/35 dark:border-white/5 dark:text-white/35">
-                    <span>{t("command_palette.open_conversation", "Open conversation")}</span>
+                  <button
+                    type="button"
+                    onClick={() => openSourceConversation(selectedPreview)}
+                    disabled={!selectedPreview.conversationId}
+                    className="mt-auto flex items-center justify-between border-t border-black/5 pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-default disabled:hover:text-black/35 dark:border-white/5 dark:text-white/35 dark:hover:text-white dark:disabled:hover:text-white/35"
+                  >
+                    <span>
+                      {t(
+                        commandPaletteOpenLabelKey(selectedPreview),
+                        commandPaletteOpenFallback(selectedPreview),
+                      )}
+                    </span>
                     <ChevronRight className="h-4 w-4" />
-                  </div>
+                  </button>
                 </div>
               ) : (
                 <div className="flex flex-1 items-center justify-center text-center">
                   <p className="text-[13px] text-black/30 dark:text-white/30">
                     {t(
                       "command_palette.select_preview",
-                      "Select a conversation to preview its metadata.",
+                      "Select a result to preview its details.",
                     )}
                   </p>
                 </div>
@@ -638,11 +851,20 @@ export default function ChatCommandPalette({
         <div className="flex items-center justify-between border-t border-black/5 px-4 py-2 dark:border-white/5">
           <span className="text-[11px] text-black/30 dark:text-white/30">
             {displayItems.length > 0 &&
-              t("command_palette.conversation_count", {
-                count: displayItems.length,
-                defaultValue_one: "{{count}} conversation",
-                defaultValue_other: "{{count}} conversations",
-              })}
+              t(
+                isFiltering
+                  ? "command_palette.result_count"
+                  : "command_palette.conversation_count",
+                {
+                  count: displayItems.length,
+                  defaultValue_one: isFiltering
+                    ? "{{count}} result"
+                    : "{{count}} conversation",
+                  defaultValue_other: isFiltering
+                    ? "{{count}} results"
+                    : "{{count}} conversations",
+                },
+              )}
           </span>
           <button
             type="button"
@@ -668,9 +890,16 @@ export default function ChatCommandPalette({
           description={t(
             "sidebar.delete_confirm.description",
             "This removes “{{title}}” from your visible history.",
-            { title: pendingDeleteItem?.title ?? t("common.conversation", "Conversation") },
+            {
+              title:
+                pendingDeleteItem?.title ??
+                t("common.conversation", "Conversation"),
+            },
           )}
-          confirmLabel={t("sidebar.delete_confirm.confirm", "Delete conversation")}
+          confirmLabel={t(
+            "sidebar.delete_confirm.confirm",
+            "Delete conversation",
+          )}
           cancelLabel={t("common.cancel", "Cancel")}
           isBusy={isDeleting}
           onCancel={handleCancelDelete}

@@ -6,7 +6,10 @@ import {
   actionHasCardScopedOwnership,
   visibleComposerActions,
 } from "../lib/chat-action-ownership";
-import { confirmationRowKey } from "../components/chat/confirmation-display";
+import {
+  confirmationRowKey,
+  confirmationStatusAllowsActions,
+} from "../components/chat/confirmation-display";
 import type { ChatActionOption } from "../components/chat/types";
 
 const root = join(import.meta.dir, "..");
@@ -90,6 +93,30 @@ describe("chat turn artifact UX", () => {
     expect(card).toContain("updated: { icon: RefreshCw, isSpinning: false }");
   });
 
+  test("confirmation actions are gated by semantic status, not stale action arrays", () => {
+    expect(confirmationStatusAllowsActions("ready_to_run")).toBe(true);
+    expect(confirmationStatusAllowsActions("needs_change")).toBe(true);
+    expect(confirmationStatusAllowsActions("updated")).toBe(true);
+    expect(confirmationStatusAllowsActions("running")).toBe(false);
+    expect(confirmationStatusAllowsActions("request_sent")).toBe(false);
+    expect(confirmationStatusAllowsActions("run_complete")).toBe(false);
+    expect(confirmationStatusAllowsActions("could_not_run")).toBe(false);
+    expect(confirmationStatusAllowsActions("draft_canceled")).toBe(false);
+    expect(confirmationStatusAllowsActions("not_completed")).toBe(false);
+
+    const card = readFileSync(
+      join(root, "components/chat/StrategyConfirmationCard.tsx"),
+      "utf-8",
+    );
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+
+    expect(card).toContain("confirmationStatusAllowsActions(displayState.status)");
+    expect(chat).toContain("confirmationStatusAllowsActions(confirmationStatus)");
+  });
+
   test("confirmation row identity uses structured keys instead of translated labels", () => {
     expect(
       confirmationRowKey({
@@ -127,6 +154,26 @@ describe("chat turn artifact UX", () => {
     expect(message).toContain("group-hover:opacity-100");
     expect(message).toContain("focus-within:opacity-100");
     expect(message).not.toContain("const shouldShowTextFooter =");
+  });
+
+  test("card-scoped confirmation actions close the source card before sending", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const handleActionStart = chat.indexOf("const handleAction =");
+    const handleActionEnd = chat.indexOf("// ── Chat options helpers", handleActionStart);
+    const handleActionBlock = chat.slice(handleActionStart, handleActionEnd);
+
+    expect(handleActionStart).toBeGreaterThan(-1);
+    expect(handleActionBlock).toContain(
+      "const confirmationEffect = confirmationActionEffectFromAction(action)",
+    );
+    expect(handleActionBlock).toContain("setMessages((prev) =>");
+    expect(handleActionBlock).toContain("normalizeConfirmationHistory(");
+    expect(handleActionBlock).toContain(
+      "applyConfirmationActionEffects(prev, [confirmationEffect])",
+    );
   });
 
   test("final recovery responses hydrate retry controls from structured metadata", () => {

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Header, Request
 from argus.api import state as api_state
 from argus.api.chat.backtest_jobs import reconcile_terminal_render_task_run
 from argus.api.dependencies import current_user, problem
+from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import (
     BacktestJob,
     BacktestJobResponse,
@@ -25,24 +26,22 @@ def run_backtest(
     user: User = Depends(current_user),  # noqa: B008
 ) -> BacktestRunResponse:
     endpoint = "/api/v1/backtests/run"
-    if idempotency_key:
-        cached = api_state.store.idempotency.get((user.id, endpoint, idempotency_key))
-        if cached:
-            return BacktestRunResponse(run=cached)
+    clean_idempotency_key = _clean_required_idempotency_key(
+        request=request,
+        idempotency_key=idempotency_key,
+    )
+    cached = api_state.store.idempotency.get(
+        (user.id, endpoint, clean_idempotency_key)
+    )
+    if cached:
+        return BacktestRunResponse(run=cached)
 
     if api_state.supabase_gateway is not None:
         try:
-            api_state.supabase_gateway.check_and_increment_usage(
+            api_state.supabase_gateway.check_and_increment_usage_limits(
                 user_id=user.id,
                 resource="backtest_runs",
-                period="day",
-                limit_count=50,
-            )
-            api_state.supabase_gateway.check_and_increment_usage(
-                user_id=user.id,
-                resource="backtest_runs",
-                period="hour",
-                limit_count=10,
+                limits=[("day", 50), ("hour", 10)],
             )
         except QuotaExceededError as exc:
             raise problem(
@@ -83,7 +82,12 @@ def run_backtest(
                 strategy_id=payload.strategy_id,
             )
         else:
-            strategy = api_state.store.strategies.get(payload.strategy_id)
+            if memory_object_visible(
+                owner_map=api_state.store.strategy_owners,
+                object_id=payload.strategy_id,
+                user_id=user.id,
+            ):
+                strategy = api_state.store.strategies.get(payload.strategy_id)
 
         if not strategy:
             raise problem(
@@ -117,9 +121,26 @@ def run_backtest(
     )
     if api_state.supabase_gateway is not None:
         run = api_state.supabase_gateway.create_backtest_run(user_id=user.id, run=run)
-    if idempotency_key:
-        api_state.store.idempotency[(user.id, endpoint, idempotency_key)] = run
+    api_state.store.idempotency[(user.id, endpoint, clean_idempotency_key)] = run
     return BacktestRunResponse(run=run)
+
+
+def _clean_required_idempotency_key(
+    *,
+    request: Request,
+    idempotency_key: str | None,
+) -> str:
+    if isinstance(idempotency_key, str):
+        stripped = idempotency_key.strip()
+        if stripped:
+            return stripped
+    raise problem(
+        request,
+        status_code=400,
+        code="idempotency_key_required",
+        title="Idempotency Key Required",
+        detail="POST /backtests/run requires an Idempotency-Key header.",
+    )
 
 
 @router.get("/backtest-jobs/{job_id}", response_model=BacktestJobResponse)

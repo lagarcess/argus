@@ -353,9 +353,178 @@ Represents an immutable result of a simulation. Every run is reproducible from i
   symbols, contribution amount, cadence, timeframe, benchmark, and strategy
   template must carry forward unless explicitly changed or invalidated by
   deterministic guardrails.
+- P1 completed chat backtests also attach sidecar evidence metadata to
+  `conversation_result_card`:
+  - `idea_id`
+  - `idea_version_id`
+  - `evidence_artifact_id`
+  - `evidence_lifecycle`
+  - `artifact_type = "backtest"`
+  - `decision_note_id` and `decision_state` after explicit decision capture.
+  These fields are stable codes/ids, not localized display prose.
 ---
 
-## 12.1 backtest_jobs
+## 12.1 P1 Idea / Evidence / Decision Spine
+
+P1 adds a light evidence ledger around completed backtests. Persistence is
+automatic; user commitment is explicit.
+
+### ideas
+
+Represents a durable investing idea container.
+
+Fields:
+- `id`: `uuid` (Primary Key)
+- `user_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
+- `source_conversation_id`: `uuid` (Nullable, references `conversations.id`)
+- `title`: `text`
+- `summary`: `text`
+- `lifecycle`: `text` (`captured`, `reviewed`, `saved`, `decided`, `archived`, `discarded`)
+- `active_version_id`: `uuid` (Nullable, references `idea_versions.id`)
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+Creation order:
+- Insert the idea with `active_version_id = null`.
+- Insert the corresponding `idea_versions` row.
+- Update `ideas.active_version_id` to the inserted version id.
+
+This ordering keeps the circular idea/version relationship compatible with
+Supabase FK enforcement. If artifact creation fails after either sidecar is
+created, the gateway discards the transient idea/version sidecars and re-checks
+`UNIQUE(user_id, source_run_id)` before surfacing an error, so worker retries do
+not leave orphaned evidence records.
+
+### idea_versions
+
+Immutable snapshot of an idea at the point evidence was created.
+
+Fields:
+- `id`: `uuid` (Primary Key)
+- `idea_id`: `uuid` (References `ideas.id` ON DELETE CASCADE)
+- `user_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
+- `source_conversation_id`: `uuid` (Nullable, references `conversations.id`)
+- `source_run_id`: `uuid` (Nullable, references `backtest_runs.id`)
+- `version_number`: `integer`
+- `canonical_spec`: `jsonb`
+- `strategy_snapshot`: `jsonb`
+- `title`: `text`
+- `summary`: `text`
+- `lifecycle`: `text`
+- `created_at`: `timestamptz`
+
+DB immutability:
+- After insert, immutable fields are enforced by a database trigger:
+  `id`, `user_id`, `idea_id`, `source_conversation_id`, `source_run_id`,
+  `version_number`, `canonical_spec`, `strategy_snapshot`, `title`, `summary`,
+  and `created_at`.
+- `lifecycle` may change for review, save, archive/discard, and decision
+  transitions without creating a new version row.
+
+### evidence_artifacts
+
+Immutable proof package. P1 writes `artifact_type = "backtest"` from completed
+backtests.
+
+Fields:
+- `id`: `uuid` (Primary Key)
+- `idea_id`: `uuid` (References `ideas.id` ON DELETE CASCADE)
+- `idea_version_id`: `uuid` (References `idea_versions.id` ON DELETE CASCADE)
+- `user_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
+- `source_conversation_id`: `uuid` (Nullable, references `conversations.id`)
+- `source_run_id`: `uuid` (Nullable, references `backtest_runs.id`)
+- `artifact_type`: `text` (`backtest`)
+- `lifecycle`: `text`
+- `title`: `text`
+- `digest`: `text`
+- `payload`: `jsonb`
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+DB immutability:
+- After insert, immutable fields are enforced by a database trigger:
+  `id`, `user_id`, `idea_id`, `idea_version_id`, `source_conversation_id`,
+  `source_run_id`, `artifact_type`, `title`, `digest`, `payload`, and
+  `created_at`.
+- `lifecycle` and `updated_at` may change for lifecycle transitions and
+  timestamp bookkeeping.
+
+Payload rules:
+- `payload.result_card` is sanitized for recall and must not expose context
+  packets, provider/model metadata, route receipts, retry payloads, or raw
+  conversation transcripts.
+- `payload.assumptions`, `payload.metrics`, `payload.provenance`,
+  `payload.digest`, and when available `payload.quick_take` and
+  `payload.breakdown` are first-class evidence context, not frontend-only copy.
+- Search previews derive from this sanitized evidence payload and may expose
+  digest, symbols, benchmark, assumptions, compact metric summaries, quick take,
+  and breakdown context. Search previews must not expose internal ids inside
+  `preview`; object identity remains on the top-level search result fields.
+- `UNIQUE(user_id, source_run_id)` keeps completed-run capture idempotent.
+  Replays or worker restarts must reuse the existing sidecar instead of
+  creating another evidence artifact for the same completed run.
+
+### decision_notes
+
+Explicit user judgment after reviewing evidence. P1 stores the current decision
+for an evidence artifact, not an append-only decision history. A later slice may
+add history if the product needs audit trails.
+
+Fields:
+- `id`: `uuid` (Primary Key)
+- `idea_id`: `uuid` (References `ideas.id` ON DELETE CASCADE)
+- `idea_version_id`: `uuid` (References `idea_versions.id` ON DELETE CASCADE)
+- `evidence_artifact_id`: `uuid` (References `evidence_artifacts.id` ON DELETE CASCADE)
+- `user_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
+- `source_conversation_id`: `uuid` (Nullable, references `conversations.id`)
+- `decision_state`: `text` (`watching`, `promising`, `rejected`, `revisit_later`)
+- `note`: `text` (Nullable)
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+Constraints:
+- `UNIQUE(user_id, evidence_artifact_id)` enforces one current decision per
+  user-owned evidence artifact.
+- Duplicate POST/retry semantics update the existing decision row and return the
+  canonical current decision.
+
+Durable decision capture:
+- The API uses the service-role-only `upsert_current_decision_note` RPC so the
+  decision row, evidence artifact lifecycle, idea lifecycle, and active
+  idea-version lifecycle move to `decided` together.
+- The RPC is not a public/client surface. Frontend code only calls
+  `POST /evidence-artifacts/{id}/decision`.
+
+### RLS
+
+All four P1 tables are owner-scoped by `user_id`. Select, insert, update, and
+delete policies require `auth.uid() = user_id`. Backend P1 persistence uses the
+service role server-side; service-role grants do not relax frontend/client RLS.
+
+## 12.1.1 P1 Observability Envelope
+
+P1 defines the private-alpha observability envelope in code without adding a new
+durable analytics or cost table in this slice.
+
+Current behavior:
+- `argus_observability_event/v1` is the canonical event-envelope schema.
+- Default privacy mode is `metadata_only`.
+- Event categories include chat interpretation, continuity, evidence capture,
+  decision capture, recall, cost-ledger entries, and eval-suite readiness.
+- The sanitizer strips raw prompts, transcripts, context packets, route
+  receipts, provider/model metadata, auth tokens, API keys, broker credentials,
+  account balances, exact holdings, payment identifiers, and similar sensitive
+  payloads.
+- Live analytics capture is suppressed with `reason = "p1_measurement_only"`.
+
+Deferred durable surfaces:
+- PostHog product analytics wiring.
+- Append-only provider cost ledger.
+- Eval run/case result persistence.
+- Route-receipt to cost/eval/product-event joins beyond existing product
+  records.
+
+## 12.2 backtest_jobs
 
 Represents durable lifecycle state for an asynchronous backtest execution job.
 Jobs are the bridge between the chat/API control plane and the Render Workflow

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user, problem
+from argus.api.memory_ownership import memory_object_visible
 from argus.api.naming import suggest_entity_name
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
@@ -57,6 +58,7 @@ def create_collection(
             updated_at=now,
         )
         api_state.store.collections[collection.id] = collection
+        api_state.store.collection_owners[collection.id] = user.id
         api_state.store.collection_strategies[collection.id] = set()
     return CollectionResponse(collection=collection)
 
@@ -74,6 +76,11 @@ def list_collections(
         items = [
             item
             for item in api_state.store.collections.values()
+            if memory_object_visible(
+                owner_map=api_state.store.collection_owners,
+                object_id=item.id,
+                user_id=user.id,
+            )
             if item.deleted_at is None
         ]
     items.sort(
@@ -119,7 +126,12 @@ def patch_collection(
             collection_id=collection_id,
         )
     else:
-        collection = api_state.store.collections.get(collection_id)
+        if memory_object_visible(
+            owner_map=api_state.store.collection_owners,
+            object_id=collection_id,
+            user_id=user.id,
+        ):
+            collection = api_state.store.collections.get(collection_id)
 
     if not collection:
         raise problem(
@@ -162,7 +174,12 @@ def delete_collection(
             collection_id=collection_id,
         )
     else:
-        collection = api_state.store.collections.get(collection_id)
+        if memory_object_visible(
+            owner_map=api_state.store.collection_owners,
+            object_id=collection_id,
+            user_id=user.id,
+        ):
+            collection = api_state.store.collections.get(collection_id)
 
     if not collection:
         raise problem(
@@ -220,7 +237,13 @@ def attach_strategies(
                 detail=str(exc),
             ) from exc
 
-    collection = api_state.store.collections.get(collection_id)
+    collection = None
+    if memory_object_visible(
+        owner_map=api_state.store.collection_owners,
+        object_id=collection_id,
+        user_id=user.id,
+    ):
+        collection = api_state.store.collections.get(collection_id)
     if not collection:
         raise problem(
             request,
@@ -231,8 +254,19 @@ def attach_strategies(
         )
     attached = api_state.store.collection_strategies.setdefault(collection_id, set())
     for strategy_id in payload.strategy_ids:
-        if strategy_id in api_state.store.strategies:
-            attached.add(strategy_id)
+        if strategy_id not in api_state.store.strategies or not memory_object_visible(
+            owner_map=api_state.store.strategy_owners,
+            object_id=strategy_id,
+            user_id=user.id,
+        ):
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Strategy not found.",
+            )
+        attached.add(strategy_id)
     updated = collection.model_copy(
         update={"strategy_count": len(attached), "updated_at": utcnow()}
     )
@@ -256,6 +290,12 @@ def detach_strategy(
             strategy_id=strategy_id,
         )
     else:
+        if not memory_object_visible(
+            owner_map=api_state.store.collection_owners,
+            object_id=collection_id,
+            user_id=user.id,
+        ):
+            return SuccessResponse(success=True)
         api_state.store.collection_strategies.setdefault(collection_id, set()).discard(
             strategy_id
         )

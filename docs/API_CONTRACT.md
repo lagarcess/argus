@@ -495,6 +495,11 @@ Ownership hardening:
   "conversation_result_card": {
     "title": "Moon Mission (Momentum Breakout)",
     "asset_class": "equity",
+    "artifact_type": "backtest",
+    "idea_id": "uuid",
+    "idea_version_id": "uuid",
+    "evidence_artifact_id": "uuid",
+    "evidence_lifecycle": "captured",
     "date_range": {
       "start": "2022-01-01",
       "end": "2024-12-31",
@@ -609,6 +614,11 @@ Ownership hardening:
   "created_at": "timestamp"
 }
 ```
+
+`save_strategy` is a legacy/compatibility result action for Strategy persistence
+when that feature surface is enabled. It is separate from the P1 evidence
+lifecycle: completed runs are captured automatically as evidence, while user
+commitment is represented by an explicit `DecisionNote`.
 
 **Result chart contract:**
 - `chart.kind` is currently `portfolio_equity`.
@@ -1324,7 +1334,7 @@ All events follow the SSE format: `data: {json}\n\n`.
 Events are emitted in this order per turn:
 
 **1. `stage_start`** — emitted when each pipeline stage begins
-```json
+```jsonl
 { "type": "stage_start", "stage": "interpret" }
 { "type": "stage_start", "stage": "clarify" }
 { "type": "stage_start", "stage": "confirm" }
@@ -1342,14 +1352,14 @@ The frontend maps `stage` values to human-readable progress labels:
 - `next_step` → "What's next..."
 
 **2. `token`** — streaming LLM response text, one chunk at a time
-```json
+```jsonl
 { "type": "token", "content": "Based on your idea" }
 { "type": "token", "content": " about Tesla..." }
 ```
 Frontend appends tokens progressively. Applies to `clarify`, `explain`, and `next_step` nodes.
 
 **3. `stage_outcome`** — emitted after `interpret` completes, so the frontend can render the correct UI element before the full graph finishes
-```json
+```jsonl
 { "type": "stage_outcome", "outcome": "ready_for_confirmation" }
 { "type": "stage_outcome", "outcome": "needs_clarification" }
 { "type": "stage_outcome", "outcome": "approved_for_execution" }
@@ -1621,6 +1631,7 @@ Detach strategy.
 
 **Required Header:**
 - `Idempotency-Key`: `uuid` (Required to prevent duplicate engine runs)
+- Missing or blank keys return `400 idempotency_key_required`.
 
 Run directly from saved strategy or inline config.
 
@@ -1843,6 +1854,89 @@ deterministic safety renderer.
 
 *Note: `chart` and `trades` are detail-only and must not be returned in list endpoints (e.g. History).*
 
+Completed chat-launched backtests auto-capture P1 evidence sidecars. The
+result-card metadata may include `idea_id`, `idea_version_id`,
+`evidence_artifact_id`, `evidence_lifecycle`, `artifact_type = "backtest"`,
+and after explicit decision capture, `decision_note_id` and `decision_state`.
+These are stable ids/enums and must not be localized.
+
+## `POST /evidence-artifacts/{id}/decision`
+
+Create or update the current explicit user decision attached to a user-owned
+evidence artifact. P1 stores one canonical current `DecisionNote` per
+`user_id + evidence_artifact_id`; repeated POSTs and retries update that
+canonical decision instead of appending history. Append-only decision history is
+deferred until a later product slice.
+
+This is the P1 commitment surface; automatic evidence capture alone does not
+mean the user has committed to the idea.
+
+Server behavior:
+- The endpoint is idempotent for `user_id + evidence_artifact_id`.
+- Durable Supabase mode uses a service-role-only RPC so the current
+  `DecisionNote`, backing `EvidenceArtifact`, parent `Idea`, and active
+  `IdeaVersion` lifecycle update as one database operation.
+- Clients must render the returned stable ids/enums and localize labels in the
+  frontend; backend semantic layers must not emit localized UI labels for this
+  lifecycle state.
+
+**Request:**
+```json
+{
+  "decision_state": "promising",
+  "note": "Worth revisiting after the next earnings cycle."
+}
+```
+
+`decision_state` enum:
+- `watching`
+- `promising`
+- `rejected`
+- `revisit_later`
+
+**Response:**
+```json
+{
+  "decision": {
+    "id": "uuid",
+    "idea_id": "uuid",
+    "idea_version_id": "uuid",
+    "evidence_artifact_id": "uuid",
+    "source_conversation_id": "uuid",
+    "decision_state": "promising",
+    "note": "Worth revisiting after the next earnings cycle.",
+    "created_at": "timestamp",
+    "updated_at": "timestamp"
+  },
+  "evidence_artifact": {
+    "id": "uuid",
+    "idea_id": "uuid",
+    "idea_version_id": "uuid",
+    "source_conversation_id": "uuid",
+    "source_run_id": "uuid",
+    "artifact_type": "backtest",
+    "lifecycle": "decided",
+    "title": "AAPL, MSFT Buy and Hold",
+    "digest": "AAPL and MSFT were tested against SPY.",
+    "payload": {},
+    "created_at": "timestamp",
+    "updated_at": "timestamp"
+  }
+}
+```
+
+**Error rules:**
+- `404 Not Found`: evidence artifact is missing or not owned by the user. The
+  response follows the standard RFC 9457 Problem Details shape with
+  `code = "not_found"`.
+- `422 Validation Error`: malformed body or unsupported `decision_state`. The
+  response follows the standard RFC 9457 Problem Details shape with
+  `code = "validation_error"` and validation details in `context.errors`.
+- `500 Decision Capture Failed`: durable decision capture failed after request
+  validation. The response follows the standard RFC 9457 Problem Details shape
+  with `code = "decision_capture_failed"`. Clients should show a retryable
+  failure state and must not invent a saved decision locally.
+
 ---
 
 # 16. History / Recents
@@ -1882,7 +1976,7 @@ Mixed recent activity feed.
 
 ## `GET /search`
 
-Global omni-search.
+Global omni-search across conversations and typed recall objects.
 
 **Query Params:**
 - `q`
@@ -1898,20 +1992,54 @@ Global omni-search.
       "id": "uuid",
       "title": "Tesla Dip Strategy",
       "matched_text": "...",
-      "updated_at": "timestamp"
+      "updated_at": "timestamp",
+      "conversation_id": "uuid",
+      "lifecycle": null,
+      "preview": null
+    },
+    {
+      "type": "evidence",
+      "id": "uuid",
+      "title": "AAPL, MSFT Buy and Hold",
+      "matched_text": "AAPL and MSFT were tested against SPY.",
+      "updated_at": "timestamp",
+      "conversation_id": "uuid",
+      "lifecycle": "captured",
+      "preview": {
+        "digest": "AAPL and MSFT were tested against SPY.",
+        "symbols": ["AAPL", "MSFT"],
+        "benchmark_symbol": "SPY",
+        "assumptions": ["Benchmark: SPY", "No fees"],
+        "metrics_summary": {
+          "total_return_pct": 12.5
+        },
+        "quick_take": "AAPL and MSFT beat SPY in this historical test."
+      }
     }
   ],
   "next_cursor": null
 }
 ```
 
+`type` enum:
+- `chat`
+- `strategy`
+- `collection`
+- `run`
+- `backtest`
+- `idea`
+- `evidence`
+- `decision`
+
 **Ranking Logic:**
 Results are ranked by:
 1. **Pinned Boost**: Pinned items always appear first.
 2. **Exact Match**: Full title/name match.
 3. **Symbol Match**: Match against symbols in strategies/backtests.
-4. **Recency**: Sorted by `updated_at` within same relevance tier.
-5. **Basic Text Relevance**: Keyword matching in metadata.
+4. **P1 Artifact Priority**: Backtest, Evidence, Decision, and Idea results
+   rank ahead of source conversation wrappers within the same relevance tier.
+5. **Recency**: Sorted by `updated_at` within same relevance and type tier.
+6. **Basic Text Relevance**: Keyword matching in metadata.
 
 **Search Scope:**
 Search is limited to:
@@ -1920,10 +2048,75 @@ Search is limited to:
 - Last message preview (Conversations)
 - Collection names
 - Strategy template labels (e.g. "Momentum Breakout")
+- P1 evidence digests, idea summaries, decision state/note text, and sanitized
+  preview metadata.
 
 *Note: Alpha search does not perform deep indexing of full message bodies or complex template parameters.*
 
+P1 previews must be sanitized owner-only summaries. They must not expose raw
+context packets, route receipts, provider/model metadata, retry payloads,
+conversation transcripts, private memory, internal source-run ids, or internal
+artifact implementation fields. Object identity and product type are carried by
+the top-level `id`, `type`, `conversation_id`, and `lifecycle` fields; `preview`
+is reserved for grounded display context such as digest, symbols, benchmark,
+assumptions, compact metrics summaries, quick take, and breakdown context when
+available.
+
+For typed P1 objects, Omnisearch treats artifacts as first-class results and
+the source conversation as provenance. Evidence-like objects do not expose chat
+owner actions such as rename, archive, or delete.
+
 *Future semantic retrieval may extend this endpoint.*
+
+---
+
+# 17.1 Private Alpha Observability Envelope
+
+P1 defines a stable measurement envelope for future analytics, cost, and eval
+readiness. This is a contract-only surface in the current slice: Argus can build
+and sanitize event envelopes, but live analytics emission remains disabled.
+
+Event envelope schema version: `argus_observability_event/v1`.
+
+Core fields:
+- `schema_version`
+- `event_id`
+- `occurred_at`
+- `environment`
+- `privacy_mode`
+- `event_type`
+- `event_action`
+- `feature_area`
+- `actor_hash`
+- `session_id`
+- `conversation_id`
+- `turn_id`
+- `message_id`
+- `job_id`
+- `backtest_run_id`
+- `route_receipt_id`
+- `provider`
+- `model`
+- `provider_request_id`
+- `upstream_id`
+- `status`
+- `latency_ms`
+- `usage`
+- `cost`
+- `error_category`
+- `sampling_rate`
+- `retention_class`
+- `attributes`
+
+Privacy posture:
+- Default mode is `metadata_only`.
+- The sanitizer removes raw prompts, transcripts, context packets, route
+  receipts, provider/model metadata, auth tokens, API keys, broker credentials,
+  account balances, exact holdings, payment identifiers, and similar sensitive
+  payloads before capture.
+- `capture_event` returns a suppressed result with
+  `reason = "p1_measurement_only"` in this slice. PostHog, cost-ledger tables,
+  and eval-result persistence are future implementation surfaces.
 
 ---
 

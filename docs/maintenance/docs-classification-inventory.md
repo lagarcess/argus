@@ -2,15 +2,22 @@
 
 ## Summary
 
-*   **Canon:** 6
-*   **Current Active Goal:** 1
-*   **Active Staging/Process Context:** 1
-*   **Branch/Lane-Specific Active Context:** 4
-*   **Future/Later Context:** 2
-*   **Maintenance:** 6
-*   **Historical Evidence / Completed Checkpoint:** 21
-*   **Stale/Superseded:** 1
-*   **Unclear/Needs Owner Decision:** 16
+Snapshot note: refreshed after the clean P0 continuity reintegration on
+`codex/private-alpha-next-reintegration` at `bbd9f10`.
+
+Current source stack after the canon docs:
+
+1. `docs/specs/private-alpha-next-roadmap.md` is the active P1 execution board.
+2. `docs/specs/private-alpha-next-decision-memo.md` is the active strategic
+   north star and slice-onboarding source.
+3. `docs/specs/private-alpha-ci-cd-sota.md`,
+   `docs/PRIVATE_LAUNCH_RUNBOOK.md`, and
+   `docs/release-manifests/TEMPLATE.md` are release-discipline references.
+4. `docs/specs/private-alpha-next-integration.md` is staging/process context.
+
+Quarantine branches are reference material only. Do not broad cherry-pick
+runtime work from `codex/private-alpha-next-quarantine-fc231e8`; promote only
+small, reviewed, revertable slices.
 
 Snapshot note: refreshed for the `codex/private-alpha-next` CI/CD SOTA mission.
 For this branch, `docs/specs/private-alpha-ci-cd-sota.md` is the current active
@@ -28,22 +35,24 @@ only.
 | `docs/API_CONTRACT.md` | canon | Defined as canon API contract source of truth. | None | Current |
 | `docs/DATA_MODEL.md` | canon | Defined as canon data model source of truth. | None | Current |
 | `.agent/designs/argus/DESIGN.md` | canon | Explicitly listed as canon design source of truth. | None | Current |
-| `docs/specs/private-alpha-ci-cd-sota.md` | current active goal | Active execution roadmap for `codex/private-alpha-next` release-captain work. | Use as the first non-canon execution source for the current mission. | Current |
-| `docs/specs/private-alpha-next-integration.md` | active staging/process context | Records integration-lane branch mechanics, closed work, and Jules boundaries. No longer owns the current execution order when it conflicts with the CI/CD SOTA spec. | Keep as staging context. | Current context, not command doc |
+| `docs/specs/private-alpha-next-roadmap.md` | current active roadmap | Active P1 board for done/next/deferred labels, slice stop criteria, and integration criteria. | Use as the first non-canon execution source for Private Alpha Next product work. | Created after P0 reintegration |
+| `docs/specs/private-alpha-next-decision-memo.md` | active strategic source | Strategic north star for Private Alpha Next; contains the addenda and details each slice must onboard through. | Read relevant sections before planning or implementation. | Current |
+| `docs/specs/private-alpha-ci-cd-sota.md` | release-discipline reference | Completed CI/CD SOTA plan; still owns canary, manifest, Render validation, and deployment discipline. | Use for release gates, not product sequencing. | Completed/reference |
+| `docs/PRIVATE_LAUNCH_RUNBOOK.md` | release-discipline reference | Operational gate for controlled private-alpha validation and launch steps. | Keep as operator runbook. | Current release ops |
+| `docs/release-manifests/TEMPLATE.md` | release-discipline reference | Template for candidate SHA, env fingerprint, evidence, approver, and rollback target. | Use when producing a candidate manifest. | Current release ops |
+| `docs/specs/private-alpha-next-integration.md` | active staging/process context | Records integration-lane branch mechanics, quarantine rules, closed work, Jules boundaries, and P0 reintegration process. | Keep as staging/process context. | Current context, not command doc |
 | `docs/specs/private-alpha-conversation-trust.md` | historical evidence / completed checkpoint | Marked as merged and deployed checkpoint; useful for conversation-trust design context but not current execution scope. | Keep as historical context. | Completed |
-| `docs/specs/private-alpha-readiness-orchestration.md` | branch-specific active context | Active coordination note for `codex/private-alpha-readiness-clean`; not the current `codex/private-alpha-next` CI/CD execution roadmap. | Keep with branch-scope note. | Readiness lane |
-| `docs/specs/private-alpha-controlled-readiness-panel.md` | branch/lane-specific active context | Controlled-alpha readiness panel for readiness decisions; useful context but not the CI/CD SOTA roadmap. | Keep with readiness-lane scope note. | Readiness lane |
+| `docs/specs/private-alpha-readiness-orchestration.md` | branch-specific active context | Active coordination note for `codex/private-alpha-readiness-clean`; not the current Private Alpha Next P1 roadmap. | Keep with branch-scope note. | Readiness lane |
+| `docs/specs/private-alpha-controlled-readiness-panel.md` | branch/lane-specific active context | Controlled-alpha readiness panel for readiness decisions; useful context but not the active P1 roadmap. | Keep with readiness-lane scope note. | Readiness lane |
 | `docs/specs/private-alpha-performance-readiness-audit.md` | branch/lane-specific active context | Supporting performance addendum for the controlled readiness slice. | Keep with readiness-lane scope note. | Readiness lane |
-| `docs/specs/private-alpha-next-decision-memo.md` | future/later context | Promoted decision memo; user identified it as the later goal after the CI/CD SOTA mission. | Do not implement during the CI/CD SOTA milestone unless explicitly resumed. | Future |
 | `docs/specs/evidence-aware-idea-loop.md` | future/later context | Active refined product spec for the post-conversation-trust direction. It keeps direct test, education, light evidence, deep research, and monitoring as lanes into one durable idea loop. | Keep as future product context. | Future |
 | `docs/specs/research-lab-thesis.md` | historical evidence | Earlier Research Lab thesis draft. It is retained for context and explicitly refined by `docs/specs/evidence-aware-idea-loop.md`. | Keep as historical context. | Superseded by active evidence-aware loop spec. |
 | `docs/specs/private-alpha-backtest-execution-capacity.md` | unclear/needs owner decision | Draft from 2026-06-05, frames architecture questions before scaling. Not clearly an active spec for the current milestone, nor pure historical evidence. | Determine if this is an active spec or historical. |  |
 | `docs/specs/agent-architecture.md` | historical evidence | Proposed architecture from 2026-04-29. Predates the conversation trust milestone. | Add historical banner. | Stale date. |
 | `docs/CONVERSATIONAL_RUNTIME.md` | unclear/needs owner decision | Status is "Active Alpha implementation", but unclear if it's canon, active spec, or superseded by `docs/ARCHITECTURE.md`. | Decide if canon or stale/superseded. |  |
-| `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` | archived/superseded | Explicitly marked "> Historical plan. This document records an earlier launch-closure checklist and should not be treated as the current milestone source of truth." | Archived under `docs/archive/`; use `docs/specs/private-alpha-conversation-trust.md` for the completed trust checkpoint and `docs/specs/private-alpha-ci-cd-sota.md` for the active CI/CD gate. | Explicitly stale. |
+| `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` | archived/superseded | Explicitly marked "> Historical plan. This document records an earlier launch-closure checklist and should not be treated as the current milestone source of truth." | Archived under `docs/archive/`; use `docs/specs/private-alpha-conversation-trust.md` for the completed trust checkpoint and `docs/specs/private-alpha-ci-cd-sota.md` for release-gate discipline. | Explicitly stale. |
 | `docs/ARGUS_SYSTEM_STEERING.md` | historical evidence | "Pre-private-launch steering reference... planning reference, not an implementation ticket" from 2026-05-19. | Add historical banner. |  |
 | `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md` | unclear/needs owner decision | QA script. Could be canon process, or an active spec, or archive if out of date. | Clarify if this QA process is still active. | Uses legacy orchestrator path? |
-| `docs/PRIVATE_LAUNCH_RUNBOOK.md` | branch/lane-specific active context | Current operational gate for the controlled private-alpha readiness sprint. Useful for release operations, but not the CI/CD SOTA spec source. | Keep as operational runbook context. | Readiness/runbook lane |
 | `docs/PRODUCTION_READINESS_AUDIT.md` | historical evidence | Audit for `codex/production-readiness-gap-implementation` from 2026-05-05. | Add historical banner. |  |
 | `docs/superpowers/plans/2026-05-06-streaming-persistence-ui-orchestration.md` | historical evidence | Implementation plan for Phase 5 from 2026-05-06. | Add historical banner. |  |
 | `docs/superpowers/plans/2026-05-12-conversational-contract-hardening.md` | historical evidence | Implementation plan from 2026-05-12. | Add historical banner. |  |
@@ -82,11 +91,13 @@ only.
 | `docs/maintenance/spanish-readiness-inventory.md` | maintenance | Inventory of Spanish readiness. | Keep updated as translations progress. | |
 
 
-## Banner Applied Summary
+## Prior Banner Pass Summary
 
-### Files receiving 'Historical' banner:
+This records a previous docs-janitor pass. It is not the active source order;
+use the inventory table above for current classification.
+
+### Files that already carry or were recommended for historical treatment:
 - `docs/ARGUS_SYSTEM_STEERING.md` -> AGENTS.md, docs/specs/private-alpha-next-integration.md
-- `docs/PRIVATE_LAUNCH_RUNBOOK.md` -> docs/specs/private-alpha-conversation-trust.md
 - `docs/PRODUCTION_READINESS_AUDIT.md` -> docs/specs/private-alpha-conversation-trust.md
 - `docs/specs/agent-architecture.md` -> docs/ARCHITECTURE.md
 - `docs/superpowers/plans/2026-04-29-conversational-backtest-agent-runtime.md`
@@ -106,7 +117,7 @@ only.
 - `docs/superpowers/specs/2026-05-15-artifact-runtime-milestone-checkpoint.md`
 - `docs/superpowers/specs/2026-05-17-sidebar-revamp-runtime-parity-qa.md`
 
-### Files receiving 'Superseded' banner:
+### Files that already carry or were recommended for superseded treatment:
 - `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` -> docs/specs/private-alpha-conversation-trust.md
 
 ### Files intentionally skipped (unclear/needs owner decision):

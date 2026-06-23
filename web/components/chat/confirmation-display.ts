@@ -85,6 +85,15 @@ const LABEL_KEY_TO_ROW_KEY = Object.fromEntries(
   ]),
 ) as Record<string, StrategyConfirmationRowKey>;
 
+const NON_ACTIONABLE_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
+  "could_not_run",
+  "draft_canceled",
+  "not_completed",
+  "request_sent",
+  "run_complete",
+  "running",
+]);
+
 function hasOwn<T extends object>(object: T, key: PropertyKey): key is keyof T {
   return Object.prototype.hasOwnProperty.call(object, key);
 }
@@ -142,6 +151,12 @@ export function confirmationStatusFromPayload(
     return "updated";
   }
   return "ready_to_run";
+}
+
+export function confirmationStatusAllowsActions(
+  status: StrategyConfirmationStatus,
+): boolean {
+  return !NON_ACTIONABLE_CONFIRMATION_STATUSES.has(status);
 }
 
 export function confirmationActionStatus(

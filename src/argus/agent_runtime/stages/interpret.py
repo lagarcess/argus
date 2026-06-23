@@ -7,9 +7,18 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, cast, get_args
 
+from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
+from argus.agent_runtime.artifacts.asset_edits import (
+    normalized_asset_universe_operation,
+    same_asset_universe,
+)
 from argus.agent_runtime.artifacts.patch_policy import (
     executable_artifact_patch_missing_fields,
     relevant_unsupported_constraints_for_artifact_patch,
+)
+from argus.agent_runtime.artifacts.strategy_edits import (
+    ArtifactPatch,
+    apply_artifact_patch,
 )
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
@@ -143,6 +152,7 @@ from argus.domain.indicators import (
 from argus.domain.market_data import resolve_asset
 from argus.llm.openrouter import invoke_openrouter_chat_completion
 from argus.nlp.natural_time import (
+    date_range_evidence_has_explicit_endpoints,
     dateparser_languages_for_user_language,
     parse_date_text,
     resolve_date_range_endpoint_patch,
@@ -155,6 +165,11 @@ _DEFAULT_RESOLVE_ASSET = resolve_asset
 _STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
 _LATEST_RESULT_SAVE_REQUESTED_REASON = "latest_result_save_requested"
 _BACKTEST_ASSET_CLASSES = frozenset(get_args(BacktestAssetClass))
+_DATE_RANGE_EVIDENCE_KEYS = (
+    "date_range",
+    "date_range_raw_text",
+    "date_range_intent",
+)
 _USER_GROUNDED_CAPITAL_SOURCES = frozenset(
     {
         "explicit_user",
@@ -239,9 +254,11 @@ async def interpret_stage_async(
     selected_metadata = dict(selected_thread_metadata or {})
     if structured_interpreter is None:
         return await _interpreter_unavailable_result(
+            state=state,
             user=user,
             snapshot=snapshot,
             current_user_message=state.current_user_message,
+            capability_contract=capability_contract,
             selected_thread_metadata=selected_metadata,
         )
 
@@ -258,9 +275,11 @@ async def interpret_stage_async(
     if interpretation is None:
         logger.debug("Interpret stage structured interpreter returned no result")
         return await _interpreter_unavailable_result(
+            state=state,
             user=user,
             snapshot=snapshot,
             current_user_message=state.current_user_message,
+            capability_contract=capability_contract,
             selected_thread_metadata=selected_metadata,
         )
     logger.debug(
@@ -330,6 +349,7 @@ def _pending_date_answer_route_repair_interpretation(
             today=current_date,
             endpoint="end",
             languages=languages,
+            prefer_dates_from="past",
         )
         if endpoint is None:
             return None
@@ -655,11 +675,15 @@ async def _stage_result_from_interpretation(
         strategy, validated_benchmark_reason_codes = (
             _strategy_with_validated_benchmark_symbol(strategy)
         )
+        strategy, default_benchmark_reason_codes = _strategy_with_default_benchmark(
+            strategy
+        )
         benchmark_reason_codes = [
             *benchmark_reason_codes,
             *current_message_asset_grounding_reason_codes,
             *separate_benchmark_reason_codes,
             *validated_benchmark_reason_codes,
+            *default_benchmark_reason_codes,
         ]
     strategy, optional_parameter_values = _route_contextual_money_answer(
         strategy=strategy,
@@ -1077,7 +1101,10 @@ def _strategy_with_current_message_run_field_contract(
     language: str,
 ) -> tuple[StrategySummary, StructuredInterpretation]:
     del current_user_message
-    raw_date_range = _explicit_date_range_from_strategy_for_repair(strategy)
+    raw_date_range = _explicit_date_range_from_strategy_for_repair(
+        strategy,
+        language=language,
+    )
     date_range, date_endpoint_patch_applied = (
         _complete_current_message_date_endpoint_patch(
             strategy=strategy,
@@ -1174,12 +1201,14 @@ def _complete_current_message_date_endpoint_patch(
 ) -> tuple[dict[str, str] | None, bool]:
     if date_range is None:
         return date_range, False
+    current_date = date.today()
     rolling_patch = _rolling_window_range_from_endpoint_patch(
         strategy.extra_parameters.get("date_range_intent"),
         date_range=date_range,
         prior_date_range=prior_date_range,
         date_range_raw_text=strategy.extra_parameters.get("date_range_raw_text"),
         language=language,
+        today=current_date,
     )
     if rolling_patch is not None:
         return rolling_patch, True
@@ -1211,6 +1240,7 @@ def _rolling_window_range_from_endpoint_patch(
     prior_date_range: Any = None,
     date_range_raw_text: Any = None,
     language: str | None = None,
+    today: date | None = None,
 ) -> dict[str, str] | None:
     if not isinstance(date_range_intent, dict):
         return None
@@ -1223,10 +1253,12 @@ def _rolling_window_range_from_endpoint_patch(
         prior_date_range=prior_date_range,
         date_range_raw_text=date_range_raw_text,
         language=language,
+        today=today,
     )
     resolved = resolve_date_range_endpoint_patch(
         base_intent,
         endpoint_patch,
+        today=today,
     )
     return resolved.payload if resolved is not None else None
 
@@ -1238,6 +1270,7 @@ def _endpoint_patch_with_inferred_endpoint(
     prior_date_range: Any,
     date_range_raw_text: Any,
     language: str | None,
+    today: date | None,
 ) -> dict[str, Any]:
     endpoint = str(date_range_intent.get("endpoint") or "").strip()
     if endpoint in {"start", "end"}:
@@ -1246,6 +1279,7 @@ def _endpoint_patch_with_inferred_endpoint(
         endpoint_value = _endpoint_date_from_bounded_text(
             date_range_raw_text,
             language=language,
+            today=today,
         )
         if endpoint_value is None:
             return date_range_intent
@@ -1269,13 +1303,16 @@ def _endpoint_date_from_bounded_text(
     value: Any,
     *,
     language: str | None,
+    today: date | None,
 ) -> str | None:
     text = str(value or "").strip()
     if not text:
         return None
     parsed = parse_date_text(
         text,
+        today=today,
         languages=dateparser_languages_for_user_language(language),
+        prefer_dates_from="past",
     )
     return parsed.isoformat() if parsed is not None else None
 
@@ -1309,12 +1346,37 @@ def _changed_date_endpoint(
 
 def _explicit_date_range_from_strategy_for_repair(
     strategy: StrategySummary,
+    *,
+    language: str | None,
 ) -> dict[str, str] | None:
+    current_date = date.today()
     intent = strategy.extra_parameters.get("date_range_intent")
+    intent_kind = (
+        str(intent.get("kind") or "").strip() if isinstance(intent, dict) else ""
+    )
+    bounded_evidence_range = (
+        None
+        if intent_kind == "endpoint_patch"
+        else _date_range_from_strategy_bounded_evidence(
+            strategy,
+            language=language,
+            today=current_date,
+        )
+    )
+    intent_range: dict[str, str] | None = None
     if isinstance(intent, dict):
-        resolved = resolve_date_range_intent(intent)
+        resolved = resolve_date_range_intent(intent, today=current_date)
         if resolved is not None:
-            return resolved.payload
+            intent_range = resolved.payload
+    if bounded_evidence_range is not None:
+        if intent_range is None:
+            return bounded_evidence_range
+        if _date_range_endpoints(bounded_evidence_range) != _date_range_endpoints(
+            intent_range
+        ):
+            return bounded_evidence_range
+    if intent_range is not None:
+        return intent_range
     if isinstance(strategy.date_range, dict):
         payload = {
             key: str(value)
@@ -1323,6 +1385,46 @@ def _explicit_date_range_from_strategy_for_repair(
         }
         return payload or None
     return None
+
+
+def _date_range_from_strategy_bounded_evidence(
+    strategy: StrategySummary,
+    *,
+    language: str | None,
+    today: date,
+) -> dict[str, str] | None:
+    candidates = _strategy_date_evidence_candidates(strategy)
+    if not candidates:
+        return None
+    languages = dateparser_languages_for_user_language(language)
+    for candidate in candidates:
+        resolved = resolve_date_range_text(candidate, today=today, languages=languages)
+        if resolved is None:
+            continue
+        if not date_range_evidence_has_explicit_endpoints(resolved.evidence_spans):
+            continue
+        return resolved.payload
+    return None
+
+
+def _strategy_date_evidence_candidates(strategy: StrategySummary) -> list[str]:
+    candidates: list[str] = []
+    extra_parameters = dict(strategy.extra_parameters or {})
+    raw_text = extra_parameters.get("date_range_raw_text")
+    if raw_text not in (None, "", [], {}):
+        candidates.append(str(raw_text))
+    intent = extra_parameters.get("date_range_intent")
+    if isinstance(intent, dict):
+        evidence = intent.get("evidence")
+        if evidence not in (None, "", [], {}):
+            candidates.append(str(evidence))
+    evidence_spans = extra_parameters.get("evidence_spans")
+    if isinstance(evidence_spans, dict):
+        for key in _DATE_RANGE_EVIDENCE_KEYS:
+            value = evidence_spans.get(key)
+            if value not in (None, "", [], {}):
+                candidates.append(str(value))
+    return list(dict.fromkeys(candidate.strip() for candidate in candidates if candidate.strip()))
 
 
 def _strategy_date_range_needs_current_message_repair(
@@ -3134,9 +3236,11 @@ def _offline_interpreter_unavailable_result(
 
 async def _interpreter_unavailable_result(
     *,
+    state: RunState,
     user: UserState,
     snapshot: TaskSnapshot | None = None,
     current_user_message: str = "",
+    capability_contract: Any,
     selected_thread_metadata: dict[str, Any] | None = None,
 ) -> StageResult:
     result_followup = await _latest_result_followup_when_interpreter_unavailable(
@@ -3148,9 +3252,11 @@ async def _interpreter_unavailable_result(
         return result_followup
     active_confirmation_followup = (
         await _active_confirmation_followup_when_interpreter_unavailable(
+            state=state,
             user=user,
             snapshot=snapshot,
             current_user_message=current_user_message,
+            capability_contract=capability_contract,
             selected_thread_metadata=selected_thread_metadata or {},
         )
     )
@@ -3164,11 +3270,118 @@ async def _interpreter_unavailable_result(
     )
 
 
+async def _planned_active_confirmation_edit_when_interpreter_unavailable(
+    *,
+    state: RunState,
+    user: UserState,
+    snapshot: TaskSnapshot,
+    current_user_message: str,
+    capability_contract: Any,
+    selected_thread_metadata: dict[str, Any],
+) -> StageResult | None:
+    prior_strategy = snapshot.pending_strategy_summary
+    active_confirmation = snapshot.active_confirmation_reference
+    if prior_strategy is None or active_confirmation is None:
+        return None
+    def _resolve_candidate(query: str) -> AssetResolution | None:
+        return _resolve_asset_candidate_safely(
+            query,
+            field="asset_universe[0]",
+            source="user_mention",
+        )
+
+    current_mentions = {
+        symbol
+        for mention in provider_ticker_mentions_from_text(
+            current_user_message,
+            resolve_candidate=_resolve_candidate,
+            excluded_tokens=current_message_execution_context_tokens(
+                current_user_message,
+                strategy_type=prior_strategy.strategy_type,
+            ),
+            limit=10,
+        )
+        if (
+            symbol := _normalized_symbol(
+                getattr(mention.asset, "canonical_symbol", None)
+            )
+        )
+        is not None
+    }
+    prior_symbols = {
+        str(symbol or "").strip().upper()
+        for symbol in prior_strategy.asset_universe
+        if str(symbol or "").strip()
+    }
+    prior_benchmark = str(prior_strategy.comparison_baseline or "").strip().upper()
+    prior_context_symbols = set(prior_symbols)
+    if prior_benchmark:
+        prior_context_symbols.add(prior_benchmark)
+    if not current_mentions or current_mentions <= prior_context_symbols:
+        return None
+    plan = await plan_artifact_assumption_edit(
+        current_user_message=current_user_message,
+        prior_strategy=prior_strategy.model_dump(mode="json"),
+        active_confirmation=active_confirmation.model_dump(mode="json"),
+        preferred_model="",
+    )
+    if plan is None or plan.outcome != "ready_to_confirm":
+        return None
+    candidate = StrategySummary(raw_user_phrasing=current_user_message)
+    field_provenance: dict[str, str] = {}
+    if plan.asset_universe:
+        operation = normalized_asset_universe_operation(
+            plan.asset_universe_operation
+        )
+        if operation is None:
+            if not same_asset_universe(
+                plan.asset_universe,
+                prior_strategy.asset_universe,
+            ):
+                return None
+        else:
+            candidate.asset_universe = list(plan.asset_universe)
+            candidate.extra_parameters["asset_universe_operation"] = operation
+            field_provenance["asset_universe"] = "explicit_user"
+    if plan.comparison_baseline is not None:
+        baseline = str(plan.comparison_baseline or "").strip().upper()
+        if baseline:
+            candidate.comparison_baseline = baseline
+            field_provenance["comparison_baseline"] = "explicit_user"
+    if not field_provenance:
+        return None
+    candidate.extra_parameters["field_provenance"] = field_provenance
+    interpretation = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary=(
+            plan.user_goal_summary
+            or "User changed a visible confirmation assumption."
+        ),
+        candidate_strategy_draft=candidate,
+        confidence=plan.confidence,
+        reason_codes=["artifact_assumption_edit_planned"],
+        semantic_turn_act="answer_pending_need",
+        artifact_target="active_confirmation",
+    )
+    return await _stage_result_from_interpretation(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        interpretation=interpretation,
+        capability_contract=capability_contract,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+
+
 async def _active_confirmation_followup_when_interpreter_unavailable(
     *,
+    state: RunState,
     user: UserState,
     snapshot: TaskSnapshot | None,
     current_user_message: str,
+    capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
     if (
@@ -3183,6 +3396,16 @@ async def _active_confirmation_followup_when_interpreter_unavailable(
         selected_thread_metadata=selected_thread_metadata,
     ):
         return None
+    planned_edit = await _planned_active_confirmation_edit_when_interpreter_unavailable(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        current_user_message=current_user_message,
+        capability_contract=capability_contract,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    if planned_edit is not None:
+        return planned_edit
     strategy = snapshot.pending_strategy_summary
     setup_phrase = _current_setup_phrase(strategy)
     assumptions_response = _draft_assumptions_response(snapshot)
@@ -3630,6 +3853,22 @@ def _strategy_with_contextual_merge(
                 current_user_message=current_user_message,
                 selected_thread_metadata=selected_thread_metadata,
             )
+        if key == "asset_universe":
+            operation = normalized_asset_universe_operation(
+                strategy.extra_parameters.get("asset_universe_operation")
+            )
+            if operation is None and same_asset_universe(value, merged.asset_universe):
+                continue
+            operation = operation or "replace"
+            merged = apply_artifact_patch(
+                merged,
+                ArtifactPatch(
+                    source="llm_patch",
+                    asset_universe=value,
+                    asset_universe_operation=operation,
+                ),
+            )
+            continue
         if key == "extra_parameters":
             if preserve_prior_family and isinstance(value, dict):
                 value = {
@@ -4017,6 +4256,8 @@ def _merge_contextual_extra_parameters(
 ) -> dict[str, Any]:
     merged = dict(base or {})
     for key, value in incoming.items():
+        if key == "asset_universe_operation":
+            continue
         if value in (None, "", [], {}):
             continue
         if (
@@ -4852,6 +5093,24 @@ def _strategy_with_separate_benchmark_symbol(
     return updated, ["benchmark_symbol_removed_from_asset_universe"]
 
 
+def _strategy_with_default_benchmark(
+    strategy: StrategySummary,
+) -> tuple[StrategySummary, list[str]]:
+    if _normalized_symbol(strategy.comparison_baseline):
+        return strategy, []
+    if not strategy.asset_class:
+        return strategy, []
+    benchmark = _default_benchmark_for_asset_class(
+        strategy.asset_class,
+        symbols=strategy.asset_universe,
+    )
+    if benchmark is None:
+        return strategy, []
+    updated = strategy.model_copy(deep=True)
+    updated.comparison_baseline = benchmark
+    return updated, ["default_benchmark_applied"]
+
+
 def _strategy_with_unstated_benchmark_guard(
     *,
     strategy: StrategySummary,
@@ -4873,12 +5132,27 @@ def _strategy_with_unstated_benchmark_guard(
     )
     if prior_benchmark == benchmark:
         return strategy, []
+    if _strategy_uses_safe_default_benchmark(strategy, benchmark):
+        return strategy, []
     updated = strategy.model_copy(deep=True)
     if prior_benchmark is not None:
         updated.comparison_baseline = prior_benchmark
         return updated, ["unstated_benchmark_symbol_reverted"]
     updated.comparison_baseline = None
     return updated, ["unstated_benchmark_symbol_cleared"]
+
+
+def _strategy_uses_safe_default_benchmark(
+    strategy: StrategySummary,
+    benchmark: str,
+) -> bool:
+    if not strategy.asset_class or not strategy.asset_universe:
+        return False
+    default_benchmark = _default_benchmark_for_asset_class(
+        strategy.asset_class,
+        symbols=strategy.asset_universe,
+    )
+    return default_benchmark == benchmark
 
 
 def _strategy_with_validated_benchmark_symbol(

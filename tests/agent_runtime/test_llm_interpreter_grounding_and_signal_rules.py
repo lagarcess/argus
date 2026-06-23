@@ -1524,10 +1524,8 @@ async def test_llm_interpreter_plans_active_artifact_assumption_edit_after_model
         )
     )
 
-    assert calls == [
-        "LLMInterpretationResponse",
-        "ArtifactAssumptionEditPlan",
-    ]
+    assert calls[0] == "LLMInterpretationResponse"
+    assert "ArtifactAssumptionEditPlan" in calls
     assert result is not None
     assert result.intent == "backtest_execution"
     assert result.semantic_turn_act == "answer_pending_need"
@@ -1536,6 +1534,107 @@ async def test_llm_interpreter_plans_active_artifact_assumption_edit_after_model
         "capital_amount": "starting_capital"
     }
     assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_plans_active_artifact_benchmark_after_prose_only_response(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="conversation_followup",
+                task_relation="continue",
+                requires_clarification=False,
+                assistant_response=(
+                    "I can update the visible confirmation card to use QQQ."
+                ),
+                user_goal_summary="User asked to change the benchmark.",
+                candidate_strategy_draft=LLMStrategyDraft(),
+                semantic_turn_act="result_followup",
+            )
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed the visible benchmark.",
+            comparison_baseline="QQQ",
+            confidence=0.93,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2023-01-01", "end": "2026-06-19"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message=(
+                "compare it to QQQ, keep the same assets and dates"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=pending,
+                active_confirmation_reference=ArtifactReference(
+                    artifact_kind="confirmation",
+                    artifact_id="confirmation-1",
+                    artifact_status="active",
+                    metadata={"strategy": pending.model_dump(mode="json")},
+                ),
+            ),
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert result is not None
+    assert result.intent == "backtest_execution"
+    assert result.assistant_response is None
+    assert result.candidate_strategy_draft.comparison_baseline == "QQQ"
+    assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
+        "comparison_baseline": "explicit_user"
+    }
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_llm_interpreter_plans_underfilled_active_artifact_assumption_edit(
@@ -1617,10 +1716,8 @@ async def test_llm_interpreter_plans_underfilled_active_artifact_assumption_edit
         )
     )
 
-    assert calls == [
-        "LLMInterpretationResponse",
-        "ArtifactAssumptionEditPlan",
-    ]
+    assert calls[0] == "LLMInterpretationResponse"
+    assert "ArtifactAssumptionEditPlan" in calls
     assert result is not None
     assert result.intent == "backtest_execution"
     assert result.candidate_strategy_draft.capital_amount == 5000
@@ -1628,6 +1725,401 @@ async def test_llm_interpreter_plans_underfilled_active_artifact_assumption_edit
         "capital_amount": "starting_capital"
     }
     assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_plans_active_artifact_asset_append_after_model_failure(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            raise TimeoutError("general interpreter timed out")
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User added Microsoft to the visible draft.",
+            asset_universe=["MSFT"],
+            asset_universe_operation="append",
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message="Include MSFT too, keep everything else the same.",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold Apple.",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    date_range={"start": "2025-01-01", "end": "2026-06-05"},
+                    capital_amount=10000,
+                    timeframe="1D",
+                    comparison_baseline="SPY",
+                ),
+                active_confirmation_reference=ArtifactReference(
+                    artifact_kind="confirmation",
+                    artifact_id="confirmation-1",
+                    artifact_status="active",
+                ),
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls[0] == "LLMInterpretationResponse"
+    assert "ArtifactAssumptionEditPlan" in calls
+    assert result is not None
+    assert result.intent == "backtest_execution"
+    assert result.semantic_turn_act == "answer_pending_need"
+    assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
+    assert result.candidate_strategy_draft.extra_parameters[
+        "asset_universe_operation"
+    ] == "append"
+    assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
+        "asset_universe": "explicit_user"
+    }
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_plans_active_artifact_benchmark_edit_after_model_clarification(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="conversation_followup",
+                task_relation="continue",
+                requires_clarification=True,
+                user_goal_summary="User might want a QQQ comparison.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing="compare it to QQQ",
+                    asset_universe=["QQQ"],
+                    asset_class="equity",
+                ),
+                assistant_response=(
+                    "Use the card controls to change the benchmark to QQQ."
+                ),
+                semantic_turn_act="educational_question",
+            )
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed the visible benchmark.",
+            comparison_baseline="QQQ",
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message="compare it to QQQ, keep the same assets and dates",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+                    asset_universe=["AAPL", "MSFT", "TSLA"],
+                    asset_class="equity",
+                    date_range={"start": "2023-01-01", "end": "today"},
+                    capital_amount=100000,
+                    timeframe="1D",
+                    comparison_baseline="SPY",
+                ),
+                active_confirmation_reference=ArtifactReference(
+                    artifact_kind="confirmation",
+                    artifact_id="confirmation-1",
+                    artifact_status="active",
+                ),
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls[0] == "LLMInterpretationResponse"
+    assert "ArtifactAssumptionEditPlan" in calls
+    assert result is not None
+    assert result.intent == "backtest_execution"
+    assert result.semantic_turn_act == "answer_pending_need"
+    assert result.candidate_strategy_draft.asset_universe == []
+    assert result.candidate_strategy_draft.comparison_baseline == "QQQ"
+    assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
+        "comparison_baseline": "explicit_user"
+    }
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_plans_active_artifact_benchmark_edit_when_model_restates_prior_setup(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User continued the visible draft.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing=(
+                        "compare it to QQQ, keep the same assets and dates"
+                    ),
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+                    asset_universe=["AAPL", "MSFT", "TSLA"],
+                    asset_class="equity",
+                    date_range={"start": "2023-01-01", "end": "today"},
+                    capital_amount=100000,
+                    timeframe="1D",
+                    comparison_baseline="SPY",
+                ),
+                semantic_turn_act="refine_current_idea",
+            )
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed the visible benchmark.",
+            comparison_baseline="QQQ",
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message="compare it to QQQ, keep the same assets and dates",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+                    asset_universe=["AAPL", "MSFT", "TSLA"],
+                    asset_class="equity",
+                    date_range={"start": "2023-01-01", "end": "today"},
+                    capital_amount=100000,
+                    timeframe="1D",
+                    comparison_baseline="SPY",
+                ),
+                active_confirmation_reference=ArtifactReference(
+                    artifact_kind="confirmation",
+                    artifact_id="confirmation-1",
+                    artifact_status="active",
+                ),
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert result is not None
+    assert result.intent == "backtest_execution"
+    assert result.semantic_turn_act == "answer_pending_need"
+    assert result.candidate_strategy_draft.asset_universe == []
+    assert result.candidate_strategy_draft.comparison_baseline == "QQQ"
+    assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
+        "comparison_baseline": "explicit_user"
+    }
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_plans_active_artifact_asset_operation_when_model_keeps_benchmark(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="strategy_drafting",
+                task_relation="refine",
+                requires_clarification=False,
+                user_goal_summary="El usuario agregó dos activos.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing="agrega GOOGL y NVDA",
+                    strategy_type="buy_and_hold",
+                    asset_universe=["GOOGL", "NVDA"],
+                    asset_class="equity",
+                    comparison_baseline="QQQ",
+                    field_provenance={
+                        "asset_universe": "explicit_user",
+                        "comparison_baseline": "explicit_user",
+                    },
+                ),
+                semantic_turn_act="refine_current_idea",
+            )
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="El usuario agregó dos activos.",
+            asset_universe=["GOOGL", "NVDA"],
+            asset_universe_operation="append",
+            confidence=0.93,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message="agrega GOOGL y NVDA",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+                    asset_universe=["AAPL", "MSFT", "TSLA"],
+                    asset_class="equity",
+                    date_range={"start": "2023-01-01", "end": "2026-06-19"},
+                    capital_amount=100000,
+                    timeframe="1D",
+                    comparison_baseline="QQQ",
+                ),
+                active_confirmation_reference=ArtifactReference(
+                    artifact_kind="confirmation",
+                    artifact_id="confirmation-1",
+                    artifact_status="active",
+                ),
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1", language_preference="es-419"),
+        )
+    )
+
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert result is not None
+    assert result.intent == "backtest_execution"
+    assert result.semantic_turn_act == "answer_pending_need"
+    assert result.candidate_strategy_draft.asset_universe == ["GOOGL", "NVDA"]
+    assert result.candidate_strategy_draft.extra_parameters[
+        "asset_universe_operation"
+    ] == "append"
+    assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
+        "asset_universe": "explicit_user"
+    }
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_artifact_assumption_edit_planner_supports_dca_recurring_contribution(
@@ -1674,6 +2166,180 @@ async def test_artifact_assumption_edit_planner_supports_dca_recurring_contribut
     assert plan.recurring_contribution_amount == 200
     assert plan.cadence == "weekly"
 
+
+@pytest.mark.asyncio
+async def test_artifact_assumption_edit_planner_supports_asset_replace(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User replaced the visible traded assets.",
+            asset_universe=["AMD", "INTC"],
+            asset_universe_operation="replace",
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    plan = await artifact_edit_planner.plan_artifact_assumption_edit(
+        current_user_message="reemplázalas con AMD e INTC",
+        prior_strategy={
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL", "MSFT"],
+            "date_range": {"start": "2024-01-01", "end": "today"},
+        },
+        active_confirmation=None,
+        preferred_model="test-model",
+    )
+
+    assert plan is not None
+    assert plan.asset_universe == ["AMD", "INTC"]
+    assert plan.asset_universe_operation == "replace"
+
+
+@pytest.mark.asyncio
+async def test_artifact_assumption_edit_planner_rejects_asset_edit_without_operation(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed the visible traded assets.",
+            asset_universe=["GOOGL", "NVDA"],
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    plan = await artifact_edit_planner.plan_artifact_assumption_edit(
+        current_user_message="add GOOGL and NVDA",
+        prior_strategy={
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL", "MSFT", "TSLA"],
+            "comparison_baseline": "QQQ",
+            "date_range": {"start": "2023-01-01", "end": "today"},
+        },
+        active_confirmation=None,
+        preferred_model="test-model",
+    )
+
+    assert plan is None
+
+
+@pytest.mark.asyncio
+async def test_artifact_assumption_edit_planner_allows_same_assets_without_operation(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed the visible benchmark.",
+            asset_universe=["TSLA", "AAPL", "MSFT"],
+            comparison_baseline="QQQ",
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    plan = await artifact_edit_planner.plan_artifact_assumption_edit(
+        current_user_message="compare the same setup to QQQ",
+        prior_strategy={
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL", "MSFT", "TSLA"],
+            "comparison_baseline": "SPY",
+            "date_range": {"start": "2023-01-01", "end": "today"},
+        },
+        active_confirmation=None,
+        preferred_model="test-model",
+    )
+
+    assert plan is not None
+    assert plan.comparison_baseline == "QQQ"
+
+
+@pytest.mark.asyncio
+async def test_artifact_assumption_edit_planner_supports_benchmark_edit(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed the visible benchmark.",
+            comparison_baseline="QQQ",
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    plan = await artifact_edit_planner.plan_artifact_assumption_edit(
+        current_user_message="compare it to QQQ",
+        prior_strategy={
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL", "MSFT", "TSLA"],
+            "comparison_baseline": "SPY",
+            "date_range": {"start": "2023-01-01", "end": "today"},
+        },
+        active_confirmation=None,
+        preferred_model="test-model",
+    )
+
+    assert plan is not None
+    assert plan.comparison_baseline == "QQQ"
+
+
 def test_artifact_assumption_edit_plan_maps_dca_recurring_contribution() -> None:
     from argus.agent_runtime import artifact_edit_planner
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -1719,6 +2385,91 @@ def test_artifact_assumption_edit_plan_maps_dca_recurring_contribution() -> None
     assert draft.field_provenance["cadence"] == "explicit_user"
     assert draft.extra_parameters["recurring_contribution"] == 200
     assert draft.extra_parameters["recurring_cadence"] == "weekly"
+
+
+def test_artifact_assumption_edit_plan_maps_asset_operation() -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    plan = artifact_edit_planner.ArtifactAssumptionEditPlan(
+        outcome="ready_to_confirm",
+        user_goal_summary="User added Microsoft to the visible draft.",
+        asset_universe=["MSFT"],
+        asset_universe_operation="append",
+        confidence=0.91,
+    )
+
+    response = interpreter_module._response_from_artifact_assumption_edit_plan(
+        plan=plan,
+        request=InterpretationRequest(
+            current_user_message="agrega MSFT",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    date_range={"start": "2024-01-01", "end": "today"},
+                )
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = response.candidate_strategy_draft
+    assert draft.asset_universe == ["MSFT"]
+    assert draft.extra_parameters["asset_universe_operation"] == "append"
+    assert draft.field_provenance == {"asset_universe": "explicit_user"}
+
+
+def test_artifact_assumption_edit_plan_maps_benchmark() -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    plan = artifact_edit_planner.ArtifactAssumptionEditPlan(
+        outcome="ready_to_confirm",
+        user_goal_summary="User changed the visible benchmark.",
+        comparison_baseline="QQQ",
+        confidence=0.91,
+    )
+
+    response = interpreter_module._response_from_artifact_assumption_edit_plan(
+        plan=plan,
+        request=InterpretationRequest(
+            current_user_message="compare it to QQQ",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL", "MSFT", "TSLA"],
+                    asset_class="equity",
+                    date_range={"start": "2023-01-01", "end": "today"},
+                    comparison_baseline="SPY",
+                )
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = response.candidate_strategy_draft
+    assert draft.asset_universe == []
+    assert draft.comparison_baseline == "QQQ"
+    assert draft.field_provenance == {"comparison_baseline": "explicit_user"}
+
+
+def test_strategy_from_llm_preserves_asset_operation_in_extra_parameters() -> None:
+    strategy = _strategy_from_llm(
+        LLMStrategyDraft(
+            asset_universe=["MSFT"],
+            asset_universe_operation="append",
+        )
+    )
+
+    assert strategy.asset_universe == ["MSFT"]
+    assert strategy.extra_parameters["asset_universe_operation"] == "append"
+
 
 def test_signal_rule_plan_promotes_macd_crossover_to_ready_rule_spec() -> None:
     response = LLMInterpretationResponse(

@@ -21,6 +21,16 @@ BacktestStatus = Literal["queued", "running", "completed", "failed"]
 BacktestJobStatus = Literal[
     "queued", "running", "succeeded", "failed", "canceled", "expired"
 ]
+ArtifactLifecycle = Literal[
+    "captured",
+    "reviewed",
+    "saved",
+    "decided",
+    "archived",
+    "discarded",
+]
+EvidenceArtifactType = Literal["backtest"]
+DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
 StrategyTemplate = Literal[
@@ -281,6 +291,76 @@ class BacktestJobResponse(BaseModel):
     result_readout_failure_mode: str | None = None
 
 
+class Idea(BaseModel):
+    id: str
+    source_conversation_id: str | None = None
+    title: str
+    summary: str
+    lifecycle: ArtifactLifecycle = "captured"
+    active_version_id: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class IdeaVersion(BaseModel):
+    id: str
+    idea_id: str
+    source_conversation_id: str | None = None
+    source_run_id: str | None = None
+    version_number: int = 1
+    canonical_spec: dict[str, Any]
+    strategy_snapshot: dict[str, Any]
+    title: str
+    summary: str
+    lifecycle: ArtifactLifecycle = "captured"
+    created_at: datetime
+
+
+class EvidenceArtifact(BaseModel):
+    id: str
+    idea_id: str
+    idea_version_id: str
+    source_conversation_id: str | None = None
+    source_run_id: str | None = None
+    artifact_type: EvidenceArtifactType = "backtest"
+    lifecycle: ArtifactLifecycle = "captured"
+    title: str
+    digest: str
+    payload: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class DecisionNote(BaseModel):
+    id: str
+    idea_id: str
+    idea_version_id: str
+    evidence_artifact_id: str
+    source_conversation_id: str | None = None
+    decision_state: DecisionState
+    note: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class DecisionNoteCreate(BaseModel):
+    decision_state: DecisionState
+    note: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("note")
+    @classmethod
+    def normalize_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class DecisionNoteResponse(BaseModel):
+    decision: DecisionNote
+    evidence_artifact: EvidenceArtifact
+
+
 class HistoryItem(BaseModel):
     type: Literal["chat", "strategy", "collection", "run"]
     id: str
@@ -297,12 +377,23 @@ class PaginatedHistory(BaseModel):
 
 
 class SearchItem(BaseModel):
-    type: Literal["chat", "strategy", "collection", "run"]
+    type: Literal[
+        "chat",
+        "strategy",
+        "collection",
+        "run",
+        "backtest",
+        "evidence",
+        "decision",
+        "idea",
+    ]
     id: str
     title: str
     matched_text: str
     updated_at: datetime
     conversation_id: str | None = None
+    lifecycle: ArtifactLifecycle | None = None
+    preview: dict[str, Any] | None = None
 
 
 class PaginatedSearch(BaseModel):

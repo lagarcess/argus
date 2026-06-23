@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import calendar
-import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -31,6 +30,17 @@ class DateRangeIntentResolution:
     label: str
     payload: dict[str, str]
     evidence_spans: tuple[str, ...] = ()
+
+
+def date_range_evidence_has_explicit_endpoints(
+    evidence_spans: tuple[str, ...],
+) -> bool:
+    """Return true when natural-time evidence came from two user-visible endpoints."""
+
+    spans = tuple(str(span or "").strip() for span in evidence_spans if str(span or "").strip())
+    if len(spans) < 2:
+        return False
+    return not any(_is_generated_time_span_endpoint(span) for span in spans)
 
 
 @dataclass(frozen=True)
@@ -191,9 +201,11 @@ def resolve_date_range_intent(
         year = _positive_int(payload.get("year")) or current_date.year
         if year > current_date.year:
             return None
-        end = _intent_date(payload.get("end"), today=current_date) or current_date
-        if end.year != year:
-            end = date(year, 12, 31) if year < current_date.year else current_date
+        end = _intent_date(payload.get("end"), today=current_date)
+        if end is None:
+            end = current_date if year == current_date.year else date(year, 12, 31)
+        if end < date(year, 1, 1):
+            return None
         return DateRangeIntentResolution(
             label="year to date" if year == current_date.year else f"{year} so far",
             payload={"start": date(year, 1, 1).isoformat(), "end": end.isoformat()},
@@ -243,9 +255,7 @@ def resolve_date_range_intent(
                 return None
             patch = {endpoint: endpoint_value.isoformat()}
         if not patch or (
-            patch.get("start")
-            and patch.get("end")
-            and patch["end"] < patch["start"]
+            patch.get("start") and patch.get("end") and patch["end"] < patch["start"]
         ):
             return None
         label = (
@@ -288,11 +298,8 @@ def _rolling_window_fields_from_single_date_evidence(
     today: date,
     languages: tuple[str, ...] | None,
 ) -> dict[str, Any] | None:
-    word_window = _singular_relative_year_window_from_words(text)
-    if word_window is not None:
-        return word_window
     parsed = _single_searched_date_span(text, today=today, languages=languages)
-    if parsed is not None and parsed.value < today:
+    if parsed is not None and parsed.period != "day" and parsed.value < today:
         if _span_has_explicit_year(parsed.span):
             return None
         window = _rolling_window_fields_from_range(
@@ -311,32 +318,6 @@ def _rolling_window_fields_from_single_date_evidence(
     return None
 
 
-def _singular_relative_year_window_from_words(text: str) -> dict[str, Any] | None:
-    words = _normalized_words(text)
-    if "ano" not in words and "year" not in words:
-        return None
-    if "ultimo" not in words and "last" not in words:
-        return None
-    return {"count": 1, "unit": "year"}
-
-
-def _normalized_words(text: str) -> set[str]:
-    normalized = unicodedata.normalize("NFKD", str(text or ""))
-    ascii_text = "".join(char for char in normalized if not unicodedata.combining(char))
-    words: set[str] = set()
-    current: list[str] = []
-    for char in ascii_text.casefold():
-        if char.isalpha():
-            current.append(char)
-            continue
-        if current:
-            words.add("".join(current))
-            current = []
-    if current:
-        words.add("".join(current))
-    return words
-
-
 def resolve_date_range_endpoint_patch(
     base_intent: Mapping[str, Any] | object | None,
     endpoint_patch: Mapping[str, Any] | object | None,
@@ -353,9 +334,7 @@ def resolve_date_range_endpoint_patch(
         return None
     if str(patch.get("kind") or "").strip() != "endpoint_patch":
         return None
-    if not _intent_confidence_is_usable(base) or not _intent_confidence_is_usable(
-        patch
-    ):
+    if not _intent_confidence_is_usable(base) or not _intent_confidence_is_usable(patch):
         return None
 
     count = _positive_int(base.get("count"))
@@ -469,18 +448,21 @@ def parse_date_text(
     today: date | None = None,
     endpoint: Literal["start", "end"] = "start",
     languages: tuple[str, ...] | None = None,
+    prefer_dates_from: Literal["past", "future"] | None = None,
 ) -> date | None:
     current_date = today or date.today()
     parsed = _parse_date_span(
         str(text or ""),
         today=current_date,
         languages=languages,
+        prefer_dates_from=prefer_dates_from,
     )
     if parsed is None:
         parsed = _single_searched_date_span(
             str(text or ""),
             today=current_date,
             languages=languages,
+            prefer_dates_from=prefer_dates_from,
         )
     if parsed is None:
         return None
@@ -497,7 +479,12 @@ def parse_explicit_date_text(
     raw = str(text or "").strip()
     if not raw or not any(char.isdigit() for char in raw):
         return None
-    return parse_date_text(raw, today=today, endpoint=endpoint, languages=languages)
+    return parse_date_text(
+        raw,
+        today=today,
+        endpoint=endpoint,
+        languages=languages,
+    )
 
 
 def dateparser_languages_for_user_language(language: str | None) -> tuple[str, ...]:
@@ -595,6 +582,7 @@ def _search_date_spans(
     today: date,
     languages: tuple[str, ...] | None,
     return_time_span: bool = True,
+    prefer_dates_from: Literal["past", "future"] | None = None,
 ) -> list[tuple[str, datetime]]:
     settings = {
         "RELATIVE_BASE": _relative_base(today),
@@ -602,6 +590,8 @@ def _search_date_spans(
         "PREFER_DAY_OF_MONTH": "first",
         "PREFER_MONTH_OF_YEAR": "first",
     }
+    if prefer_dates_from is not None:
+        settings["PREFER_DATES_FROM"] = prefer_dates_from
     if return_time_span:
         settings["RETURN_TIME_SPAN"] = True
     results = search_dates(
@@ -617,15 +607,19 @@ def _parse_date_span(
     *,
     today: date,
     languages: tuple[str, ...] | None,
+    prefer_dates_from: Literal["past", "future"] | None = None,
 ) -> _ParsedDate | None:
+    settings = {
+        "RELATIVE_BASE": _relative_base(today),
+        "RETURN_AS_TIMEZONE_AWARE": False,
+        "PREFER_DAY_OF_MONTH": "first",
+        "PREFER_MONTH_OF_YEAR": "first",
+    }
+    if prefer_dates_from is not None:
+        settings["PREFER_DATES_FROM"] = prefer_dates_from
     parser = DateDataParser(
         languages=list(languages) if languages else None,
-        settings={
-            "RELATIVE_BASE": _relative_base(today),
-            "RETURN_AS_TIMEZONE_AWARE": False,
-            "PREFER_DAY_OF_MONTH": "first",
-            "PREFER_MONTH_OF_YEAR": "first",
-        },
+        settings=settings,
     )
     data = parser.get_date_data(_strip_time_span_suffix(span))
     if data.date_obj is None:
@@ -645,17 +639,24 @@ def _single_searched_date_span(
     *,
     today: date,
     languages: tuple[str, ...] | None,
+    prefer_dates_from: Literal["past", "future"] | None = None,
 ) -> _ParsedDate | None:
     matches = _search_date_spans(
         text,
         today=today,
         languages=languages,
         return_time_span=False,
+        prefer_dates_from=prefer_dates_from,
     )
     if len(matches) != 1:
         return None
     span, value = matches[0]
-    parsed = _parse_date_span(span, today=today, languages=languages)
+    parsed = _parse_date_span(
+        span,
+        today=today,
+        languages=languages,
+        prefer_dates_from=prefer_dates_from,
+    )
     if parsed is not None:
         return parsed
     return _ParsedDate(
@@ -772,6 +773,11 @@ def _strip_time_span_suffix(value: str) -> str:
         if lowered.endswith(suffix):
             return stripped[: -len(suffix)].rstrip()
     return stripped
+
+
+def _is_generated_time_span_endpoint(value: str) -> bool:
+    lowered = str(value or "").strip().casefold()
+    return lowered.endswith("(start)") or lowered.endswith("(end)")
 
 
 def _span_has_explicit_year(value: str) -> bool:

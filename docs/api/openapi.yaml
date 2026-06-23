@@ -119,9 +119,18 @@ paths:
           description: Detached strategy from collection.
   /api/v1/backtests/run:
     post:
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Stable client key for deduplicating direct backtest runs.
+          schema:
+            type: string
       responses:
         "200":
           description: Completed Alpha backtest run.
+        "400":
+          description: Missing required Idempotency-Key header.
         "422":
           description: Problem Details for unsupported Alpha requests.
   /api/v1/backtest-jobs/{id}:
@@ -145,7 +154,64 @@ paths:
     get:
       responses:
         "200":
-          description: Global keyword search across chats, strategies, collections, and runs.
+          description: Global keyword search across chats, strategies, collections, runs, and typed P1 recall objects.
+  /api/v1/evidence-artifacts/{id}/decision:
+    post:
+      description: Create or update the one current decision for a user-owned evidence artifact.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionNoteCreate"
+      responses:
+        "200":
+          description: Canonical current decision note and updated evidence/idea lifecycle.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionNoteResponse"
+        "404":
+          description: Evidence artifact not found or inaccessible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Malformed decision payload or unsupported decision state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                type: https://api.argus.app/problems/validation-error
+                title: Validation Error
+                status: 422
+                detail: Request validation failed.
+                code: validation_error
+                request_id: req_123
+                context:
+                  errors: []
+        "500":
+          description: Decision capture failed after request validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                type: https://api.argus.app/problems/decision-capture-failed
+                title: Decision Capture Failed
+                status: 500
+                detail: Argus could not safely record that decision. Please retry in a moment.
+                code: decision_capture_failed
+                request_id: req_123
   /api/v1/feedback:
     post:
       requestBody:
@@ -213,7 +279,125 @@ components:
           description: Reproducible normalized runtime configuration.
         conversation_result_card:
           type: object
-          description: Beginner-friendly inline chat result card.
+          description: Beginner-friendly inline chat result card. Completed chat runs may include P1 sidecar ids and decision state.
+    ArtifactLifecycle:
+      type: string
+      enum: [captured, reviewed, saved, decided, archived, discarded]
+    DecisionState:
+      type: string
+      enum: [watching, promising, rejected, revisit_later]
+    EvidenceArtifact:
+      type: object
+      required:
+        - id
+        - idea_id
+        - idea_version_id
+        - artifact_type
+        - lifecycle
+        - title
+        - digest
+        - payload
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        idea_id:
+          type: string
+          format: uuid
+        idea_version_id:
+          type: string
+          format: uuid
+        source_conversation_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+        source_run_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+        artifact_type:
+          const: backtest
+        lifecycle:
+          $ref: "#/components/schemas/ArtifactLifecycle"
+        title:
+          type: string
+        digest:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    DecisionNote:
+      type: object
+      required:
+        - id
+        - idea_id
+        - idea_version_id
+        - evidence_artifact_id
+        - decision_state
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        idea_id:
+          type: string
+          format: uuid
+        idea_version_id:
+          type: string
+          format: uuid
+        evidence_artifact_id:
+          type: string
+          format: uuid
+        source_conversation_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+        decision_state:
+          $ref: "#/components/schemas/DecisionState"
+        note:
+          type:
+            - string
+            - "null"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    DecisionNoteCreate:
+      type: object
+      required:
+        - decision_state
+      properties:
+        decision_state:
+          $ref: "#/components/schemas/DecisionState"
+        note:
+          type:
+            - string
+            - "null"
+          maxLength: 2000
+    DecisionNoteResponse:
+      type: object
+      required:
+        - decision
+        - evidence_artifact
+      properties:
+        decision:
+          $ref: "#/components/schemas/DecisionNote"
+        evidence_artifact:
+          $ref: "#/components/schemas/EvidenceArtifact"
     BacktestJob:
       type: object
       required:

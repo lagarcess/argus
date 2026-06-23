@@ -1,12 +1,22 @@
 import json
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from argus.api import state as api_state
 from argus.api.main import app
-from argus.api.schemas import BacktestRun, Conversation, Message, OnboardingState, User
+from argus.api.schemas import (
+    BacktestRun,
+    Conversation,
+    EvidenceArtifact,
+    Idea,
+    IdeaVersion,
+    Message,
+    OnboardingState,
+    User,
+)
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
@@ -320,19 +330,62 @@ def mock_gateway():
     gateway.private_alpha_email_allowed.return_value = True
     gateway.count_completed_runs.return_value = 1
     gateway.list_messages.return_value = []
+    gateway.get_evidence_capture_by_run.return_value = None
+    gateway.create_backtest_evidence_capture.side_effect = (
+        lambda *, user_id, captured: captured
+    )
+    gateway.create_idea.side_effect = lambda *, user_id, idea: idea
+    gateway.create_idea_version.side_effect = lambda *, user_id, version: version
+    gateway.create_evidence_artifact.side_effect = lambda *, user_id, artifact: artifact
+    gateway.get_decision_note_by_artifact.return_value = None
+    gateway.upsert_decision_note.side_effect = lambda *, user_id, decision: decision
+    gateway.capture_current_decision_note.side_effect = (
+        lambda *,
+        user_id,
+        decision: (
+            decision,
+            api_state.store.evidence_artifacts[decision.evidence_artifact_id].model_copy(
+                update={"lifecycle": "decided"}
+            ),
+            api_state.store.ideas[decision.idea_id].model_copy(
+                update={"lifecycle": "decided"}
+            ),
+            api_state.store.idea_versions[decision.idea_version_id].model_copy(
+                update={"lifecycle": "decided"}
+            ),
+        )
+    )
+    gateway.create_decision_note.side_effect = lambda *, user_id, decision: decision
+    gateway.mark_evidence_artifact_lifecycle.side_effect = (
+        lambda *, user_id, artifact_id, lifecycle: api_state.store.evidence_artifacts[
+            artifact_id
+        ].model_copy(update={"lifecycle": lifecycle})
+    )
+    gateway.update_backtest_run_result_card.side_effect = (
+        lambda *,
+        user_id,
+        run_id,
+        conversation_result_card: api_state.store.backtest_runs[run_id].model_copy(
+            update={"conversation_result_card": conversation_result_card}
+        )
+    )
+    gateway.mark_result_card_decision_for_run.return_value = None
     with patch("argus.api.state.supabase_gateway", gateway):
         yield gateway
 
 
 def test_run_backtest_quota_exceeded(mock_gateway):
-    mock_gateway.check_and_increment_usage.side_effect = QuotaExceededError(
+    mock_gateway.check_and_increment_usage_limits.side_effect = QuotaExceededError(
         "Quota exceeded for backtest_runs (day)"
     )
 
     response = client.post(
         "/api/v1/backtests/run",
         json={"symbols": ["AAPL"]},
-        headers={"Authorization": "Bearer test-token"},
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "quota-exceeded",
+        },
     )
     assert response.status_code == 429
     data = response.json()
@@ -342,7 +395,7 @@ def test_run_backtest_quota_exceeded(mock_gateway):
 
 
 def test_chat_stream_quota_exceeded(mock_gateway):
-    mock_gateway.check_and_increment_usage.side_effect = QuotaExceededError(
+    mock_gateway.check_and_increment_usage_limits.side_effect = QuotaExceededError(
         "Quota exceeded for chat_messages (day)"
     )
 
@@ -389,21 +442,11 @@ def test_chat_stream_checks_daily_and_hourly_quotas(mock_gateway):
     )
 
     assert response.status_code == 200
-    quota_calls = [
-        call.kwargs for call in mock_gateway.check_and_increment_usage.call_args_list
-    ]
-    assert {
-        "user_id": "00000000-0000-0000-0000-000000000001",
-        "resource": "chat_messages",
-        "period": "day",
-        "limit_count": 200,
-    } in quota_calls
-    assert {
-        "user_id": "00000000-0000-0000-0000-000000000001",
-        "resource": "chat_messages",
-        "period": "hour",
-        "limit_count": 60,
-    } in quota_calls
+    mock_gateway.check_and_increment_usage_limits.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        resource="chat_messages",
+        limits=[("day", 200), ("hour", 60)],
+    )
 
 
 def test_successful_api_response_omits_static_rate_limit_headers(mock_gateway):
@@ -543,7 +586,10 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock
     response = client.post(
         "/api/v1/backtests/run",
         json={"template": "rsi_mean_reversion", "symbols": ["TSLA"]},
-        headers={"Authorization": "Bearer test-token"},
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "supabase-normalized-snapshot",
+        },
     )
 
     assert response.status_code == 200
@@ -570,7 +616,10 @@ def test_run_backtest_rejects_unowned_parent_conversation(mock_gateway):
             "template": "rsi_mean_reversion",
             "symbols": ["AAPL"],
         },
-        headers={"Authorization": "Bearer test-token"},
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "unowned-parent-conversation",
+        },
     )
 
     assert response.status_code == 404
@@ -612,7 +661,10 @@ def test_get_backtest_supabase_reads_from_gateway(mock_gateway):
     create = client.post(
         "/api/v1/backtests/run",
         json={"template": "rsi_mean_reversion", "symbols": ["AAPL"]},
-        headers={"Authorization": "Bearer test-token"},
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "supabase-get-backtest",
+        },
     )
     assert create.status_code == 200
     created_run = create.json()["run"]
@@ -687,9 +739,7 @@ def test_chat_stream_supabase_rejects_memory_only_conversation(mock_gateway):
         created_at=now,
         updated_at=now,
     )
-    api_state.store.conversations[memory_only_conversation.id] = (
-        memory_only_conversation
-    )
+    api_state.store.conversations[memory_only_conversation.id] = memory_only_conversation
     api_state.store.messages[memory_only_conversation.id] = []
     mock_gateway.get_conversation.return_value = None
 
@@ -892,9 +942,7 @@ def test_login_sets_session_cookie_for_browser_auth(mock_gateway):
     assert response.cookies.get("sb-refresh-token") == "refresh-token-123"
 
 
-def test_login_forces_secure_session_cookies_in_production(
-    mock_gateway, monkeypatch
-):
+def test_login_forces_secure_session_cookies_in_production(mock_gateway, monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     mock_gateway.private_alpha_email_allowed.return_value = True
     mock_gateway.login.return_value = {
@@ -933,18 +981,11 @@ def test_feedback_submission_persists_with_user_ownership(mock_gateway):
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
-    assert {
-        "user_id": profile.id,
-        "resource": "feedback",
-        "period": "day",
-        "limit_count": 50,
-    } in [call.kwargs for call in mock_gateway.check_and_increment_usage.call_args_list]
-    assert {
-        "user_id": profile.id,
-        "resource": "feedback",
-        "period": "hour",
-        "limit_count": 20,
-    } in [call.kwargs for call in mock_gateway.check_and_increment_usage.call_args_list]
+    mock_gateway.check_and_increment_usage_limits.assert_called_once_with(
+        user_id=profile.id,
+        resource="feedback",
+        limits=[("day", 50), ("hour", 20)],
+    )
     mock_gateway.create_feedback.assert_called_once_with(
         user_id=profile.id,
         feedback_type="general",
@@ -1061,7 +1102,7 @@ def test_feedback_rejects_large_serialized_context(mock_gateway):
 
 
 def test_feedback_quota_exceeded_returns_retry_after(mock_gateway):
-    mock_gateway.check_and_increment_usage.side_effect = QuotaExceededError(
+    mock_gateway.check_and_increment_usage_limits.side_effect = QuotaExceededError(
         "Quota exceeded for feedback (hour)"
     )
 
@@ -1099,9 +1140,7 @@ def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatc
     )
 
     assert response.status_code == 200
-    mock_gateway.private_alpha_email_allowed.assert_called_once_with(
-        "beta@example.com"
-    )
+    mock_gateway.private_alpha_email_allowed.assert_called_once_with("beta@example.com")
     mock_gateway.signup.assert_called_once()
     assert "mark_private_alpha_signup_accepted" not in [
         call[0] for call in mock_gateway.method_calls
@@ -1268,6 +1307,211 @@ def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
     mock_gateway.signup.assert_not_called()
 
 
+def test_auth_attempt_limiter_compacts_expired_keys(monkeypatch):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setattr(auth_router, "_AUTH_ATTEMPT_COMPACT_THRESHOLD", 1)
+    monkeypatch.setattr(auth_router, "monotonic", lambda: 0.0)
+
+    assert (
+        auth_router._AUTH_ATTEMPT_LIMITER.record_or_retry_after(
+            keys=("login:ip:stale",),
+            limit=auth_router.AUTH_LOGIN_ATTEMPT_LIMIT,
+            window_seconds=auth_router._AUTH_ATTEMPT_WINDOW_SECONDS,
+        )
+        is None
+    )
+
+    monkeypatch.setattr(
+        auth_router,
+        "monotonic",
+        lambda: float(auth_router._AUTH_ATTEMPT_WINDOW_SECONDS + 1),
+    )
+    assert (
+        auth_router._AUTH_ATTEMPT_LIMITER.record_or_retry_after(
+            keys=("login:ip:fresh",),
+            limit=auth_router.AUTH_LOGIN_ATTEMPT_LIMIT,
+            window_seconds=auth_router._AUTH_ATTEMPT_WINDOW_SECONDS,
+        )
+        is None
+    )
+
+    assert "login:ip:stale" not in auth_router._AUTH_ATTEMPT_LIMITER._attempts
+    assert "login:ip:fresh" in auth_router._AUTH_ATTEMPT_LIMITER._attempts
+
+
+def test_decision_endpoint_returns_success_when_card_enrichment_fails(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
+    now = utcnow()
+    user_id = "00000000-0000-0000-0000-000000000001"
+    idea = Idea(
+        id="idea-card-fail",
+        source_conversation_id="conversation-card-fail",
+        title="AAPL evidence idea",
+        summary="AAPL evidence summary",
+        lifecycle="captured",
+        active_version_id="version-card-fail",
+        created_at=now,
+        updated_at=now,
+    )
+    version = IdeaVersion(
+        id="version-card-fail",
+        idea_id=idea.id,
+        source_conversation_id="conversation-card-fail",
+        source_run_id="run-card-fail",
+        version_number=1,
+        canonical_spec={"symbols": ["AAPL"], "benchmark_symbol": "SPY"},
+        strategy_snapshot={"symbols": ["AAPL"]},
+        title=idea.title,
+        summary=idea.summary,
+        lifecycle="captured",
+        created_at=now,
+    )
+    artifact = EvidenceArtifact(
+        id="artifact-card-fail",
+        idea_id=idea.id,
+        idea_version_id=version.id,
+        source_conversation_id="conversation-card-fail",
+        source_run_id="run-card-fail",
+        artifact_type="backtest",
+        lifecycle="captured",
+        title="AAPL evidence",
+        digest="AAPL backtest versus SPY.",
+        payload={
+            "provenance": {
+                "symbols": ["AAPL"],
+                "benchmark_symbol": "SPY",
+            }
+        },
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.ideas[idea.id] = idea
+    api_state.store.idea_owners[idea.id] = user_id
+    api_state.store.idea_versions[version.id] = version
+    api_state.store.idea_version_owners[version.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+    mock_gateway.mark_result_card_decision_for_run.side_effect = RuntimeError(
+        "card enrichment failed"
+    )
+
+    response = client.post(
+        f"/api/v1/evidence-artifacts/{artifact.id}/decision",
+        json={"decision_state": "promising", "note": "Keep watching."},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["decision"]["decision_state"] == "promising"
+    assert body["evidence_artifact"]["lifecycle"] == "decided"
+    decisions = [
+        decision
+        for decision in api_state.store.decision_notes.values()
+        if decision.evidence_artifact_id == artifact.id
+    ]
+    assert len(decisions) == 1
+    mock_gateway.capture_current_decision_note.assert_called_once()
+    mock_gateway.mark_result_card_decision_for_run.assert_called_once()
+
+
+def test_decision_endpoint_missing_evidence_returns_404_problem_details(
+    mock_gateway,
+):
+    mock_gateway.get_evidence_artifact.return_value = None
+
+    response = client.post(
+        "/api/v1/evidence-artifacts/missing-artifact/decision",
+        json={"decision_state": "watching"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 404
+    body = response.json()
+    assert body["type"] == "https://api.argus.app/problems/not-found"
+    assert body["title"] == "Not Found"
+    assert body["status"] == 404
+    assert body["code"] == "not_found"
+    assert body["request_id"]
+
+
+def test_decision_endpoint_integrity_failure_returns_500_problem_details(
+    mock_gateway,
+):
+    now = utcnow()
+    user_id = "00000000-0000-0000-0000-000000000001"
+    idea = Idea(
+        id="idea-integrity-fail",
+        source_conversation_id="conversation-integrity-fail",
+        title="AAPL evidence idea",
+        summary="AAPL evidence summary",
+        lifecycle="captured",
+        active_version_id="version-integrity-fail",
+        created_at=now,
+        updated_at=now,
+    )
+    version = IdeaVersion(
+        id="version-integrity-fail",
+        idea_id=idea.id,
+        source_conversation_id="conversation-integrity-fail",
+        source_run_id="run-integrity-fail",
+        version_number=1,
+        canonical_spec={"symbols": ["AAPL"], "benchmark_symbol": "SPY"},
+        strategy_snapshot={"symbols": ["AAPL"]},
+        title=idea.title,
+        summary=idea.summary,
+        lifecycle="captured",
+        created_at=now,
+    )
+    artifact = EvidenceArtifact(
+        id="artifact-integrity-fail",
+        idea_id=idea.id,
+        idea_version_id=version.id,
+        source_conversation_id="conversation-integrity-fail",
+        source_run_id="run-integrity-fail",
+        artifact_type="backtest",
+        lifecycle="captured",
+        title="AAPL evidence",
+        digest="AAPL backtest versus SPY.",
+        payload={
+            "provenance": {
+                "symbols": ["AAPL"],
+                "benchmark_symbol": "SPY",
+            }
+        },
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.ideas[idea.id] = idea
+    api_state.store.idea_owners[idea.id] = user_id
+    api_state.store.idea_versions[version.id] = version
+    api_state.store.idea_version_owners[version.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+    mock_gateway.capture_current_decision_note.side_effect = ValueError(
+        "Decision capture did not return durable artifact state."
+    )
+
+    response = client.post(
+        f"/api/v1/evidence-artifacts/{artifact.id}/decision",
+        json={"decision_state": "promising", "note": "Keep watching."},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["type"] == "https://api.argus.app/problems/decision-capture-failed"
+    assert body["title"] == "Decision Capture Failed"
+    assert body["status"] == 500
+    assert body["code"] == "decision_capture_failed"
+    assert body["request_id"]
+
+
 def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
     now = utcnow()
     mock_gateway.search_rows.return_value = {
@@ -1319,6 +1563,340 @@ def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
     assert {item["type"] for item in payload["items"]}.issubset(
         {"chat", "strategy", "collection", "run"}
     )
+
+
+def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
+    now = utcnow()
+    mock_gateway.search_rows.return_value = {
+        "conversations": [],
+        "strategies": [],
+        "collections": [],
+        "runs": [
+            {
+                "id": "run-1",
+                "conversation_id": "conversation-1",
+                "conversation_result_card": {
+                    "title": "AAPL MSFT evidence run",
+                    "symbols": ["AAPL", "MSFT"],
+                    "artifact_type": "backtest",
+                    "evidence_artifact_id": "artifact-1",
+                    "evidence_lifecycle": "captured",
+                    "context_packets": [{"raw": "do not expose"}],
+                },
+                "created_at": now.isoformat(),
+                "benchmark_symbol": "SPY",
+            }
+        ],
+        "ideas": [
+            {
+                "id": "idea-1",
+                "title": "AAPL MSFT Buy and Hold",
+                "summary": "Test AAPL and MSFT against SPY.",
+                "lifecycle": "captured",
+                "active_version_id": "version-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+            }
+        ],
+        "evidence": [
+            {
+                "id": "artifact-1",
+                "title": "AAPL MSFT evidence run",
+                "digest": "AAPL MSFT beat SPY in the test window.",
+                "lifecycle": "captured",
+                "artifact_type": "backtest",
+                "source_run_id": "run-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+                "payload": {
+                    "result_card": {
+                        "context_packets": [{"raw": "do not expose"}],
+                    },
+                    "provenance": {
+                        "symbols": ["AAPL", "MSFT"],
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+            }
+        ],
+        "decisions": [
+            {
+                "id": "decision-1",
+                "decision_state": "promising",
+                "note": "Worth revisiting.",
+                "evidence_artifact_id": "artifact-1",
+                "artifact_title": "AAPL MSFT evidence run",
+                "artifact_digest": "AAPL MSFT beat SPY in the test window.",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+            }
+        ],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=aapl&limit=20",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert {item["type"] for item in items} == {
+        "backtest",
+        "idea",
+        "evidence",
+        "decision",
+    }
+    evidence = next(item for item in items if item["type"] == "evidence")
+    assert evidence["preview"] == {
+        "digest": "AAPL MSFT beat SPY in the test window.",
+        "symbols": ["AAPL", "MSFT"],
+        "benchmark_symbol": "SPY",
+    }
+    assert "context_packets" not in evidence["preview"]
+    assert not any(key.endswith("_id") for key in evidence["preview"])
+    idea = next(item for item in items if item["type"] == "idea")
+    assert idea["preview"]["digest"] == "Test AAPL and MSFT against SPY."
+    assert not any(key.endswith("_id") for key in idea["preview"])
+    decision = next(item for item in items if item["type"] == "decision")
+    assert decision["preview"]["decision_state"] == "promising"
+    assert not any(key.endswith("_id") for key in decision["preview"])
+    assert decision["matched_text"] == (
+        "Worth revisiting. · AAPL MSFT beat SPY in the test window."
+    )
+    assert "promising" not in decision["matched_text"]
+
+
+def test_search_supabase_orders_p1_artifacts_before_source_conversation(
+    mock_gateway,
+):
+    now = utcnow()
+    newer = (now + timedelta(minutes=5)).replace(microsecond=0)
+    mock_gateway.search_rows.return_value = {
+            "conversations": [
+                {
+                    "id": "conversation-1",
+                    "title": "AAPL MSFT TSLA source wrapper",
+                    "last_message_preview": "AAPL MSFT TSLA chat wrapper",
+                    "updated_at": newer.isoformat(),
+                    "pinned": False,
+                }
+        ],
+        "strategies": [],
+        "collections": [],
+        "runs": [
+            {
+                "id": "run-1",
+                "conversation_id": "conversation-1",
+                "conversation_result_card": {
+                    "title": "AAPL, MSFT, TSLA evidence backtest",
+                    "symbols": ["AAPL", "MSFT", "TSLA"],
+                    "artifact_type": "backtest",
+                    "evidence_artifact_id": "artifact-1",
+                    "evidence_lifecycle": "captured",
+                },
+                "created_at": (now.replace(microsecond=0)).isoformat(),
+                "benchmark_symbol": "SPY",
+            }
+        ],
+        "ideas": [
+            {
+                "id": "idea-1",
+                "title": "AAPL, MSFT, TSLA evidence idea",
+                "summary": "AAPL, MSFT, TSLA evidence summary.",
+                "lifecycle": "captured",
+                "active_version_id": "version-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+            }
+        ],
+        "evidence": [
+            {
+                "id": "artifact-1",
+                "title": "AAPL, MSFT, TSLA evidence artifact",
+                "digest": "AAPL, MSFT, TSLA evidence artifact digest.",
+                "lifecycle": "captured",
+                "artifact_type": "backtest",
+                "source_run_id": "run-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+                "payload": {
+                    "provenance": {
+                        "symbols": ["AAPL", "MSFT", "TSLA"],
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+            }
+        ],
+        "decisions": [
+            {
+                "id": "decision-1",
+                "decision_state": "promising",
+                "note": "AAPL, MSFT, TSLA evidence decision note.",
+                "evidence_artifact_id": "artifact-1",
+                "artifact_title": "AAPL, MSFT, TSLA evidence artifact",
+                "artifact_digest": "AAPL, MSFT, TSLA evidence artifact digest.",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+            }
+        ],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=AAPL%20MSFT%20TSLA&limit=10",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    chat_index = ordered_types.index("chat")
+    for artifact_type in ("backtest", "evidence", "idea", "decision"):
+        assert ordered_types.index(artifact_type) < chat_index
+
+
+def test_search_supabase_preserves_pinned_chat_above_p1_artifacts(mock_gateway):
+    now = utcnow().replace(microsecond=0)
+    mock_gateway.search_rows.return_value = {
+        "conversations": [
+            {
+                "id": "conversation-1",
+                "title": "AAPL pinned conversation",
+                "last_message_preview": "AAPL pinned source",
+                "updated_at": (now + timedelta(minutes=5)).isoformat(),
+                "pinned": True,
+            }
+        ],
+        "strategies": [],
+        "collections": [],
+        "runs": [],
+        "ideas": [],
+        "evidence": [
+            {
+                "id": "artifact-1",
+                "title": "AAPL evidence artifact",
+                "digest": "AAPL evidence artifact digest.",
+                "lifecycle": "captured",
+                "artifact_type": "backtest",
+                "source_run_id": "run-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+                "payload": {
+                    "provenance": {
+                        "symbols": ["AAPL"],
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+            }
+        ],
+        "decisions": [],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=aapl&limit=10",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    assert ordered_types.index("chat") < ordered_types.index("evidence")
+
+
+def test_search_supabase_preserves_exact_chat_above_lower_relevance_p1_artifacts(
+    mock_gateway,
+):
+    now = utcnow().replace(microsecond=0)
+    mock_gateway.search_rows.return_value = {
+        "conversations": [
+            {
+                "id": "conversation-1",
+                "title": "AAPL",
+                "last_message_preview": "AAPL exact source",
+                "updated_at": (now + timedelta(minutes=5)).isoformat(),
+                "pinned": False,
+            }
+        ],
+        "strategies": [],
+        "collections": [],
+        "runs": [],
+        "ideas": [],
+        "evidence": [
+            {
+                "id": "artifact-1",
+                "title": "AAPL evidence artifact",
+                "digest": "AAPL evidence artifact digest.",
+                "lifecycle": "captured",
+                "artifact_type": "backtest",
+                "source_run_id": "run-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": now.isoformat(),
+                "payload": {
+                    "provenance": {
+                        "symbols": ["AAPL"],
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+            }
+        ],
+        "decisions": [],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=aapl&limit=10",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    assert ordered_types.index("chat") < ordered_types.index("evidence")
+
+
+def test_search_supabase_preserves_symbol_match_above_lower_relevance_p1_artifact(
+    mock_gateway,
+):
+    now = utcnow().replace(microsecond=0)
+    mock_gateway.search_rows.return_value = {
+        "conversations": [],
+        "strategies": [
+            {
+                "id": "strategy-1",
+                "name": "Saved alpha strategy",
+                "symbols": ["AAPL"],
+                "template": "buy_hold",
+                "updated_at": now.isoformat(),
+                "pinned": False,
+            }
+        ],
+        "collections": [],
+        "runs": [],
+        "ideas": [],
+        "evidence": [
+            {
+                "id": "artifact-1",
+                "title": "AAPL evidence artifact",
+                "digest": "AAPL evidence artifact digest.",
+                "lifecycle": "captured",
+                "artifact_type": "backtest",
+                "source_run_id": "run-1",
+                "source_conversation_id": "conversation-1",
+                "updated_at": (now + timedelta(minutes=5)).isoformat(),
+                "payload": {
+                    "provenance": {
+                        "symbols": ["MSFT"],
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+            }
+        ],
+        "decisions": [],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=aapl&limit=10",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    ordered_types = [item["type"] for item in response.json()["items"]]
+    assert ordered_types.index("strategy") < ordered_types.index("evidence")
 
 
 def test_history_supabase_requests_non_archived_rows_by_default(mock_gateway):

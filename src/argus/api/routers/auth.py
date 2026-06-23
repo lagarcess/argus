@@ -22,6 +22,7 @@ AUTH_LOGIN_ATTEMPT_LIMIT = 8
 AUTH_SIGNUP_ATTEMPT_LIMIT = 5
 _AUTH_ATTEMPT_WINDOW_SECONDS = 10 * 60
 _AUTH_ATTEMPT_RETRY_FLOOR_SECONDS = 1
+_AUTH_ATTEMPT_COMPACT_THRESHOLD = 2048
 _AuthAction = Literal["login", "signup"]
 
 
@@ -39,6 +40,8 @@ class _AuthAttemptLimiter:
     ) -> int | None:
         now = monotonic()
         with self._lock:
+            if len(self._attempts) >= _AUTH_ATTEMPT_COMPACT_THRESHOLD:
+                self._compact(now=now, window_seconds=window_seconds)
             retry_after = 0
             for key in keys:
                 attempts = self._attempts[key]
@@ -67,6 +70,15 @@ class _AuthAttemptLimiter:
     ) -> None:
         while attempts and now - attempts[0] >= window_seconds:
             attempts.popleft()
+
+    def _compact(self, *, now: float, window_seconds: int) -> None:
+        stale_keys: list[str] = []
+        for key, attempts in self._attempts.items():
+            self._prune(attempts, now=now, window_seconds=window_seconds)
+            if not attempts:
+                stale_keys.append(key)
+        for key in stale_keys:
+            self._attempts.pop(key, None)
 
 
 _AUTH_ATTEMPT_LIMITER = _AuthAttemptLimiter()

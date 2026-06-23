@@ -246,6 +246,17 @@
       "worst_drop": "Worst drop",
       "explain_result": "Explain result",
       "refine_idea": "Refine idea",
+      "add_decision": "Add decision",
+      "decision": "Decision: {{state}}",
+      "decision_note_placeholder": "Optional note for future you",
+      "save_decision": "Save decision",
+      "decision_saved": "Decision saved",
+      "decision_states": {
+        "watching": "Watching",
+        "promising": "Promising",
+        "rejected": "Rejected",
+        "revisit_later": "Revisit later"
+      },
       "save": "Save",
       "unavailable": "Unavailable",
       "return_unavailable": "return unavailable",
@@ -551,17 +562,61 @@
   },
   "command_palette": {
     "close": "Close search",
+    "search_placeholder": "Search Argus...",
     "no_results": "No results found",
     "no_conversations": "No conversations yet",
+    "clear_search": "Clear search",
     "rename_conversation": "Rename conversation",
     "archive_conversation": "Archive conversation",
     "delete_conversation": "Delete conversation",
     "preview": "Preview",
-    "preview_empty": "Open this conversation to view its messages.",
+    "preview_empty": "Open the source conversation to view more context.",
     "open_conversation": "Open conversation",
-    "select_preview": "Select a conversation to preview its metadata.",
+    "open_source_conversation": "Open source conversation",
+    "select_preview": "Select a result to preview its details.",
+    "status": {
+      "archived": "Archived",
+      "captured": "Captured",
+      "decided": "Decided",
+      "decision": "Decision",
+      "discarded": "Discarded",
+      "reviewed": "Reviewed",
+      "saved": "Saved"
+    },
+    "metric_labels": {
+      "benchmark_return_pct": "Benchmark return",
+      "delta_vs_benchmark_pct": "Against benchmark",
+      "excess_return_pct": "Against benchmark",
+      "max_drawdown_pct": "Worst drop",
+      "sharpe_ratio": "Sharpe",
+      "total_return_pct": "Total return",
+      "volatility_pct": "Volatility"
+    },
+    "preview_fields": {
+      "assets": "Assets",
+      "assumptions": "Assumptions",
+      "benchmark": "Benchmark",
+      "breakdown": "Breakdown",
+      "decision": "Decision",
+      "digest": "Digest",
+      "metrics": "Metrics",
+      "preview": "Preview",
+      "quick_take": "Quick take"
+    },
     "conversation_count_one": "{{count}} conversation",
-    "conversation_count_other": "{{count}} conversations"
+    "conversation_count_other": "{{count}} conversations",
+    "result_count_one": "{{count}} result",
+    "result_count_other": "{{count}} results",
+    "type": {
+      "backtest": "Backtest",
+      "chat": "Conversation",
+      "collection": "Collection",
+      "decision": "Decision",
+      "evidence": "Evidence",
+      "idea": "Idea",
+      "run": "Run",
+      "strategy": "Strategy"
+    }
   },
   "onboarding": {
     "prompt": "What is your current primary goal? Don't worry, you can change it later.",
