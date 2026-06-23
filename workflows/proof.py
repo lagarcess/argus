@@ -14,6 +14,8 @@ PROOF_KIND = "render_workflow_proof"
 PROOF_EMAIL_DOMAIN = "example.invalid"
 WORKFLOW_DATABASE_URL_ENV = "ARGUS_WORKFLOW_DATABASE_URL"
 LEGACY_DATABASE_URL_ENV = "DATABASE_URL"
+PROVIDER_MODE_ENV = "ARGUS_MARKET_DATA_PROVIDER_MODE"
+CACHE_ENABLED_ENV = "ENABLE_MARKET_DATA_CACHE"
 
 
 class WorkflowProofError(RuntimeError):
@@ -52,6 +54,16 @@ def require_database_url(env: Mapping[str, str] | None = None) -> str:
             "accepted as a local/backward-compatible fallback."
         )
     return database_url
+
+
+def workflow_runtime_facts(env: Mapping[str, str] | None = None) -> dict[str, str]:
+    source = os.environ if env is None else env
+    provider_mode = source.get(PROVIDER_MODE_ENV, "").strip()
+    market_data_cache = source.get(CACHE_ENABLED_ENV, "").strip()
+    return {
+        "provider_mode": provider_mode or "<missing>",
+        "market_data_cache": market_data_cache or "<missing>",
+    }
 
 
 def stable_payload_hash(payload: Mapping[str, Any]) -> str:
@@ -109,6 +121,7 @@ def run_workflow_proof(
     job_id: str,
     nonce: str,
     workflow_run_id: str | None = None,
+    runtime_facts: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     row = gateway.fetch_job(job_id)
     if row is None:
@@ -121,6 +134,7 @@ def run_workflow_proof(
         "kind": PROOF_KIND,
         "nonce": nonce,
         "workflow_run_id": workflow_run_id,
+        "runtime_facts": dict(runtime_facts or workflow_runtime_facts()),
         "started_at": started_at,
     }
     running = gateway.update_job_status(
@@ -148,6 +162,11 @@ def run_workflow_proof(
         "status": readback["status"],
         "nonce": nonce,
         "workflow_run_id": workflow_run_id,
+        "runtime_facts": _json_safe(
+            (readback.get("execution_metadata") or {})
+            .get("workflow_proof", {})
+            .get("runtime_facts", {})
+        ),
         "execution_metadata": _json_safe(readback.get("execution_metadata") or {}),
     }
 
@@ -409,6 +428,47 @@ def _verify(args: argparse.Namespace) -> int:
     row = PostgresProofJobGateway.from_env().fetch_job(args.job_id)
     if row is None:
         raise WorkflowProofError(f"Backtest job {args.job_id} was not found.")
+    metadata = row.get("execution_metadata") or {}
+    workflow_metadata = (
+        metadata.get("workflow_proof") if isinstance(metadata, dict) else None
+    )
+    if args.expect_nonce or args.expect_provider_mode:
+        if row.get("status") != "succeeded":
+            raise WorkflowProofError(
+                "Workflow proof expected succeeded job, "
+                f"found {row.get('status')!r}."
+            )
+        if not isinstance(workflow_metadata, dict):
+            raise WorkflowProofError("Workflow proof metadata is missing.")
+        if workflow_metadata.get("kind") != PROOF_KIND:
+            raise WorkflowProofError(
+                "Workflow proof metadata expected "
+                f"kind={PROOF_KIND!r}, found {workflow_metadata.get('kind')!r}."
+            )
+        if not row.get("finished_at") or not workflow_metadata.get("finished_at"):
+            raise WorkflowProofError("Workflow proof expected finished_at timestamps.")
+        if args.expect_nonce:
+            actual_nonce = str(workflow_metadata.get("nonce") or "").strip()
+            if actual_nonce != args.expect_nonce:
+                raise WorkflowProofError(
+                    "Workflow proof expected nonce "
+                    f"{args.expect_nonce!r}, found {actual_nonce or '<missing>'!r}."
+                )
+    runtime_facts = (
+        workflow_metadata.get("runtime_facts")
+        if isinstance(workflow_metadata, dict)
+        else None
+    )
+    if args.expect_provider_mode:
+        actual_provider_mode = ""
+        if isinstance(runtime_facts, dict):
+            actual_provider_mode = str(runtime_facts.get("provider_mode") or "").strip()
+        if actual_provider_mode != args.expect_provider_mode:
+            raise WorkflowProofError(
+                "Workflow proof expected "
+                f"{PROVIDER_MODE_ENV}={args.expect_provider_mode!r}, "
+                f"found {actual_provider_mode or '<missing>'!r}."
+            )
     _dump_json(
         {
             "job_id": row["id"],
@@ -437,6 +497,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     verify = subcommands.add_parser("verify")
     verify.add_argument("--job-id", required=True)
+    verify.add_argument("--expect-nonce")
+    verify.add_argument("--expect-provider-mode")
     verify.set_defaults(func=_verify)
     return parser
 

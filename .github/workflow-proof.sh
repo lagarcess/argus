@@ -30,7 +30,7 @@ Usage:
   .github/workflow-proof.sh local --job-id <uuid> --nonce <value>
   .github/workflow-proof.sh remote --job-id <uuid> --nonce <value>
   .github/workflow-proof.sh direct --job-id <uuid> --nonce <value>
-  .github/workflow-proof.sh verify --job-id <uuid>
+  .github/workflow-proof.sh verify --job-id <uuid> [--expect-nonce <value>] [--expect-provider-mode <mode>]
 
 Seed creates a disposable proof auth/profile row when --user-id is omitted.
 Use it only against a local or preview Supabase database for validation.

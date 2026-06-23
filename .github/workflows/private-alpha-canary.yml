@@ -48,6 +48,7 @@ jobs:
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
+          ARGUS_WORKFLOW_DATABASE_URL: ${{ secrets.ARGUS_WORKFLOW_DATABASE_URL }}
           ARGUS_CANARY_EMAIL: ${{ secrets.ARGUS_CANARY_EMAIL }}
           ARGUS_CANARY_PASSWORD: ${{ secrets.ARGUS_CANARY_PASSWORD }}
           ARGUS_CANARY_SUPABASE_URL: ${{ secrets.ARGUS_CANARY_SUPABASE_URL }}
@@ -57,6 +58,7 @@ jobs:
           for name in \
             RENDER_API_KEY \
             ARGUS_OPS_TOKEN \
+            ARGUS_WORKFLOW_DATABASE_URL \
             ARGUS_CANARY_EMAIL \
             ARGUS_CANARY_PASSWORD \
             ARGUS_CANARY_SUPABASE_URL \
@@ -77,6 +79,7 @@ jobs:
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
+          ARGUS_WORKFLOW_DATABASE_URL: ${{ secrets.ARGUS_WORKFLOW_DATABASE_URL }}
         run: .github/warmup-render.sh --expect-mode real-workflow
 
       - name: Prepare canary evidence directory
@@ -87,6 +90,7 @@ jobs:
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
+          ARGUS_WORKFLOW_DATABASE_URL: ${{ secrets.ARGUS_WORKFLOW_DATABASE_URL }}
           ARGUS_CANARY_EMAIL: ${{ secrets.ARGUS_CANARY_EMAIL }}
           ARGUS_CANARY_PASSWORD: ${{ secrets.ARGUS_CANARY_PASSWORD }}
           ARGUS_CANARY_SUPABASE_URL: ${{ secrets.ARGUS_CANARY_SUPABASE_URL }}
@@ -105,6 +109,7 @@ jobs:
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
+          ARGUS_WORKFLOW_DATABASE_URL: ${{ secrets.ARGUS_WORKFLOW_DATABASE_URL }}
           ARGUS_CANARY_EMAIL: ${{ secrets.ARGUS_CANARY_EMAIL }}
           ARGUS_CANARY_PASSWORD: ${{ secrets.ARGUS_CANARY_PASSWORD }}
           ARGUS_CANARY_SUPABASE_URL: ${{ secrets.ARGUS_CANARY_SUPABASE_URL }}
@@ -119,11 +124,32 @@ jobs:
           echo "$status" > temp/canary-evidence/es-419.exit
           exit "$status"
 
-      - name: Require bilingual canary matrix
+      - name: Run provider-path-sensitive Spanish canary
+        continue-on-error: true
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
+          ARGUS_WORKFLOW_DATABASE_URL: ${{ secrets.ARGUS_WORKFLOW_DATABASE_URL }}
+          ARGUS_CANARY_EMAIL: ${{ secrets.ARGUS_CANARY_EMAIL }}
+          ARGUS_CANARY_PASSWORD: ${{ secrets.ARGUS_CANARY_PASSWORD }}
+          ARGUS_CANARY_SUPABASE_URL: ${{ secrets.ARGUS_CANARY_SUPABASE_URL }}
+          ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set +e
+          ARGUS_CANARY_LANGUAGE=es-419 \
+          ARGUS_CANARY_PROMPT='Prueba comprar y mantener SNDK, AMD, NVDA y Goldman Sachs con 1000 dolares durante los ultimos 3 anos' \
+          ARGUS_CANARY_FOCUSED_SYMBOL_PATH=SNDK,AMD,NVDA,GS \
+          ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/provider-path.json \
+          .github/canary-render.sh
+          status=$?
+          echo "$status" > temp/canary-evidence/provider-path.exit
+          exit "$status"
+
+      - name: Require private-alpha canary matrix
         if: always()
         run: |
           failed=0
-          for locale in en es-419
+          for locale in en es-419 provider-path
           do
             status_file="temp/canary-evidence/${locale}.exit"
             if [ ! -f "$status_file" ]; then

@@ -40,10 +40,21 @@ def test_canary_captures_warmup_mode_fingerprint_and_commit_evidence() -> None:
     assert 'CHECKED_OUT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"' in source
     assert 'WARMUP_OUTPUT="$(.github/warmup-render.sh --expect-mode "$EXPECT_MODE")"' in source
     assert "extract_warmup_value env_fingerprint" in source
+    assert "extract_warmup_value workflow_env_fingerprint" in source
+    assert "extract_warmup_value workflow_env_status" in source
+    assert "extract_warmup_value workflow_runtime_provider_mode" in source
+    assert "extract_warmup_value workflow_runtime_proof" in source
     assert "extract_warmup_value workflow_task" in source
     assert "extract_warmup_value real_workflow_task" in source
     assert 'canary_expected_mode=$EXPECT_MODE' in source
     assert 'canary_env_fingerprint=$ENV_FINGERPRINT' in source
+    assert 'canary_workflow_env_fingerprint=$WORKFLOW_ENV_FINGERPRINT' in source
+    assert 'canary_workflow_env_status=$WORKFLOW_ENV_STATUS' in source
+    assert (
+        'canary_workflow_runtime_provider_mode=$WORKFLOW_RUNTIME_PROVIDER_MODE'
+        in source
+    )
+    assert 'canary_workflow_runtime_proof=$WORKFLOW_RUNTIME_PROOF' in source
     assert 'canary_workflow_task=$WORKFLOW_TASK' in source
     assert 'canary_real_workflow_task=$REAL_WORKFLOW_TASK' in source
     assert 'canary_expected_sha=$CANDIDATE_SHA' in source
@@ -107,6 +118,15 @@ def test_canary_writes_privacy_safe_release_evidence() -> None:
     assert "no_raw_ids" in source
     assert "canary_evidence_path=" in source
     assert "ARGUS_CANARY_EVIDENCE_PATH" in source
+    assert '"workflow_env_fingerprint":' in source
+    assert '"workflow_env_status":' in source
+    assert '"workflow_runtime_provider_mode":' in source
+    assert '"workflow_runtime_proof":' in source
+    assert 'FOCUSED_SYMBOL_PATH="${ARGUS_CANARY_FOCUSED_SYMBOL_PATH:-}"' in source
+    assert 'CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH"' in source
+    assert '"focused_symbol_path": os.environ["CANARY_FOCUSED_SYMBOL_PATH"] or None' in (
+        source
+    )
 
 
 def test_canary_sanitizes_warmup_output_before_logging() -> None:
@@ -155,6 +175,19 @@ def test_canary_can_write_manual_failed_capture_artifact() -> None:
     assert "failure" in source
     assert "no_raw_ids" in source
     assert "ARGUS_CANARY_CAPTURE_PATH" in source
+    assert '"workflow_env_fingerprint": os.environ["CANARY_WORKFLOW_ENV_FINGERPRINT"]' in source
+    assert '"workflow_env_status": os.environ["CANARY_WORKFLOW_ENV_STATUS"]' in source
+    assert (
+        '"workflow_runtime_provider_mode": '
+        'os.environ["CANARY_WORKFLOW_RUNTIME_PROVIDER_MODE"]'
+    ) in source
+    assert (
+        '"workflow_runtime_proof": os.environ["CANARY_WORKFLOW_RUNTIME_PROOF"]'
+        in source
+    )
+    assert '"focused_symbol_path": os.environ["CANARY_FOCUSED_SYMBOL_PATH"] or None' in (
+        source
+    )
 
 
 def test_canary_failure_capture_is_written_with_failure_evidence() -> None:
@@ -247,6 +280,18 @@ def test_canary_uses_confirmation_card_run_action_payload() -> None:
     assert "confirmation stream did not include run_backtest action" in source
     assert '"payload": {}' not in source
     assert 'json.loads(os.environ["RUN_ACTION"])' in source
+
+
+def test_canary_asserts_focused_provider_path_symbols_when_configured() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert "assert_focused_symbol_path" in source
+    assert 'if [ -z "$FOCUSED_SYMBOL_PATH" ]; then' in source
+    assert 'CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \\' in source
+    assert 'CANARY_RUN_ACTION="$RUN_ACTION" \\' in source
+    assert "focused symbol path missing expected symbols" in source
+    assert "assert_focused_symbol_path run_action" in source
+    assert "assert_focused_symbol_path job_response" in source
 
 
 def test_canary_uses_temp_file_for_reload_messages_payload() -> None:

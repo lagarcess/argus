@@ -88,6 +88,138 @@ def test_workflow_proof_marks_queued_job_running_then_succeeded() -> None:
     assert metadata["workflow_proof"]["workflow_run_id"] == "local-run"
 
 
+def test_workflow_proof_records_effective_runtime_provider_mode() -> None:
+    from workflows.proof import run_workflow_proof
+
+    job_id = str(uuid4())
+    gateway = FakeProofGateway(
+        {
+            "id": job_id,
+            "status": "queued",
+            "attempts": 0,
+            "launch_payload": {"kind": "render_workflow_proof"},
+            "execution_metadata": {},
+        }
+    )
+
+    result = run_workflow_proof(
+        gateway,
+        job_id=job_id,
+        nonce="proof-nonce",
+        workflow_run_id="local-run",
+        runtime_facts={
+            "provider_mode": "live_provider",
+            "market_data_cache": "false",
+        },
+    )
+
+    assert result["runtime_facts"] == {
+        "provider_mode": "live_provider",
+        "market_data_cache": "false",
+    }
+    metadata = gateway.row["execution_metadata"]["workflow_proof"]
+    assert metadata["runtime_facts"] == {
+        "provider_mode": "live_provider",
+        "market_data_cache": "false",
+    }
+
+
+def test_workflow_proof_verify_requires_completed_current_nonce(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows import proof
+
+    job_id = str(uuid4())
+    gateway = FakeProofGateway(
+        {
+            "id": job_id,
+            "status": "succeeded",
+            "attempts": 1,
+            "finished_at": "2026-06-23T16:00:00+00:00",
+            "launch_payload": {"kind": "render_workflow_proof"},
+            "execution_metadata": {
+                "workflow_proof": {
+                    "kind": "render_workflow_proof",
+                    "nonce": "proof-nonce",
+                    "finished_at": "2026-06-23T16:00:00+00:00",
+                    "runtime_facts": {"provider_mode": "live_provider"},
+                }
+            },
+        }
+    )
+    monkeypatch.setattr(proof.PostgresProofJobGateway, "from_env", lambda: gateway)
+
+    assert (
+        proof.main(
+            [
+                "verify",
+                "--job-id",
+                job_id,
+                "--expect-nonce",
+                "proof-nonce",
+                "--expect-provider-mode",
+                "live_provider",
+            ]
+        )
+        == 0
+    )
+
+
+def test_workflow_proof_verify_rejects_unfinished_or_stale_proof_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows import proof
+
+    job_id = str(uuid4())
+    gateway = FakeProofGateway(
+        {
+            "id": job_id,
+            "status": "running",
+            "attempts": 1,
+            "launch_payload": {"kind": "render_workflow_proof"},
+            "execution_metadata": {
+                "workflow_proof": {
+                    "kind": "render_workflow_proof",
+                    "nonce": "old-nonce",
+                    "runtime_facts": {"provider_mode": "live_provider"},
+                }
+            },
+        }
+    )
+    monkeypatch.setattr(proof.PostgresProofJobGateway, "from_env", lambda: gateway)
+
+    with pytest.raises(proof.WorkflowProofError, match="expected succeeded"):
+        proof.main(
+            [
+                "verify",
+                "--job-id",
+                job_id,
+                "--expect-nonce",
+                "proof-nonce",
+                "--expect-provider-mode",
+                "live_provider",
+            ]
+        )
+
+    gateway.row["status"] = "succeeded"
+    gateway.row["finished_at"] = "2026-06-23T16:00:00+00:00"
+    gateway.row["execution_metadata"]["workflow_proof"]["finished_at"] = (
+        "2026-06-23T16:00:00+00:00"
+    )
+    with pytest.raises(proof.WorkflowProofError, match="expected nonce"):
+        proof.main(
+            [
+                "verify",
+                "--job-id",
+                job_id,
+                "--expect-nonce",
+                "proof-nonce",
+                "--expect-provider-mode",
+                "live_provider",
+            ]
+        )
+
+
 def test_workflow_proof_rejects_non_proof_jobs() -> None:
     from workflows.proof import WorkflowProofError, run_workflow_proof
 

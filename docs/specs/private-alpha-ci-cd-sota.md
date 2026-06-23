@@ -16,10 +16,20 @@ relevant details and addenda in
 `docs/specs/private-alpha-next-decision-memo.md`.
 
 Implementation note: the release gate now centers on local smoke, Render
-release-config audit, live API/web deploy SHA checks, bilingual canary evidence,
-and a per-candidate release manifest. Keep this document as the release gate
-contract whenever a candidate is promoted toward tester-facing validation or
-deployment.
+release-config audit, live API/web deploy SHA checks, workflow env parity proof,
+bilingual canary evidence, provider-path canary evidence, and a per-candidate
+release manifest. Keep this document as the release gate contract whenever a
+candidate is promoted toward tester-facing validation or deployment.
+
+Issue #124 tightened the gate after `argus-api` and `argus-app` were aligned to
+a candidate SHA while `argus-backtests` could still run with an effective dev
+provider mode. For tester-facing releases, deploy status alone is insufficient:
+the release captain must also prove the `argus-backtests` workflow env reports
+`ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider`, all required workflow secrets
+are present only as redacted proof, `workflow_proof` confirms the effective
+runtime with `workflow_runtime_provider_mode=live_provider` and
+`workflow_runtime_proof=ready`, and a provider-path canary exercises a
+non-trivial live-provider symbol set before promotion.
 
 ## Purpose
 
@@ -445,6 +455,13 @@ Scope:
 - Include English and Spanish.
 - Include stream failure/reload/recovery behavior.
 - Include workflow mode verification.
+- Include workflow env parity verification: the canary evidence must carry
+  `workflow_env_fingerprint` and `workflow_env_status=ready`.
+- Include effective workflow runtime proof: warmup must run `workflow_proof` and
+  emit `workflow_runtime_provider_mode=live_provider` plus
+  `workflow_runtime_proof=ready`.
+- Include a provider-path canary that catches live-provider workflow drift before
+  testers see a failed executable backtest.
 - Keep canary output privacy-safe.
 - When a canary fails after warmup passes, write a sanitized failed-capture
   artifact and replay it locally before redeploying. The replay should exercise

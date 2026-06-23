@@ -126,6 +126,7 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
     secret_names = {
         "RENDER_API_KEY",
         "ARGUS_OPS_TOKEN",
+        "ARGUS_WORKFLOW_DATABASE_URL",
         "ARGUS_CANARY_EMAIL",
         "ARGUS_CANARY_PASSWORD",
         "ARGUS_CANARY_SUPABASE_URL",
@@ -142,9 +143,11 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
     assert secret_steps["Warm Render product path"] == {
         "RENDER_API_KEY",
         "ARGUS_OPS_TOKEN",
+        "ARGUS_WORKFLOW_DATABASE_URL",
     }
     assert secret_steps["Run authenticated English golden-path canary"] == secret_names
     assert secret_steps["Run authenticated Spanish golden-path canary"] == secret_names
+    assert secret_steps["Run provider-path-sensitive Spanish canary"] == secret_names
     assert secret_steps["Upload canary evidence"] == set()
 
     for step in steps:
@@ -153,6 +156,7 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
             "Warm Render product path",
             "Run authenticated English golden-path canary",
             "Run authenticated Spanish golden-path canary",
+            "Run provider-path-sensitive Spanish canary",
         }:
             continue
         assert not (set((step.get("env") or {}).keys()) & secret_names)
@@ -178,15 +182,29 @@ def test_private_alpha_canary_workflow_runs_bilingual_evidence_matrix() -> None:
         ]
         is True
     )
+    assert (
+        steps_by_name["Run provider-path-sensitive Spanish canary"][
+            "continue-on-error"
+        ]
+        is True
+    )
     assert "ARGUS_CANARY_LANGUAGE=en" in joined_steps
     assert "ARGUS_CANARY_LANGUAGE=es-419" in joined_steps
     assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/en.json" in joined_steps
     assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json" in joined_steps
+    assert (
+        "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/provider-path.json"
+        in joined_steps
+    )
+    assert "ARGUS_CANARY_FOCUSED_SYMBOL_PATH=SNDK,AMD,NVDA,GS" in joined_steps
     assert "temp/canary-evidence/en.exit" in joined_steps
     assert "temp/canary-evidence/es-419.exit" in joined_steps
-    assert "Require bilingual canary matrix" in steps_by_name
+    assert "temp/canary-evidence/provider-path.exit" in joined_steps
+    assert "Require private-alpha canary matrix" in steps_by_name
     assert "canary_locale_${locale}_exit" in joined_steps
     assert "Prueba una estrategia de comprar y mantener AAPL y MSFT" in joined_steps
+    assert "SNDK, AMD, NVDA y Goldman Sachs" in joined_steps
+    assert "for locale in en es-419 provider-path" in joined_steps
     assert "actions/upload-artifact@v4" in uses_steps
     assert "private-alpha-canary-evidence" in CANARY_WORKFLOW_PATH.read_text(
         encoding="utf-8"

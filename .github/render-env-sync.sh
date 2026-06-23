@@ -38,7 +38,7 @@ Commands:
   api-proof-shadow-on     Enable proof-only shadow dispatch to workflow_proof.
   api-real-workflow-on    Enable real async dispatch to run_backtest_job.
   api-runtime             Sync argus-api build/start commands and Poetry pin.
-  release-config-audit    Read-only API/web env audit with redacted fingerprint.
+  release-config-audit    Read-only API/web/workflow env audit with redacted fingerprints.
   workflow-proof          Sync workflow DB/task/provider env vars on argus-backtests.
   workflow-release        Release argus-backtests so env/build changes reach new runs.
   workflow-runtime        Sync workflow build/start commands on argus-backtests.
@@ -127,8 +127,33 @@ ARGUS_RELEASE_WEB_ENV_EXPECTED=(
   "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false"
 )
 
+ARGUS_RELEASE_WORKFLOW_ENV_EXPECTED=(
+  "ARGUS_WORKFLOW_DATABASE_URL=<redacted-present>"
+  "ARGUS_RENDER_WORKFLOW_PROOF_TASK=$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"
+  "ARGUS_WORKFLOW_PROOF_PLAN=starter"
+  "POETRY_VERSION=$ARGUS_RENDER_POETRY_VERSION"
+  "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS=300"
+  "ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider"
+  "ENABLE_MARKET_DATA_CACHE=false"
+  "ALPACA_API_KEY=<redacted-present>"
+  "ALPACA_SECRET_KEY=<redacted-present>"
+  "ALPACA_PAPER_TRADING=true"
+  "OPENROUTER_API_KEY=<redacted-present>"
+  "ARGUS_UTILITY_MODEL=qwen/qwen3.5-9b"
+  "ARGUS_UTILITY_FALLBACK_MODEL=google/gemini-2.5-flash-lite"
+  "ARGUS_CHAT_MODEL=deepseek/deepseek-v4-flash"
+  "ARGUS_CHAT_FALLBACK_MODEL=qwen/qwen3.5-9b"
+  "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=30"
+  "ARGUS_STRUCTURED_MODEL=mistralai/mistral-small-2603"
+  "ARGUS_STRUCTURED_FALLBACK_MODEL=deepseek/deepseek-v4-flash"
+  "ARGUS_CONTEXT_MODEL=openai/gpt-oss-120b"
+  "ARGUS_CONTEXT_FALLBACK_MODEL=deepseek/deepseek-v4-flash"
+)
+
 AUDIT_FAILURES=0
 AUDIT_FINGERPRINT_ROWS=()
+WORKFLOW_AUDIT_FAILURES=0
+WORKFLOW_AUDIT_FINGERPRINT_ROWS=()
 
 require_local_env() {
   local name="$1"
@@ -273,7 +298,7 @@ print_web_deploy_status() {
 is_secret_render_env_key() {
   local key="$1"
   case "$key" in
-    ARGUS_OPS_TOKEN|DATABASE_URL|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_JWT_SECRET|RENDER_API_KEY|OPENROUTER_API_KEY|ALPACA_API_KEY|ALPACA_SECRET_KEY|NEXT_PUBLIC_POSTHOG_KEY)
+    ARGUS_OPS_TOKEN|DATABASE_URL|ARGUS_WORKFLOW_DATABASE_URL|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_JWT_SECRET|RENDER_API_KEY|OPENROUTER_API_KEY|ALPACA_API_KEY|ALPACA_SECRET_KEY|NEXT_PUBLIC_POSTHOG_KEY)
       return 0
       ;;
     *)
@@ -324,6 +349,26 @@ list_contains() {
   return 1
 }
 
+record_audit_row() {
+  local service="$1"
+  local row="$2"
+
+  if [ "$service" = "argus-backtests" ]; then
+    WORKFLOW_AUDIT_FINGERPRINT_ROWS+=("${service}:${row}")
+    return
+  fi
+  AUDIT_FINGERPRINT_ROWS+=("${service}:${row}")
+}
+
+record_audit_failure() {
+  local service="$1"
+
+  AUDIT_FAILURES=$((AUDIT_FAILURES + 1))
+  if [ "$service" = "argus-backtests" ]; then
+    WORKFLOW_AUDIT_FAILURES=$((WORKFLOW_AUDIT_FAILURES + 1))
+  fi
+}
+
 render_env_status_value() {
   local env_json="$1"
   local key="$2"
@@ -353,14 +398,14 @@ audit_expected_value() {
   local actual
 
   actual="$(render_env_status_value "$env_json" "$key")"
-  AUDIT_FINGERPRINT_ROWS+=("${service}:${key}=${actual}")
+  record_audit_row "$service" "${key}=${actual}"
   if [ "$actual" = "$expected" ]; then
     echo "ok ${service}:${key}=${actual}"
     return
   fi
 
   echo "drift ${service}:${key} expected=${expected} actual=${actual}"
-  AUDIT_FAILURES=$((AUDIT_FAILURES + 1))
+  record_audit_failure "$service"
 }
 
 audit_render_service_config() {
@@ -384,9 +429,9 @@ audit_forbidden_render_env_keys() {
   local key
   for key in "$@"; do
     if render_env_has_key "$env_json" "$key"; then
-      AUDIT_FINGERPRINT_ROWS+=("${service}:${key}=<forbidden>")
+      record_audit_row "$service" "${key}=<forbidden>"
       echo "forbidden ${service}:${key} forbidden_legacy_env"
-      AUDIT_FAILURES=$((AUDIT_FAILURES + 1))
+      record_audit_failure "$service"
     fi
   done
 }
@@ -407,9 +452,9 @@ audit_unexpected_render_env_keys() {
     if list_contains "$key" "$@"; then
       continue
     fi
-    AUDIT_FINGERPRINT_ROWS+=("${service}:${key}=<unexpected>")
+    record_audit_row "$service" "${key}=<unexpected>"
     echo "forbidden ${service}:${key} unexpected_live_env"
-    AUDIT_FAILURES=$((AUDIT_FAILURES + 1))
+    record_audit_failure "$service"
   done < <(render_env_keys "$env_json")
 }
 
@@ -444,12 +489,20 @@ expected_api_mode_pairs() {
   esac
 }
 
-render_env_fingerprint() {
+fingerprint_rows() {
   if command -v sha256sum >/dev/null 2>&1; then
-    printf "%s\n" "${AUDIT_FINGERPRINT_ROWS[@]}" | LC_ALL=C sort | sha256sum | awk '{print $1}'
+    printf "%s\n" "$@" | LC_ALL=C sort | sha256sum | awk '{print $1}'
     return
   fi
-  printf "%s\n" "${AUDIT_FINGERPRINT_ROWS[@]}" | LC_ALL=C sort | shasum -a 256 | awk '{print $1}'
+  printf "%s\n" "$@" | LC_ALL=C sort | shasum -a 256 | awk '{print $1}'
+}
+
+render_env_fingerprint() {
+  fingerprint_rows "${AUDIT_FINGERPRINT_ROWS[@]}"
+}
+
+workflow_env_fingerprint() {
+  fingerprint_rows "${WORKFLOW_AUDIT_FINGERPRINT_ROWS[@]}"
 }
 
 audit_release_config() {
@@ -486,8 +539,10 @@ audit_release_config() {
   require_local_env RENDER_API_KEY
   AUDIT_FAILURES=0
   AUDIT_FINGERPRINT_ROWS=()
+  WORKFLOW_AUDIT_FAILURES=0
+  WORKFLOW_AUDIT_FINGERPRINT_ROWS=()
 
-  local api_env_json web_env_json workflow_task real_workflow_task fingerprint
+  local api_env_json web_env_json workflow_env_json workflow_task real_workflow_task fingerprint workflow_fingerprint
   local mode_pairs=()
   local mode_pair
   while IFS= read -r mode_pair; do
@@ -495,24 +550,35 @@ audit_release_config() {
   done < <(expected_api_mode_pairs "$expected_mode")
   api_env_json="$(render_env_json "$API_SERVICE_ID")"
   web_env_json="$(render_env_json "$WEB_SERVICE_ID")"
+  workflow_env_json="$(render_env_json "$WORKFLOW_SERVICE_ID")"
 
   echo "Argus release config audit"
   echo "expected_mode=$expected_mode"
   audit_forbidden_render_env_keys "$api_env_json" "argus-api" "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
   audit_forbidden_render_env_keys "$web_env_json" "argus-app" "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
+  audit_forbidden_render_env_keys "$workflow_env_json" "argus-backtests" "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
   audit_unexpected_render_env_keys "$api_env_json" "argus-api" "${ARGUS_RENDER_API_ENV[@]}"
   audit_unexpected_render_env_keys "$web_env_json" "argus-app" "${ARGUS_RENDER_WEB_ENV[@]}"
+  audit_unexpected_render_env_keys "$workflow_env_json" "argus-backtests" "${ARGUS_RENDER_WORKFLOW_PROOF_ENV[@]}"
   audit_render_service_config "$api_env_json" "argus-api" "${ARGUS_RELEASE_API_ENV_EXPECTED[@]}"
   audit_render_service_config "$api_env_json" "argus-api" "${mode_pairs[@]}"
   audit_render_service_config "$web_env_json" "argus-app" "${ARGUS_RELEASE_WEB_ENV_EXPECTED[@]}"
+  audit_render_service_config "$workflow_env_json" "argus-backtests" "${ARGUS_RELEASE_WORKFLOW_ENV_EXPECTED[@]}"
 
   workflow_task="$(render_env_status_value "$api_env_json" ARGUS_BACKTEST_WORKFLOW_TASK)"
   real_workflow_task="$(render_env_status_value "$api_env_json" ARGUS_BACKTEST_REAL_WORKFLOW_TASK)"
   fingerprint="$(render_env_fingerprint)"
+  workflow_fingerprint="$(workflow_env_fingerprint)"
 
   echo "workflow_task=$workflow_task"
   echo "real_workflow_task=$real_workflow_task"
   echo "env_fingerprint=$fingerprint"
+  echo "workflow_env_fingerprint=$workflow_fingerprint"
+  if [ "$WORKFLOW_AUDIT_FAILURES" -eq 0 ]; then
+    echo "workflow_env_status=ready"
+  else
+    echo "workflow_env_status=drift"
+  fi
   if [ "$AUDIT_FAILURES" -eq 0 ]; then
     echo "status=ready"
     return 0
@@ -614,7 +680,7 @@ sync_workflow_proof() {
   put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_WORKFLOW_PROOF_PLAN "${ARGUS_WORKFLOW_PROOF_PLAN:-starter}"
   put_render_env "$WORKFLOW_SERVICE_ID" POETRY_VERSION "$ARGUS_RENDER_POETRY_VERSION"
   put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS "${ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS:-300}"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_MARKET_DATA_PROVIDER_MODE "${ARGUS_MARKET_DATA_PROVIDER_MODE:-live_provider}"
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_MARKET_DATA_PROVIDER_MODE live_provider
   put_render_env "$WORKFLOW_SERVICE_ID" ENABLE_MARKET_DATA_CACHE "${ENABLE_MARKET_DATA_CACHE:-false}"
   put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_API_KEY "$ALPACA_API_KEY"
   put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_SECRET_KEY "$ALPACA_SECRET_KEY"
