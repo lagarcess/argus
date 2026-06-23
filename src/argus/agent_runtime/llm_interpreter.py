@@ -1706,6 +1706,8 @@ def _response_is_audited_requested_asset_answer_patch(
         return False
     if response.assistant_response:
         return False
+    if response.candidate_strategy_draft is None:
+        return False
     return _draft_has_valid_requested_asset_update(
         response.candidate_strategy_draft,
         request,
