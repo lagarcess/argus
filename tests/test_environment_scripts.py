@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -104,6 +105,7 @@ def _run_render_release_audit(
     web_env_json: str,
     workflow_env_json: str | None = None,
     expect_mode: str = "safe-off",
+    isolate: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -146,14 +148,38 @@ esac
             "FAKE_CURL_REQUEST_LOG": str(request_log),
         }
     )
+
+    script = ".github/render-env-sync.sh"
+    cwd = str(ROOT)
+    if isolate:
+        # Mirror the scripts into a root with no .env so argus_load_root_env is a
+        # no-op, then scrub workflow secrets from the process env. This reproduces
+        # the daily-gate warmup step, which exports neither .env nor the workflow
+        # secrets (ALPACA_*/OPENROUTER_API_KEY) it audits.
+        github_dir = tmp_path / ".github"
+        github_dir.mkdir()
+        for name in ("render-env-sync.sh", "argus-env.sh"):
+            copied = github_dir / name
+            shutil.copy(ROOT / ".github" / name, copied)
+            copied.chmod(0o755)
+        for secret in (
+            "ALPACA_API_KEY",
+            "ALPACA_SECRET_KEY",
+            "OPENROUTER_API_KEY",
+            "ARGUS_WORKFLOW_DATABASE_URL",
+        ):
+            env.pop(secret, None)
+        script = str(github_dir / "render-env-sync.sh")
+        cwd = str(tmp_path)
+
     return subprocess.run(
         [
-            ".github/render-env-sync.sh",
+            script,
             "release-config-audit",
             "--expect-mode",
             expect_mode,
         ],
-        cwd=ROOT,
+        cwd=cwd,
         env=env,
         capture_output=True,
         text=True,
@@ -777,6 +803,55 @@ def test_render_env_sync_audit_includes_workflow_env_parity(
     assert "workflow_env_status=ready" in result.stdout
     assert "status=ready" in result.stdout
     assert "postgres://workflow-db.example/argus" not in result.stdout
+
+
+def test_render_env_sync_audit_workflow_secrets_ready_without_local_secrets(
+    tmp_path: Path,
+) -> None:
+    # Regression for the daily-gate warmup step: it audits the workflow service
+    # without exporting workflow secrets (ALPACA_*/OPENROUTER_API_KEY) or a .env.
+    # The audit must verify those secrets are present on Render, not in the audit
+    # runner's local env, so it stays ready even when the runner has none of them.
+    result = _run_render_release_audit(
+        tmp_path,
+        expect_mode="real-workflow",
+        api_env_json=_real_workflow_api_env_payload(),
+        web_env_json=_render_env_payload("argus-app"),
+        workflow_env_json=_workflow_env_payload(),
+        isolate=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    for secret in ("ALPACA_API_KEY", "ALPACA_SECRET_KEY", "OPENROUTER_API_KEY"):
+        assert f"ok argus-backtests:{secret}=<redacted-present>" in result.stdout
+        assert f"drift argus-backtests:{secret}" not in result.stdout
+    assert "ok argus-backtests:ARGUS_WORKFLOW_DATABASE_URL=<redacted-present>" in (
+        result.stdout
+    )
+    assert "workflow_env_status=ready" in result.stdout
+    assert "status=ready" in result.stdout
+
+
+def test_render_env_sync_audit_flags_workflow_secret_missing_on_render(
+    tmp_path: Path,
+) -> None:
+    # The unconditional <redacted-present> expectation must still catch a secret
+    # that is genuinely absent on the Render workflow service.
+    result = _run_render_release_audit(
+        tmp_path,
+        expect_mode="real-workflow",
+        api_env_json=_real_workflow_api_env_payload(),
+        web_env_json=_render_env_payload("argus-app"),
+        workflow_env_json=_workflow_env_payload(omit={"OPENROUTER_API_KEY"}),
+        isolate=True,
+    )
+
+    assert result.returncode == 1
+    assert (
+        "drift argus-backtests:OPENROUTER_API_KEY "
+        "expected=<redacted-present> actual=<missing-or-empty>"
+    ) in result.stdout
+    assert "workflow_env_status=drift" in result.stdout
 
 
 def test_render_env_sync_audit_fails_when_workflow_provider_mode_is_not_live(

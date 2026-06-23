@@ -473,15 +473,16 @@ workflow_render_env_value() {
 workflow_render_env_expected_status() {
   local key="$1"
   local value
-  value="$(workflow_render_env_value "$key")"
+  # Secret keys are verified for presence on Render, not in the audit runner's
+  # local env. The read-only audit step (warmup) intentionally does not export
+  # workflow secrets like ALPACA_*/OPENROUTER_API_KEY, so expecting them locally
+  # would report false drift. Render redacts secret values, so the only signal
+  # we can assert is <redacted-present>.
   if is_secret_render_env_key "$key"; then
-    if [ -z "$value" ]; then
-      echo "<missing-or-empty>"
-    else
-      echo "<redacted-present>"
-    fi
+    echo "<redacted-present>"
     return
   fi
+  value="$(workflow_render_env_value "$key")"
   if [ -z "$value" ]; then
     echo "<missing>"
     return
