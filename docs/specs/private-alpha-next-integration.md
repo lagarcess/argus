@@ -39,13 +39,17 @@ Before testers are invited, the release captain must prove:
 - `argus-api` and `argus-app` latest Render deploys are `live` at the candidate
   SHA;
 - Render release config audit produced the expected `env_fingerprint`,
-  `workflow_task`, and `real_workflow_task`;
+  `workflow_env_fingerprint`, `workflow_env_status=ready`, `workflow_task`, and
+  `real_workflow_task`;
+- warmup ran `workflow_proof` against the deployed `argus-backtests` workflow
+  and emitted `workflow_runtime_provider_mode=live_provider` plus
+  `workflow_runtime_proof=ready`;
 - the `Private Alpha Canary` workflow or equivalent manual commands passed both
-  English and Spanish canaries;
+  English, Spanish, and provider-path canaries;
 - the canary evidence artifact is retained as `private-alpha-canary-evidence`;
 - a release manifest exists from `docs/release-manifests/TEMPLATE.md` and names
-  SHA, env fingerprint, canary evidence, rollback target, approver, and
-  backtest service mode.
+  SHA, env fingerprints, workflow env status, canary evidence, rollback target,
+  approver, and backtest service mode.
 
 Production deploys remain manual and founder-directed. No production deploy
 happens from this branch unless the founder explicitly asks for a deploy check.

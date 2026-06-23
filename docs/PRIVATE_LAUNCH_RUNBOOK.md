@@ -135,29 +135,46 @@ cd web && bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium
 ```
 
 Only send the app URL to testers after API deploy-status, app deploy-status,
-local smoke, warmup, English canary, Spanish canary, and the release manifest all
-pass against the intended candidate commit. If either deploy-status reports a
-different commit, deploy the candidate branch before continuing. If warmup fails,
-do not invite testers yet. Check Render service status and redeploy only if the
-service is stuck. If warmup passes but a canary fails, treat it as an Argus
-product-path regression and inspect the failed-capture replay, API logs,
-Supabase messages, backtest runs, and route receipts using the hashed labels and
-internal access controls from the canary evidence.
+local smoke, warmup, English canary, Spanish canary, provider-path canary, and
+the release manifest all pass against the intended candidate commit. If either
+deploy-status reports a different commit, deploy the candidate branch before
+continuing. If warmup fails, do not invite testers yet. Check Render service
+status and redeploy only if the service is stuck. If warmup passes but a canary
+fails, treat it as an Argus product-path regression and inspect the failed-capture
+replay, API logs, Supabase messages, backtest runs, and route receipts using the
+hashed labels and internal access controls from the canary evidence.
 
 For the daily automated gate, configure GitHub repository secrets with the same
-canary variables above plus `RENDER_API_KEY`, then use the scheduled or manually
-dispatched `Private Alpha Canary` workflow. That workflow runs the local smoke
-gate, warmup, English canary, Spanish canary, and a bilingual matrix check. It
-uploads the `private-alpha-canary-evidence` artifact containing per-locale JSON
-evidence plus exit-code files, and it does not deploy or configure analytics.
-Secrets are scoped to the operational steps that need them; install and artifact
-upload steps do not receive canary credentials or service-role keys.
+canary variables above plus `RENDER_API_KEY` and `ARGUS_WORKFLOW_DATABASE_URL`,
+then use the scheduled or manually dispatched `Private Alpha Canary` workflow.
+Set `ARGUS_WORKFLOW_DATABASE_URL` from the `.env`/`.env.example` mapping to
+`SUPABASE_POSTGRES_TRANSACTION_POOLER_URL`; do not use the session pooler for
+short-lived workflow tasks. That workflow runs the local smoke gate, warmup,
+English canary, Spanish canary, provider-path canary, and a full matrix check.
+The provider-path canary exists specifically to catch live-provider workflow
+drift like issue #124: it exercises a non-trivial same-asset-class symbol set on
+`argus-backtests`, while `release-config-audit --expect-mode real-workflow`
+proves the workflow env itself is using `live_provider`. Warmup then runs the
+deployed `workflow_proof` task and requires
+`workflow_runtime_provider_mode=live_provider` and
+`workflow_runtime_proof=ready`, proving effective workflow runtime rather than
+only saved Render env vars. It uploads the `private-alpha-canary-evidence`
+artifact containing per-locale JSON evidence plus exit-code files, and it does
+not deploy or configure analytics. Secrets are scoped to the operational steps
+that need them; install and artifact upload steps do not receive canary
+credentials or service-role keys.
 
 After the gate passes, copy the relevant command output and canary evidence into
 a candidate manifest based on `docs/release-manifests/TEMPLATE.md`. The
 `env_fingerprint` emitted by `.github/render-env-sync.sh release-config-audit`
-is the API/web environment fingerprint; record it as `api_web_env_fingerprint`
-and keep the raw script output for audit traceability. The manifest must also
+remains the API/web environment fingerprint; record it as
+`api_web_env_fingerprint` and keep the raw script output for traceability. The
+workflow proof is recorded separately as `workflow_env_fingerprint` and
+`workflow_env_status`. The workflow env proof must show
+`workflow_env_status=ready`, `ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider`,
+redacted-present required workflow secrets,
+`workflow_runtime_provider_mode=live_provider`, and
+`workflow_runtime_proof=ready` before tester exposure. The manifest must also
 name the candidate SHA, deployed API/web SHAs, `workflow_task`,
 `real_workflow_task`, backtest service mode, workflow-service proof for
 `argus-backtests`, canary evidence, rollback target, and approver.

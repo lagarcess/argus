@@ -26,6 +26,8 @@ CAPTURE_PATH="${ARGUS_CANARY_CAPTURE_PATH:-}"
 CANDIDATE_SHA="${ARGUS_CANARY_SHA:-${GITHUB_SHA:-}}"
 CHECKED_OUT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
 PROMPT="${ARGUS_CANARY_PROMPT:-Test an equal-weight AAPL and MSFT buy-and-hold strategy from January 1, 2025 through June 5, 2026 with 10,000 dollars}"
+FOCUSED_SYMBOL_PATH="${ARGUS_CANARY_FOCUSED_SYMBOL_PATH:-}"
+REQUIRE_ASYNC_WORKFLOW="${ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW:-false}"
 
 if [ -z "$CHECKED_OUT_SHA" ]; then
   CHECKED_OUT_SHA="unknown"
@@ -88,6 +90,7 @@ PY
 WARMUP_OUTPUT=""
 API_DEPLOY_STATUS_OUTPUT=""
 WEB_DEPLOY_STATUS_OUTPUT=""
+WORKFLOW_VERSION_STATUS_OUTPUT=""
 print_sanitized_warmup_output() {
   CANARY_WARMUP_OUTPUT="$WARMUP_OUTPUT" python3 - <<'PY'
 import json
@@ -154,17 +157,30 @@ run_deploy_status_probe() {
   if ! WEB_DEPLOY_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" web-deploy-status)"; then
     fail_canary "deploy_status" "web_deploy_status_failed"
   fi
+  if ! WORKFLOW_VERSION_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" workflow-version-status)"; then
+    fail_canary "deploy_status" "workflow_version_status_failed"
+  fi
 
   API_DEPLOY_SHA="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" commit || true)"
   WEB_DEPLOY_SHA="$(extract_status_value "$WEB_DEPLOY_STATUS_OUTPUT" commit || true)"
   API_DEPLOY_STATUS="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" status || true)"
   WEB_DEPLOY_STATUS="$(extract_status_value "$WEB_DEPLOY_STATUS_OUTPUT" status || true)"
+  WORKFLOW_VERSION_ID="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" workflow_version_id || true)"
+  WORKFLOW_VERSION_STATUS="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" status || true)"
+  WORKFLOW_VERSION_COMMIT="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" commit || true)"
+  WORKFLOW_EXPECTED_VERSION_ID="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" expected_workflow_version_id || true)"
 
   if [ -z "$API_DEPLOY_SHA" ] || [ "$API_DEPLOY_SHA" = "<missing>" ]; then
     fail_canary "deploy_status" "api_deploy_sha_missing"
   fi
   if [ -z "$WEB_DEPLOY_SHA" ] || [ "$WEB_DEPLOY_SHA" = "<missing>" ]; then
     fail_canary "deploy_status" "web_deploy_sha_missing"
+  fi
+  if [ -z "$WORKFLOW_VERSION_ID" ] || [ "$WORKFLOW_VERSION_ID" = "<missing>" ]; then
+    fail_canary "deploy_status" "workflow_version_id_missing"
+  fi
+  if [ -z "$WORKFLOW_VERSION_COMMIT" ] || [ "$WORKFLOW_VERSION_COMMIT" = "<missing>" ]; then
+    fail_canary "deploy_status" "workflow_version_commit_missing"
   fi
   if [ "$API_DEPLOY_STATUS" != "live" ]; then
     echo "ERROR: argus-api latest deploy is not live."
@@ -182,11 +198,26 @@ run_deploy_status_probe() {
     echo "ERROR: argus-app deploy SHA does not match candidate SHA."
     fail_canary "deploy_status" "web_deploy_sha_mismatch"
   fi
+  if [ "$WORKFLOW_VERSION_STATUS" != "ready" ]; then
+    echo "ERROR: argus-backtests latest workflow version is not ready."
+    fail_canary "deploy_status" "workflow_version_not_ready"
+  fi
+  if [ "$WORKFLOW_VERSION_COMMIT" != "$CANDIDATE_SHA" ]; then
+    echo "ERROR: argus-backtests workflow release commit does not match candidate SHA."
+    fail_canary "deploy_status" "workflow_version_commit_mismatch"
+  fi
+  if [ "$WORKFLOW_EXPECTED_VERSION_ID" != "$WORKFLOW_VERSION_ID" ]; then
+    echo "ERROR: argus-backtests workflow version id does not match release proof."
+    fail_canary "deploy_status" "workflow_version_id_mismatch"
+  fi
 
   echo "canary_api_deploy_status=$API_DEPLOY_STATUS"
   echo "canary_web_deploy_status=$WEB_DEPLOY_STATUS"
   echo "canary_api_deploy_sha=$API_DEPLOY_SHA"
   echo "canary_web_deploy_sha=$WEB_DEPLOY_SHA"
+  echo "canary_workflow_version_status=$WORKFLOW_VERSION_STATUS"
+  echo "canary_workflow_version_commit=$WORKFLOW_VERSION_COMMIT"
+  echo "canary_workflow_version_id=$WORKFLOW_VERSION_ID"
 }
 
 validate_release_evidence_contract() {
@@ -199,12 +230,24 @@ validate_release_evidence_contract() {
   run_warmup_probe
 
   ENV_FINGERPRINT="$(extract_warmup_value env_fingerprint || true)"
+  WORKFLOW_ENV_FINGERPRINT="$(extract_warmup_value workflow_env_fingerprint || true)"
+  WORKFLOW_ENV_STATUS="$(extract_warmup_value workflow_env_status || true)"
+  WORKFLOW_RUNTIME_PROVIDER_MODE="$(extract_warmup_value workflow_runtime_provider_mode || true)"
+  WORKFLOW_RUNTIME_PROOF="$(extract_warmup_value workflow_runtime_proof || true)"
   WORKFLOW_TASK="$(extract_warmup_value workflow_task || true)"
   REAL_WORKFLOW_TASK="$(extract_warmup_value real_workflow_task || true)"
 
   if [[ ! "$ENV_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]; then
     echo "ERROR: release config audit did not emit a valid env_fingerprint."
     fail_canary "warmup" "missing_env_fingerprint"
+  fi
+  if [[ ! "$WORKFLOW_ENV_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "ERROR: release config audit did not emit a valid workflow_env_fingerprint."
+    fail_canary "warmup" "missing_workflow_env_fingerprint"
+  fi
+  if [ "$WORKFLOW_ENV_STATUS" != "ready" ]; then
+    echo "ERROR: release config audit did not report workflow_env_status=ready."
+    fail_canary "warmup" "workflow_env_drift"
   fi
   if [ -z "$WORKFLOW_TASK" ]; then
     echo "ERROR: release config audit did not emit workflow_task."
@@ -214,14 +257,78 @@ validate_release_evidence_contract() {
     echo "ERROR: release config audit did not emit real_workflow_task."
     fail_canary "warmup" "missing_real_workflow_task"
   fi
+  if [ "$EXPECT_MODE" = "real-workflow" ] && [ "$WORKFLOW_RUNTIME_PROVIDER_MODE" != "live_provider" ]; then
+    echo "ERROR: release runtime proof did not confirm live_provider."
+    fail_canary "warmup" "workflow_runtime_provider_mode_mismatch"
+  fi
+  if [ "$EXPECT_MODE" = "real-workflow" ] && [ "$WORKFLOW_RUNTIME_PROOF" != "ready" ]; then
+    echo "ERROR: release runtime proof did not report ready."
+    fail_canary "warmup" "workflow_runtime_proof_missing"
+  fi
 
   echo "canary_expected_mode=$EXPECT_MODE"
   echo "canary_env_fingerprint=$ENV_FINGERPRINT"
+  echo "canary_workflow_env_fingerprint=$WORKFLOW_ENV_FINGERPRINT"
+  echo "canary_workflow_env_status=$WORKFLOW_ENV_STATUS"
+  echo "canary_workflow_runtime_provider_mode=$WORKFLOW_RUNTIME_PROVIDER_MODE"
+  echo "canary_workflow_runtime_proof=$WORKFLOW_RUNTIME_PROOF"
   echo "canary_workflow_task=$WORKFLOW_TASK"
   echo "canary_real_workflow_task=$REAL_WORKFLOW_TASK"
   echo "canary_expected_sha=$CANDIDATE_SHA"
   echo "canary_checked_out_sha=$CHECKED_OUT_SHA"
   echo "canary_language=$LANGUAGE"
+  if [ -n "$FOCUSED_SYMBOL_PATH" ]; then
+    echo "canary_focused_symbol_path=$FOCUSED_SYMBOL_PATH"
+  fi
+}
+
+build_release_evidence_json() {
+  CANARY_EXPECTED_MODE="$EXPECT_MODE" \
+  CANARY_ENV_FINGERPRINT="$ENV_FINGERPRINT" \
+  CANARY_WORKFLOW_ENV_FINGERPRINT="$WORKFLOW_ENV_FINGERPRINT" \
+  CANARY_WORKFLOW_ENV_STATUS="$WORKFLOW_ENV_STATUS" \
+  CANARY_WORKFLOW_RUNTIME_PROVIDER_MODE="$WORKFLOW_RUNTIME_PROVIDER_MODE" \
+  CANARY_WORKFLOW_RUNTIME_PROOF="$WORKFLOW_RUNTIME_PROOF" \
+  CANARY_WORKFLOW_TASK="$WORKFLOW_TASK" \
+  CANARY_REAL_WORKFLOW_TASK="$REAL_WORKFLOW_TASK" \
+  CANARY_API_DEPLOY_SHA="$API_DEPLOY_SHA" \
+  CANARY_WEB_DEPLOY_SHA="$WEB_DEPLOY_SHA" \
+  CANARY_API_DEPLOY_STATUS="$API_DEPLOY_STATUS" \
+  CANARY_WEB_DEPLOY_STATUS="$WEB_DEPLOY_STATUS" \
+  CANARY_WORKFLOW_VERSION_COMMIT="$WORKFLOW_VERSION_COMMIT" \
+  CANARY_WORKFLOW_VERSION_ID="$WORKFLOW_VERSION_ID" \
+  CANARY_WORKFLOW_VERSION_STATUS="$WORKFLOW_VERSION_STATUS" \
+  CANARY_EXPECTED_SHA="$CANDIDATE_SHA" \
+  CANARY_CHECKED_OUT_SHA="$CHECKED_OUT_SHA" \
+  CANARY_LANGUAGE="$LANGUAGE" \
+  CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \
+  python3 - <<'PY'
+import json
+import os
+
+payload = {
+    "expected_mode": os.environ["CANARY_EXPECTED_MODE"],
+    "env_fingerprint": os.environ["CANARY_ENV_FINGERPRINT"],
+    "workflow_env_fingerprint": os.environ["CANARY_WORKFLOW_ENV_FINGERPRINT"],
+    "workflow_env_status": os.environ["CANARY_WORKFLOW_ENV_STATUS"],
+    "workflow_runtime_provider_mode": os.environ["CANARY_WORKFLOW_RUNTIME_PROVIDER_MODE"],
+    "workflow_runtime_proof": os.environ["CANARY_WORKFLOW_RUNTIME_PROOF"],
+    "workflow_task": os.environ["CANARY_WORKFLOW_TASK"],
+    "real_workflow_task": os.environ["CANARY_REAL_WORKFLOW_TASK"],
+    "api_deploy_sha": os.environ["CANARY_API_DEPLOY_SHA"] or None,
+    "web_deploy_sha": os.environ["CANARY_WEB_DEPLOY_SHA"] or None,
+    "api_deploy_status": os.environ["CANARY_API_DEPLOY_STATUS"] or None,
+    "web_deploy_status": os.environ["CANARY_WEB_DEPLOY_STATUS"] or None,
+    "workflow_version_commit": os.environ["CANARY_WORKFLOW_VERSION_COMMIT"] or None,
+    "workflow_version_id": os.environ["CANARY_WORKFLOW_VERSION_ID"] or None,
+    "workflow_version_status": os.environ["CANARY_WORKFLOW_VERSION_STATUS"] or None,
+    "candidate_sha": os.environ["CANARY_EXPECTED_SHA"],
+    "checked_out_sha": os.environ["CANARY_CHECKED_OUT_SHA"],
+    "language": os.environ["CANARY_LANGUAGE"],
+    "focused_symbol_path": os.environ["CANARY_FOCUSED_SYMBOL_PATH"] or None,
+}
+print(json.dumps(payload, sort_keys=True))
+PY
 }
 
 write_canary_evidence() {
@@ -230,21 +337,13 @@ write_canary_evidence() {
   fi
 
   mkdir -p "$(dirname "$EVIDENCE_PATH")"
+  local release_evidence_json
+  release_evidence_json="$(build_release_evidence_json)"
   CANARY_EVIDENCE_PATH="$EVIDENCE_PATH" \
   CANARY_STATUS="$CANARY_STATUS" \
   CANARY_FAILURE_STAGE="$CANARY_FAILURE_STAGE" \
   CANARY_FAILURE_REASON="$CANARY_FAILURE_REASON" \
-  CANARY_EXPECTED_MODE="$EXPECT_MODE" \
-  CANARY_ENV_FINGERPRINT="$ENV_FINGERPRINT" \
-  CANARY_WORKFLOW_TASK="$WORKFLOW_TASK" \
-  CANARY_REAL_WORKFLOW_TASK="$REAL_WORKFLOW_TASK" \
-  CANARY_API_DEPLOY_SHA="$API_DEPLOY_SHA" \
-  CANARY_WEB_DEPLOY_SHA="$WEB_DEPLOY_SHA" \
-  CANARY_API_DEPLOY_STATUS="$API_DEPLOY_STATUS" \
-  CANARY_WEB_DEPLOY_STATUS="$WEB_DEPLOY_STATUS" \
-  CANARY_EXPECTED_SHA="$CANDIDATE_SHA" \
-  CANARY_CHECKED_OUT_SHA="$CHECKED_OUT_SHA" \
-  CANARY_LANGUAGE="$LANGUAGE" \
+  CANARY_RELEASE_EVIDENCE_JSON="$release_evidence_json" \
   CANARY_CONVERSATION_LABEL="$CONVERSATION_LABEL" \
   CANARY_BACKTEST_JOB_LABEL="$BACKTEST_JOB_LABEL" \
   CANARY_RESULT_LABEL="$RESULT_LABEL" \
@@ -255,27 +354,18 @@ import os
 import pathlib
 
 path = pathlib.Path(os.environ["CANARY_EVIDENCE_PATH"])
+release = json.loads(os.environ["CANARY_RELEASE_EVIDENCE_JSON"])
 payload = {
     "status": os.environ["CANARY_STATUS"],
     "failure_stage": os.environ["CANARY_FAILURE_STAGE"] or None,
     "failure_reason": os.environ["CANARY_FAILURE_REASON"] or None,
-    "expected_mode": os.environ["CANARY_EXPECTED_MODE"],
-    "env_fingerprint": os.environ["CANARY_ENV_FINGERPRINT"],
-    "workflow_task": os.environ["CANARY_WORKFLOW_TASK"],
-    "real_workflow_task": os.environ["CANARY_REAL_WORKFLOW_TASK"],
-    "api_deploy_sha": os.environ["CANARY_API_DEPLOY_SHA"] or None,
-    "web_deploy_sha": os.environ["CANARY_WEB_DEPLOY_SHA"] or None,
-    "api_deploy_status": os.environ["CANARY_API_DEPLOY_STATUS"] or None,
-    "web_deploy_status": os.environ["CANARY_WEB_DEPLOY_STATUS"] or None,
-    "candidate_sha": os.environ["CANARY_EXPECTED_SHA"],
-    "checked_out_sha": os.environ["CANARY_CHECKED_OUT_SHA"],
-    "language": os.environ["CANARY_LANGUAGE"],
     "conversation_label": os.environ["CANARY_CONVERSATION_LABEL"],
     "backtest_job_label": os.environ["CANARY_BACKTEST_JOB_LABEL"] or None,
     "result_label": os.environ["CANARY_RESULT_LABEL"] or None,
     "result_kind": os.environ["CANARY_RESULT_KIND"] or None,
     "privacy": "no_raw_ids; labels are sha256 prefixes",
 }
+payload.update(release)
 path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 print(f"canary_evidence_path={path}")
 PY
@@ -299,21 +389,14 @@ write_canary_capture() {
   fi
 
   local exit_code=0
+  local release_evidence_json
+  release_evidence_json="$(build_release_evidence_json)"
   CANARY_CAPTURE_PATH="$CAPTURE_PATH" \
   CANARY_STATUS="$CANARY_STATUS" \
   CANARY_FAILURE_STAGE="$CANARY_FAILURE_STAGE" \
   CANARY_FAILURE_REASON="$CANARY_FAILURE_REASON" \
-  CANARY_EXPECTED_MODE="$EXPECT_MODE" \
-  CANARY_ENV_FINGERPRINT="$ENV_FINGERPRINT" \
-  CANARY_WORKFLOW_TASK="$WORKFLOW_TASK" \
-  CANARY_REAL_WORKFLOW_TASK="$REAL_WORKFLOW_TASK" \
-  CANARY_API_DEPLOY_SHA="$API_DEPLOY_SHA" \
-  CANARY_WEB_DEPLOY_SHA="$WEB_DEPLOY_SHA" \
-  CANARY_API_DEPLOY_STATUS="$API_DEPLOY_STATUS" \
-  CANARY_WEB_DEPLOY_STATUS="$WEB_DEPLOY_STATUS" \
-  CANARY_EXPECTED_SHA="$CANDIDATE_SHA" \
-  CANARY_CHECKED_OUT_SHA="$CHECKED_OUT_SHA" \
-  CANARY_LANGUAGE="$LANGUAGE" \
+  CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \
+  CANARY_RELEASE_EVIDENCE_JSON="$release_evidence_json" \
   CANARY_PROMPT="$PROMPT" \
   CANARY_RUN_ACTION="${RUN_ACTION:-}" \
   CANARY_CONVERSATION_LABEL="$CONVERSATION_LABEL" \
@@ -463,6 +546,7 @@ messages_payload = read_json_file(os.environ["CANARY_MESSAGES_FILE"])
 message_artifacts = extract_message_artifacts(messages_payload)
 job_response = read_json_file(os.environ["CANARY_JOB_RESPONSE_FILE"])
 receipt_payload = read_json_file(os.environ["CANARY_RECEIPT_ROWS_FILE"])
+release = json.loads(os.environ["CANARY_RELEASE_EVIDENCE_JSON"])
 run_action = None
 if os.environ["CANARY_RUN_ACTION"]:
     try:
@@ -471,8 +555,9 @@ if os.environ["CANARY_RUN_ACTION"]:
         run_action = None
 
 launch_payload = {
-    "language": os.environ["CANARY_LANGUAGE"],
+    "language": release["language"],
     "message": os.environ["CANARY_PROMPT"],
+    "focused_symbol_path": os.environ["CANARY_FOCUSED_SYMBOL_PATH"] or None,
     "action": run_action,
     "confirmation_payload": message_artifacts.get("confirmation_payload"),
 }
@@ -489,18 +574,7 @@ payload = {
         "reason": os.environ["CANARY_FAILURE_REASON"] or None,
         "status": os.environ["CANARY_STATUS"],
     },
-    "release": {
-        "expected_mode": os.environ["CANARY_EXPECTED_MODE"],
-        "env_fingerprint": os.environ["CANARY_ENV_FINGERPRINT"],
-        "workflow_task": os.environ["CANARY_WORKFLOW_TASK"],
-        "real_workflow_task": os.environ["CANARY_REAL_WORKFLOW_TASK"],
-        "api_deploy_sha": os.environ["CANARY_API_DEPLOY_SHA"] or None,
-        "web_deploy_sha": os.environ["CANARY_WEB_DEPLOY_SHA"] or None,
-        "api_deploy_status": os.environ["CANARY_API_DEPLOY_STATUS"] or None,
-        "web_deploy_status": os.environ["CANARY_WEB_DEPLOY_STATUS"] or None,
-        "candidate_sha": os.environ["CANARY_EXPECTED_SHA"],
-        "checked_out_sha": os.environ["CANARY_CHECKED_OUT_SHA"],
-    },
+    "release": release,
     "labels": {
         "conversation": os.environ["CANARY_CONVERSATION_LABEL"] or None,
         "backtest_job": os.environ["CANARY_BACKTEST_JOB_LABEL"] or None,
@@ -638,19 +712,131 @@ handle_stream_failure() {
   fail_canary "${stream_name}_stream" "stream_transport_failed"
 }
 
+assert_focused_symbol_path() {
+  local source_name="$1"
+  local json_file="${2:-}"
+
+  if [ -z "$FOCUSED_SYMBOL_PATH" ]; then
+    return 0
+  fi
+
+  local exit_code=0
+  CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \
+  CANARY_RUN_ACTION="$RUN_ACTION" \
+  CANARY_JSON_FILE="$json_file" \
+  CANARY_SOURCE_NAME="$source_name" \
+  python3 - <<'PY' || exit_code=$?
+import json
+import os
+import pathlib
+from typing import Any
+
+expected = {
+    symbol.strip().upper()
+    for symbol in os.environ["CANARY_FOCUSED_SYMBOL_PATH"].split(",")
+    if symbol.strip()
+}
+actual: set[str] = set()
+
+SYMBOL_COLLECTION_KEYS = {
+    "asset_universe",
+    "asset_symbols",
+    "assets",
+    "symbols",
+    "tickers",
+}
+SYMBOL_VALUE_KEYS = {"symbol", "ticker"}
+
+
+def add_symbol(value: Any) -> None:
+    if not isinstance(value, str):
+        return
+    symbol = value.strip().upper()
+    if symbol:
+        actual.add(symbol)
+
+
+def collect_symbol_collection(value: Any) -> None:
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                for key in SYMBOL_VALUE_KEYS:
+                    add_symbol(item.get(key))
+            else:
+                add_symbol(item)
+        return
+    if isinstance(value, dict):
+        for key in SYMBOL_VALUE_KEYS:
+            add_symbol(value.get(key))
+
+
+def collect_canonical_symbols(value: Any) -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized_key = str(key).lower()
+            if normalized_key in SYMBOL_COLLECTION_KEYS:
+                collect_symbol_collection(item)
+                continue
+            if normalized_key in SYMBOL_VALUE_KEYS:
+                add_symbol(item)
+                continue
+            collect_canonical_symbols(item)
+        return
+    if isinstance(value, list):
+        for item in value:
+            collect_canonical_symbols(item)
+
+
+source_name = os.environ["CANARY_SOURCE_NAME"]
+if source_name == "run_action":
+    try:
+        collect_canonical_symbols(json.loads(os.environ["CANARY_RUN_ACTION"]))
+    except json.JSONDecodeError:
+        pass
+
+json_file = os.environ.get("CANARY_JSON_FILE", "")
+if json_file:
+    path = pathlib.Path(json_file)
+    if path.exists() and path.stat().st_size > 0:
+        try:
+            collect_canonical_symbols(json.loads(path.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+
+missing = sorted(expected - actual)
+if missing:
+    raise SystemExit(
+        f"{source_name} focused symbol path missing expected symbols: "
+        f"expected={sorted(expected)} actual={sorted(actual)}"
+    )
+PY
+  if [ "$exit_code" -ne 0 ]; then
+    fail_canary "$source_name" "focused_symbol_path_mismatch"
+  fi
+}
+
 COOKIE_JAR="$(mktemp)"
 CONFIRMATION_STREAM="$(mktemp)"
+CONFIRMATION_PAYLOAD="$(mktemp)"
 RUN_STREAM="$(mktemp)"
 JOB_RESPONSE="$(mktemp)"
-trap 'rm -f "$COOKIE_JAR" "$CONFIRMATION_STREAM" "$RUN_STREAM" "$JOB_RESPONSE"' EXIT
+trap 'rm -f "$COOKIE_JAR" "$CONFIRMATION_STREAM" "$CONFIRMATION_PAYLOAD" "$RUN_STREAM" "$JOB_RESPONSE"' EXIT
 
 ENV_FINGERPRINT=""
+WORKFLOW_ENV_FINGERPRINT=""
+WORKFLOW_ENV_STATUS=""
+WORKFLOW_RUNTIME_PROVIDER_MODE=""
+WORKFLOW_RUNTIME_PROOF=""
 WORKFLOW_TASK=""
 REAL_WORKFLOW_TASK=""
 API_DEPLOY_SHA=""
 WEB_DEPLOY_SHA=""
 API_DEPLOY_STATUS=""
 WEB_DEPLOY_STATUS=""
+WORKFLOW_VERSION_COMMIT=""
+WORKFLOW_VERSION_ID=""
+WORKFLOW_VERSION_STATUS=""
+WORKFLOW_EXPECTED_VERSION_ID=""
 CONVERSATION_LABEL=""
 BACKTEST_JOB_LABEL=""
 RESULT_LABEL=""
@@ -731,8 +917,10 @@ if ! curl -fsS -N \
 fi
 
 if ! RUN_ACTION="$(
+CANARY_CONFIRMATION_PAYLOAD_FILE="$CONFIRMATION_PAYLOAD" \
 python3 - "$CONFIRMATION_STREAM" <<'PY'
 import json
+import os
 import pathlib
 import sys
 
@@ -750,12 +938,14 @@ if any(event.get("type") == "error" for event in events):
     raise SystemExit("confirmation stream returned error")
 
 confirmations = []
+final_payloads = []
 for event in events:
     if event.get("type") != "final":
         continue
     payload = event.get("payload", {})
     if not isinstance(payload, dict):
         continue
+    final_payloads.append(payload)
     for key in ("confirmation", "confirmation_card"):
         value = payload.get(key)
         if isinstance(value, dict):
@@ -770,6 +960,12 @@ for event in events:
 if not confirmations:
     raise SystemExit("confirmation stream did not return a confirmation")
 
+payload_file = pathlib.Path(os.environ["CANARY_CONFIRMATION_PAYLOAD_FILE"])
+payload_file.write_text(
+    json.dumps(final_payloads[-1] if final_payloads else {}, sort_keys=True),
+    encoding="utf-8",
+)
+
 for confirmation in confirmations:
     for action in confirmation.get("actions") or []:
         if isinstance(action, dict) and action.get("type") == "run_backtest":
@@ -781,6 +977,7 @@ PY
 )"; then
   fail_canary "confirmation_stream" "confirmation_contract_failed"
 fi
+assert_focused_symbol_path confirmation_payload "$CONFIRMATION_PAYLOAD"
 
 RUN_BODY="$(
   CONVERSATION_ID="$CONVERSATION_ID" RUN_ACTION="$RUN_ACTION" CANARY_LANGUAGE="$LANGUAGE" python3 - <<'PY'
@@ -927,8 +1124,12 @@ case "$RUN_RESULT" in
     BACKTEST_JOB_LABEL="$(privacy_safe_id_label backtest_job "$BACKTEST_JOB_ID")"
     RESULT_KIND="backtest_job"
     poll_backtest_job "$BACKTEST_JOB_ID"
+    assert_focused_symbol_path job_response "$JOB_RESPONSE"
     ;;
   run:*)
+    if [ "$REQUIRE_ASYNC_WORKFLOW" = "true" ]; then
+      fail_canary "run_stream" "missing_async_workflow_job"
+    fi
     BACKTEST_RUN_ID="${RUN_RESULT#run:}"
     RESULT_KIND="backtest_run"
     RESULT_LABEL="$(privacy_safe_id_label backtest_run "$BACKTEST_RUN_ID")"

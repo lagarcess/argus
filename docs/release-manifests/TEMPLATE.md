@@ -28,12 +28,20 @@ job ids; use the privacy-safe labels from canary evidence.
 
 - Expected mode:
 - api_web_env_fingerprint:
+- workflow_env_fingerprint:
+- workflow_env_status:
+- workflow_runtime_provider_mode:
+- workflow_runtime_proof:
 - env_fingerprint script output:
 - workflow_task:
 - real_workflow_task:
 - Backtest service mode:
 - Workflow service proof:
   - `argus-backtests` latest deploy/status:
+  - workflow provider mode verified: `live_provider`
+  - effective runtime provider mode verified: `live_provider`
+  - effective runtime proof status:
+  - required workflow secrets present with redacted proof:
   - active workflow task verified:
   - real workflow task verified:
 - Feature flags:
@@ -53,6 +61,11 @@ job ids; use the privacy-safe labels from canary evidence.
   - Exit status:
 - Spanish canary:
   - JSON evidence:
+  - Failed-capture replay, if failed:
+  - Exit status:
+- Provider-path canary:
+  - JSON evidence:
+  - Focused symbol path:
   - Failed-capture replay, if failed:
   - Exit status:
 - Browser QA, if applicable:
