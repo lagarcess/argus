@@ -287,6 +287,125 @@ def test_trigger_proof_serializes_generated_sdk_models() -> None:
     }
 
 
+def test_trigger_proof_prefers_canonical_task_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows.trigger_proof import _task_id
+
+    monkeypatch.setenv(
+        "ARGUS_BACKTEST_WORKFLOW_TASK",
+        "argus-backtests/workflow_proof",
+    )
+    monkeypatch.setenv(
+        "ARGUS_RENDER_WORKFLOW_PROOF_TASK",
+        "argus-render-workflow-proof/workflow_proof",
+    )
+
+    assert _task_id(None) == "argus-backtests/workflow_proof"
+
+
+def test_trigger_proof_uses_direct_task_run_api(monkeypatch: pytest.MonkeyPatch) -> None:
+    from workflows import trigger_proof as proof_trigger
+
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    class FakeDispatcher:
+        def __init__(self, *, task_id: str) -> None:
+            calls.append(("dispatcher_init", {"task_id": task_id}))
+
+        def dispatch(self, *, job_id: str, nonce: str) -> dict[str, object]:
+            calls.append(("dispatch", {"job_id": job_id, "nonce": nonce}))
+            return {"id": "trn-direct", "status": "pending"}
+
+    class FakeTaskRunClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get_task_run(self, task_run_id: str) -> dict[str, object]:
+            self.calls += 1
+            calls.append(
+                (
+                    "get_task_run",
+                    {"task_run_id": task_run_id, "call": self.calls},
+                )
+            )
+            if self.calls == 1:
+                return {"id": task_run_id, "status": "pending"}
+            return {
+                "id": task_run_id,
+                "status": "completed",
+                "results": [{"job_id": "job-1", "status": "succeeded"}],
+            }
+
+    monkeypatch.setattr(
+        "argus.api.chat.backtest_jobs.RenderWorkflowDispatcher",
+        FakeDispatcher,
+    )
+    monkeypatch.setattr(
+        "argus.api.chat.backtest_jobs.RenderTaskRunClient",
+        FakeTaskRunClient,
+    )
+    monkeypatch.setattr(proof_trigger.time, "sleep", lambda _seconds: None)
+
+    result = proof_trigger.trigger_proof(
+        task_id="argus-backtests/workflow_proof",
+        job_id="job-1",
+        nonce="nonce-1",
+        timeout_seconds=5,
+        poll_seconds=0.1,
+    )
+
+    assert result == {
+        "id": "trn-direct",
+        "status": "completed",
+        "results": [{"job_id": "job-1", "status": "succeeded"}],
+    }
+    assert calls == [
+        (
+            "dispatcher_init",
+            {"task_id": "argus-backtests/workflow_proof"},
+        ),
+        ("dispatch", {"job_id": "job-1", "nonce": "nonce-1"}),
+        ("get_task_run", {"task_run_id": "trn-direct", "call": 1}),
+        ("get_task_run", {"task_run_id": "trn-direct", "call": 2}),
+    ]
+
+
+def test_trigger_proof_fails_on_terminal_task_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows import trigger_proof as proof_trigger
+
+    class FakeDispatcher:
+        def __init__(self, *, task_id: str) -> None:
+            self.task_id = task_id
+
+        def dispatch(self, *, job_id: str, nonce: str) -> dict[str, object]:
+            return {"id": "trn-failed", "status": "pending"}
+
+    class FakeTaskRunClient:
+        def get_task_run(self, task_run_id: str) -> dict[str, object]:
+            return {"id": task_run_id, "status": "failed"}
+
+    monkeypatch.setattr(
+        "argus.api.chat.backtest_jobs.RenderWorkflowDispatcher",
+        FakeDispatcher,
+    )
+    monkeypatch.setattr(
+        "argus.api.chat.backtest_jobs.RenderTaskRunClient",
+        FakeTaskRunClient,
+    )
+
+    with pytest.raises(RuntimeError, match="finished with status failed"):
+        proof_trigger.trigger_proof(
+            task_id="argus-backtests/workflow_proof",
+            job_id="job-1",
+            nonce="nonce-1",
+            timeout_seconds=5,
+            poll_seconds=0.1,
+        )
+
+
 def test_seed_cli_creates_disposable_profile_for_empty_preview_branch(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

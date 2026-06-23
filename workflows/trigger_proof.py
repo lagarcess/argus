@@ -4,12 +4,19 @@ import argparse
 import json
 import os
 import sys
+import time
 from typing import Any
+
+DEFAULT_TIMEOUT_SECONDS = 120
+DEFAULT_POLL_SECONDS = 2.0
+COMPLETED_STATUSES = {"completed"}
+FAILED_STATUSES = {"failed", "canceled", "cancelled", "expired"}
 
 
 def _task_id(explicit: str | None = None) -> str:
     value = (
         explicit
+        or os.getenv("ARGUS_BACKTEST_WORKFLOW_TASK")
         or os.getenv("ARGUS_RENDER_WORKFLOW_PROOF_TASK")
         or "argus-backtests/workflow_proof"
     ).strip()
@@ -19,6 +26,15 @@ def _task_id(explicit: str | None = None) -> str:
             "{workflow-slug}/workflow_proof format."
         )
     return value
+
+
+def _positive_float(value: str | None, *, default: float) -> float:
+    if value is None or not value.strip():
+        return default
+    try:
+        return max(0.1, float(value))
+    except ValueError:
+        return default
 
 
 def _json_safe(value: Any) -> Any:
@@ -39,11 +55,44 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
-def trigger_proof(*, task_id: str, job_id: str, nonce: str) -> Any:
-    from render_sdk import Render
+def _task_run_id(value: dict[str, Any]) -> str:
+    task_run_id = str(value.get("id") or "").strip()
+    if not task_run_id:
+        raise RuntimeError("Render workflow proof dispatch did not return a task run id.")
+    return task_run_id
 
-    render = Render()
-    return render.workflows.run_task(task_id, [job_id, nonce])
+
+def trigger_proof(
+    *,
+    task_id: str,
+    job_id: str,
+    nonce: str,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    poll_seconds: float = DEFAULT_POLL_SECONDS,
+) -> Any:
+    from argus.api.chat.backtest_jobs import RenderTaskRunClient, RenderWorkflowDispatcher
+
+    dispatcher = RenderWorkflowDispatcher(task_id=task_id)
+    task_run = dispatcher.dispatch(job_id=job_id, nonce=nonce)
+    task_run_id = _task_run_id(task_run)
+    client = RenderTaskRunClient()
+    deadline = time.monotonic() + timeout_seconds
+
+    while True:
+        details = client.get_task_run(task_run_id)
+        status = str(details.get("status") or "").strip().lower()
+        if status in COMPLETED_STATUSES:
+            return details
+        if status in FAILED_STATUSES:
+            raise RuntimeError(
+                f"Render workflow proof task {task_run_id} finished with status {status}."
+            )
+        if time.monotonic() >= deadline:
+            raise TimeoutError(
+                f"Render workflow proof task {task_run_id} did not finish within "
+                f"{timeout_seconds:g} seconds."
+            )
+        time.sleep(poll_seconds)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -51,6 +100,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--job-id", required=True)
     parser.add_argument("--nonce", required=True)
     parser.add_argument("--task-id")
+    parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=_positive_float(
+            os.getenv("ARGUS_RENDER_WORKFLOW_PROOF_TIMEOUT_SECONDS"),
+            default=DEFAULT_TIMEOUT_SECONDS,
+        ),
+    )
+    parser.add_argument(
+        "--poll-seconds",
+        type=float,
+        default=_positive_float(
+            os.getenv("ARGUS_RENDER_WORKFLOW_PROOF_POLL_SECONDS"),
+            default=DEFAULT_POLL_SECONDS,
+        ),
+    )
     return parser
 
 
@@ -60,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
         task_id=_task_id(args.task_id),
         job_id=args.job_id,
         nonce=args.nonce,
+        timeout_seconds=args.timeout_seconds,
+        poll_seconds=args.poll_seconds,
     )
     json.dump(_json_safe(result), sys.stdout, sort_keys=True)
     sys.stdout.write("\n")
