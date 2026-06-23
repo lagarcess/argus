@@ -34,9 +34,10 @@ jobs:
 
       - name: Install Render CLI
         run: |
-          curl -fsSL https://github.com/render-oss/cli/releases/download/v2.20.0/cli_2.20.0_linux_amd64.zip -o render.zip
-          unzip -q render.zip
-          sudo mv cli_v2.20.0 /usr/local/bin/render
+          tmpdir="$(mktemp -d)"
+          curl -fsSL https://github.com/render-oss/cli/releases/download/v2.20.0/cli_2.20.0_linux_amd64.zip -o "$tmpdir/render.zip"
+          unzip -q "$tmpdir/render.zip" -d "$tmpdir"
+          sudo mv "$tmpdir/cli_v2.20.0" /usr/local/bin/render
           render --version
 
       - name: Install Poetry
