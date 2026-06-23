@@ -89,6 +89,23 @@ Rules:
 - No production deploy happens from this branch unless the founder explicitly
   asks for a deploy check.
 
+## Claude Review Workflow
+
+Claude review is a bounded review aid, not an always-on push hook.
+
+- During active development, run Claude Code CLI reviews on demand from the
+  terminal against a bounded local diff before commit or before internal review.
+- For promotion candidates, run Claude review as an explicit gate through a
+  manual GitHub workflow, PR label, or review command after the lane is stable.
+- Do not run Claude review automatically on every push. WIP branches should not
+  accumulate noisy automated review comments before a lane is ready.
+- Claude reviews must use the root `CLAUDE.md`, `AGENTS.md`, the canon docs,
+  the active roadmap or lane spec, and the correct parent branch for the diff.
+- Promotion-gate review focus is defined by the root `CLAUDE.md`. The
+  integration workflow especially depends on regression detection,
+  language-agnostic runtime-spine protection, modularity, API contract drift,
+  frontend truth ownership, tests/browser-QA gaps, and release-gate discipline.
+
 ## Current Closed Items
 
 Do not reopen these as debt unless a new bug is reproduced:
