@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from argus.api.chat.backtest_jobs import (
     BacktestJobShadowContext,
+    RenderTaskRunClient,
     RenderWorkflowDispatcher,
     ShadowBacktestJobTool,
     backtest_job_shadow_context,
@@ -91,6 +94,17 @@ class _FakeTerminalTaskRunClient:
         return dict(self.payload)
 
 
+class _FakeResponse:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self.payload = payload
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, object]:
+        return dict(self.payload)
+
+
 class _BackpressureReconciliationGateway(_Gateway):
     def __init__(self, events: list[str]) -> None:
         super().__init__(events)
@@ -145,6 +159,62 @@ class _BackpressureReconciliationGateway(_Gateway):
         }
 
 
+class _ProofBackpressureGateway(_Gateway):
+    def __init__(self, events: list[str]) -> None:
+        super().__init__(events)
+        self.blocking_failed = False
+        self.failed_updates: list[dict[str, object]] = []
+
+    def count_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> int:
+        if status == "running" and user_id == "user-1" and not self.blocking_failed:
+            return min(1, limit)
+        return 0
+
+    def list_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, object]]:
+        if status != "running" or user_id != "user-1" or self.blocking_failed:
+            return []
+        old_timestamp = (
+            datetime.now(timezone.utc) - timedelta(seconds=60 * 60)
+        ).isoformat()
+        return [
+            {
+                "id": "proof-blocking-job-1",
+                "user_id": "user-1",
+                "status": "running",
+                "created_at": old_timestamp,
+                "started_at": old_timestamp,
+                "launch_payload": {"kind": "render_workflow_proof"},
+                "execution_metadata": {},
+            }
+        ][:limit]
+
+    def mark_backtest_job_failed(self, **payload: object) -> dict[str, object]:
+        self.events.append("reconcile")
+        self.blocking_failed = True
+        self.failed_updates.append(payload)
+        return {
+            "id": payload["job_id"],
+            "user_id": payload["user_id"],
+            "status": "failed",
+            "failure_code": payload["failure_code"],
+            "failure_detail": payload["failure_detail"],
+            "retryable": payload["retryable"],
+            "execution_metadata": payload.get("execution_metadata") or {},
+        }
+
+
 def _payload() -> dict[str, object]:
     return {
         "strategy_type": "buy_and_hold",
@@ -169,6 +239,86 @@ def _context() -> BacktestJobShadowContext:
             "payload": {"confirmation_id": "confirmation-1"},
         },
     )
+
+
+def test_render_workflow_dispatcher_uses_local_task_server_without_render_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.chat import backtest_jobs
+
+    monkeypatch.setenv("RENDER_USE_LOCAL_DEV", "true")
+    monkeypatch.setenv("RENDER_LOCAL_DEV_URL", "http://127.0.0.1:8121")
+    monkeypatch.delenv("RENDER_API_KEY", raising=False)
+    calls: list[dict[str, object]] = []
+
+    def fake_post(
+        url: str,
+        *,
+        headers: dict[str, str],
+        json: dict[str, object],
+        timeout: int,
+    ) -> _FakeResponse:
+        calls.append(
+            {
+                "url": url,
+                "headers": headers,
+                "json": json,
+                "timeout": timeout,
+            }
+        )
+        return _FakeResponse({"id": "trn-local", "status": "pending"})
+
+    monkeypatch.setattr(backtest_jobs.httpx, "post", fake_post)
+
+    result = RenderWorkflowDispatcher(
+        task_id="argus-backtests/workflow_proof"
+    ).dispatch(job_id="job-1", nonce="nonce-1")
+
+    assert result == {"id": "trn-local", "status": "pending"}
+    assert calls == [
+        {
+            "url": "http://127.0.0.1:8121/v1/task-runs",
+            "headers": {"Content-Type": "application/json"},
+            "json": {
+                "task": "argus-backtests/workflow_proof",
+                "input": ["job-1", "nonce-1"],
+            },
+            "timeout": 15,
+        }
+    ]
+
+
+def test_render_task_run_client_uses_local_task_server_without_render_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.chat import backtest_jobs
+
+    monkeypatch.setenv("RENDER_USE_LOCAL_DEV", "true")
+    monkeypatch.delenv("RENDER_LOCAL_DEV_URL", raising=False)
+    monkeypatch.delenv("RENDER_API_KEY", raising=False)
+    calls: list[dict[str, object]] = []
+
+    def fake_get(
+        url: str,
+        *,
+        headers: dict[str, str],
+        timeout: int,
+    ) -> _FakeResponse:
+        calls.append({"url": url, "headers": headers, "timeout": timeout})
+        return _FakeResponse({"id": "trn-local", "status": "completed"})
+
+    monkeypatch.setattr(backtest_jobs.httpx, "get", fake_get)
+
+    result = RenderTaskRunClient().get_task_run("trn-local")
+
+    assert result == {"id": "trn-local", "status": "completed"}
+    assert calls == [
+        {
+            "url": "http://localhost:8120/v1/task-runs/trn-local",
+            "headers": {"Accept": "application/json"},
+            "timeout": 10,
+        }
+    ]
 
 
 def test_shadow_backtest_job_tool_is_noop_when_flag_disabled(monkeypatch) -> None:
@@ -439,6 +589,34 @@ def test_shadow_backtest_job_tool_reconciles_terminal_blocker_before_backpressur
     assert events == ["reconcile", "job", "dispatch", "metadata"]
     assert task_client.calls == ["trn-blocking-timeout"]
     assert gateway.failed_updates[0]["failure_code"] == "workflow_task_timeout"
+    assert context.created_job_id == "job-1"
+
+
+def test_shadow_backtest_job_tool_reconciles_stale_proof_without_task_metadata(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED", "true")
+    events: list[str] = []
+    gateway = _ProofBackpressureGateway(events)
+    dispatcher = _Dispatcher(events)
+    tool = ShadowBacktestJobTool(
+        delegate=None,
+        gateway_getter=lambda: gateway,
+        dev_memory_fallback_getter=lambda: False,
+        dispatcher_getter=lambda: dispatcher,
+    )
+    context = _context()
+
+    with backtest_job_shadow_context(context):
+        result = tool.run(_payload())
+
+    assert result["success"] is True
+    assert result["payload"]["backtest_job"]["id"] == "job-1"
+    assert events == ["reconcile", "job", "dispatch", "metadata"]
+    assert gateway.failed_updates[0]["job_id"] == "proof-blocking-job-1"
+    assert gateway.failed_updates[0]["failure_code"] == "workflow_dispatch_missing"
     assert context.created_job_id == "job-1"
 
 

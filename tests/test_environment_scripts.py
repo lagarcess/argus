@@ -481,11 +481,12 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     assert all(service["type"] != "workflow" for service in render_config["services"])
 
 
-def test_workflow_proof_seed_usage_allows_disposable_preview_user() -> None:
+def test_workflow_proof_seed_usage_reuses_stable_proof_principal() -> None:
     proof_script = _source(".github/workflow-proof.sh")
 
     assert ".github/workflow-proof.sh seed [--user-id <uuid>]" in proof_script
-    assert "Seed creates a disposable proof auth/profile row" in proof_script
+    assert "Seed reuses a stable proof auth/profile/conversation" in proof_script
+    assert "--conversation-id" in proof_script
     assert "local or preview Supabase database" in proof_script
 
 
@@ -542,8 +543,13 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
     source = _source(".github/render-env-sync.sh")
 
     assert ".github/render-env-sync.sh workflow-release [commit]" in source
+    assert ".github/render-env-sync.sh workflow-version-status" in source
     assert "sync_workflow_release()" in source
+    assert "print_workflow_version_status()" in source
     assert 'render workflows versions release "$WORKFLOW_SERVICE_ID"' in source
+    assert 'render workflows versions list "$WORKFLOW_SERVICE_ID"' in source
+    assert "ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT" in source
+    assert "ARGUS_RENDER_WORKFLOW_RELEASE_VERSION_ID" in source
     assert "--wait" in source
     assert "--confirm" in source
     assert 'for key in "${ARGUS_RENDER_WORKFLOW_PROOF_ENV[@]}"; do' in source
@@ -799,6 +805,29 @@ def test_render_env_sync_audit_includes_workflow_env_parity(
     assert "workflow_env_status=ready" in result.stdout
     assert "status=ready" in result.stdout
     assert "postgres://workflow-db.example/argus" not in result.stdout
+
+
+def test_render_env_sync_skips_workflow_env_gate_outside_real_workflow_mode(
+    tmp_path: Path,
+) -> None:
+    result = _run_render_release_audit(
+        tmp_path,
+        expect_mode="safe-off",
+        api_env_json=_render_env_payload(
+            "argus-api",
+            overrides={"RENDER_API_KEY": ""},
+        ),
+        web_env_json=_render_env_payload("argus-app"),
+        workflow_env_json=_workflow_env_payload(
+            overrides={"ARGUS_MARKET_DATA_PROVIDER_MODE": "synthetic_unit_fixture"},
+            omit={"OPENROUTER_API_KEY"},
+        ),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "workflow_env_status=skipped" in result.stdout
+    assert "status=ready" in result.stdout
+    assert "drift argus-backtests:" not in result.stdout
 
 
 def test_render_env_sync_audit_workflow_secrets_ready_without_local_secrets(

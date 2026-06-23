@@ -27,6 +27,7 @@ CANDIDATE_SHA="${ARGUS_CANARY_SHA:-${GITHUB_SHA:-}}"
 CHECKED_OUT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
 PROMPT="${ARGUS_CANARY_PROMPT:-Test an equal-weight AAPL and MSFT buy-and-hold strategy from January 1, 2025 through June 5, 2026 with 10,000 dollars}"
 FOCUSED_SYMBOL_PATH="${ARGUS_CANARY_FOCUSED_SYMBOL_PATH:-}"
+REQUIRE_ASYNC_WORKFLOW="${ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW:-false}"
 
 if [ -z "$CHECKED_OUT_SHA" ]; then
   CHECKED_OUT_SHA="unknown"
@@ -89,6 +90,7 @@ PY
 WARMUP_OUTPUT=""
 API_DEPLOY_STATUS_OUTPUT=""
 WEB_DEPLOY_STATUS_OUTPUT=""
+WORKFLOW_VERSION_STATUS_OUTPUT=""
 print_sanitized_warmup_output() {
   CANARY_WARMUP_OUTPUT="$WARMUP_OUTPUT" python3 - <<'PY'
 import json
@@ -155,17 +157,30 @@ run_deploy_status_probe() {
   if ! WEB_DEPLOY_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" web-deploy-status)"; then
     fail_canary "deploy_status" "web_deploy_status_failed"
   fi
+  if ! WORKFLOW_VERSION_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" workflow-version-status)"; then
+    fail_canary "deploy_status" "workflow_version_status_failed"
+  fi
 
   API_DEPLOY_SHA="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" commit || true)"
   WEB_DEPLOY_SHA="$(extract_status_value "$WEB_DEPLOY_STATUS_OUTPUT" commit || true)"
   API_DEPLOY_STATUS="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" status || true)"
   WEB_DEPLOY_STATUS="$(extract_status_value "$WEB_DEPLOY_STATUS_OUTPUT" status || true)"
+  WORKFLOW_VERSION_ID="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" workflow_version_id || true)"
+  WORKFLOW_VERSION_STATUS="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" status || true)"
+  WORKFLOW_VERSION_COMMIT="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" commit || true)"
+  WORKFLOW_EXPECTED_VERSION_ID="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" expected_workflow_version_id || true)"
 
   if [ -z "$API_DEPLOY_SHA" ] || [ "$API_DEPLOY_SHA" = "<missing>" ]; then
     fail_canary "deploy_status" "api_deploy_sha_missing"
   fi
   if [ -z "$WEB_DEPLOY_SHA" ] || [ "$WEB_DEPLOY_SHA" = "<missing>" ]; then
     fail_canary "deploy_status" "web_deploy_sha_missing"
+  fi
+  if [ -z "$WORKFLOW_VERSION_ID" ] || [ "$WORKFLOW_VERSION_ID" = "<missing>" ]; then
+    fail_canary "deploy_status" "workflow_version_id_missing"
+  fi
+  if [ -z "$WORKFLOW_VERSION_COMMIT" ] || [ "$WORKFLOW_VERSION_COMMIT" = "<missing>" ]; then
+    fail_canary "deploy_status" "workflow_version_commit_missing"
   fi
   if [ "$API_DEPLOY_STATUS" != "live" ]; then
     echo "ERROR: argus-api latest deploy is not live."
@@ -183,11 +198,26 @@ run_deploy_status_probe() {
     echo "ERROR: argus-app deploy SHA does not match candidate SHA."
     fail_canary "deploy_status" "web_deploy_sha_mismatch"
   fi
+  if [ "$WORKFLOW_VERSION_STATUS" != "ready" ]; then
+    echo "ERROR: argus-backtests latest workflow version is not ready."
+    fail_canary "deploy_status" "workflow_version_not_ready"
+  fi
+  if [ "$WORKFLOW_VERSION_COMMIT" != "$CANDIDATE_SHA" ]; then
+    echo "ERROR: argus-backtests workflow release commit does not match candidate SHA."
+    fail_canary "deploy_status" "workflow_version_commit_mismatch"
+  fi
+  if [ "$WORKFLOW_EXPECTED_VERSION_ID" != "$WORKFLOW_VERSION_ID" ]; then
+    echo "ERROR: argus-backtests workflow version id does not match release proof."
+    fail_canary "deploy_status" "workflow_version_id_mismatch"
+  fi
 
   echo "canary_api_deploy_status=$API_DEPLOY_STATUS"
   echo "canary_web_deploy_status=$WEB_DEPLOY_STATUS"
   echo "canary_api_deploy_sha=$API_DEPLOY_SHA"
   echo "canary_web_deploy_sha=$WEB_DEPLOY_SHA"
+  echo "canary_workflow_version_status=$WORKFLOW_VERSION_STATUS"
+  echo "canary_workflow_version_commit=$WORKFLOW_VERSION_COMMIT"
+  echo "canary_workflow_version_id=$WORKFLOW_VERSION_ID"
 }
 
 validate_release_evidence_contract() {
@@ -265,6 +295,9 @@ build_release_evidence_json() {
   CANARY_WEB_DEPLOY_SHA="$WEB_DEPLOY_SHA" \
   CANARY_API_DEPLOY_STATUS="$API_DEPLOY_STATUS" \
   CANARY_WEB_DEPLOY_STATUS="$WEB_DEPLOY_STATUS" \
+  CANARY_WORKFLOW_VERSION_COMMIT="$WORKFLOW_VERSION_COMMIT" \
+  CANARY_WORKFLOW_VERSION_ID="$WORKFLOW_VERSION_ID" \
+  CANARY_WORKFLOW_VERSION_STATUS="$WORKFLOW_VERSION_STATUS" \
   CANARY_EXPECTED_SHA="$CANDIDATE_SHA" \
   CANARY_CHECKED_OUT_SHA="$CHECKED_OUT_SHA" \
   CANARY_LANGUAGE="$LANGUAGE" \
@@ -286,6 +319,9 @@ payload = {
     "web_deploy_sha": os.environ["CANARY_WEB_DEPLOY_SHA"] or None,
     "api_deploy_status": os.environ["CANARY_API_DEPLOY_STATUS"] or None,
     "web_deploy_status": os.environ["CANARY_WEB_DEPLOY_STATUS"] or None,
+    "workflow_version_commit": os.environ["CANARY_WORKFLOW_VERSION_COMMIT"] or None,
+    "workflow_version_id": os.environ["CANARY_WORKFLOW_VERSION_ID"] or None,
+    "workflow_version_status": os.environ["CANARY_WORKFLOW_VERSION_STATUS"] or None,
     "candidate_sha": os.environ["CANARY_EXPECTED_SHA"],
     "checked_out_sha": os.environ["CANARY_CHECKED_OUT_SHA"],
     "language": os.environ["CANARY_LANGUAGE"],
@@ -796,6 +832,10 @@ API_DEPLOY_SHA=""
 WEB_DEPLOY_SHA=""
 API_DEPLOY_STATUS=""
 WEB_DEPLOY_STATUS=""
+WORKFLOW_VERSION_COMMIT=""
+WORKFLOW_VERSION_ID=""
+WORKFLOW_VERSION_STATUS=""
+WORKFLOW_EXPECTED_VERSION_ID=""
 CONVERSATION_LABEL=""
 BACKTEST_JOB_LABEL=""
 RESULT_LABEL=""
@@ -1076,6 +1116,9 @@ case "$RUN_RESULT" in
     assert_focused_symbol_path job_response "$JOB_RESPONSE"
     ;;
   run:*)
+    if [ "$REQUIRE_ASYNC_WORKFLOW" = "true" ]; then
+      fail_canary "run_stream" "missing_async_workflow_job"
+    fi
     BACKTEST_RUN_ID="${RUN_RESULT#run:}"
     RESULT_KIND="backtest_run"
     RESULT_LABEL="$(privacy_safe_id_label backtest_run "$BACKTEST_RUN_ID")"

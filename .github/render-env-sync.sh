@@ -29,6 +29,7 @@ Usage:
   .github/render-env-sync.sh workflow-proof
   .github/render-env-sync.sh workflow-release [commit]
   .github/render-env-sync.sh workflow-runtime
+  .github/render-env-sync.sh workflow-version-status
 
 Commands:
   api-status              Print redacted API workflow env status for argus-api.
@@ -42,6 +43,7 @@ Commands:
   workflow-proof          Sync workflow DB/task/provider env vars on argus-backtests.
   workflow-release        Release argus-backtests so env/build changes reach new runs.
   workflow-runtime        Sync workflow build/start commands on argus-backtests.
+  workflow-version-status Print latest argus-backtests workflow version and release proof.
 
 Compatibility aliases:
   api-dispatch-on   Alias for api-proof-shadow-on.
@@ -270,6 +272,56 @@ print_api_deploy_status() {
 print_web_deploy_status() {
   require_local_env RENDER_API_KEY
   print_deploy_status "$WEB_SERVICE_ID" "argus-app"
+}
+
+latest_workflow_version_json() {
+  render workflows versions list "$WORKFLOW_SERVICE_ID" -o json |
+    jq '
+      if type == "array" then
+        (sort_by(.createdAt // .created_at // "") | reverse) as $versions
+        | ($versions | map(select((.status // "") == "ready")) | .[0])
+          // $versions[0]
+          // {}
+      elif type == "object" and (.items | type) == "array" then
+        (.items | sort_by(.createdAt // .created_at // "") | reverse) as $versions
+        | ($versions | map(select((.status // "") == "ready")) | .[0])
+          // $versions[0]
+          // {}
+      else
+        {}
+      end
+    '
+}
+
+print_workflow_version_status() {
+  require_local_env RENDER_API_KEY
+  local workflow_env_json
+  local version_json
+  local release_commit
+  local expected_version_id
+
+  workflow_env_json="$(render_env_json "$WORKFLOW_SERVICE_ID")"
+  version_json="$(latest_workflow_version_json)"
+  release_commit="$(
+    render_env_raw_value "$workflow_env_json" ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT
+  )"
+  expected_version_id="$(
+    render_env_raw_value "$workflow_env_json" ARGUS_RENDER_WORKFLOW_RELEASE_VERSION_ID
+  )"
+
+  jq -r \
+    --arg workflow_id "$WORKFLOW_SERVICE_ID" \
+    --arg release_commit "${release_commit:-<missing>}" \
+    --arg expected_version_id "${expected_version_id:-<missing>}" \
+    '
+      "service=argus-backtests",
+      "workflow_id=\($workflow_id)",
+      "workflow_version_id=\(.id // "<missing>")",
+      "status=\(.status // "<missing>")",
+      "commit=\($release_commit)",
+      "expected_workflow_version_id=\($expected_version_id)",
+      "created_at=\(.createdAt // .created_at // "<missing>")"
+    ' <<< "$version_json"
 }
 
 is_secret_render_env_key() {
@@ -622,39 +674,59 @@ audit_release_config() {
   local mode_pairs=()
   local mode_pair
   local workflow_pairs=()
+  local audit_workflow_env=false
   while IFS= read -r mode_pair; do
     mode_pairs+=("$mode_pair")
   done < <(expected_api_mode_pairs "$expected_mode")
-  while IFS= read -r mode_pair; do
-    workflow_pairs+=("$mode_pair")
-  done < <(workflow_expected_env_pairs)
+  if [ "$expected_mode" = "real-workflow" ]; then
+    audit_workflow_env=true
+    while IFS= read -r mode_pair; do
+      workflow_pairs+=("$mode_pair")
+    done < <(workflow_expected_env_pairs)
+  fi
   api_env_json="$(render_env_json "$API_SERVICE_ID")"
   web_env_json="$(render_env_json "$WEB_SERVICE_ID")"
-  workflow_env_json="$(render_env_json "$WORKFLOW_SERVICE_ID")"
+  if [ "$audit_workflow_env" = "true" ]; then
+    workflow_env_json="$(render_env_json "$WORKFLOW_SERVICE_ID")"
+  else
+    workflow_env_json="[]"
+  fi
 
   echo "Argus release config audit"
   echo "expected_mode=$expected_mode"
   audit_forbidden_render_env_keys "$api_env_json" "argus-api" "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
   audit_forbidden_render_env_keys "$web_env_json" "argus-app" "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
-  audit_forbidden_render_env_keys "$workflow_env_json" "argus-backtests" "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
   audit_unexpected_render_env_keys "$api_env_json" "argus-api" "${ARGUS_RENDER_API_ENV[@]}"
   audit_unexpected_render_env_keys "$web_env_json" "argus-app" "${ARGUS_RENDER_WEB_ENV[@]}"
-  audit_unexpected_render_env_keys "$workflow_env_json" "argus-backtests" "${ARGUS_RENDER_WORKFLOW_PROOF_ENV[@]}"
   audit_render_service_config "$api_env_json" "argus-api" "${ARGUS_RELEASE_API_ENV_EXPECTED[@]}"
   audit_render_service_config "$api_env_json" "argus-api" "${mode_pairs[@]}"
   audit_render_service_config "$web_env_json" "argus-app" "${ARGUS_RELEASE_WEB_ENV_EXPECTED[@]}"
-  audit_render_service_config "$workflow_env_json" "argus-backtests" "${workflow_pairs[@]}"
+  if [ "$audit_workflow_env" = "true" ]; then
+    audit_forbidden_render_env_keys "$workflow_env_json" "argus-backtests" "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
+    audit_unexpected_render_env_keys \
+      "$workflow_env_json" \
+      "argus-backtests" \
+      "${ARGUS_RENDER_WORKFLOW_PROOF_ENV[@]}" \
+      "${ARGUS_RENDER_WORKFLOW_RELEASE_ENV[@]}"
+    audit_render_service_config "$workflow_env_json" "argus-backtests" "${workflow_pairs[@]}"
+  fi
 
   workflow_task="$(render_env_status_value "$api_env_json" ARGUS_BACKTEST_WORKFLOW_TASK)"
   real_workflow_task="$(render_env_status_value "$api_env_json" ARGUS_BACKTEST_REAL_WORKFLOW_TASK)"
   fingerprint="$(render_env_fingerprint)"
-  workflow_fingerprint="$(workflow_env_fingerprint)"
+  if [ "$audit_workflow_env" = "true" ]; then
+    workflow_fingerprint="$(workflow_env_fingerprint)"
+  else
+    workflow_fingerprint="<skipped>"
+  fi
 
   echo "workflow_task=$workflow_task"
   echo "real_workflow_task=$real_workflow_task"
   echo "env_fingerprint=$fingerprint"
   echo "workflow_env_fingerprint=$workflow_fingerprint"
-  if [ "$WORKFLOW_AUDIT_FAILURES" -eq 0 ]; then
+  if [ "$audit_workflow_env" != "true" ]; then
+    echo "workflow_env_status=skipped"
+  elif [ "$WORKFLOW_AUDIT_FAILURES" -eq 0 ]; then
     echo "workflow_env_status=ready"
   else
     echo "workflow_env_status=drift"
@@ -795,14 +867,24 @@ sync_workflow_runtime() {
 sync_workflow_release() {
   require_local_env RENDER_API_KEY
   local commit="${1:-}"
+  local version_id
   if [ -z "$commit" ]; then
     commit="$(git rev-parse HEAD)"
   fi
 
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT "$commit"
   render workflows versions release "$WORKFLOW_SERVICE_ID" \
     --commit "$commit" \
     --wait \
     --confirm
+  version_id="$(latest_workflow_version_json | jq -r '.id // empty')"
+  if [ -z "$version_id" ]; then
+    echo "Unable to determine released workflow version id for ${WORKFLOW_SERVICE_ID}."
+    return 1
+  fi
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_RENDER_WORKFLOW_RELEASE_VERSION_ID "$version_id"
+  echo "workflow_release_commit=$commit"
+  echo "workflow_release_version_id=$version_id"
 }
 
 command="${1:-}"
@@ -848,6 +930,9 @@ case "$command" in
     ;;
   workflow-runtime)
     sync_workflow_runtime
+    ;;
+  workflow-version-status)
+    print_workflow_version_status
     ;;
   help|-h|--help)
     usage

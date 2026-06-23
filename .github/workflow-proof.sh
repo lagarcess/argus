@@ -32,8 +32,8 @@ Usage:
   .github/workflow-proof.sh direct --job-id <uuid> --nonce <value>
   .github/workflow-proof.sh verify --job-id <uuid> [--expect-nonce <value>] [--expect-provider-mode <mode>]
 
-Seed creates a disposable proof auth/profile row when --user-id is omitted.
-Use it only against a local or preview Supabase database for validation.
+Seed reuses a stable proof auth/profile/conversation by default.
+Use explicit --user-id/--conversation-id only against an isolated local or preview Supabase database.
 
 Local Render validation:
   1. poetry install --only main,workflows --no-interaction

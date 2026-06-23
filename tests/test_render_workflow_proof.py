@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -406,7 +406,7 @@ def test_trigger_proof_fails_on_terminal_task_error(
         )
 
 
-def test_seed_cli_creates_disposable_profile_for_empty_preview_branch(
+def test_seed_cli_reuses_stable_proof_principal_by_default(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -415,17 +415,25 @@ def test_seed_cli_creates_disposable_profile_for_empty_preview_branch(
     class SeedGateway:
         def __init__(self) -> None:
             self.profile: dict[str, str] | None = None
-            self.conversation_user_id: str | None = None
+            self.conversation: dict[str, str] | None = None
             self.job_args: dict[str, str | None] | None = None
 
         def ensure_proof_profile(self, *, user_id: str, email: str) -> None:
             self.profile = {"user_id": user_id, "email": email}
 
-        def create_proof_conversation(self, *, user_id: str) -> str:
+        def ensure_proof_conversation(
+            self,
+            *,
+            user_id: str,
+            conversation_id: str,
+        ) -> str:
             assert self.profile is not None
             assert self.profile["user_id"] == user_id
-            self.conversation_user_id = user_id
-            return "00000000-0000-4000-8000-000000000001"
+            self.conversation = {
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+            }
+            return conversation_id
 
         def create_proof_job(
             self,
@@ -455,19 +463,87 @@ def test_seed_cli_creates_disposable_profile_for_empty_preview_branch(
     output = json.loads(capsys.readouterr().out)
 
     assert exit_code == 0
-    assert UUID(output["user_id"])
+    assert output["user_id"] == proof.DEFAULT_PROOF_USER_ID
     assert output["email"] == f"render-workflow-proof+{output['user_id']}@example.invalid"
     assert output["job_id"] == "00000000-0000-4000-8000-000000000002"
-    assert output["conversation_id"] == "00000000-0000-4000-8000-000000000001"
+    assert output["conversation_id"] == proof.DEFAULT_PROOF_CONVERSATION_ID
     assert output["nonce"] == "internet-proof"
     assert output["status"] == "queued"
     assert gateway.profile == {"user_id": output["user_id"], "email": output["email"]}
-    assert gateway.conversation_user_id == output["user_id"]
+    assert gateway.conversation == {
+        "user_id": output["user_id"],
+        "conversation_id": output["conversation_id"],
+    }
     assert gateway.job_args == {
         "user_id": output["user_id"],
         "conversation_id": output["conversation_id"],
         "nonce": "internet-proof",
         "idempotency_key": None,
+    }
+
+
+def test_seed_cli_respects_explicit_proof_user_and_conversation(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from workflows import proof
+
+    class SeedGateway:
+        def __init__(self) -> None:
+            self.conversation: dict[str, str] | None = None
+
+        def ensure_proof_profile(self, *, user_id: str, email: str) -> None:
+            self.profile = {"user_id": user_id, "email": email}
+
+        def ensure_proof_conversation(
+            self,
+            *,
+            user_id: str,
+            conversation_id: str,
+        ) -> str:
+            self.conversation = {
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+            }
+            return conversation_id
+
+        def create_proof_job(
+            self,
+            *,
+            user_id: str,
+            conversation_id: str,
+            nonce: str,
+            idempotency_key: str | None = None,
+        ) -> dict[str, object]:
+            return {
+                "id": "00000000-0000-4000-8000-000000000004",
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "status": "queued",
+            }
+
+    gateway = SeedGateway()
+    monkeypatch.setattr(proof.PostgresProofJobGateway, "from_env", lambda: gateway)
+
+    exit_code = proof.main(
+        [
+            "seed",
+            "--user-id",
+            "00000000-0000-4000-8000-000000000003",
+            "--conversation-id",
+            "00000000-0000-4000-8000-000000000005",
+            "--nonce",
+            "explicit-proof",
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert output["user_id"] == "00000000-0000-4000-8000-000000000003"
+    assert output["conversation_id"] == "00000000-0000-4000-8000-000000000005"
+    assert gateway.conversation == {
+        "user_id": "00000000-0000-4000-8000-000000000003",
+        "conversation_id": "00000000-0000-4000-8000-000000000005",
     }
 
 

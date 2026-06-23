@@ -67,19 +67,29 @@ def test_canary_requires_render_deploy_shas_to_match_candidate() -> None:
 
     assert '"$SCRIPT_DIR/render-env-sync.sh" api-deploy-status' in source
     assert '"$SCRIPT_DIR/render-env-sync.sh" web-deploy-status' in source
+    assert '"$SCRIPT_DIR/render-env-sync.sh" workflow-version-status' in source
     assert "extract_status_value" in source
     assert "API_DEPLOY_SHA" in source
     assert "WEB_DEPLOY_SHA" in source
+    assert "WORKFLOW_VERSION_COMMIT" in source
+    assert "WORKFLOW_VERSION_ID" in source
     assert 'fail_canary "deploy_status" "api_deploy_status_failed"' in source
     assert 'fail_canary "deploy_status" "web_deploy_status_failed"' in source
+    assert 'fail_canary "deploy_status" "workflow_version_status_failed"' in source
     assert 'fail_canary "deploy_status" "api_deploy_sha_mismatch"' in source
     assert 'fail_canary "deploy_status" "web_deploy_sha_mismatch"' in source
+    assert 'fail_canary "deploy_status" "workflow_version_commit_mismatch"' in source
+    assert 'fail_canary "deploy_status" "workflow_version_not_ready"' in source
     assert 'fail_canary "deploy_status" "api_deploy_not_live"' in source
     assert 'fail_canary "deploy_status" "web_deploy_not_live"' in source
     assert 'canary_api_deploy_sha=$API_DEPLOY_SHA' in source
     assert 'canary_web_deploy_sha=$WEB_DEPLOY_SHA' in source
+    assert 'canary_workflow_version_commit=$WORKFLOW_VERSION_COMMIT' in source
+    assert 'canary_workflow_version_id=$WORKFLOW_VERSION_ID' in source
     assert '"api_deploy_sha":' in source
     assert '"web_deploy_sha":' in source
+    assert '"workflow_version_commit":' in source
+    assert '"workflow_version_id":' in source
 
 
 def test_canary_asserts_reload_hydration_does_not_contradict_runtime_result() -> None:
@@ -301,6 +311,23 @@ def test_canary_asserts_focused_provider_path_symbols_when_configured() -> None:
     assert "focused symbol path missing expected symbols" in source
     assert "assert_focused_symbol_path run_action" in source
     assert "assert_focused_symbol_path job_response" in source
+
+
+def test_canary_can_require_async_workflow_job_for_provider_path() -> None:
+    source = _source(".github/canary-render.sh")
+    workflow = _source(".github/workflows/private-alpha-canary.yml")
+
+    assert 'REQUIRE_ASYNC_WORKFLOW="${ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW:-false}"' in (
+        source
+    )
+    assert 'if [ "$REQUIRE_ASYNC_WORKFLOW" = "true" ]; then' in source
+    assert 'fail_canary "run_stream" "missing_async_workflow_job"' in source
+    assert "ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW=true" in workflow
+    provider_step = workflow.split(
+        "Run provider-path-sensitive Spanish canary",
+        maxsplit=1,
+    )[1]
+    assert "ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW=true" in provider_step
 
 
 def test_canary_uses_temp_file_for_reload_messages_payload() -> None:

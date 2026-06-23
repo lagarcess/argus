@@ -16,6 +16,10 @@ WORKFLOW_DATABASE_URL_ENV = "ARGUS_WORKFLOW_DATABASE_URL"
 LEGACY_DATABASE_URL_ENV = "DATABASE_URL"
 PROVIDER_MODE_ENV = "ARGUS_MARKET_DATA_PROVIDER_MODE"
 CACHE_ENABLED_ENV = "ENABLE_MARKET_DATA_CACHE"
+DEFAULT_PROOF_USER_ID = "00000000-0000-4000-8000-000000000124"
+DEFAULT_PROOF_CONVERSATION_ID = "00000000-0000-4000-8000-000000000125"
+PROOF_USER_ID_ENV = "ARGUS_WORKFLOW_PROOF_USER_ID"
+PROOF_CONVERSATION_ID_ENV = "ARGUS_WORKFLOW_PROOF_CONVERSATION_ID"
 
 
 class WorkflowProofError(RuntimeError):
@@ -73,6 +77,13 @@ def stable_payload_hash(payload: Mapping[str, Any]) -> str:
 
 def proof_user_email(user_id: str) -> str:
     return f"render-workflow-proof+{user_id}@{PROOF_EMAIL_DOMAIN}"
+
+
+def _proof_uuid(value: str, *, label: str) -> str:
+    try:
+        return str(UUID(value))
+    except ValueError as exc:
+        raise WorkflowProofError(f"{label} must be a valid UUID.") from exc
 
 
 def _json_safe(value: Any) -> Any:
@@ -338,6 +349,47 @@ class PostgresProofJobGateway:
                 row = cur.fetchone()
         return str(row["id"])
 
+    def ensure_proof_conversation(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+    ) -> str:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into public.conversations (id, user_id, title, title_source)
+                    values (%s, %s, %s, %s)
+                    on conflict (id) do nothing
+                    """,
+                    (
+                        conversation_id,
+                        user_id,
+                        "Render Workflow Proof",
+                        "system_default",
+                    ),
+                )
+                cur.execute(
+                    """
+                    select user_id
+                    from public.conversations
+                    where id = %s
+                    """,
+                    (conversation_id,),
+                )
+                row = cur.fetchone()
+        if row is None:
+            raise WorkflowProofError(
+                f"Workflow proof conversation {conversation_id} was not created."
+            )
+        owner_user_id = str(row["user_id"])
+        if owner_user_id != user_id:
+            raise WorkflowProofError(
+                "Workflow proof conversation belongs to a different user."
+            )
+        return conversation_id
+
     def create_proof_job(
         self,
         *,
@@ -388,12 +440,22 @@ def _dump_json(payload: Mapping[str, Any]) -> None:
 
 def _seed(args: argparse.Namespace) -> int:
     gateway = PostgresProofJobGateway.from_env()
-    user_id = str(UUID(args.user_id)) if args.user_id else str(uuid4())
+    user_id = _proof_uuid(
+        args.user_id or os.getenv(PROOF_USER_ID_ENV) or DEFAULT_PROOF_USER_ID,
+        label="proof user id",
+    )
     email = proof_user_email(user_id)
     gateway.ensure_proof_profile(user_id=user_id, email=email)
-    conversation_id = args.conversation_id
-    if not conversation_id:
-        conversation_id = gateway.create_proof_conversation(user_id=user_id)
+    conversation_id = _proof_uuid(
+        args.conversation_id
+        or os.getenv(PROOF_CONVERSATION_ID_ENV)
+        or DEFAULT_PROOF_CONVERSATION_ID,
+        label="proof conversation id",
+    )
+    conversation_id = gateway.ensure_proof_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+    )
     row = gateway.create_proof_job(
         user_id=user_id,
         conversation_id=conversation_id,

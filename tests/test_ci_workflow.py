@@ -107,6 +107,9 @@ def test_private_alpha_canary_workflow_runs_real_workflow_gate() -> None:
     joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert "poetry install --with dev,workflows --no-interaction" in joined_steps
     assert "cd web && bun install --frozen-lockfile" in joined_steps
+    assert "cli_2.20.0_linux_amd64.zip" in joined_steps
+    assert "sudo mv cli_v2.20.0 /usr/local/bin/render" in joined_steps
+    assert "render --version" in joined_steps
     assert ".github/local-smoke.sh --expected-sha \"$GITHUB_SHA\"" in joined_steps
     assert joined_steps.index(".github/local-smoke.sh") < joined_steps.index(
         ".github/warmup-render.sh"

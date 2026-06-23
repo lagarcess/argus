@@ -79,6 +79,19 @@ def backtest_workflow_execution_enabled() -> bool:
     )
 
 
+def render_local_dev_enabled() -> bool:
+    return os.getenv("RENDER_USE_LOCAL_DEV", "").strip().lower() in TRUE_VALUES
+
+
+def _render_task_runs_endpoint(endpoint: str | None = None) -> str:
+    if endpoint:
+        return endpoint.rstrip("/")
+    if render_local_dev_enabled():
+        local_base = os.getenv("RENDER_LOCAL_DEV_URL", "http://localhost:8120").strip()
+        return f"{local_base.rstrip('/')}/v1/task-runs"
+    return RENDER_TASK_RUNS_URL
+
+
 @contextmanager
 def backtest_job_shadow_context(
     context: BacktestJobShadowContext | None,
@@ -248,11 +261,18 @@ def _reconcile_backpressure_blockers(
             continue
         owner_user_id = str(job.get("user_id") or user_id or fallback_user_id)
         before = str(job.get("status") or "").strip().lower()
-        reconciled = reconcile_terminal_render_task_run(
-            gateway=gateway,
-            user_id=owner_user_id,
-            job=job,
-        )
+        if _should_fail_stale_proof_job_without_task_run(job):
+            reconciled = _fail_stale_proof_job_without_task_run(
+                gateway=gateway,
+                user_id=owner_user_id,
+                job=job,
+            )
+        else:
+            reconciled = reconcile_terminal_render_task_run(
+                gateway=gateway,
+                user_id=owner_user_id,
+                job=job,
+            )
         after = str((reconciled or {}).get("status") or "").strip().lower()
         if before and after and after != before:
             changed = True
@@ -265,26 +285,26 @@ class RenderWorkflowDispatcher:
         *,
         api_key: str | None = None,
         task_id: str | None = None,
-        endpoint: str = RENDER_TASK_RUNS_URL,
+        endpoint: str | None = None,
     ) -> None:
         self.api_key = (api_key or os.getenv("RENDER_API_KEY") or "").strip()
         self.task_id = (task_id or _workflow_task_id()).strip()
-        self.endpoint = endpoint
+        self.endpoint = _render_task_runs_endpoint(endpoint)
 
     def dispatch(self, *, job_id: str, nonce: str) -> dict[str, Any]:
-        if not self.api_key:
+        if not self.api_key and not render_local_dev_enabled():
             raise RuntimeError("RENDER_API_KEY is required to dispatch backtest jobs.")
         if "/" not in self.task_id:
             raise RuntimeError(
                 "ARGUS_BACKTEST_WORKFLOW_TASK must use {workflow-slug}/{task-name}."
             )
 
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         response = httpx.post(
             self.endpoint,
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
+            headers=headers,
             json={"task": self.task_id, "input": [job_id, nonce]},
             timeout=15,
         )
@@ -298,20 +318,20 @@ class RenderTaskRunClient:
         self,
         *,
         api_key: str | None = None,
-        endpoint: str = RENDER_TASK_RUNS_URL,
+        endpoint: str | None = None,
     ) -> None:
         self.api_key = (api_key or os.getenv("RENDER_API_KEY") or "").strip()
-        self.endpoint = endpoint.rstrip("/")
+        self.endpoint = _render_task_runs_endpoint(endpoint)
 
     def get_task_run(self, task_run_id: str) -> dict[str, Any]:
-        if not self.api_key:
+        if not self.api_key and not render_local_dev_enabled():
             raise RuntimeError("RENDER_API_KEY is required to inspect task runs.")
+        headers = {"Accept": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         response = httpx.get(
             f"{self.endpoint}/{task_run_id}",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Accept": "application/json",
-            },
+            headers=headers,
             timeout=10,
         )
         response.raise_for_status()
@@ -535,6 +555,30 @@ def _fail_stale_proof_job_without_task_run(
             execution_metadata=metadata,
         )
     )
+
+
+def _stale_seconds_for_status(status: str) -> int:
+    if status == "queued":
+        return DEFAULT_STALE_QUEUED_SECONDS
+    return DEFAULT_STALE_RUNNING_SECONDS
+
+
+def _should_fail_stale_proof_job_without_task_run(job: dict[str, Any]) -> bool:
+    status = str(job.get("status") or "").strip().lower()
+    if status not in {"queued", "running"}:
+        return False
+    if not _is_workflow_proof_job(job):
+        return False
+    if _task_run_id_from_job(job) is not None:
+        return False
+    age_seconds = _job_age_seconds(
+        job,
+        now=datetime.now(timezone.utc),
+        timestamp_keys=("started_at", "created_at"),
+    )
+    if age_seconds is None:
+        return False
+    return age_seconds >= _stale_seconds_for_status(status)
 
 
 def _stale_job_report(
