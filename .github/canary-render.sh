@@ -817,9 +817,10 @@ PY
 
 COOKIE_JAR="$(mktemp)"
 CONFIRMATION_STREAM="$(mktemp)"
+CONFIRMATION_PAYLOAD="$(mktemp)"
 RUN_STREAM="$(mktemp)"
 JOB_RESPONSE="$(mktemp)"
-trap 'rm -f "$COOKIE_JAR" "$CONFIRMATION_STREAM" "$RUN_STREAM" "$JOB_RESPONSE"' EXIT
+trap 'rm -f "$COOKIE_JAR" "$CONFIRMATION_STREAM" "$CONFIRMATION_PAYLOAD" "$RUN_STREAM" "$JOB_RESPONSE"' EXIT
 
 ENV_FINGERPRINT=""
 WORKFLOW_ENV_FINGERPRINT=""
@@ -916,8 +917,10 @@ if ! curl -fsS -N \
 fi
 
 if ! RUN_ACTION="$(
+CANARY_CONFIRMATION_PAYLOAD_FILE="$CONFIRMATION_PAYLOAD" \
 python3 - "$CONFIRMATION_STREAM" <<'PY'
 import json
+import os
 import pathlib
 import sys
 
@@ -935,12 +938,14 @@ if any(event.get("type") == "error" for event in events):
     raise SystemExit("confirmation stream returned error")
 
 confirmations = []
+final_payloads = []
 for event in events:
     if event.get("type") != "final":
         continue
     payload = event.get("payload", {})
     if not isinstance(payload, dict):
         continue
+    final_payloads.append(payload)
     for key in ("confirmation", "confirmation_card"):
         value = payload.get(key)
         if isinstance(value, dict):
@@ -955,6 +960,12 @@ for event in events:
 if not confirmations:
     raise SystemExit("confirmation stream did not return a confirmation")
 
+payload_file = pathlib.Path(os.environ["CANARY_CONFIRMATION_PAYLOAD_FILE"])
+payload_file.write_text(
+    json.dumps(final_payloads[-1] if final_payloads else {}, sort_keys=True),
+    encoding="utf-8",
+)
+
 for confirmation in confirmations:
     for action in confirmation.get("actions") or []:
         if isinstance(action, dict) and action.get("type") == "run_backtest":
@@ -966,7 +977,7 @@ PY
 )"; then
   fail_canary "confirmation_stream" "confirmation_contract_failed"
 fi
-assert_focused_symbol_path run_action
+assert_focused_symbol_path confirmation_payload "$CONFIRMATION_PAYLOAD"
 
 RUN_BODY="$(
   CONVERSATION_ID="$CONVERSATION_ID" RUN_ACTION="$RUN_ACTION" CANARY_LANGUAGE="$LANGUAGE" python3 - <<'PY'

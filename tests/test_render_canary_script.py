@@ -304,12 +304,17 @@ def test_canary_asserts_focused_provider_path_symbols_when_configured() -> None:
     assert 'CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \\' in source
     assert 'CANARY_RUN_ACTION="$RUN_ACTION" \\' in source
     assert 'if source_name == "run_action":' in source
+    assert 'CONFIRMATION_PAYLOAD="$(mktemp)"' in source
+    assert 'CANARY_CONFIRMATION_PAYLOAD_FILE="$CONFIRMATION_PAYLOAD"' in source
     assert "collect_canonical_symbols" in source
     assert "SYMBOL_COLLECTION_KEYS" in source
     assert "import re" not in source
     assert "re.findall" not in source
     assert "focused symbol path missing expected symbols" in source
-    assert "assert_focused_symbol_path run_action" in source
+    assert (
+        'assert_focused_symbol_path confirmation_payload "$CONFIRMATION_PAYLOAD"'
+        in source
+    )
     assert "assert_focused_symbol_path job_response" in source
 
 
