@@ -444,6 +444,17 @@ def scan_stale_backtest_jobs(
                 continue
 
             try:
+                if task_run_id is None and _is_workflow_proof_job(job):
+                    reconciled = _fail_stale_proof_job_without_task_run(
+                        gateway=gateway,
+                        user_id=user_id,
+                        job=job,
+                    )
+                    after = str(reconciled.get("status") or before).strip().lower()
+                    if after not in {"queued", "running"}:
+                        report["reconciled_count"] += 1
+                        continue
+
                 reconciled = reconcile_terminal_render_task_run(
                     gateway=gateway,
                     user_id=user_id,
@@ -475,6 +486,55 @@ def scan_stale_backtest_jobs(
     if report["unresolved_count"] or report["error_count"]:
         report["status"] = "degraded"
     return report
+
+
+def _is_workflow_proof_job(job: dict[str, Any]) -> bool:
+    launch_payload = _dict_or_empty(job.get("launch_payload"))
+    return launch_payload.get("kind") == PROOF_JOB_KIND
+
+
+def _fail_stale_proof_job_without_task_run(
+    *,
+    gateway: Any,
+    user_id: str,
+    job: dict[str, Any],
+) -> dict[str, Any]:
+    failure_code = "workflow_dispatch_missing"
+    failure_detail = "Render workflow proof did not record a task run before the stale threshold."
+    reconciled_at = _utcnow_iso()
+    metadata = _dict_or_empty(job.get("execution_metadata"))
+
+    workflow_dispatch = _dict_or_empty(metadata.get("workflow_dispatch"))
+    workflow_dispatch.update(
+        {
+            "status": "failed",
+            "failure_code": failure_code,
+            "reconciled_at": reconciled_at,
+        }
+    )
+    metadata["workflow_dispatch"] = workflow_dispatch
+
+    workflow_metadata = _dict_or_empty(metadata.get("workflow_proof"))
+    workflow_metadata.update(
+        {
+            "kind": PROOF_JOB_KIND,
+            "failure_code": failure_code,
+            "finished_at": reconciled_at,
+        }
+    )
+    metadata["workflow_proof"] = workflow_metadata
+
+    return dict(
+        gateway.mark_backtest_job_failed(
+            user_id=user_id,
+            job_id=str(job.get("id") or ""),
+            failure_code=failure_code,
+            failure_detail=failure_detail,
+            retryable=True,
+            finished_at=reconciled_at,
+            execution_metadata=metadata,
+        )
+    )
 
 
 def _stale_job_report(
