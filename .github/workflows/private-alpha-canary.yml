@@ -137,7 +137,7 @@ jobs:
         run: |
           set +e
           ARGUS_CANARY_LANGUAGE=es-419 \
-          ARGUS_CANARY_PROMPT='Prueba comprar y mantener SNDK, AMD, NVDA y Goldman Sachs con 1000 dolares durante los ultimos 3 anos' \
+          ARGUS_CANARY_PROMPT='Prueba comprar y mantener SNDK, AMD, NVDA y GS con 1000 dolares durante los ultimos 3 anos' \
           ARGUS_CANARY_FOCUSED_SYMBOL_PATH=SNDK,AMD,NVDA,GS \
           ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/provider-path.json \
           .github/canary-render.sh

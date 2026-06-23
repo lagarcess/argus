@@ -110,6 +110,8 @@ def test_canary_writes_privacy_safe_release_evidence() -> None:
 
     assert 'EVIDENCE_PATH="${ARGUS_CANARY_EVIDENCE_PATH:-}"' in source
     assert "write_canary_evidence" in source
+    assert "build_release_evidence_json" in source
+    assert "CANARY_RELEASE_EVIDENCE_JSON" in source
     assert "privacy_safe_id_label" in source
     assert "conversation_label" in source
     assert "backtest_job_label" in source
@@ -167,6 +169,8 @@ def test_canary_can_write_manual_failed_capture_artifact() -> None:
 
     assert 'CAPTURE_PATH="${ARGUS_CANARY_CAPTURE_PATH:-}"' in source
     assert "write_canary_capture" in source
+    assert "build_release_evidence_json" in source
+    assert "release = json.loads(os.environ[\"CANARY_RELEASE_EVIDENCE_JSON\"])" in source
     assert "CANARY_CAPTURE_PATH" in source
     assert "launch_payload" in source
     assert "result_card" in source
@@ -289,6 +293,10 @@ def test_canary_asserts_focused_provider_path_symbols_when_configured() -> None:
     assert 'if [ -z "$FOCUSED_SYMBOL_PATH" ]; then' in source
     assert 'CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \\' in source
     assert 'CANARY_RUN_ACTION="$RUN_ACTION" \\' in source
+    assert "collect_canonical_symbols" in source
+    assert "SYMBOL_COLLECTION_KEYS" in source
+    assert "import re" not in source
+    assert "re.findall" not in source
     assert "focused symbol path missing expected symbols" in source
     assert "assert_focused_symbol_path run_action" in source
     assert "assert_focused_symbol_path job_response" in source

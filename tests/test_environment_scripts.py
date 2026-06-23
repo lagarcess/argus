@@ -448,10 +448,10 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
         maxsplit=1,
     )[1].split("\n)", maxsplit=1)[0]
     assert "RENDER_API_KEY" not in workflow_env_section
-    assert (
-        "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS "
-        '"${ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS:-300}"'
-    ) in _source(".github/render-env-sync.sh")
+    render_sync = _source(".github/render-env-sync.sh")
+    assert "workflow_render_env_value()" in render_sync
+    assert "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS)" in render_sync
+    assert 'echo "${ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS:-300}"' in render_sync
     assert all(service["type"] != "workflow" for service in render_config["services"])
 
 
@@ -499,12 +499,14 @@ def test_render_env_sync_pushes_workflow_llm_readout_env() -> None:
         "ARGUS_CONTEXT_FALLBACK_MODEL",
     ):
         assert f"require_local_env {key}" in workflow_block
-        assert f'put_render_env "$WORKFLOW_SERVICE_ID" {key} "${key}"' in workflow_block
+        assert f"{key})" in source
+    assert 'for key in "${ARGUS_RENDER_WORKFLOW_PROOF_ENV[@]}"; do' in workflow_block
     assert (
-        'put_render_env "$WORKFLOW_SERVICE_ID" '
-        'ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS '
-        '"${ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS:-30}"'
+        'put_render_env "$WORKFLOW_SERVICE_ID" "$key" '
+        '"$(workflow_render_env_value "$key")"'
     ) in workflow_block
+    assert "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS)" in source
+    assert 'echo "${ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS:-30}"' in source
     assert "ARGUS_WORKFLOW_DATABASE_URL" in source
     assert "require_local_env ALPACA_API_KEY" in source
     assert "require_local_env ALPACA_SECRET_KEY" in source
@@ -518,14 +520,17 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
     assert 'render workflows versions release "$WORKFLOW_SERVICE_ID"' in source
     assert "--wait" in source
     assert "--confirm" in source
-    assert 'put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_API_KEY' in source
-    assert 'put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_SECRET_KEY' in source
-    assert (
-        'put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_MARKET_DATA_PROVIDER_MODE' in source
-    )
-    assert 'put_render_env "$WORKFLOW_SERVICE_ID" ENABLE_MARKET_DATA_CACHE' in source
-    assert 'put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_PAPER_TRADING' in source
-    assert 'put_render_env "$WORKFLOW_SERVICE_ID" POETRY_VERSION' in source
+    assert 'for key in "${ARGUS_RENDER_WORKFLOW_PROOF_ENV[@]}"; do' in source
+    assert 'workflow_render_env_value "$key"' in source
+    for key in (
+        "ALPACA_API_KEY",
+        "ALPACA_SECRET_KEY",
+        "ARGUS_MARKET_DATA_PROVIDER_MODE",
+        "ENABLE_MARKET_DATA_CACHE",
+        "ALPACA_PAPER_TRADING",
+        "POETRY_VERSION",
+    ):
+        assert f"{key})" in source
     assert "workflow-runtime" in source
     assert "https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}" in source
     assert "render_workflow_json" in source
@@ -538,14 +543,15 @@ def test_render_env_sync_workflow_proof_forces_live_provider_mode() -> None:
         maxsplit=1,
     )[0]
 
+    value_block = source.split("workflow_render_env_value() {", maxsplit=1)[1].split(
+        "\n}",
+        maxsplit=1,
+    )[0]
+    assert "ARGUS_MARKET_DATA_PROVIDER_MODE)" in value_block
+    assert 'echo "live_provider"' in value_block
     assert (
-        'put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_MARKET_DATA_PROVIDER_MODE '
-        "live_provider"
-    ) in workflow_block
-    assert (
-        'put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_MARKET_DATA_PROVIDER_MODE '
-        '"${ARGUS_MARKET_DATA_PROVIDER_MODE:-live_provider}"'
-    ) not in workflow_block
+        'echo "${ARGUS_MARKET_DATA_PROVIDER_MODE:-live_provider}"' not in value_block
+    )
 
 
 def test_render_env_sync_prints_api_deploy_status_without_mutation() -> None:
@@ -707,7 +713,7 @@ def test_render_env_sync_can_audit_release_config_without_mutation() -> None:
     assert "ARGUS_RENDER_API_ENV" in source
     assert "ARGUS_RENDER_WEB_ENV" in source
     assert "ARGUS_RENDER_WORKFLOW_PROOF_ENV" in source
-    assert "ARGUS_RELEASE_WORKFLOW_ENV_EXPECTED" in source
+    assert "workflow_expected_env_pairs" in source
     assert "ARGUS_FORBIDDEN_LEGACY_ENV" in source
     assert "render_env_fingerprint" in source
     assert "workflow_env_fingerprint=" in source

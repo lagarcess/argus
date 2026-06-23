@@ -127,29 +127,6 @@ ARGUS_RELEASE_WEB_ENV_EXPECTED=(
   "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false"
 )
 
-ARGUS_RELEASE_WORKFLOW_ENV_EXPECTED=(
-  "ARGUS_WORKFLOW_DATABASE_URL=<redacted-present>"
-  "ARGUS_RENDER_WORKFLOW_PROOF_TASK=$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"
-  "ARGUS_WORKFLOW_PROOF_PLAN=starter"
-  "POETRY_VERSION=$ARGUS_RENDER_POETRY_VERSION"
-  "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS=300"
-  "ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider"
-  "ENABLE_MARKET_DATA_CACHE=false"
-  "ALPACA_API_KEY=<redacted-present>"
-  "ALPACA_SECRET_KEY=<redacted-present>"
-  "ALPACA_PAPER_TRADING=true"
-  "OPENROUTER_API_KEY=<redacted-present>"
-  "ARGUS_UTILITY_MODEL=qwen/qwen3.5-9b"
-  "ARGUS_UTILITY_FALLBACK_MODEL=google/gemini-2.5-flash-lite"
-  "ARGUS_CHAT_MODEL=deepseek/deepseek-v4-flash"
-  "ARGUS_CHAT_FALLBACK_MODEL=qwen/qwen3.5-9b"
-  "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=30"
-  "ARGUS_STRUCTURED_MODEL=mistralai/mistral-small-2603"
-  "ARGUS_STRUCTURED_FALLBACK_MODEL=deepseek/deepseek-v4-flash"
-  "ARGUS_CONTEXT_MODEL=openai/gpt-oss-120b"
-  "ARGUS_CONTEXT_FALLBACK_MODEL=deepseek/deepseek-v4-flash"
-)
-
 AUDIT_FAILURES=0
 AUDIT_FINGERPRINT_ROWS=()
 WORKFLOW_AUDIT_FAILURES=0
@@ -421,6 +398,104 @@ audit_render_service_config() {
   done
 }
 
+workflow_render_env_value() {
+  local key="$1"
+  local workflow_database_url="${ARGUS_WORKFLOW_DATABASE_URL:-${SUPABASE_POSTGRES_TRANSACTION_POOLER_URL:-}}"
+
+  case "$key" in
+    ARGUS_WORKFLOW_DATABASE_URL)
+      echo "$workflow_database_url"
+      ;;
+    ARGUS_RENDER_WORKFLOW_PROOF_TASK)
+      echo "$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"
+      ;;
+    ARGUS_WORKFLOW_PROOF_PLAN)
+      echo "${ARGUS_WORKFLOW_PROOF_PLAN:-starter}"
+      ;;
+    POETRY_VERSION)
+      echo "$ARGUS_RENDER_POETRY_VERSION"
+      ;;
+    ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS)
+      echo "${ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS:-300}"
+      ;;
+    ARGUS_MARKET_DATA_PROVIDER_MODE)
+      echo "live_provider"
+      ;;
+    ENABLE_MARKET_DATA_CACHE)
+      echo "${ENABLE_MARKET_DATA_CACHE:-false}"
+      ;;
+    ALPACA_API_KEY)
+      echo "${ALPACA_API_KEY:-}"
+      ;;
+    ALPACA_SECRET_KEY)
+      echo "${ALPACA_SECRET_KEY:-}"
+      ;;
+    ALPACA_PAPER_TRADING)
+      echo "${ALPACA_PAPER_TRADING:-true}"
+      ;;
+    OPENROUTER_API_KEY)
+      echo "${OPENROUTER_API_KEY:-}"
+      ;;
+    ARGUS_UTILITY_MODEL)
+      echo "${ARGUS_UTILITY_MODEL:-qwen/qwen3.5-9b}"
+      ;;
+    ARGUS_UTILITY_FALLBACK_MODEL)
+      echo "${ARGUS_UTILITY_FALLBACK_MODEL:-google/gemini-2.5-flash-lite}"
+      ;;
+    ARGUS_CHAT_MODEL)
+      echo "${ARGUS_CHAT_MODEL:-deepseek/deepseek-v4-flash}"
+      ;;
+    ARGUS_CHAT_FALLBACK_MODEL)
+      echo "${ARGUS_CHAT_FALLBACK_MODEL:-qwen/qwen3.5-9b}"
+      ;;
+    ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS)
+      echo "${ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS:-30}"
+      ;;
+    ARGUS_STRUCTURED_MODEL)
+      echo "${ARGUS_STRUCTURED_MODEL:-mistralai/mistral-small-2603}"
+      ;;
+    ARGUS_STRUCTURED_FALLBACK_MODEL)
+      echo "${ARGUS_STRUCTURED_FALLBACK_MODEL:-deepseek/deepseek-v4-flash}"
+      ;;
+    ARGUS_CONTEXT_MODEL)
+      echo "${ARGUS_CONTEXT_MODEL:-openai/gpt-oss-120b}"
+      ;;
+    ARGUS_CONTEXT_FALLBACK_MODEL)
+      echo "${ARGUS_CONTEXT_FALLBACK_MODEL:-deepseek/deepseek-v4-flash}"
+      ;;
+    *)
+      echo "Unsupported workflow env key: $key" >&2
+      return 2
+      ;;
+  esac
+}
+
+workflow_render_env_expected_status() {
+  local key="$1"
+  local value
+  value="$(workflow_render_env_value "$key")"
+  if is_secret_render_env_key "$key"; then
+    if [ -z "$value" ]; then
+      echo "<missing-or-empty>"
+    else
+      echo "<redacted-present>"
+    fi
+    return
+  fi
+  if [ -z "$value" ]; then
+    echo "<missing>"
+    return
+  fi
+  echo "$value"
+}
+
+workflow_expected_env_pairs() {
+  local key
+  for key in "${ARGUS_RENDER_WORKFLOW_PROOF_ENV[@]}"; do
+    echo "${key}=$(workflow_render_env_expected_status "$key")"
+  done
+}
+
 audit_forbidden_render_env_keys() {
   local env_json="$1"
   local service="$2"
@@ -545,9 +620,13 @@ audit_release_config() {
   local api_env_json web_env_json workflow_env_json workflow_task real_workflow_task fingerprint workflow_fingerprint
   local mode_pairs=()
   local mode_pair
+  local workflow_pairs=()
   while IFS= read -r mode_pair; do
     mode_pairs+=("$mode_pair")
   done < <(expected_api_mode_pairs "$expected_mode")
+  while IFS= read -r mode_pair; do
+    workflow_pairs+=("$mode_pair")
+  done < <(workflow_expected_env_pairs)
   api_env_json="$(render_env_json "$API_SERVICE_ID")"
   web_env_json="$(render_env_json "$WEB_SERVICE_ID")"
   workflow_env_json="$(render_env_json "$WORKFLOW_SERVICE_ID")"
@@ -563,7 +642,7 @@ audit_release_config() {
   audit_render_service_config "$api_env_json" "argus-api" "${ARGUS_RELEASE_API_ENV_EXPECTED[@]}"
   audit_render_service_config "$api_env_json" "argus-api" "${mode_pairs[@]}"
   audit_render_service_config "$web_env_json" "argus-app" "${ARGUS_RELEASE_WEB_ENV_EXPECTED[@]}"
-  audit_render_service_config "$workflow_env_json" "argus-backtests" "${ARGUS_RELEASE_WORKFLOW_ENV_EXPECTED[@]}"
+  audit_render_service_config "$workflow_env_json" "argus-backtests" "${workflow_pairs[@]}"
 
   workflow_task="$(render_env_status_value "$api_env_json" ARGUS_BACKTEST_WORKFLOW_TASK)"
   real_workflow_task="$(render_env_status_value "$api_env_json" ARGUS_BACKTEST_REAL_WORKFLOW_TASK)"
@@ -675,26 +754,10 @@ sync_workflow_proof() {
     exit 1
   fi
 
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_WORKFLOW_DATABASE_URL "$workflow_database_url"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_RENDER_WORKFLOW_PROOF_TASK "$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_WORKFLOW_PROOF_PLAN "${ARGUS_WORKFLOW_PROOF_PLAN:-starter}"
-  put_render_env "$WORKFLOW_SERVICE_ID" POETRY_VERSION "$ARGUS_RENDER_POETRY_VERSION"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS "${ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS:-300}"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_MARKET_DATA_PROVIDER_MODE live_provider
-  put_render_env "$WORKFLOW_SERVICE_ID" ENABLE_MARKET_DATA_CACHE "${ENABLE_MARKET_DATA_CACHE:-false}"
-  put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_API_KEY "$ALPACA_API_KEY"
-  put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_SECRET_KEY "$ALPACA_SECRET_KEY"
-  put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_PAPER_TRADING "${ALPACA_PAPER_TRADING:-true}"
-  put_render_env "$WORKFLOW_SERVICE_ID" OPENROUTER_API_KEY "$OPENROUTER_API_KEY"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_UTILITY_MODEL "$ARGUS_UTILITY_MODEL"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_UTILITY_FALLBACK_MODEL "$ARGUS_UTILITY_FALLBACK_MODEL"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_CHAT_MODEL "$ARGUS_CHAT_MODEL"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_CHAT_FALLBACK_MODEL "$ARGUS_CHAT_FALLBACK_MODEL"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS "${ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS:-30}"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_STRUCTURED_MODEL "$ARGUS_STRUCTURED_MODEL"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_STRUCTURED_FALLBACK_MODEL "$ARGUS_STRUCTURED_FALLBACK_MODEL"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_CONTEXT_MODEL "$ARGUS_CONTEXT_MODEL"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_CONTEXT_FALLBACK_MODEL "$ARGUS_CONTEXT_FALLBACK_MODEL"
+  local key
+  for key in "${ARGUS_RENDER_WORKFLOW_PROOF_ENV[@]}"; do
+    put_render_env "$WORKFLOW_SERVICE_ID" "$key" "$(workflow_render_env_value "$key")"
+  done
 }
 
 sync_workflow_runtime() {

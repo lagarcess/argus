@@ -252,16 +252,7 @@ validate_release_evidence_contract() {
   fi
 }
 
-write_canary_evidence() {
-  if [ -z "$EVIDENCE_PATH" ]; then
-    return 0
-  fi
-
-  mkdir -p "$(dirname "$EVIDENCE_PATH")"
-  CANARY_EVIDENCE_PATH="$EVIDENCE_PATH" \
-  CANARY_STATUS="$CANARY_STATUS" \
-  CANARY_FAILURE_STAGE="$CANARY_FAILURE_STAGE" \
-  CANARY_FAILURE_REASON="$CANARY_FAILURE_REASON" \
+build_release_evidence_json() {
   CANARY_EXPECTED_MODE="$EXPECT_MODE" \
   CANARY_ENV_FINGERPRINT="$ENV_FINGERPRINT" \
   CANARY_WORKFLOW_ENV_FINGERPRINT="$WORKFLOW_ENV_FINGERPRINT" \
@@ -278,20 +269,11 @@ write_canary_evidence() {
   CANARY_CHECKED_OUT_SHA="$CHECKED_OUT_SHA" \
   CANARY_LANGUAGE="$LANGUAGE" \
   CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \
-  CANARY_CONVERSATION_LABEL="$CONVERSATION_LABEL" \
-  CANARY_BACKTEST_JOB_LABEL="$BACKTEST_JOB_LABEL" \
-  CANARY_RESULT_LABEL="$RESULT_LABEL" \
-  CANARY_RESULT_KIND="$RESULT_KIND" \
   python3 - <<'PY'
 import json
 import os
-import pathlib
 
-path = pathlib.Path(os.environ["CANARY_EVIDENCE_PATH"])
 payload = {
-    "status": os.environ["CANARY_STATUS"],
-    "failure_stage": os.environ["CANARY_FAILURE_STAGE"] or None,
-    "failure_reason": os.environ["CANARY_FAILURE_REASON"] or None,
     "expected_mode": os.environ["CANARY_EXPECTED_MODE"],
     "env_fingerprint": os.environ["CANARY_ENV_FINGERPRINT"],
     "workflow_env_fingerprint": os.environ["CANARY_WORKFLOW_ENV_FINGERPRINT"],
@@ -308,12 +290,46 @@ payload = {
     "checked_out_sha": os.environ["CANARY_CHECKED_OUT_SHA"],
     "language": os.environ["CANARY_LANGUAGE"],
     "focused_symbol_path": os.environ["CANARY_FOCUSED_SYMBOL_PATH"] or None,
+}
+print(json.dumps(payload, sort_keys=True))
+PY
+}
+
+write_canary_evidence() {
+  if [ -z "$EVIDENCE_PATH" ]; then
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$EVIDENCE_PATH")"
+  local release_evidence_json
+  release_evidence_json="$(build_release_evidence_json)"
+  CANARY_EVIDENCE_PATH="$EVIDENCE_PATH" \
+  CANARY_STATUS="$CANARY_STATUS" \
+  CANARY_FAILURE_STAGE="$CANARY_FAILURE_STAGE" \
+  CANARY_FAILURE_REASON="$CANARY_FAILURE_REASON" \
+  CANARY_RELEASE_EVIDENCE_JSON="$release_evidence_json" \
+  CANARY_CONVERSATION_LABEL="$CONVERSATION_LABEL" \
+  CANARY_BACKTEST_JOB_LABEL="$BACKTEST_JOB_LABEL" \
+  CANARY_RESULT_LABEL="$RESULT_LABEL" \
+  CANARY_RESULT_KIND="$RESULT_KIND" \
+  python3 - <<'PY'
+import json
+import os
+import pathlib
+
+path = pathlib.Path(os.environ["CANARY_EVIDENCE_PATH"])
+release = json.loads(os.environ["CANARY_RELEASE_EVIDENCE_JSON"])
+payload = {
+    "status": os.environ["CANARY_STATUS"],
+    "failure_stage": os.environ["CANARY_FAILURE_STAGE"] or None,
+    "failure_reason": os.environ["CANARY_FAILURE_REASON"] or None,
     "conversation_label": os.environ["CANARY_CONVERSATION_LABEL"],
     "backtest_job_label": os.environ["CANARY_BACKTEST_JOB_LABEL"] or None,
     "result_label": os.environ["CANARY_RESULT_LABEL"] or None,
     "result_kind": os.environ["CANARY_RESULT_KIND"] or None,
     "privacy": "no_raw_ids; labels are sha256 prefixes",
 }
+payload.update(release)
 path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 print(f"canary_evidence_path={path}")
 PY
@@ -337,26 +353,14 @@ write_canary_capture() {
   fi
 
   local exit_code=0
+  local release_evidence_json
+  release_evidence_json="$(build_release_evidence_json)"
   CANARY_CAPTURE_PATH="$CAPTURE_PATH" \
   CANARY_STATUS="$CANARY_STATUS" \
   CANARY_FAILURE_STAGE="$CANARY_FAILURE_STAGE" \
   CANARY_FAILURE_REASON="$CANARY_FAILURE_REASON" \
-  CANARY_EXPECTED_MODE="$EXPECT_MODE" \
-  CANARY_ENV_FINGERPRINT="$ENV_FINGERPRINT" \
-  CANARY_WORKFLOW_ENV_FINGERPRINT="$WORKFLOW_ENV_FINGERPRINT" \
-  CANARY_WORKFLOW_ENV_STATUS="$WORKFLOW_ENV_STATUS" \
-  CANARY_WORKFLOW_RUNTIME_PROVIDER_MODE="$WORKFLOW_RUNTIME_PROVIDER_MODE" \
-  CANARY_WORKFLOW_RUNTIME_PROOF="$WORKFLOW_RUNTIME_PROOF" \
-  CANARY_WORKFLOW_TASK="$WORKFLOW_TASK" \
-  CANARY_REAL_WORKFLOW_TASK="$REAL_WORKFLOW_TASK" \
-  CANARY_API_DEPLOY_SHA="$API_DEPLOY_SHA" \
-  CANARY_WEB_DEPLOY_SHA="$WEB_DEPLOY_SHA" \
-  CANARY_API_DEPLOY_STATUS="$API_DEPLOY_STATUS" \
-  CANARY_WEB_DEPLOY_STATUS="$WEB_DEPLOY_STATUS" \
-  CANARY_EXPECTED_SHA="$CANDIDATE_SHA" \
-  CANARY_CHECKED_OUT_SHA="$CHECKED_OUT_SHA" \
-  CANARY_LANGUAGE="$LANGUAGE" \
   CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \
+  CANARY_RELEASE_EVIDENCE_JSON="$release_evidence_json" \
   CANARY_PROMPT="$PROMPT" \
   CANARY_RUN_ACTION="${RUN_ACTION:-}" \
   CANARY_CONVERSATION_LABEL="$CONVERSATION_LABEL" \
@@ -506,6 +510,7 @@ messages_payload = read_json_file(os.environ["CANARY_MESSAGES_FILE"])
 message_artifacts = extract_message_artifacts(messages_payload)
 job_response = read_json_file(os.environ["CANARY_JOB_RESPONSE_FILE"])
 receipt_payload = read_json_file(os.environ["CANARY_RECEIPT_ROWS_FILE"])
+release = json.loads(os.environ["CANARY_RELEASE_EVIDENCE_JSON"])
 run_action = None
 if os.environ["CANARY_RUN_ACTION"]:
     try:
@@ -514,7 +519,7 @@ if os.environ["CANARY_RUN_ACTION"]:
         run_action = None
 
 launch_payload = {
-    "language": os.environ["CANARY_LANGUAGE"],
+    "language": release["language"],
     "message": os.environ["CANARY_PROMPT"],
     "focused_symbol_path": os.environ["CANARY_FOCUSED_SYMBOL_PATH"] or None,
     "action": run_action,
@@ -533,23 +538,7 @@ payload = {
         "reason": os.environ["CANARY_FAILURE_REASON"] or None,
         "status": os.environ["CANARY_STATUS"],
     },
-    "release": {
-        "expected_mode": os.environ["CANARY_EXPECTED_MODE"],
-        "env_fingerprint": os.environ["CANARY_ENV_FINGERPRINT"],
-        "workflow_env_fingerprint": os.environ["CANARY_WORKFLOW_ENV_FINGERPRINT"],
-        "workflow_env_status": os.environ["CANARY_WORKFLOW_ENV_STATUS"],
-        "workflow_runtime_provider_mode": os.environ["CANARY_WORKFLOW_RUNTIME_PROVIDER_MODE"],
-        "workflow_runtime_proof": os.environ["CANARY_WORKFLOW_RUNTIME_PROOF"],
-        "workflow_task": os.environ["CANARY_WORKFLOW_TASK"],
-        "real_workflow_task": os.environ["CANARY_REAL_WORKFLOW_TASK"],
-        "api_deploy_sha": os.environ["CANARY_API_DEPLOY_SHA"] or None,
-        "web_deploy_sha": os.environ["CANARY_WEB_DEPLOY_SHA"] or None,
-        "api_deploy_status": os.environ["CANARY_API_DEPLOY_STATUS"] or None,
-        "web_deploy_status": os.environ["CANARY_WEB_DEPLOY_STATUS"] or None,
-        "candidate_sha": os.environ["CANARY_EXPECTED_SHA"],
-        "checked_out_sha": os.environ["CANARY_CHECKED_OUT_SHA"],
-        "focused_symbol_path": os.environ["CANARY_FOCUSED_SYMBOL_PATH"] or None,
-    },
+    "release": release,
     "labels": {
         "conversation": os.environ["CANARY_CONVERSATION_LABEL"] or None,
         "backtest_job": os.environ["CANARY_BACKTEST_JOB_LABEL"] or None,
@@ -704,7 +693,6 @@ assert_focused_symbol_path() {
 import json
 import os
 import pathlib
-import re
 from typing import Any
 
 expected = {
@@ -714,23 +702,57 @@ expected = {
 }
 actual: set[str] = set()
 
+SYMBOL_COLLECTION_KEYS = {
+    "asset_universe",
+    "asset_symbols",
+    "assets",
+    "symbols",
+    "tickers",
+}
+SYMBOL_VALUE_KEYS = {"symbol", "ticker"}
 
-def collect_symbols(value: Any) -> None:
+
+def add_symbol(value: Any) -> None:
+    if not isinstance(value, str):
+        return
+    symbol = value.strip().upper()
+    if symbol:
+        actual.add(symbol)
+
+
+def collect_symbol_collection(value: Any) -> None:
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                for key in SYMBOL_VALUE_KEYS:
+                    add_symbol(item.get(key))
+            else:
+                add_symbol(item)
+        return
     if isinstance(value, dict):
-        for item in value.values():
-            collect_symbols(item)
+        for key in SYMBOL_VALUE_KEYS:
+            add_symbol(value.get(key))
+
+
+def collect_canonical_symbols(value: Any) -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized_key = str(key).lower()
+            if normalized_key in SYMBOL_COLLECTION_KEYS:
+                collect_symbol_collection(item)
+                continue
+            if normalized_key in SYMBOL_VALUE_KEYS:
+                add_symbol(item)
+                continue
+            collect_canonical_symbols(item)
         return
     if isinstance(value, list):
         for item in value:
-            collect_symbols(item)
-        return
-    if isinstance(value, str):
-        for token in re.findall(r"\b[A-Z][A-Z0-9.-]{0,9}\b", value.upper()):
-            actual.add(token)
+            collect_canonical_symbols(item)
 
 
 try:
-    collect_symbols(json.loads(os.environ["CANARY_RUN_ACTION"]))
+    collect_canonical_symbols(json.loads(os.environ["CANARY_RUN_ACTION"]))
 except json.JSONDecodeError:
     pass
 
@@ -739,7 +761,7 @@ if json_file:
     path = pathlib.Path(json_file)
     if path.exists() and path.stat().st_size > 0:
         try:
-            collect_symbols(json.loads(path.read_text(encoding="utf-8")))
+            collect_canonical_symbols(json.loads(path.read_text(encoding="utf-8")))
         except Exception:
             pass
 

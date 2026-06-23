@@ -203,7 +203,7 @@ def test_private_alpha_canary_workflow_runs_bilingual_evidence_matrix() -> None:
     assert "Require private-alpha canary matrix" in steps_by_name
     assert "canary_locale_${locale}_exit" in joined_steps
     assert "Prueba una estrategia de comprar y mantener AAPL y MSFT" in joined_steps
-    assert "SNDK, AMD, NVDA y Goldman Sachs" in joined_steps
+    assert "SNDK, AMD, NVDA y GS" in joined_steps
     assert "for locale in en es-419 provider-path" in joined_steps
     assert "actions/upload-artifact@v4" in uses_steps
     assert "private-alpha-canary-evidence" in CANARY_WORKFLOW_PATH.read_text(
