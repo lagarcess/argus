@@ -1691,6 +1691,29 @@ def _response_needs_requested_asset_answer_candidate_audit(
     return bool(_prior_strategy_symbols(request))
 
 
+def _response_is_audited_requested_asset_answer_patch(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if _selected_requested_field_base(request) != "asset_universe":
+        return False
+    if "requested_asset_answer_candidate_audit" not in response.reason_codes:
+        return False
+    if response.semantic_turn_act != "answer_pending_need":
+        return False
+    if response.intent != "backtest_execution":
+        return False
+    if response.assistant_response:
+        return False
+    if response.candidate_strategy_draft is None:
+        return False
+    return _draft_has_valid_requested_asset_update(
+        response.candidate_strategy_draft,
+        request,
+    )
+
+
 def _draft_has_valid_requested_asset_update(
     draft: LLMStrategyDraft,
     request: InterpretationRequest,
@@ -3295,6 +3318,11 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
     )
+    if _response_is_audited_requested_asset_answer_patch(
+        response=response,
+        request=request,
+    ):
+        return response
     response = await _latest_result_routing_audited_response(
         response=response,
         preferred_model=preferred_model,

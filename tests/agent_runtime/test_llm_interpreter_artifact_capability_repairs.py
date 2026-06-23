@@ -130,6 +130,91 @@ async def test_llm_interpreter_audits_pending_asset_answer_despite_educational_c
     assert ready_response.assistant_response is None
     assert "requested_asset_answer_candidate_audit" in ready_response.reason_codes
 
+
+@pytest.mark.asyncio
+async def test_requested_asset_answer_audit_skips_generic_readiness_repairs(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def audit_stub(**kwargs):
+        assert kwargs["schema_name"] == "AssetAnswerCandidateAudit"
+        return interpreter_module.AssetAnswerCandidateAudit(
+            candidate_symbols=["GOOGL"],
+            needs_clarification=False,
+            confidence=0.92,
+        )
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized == "GOOGL":
+            return ResolvedAssetStub(
+                "GOOGL",
+                "equity",
+                name="Alphabet Inc. Class A Common Stock",
+            )
+        raise ValueError("invalid_symbol")
+
+    async def generic_router_stub(**kwargs):
+        raise AssertionError("accepted requested-asset patch reached generic router")
+
+    async def no_pre_audit_planner(**kwargs):
+        return None
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(
+        interpreter_module,
+        "_ready_active_artifact_edit_planned_response",
+        no_pre_audit_planner,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_latest_result_routing_audited_response",
+        generic_router_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User answered the asset edit with a company name.",
+        assistant_response="I cannot treat that as a supported ticker.",
+        semantic_turn_act="educational_question",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="google",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="buy_and_hold",
+                strategy_thesis="Test TSLA with buy and hold.",
+                asset_universe=["TSLA"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            )
+        ),
+        selected_thread_metadata={"requested_field": "asset_universe"},
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=request,
+    )
+
+    assert ready_response.semantic_turn_act == "answer_pending_need"
+    assert ready_response.candidate_strategy_draft.asset_universe == ["GOOGL"]
+    assert ready_response.assistant_response is None
+    assert "requested_asset_answer_candidate_audit" in ready_response.reason_codes
+
+
 def test_requested_asset_answer_audit_prompt_does_not_copy_rejection_prose() -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
