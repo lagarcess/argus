@@ -751,10 +751,12 @@ def collect_canonical_symbols(value: Any) -> None:
             collect_canonical_symbols(item)
 
 
-try:
-    collect_canonical_symbols(json.loads(os.environ["CANARY_RUN_ACTION"]))
-except json.JSONDecodeError:
-    pass
+source_name = os.environ["CANARY_SOURCE_NAME"]
+if source_name == "run_action":
+    try:
+        collect_canonical_symbols(json.loads(os.environ["CANARY_RUN_ACTION"]))
+    except json.JSONDecodeError:
+        pass
 
 json_file = os.environ.get("CANARY_JSON_FILE", "")
 if json_file:
@@ -767,7 +769,6 @@ if json_file:
 
 missing = sorted(expected - actual)
 if missing:
-    source_name = os.environ["CANARY_SOURCE_NAME"]
     raise SystemExit(
         f"{source_name} focused symbol path missing expected symbols: "
         f"expected={sorted(expected)} actual={sorted(actual)}"

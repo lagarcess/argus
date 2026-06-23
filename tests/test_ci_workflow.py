@@ -204,6 +204,9 @@ def test_private_alpha_canary_workflow_runs_bilingual_evidence_matrix() -> None:
     assert "canary_locale_${locale}_exit" in joined_steps
     assert "Prueba una estrategia de comprar y mantener AAPL y MSFT" in joined_steps
     assert "SNDK, AMD, NVDA y GS" in joined_steps
+    assert "desde el 24 de febrero de 2025 hasta el 5 de junio de 2026" in joined_steps
+    assert "dólares" in joined_steps
+    assert "ultimos 3 anos" not in joined_steps
     assert "for locale in en es-419 provider-path" in joined_steps
     assert "actions/upload-artifact@v4" in uses_steps
     assert "private-alpha-canary-evidence" in CANARY_WORKFLOW_PATH.read_text(
