@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -88,6 +88,138 @@ def test_workflow_proof_marks_queued_job_running_then_succeeded() -> None:
     assert metadata["workflow_proof"]["workflow_run_id"] == "local-run"
 
 
+def test_workflow_proof_records_effective_runtime_provider_mode() -> None:
+    from workflows.proof import run_workflow_proof
+
+    job_id = str(uuid4())
+    gateway = FakeProofGateway(
+        {
+            "id": job_id,
+            "status": "queued",
+            "attempts": 0,
+            "launch_payload": {"kind": "render_workflow_proof"},
+            "execution_metadata": {},
+        }
+    )
+
+    result = run_workflow_proof(
+        gateway,
+        job_id=job_id,
+        nonce="proof-nonce",
+        workflow_run_id="local-run",
+        runtime_facts={
+            "provider_mode": "live_provider",
+            "market_data_cache": "false",
+        },
+    )
+
+    assert result["runtime_facts"] == {
+        "provider_mode": "live_provider",
+        "market_data_cache": "false",
+    }
+    metadata = gateway.row["execution_metadata"]["workflow_proof"]
+    assert metadata["runtime_facts"] == {
+        "provider_mode": "live_provider",
+        "market_data_cache": "false",
+    }
+
+
+def test_workflow_proof_verify_requires_completed_current_nonce(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows import proof
+
+    job_id = str(uuid4())
+    gateway = FakeProofGateway(
+        {
+            "id": job_id,
+            "status": "succeeded",
+            "attempts": 1,
+            "finished_at": "2026-06-23T16:00:00+00:00",
+            "launch_payload": {"kind": "render_workflow_proof"},
+            "execution_metadata": {
+                "workflow_proof": {
+                    "kind": "render_workflow_proof",
+                    "nonce": "proof-nonce",
+                    "finished_at": "2026-06-23T16:00:00+00:00",
+                    "runtime_facts": {"provider_mode": "live_provider"},
+                }
+            },
+        }
+    )
+    monkeypatch.setattr(proof.PostgresProofJobGateway, "from_env", lambda: gateway)
+
+    assert (
+        proof.main(
+            [
+                "verify",
+                "--job-id",
+                job_id,
+                "--expect-nonce",
+                "proof-nonce",
+                "--expect-provider-mode",
+                "live_provider",
+            ]
+        )
+        == 0
+    )
+
+
+def test_workflow_proof_verify_rejects_unfinished_or_stale_proof_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows import proof
+
+    job_id = str(uuid4())
+    gateway = FakeProofGateway(
+        {
+            "id": job_id,
+            "status": "running",
+            "attempts": 1,
+            "launch_payload": {"kind": "render_workflow_proof"},
+            "execution_metadata": {
+                "workflow_proof": {
+                    "kind": "render_workflow_proof",
+                    "nonce": "old-nonce",
+                    "runtime_facts": {"provider_mode": "live_provider"},
+                }
+            },
+        }
+    )
+    monkeypatch.setattr(proof.PostgresProofJobGateway, "from_env", lambda: gateway)
+
+    with pytest.raises(proof.WorkflowProofError, match="expected succeeded"):
+        proof.main(
+            [
+                "verify",
+                "--job-id",
+                job_id,
+                "--expect-nonce",
+                "proof-nonce",
+                "--expect-provider-mode",
+                "live_provider",
+            ]
+        )
+
+    gateway.row["status"] = "succeeded"
+    gateway.row["finished_at"] = "2026-06-23T16:00:00+00:00"
+    gateway.row["execution_metadata"]["workflow_proof"]["finished_at"] = (
+        "2026-06-23T16:00:00+00:00"
+    )
+    with pytest.raises(proof.WorkflowProofError, match="expected nonce"):
+        proof.main(
+            [
+                "verify",
+                "--job-id",
+                job_id,
+                "--expect-nonce",
+                "proof-nonce",
+                "--expect-provider-mode",
+                "live_provider",
+            ]
+        )
+
+
 def test_workflow_proof_rejects_non_proof_jobs() -> None:
     from workflows.proof import WorkflowProofError, run_workflow_proof
 
@@ -155,7 +287,126 @@ def test_trigger_proof_serializes_generated_sdk_models() -> None:
     }
 
 
-def test_seed_cli_creates_disposable_profile_for_empty_preview_branch(
+def test_trigger_proof_prefers_canonical_task_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows.trigger_proof import _task_id
+
+    monkeypatch.setenv(
+        "ARGUS_BACKTEST_WORKFLOW_TASK",
+        "argus-backtests/workflow_proof",
+    )
+    monkeypatch.setenv(
+        "ARGUS_RENDER_WORKFLOW_PROOF_TASK",
+        "argus-render-workflow-proof/workflow_proof",
+    )
+
+    assert _task_id(None) == "argus-backtests/workflow_proof"
+
+
+def test_trigger_proof_uses_direct_task_run_api(monkeypatch: pytest.MonkeyPatch) -> None:
+    from workflows import trigger_proof as proof_trigger
+
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    class FakeDispatcher:
+        def __init__(self, *, task_id: str) -> None:
+            calls.append(("dispatcher_init", {"task_id": task_id}))
+
+        def dispatch(self, *, job_id: str, nonce: str) -> dict[str, object]:
+            calls.append(("dispatch", {"job_id": job_id, "nonce": nonce}))
+            return {"id": "trn-direct", "status": "pending"}
+
+    class FakeTaskRunClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get_task_run(self, task_run_id: str) -> dict[str, object]:
+            self.calls += 1
+            calls.append(
+                (
+                    "get_task_run",
+                    {"task_run_id": task_run_id, "call": self.calls},
+                )
+            )
+            if self.calls == 1:
+                return {"id": task_run_id, "status": "pending"}
+            return {
+                "id": task_run_id,
+                "status": "completed",
+                "results": [{"job_id": "job-1", "status": "succeeded"}],
+            }
+
+    monkeypatch.setattr(
+        "argus.api.chat.backtest_jobs.RenderWorkflowDispatcher",
+        FakeDispatcher,
+    )
+    monkeypatch.setattr(
+        "argus.api.chat.backtest_jobs.RenderTaskRunClient",
+        FakeTaskRunClient,
+    )
+    monkeypatch.setattr(proof_trigger.time, "sleep", lambda _seconds: None)
+
+    result = proof_trigger.trigger_proof(
+        task_id="argus-backtests/workflow_proof",
+        job_id="job-1",
+        nonce="nonce-1",
+        timeout_seconds=5,
+        poll_seconds=0.1,
+    )
+
+    assert result == {
+        "id": "trn-direct",
+        "status": "completed",
+        "results": [{"job_id": "job-1", "status": "succeeded"}],
+    }
+    assert calls == [
+        (
+            "dispatcher_init",
+            {"task_id": "argus-backtests/workflow_proof"},
+        ),
+        ("dispatch", {"job_id": "job-1", "nonce": "nonce-1"}),
+        ("get_task_run", {"task_run_id": "trn-direct", "call": 1}),
+        ("get_task_run", {"task_run_id": "trn-direct", "call": 2}),
+    ]
+
+
+def test_trigger_proof_fails_on_terminal_task_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows import trigger_proof as proof_trigger
+
+    class FakeDispatcher:
+        def __init__(self, *, task_id: str) -> None:
+            self.task_id = task_id
+
+        def dispatch(self, *, job_id: str, nonce: str) -> dict[str, object]:
+            return {"id": "trn-failed", "status": "pending"}
+
+    class FakeTaskRunClient:
+        def get_task_run(self, task_run_id: str) -> dict[str, object]:
+            return {"id": task_run_id, "status": "failed"}
+
+    monkeypatch.setattr(
+        "argus.api.chat.backtest_jobs.RenderWorkflowDispatcher",
+        FakeDispatcher,
+    )
+    monkeypatch.setattr(
+        "argus.api.chat.backtest_jobs.RenderTaskRunClient",
+        FakeTaskRunClient,
+    )
+
+    with pytest.raises(RuntimeError, match="finished with status failed"):
+        proof_trigger.trigger_proof(
+            task_id="argus-backtests/workflow_proof",
+            job_id="job-1",
+            nonce="nonce-1",
+            timeout_seconds=5,
+            poll_seconds=0.1,
+        )
+
+
+def test_seed_cli_reuses_stable_proof_principal_by_default(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -164,17 +415,25 @@ def test_seed_cli_creates_disposable_profile_for_empty_preview_branch(
     class SeedGateway:
         def __init__(self) -> None:
             self.profile: dict[str, str] | None = None
-            self.conversation_user_id: str | None = None
+            self.conversation: dict[str, str] | None = None
             self.job_args: dict[str, str | None] | None = None
 
         def ensure_proof_profile(self, *, user_id: str, email: str) -> None:
             self.profile = {"user_id": user_id, "email": email}
 
-        def create_proof_conversation(self, *, user_id: str) -> str:
+        def ensure_proof_conversation(
+            self,
+            *,
+            user_id: str,
+            conversation_id: str,
+        ) -> str:
             assert self.profile is not None
             assert self.profile["user_id"] == user_id
-            self.conversation_user_id = user_id
-            return "00000000-0000-4000-8000-000000000001"
+            self.conversation = {
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+            }
+            return conversation_id
 
         def create_proof_job(
             self,
@@ -204,19 +463,87 @@ def test_seed_cli_creates_disposable_profile_for_empty_preview_branch(
     output = json.loads(capsys.readouterr().out)
 
     assert exit_code == 0
-    assert UUID(output["user_id"])
+    assert output["user_id"] == proof.DEFAULT_PROOF_USER_ID
     assert output["email"] == f"render-workflow-proof+{output['user_id']}@example.invalid"
     assert output["job_id"] == "00000000-0000-4000-8000-000000000002"
-    assert output["conversation_id"] == "00000000-0000-4000-8000-000000000001"
+    assert output["conversation_id"] == proof.DEFAULT_PROOF_CONVERSATION_ID
     assert output["nonce"] == "internet-proof"
     assert output["status"] == "queued"
     assert gateway.profile == {"user_id": output["user_id"], "email": output["email"]}
-    assert gateway.conversation_user_id == output["user_id"]
+    assert gateway.conversation == {
+        "user_id": output["user_id"],
+        "conversation_id": output["conversation_id"],
+    }
     assert gateway.job_args == {
         "user_id": output["user_id"],
         "conversation_id": output["conversation_id"],
         "nonce": "internet-proof",
         "idempotency_key": None,
+    }
+
+
+def test_seed_cli_respects_explicit_proof_user_and_conversation(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from workflows import proof
+
+    class SeedGateway:
+        def __init__(self) -> None:
+            self.conversation: dict[str, str] | None = None
+
+        def ensure_proof_profile(self, *, user_id: str, email: str) -> None:
+            self.profile = {"user_id": user_id, "email": email}
+
+        def ensure_proof_conversation(
+            self,
+            *,
+            user_id: str,
+            conversation_id: str,
+        ) -> str:
+            self.conversation = {
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+            }
+            return conversation_id
+
+        def create_proof_job(
+            self,
+            *,
+            user_id: str,
+            conversation_id: str,
+            nonce: str,
+            idempotency_key: str | None = None,
+        ) -> dict[str, object]:
+            return {
+                "id": "00000000-0000-4000-8000-000000000004",
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "status": "queued",
+            }
+
+    gateway = SeedGateway()
+    monkeypatch.setattr(proof.PostgresProofJobGateway, "from_env", lambda: gateway)
+
+    exit_code = proof.main(
+        [
+            "seed",
+            "--user-id",
+            "00000000-0000-4000-8000-000000000003",
+            "--conversation-id",
+            "00000000-0000-4000-8000-000000000005",
+            "--nonce",
+            "explicit-proof",
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert output["user_id"] == "00000000-0000-4000-8000-000000000003"
+    assert output["conversation_id"] == "00000000-0000-4000-8000-000000000005"
+    assert gateway.conversation == {
+        "user_id": "00000000-0000-4000-8000-000000000003",
+        "conversation_id": "00000000-0000-4000-8000-000000000005",
     }
 
 
