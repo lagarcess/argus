@@ -19,6 +19,12 @@ Quarantine branches are reference material only. Do not broad cherry-pick
 runtime work from `codex/private-alpha-next-quarantine-fc231e8`; promote only
 small, reviewed, revertable slices.
 
+Snapshot note: refreshed for the `codex/private-alpha-next` CI/CD SOTA mission.
+For this branch, `docs/specs/private-alpha-ci-cd-sota.md` is the current active
+goal. `docs/specs/private-alpha-next-integration.md` remains staging/process
+context, and `docs/specs/private-alpha-next-decision-memo.md` is future context
+only.
+
 ## Inventory
 
 | File | Classification | Rationale | Recommended next action | Notes / possible stale references |
