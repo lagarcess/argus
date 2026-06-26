@@ -1003,7 +1003,7 @@ Local source-of-truth guidance:
 
 - `AGENTS.md` says not to restore "copy conversation link" or "share conversation id" as pseudo-sharing.
 - `AGENTS.md` says future public conversation excerpts must be immutable, sanitized snapshots behind owner-only create/revoke and an unguessable public slug.
-- `docs/specs/private-alpha-conversation-trust.md` has a design-only slice for public conversation excerpts.
+- `docs/archive/private-alpha-conversation-trust.md` has a design-only slice for public conversation excerpts.
 - `docs/specs/evidence-aware-idea-loop.md` says sharing should wait for privacy, revocation, and artifact sanitization, but also recognizes sharing as a future distribution question.
 
 Strategic interpretation:
@@ -2621,7 +2621,7 @@ Do this instead:
 ### Sharing and public excerpts
 
 - Argus agent guidance on public excerpts: `AGENTS.md`
-- Private Alpha Conversation Trust, Slice 7 public excerpt design: `docs/specs/private-alpha-conversation-trust.md`
+- Private Alpha Conversation Trust, Slice 7 public excerpt design: `docs/archive/private-alpha-conversation-trust.md`
 - Evidence-aware idea loop sharing notes: `docs/specs/evidence-aware-idea-loop.md`
 
 ### LLM/model routing and prompting

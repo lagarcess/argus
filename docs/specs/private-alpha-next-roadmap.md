@@ -1,13 +1,14 @@
 # Private Alpha Next Roadmap
 
-Status: P1 local recovery candidate on reintegration branch; Codex-browser QA passed
-Date: 2026-06-21
+Status: P1 checkpoint closed; P2 planning intentionally parked
+Date: 2026-06-26
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
 
 This is the current execution board for Private Alpha Next after the clean P0
-continuity reintegration. It turns the decision memo into ordered, testable
-slices without importing contaminated runtime work from quarantine.
+continuity reintegration and P1 idea/evidence checkpoint. It turns the decision
+memo into ordered, testable slices without importing contaminated runtime work
+from quarantine.
 
 ## Source Order
 
@@ -24,9 +25,9 @@ Every agent starts here:
 9. `docs/specs/private-alpha-ci-cd-sota.md`
 10. `docs/PRIVATE_LAUNCH_RUNBOOK.md`
 11. `docs/release-manifests/TEMPLATE.md`
-12. Supporting notes such as
-    `docs/specs/private-alpha-performance-readiness-audit.md` and
-    `temp/bytebytego/bytebytego.md`
+12. Supporting archived notes such as
+    `docs/archive/private-alpha-performance-readiness-audit.md`, plus local
+    memos such as `temp/bytebytego/bytebytego.md`
 
 The decision memo is mandatory slice onboarding. Before a subagent works on a
 slice, it must read the relevant memo sections and addenda for that slice.
@@ -211,6 +212,34 @@ Stop immediately if:
 - Native mobile.
 - Research Lab / Perplexity-style deep research.
 
+### P2 Placeholder
+
+P2 is intentionally blank until the founder slices it into one or more cohesive,
+high-leverage milestones. Do not treat the decision memo's remaining roadmap
+slices as authorized implementation scope yet.
+
+Next step when work resumes:
+
+1. Read `docs/specs/private-alpha-next-decision-memo.md`, especially:
+   - `## 11. Updated Roadmap Slices`;
+   - `## 16. Recommended Immediate Action`;
+   - `### Backtest credibility ladder`;
+   - `### Failure and recovery trust`;
+   - `### 15.1 Idea, Strategy, Run, Evidence, and Decision Object Boundary`;
+   - `### 15.2 Ledger UI, Recents, and Omnisearch`;
+   - `### 15.3 Memory Product Posture`;
+   - `### 15.5 Evaluation, Cost, and Analytics Instrumentation`.
+2. Cross-reference the contaminated reference branches only for product
+   direction, anti-patterns, UI ideas, and test inspiration:
+   - `codex/private-alpha-next-quarantine-fc231e8`;
+   - `codex/private-alpha-next-p2.1-quarantine`.
+3. Draft a bounded P2 board here before implementation. The board must include
+   user-facing outcome, allowed surfaces, forbidden surfaces, verification,
+   browser QA, rollback posture, and explicit stop conditions.
+
+Until that board exists, do not implement P2 runtime, backend, schema, or UI
+changes from this roadmap.
+
 ## Parallelization Rules
 
 Serialized:
@@ -251,11 +280,11 @@ The P0 reintegration strategy worked directionally:
 - reintegration restarted from the clean branch;
 - P0 landed as a focused, tested, revertable slice.
 
-The P1 workflow should keep that discipline:
+Future P2 work should keep that discipline:
 
-- work on `codex/private-alpha-next-reintegration` or a focused child branch;
+- work on a focused child branch from `codex/private-alpha-next`;
 - promote to `codex/private-alpha-next` only after tests, browser QA, and review;
 - keep each slice revertable;
-- use subagents for bounded scouting, specs, tests, and reviews;
+- use bounded scouting, specs, tests, and reviews only when they reduce risk;
 - keep architecture, prioritization, and final promotion with the main
   orchestrator and founder.

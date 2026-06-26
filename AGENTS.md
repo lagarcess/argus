@@ -89,7 +89,7 @@ still own smoke/canary/release-manifest expectations, but they no longer own
 Private Alpha Next product sequencing.
 
 Use `docs/specs/private-alpha-next-integration.md` as staging and branch-process
-context. It records integration-lane guardrails, closed work, and Jules
+context. It records integration-lane guardrails, closed work, and branch-process
 boundaries, but it should not override the active roadmap or decision memo.
 
 Integration guardrails:
@@ -97,25 +97,25 @@ Integration guardrails:
 - Worker branches start from `codex/private-alpha-next`, not directly from
   `main`, unless the task is an urgent hotfix.
 - `codex/private-alpha-next` is the clean integration gate. Quarantine branches
-  such as `codex/private-alpha-next-quarantine-fc231e8` are read-only reference
-  material unless the founder explicitly approves a surgical promotion.
+  such as `codex/private-alpha-next-quarantine-fc231e8` and
+  `codex/private-alpha-next-p2.1-quarantine` are read-only reference material
+  for product direction, UI salvage, tests, and anti-pattern evidence unless
+  the founder explicitly approves a surgical promotion.
 - Do not broad cherry-pick or merge runtime code from quarantine into the clean
   integration branch. Reintegrate in small, reviewable, revertable slices.
-- External async agent Jules must work on focused `jules/**` branches and must
-  not push directly to `main` or to the integration branch.
-- Jules PRs should target `codex/private-alpha-next-jules-intake`; CI is
-  configured to run on `jules/**` pushes and on PRs targeting the intake branch.
-- Keep `codex/private-alpha-next-jules-intake` downstream of
-  `codex/private-alpha-next`; merge/fast-forward the main integration branch
-  down into the Jules intake branch when high-leverage integration work lands.
+- Jules work is decommissioned for the near term. Do not create or maintain
+  `jules/**` branches, `codex/private-alpha-next-jules-intake`, or Jules intake
+  PRs unless the founder explicitly reactivates that workflow.
+- External async agents, if reintroduced later, must work from a fresh
+  founder-approved delegation model and must not push directly to `main` or
+  `codex/private-alpha-next`.
 - Codex reviews worker diffs before merging or cherry-picking them into the
   integration branch.
 - For Argus multi-agent work, the main Codex thread is the release captain and
   owns subagent cleanup. Every spawned agent must have a bounded goal, expected
   output, and cleanup expectation. After the run, the parent agent must
   summarize outputs, close/archive completed agents, and leave open only agents
-  with an explicit active follow-up. Jules cleanup follows the
-  `argus-jules-intake` skill.
+  with an explicit active follow-up.
 - For horizon-spec work, follow the AI-native engineering cadence: delegate
   code-aware planning/scoping, first-pass implementation, test generation,
   review, and documentation support to bounded agents, but keep prioritization,
@@ -138,10 +138,10 @@ Integration guardrails:
 - Perplexity Research Lab, generic memory/RAG, public excerpts, voice provider
   integration, and broker/export execution remain design-only until the roadmap
   explicitly starts those slices.
-- When working from `codex/private-alpha-readiness-clean`, use
-  `docs/specs/private-alpha-readiness-orchestration.md` as the active
-  release-captain/subagent coordination note before dispatching or executing
-  readiness work.
+- The old `codex/private-alpha-readiness-clean` coordination note now lives at
+  `docs/archive/private-alpha-readiness-orchestration.md` as historical
+  branch-specific context. Do not treat it as the active command source for
+  `codex/private-alpha-next`.
 
 ---
 
@@ -150,7 +150,7 @@ Integration guardrails:
 When working on private-alpha conversation trust branches, including
 `codex/private-alpha-conversation-trust` and follow-up branches such as
 `codex/private-alpha-ux-trust-followups`, use
-`docs/specs/private-alpha-conversation-trust.md` as the milestone source of
+`docs/archive/private-alpha-conversation-trust.md` as the milestone source of
 truth for historical context. This milestone hardened the current private-alpha
 chat/backtest loop; it does not implement the Perplexity Research Lab thesis.
 
@@ -182,7 +182,7 @@ Milestone guardrails:
   metadata, retry payloads, or direct anon table access.
 - Keep Perplexity/Research Lab work as design-only unless a later milestone
   explicitly starts that implementation. The preserved thesis lives in
-  `docs/specs/research-lab-thesis.md`.
+  `docs/archive/research-lab-thesis.md`.
 
 Never let UI polish violate the runtime principles below: the frontend renders
 backend-provided artifacts, LangGraph remains the only chat brain, and
@@ -459,7 +459,7 @@ NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 - **Data Model**: [`docs/DATA_MODEL.md`](./docs/DATA_MODEL.md)
 - **Design System**: [`.agent/designs/argus/DESIGN.md`](./.agent/designs/argus/DESIGN.md)
 - **OpenAPI Spec**: [`docs/api/openapi.yaml`](./docs/api/openapi.yaml)
-- **Scheduled Framework**: [`.agent/.jules/README.md`](./.agent/.jules/README.md)
+- **Archived Jules Framework**: [`.agent/.jules/README.md`](./.agent/.jules/README.md)
 
 ### Documentation Classes
 
@@ -478,8 +478,8 @@ NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
   `docs/release-manifests/TEMPLATE.md` own release gates, canaries, manifests,
   and deployment discipline. They do not own the current product roadmap.
 - **Staging/process context**: `docs/specs/private-alpha-next-integration.md`
-  explains the integration branch, Jules quarantine lane, closed work, and
-  branch process. Use it for context, not as the active product roadmap.
+  explains the integration branch, closed work, and branch process. Use it for
+  context, not as the active product roadmap.
 - **Future/design-only docs**: Research Lab, voice, public excerpt, broker,
   memory-control, and evidence-aware idea-loop specs remain design/reference
   material until the active roadmap starts a bounded slice.

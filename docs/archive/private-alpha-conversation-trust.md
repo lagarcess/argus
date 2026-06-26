@@ -429,7 +429,7 @@ SOTA direction:
 ## Research Lab Thesis For Next Milestone
 
 The larger product direction is strong and is preserved in
-`docs/specs/research-lab-thesis.md`.
+`docs/archive/research-lab-thesis.md`.
 
 This milestone does not implement Perplexity or Research Lab behavior. Any
 future implementation must first update canon docs because it broadens Argus

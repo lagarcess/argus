@@ -17,8 +17,8 @@ discipline, use `docs/specs/private-alpha-ci-cd-sota.md`.
 Deliver the controlled private-alpha readiness slice end to end so Argus can be
 handed to two trusted private-circle users.
 
-Use `docs/specs/private-alpha-controlled-readiness-panel.md` as the active
-sprint source of truth. Use this note as the broadcast packet for subagents so
+Use `docs/archive/private-alpha-controlled-readiness-panel.md` as archived
+readiness-panel context. Use this note as the broadcast packet for subagents so
 all work starts from the same checkpoint, boundaries, and verification posture.
 Bounded agents should inspect the current branch tip first, then use
 `2e35785` as the latest named release-captain local browser QA evidence bundle.
