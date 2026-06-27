@@ -417,6 +417,31 @@ one.
 - Start instrumentation early, in parallel with P2.1-P2.3, so gates are
   measurable as features land.
 
+##### Design candidate: Conversational edit contract (macro pattern)
+
+Status: design-only, not yet sliced or scheduled. Founder-identified 2026-06-27.
+Captured here so it stays current and pickup-ready; do not implement until sliced.
+
+- Idea: the confirmation-card action chips (Run backtest, Change dates, Change
+  asset, Adjust assumptions, Cancel) and natural-language turn edits should be two
+  entry points to ONE canonical set of edit operations on the pending artifact. A
+  user can say it in their turn ("change the start date to the beginning of this
+  year and also add AMZN") and Argus interprets and applies it, or click a chip to
+  be direct, or Argus can offer "what would you like to change?". Chips become a
+  convenience layer over the contract, not a separate path (consistent with the
+  "no duplicate action surfaces" rule and the LLM-first spine).
+- Why it matters: a multi-intent natural-language edit currently applies one
+  operation (asset add) but can silently drop another (the date change). That
+  observed behavior is a symptom of an under-specified multi-operation edit
+  contract, not a one-off bug. Designing the contract (what operations exist, how
+  multi-op NL edits compose, how chips and NL both map to the same operations) is
+  the adequate fix; a point patch risks baking in the wrong model.
+- Spine constraint: relative dates ("beginning of this year") must be resolved by
+  LLM interpretation and the planner must apply ALL operations in a turn. No
+  regex/text-scan for date phrases, no per-language gate (P2.0 guardrails apply).
+- Sequencing: candidate near P2.1, since both live on the confirmation/edit
+  surface. Spec before implement.
+
 #### P2 stop conditions (whole wave)
 
 Stop immediately and escalate to the founder if:
