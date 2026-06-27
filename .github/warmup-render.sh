@@ -131,11 +131,16 @@ assert_api_mode() {
     echo "ERROR: release config audit did not emit env_fingerprint."
     return 1
   fi
-  if ! grep -Eq '^workflow_env_fingerprint=[0-9a-f]{64}$' <<< "$status"; then
-    echo "ERROR: release config audit did not emit workflow_env_fingerprint."
+  if [ "$mode" = "real-workflow" ]; then
+    if ! grep -Eq '^workflow_env_fingerprint=[0-9a-f]{64}$' <<< "$status"; then
+      echo "ERROR: release config audit did not emit workflow_env_fingerprint."
+      return 1
+    fi
+    require_status_line "$status" "workflow_env_status=ready"
+  elif grep -q '^workflow_env_status=drift$' <<< "$status"; then
+    echo "ERROR: release config audit reported workflow_env_status=drift for $mode."
     return 1
   fi
-  require_status_line "$status" "workflow_env_status=ready"
 
   echo "OK: release config matched $mode"
   run_workflow_runtime_proof "$mode"

@@ -872,7 +872,6 @@ sync_workflow_release() {
     commit="$(git rev-parse HEAD)"
   fi
 
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT "$commit"
   render workflows versions release "$WORKFLOW_SERVICE_ID" \
     --commit "$commit" \
     --wait \
@@ -882,6 +881,10 @@ sync_workflow_release() {
     echo "Unable to determine released workflow version id for ${WORKFLOW_SERVICE_ID}."
     return 1
   fi
+  # Write both proof markers only after the release succeeded and the version id
+  # resolved, so a failed release cannot leave the commit marker pointing at a new
+  # SHA while the version id still references the previous ready version.
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT "$commit"
   put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_RENDER_WORKFLOW_RELEASE_VERSION_ID "$version_id"
   echo "workflow_release_commit=$commit"
   echo "workflow_release_version_id=$version_id"

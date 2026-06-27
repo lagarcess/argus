@@ -9,7 +9,7 @@ from typing import Any
 
 DEFAULT_TIMEOUT_SECONDS = 120
 DEFAULT_POLL_SECONDS = 2.0
-COMPLETED_STATUSES = {"completed"}
+COMPLETED_STATUSES = {"completed", "succeeded"}
 FAILED_STATUSES = {"failed", "canceled", "cancelled", "expired"}
 
 
