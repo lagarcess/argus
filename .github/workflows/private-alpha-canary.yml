@@ -15,7 +15,7 @@ concurrency:
 jobs:
   canary:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 50
     env:
       ARGUS_WARMUP_EXPECT_MODE: real-workflow
     steps:

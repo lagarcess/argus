@@ -112,6 +112,20 @@ ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json \
 .github/canary-render.sh
 ```
 
+13. Run the provider-path-sensitive canary. This guards live-provider workflow
+   drift (issue #124) by exercising a non-trivial same-asset-class symbol set on
+   `argus-backtests`, matching the CI provider-path leg:
+
+```bash
+ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
+ARGUS_CANARY_LANGUAGE=es-419 \
+ARGUS_CANARY_PROMPT='Prueba comprar y mantener SNDK, AMD, NVDA y GS con 1000 dólares desde el 24 de febrero de 2025 hasta el 5 de junio de 2026' \
+ARGUS_CANARY_FOCUSED_SYMBOL_PATH=SNDK,AMD,NVDA,GS \
+ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW=true \
+ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-provider-path.json \
+.github/canary-render.sh
+```
+
 If a canary fails after warmup passed, do not redeploy one-off fixes in a loop.
 Set `ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-failed-capture.json`
 or the matching English path, rerun the failing locale once to write a

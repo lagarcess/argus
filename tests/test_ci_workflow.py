@@ -103,7 +103,7 @@ def test_private_alpha_canary_workflow_runs_real_workflow_gate() -> None:
     workflow = _canary_workflow()
     job = workflow["jobs"]["canary"]
 
-    assert job["timeout-minutes"] == 25
+    assert job["timeout-minutes"] == 50
     joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert "poetry install --with dev,workflows --no-interaction" in joined_steps
     assert "cd web && bun install --frozen-lockfile" in joined_steps

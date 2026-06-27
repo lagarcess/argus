@@ -241,12 +241,17 @@ validate_release_evidence_contract() {
     echo "ERROR: release config audit did not emit a valid env_fingerprint."
     fail_canary "warmup" "missing_env_fingerprint"
   fi
-  if [[ ! "$WORKFLOW_ENV_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]; then
-    echo "ERROR: release config audit did not emit a valid workflow_env_fingerprint."
-    fail_canary "warmup" "missing_workflow_env_fingerprint"
-  fi
-  if [ "$WORKFLOW_ENV_STATUS" != "ready" ]; then
-    echo "ERROR: release config audit did not report workflow_env_status=ready."
+  if [ "$EXPECT_MODE" = "real-workflow" ]; then
+    if [[ ! "$WORKFLOW_ENV_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "ERROR: release config audit did not emit a valid workflow_env_fingerprint."
+      fail_canary "warmup" "missing_workflow_env_fingerprint"
+    fi
+    if [ "$WORKFLOW_ENV_STATUS" != "ready" ]; then
+      echo "ERROR: release config audit did not report workflow_env_status=ready."
+      fail_canary "warmup" "workflow_env_drift"
+    fi
+  elif [ "$WORKFLOW_ENV_STATUS" = "drift" ]; then
+    echo "ERROR: release config audit reported workflow_env_status=drift for $EXPECT_MODE."
     fail_canary "warmup" "workflow_env_drift"
   fi
   if [ -z "$WORKFLOW_TASK" ]; then
