@@ -333,6 +333,18 @@ one.
   interpreted, validated, executable, rendered, documented), and feed truth into
   the registry. No broad indicator expansion until the audit proves current
   state.
+- Surface containment: draft strategies (`momentum_breakout`, `trend_follow`) and
+  draft/discovery indicators must have no user path. Today they are already hidden
+  (the `@` indicator picker filters to supported only; the two draft strategies
+  never appear in the frontend and are blocked at confirm), but containment is by
+  convention, not construction. P2.1 makes it structural: derive the API template
+  allow-list (`api/schemas.py` `StrategyTemplate`, `backtesting/config.py`
+  `ALLOWED_TEMPLATES`), the save-passthrough set (`api/chat/strategies.py`), and
+  discovery from the single executable registry; remove the latent frontend
+  `draft_only` token plumbing (`web/components/chat/ChatInput.tsx`,
+  `web/components/chat/types.ts`); and retire or guard the orphaned `signals.py`
+  handlers for the two drafts. Stay narrow: do not widen the supported set in this
+  slice. See `docs/specs/private-alpha-next-p2.1-capability-audit.md`.
 - Allowed surfaces: capability registry domain module, interpreter
   context/tools wiring, typed post-LLM capability validation, registry-backed
   result/clarification copy that is model-voiced, docs (`API_CONTRACT.md`,

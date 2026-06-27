@@ -126,6 +126,41 @@ branching exists in the interpretation/capability path.
 Confirmed absent (present on quarantine branches): `capability_response_voice.py` with
 `if locale == "es-419": <es> else: <en>` capability copy tables.
 
+## User-facing surface containment (verified 2026-06-27)
+
+Founder requirement: draft-only / discovery indicators and draft strategies must not be
+visible to users, to avoid confusing the first alpha cohort. Verified current state and
+the gap P2.1 must close.
+
+Already contained (today's behavior):
+
+- The `@` indicator picker only offers executable indicators. The discovery endpoint
+  hard-filters to `support_status == "supported"` (`api/routers/discovery.py:96`); the
+  ~100+ auto-discovered `pandas_ta` indicators and catalog-only names (ATR, VWAP, OBV,
+  Stochastic) default to `draft_only` and are dropped before reaching the user.
+- No endpoint exposes the full indicator catalog; only the filtered `search_indicators`
+  path is reachable.
+- A draft indicator typed by hand resolves as `unsupported`
+  (`agent_runtime/resolution.py:264`), so it cannot execute; free text is handled by the
+  LLM-voiced capability answer.
+- `momentum_breakout` and `trend_follow` appear nowhere in the frontend and are blocked at
+  confirm (`execution_strategy_type=None`).
+
+Residual paths to close in P2.1 (containment by construction, not convention):
+
+- The two draft strategies remain valid values in `api/schemas.py` (`StrategyTemplate`)
+  and `backtesting/config.py` (`ALLOWED_TEMPLATES`), so a raw API call outside the chat UI
+  is still accepted, and `api/chat/strategies.py` (`supported_templates`) preserves their
+  label on save; orphaned `signals.py` handlers would still compute. Derive these
+  allow-lists from the executable registry instead of maintaining a parallel set.
+- The frontend still understands `draft_only`/`unavailable` tokens
+  (`web/components/chat/ChatInput.tsx`, `web/components/chat/types.ts`). Nothing emits them
+  today, but the plumbing is a latent render path; remove it.
+
+Canon correction made alongside this audit: `docs/PRODUCT.md` section 12 no longer lists
+`momentum_breakout`/`trend_follow` as supported strategy examples, and
+`docs/API_CONTRACT.md` examples no longer use `momentum_breakout`.
+
 ## Gaps and overpromise risks
 
 1. **Orphaned draft templates.** `momentum_breakout` and `trend_follow` appear in the
