@@ -12,9 +12,9 @@
 
 ## Reference Inputs
 
-- Spec: `docs/specs/private-alpha-status-action-parity-audit.md`
+- Spec: `docs/archive/private-alpha-status-action-parity-audit.md`
 - Branch source of truth: `docs/specs/private-alpha-next-integration.md`
-- Prior milestone context: `docs/specs/private-alpha-conversation-trust.md`
+- Prior milestone context: `docs/archive/private-alpha-conversation-trust.md`
 - Frontend lifecycle helpers:
   - `web/lib/chat-backtest-jobs.ts`
   - `web/lib/backtest-job-card-copy.ts`
@@ -797,10 +797,10 @@ Expected: no whitespace errors.
 
 - [ ] **Step 5: Commit verification-only doc update if needed**
 
-If verification evidence is added to `docs/specs/private-alpha-status-action-parity-audit.md`, run:
+If verification evidence is added to `docs/archive/private-alpha-status-action-parity-audit.md`, run:
 
 ```bash
-git add docs/specs/private-alpha-status-action-parity-audit.md
+git add docs/archive/private-alpha-status-action-parity-audit.md
 git commit -m "docs(chat): record status action parity verification"
 ```
 
@@ -890,7 +890,7 @@ Record in the final report:
 If QA evidence is appended to the spec, run:
 
 ```bash
-git add docs/specs/private-alpha-status-action-parity-audit.md
+git add docs/archive/private-alpha-status-action-parity-audit.md
 git commit -m "docs(chat): capture status action parity QA"
 ```
 

@@ -689,3 +689,46 @@ def test_stale_backtest_job_scan_reports_unresolved_jobs_without_task_metadata()
             "task_run_id": None,
         }
     ]
+
+
+def test_stale_backtest_job_scan_fails_stale_proof_jobs_without_task_metadata() -> None:
+    from argus.api.chat.backtest_jobs import scan_stale_backtest_jobs
+
+    gateway = _StaleJobScanGateway()
+    gateway.jobs = [
+        {
+            "id": "job-stale-proof",
+            "user_id": "user-1",
+            "status": "queued",
+            "queued_at": "2026-06-06T12:00:00+00:00",
+            "created_at": "2026-06-06T12:00:00+00:00",
+            "updated_at": "2026-06-06T12:00:00+00:00",
+            "launch_payload": {"kind": "render_workflow_proof"},
+            "execution_metadata": {},
+        }
+    ]
+    task_client = _FakeTerminalTaskRunClient(
+        {
+            "id": "trn-stale-1",
+            "status": "failed",
+            "error": "task timed out",
+        }
+    )
+
+    report = scan_stale_backtest_jobs(
+        gateway=gateway,
+        now=datetime(2026, 6, 6, 12, 30, tzinfo=timezone.utc),
+        queued_age_seconds=900,
+        running_age_seconds=900,
+        limit=20,
+        task_run_client=task_client,
+    )
+
+    assert task_client.calls == []
+    assert report["status"] == "ready"
+    assert report["stale_count"] == 1
+    assert report["reconciled_count"] == 1
+    assert report["unresolved_count"] == 0
+    assert gateway.failed_updates[0]["job_id"] == "job-stale-proof"
+    assert gateway.failed_updates[0]["failure_code"] == "workflow_dispatch_missing"
+    assert gateway.failed_updates[0]["retryable"] is True

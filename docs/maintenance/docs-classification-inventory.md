@@ -25,6 +25,10 @@ goal. `docs/specs/private-alpha-next-integration.md` remains staging/process
 context, and `docs/specs/private-alpha-next-decision-memo.md` is future context
 only.
 
+Archive pass: high-confidence stale private-alpha specs and completed checkpoint
+docs were moved from `docs/specs/` to `docs/archive/` so active agents do not
+mistake them for current command sources.
+
 ## Inventory
 
 | File | Classification | Rationale | Recommended next action | Notes / possible stale references |
@@ -41,16 +45,17 @@ only.
 | `docs/PRIVATE_LAUNCH_RUNBOOK.md` | release-discipline reference | Operational gate for controlled private-alpha validation and launch steps. | Keep as operator runbook. | Current release ops |
 | `docs/release-manifests/TEMPLATE.md` | release-discipline reference | Template for candidate SHA, env fingerprint, evidence, approver, and rollback target. | Use when producing a candidate manifest. | Current release ops |
 | `docs/specs/private-alpha-next-integration.md` | active staging/process context | Records integration-lane branch mechanics, quarantine rules, closed work, Jules boundaries, and P0 reintegration process. | Keep as staging/process context. | Current context, not command doc |
-| `docs/specs/private-alpha-conversation-trust.md` | historical evidence / completed checkpoint | Marked as merged and deployed checkpoint; useful for conversation-trust design context but not current execution scope. | Keep as historical context. | Completed |
-| `docs/specs/private-alpha-readiness-orchestration.md` | branch-specific active context | Active coordination note for `codex/private-alpha-readiness-clean`; not the current Private Alpha Next P1 roadmap. | Keep with branch-scope note. | Readiness lane |
-| `docs/specs/private-alpha-controlled-readiness-panel.md` | branch/lane-specific active context | Controlled-alpha readiness panel for readiness decisions; useful context but not the active P1 roadmap. | Keep with readiness-lane scope note. | Readiness lane |
-| `docs/specs/private-alpha-performance-readiness-audit.md` | branch/lane-specific active context | Supporting performance addendum for the controlled readiness slice. | Keep with readiness-lane scope note. | Readiness lane |
+| `docs/archive/private-alpha-conversation-trust.md` | archived historical evidence / completed checkpoint | Marked as merged and deployed checkpoint; useful for conversation-trust design context but not current execution scope. | Keep archived for branch archaeology. | Completed |
+| `docs/archive/private-alpha-status-action-parity-audit.md` | archived historical evidence / implemented slice | Implemented and locally verified; useful as artifact lifecycle evidence but not current execution scope. | Keep archived for branch archaeology. | Completed |
+| `docs/archive/private-alpha-readiness-orchestration.md` | archived branch-specific context | Coordination note for `codex/private-alpha-readiness-clean`; not the current Private Alpha Next roadmap. | Keep archived for readiness-lane archaeology. | Readiness lane |
+| `docs/archive/private-alpha-controlled-readiness-panel.md` | archived branch/lane-specific context | Controlled-alpha readiness panel for readiness decisions; useful evidence but not the active roadmap. | Keep archived for readiness-lane archaeology. | Readiness lane |
+| `docs/archive/private-alpha-performance-readiness-audit.md` | archived branch/lane-specific context | Supporting performance addendum for the controlled readiness slice. | Keep archived for readiness-lane archaeology. | Readiness lane |
 | `docs/specs/evidence-aware-idea-loop.md` | future/later context | Active refined product spec for the post-conversation-trust direction. It keeps direct test, education, light evidence, deep research, and monitoring as lanes into one durable idea loop. | Keep as future product context. | Future |
-| `docs/specs/research-lab-thesis.md` | historical evidence | Earlier Research Lab thesis draft. It is retained for context and explicitly refined by `docs/specs/evidence-aware-idea-loop.md`. | Keep as historical context. | Superseded by active evidence-aware loop spec. |
-| `docs/specs/private-alpha-backtest-execution-capacity.md` | unclear/needs owner decision | Draft from 2026-06-05, frames architecture questions before scaling. Not clearly an active spec for the current milestone, nor pure historical evidence. | Determine if this is an active spec or historical. |  |
-| `docs/specs/agent-architecture.md` | historical evidence | Proposed architecture from 2026-04-29. Predates the conversation trust milestone. | Add historical banner. | Stale date. |
+| `docs/archive/research-lab-thesis.md` | archived historical evidence | Earlier Research Lab thesis draft. It is retained for context and explicitly refined by `docs/specs/evidence-aware-idea-loop.md`. | Keep archived for product archaeology. | Superseded by active evidence-aware loop spec. |
+| `docs/archive/private-alpha-backtest-execution-capacity.md` | archived historical evidence | Draft from 2026-06-05; later release/runtime docs own active deployment discipline and architecture truth. | Keep archived for runtime-capacity archaeology. | Historical capacity draft |
+| `docs/archive/agent-architecture.md` | archived historical evidence | Proposed architecture from 2026-04-29. Predates the conversation trust milestone. | Keep archived for architecture archaeology. | Stale date |
 | `docs/CONVERSATIONAL_RUNTIME.md` | unclear/needs owner decision | Status is "Active Alpha implementation", but unclear if it's canon, active spec, or superseded by `docs/ARCHITECTURE.md`. | Decide if canon or stale/superseded. |  |
-| `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` | archived/superseded | Explicitly marked "> Historical plan. This document records an earlier launch-closure checklist and should not be treated as the current milestone source of truth." | Archived under `docs/archive/`; use `docs/specs/private-alpha-conversation-trust.md` for the completed trust checkpoint and `docs/specs/private-alpha-ci-cd-sota.md` for release-gate discipline. | Explicitly stale. |
+| `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` | archived/superseded | Explicitly marked "> Historical plan. This document records an earlier launch-closure checklist and should not be treated as the current milestone source of truth." | Archived under `docs/archive/`; use `docs/archive/private-alpha-conversation-trust.md` for the completed trust checkpoint and `docs/specs/private-alpha-ci-cd-sota.md` for release-gate discipline. | Explicitly stale. |
 | `docs/ARGUS_SYSTEM_STEERING.md` | historical evidence | "Pre-private-launch steering reference... planning reference, not an implementation ticket" from 2026-05-19. | Add historical banner. |  |
 | `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md` | unclear/needs owner decision | QA script. Could be canon process, or an active spec, or archive if out of date. | Clarify if this QA process is still active. | Uses legacy orchestrator path? |
 | `docs/PRODUCTION_READINESS_AUDIT.md` | historical evidence | Audit for `codex/production-readiness-gap-implementation` from 2026-05-05. | Add historical banner. |  |
@@ -98,8 +103,8 @@ use the inventory table above for current classification.
 
 ### Files that already carry or were recommended for historical treatment:
 - `docs/ARGUS_SYSTEM_STEERING.md` -> AGENTS.md, docs/specs/private-alpha-next-integration.md
-- `docs/PRODUCTION_READINESS_AUDIT.md` -> docs/specs/private-alpha-conversation-trust.md
-- `docs/specs/agent-architecture.md` -> docs/ARCHITECTURE.md
+- `docs/PRODUCTION_READINESS_AUDIT.md` -> docs/archive/private-alpha-conversation-trust.md
+- `docs/archive/agent-architecture.md` -> docs/ARCHITECTURE.md
 - `docs/superpowers/plans/2026-04-29-conversational-backtest-agent-runtime.md`
 - `docs/superpowers/plans/2026-05-06-agent-runtime-phase-1-remediation.md`
 - `docs/superpowers/plans/2026-05-06-agent-runtime-phase-2-retire-legacy-orchestrator.md`
@@ -118,10 +123,9 @@ use the inventory table above for current classification.
 - `docs/superpowers/specs/2026-05-17-sidebar-revamp-runtime-parity-qa.md`
 
 ### Files that already carry or were recommended for superseded treatment:
-- `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` -> docs/specs/private-alpha-conversation-trust.md
+- `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` -> docs/archive/private-alpha-conversation-trust.md
 
 ### Files intentionally skipped (unclear/needs owner decision):
-- `docs/specs/private-alpha-backtest-execution-capacity.md`
 - `docs/CONVERSATIONAL_RUNTIME.md`
 - `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md`
 - `docs/superpowers/specs/2026-06-03-chat-disclaimer-design.md`
@@ -142,4 +146,4 @@ use the inventory table above for current classification.
 
 *   Multiple detailed references and templates exist under `.agent/skills/` which were intentionally excluded from this inventory to keep it focused on high-level workflows and product documentation.
 *   No high-risk, obviously stale instructions were immediately identified in the high-level scan of the skills directory, but a deeper audit of `.agent/skills/` may be beneficial later.
-*   `docs/specs/research-lab-thesis.md` already carries its own historical/refined status banner from the active evidence-aware idea-loop spec and did not need a second Jules banner pass.
+*   `docs/archive/research-lab-thesis.md` already carries its own historical/refined status banner from the active evidence-aware idea-loop spec and did not need a second Jules banner pass.

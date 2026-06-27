@@ -493,7 +493,7 @@ Ownership hardening:
     "parameters": {}
   },
   "conversation_result_card": {
-    "title": "Moon Mission (Momentum Breakout)",
+    "title": "Moon Mission (Buy the Dip)",
     "asset_class": "equity",
     "artifact_type": "backtest",
     "idea_id": "uuid",
@@ -1511,7 +1511,7 @@ data: [DONE]
 ```json
 {
   "name": null,
-  "template": "momentum_breakout",
+  "template": "buy_and_hold",
   "asset_class": "equity",
   "symbols": ["AAPL", "MSFT"],
   "parameters": {},
@@ -2047,7 +2047,7 @@ Search is limited to:
 - Symbols
 - Last message preview (Conversations)
 - Collection names
-- Strategy template labels (e.g. "Momentum Breakout")
+- Strategy template labels (e.g. "RSI Mean Reversion")
 - P1 evidence digests, idea summaries, decision state/note text, and sanitized
   preview metadata.
 
