@@ -245,7 +245,7 @@ def test_openrouter_factory_applies_task_token_budget(
             "model_name": "test/model",
             "temperature": 0,
             "max_tokens": 3200,
-            "timeout": 12,
+            "timeout": 20,
             "max_retries": 1,
             "openrouter_api_key": "test-key",
         }
@@ -429,7 +429,7 @@ def test_structured_interpreter_uses_bounded_interpretation_profile(
         "model_name": "custom/model",
         "temperature": 0,
         "max_tokens": 3200,
-        "timeout": 12,
+        "timeout": 20,
         "max_retries": 1,
         "openrouter_api_key": "test-key",
     }
@@ -2991,7 +2991,7 @@ async def test_agent_runtime_turn_uses_interpretation_profile_without_legacy_com
             "model_name": "custom/model",
             "temperature": 0,
             "max_tokens": 3200,
-            "timeout": 12,
+            "timeout": 20,
             "max_retries": 1,
             "openrouter_api_key": "test-key",
         }
