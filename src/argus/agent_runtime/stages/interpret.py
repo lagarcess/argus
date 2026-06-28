@@ -1072,10 +1072,22 @@ async def _stage_result_from_interpretation(
             stage_patch=stage_patch,
         )
     if expects_strategy_route:
+        stage_patch = dict(optional_parameter_stage_patch)
+        # Preserve the artifact-edit planner's honesty note (a mixed
+        # supported/unsupported edit) alongside the confirmation card, so it is
+        # not silently dropped. Scoped to the edit-planner reason code so spurious
+        # clarifications overridden to a confirmation on other routes stay
+        # suppressed; clean edits leave assistant_response None -> no message.
+        if (
+            interpretation.assistant_response
+            and "artifact_assumption_edit_planned"
+            in (interpretation.reason_codes or [])
+        ):
+            stage_patch["assistant_response"] = interpretation.assistant_response
         return StageResult(
             outcome="ready_for_confirmation",
             decision=decision,
-            stage_patch=optional_parameter_stage_patch,
+            stage_patch=stage_patch,
         )
     return StageResult(
         outcome="ready_to_respond",
