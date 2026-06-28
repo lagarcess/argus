@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -135,11 +136,18 @@ def _artifact_assumption_edit_messages(
                 "- benchmark (use value as a ticker): set or clear the comparison "
                 "asset. Do not also add it to traded assets unless the user says to "
                 "buy, hold, or test it.\n"
-                "- date_window (use date_window): set the traded date range. Put "
-                "relative or semantic windows such as 'beginning of this year' or "
-                "'last 12 months' into date_window as canonical, language-neutral "
-                "intent (kind/start/end/count/unit/year/anchor). Do not compute the "
-                "calendar dates yourself.\n"
+                "- date_window (use date_window): change the traded date range as "
+                "canonical intent (use the current date given below). For 'this "
+                "year', 'year to date', or 'the beginning of this year' use "
+                "kind=year_to_date (it resolves to January 1 of the current year "
+                "through today) — use it even when the user says 'change the start "
+                "to the beginning of this year'. For a named calendar year use "
+                "kind=calendar_year with year. For a rolling lookback such as 'last "
+                "12 months' use kind=rolling_window with count, unit, anchor=today. "
+                "For an explicit concrete endpoint date while keeping the other "
+                "endpoint, use kind=endpoint_patch with endpoint=start or end and a "
+                "concrete ISO date in the start or end field (or the literal today); "
+                "do not use anchor for endpoint_patch.\n"
                 "- capital (use number): set starting capital.\n"
                 "- recurring_contribution (use number) and cadence (use value as "
                 "daily, weekly, biweekly, monthly, or quarterly): set the DCA "
@@ -148,6 +156,14 @@ def _artifact_assumption_edit_messages(
                 "size.\n"
                 "- fees (use number) and slippage (use number): set as decimal "
                 "fractions when explicitly supplied.\n\n"
+                "Execution limits the system enforces (do not propose operations "
+                "that break them): one asset class per run (equities and crypto "
+                "cannot mix), at most 5 traded symbols, long-only, and the "
+                "benchmark must match the traded asset class. If the user's edit "
+                "would break a limit, return needs_clarification, explain the limit "
+                "plainly, and offer the closest in-limit alternative (for example "
+                "switching the whole run to that asset class). The strategy type and "
+                "its entry/exit rule parameters are not editable here.\n\n"
                 "Return outcome=ready_to_confirm when operations contains at least "
                 "one applicable change. If the user asks what is currently set, "
                 "return needs_clarification with a concise assistant_response "
@@ -155,7 +171,8 @@ def _artifact_assumption_edit_messages(
                 "outside the targets above (for example a strategy or entry/exit "
                 "rule change), return unsupported or needs_clarification and name "
                 "what can be changed; do not invent an operation for it. "
-                f"{language_line} Return only JSON matching the schema."
+                f"Today is {date.today().isoformat()}. {language_line} Return only "
+                "JSON matching the schema."
             ),
         },
         {
