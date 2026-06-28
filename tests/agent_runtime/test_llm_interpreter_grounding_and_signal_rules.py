@@ -2459,6 +2459,58 @@ def test_artifact_assumption_edit_plan_maps_benchmark() -> None:
     assert draft.field_provenance == {"comparison_baseline": "explicit_user"}
 
 
+def test_artifact_assumption_edit_plan_applies_compound_operations() -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    # The canonical failing case: add an asset AND change the date in one turn.
+    plan = artifact_edit_planner.ArtifactAssumptionEditPlan(
+        outcome="ready_to_confirm",
+        user_goal_summary="User added AMZN and moved the start date.",
+        operations=[
+            artifact_edit_planner.EditOperation(
+                op="add", target="asset", symbols=["AMZN"]
+            ),
+            artifact_edit_planner.EditOperation(
+                op="set",
+                target="date_window",
+                date_window=LLMDateRangeIntent(
+                    kind="rolling_window", count=12, unit="month"
+                ),
+            ),
+        ],
+        confidence=0.9,
+    )
+
+    response = interpreter_module._response_from_artifact_assumption_edit_plan(
+        plan=plan,
+        request=InterpretationRequest(
+            current_user_message="add AMZN and use the last 12 months",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    date_range={"start": "2024-01-01", "end": "today"},
+                )
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = response.candidate_strategy_draft
+    # asset added to the current set, not replacing it or dropping the date
+    assert draft.asset_universe == ["AAPL", "AMZN"]
+    assert draft.asset_universe_operation == "replace"
+    assert draft.date_range is not None
+    assert draft.date_range_intent is not None
+    assert draft.field_provenance["asset_universe"] == "explicit_user"
+    assert draft.field_provenance["date_range"] == "explicit_user"
+
+
 def test_strategy_from_llm_preserves_asset_operation_in_extra_parameters() -> None:
     strategy = _strategy_from_llm(
         LLMStrategyDraft(
