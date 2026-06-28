@@ -259,6 +259,9 @@ def mention_to_provenance(
         mention.get("symbol") or mention.get("insert_text") or mention.get("label") or ""
     ).strip()
     canonical = raw_text.upper() if candidate_kind == "asset" else raw_text.lower()
+    # Defense-in-depth: the composer no longer sends support_status (drafts can't become
+    # tokens — the @ picker filters them), but the backend still blocks any draft/unavailable
+    # mention from another client, so this remains the authoritative containment gate.
     support_status = str(mention.get("support_status") or "supported")
     status: ResolutionStatus = "resolved"
     if support_status == "draft_only":

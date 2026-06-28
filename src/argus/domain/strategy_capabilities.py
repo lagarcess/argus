@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 from argus.domain.capability_status import CapabilityStatus
@@ -38,6 +38,24 @@ class StrategyCapability(BaseModel):
     # True when the strategy runs with a fixed, non-user-tunable parameterization
     # (e.g. buy_the_dip's hardcoded -3% trigger), so copy never implies tunability.
     fixed_parameters: bool = False
+
+    @model_validator(mode="after")
+    def _validate_status_consistency(self) -> "StrategyCapability":
+        # Draft-ness is encoded once: an executable template has an execution type, a
+        # draft/future one does not. Making the contradictory pair unrepresentable stops
+        # the derived allow-lists (EXECUTABLE_TEMPLATES vs SUPPORTED_STRATEGY_TYPES) from
+        # silently disagreeing.
+        if self.status == "executable" and self.execution_strategy_type is None:
+            raise ValueError(
+                f"executable capability {self.template!r} requires an "
+                "execution_strategy_type"
+            )
+        if self.status != "executable" and self.execution_strategy_type is not None:
+            raise ValueError(
+                f"non-executable capability {self.template!r} must not set an "
+                "execution_strategy_type"
+            )
+        return self
 
 
 STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {

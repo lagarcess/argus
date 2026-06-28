@@ -8,6 +8,11 @@ from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 from argus.domain.capability_registry import indicator_template
 from argus.domain.indicators import EXECUTABLE_INDICATORS
 
+# NOTE(P2.1.b): hand-maintained user-facing strategy families, also consumed by the
+# interpreter prompt (agent_runtime/stages/interpret.py). Single-sourcing these from the
+# capability registry (EXECUTABLE_TEMPLATES) belongs to the interpreter-tooling sub-slice
+# (P2.1.b); kept explicit here to avoid editing the interpreter prompt in P2.1.a. Keep in
+# sync with the registry's executable set until then.
 EXECUTABLE_STRATEGY_FAMILIES: tuple[str, ...] = (
     "buy and hold",
     "recurring buys/DCA",

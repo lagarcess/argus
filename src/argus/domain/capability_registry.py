@@ -55,12 +55,14 @@ def is_executable_strategy(template: str) -> bool:
 
 # --- Indicator derivations ------------------------------------------------------------
 
-# Which supported, user-facing template consumes each executable indicator end-to-end.
-# Derivation source: rsi_mean_reversion's `indicator` parameter is rsi-only, and
-# moving_average_crossover builds its signal from sma (see backtesting/signals.py).
-# EMA/MACD/Bollinger compute but no *named template* consumes them (they remain usable
-# inside a generic signal_strategy rule), so they are draft — not executable — capability
-# truth until a dedicated template exposes them.
+# Explicit, hand-maintained map of which supported, user-facing template consumes each
+# executable indicator end-to-end. It is NOT auto-derived: RSI is consumed by
+# rsi_mean_reversion's rsi-only `indicator` parameter, and SMA by moving_average_crossover
+# (hardcoded in backtesting/signals.py). test_reachability_map_is_internally_consistent
+# ties the RSI entry back to the rsi_mean_reversion parameter so the map cannot silently
+# drift from the strategy definition. EMA/MACD/Bollinger compute but no named template
+# consumes them (they remain usable inside a generic signal_strategy rule), so they stay
+# draft — not executable — until a dedicated template exposes them.
 INDICATOR_TEMPLATE_REACHABILITY: dict[str, str] = {
     "rsi": "rsi_mean_reversion",
     "sma": "moving_average_crossover",

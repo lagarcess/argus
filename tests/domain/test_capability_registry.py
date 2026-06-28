@@ -137,6 +137,13 @@ def test_reachability_map_is_internally_consistent() -> None:
         # Each reachable indicator must compute, and its template must be executable.
         assert registry.indicator_computes(indicator_key)
         assert template in registry.EXECUTABLE_TEMPLATES
+    # Tie the hand-maintained RSI entry to the strategy's actual indicator parameter so
+    # the map cannot drift from the rsi_mean_reversion definition (the registry comment
+    # claims this relationship; this enforces it).
+    rsi_template = registry.INDICATOR_TEMPLATE_REACHABILITY["rsi"]
+    indicator_param = STRATEGY_CAPABILITIES[rsi_template].parameters["indicator"]
+    assert indicator_param.default == "rsi"
+    assert indicator_param.allowed_values == ["rsi"]
 
 
 def test_discovery_support_status_derived_from_execution_spec_membership() -> None:
