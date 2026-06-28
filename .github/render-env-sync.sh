@@ -100,13 +100,13 @@ ARGUS_RELEASE_API_ENV_EXPECTED=(
   "SUPABASE_SERVICE_ROLE_KEY=<redacted-present>"
   "SUPABASE_JWT_SECRET=<redacted-present>"
   "OPENROUTER_API_KEY=<redacted-present>"
-  "ARGUS_UTILITY_MODEL=qwen/qwen3.5-9b"
-  "ARGUS_UTILITY_FALLBACK_MODEL=google/gemini-2.5-flash-lite"
+  "ARGUS_UTILITY_MODEL=google/gemini-2.5-flash-lite"
+  "ARGUS_UTILITY_FALLBACK_MODEL=qwen/qwen3.5-9b"
   "ARGUS_CHAT_MODEL=deepseek/deepseek-v4-flash"
   "ARGUS_CHAT_FALLBACK_MODEL=qwen/qwen3.5-9b"
   "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=30"
-  "ARGUS_STRUCTURED_MODEL=mistralai/mistral-small-2603"
-  "ARGUS_STRUCTURED_FALLBACK_MODEL=deepseek/deepseek-v4-flash"
+  "ARGUS_STRUCTURED_MODEL=x-ai/grok-4.3"
+  "ARGUS_STRUCTURED_FALLBACK_MODEL=anthropic/claude-haiku-4.5"
   "ARGUS_CONTEXT_MODEL=openai/gpt-oss-120b"
   "ARGUS_CONTEXT_FALLBACK_MODEL=deepseek/deepseek-v4-flash"
   "ALPACA_API_KEY=<redacted-present>"
@@ -493,10 +493,10 @@ workflow_render_env_value() {
       echo "${OPENROUTER_API_KEY:-}"
       ;;
     ARGUS_UTILITY_MODEL)
-      echo "${ARGUS_UTILITY_MODEL:-qwen/qwen3.5-9b}"
+      echo "${ARGUS_UTILITY_MODEL:-google/gemini-2.5-flash-lite}"
       ;;
     ARGUS_UTILITY_FALLBACK_MODEL)
-      echo "${ARGUS_UTILITY_FALLBACK_MODEL:-google/gemini-2.5-flash-lite}"
+      echo "${ARGUS_UTILITY_FALLBACK_MODEL:-qwen/qwen3.5-9b}"
       ;;
     ARGUS_CHAT_MODEL)
       echo "${ARGUS_CHAT_MODEL:-deepseek/deepseek-v4-flash}"
@@ -508,10 +508,10 @@ workflow_render_env_value() {
       echo "${ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS:-30}"
       ;;
     ARGUS_STRUCTURED_MODEL)
-      echo "${ARGUS_STRUCTURED_MODEL:-mistralai/mistral-small-2603}"
+      echo "${ARGUS_STRUCTURED_MODEL:-x-ai/grok-4.3}"
       ;;
     ARGUS_STRUCTURED_FALLBACK_MODEL)
-      echo "${ARGUS_STRUCTURED_FALLBACK_MODEL:-deepseek/deepseek-v4-flash}"
+      echo "${ARGUS_STRUCTURED_FALLBACK_MODEL:-anthropic/claude-haiku-4.5}"
       ;;
     ARGUS_CONTEXT_MODEL)
       echo "${ARGUS_CONTEXT_MODEL:-openai/gpt-oss-120b}"
