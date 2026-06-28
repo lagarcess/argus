@@ -6,17 +6,44 @@ from pydantic import BaseModel, Field
 
 from argus.agent_runtime.artifacts.asset_edits import (
     AssetUniverseOperation,
+    normalized_asset_symbols,
     normalized_asset_universe_operation,
     same_asset_universe,
 )
+from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema,
     openrouter_structured_model_candidates,
 )
 
 
+class EditOperation(BaseModel):
+    """One typed edit a user expressed in a turn (via a chip or natural language).
+
+    Both entry points produce the same operations so they cannot drift apart.
+    """
+
+    op: Literal["add", "remove", "replace", "set", "clear"]
+    target: Literal[
+        "asset",
+        "benchmark",
+        "date_window",
+        "capital",
+        "recurring_contribution",
+        "cadence",
+        "timeframe",
+        "fees",
+        "slippage",
+    ]
+    symbols: list[str] = Field(default_factory=list)
+    value: str | None = None
+    number: float | None = None
+    date_window: LLMDateRangeIntent | None = None
+
+
 class ArtifactAssumptionEditPlan(BaseModel):
     outcome: Literal["ready_to_confirm", "needs_clarification", "unsupported"]
+    operations: list[EditOperation] = Field(default_factory=list)
     user_goal_summary: str | None = None
     asset_universe: list[str] = Field(default_factory=list)
     asset_universe_operation: AssetUniverseOperation | None = None
@@ -196,3 +223,131 @@ def _unique_models(preferred_model: str) -> list[str]:
         seen.add(model_name)
         ordered.append(model_name)
     return ordered
+
+
+_NUMBER_TARGETS = {"capital", "recurring_contribution", "fees", "slippage"}
+_TEXT_TARGETS = {"cadence", "timeframe"}
+
+
+class ResolvedArtifactEdit(BaseModel):
+    """Deterministic result of applying an operation list to the current card.
+
+    ``applied`` and ``unsupported`` are the typed truth of what changed — the
+    model-voiced reply is reconciled against them so Argus never silently drops an
+    edit and never claims one it did not make.
+    """
+
+    asset_universe: list[str] | None = None
+    asset_universe_operation: Literal["replace"] | None = None
+    comparison_baseline: str | None = None
+    date_window: LLMDateRangeIntent | None = None
+    initial_capital: float | None = None
+    recurring_contribution_amount: float | None = None
+    cadence: str | None = None
+    timeframe: str | None = None
+    fee_rate: float | None = None
+    slippage: float | None = None
+    applied: list[str] = Field(default_factory=list)
+    unsupported: list[str] = Field(default_factory=list)
+
+    def has_changes(self) -> bool:
+        return bool(self.applied)
+
+
+def apply_edit_operations(
+    operations: list[EditOperation],
+    *,
+    current_asset_universe: Any = None,
+) -> ResolvedArtifactEdit:
+    """Resolve a messy, multi-operation edit turn against the current card.
+
+    Asset add/remove/replace/clear are resolved against the current traded set and
+    emitted as a single ``replace`` of the final set, so existing downstream apply
+    semantics are reused. Every recognized-but-inapplicable operation is recorded
+    in ``unsupported`` rather than dropped.
+    """
+
+    resolved = ResolvedArtifactEdit()
+    working_assets = normalized_asset_symbols(current_asset_universe)
+    asset_touched = False
+
+    for operation in operations:
+        target = operation.target
+        op = operation.op
+
+        if target == "asset":
+            patch = normalized_asset_symbols(operation.symbols)
+            if op == "add":
+                working_assets = normalized_asset_symbols([*working_assets, *patch])
+            elif op == "remove":
+                removal = set(patch)
+                working_assets = [s for s in working_assets if s not in removal]
+            elif op == "replace":
+                working_assets = patch
+            elif op == "clear":
+                working_assets = []
+            else:
+                resolved.unsupported.append(f"{op}.{target}")
+                continue
+            asset_touched = True
+            resolved.applied.append(f"{op}.{target}")
+            continue
+
+        if target == "benchmark":
+            if op in {"set", "replace"}:
+                benchmark = (operation.value or "").strip().upper()
+                if not benchmark:
+                    resolved.unsupported.append(f"{op}.{target}")
+                    continue
+                resolved.comparison_baseline = benchmark
+            elif op == "clear":
+                resolved.comparison_baseline = ""
+            else:
+                resolved.unsupported.append(f"{op}.{target}")
+                continue
+            resolved.applied.append(f"{op}.{target}")
+            continue
+
+        if target == "date_window":
+            if op in {"set", "replace"} and operation.date_window is not None:
+                resolved.date_window = operation.date_window
+                resolved.applied.append(f"set.{target}")
+            else:
+                resolved.unsupported.append(f"{op}.{target}")
+            continue
+
+        if target in _NUMBER_TARGETS:
+            if op in {"set", "replace"} and operation.number is not None:
+                amount = float(operation.number)
+                if target == "capital":
+                    resolved.initial_capital = amount
+                elif target == "recurring_contribution":
+                    resolved.recurring_contribution_amount = amount
+                elif target == "fees":
+                    resolved.fee_rate = amount
+                elif target == "slippage":
+                    resolved.slippage = amount
+                resolved.applied.append(f"set.{target}")
+            else:
+                resolved.unsupported.append(f"{op}.{target}")
+            continue
+
+        if target in _TEXT_TARGETS:
+            if op in {"set", "replace"} and (operation.value or "").strip():
+                cleaned = operation.value.strip()
+                if target == "cadence":
+                    resolved.cadence = cleaned
+                else:
+                    resolved.timeframe = cleaned
+                resolved.applied.append(f"set.{target}")
+            else:
+                resolved.unsupported.append(f"{op}.{target}")
+            continue
+
+        resolved.unsupported.append(f"{op}.{target}")
+
+    if asset_touched:
+        resolved.asset_universe = working_assets
+        resolved.asset_universe_operation = "replace"
+
+    return resolved
