@@ -385,7 +385,9 @@ export type DiscoveryItem = {
   description?: string | null;
   insert_text: string;
   provider: string;
-  support_status: "supported" | "draft_only" | "unavailable";
+  // Optional: provider-backed discovery items carry it (the picker filters indicators
+  // to "supported"); composer tokens reconstructed from the DOM do not need it.
+  support_status?: "supported" | "draft_only" | "unavailable";
 };
 
 type DiscoveryResponsePayload = { items: DiscoveryItem[] };

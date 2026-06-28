@@ -879,6 +879,39 @@ def test_backtest_rejects_unknown_symbol() -> None:
     assert response.json()["code"] == "invalid_symbol"
 
 
+def test_draft_strategy_templates_have_no_api_path() -> None:
+    """Containment by construction: draft templates are rejected at the API boundary.
+
+    StrategyTemplate is derived from the capability registry's executable set, so the
+    two draft strategies (momentum_breakout, trend_follow) cannot be saved or run via a
+    direct API call outside the chat UI.
+    """
+    client = _client()
+    for template in ("momentum_breakout", "trend_follow"):
+        created = client.post(
+            "/api/v1/strategies",
+            json={
+                "name": "Draft probe",
+                "template": template,
+                "asset_class": "equity",
+                "symbols": ["AAPL"],
+                "parameters": {},
+            },
+        )
+        assert created.status_code == 422, f"{template} accepted by POST /strategies"
+
+        ran = client.post(
+            "/api/v1/backtests/run",
+            headers={"Idempotency-Key": f"draft-{template}"},
+            json={
+                "template": template,
+                "asset_class": "equity",
+                "symbols": ["AAPL"],
+            },
+        )
+        assert ran.status_code == 422, f"{template} accepted by POST /backtests/run"
+
+
 def test_collections_are_organizational_and_can_mix_strategy_asset_classes() -> None:
     client = _client()
     equity_strategy = client.post(
@@ -894,8 +927,8 @@ def test_collections_are_organizational_and_can_mix_strategy_asset_classes() -> 
     crypto_strategy = client.post(
         "/api/v1/strategies",
         json={
-            "name": "Bitcoin momentum",
-            "template": "momentum_breakout",
+            "name": "Bitcoin buy and hold",
+            "template": "buy_and_hold",
             "asset_class": "crypto",
             "symbols": ["BTC"],
             "parameters": {},

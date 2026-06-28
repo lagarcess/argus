@@ -33,14 +33,16 @@ EvidenceArtifactType = Literal["backtest"]
 DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
+# Executable templates only. Kept in sync with capability_registry.EXECUTABLE_TEMPLATES
+# by tests/domain/test_capability_registry.py (a Literal cannot be built from a runtime
+# set while preserving the OpenAPI enum, so the sync is test-enforced). Draft templates
+# (momentum_breakout, trend_follow) are intentionally excluded so the API rejects them.
 StrategyTemplate = Literal[
     "buy_and_hold",
     "buy_the_dip",
     "rsi_mean_reversion",
     "moving_average_crossover",
     "dca_accumulation",
-    "momentum_breakout",
-    "trend_follow",
 ]
 
 

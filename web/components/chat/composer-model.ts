@@ -40,7 +40,6 @@ export function composerMentions(segments: ComposerSegment[]): ChatMention[] {
         description: token.description ?? null,
         insert_text: token.insert_text,
         provider: token.provider ?? null,
-        support_status: token.support_status,
       };
       if (token.type === "asset") {
         mention.asset_class = token.asset_class ?? null;

@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.stages.interpret_types import CapabilityQuestionFocus
 from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
+from argus.domain.capability_registry import indicator_template
 from argus.domain.indicators import EXECUTABLE_INDICATORS
 
 EXECUTABLE_STRATEGY_FAMILIES: tuple[str, ...] = (
@@ -32,14 +33,24 @@ def capability_fact_packet(
 
 
 def _supported_indicators_answer() -> str:
+    # Inputs are single-sourced from the capability registry: the executable indicator
+    # specs (what computes) and, separately, which of those are reachable through a
+    # dedicated supported template (the registry's reachability truth).
     indicators = _join_labels(spec.label for spec in EXECUTABLE_INDICATORS.values())
     parameter_summary = "; ".join(
         _indicator_parameter_summary(spec.label, spec.default_parameters)
         for spec in EXECUTABLE_INDICATORS.values()
     )
+    reachable = _join_labels(
+        spec.label
+        for key, spec in EXECUTABLE_INDICATORS.items()
+        if indicator_template(key) is not None
+    )
     return (
         f"Executable indicators right now are {indicators}. "
         f"Defaults are configurable when you say them: {parameter_summary}. "
+        f"{reachable} are reachable through a dedicated strategy template today; the "
+        "others compute and can be combined inside a signal rule. "
         "Other catalog indicators can be used for drafting and discovery, "
         "but they stay draft-only until Argus has an execution spec that maps their "
         "outputs, defaults, warmup, and rule operators into the backtesting engine."

@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from argus.domain.backtesting.date_window import validate_backtest_date_window
 from argus.domain.backtesting.rules import validate_rule_spec
+from argus.domain.capability_registry import ALLOWED_TEMPLATES
 from argus.domain.indicators import normalize_indicator_parameters
 from argus.domain.market_data import resolve_asset
 from argus.domain.market_data.capabilities import validate_market_data_window
@@ -14,7 +15,9 @@ from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 
-ALLOWED_TEMPLATES = set(STRATEGY_CAPABILITIES.keys()) | {"signal_strategy"}
+# ALLOWED_TEMPLATES is derived from the canonical capability registry (executable
+# templates + the signal_strategy execution template); draft templates have no path.
+# Re-exported via argus.domain.engine for existing importers.
 
 ALLOWED_TIMEFRAMES = {"1h", "2h", "4h", "6h", "12h", "1D"}
 

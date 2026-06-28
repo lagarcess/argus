@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from typing import Any
 
@@ -258,66 +258,76 @@ EXECUTABLE_INDICATORS: dict[str, IndicatorExecutionSpec] = {
 }
 
 
-_KNOWN_INDICATORS = {
-    "rsi": IndicatorInfo(
+# Catalog metadata for the curated indicators surfaced in discovery/search. The
+# `support_status` of each entry is DERIVED (not hand-maintained) from
+# EXECUTABLE_INDICATORS membership below: an indicator is "executable" iff the engine
+# has an execution spec that computes it, otherwise it is "draft_only" (catalog/draft).
+# This keeps a single source of truth for "does this indicator compute".
+_CATALOG_INDICATORS: tuple[IndicatorInfo, ...] = (
+    IndicatorInfo(
         "rsi",
         "RSI",
         "Relative Strength Index; a momentum gauge from 0 to 100.",
-        "executable",
-        ("relative strength index", "oversold", "overbought", "momentum gauge"),
+        aliases=("relative strength index", "oversold", "overbought", "momentum gauge"),
     ),
-    "sma": IndicatorInfo(
+    IndicatorInfo(
         "sma",
         "Simple moving average",
         "Average price over a set number of bars.",
-        "executable",
         aliases=("simple moving average", "moving average", "average price"),
     ),
-    "ema": IndicatorInfo(
+    IndicatorInfo(
         "ema",
         "Exponential moving average",
         "Moving average that reacts faster to recent prices.",
-        "executable",
         aliases=("exponential moving average", "moving average"),
     ),
-    "macd": IndicatorInfo(
+    IndicatorInfo(
         "macd",
         "MACD",
         "Momentum indicator based on two moving averages.",
-        support_status="executable",
         aliases=("moving average convergence divergence", "momentum", "macd crossover"),
     ),
-    "bbands": IndicatorInfo(
+    IndicatorInfo(
         "bbands",
         "Bollinger Bands",
         "Volatility bands around a moving average.",
-        support_status="executable",
         aliases=("bollinger", "bollinger bands", "volatility bands"),
     ),
-    "atr": IndicatorInfo(
+    IndicatorInfo(
         "atr",
         "ATR",
         "Average true range, commonly used to estimate volatility.",
         aliases=("average true range", "volatility"),
     ),
-    "vwap": IndicatorInfo(
+    IndicatorInfo(
         "vwap",
         "VWAP",
         "Volume-weighted average price.",
         aliases=("volume weighted average price",),
     ),
-    "obv": IndicatorInfo(
+    IndicatorInfo(
         "obv",
         "OBV",
         "On-balance volume, a volume momentum indicator.",
         aliases=("on balance volume", "volume momentum"),
     ),
-    "stoch": IndicatorInfo(
+    IndicatorInfo(
         "stoch",
         "Stochastic oscillator",
         "Momentum indicator comparing close to recent range.",
         aliases=("stochastic", "stochastic oscillator"),
     ),
+)
+
+
+def _catalog_support_status(key: str) -> str:
+    return "executable" if key in EXECUTABLE_INDICATORS else "draft_only"
+
+
+_KNOWN_INDICATORS = {
+    info.key: replace(info, support_status=_catalog_support_status(info.key))
+    for info in _CATALOG_INDICATORS
 }
 
 

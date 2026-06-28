@@ -2,21 +2,15 @@ from __future__ import annotations
 
 from argus.api import state as api_state
 from argus.api.schemas import BacktestRun, Strategy, User
+from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
 from argus.domain.store import utcnow
 
 
 def strategy_template_from_run(run: BacktestRun) -> str:
+    # Single-sourced from the canonical registry: only executable templates pass
+    # through on save; anything else (incl. draft templates) falls back to buy_and_hold.
     template = str(run.config_snapshot.get("template") or "buy_and_hold")
-    supported_templates = {
-        "buy_and_hold",
-        "buy_the_dip",
-        "rsi_mean_reversion",
-        "moving_average_crossover",
-        "dca_accumulation",
-        "momentum_breakout",
-        "trend_follow",
-    }
-    return template if template in supported_templates else "buy_and_hold"
+    return template if template in EXECUTABLE_TEMPLATES else "buy_and_hold"
 
 
 def save_strategy_from_run(*, user: User, run: BacktestRun) -> Strategy:
