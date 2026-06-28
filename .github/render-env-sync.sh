@@ -112,6 +112,10 @@ ARGUS_RELEASE_API_ENV_EXPECTED=(
   "ALPACA_API_KEY=<redacted-present>"
   "ALPACA_SECRET_KEY=<redacted-present>"
   "ALPACA_PAPER_TRADING=true"
+  # Backend onboarding gate for the API service — keep in lockstep with the web service's
+  # NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED so onboarding stays off on the API too,
+  # not just the frontend (the gate in api/routers/agent.py reads this var).
+  "ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED=false"
 )
 
 ARGUS_RELEASE_WEB_ENV_EXPECTED=(
