@@ -1700,7 +1700,7 @@ Capture:
 - `docs/CONVERSATIONAL_RUNTIME.md`
 - `docs/PRIVATE_LAUNCH_RUNBOOK.md`
 - `docs/specs/private-alpha-next-integration.md`
-- `docs/specs/private-alpha-backtest-execution-capacity.md`
+- `docs/archive/private-alpha-backtest-execution-capacity.md`
 - `docs/specs/evidence-aware-idea-loop.md`
 - `src/argus/agent_runtime/**`
 - `src/argus/domain/backtesting/**`

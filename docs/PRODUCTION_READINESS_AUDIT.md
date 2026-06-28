@@ -1,7 +1,7 @@
 # Argus Production Readiness Audit
 
 > [!NOTE]
-> Historical context. This document is retained as implementation evidence. For current private-alpha direction, see docs/specs/private-alpha-conversation-trust.md.
+> Historical context. This document is retained as implementation evidence. For current private-alpha direction, see docs/archive/private-alpha-conversation-trust.md.
 
 Status: active for `codex/production-readiness-gap-implementation`
 Date: 2026-05-05

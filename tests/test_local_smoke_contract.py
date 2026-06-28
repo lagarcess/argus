@@ -103,7 +103,7 @@ def test_local_smoke_contract_reports_sha_flags_mode_and_fingerprint() -> None:
     assert "feature_flags=" in result.stdout
     assert '"NEXT_PUBLIC_STRATEGIES_ENABLED":"false"' in result.stdout
     assert '"NEXT_PUBLIC_COLLECTIONS_ENABLED":"false"' in result.stdout
-    assert '"NEXT_PUBLIC_OMNISEARCH_ENABLED":"false"' in result.stdout
+    assert '"NEXT_PUBLIC_OMNISEARCH_ENABLED":"true"' in result.stdout
     assert '"NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED":"false"' in (
         result.stdout
     )

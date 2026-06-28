@@ -34,6 +34,11 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "release manifest" in runbook
     assert "rollback target" in runbook
     assert "api_web_env_fingerprint" in runbook
+    assert "workflow_env_fingerprint" in runbook
+    assert "workflow_env_status" in runbook
+    assert "workflow_runtime_provider_mode=live_provider" in runbook
+    assert "workflow_runtime_proof=ready" in runbook
+    assert "provider-path canary" in runbook
     assert "workflow-service proof" in runbook
     assert "approver" in runbook
 
@@ -47,9 +52,14 @@ def test_private_alpha_release_manifest_template_has_required_audit_fields() -> 
         "Rollback target",
         "Approver",
         "api_web_env_fingerprint",
+        "workflow_env_fingerprint",
+        "workflow_env_status",
+        "workflow_runtime_provider_mode",
+        "workflow_runtime_proof",
         "env_fingerprint",
         "workflow_task",
         "real_workflow_task",
+        "Provider-path canary",
         "Backtest service mode",
         "Workflow service proof",
         "Secret rotation / least-privilege owner",
@@ -74,6 +84,7 @@ def test_private_alpha_integration_doc_points_to_current_gate_and_later_memo() -
     assert "release manifest" in integration
     assert "Private Alpha Canary" in integration
     assert "local smoke" in integration
+    assert "workflow_runtime_proof=ready" in integration
 
 
 def test_agents_guardrail_keeps_canary_evidence_before_main_promotion() -> None:

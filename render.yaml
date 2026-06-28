@@ -136,7 +136,7 @@ services:
       - key: NEXT_PUBLIC_COLLECTIONS_ENABLED
         value: "false"
       - key: NEXT_PUBLIC_OMNISEARCH_ENABLED
-        value: "false"
+        value: "true"
       - key: NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED
         value: "false"
       - key: NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED

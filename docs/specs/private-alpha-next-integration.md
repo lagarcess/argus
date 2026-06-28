@@ -39,13 +39,17 @@ Before testers are invited, the release captain must prove:
 - `argus-api` and `argus-app` latest Render deploys are `live` at the candidate
   SHA;
 - Render release config audit produced the expected `env_fingerprint`,
-  `workflow_task`, and `real_workflow_task`;
+  `workflow_env_fingerprint`, `workflow_env_status=ready`, `workflow_task`, and
+  `real_workflow_task`;
+- warmup ran `workflow_proof` against the deployed `argus-backtests` workflow
+  and emitted `workflow_runtime_provider_mode=live_provider` plus
+  `workflow_runtime_proof=ready`;
 - the `Private Alpha Canary` workflow or equivalent manual commands passed both
-  English and Spanish canaries;
+  English, Spanish, and provider-path canaries;
 - the canary evidence artifact is retained as `private-alpha-canary-evidence`;
 - a release manifest exists from `docs/release-manifests/TEMPLATE.md` and names
-  SHA, env fingerprint, canary evidence, rollback target, approver, and
-  backtest service mode.
+  SHA, env fingerprints, workflow env status, canary evidence, rollback target,
+  approver, and backtest service mode.
 
 Production deploys remain manual and founder-directed. No production deploy
 happens from this branch unless the founder explicitly asks for a deploy check.
@@ -59,35 +63,62 @@ main
   -> codex/private-alpha-next
        -> codex/<focused-high-leverage-slice>
        -> codex/<focused-low-risk-debt-slice>
-       -> codex/private-alpha-next-jules-intake
-            -> jules/<focused-low-risk-debt-slice>
 ```
 
 Rules:
 
 - `main` remains the clean release checkpoint.
 - `codex/private-alpha-next` is the only integration staging branch.
-- `codex/private-alpha-next-jules-intake` is a downstream quarantine lane for
-  low-risk Jules work. It is not the source of truth.
 - Codex worker branches start from `codex/private-alpha-next`.
-- Jules worker branches start from `codex/private-alpha-next-jules-intake`.
 - Workers do not push directly to `main`.
-- External async agents do not push directly to `codex/private-alpha-next`.
-- Jules branches use the `jules/**` branch namespace and open PRs targeting
-  `codex/private-alpha-next-jules-intake`.
-- CI runs on pushes to `jules/**` and on PRs targeting
-  `codex/private-alpha-next-jules-intake` so Jules can self-correct before
-  Codex review.
+- Jules work is decommissioned for the near term. Do not create or maintain
+  `jules/**` branches, `codex/private-alpha-next-jules-intake`, or Jules intake
+  PRs unless the founder explicitly reactivates that workflow.
+- External async agents, if reintroduced later, must use a fresh
+  founder-approved delegation model and must not push directly to
+  `codex/private-alpha-next`.
 - Codex reviews worker diffs before they are merged or cherry-picked into the
   integration branch.
-- High-leverage work lands in `codex/private-alpha-next` first. Periodically
-  merge or fast-forward `codex/private-alpha-next` down into
-  `codex/private-alpha-next-jules-intake` so Jules does not work from stale
-  context.
+- High-leverage work lands in `codex/private-alpha-next` first.
 - Every slice ends with tests run, browser QA notes when relevant, known
   caveats, and a conventional commit.
 - No production deploy happens from this branch unless the founder explicitly
   asks for a deploy check.
+
+## Claude Review Workflow
+
+Claude review is a bounded review aid, not an always-on push hook.
+
+- During active development, run Claude Code CLI reviews on demand from the
+  terminal against a bounded local diff before commit or before internal review.
+- For promotion candidates, run Claude review as an explicit gate through a
+  manual GitHub workflow, PR label, or review command after the lane is stable.
+- Do not run Claude review automatically on every push. WIP branches should not
+  accumulate noisy automated review comments before a lane is ready.
+- Claude reviews must use the root `CLAUDE.md`, `AGENTS.md`, the canon docs,
+  the active roadmap or lane spec, and the correct parent branch for the diff.
+- Promotion-gate review focus is defined by the root `CLAUDE.md`. The
+  integration workflow especially depends on regression detection,
+  language-agnostic runtime-spine protection, modularity, API contract drift,
+  frontend truth ownership, tests/browser-QA gaps, and release-gate discipline.
+
+## Quarantine Reference Branches
+
+These branches are intentionally preserved as reference material, not as merge
+sources:
+
+- `codex/private-alpha-next-quarantine-fc231e8`: preserves the broader P2
+  direction and UI/product ideas, but its backend/runtime/data scope
+  destabilized Argus. Use it only for product direction, UI salvage candidates,
+  tests, and anti-pattern evidence.
+- `codex/private-alpha-next-p2.1-quarantine`: preserves a narrower P2.1 slicing
+  attempt around capabilities and indicator truth, but it again drifted against
+  Argus runtime principles. Use it only for cautionary evidence, possible test
+  cases, and scope lessons.
+
+Do not broad cherry-pick or merge from either branch. Any salvage must be
+rebuilt from current `codex/private-alpha-next` after a bounded roadmap slice is
+approved.
 
 ## Current Closed Items
 
@@ -180,8 +211,9 @@ Codex should own or closely supervise this:
      valuation (`P/E`) clarifies into supported proxies, then a messy
      buy-and-hold follow-up re-enters the normal confirmation funnel.
    - Remaining before merge/release readiness: production-parity Render canary
-     and the rest of the controlled readiness slices in
-     `docs/specs/private-alpha-controlled-readiness-panel.md`.
+     and the rest of the controlled readiness slices recorded in archived
+     readiness context at
+     `docs/archive/private-alpha-controlled-readiness-panel.md`.
 
 2. **Research Lab product spec**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
@@ -214,14 +246,15 @@ deploy:
      inline paste, paste preview, or explicit large-text handling, then replace
      the `execCommand` paste path with a modern contenteditable or state
      insertion path and add Bun plus browser QA.
-   - This is not Jules-ready implementation until the product behavior is
-     scoped. Jules may later run a read-only validation inventory or help draft
-     a GitHub task prompt.
+   - This is not ready for delegated implementation until the product behavior
+     is scoped. A future scout may later run a read-only validation inventory or
+     help draft a GitHub task prompt if external-agent work is reactivated.
 
-## Low-Risk Work Suitable For External Async Agents
+## Deferred External-Agent Scout Candidates
 
-External async agent `Jules` may work on these only within focused
-`jules/**` branches:
+External async-agent work is decommissioned for the near term. If the founder
+reactivates it later, these are the only categories that should be considered
+for bounded scout or janitor work:
 
 - Docs classification proposals: canon, active plan, historical evidence,
   archive candidate.

@@ -329,12 +329,14 @@ Users may speak naturally, but AI maps requests into supported engine templates.
 
 Examples:
 
+- Buy and hold
 - Buy the dip
 - RSI mean reversion
 - Moving average crossover
 - DCA accumulation
-- Momentum breakout
-- Trend follow
+
+Momentum breakout and trend follow are recognized by the interpreter but are not
+yet executable. Argus does not present them as runnable strategies to users.
 
 ## Asset Class Grouping (Alpha)
 Alpha supports:
