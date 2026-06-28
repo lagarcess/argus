@@ -2,9 +2,17 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    WithJsonSchema,
+    field_validator,
+    model_validator,
+)
 
 from argus.api.feedback_context import (
     MAX_FEEDBACK_CONTEXT_DEPTH,
@@ -34,16 +42,27 @@ EvidenceArtifactType = Literal["backtest"]
 DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
-# Executable templates only. Kept in sync with capability_registry.EXECUTABLE_TEMPLATES
-# by tests/domain/test_capability_registry.py (a Literal cannot be built from a runtime
-# set while preserving the OpenAPI enum, so the sync is test-enforced). Draft templates
-# (momentum_breakout, trend_follow) are intentionally excluded so the API rejects them.
-StrategyTemplate = Literal[
-    "buy_and_hold",
-    "buy_the_dip",
-    "rsi_mean_reversion",
-    "moving_average_crossover",
-    "dca_accumulation",
+# Single source of truth: executable templates live only in the capability registry
+# (derived from each StrategyCapability's status). StrategyTemplate validates against that
+# set at runtime and publishes its OpenAPI enum from it, so there is no second hardcoded
+# list to keep in sync. Draft templates are absent from the registry's executable set, so
+# the API rejects them at the request boundary.
+def _ensure_executable_template(value: str) -> str:
+    if value not in EXECUTABLE_TEMPLATES:
+        raise ValueError(f"unsupported strategy template: {value!r}")
+    return value
+
+
+StrategyTemplate = Annotated[
+    str,
+    AfterValidator(_ensure_executable_template),
+    WithJsonSchema(
+        {
+            "type": "string",
+            "enum": sorted(EXECUTABLE_TEMPLATES),
+            "title": "StrategyTemplate",
+        }
+    ),
 ]
 
 

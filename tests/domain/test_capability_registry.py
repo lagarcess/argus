@@ -21,6 +21,7 @@ from argus.domain.engine_launch.models import LaunchStrategyType
 from argus.domain.engine_launch.strategies import normalize_template_name
 from argus.domain.indicators import EXECUTABLE_INDICATORS, search_indicators
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
+from pydantic import TypeAdapter, ValidationError
 
 DRAFT_STRATEGIES = {"momentum_breakout", "trend_follow"}
 EXECUTABLE_FIVE = {
@@ -53,8 +54,7 @@ def test_buy_the_dip_recorded_as_fixed_parameter() -> None:
 
 def test_executable_and_draft_template_sets() -> None:
     assert registry.EXECUTABLE_TEMPLATES == EXECUTABLE_FIVE
-    assert registry.DRAFT_TEMPLATES == DRAFT_STRATEGIES
-    assert registry.EXECUTABLE_TEMPLATES.isdisjoint(registry.DRAFT_TEMPLATES)
+    assert registry.EXECUTABLE_TEMPLATES.isdisjoint(DRAFT_STRATEGIES)
 
 
 def test_supported_strategy_types_derived_from_executable_strategies() -> None:
@@ -72,13 +72,6 @@ def test_supported_strategy_types_derived_from_executable_strategies() -> None:
     }
 
 
-def test_strategy_status_helpers() -> None:
-    assert registry.is_executable_strategy("buy_and_hold") is True
-    assert registry.is_executable_strategy("momentum_breakout") is False
-    assert registry.strategy_status("trend_follow") == "draft"
-    assert registry.strategy_status("not_a_template") is None
-
-
 # --- Derived allow-lists all read from the registry -----------------------------------
 
 
@@ -88,8 +81,16 @@ def test_allowed_templates_derived_and_excludes_drafts() -> None:
     assert DRAFT_STRATEGIES.isdisjoint(ALLOWED_TEMPLATES)
 
 
-def test_api_strategy_template_enum_matches_registry() -> None:
-    assert set(get_args(StrategyTemplate)) == registry.EXECUTABLE_TEMPLATES
+def test_api_strategy_template_is_single_sourced_from_registry() -> None:
+    # StrategyTemplate validates against the registry's executable set and publishes its
+    # OpenAPI enum from it — no hardcoded Literal to drift.
+    adapter = TypeAdapter(StrategyTemplate)
+    for template in registry.EXECUTABLE_TEMPLATES:
+        assert adapter.validate_python(template) == template
+    for template in DRAFT_STRATEGIES | {"totally_unknown"}:
+        with pytest.raises(ValidationError):
+            adapter.validate_python(template)
+    assert adapter.json_schema().get("enum") == sorted(registry.EXECUTABLE_TEMPLATES)
 
 
 def test_launch_strategy_type_enum_matches_supported_strategy_types() -> None:
@@ -109,33 +110,23 @@ def test_save_passthrough_uses_registry_executable_set() -> None:
 # --- Indicator truth: computes vs reachable-via-template -------------------------------
 
 
-def test_indicator_status_distinguishes_computes_from_reachable() -> None:
-    # Reachable via a named supported template -> executable.
-    assert registry.indicator_status("rsi") == "executable"
-    assert registry.indicator_status("sma") == "executable"
-    # Computes but no named template consumes it -> draft.
-    assert registry.indicator_status("ema") == "draft"
-    assert registry.indicator_status("macd") == "draft"
-    assert registry.indicator_status("bbands") == "draft"
-    # Catalog-only / does not compute -> future.
-    assert registry.indicator_status("atr") == "future"
-    assert registry.indicator_status("vwap") == "future"
-
-
-def test_indicator_computes_and_template_axes_are_explicit() -> None:
-    assert registry.indicator_computes("macd") is True
-    assert registry.indicator_template("macd") is None
-    assert registry.indicator_computes("atr") is False
+def test_indicator_template_reflects_reachability() -> None:
+    # Reachable via a named supported template.
     assert registry.indicator_template("rsi") == "rsi_mean_reversion"
     assert registry.indicator_template("sma") == "moving_average_crossover"
-    assert registry.EXECUTABLE_INDICATOR_KEYS == set(EXECUTABLE_INDICATORS)
-    assert registry.REACHABLE_INDICATOR_KEYS == {"rsi", "sma"}
+    # Computes but no named template consumes it (still usable inside a signal rule) -> None.
+    assert registry.indicator_template("ema") is None
+    assert registry.indicator_template("macd") is None
+    assert registry.indicator_template("bbands") is None
+    # Catalog-only / does not compute -> None.
+    assert registry.indicator_template("atr") is None
 
 
 def test_reachability_map_is_internally_consistent() -> None:
     for indicator_key, template in registry.INDICATOR_TEMPLATE_REACHABILITY.items():
-        # Each reachable indicator must compute, and its template must be executable.
-        assert registry.indicator_computes(indicator_key)
+        # Each reachable indicator must compute (have an execution spec), and its template
+        # must be executable.
+        assert indicator_key in EXECUTABLE_INDICATORS
         assert template in registry.EXECUTABLE_TEMPLATES
     # Tie the hand-maintained RSI entry to the strategy's actual indicator parameter so
     # the map cannot drift from the rsi_mean_reversion definition (the registry comment

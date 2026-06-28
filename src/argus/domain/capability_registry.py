@@ -13,8 +13,6 @@ See `docs/specs/private-alpha-next-p2.1a-capability-registry-impl.md`.
 
 from __future__ import annotations
 
-from argus.domain.capability_status import CapabilityStatus
-from argus.domain.indicators import EXECUTABLE_INDICATORS
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 # --- Strategy derivations -------------------------------------------------------------
@@ -25,9 +23,6 @@ EXECUTABLE_TEMPLATES: frozenset[str] = frozenset(
     for template, capability in STRATEGY_CAPABILITIES.items()
     if capability.status == "executable"
 )
-
-# Templates present in the registry but with no supported user-facing path.
-DRAFT_TEMPLATES: frozenset[str] = frozenset(STRATEGY_CAPABILITIES) - EXECUTABLE_TEMPLATES
 
 # Execution strategy types accepted by the runtime contract / confirm gate. Derived from
 # the executable strategies' execution types (e.g. buy_the_dip + rsi_mean_reversion both
@@ -42,15 +37,6 @@ SUPPORTED_STRATEGY_TYPES: frozenset[str] = frozenset(
 # plus the generic `signal_strategy` execution template (an execution type the launch
 # path uses directly, not a user-facing capability key).
 ALLOWED_TEMPLATES: frozenset[str] = EXECUTABLE_TEMPLATES | {"signal_strategy"}
-
-
-def strategy_status(template: str) -> CapabilityStatus | None:
-    capability = STRATEGY_CAPABILITIES.get(template)
-    return capability.status if capability is not None else None
-
-
-def is_executable_strategy(template: str) -> bool:
-    return template in EXECUTABLE_TEMPLATES
 
 
 # --- Indicator derivations ------------------------------------------------------------
@@ -68,31 +54,7 @@ INDICATOR_TEMPLATE_REACHABILITY: dict[str, str] = {
     "sma": "moving_average_crossover",
 }
 
-# Indicators the engine can compute (have an execution spec).
-EXECUTABLE_INDICATOR_KEYS: frozenset[str] = frozenset(EXECUTABLE_INDICATORS)
-# Indicators reachable end-to-end via a named supported template.
-REACHABLE_INDICATOR_KEYS: frozenset[str] = frozenset(INDICATOR_TEMPLATE_REACHABILITY)
-
-
-def indicator_computes(key: str) -> bool:
-    """True when the engine has an execution spec that computes this indicator."""
-    return key in EXECUTABLE_INDICATORS
-
 
 def indicator_template(key: str) -> str | None:
-    """The named supported template that consumes this indicator, if any."""
+    """The named supported template that consumes this indicator, if any (else None)."""
     return INDICATOR_TEMPLATE_REACHABILITY.get(key)
-
-
-def indicator_status(key: str) -> CapabilityStatus:
-    """Typed 3-state capability status for an indicator.
-
-    executable -> reachable via a named supported template (RSI, SMA)
-    draft      -> computes but no named template consumes it (EMA, MACD, Bollinger)
-    future     -> recognised in the catalog but not computable (ATR, VWAP, OBV, ...)
-    """
-    if indicator_template(key) is not None:
-        return "executable"
-    if indicator_computes(key):
-        return "draft"
-    return "future"
