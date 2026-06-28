@@ -669,10 +669,17 @@ async def chat_stream(
                         runtime_fallback = result_fallback
     request_message_record = persist_request_message()
 
-    onboarding_required = current_user_profile.onboarding.stage in {
-        "language_selection",
-        "primary_goal_selection",
-    }
+    # Backend mirror of NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED. Default enabled so
+    # prod/QA/tests keep the onboarding flow; dev mode sets it false so memory-mode
+    # sessions aren't re-gated on every backend restart (no per-user seed needed).
+    onboarding_enabled = (
+        os.getenv("ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED", "true").strip().lower()
+        != "false"
+    )
+    onboarding_required = onboarding_enabled and (
+        current_user_profile.onboarding.stage
+        in {"language_selection", "primary_goal_selection"}
+    )
 
     async def events() -> AsyncIterator[str]:
         naming_language = (
