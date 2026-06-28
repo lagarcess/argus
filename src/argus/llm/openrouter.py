@@ -95,6 +95,9 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
         "interpretation",
         temperature=0,
         max_tokens=3200,
+        # 3200 tokens + structured + reasoning needs more than the 12s default (its peers
+        # get 20-30s); proportionate bump so interpretation isn't the next timeout.
+        timeout_seconds=20,
         reasoning_effort="medium",
     ),
     "interpretation_repair": OpenRouterProfile(
@@ -117,7 +120,9 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
         reasoning_effort="medium",
     ),
     "clarification": OpenRouterProfile("clarification", temperature=0, max_tokens=360),
-    "chat_composer": OpenRouterProfile("chat_composer", temperature=0.2, max_tokens=1200),
+    "chat_composer": OpenRouterProfile(
+        "chat_composer", temperature=0.2, max_tokens=1200, timeout_seconds=25
+    ),
     "result_summary": OpenRouterProfile(
         "result_summary", temperature=0.2, max_tokens=700, timeout_seconds=30
     ),
@@ -125,7 +130,7 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
         "result_breakdown",
         temperature=0.2,
         max_tokens=2400,
-        timeout_seconds=6,
+        timeout_seconds=25,
         max_retries=0,
     ),
     "name_suggestion": OpenRouterProfile(

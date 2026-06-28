@@ -93,7 +93,6 @@ export type ChatMention = {
   description?: string | null;
   insert_text: string;
   provider?: string | null;
-  support_status?: "supported" | "draft_only" | "unavailable";
 };
 
 export type StrategyResultPayload = {

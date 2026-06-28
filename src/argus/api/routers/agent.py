@@ -669,10 +669,20 @@ async def chat_stream(
                         runtime_fallback = result_fallback
     request_message_record = persist_request_message()
 
-    onboarding_required = current_user_profile.onboarding.stage in {
-        "language_selection",
-        "primary_goal_selection",
-    }
+    # Onboarding feature flag on the API service. Default enabled so prod/QA/tests keep the
+    # flow; dev mode sets it false. The deployed API must set this to match the web
+    # service's NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED — enforced by the API release
+    # env audit in .github/render-env-sync.sh — so onboarding-off is honored on the API,
+    # not just the frontend. (Deliberately NOT read from the NEXT_PUBLIC_* var: that frontend
+    # flag is false in .env, which would disable the onboarding flow in dev/QA and tests.)
+    onboarding_enabled = (
+        os.getenv("ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED", "true").strip().lower()
+        != "false"
+    )
+    onboarding_required = onboarding_enabled and (
+        current_user_profile.onboarding.stage
+        in {"language_selection", "primary_goal_selection"}
+    )
 
     async def events() -> AsyncIterator[str]:
         naming_language = (

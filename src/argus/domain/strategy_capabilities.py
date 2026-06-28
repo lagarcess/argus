@@ -1,8 +1,9 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
+from argus.domain.capability_status import CapabilityStatus
 
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 SlotPolicy = Literal["required", "defaultable", "clarify_if_missing"]
@@ -30,6 +31,31 @@ class StrategyCapability(BaseModel):
     execution_strategy_type: ExecutionStrategyType | None = None
     supported_asset_classes: list[AssetClass]
     parameters: dict[str, ParameterSpec] = Field(default_factory=dict)
+    # Typed capability status (single source of truth for derived allow-lists). A
+    # template is only `executable` when it is reachable end-to-end via a supported
+    # user-facing path; drafts compute a signal but have no supported path.
+    status: CapabilityStatus = "executable"
+    # True when the strategy runs with a fixed, non-user-tunable parameterization
+    # (e.g. buy_the_dip's hardcoded -3% trigger), so copy never implies tunability.
+    fixed_parameters: bool = False
+
+    @model_validator(mode="after")
+    def _validate_status_consistency(self) -> "StrategyCapability":
+        # Draft-ness is encoded once: an executable template has an execution type, a
+        # draft/future one does not. Making the contradictory pair unrepresentable stops
+        # the derived allow-lists (EXECUTABLE_TEMPLATES vs SUPPORTED_STRATEGY_TYPES) from
+        # silently disagreeing.
+        if self.status == "executable" and self.execution_strategy_type is None:
+            raise ValueError(
+                f"executable capability {self.template!r} requires an "
+                "execution_strategy_type"
+            )
+        if self.status != "executable" and self.execution_strategy_type is not None:
+            raise ValueError(
+                f"non-executable capability {self.template!r} must not set an "
+                "execution_strategy_type"
+            )
+        return self
 
 
 STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
@@ -53,6 +79,8 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
         ],
         execution_strategy_type="indicator_threshold",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
+        # Hardcoded -3% trigger with no user-tunable parameters (see signals.py).
+        fixed_parameters=True,
     ),
     "rsi_mean_reversion": StrategyCapability(
         template="rsi_mean_reversion",
@@ -135,11 +163,15 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
             )
         },
     ),
+    # Draft templates: no execution_strategy_type and no supported user-facing path.
+    # Kept in the registry as the single source of capability truth (status=draft) so
+    # every derived allow-list excludes them by construction.
     "momentum_breakout": StrategyCapability(
         template="momentum_breakout",
         display_name="Momentum Breakout",
         aliases=["momentum", "breakout"],
         supported_asset_classes=["equity", "crypto", "currency_pair"],
+        status="draft",
     ),
     "trend_follow": StrategyCapability(
         template="trend_follow",
@@ -149,5 +181,6 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
             "trend",
         ],
         supported_asset_classes=["equity", "crypto", "currency_pair"],
+        status="draft",
     ),
 }

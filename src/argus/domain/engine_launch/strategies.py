@@ -11,15 +11,22 @@ from argus.domain.backtesting.rules import (
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.indicators import normalize_indicator_parameters
 
+_LAUNCH_TEMPLATE_BY_STRATEGY_TYPE: dict[str, str] = {
+    "buy_and_hold": "buy_and_hold",
+    "dca_accumulation": "dca_accumulation",
+    "signal_strategy": "signal_strategy",
+    # indicator_threshold maps explicitly to the rsi_mean_reversion engine template.
+    "indicator_threshold": "rsi_mean_reversion",
+}
+
 
 def normalize_template_name(request: LaunchBacktestRequest) -> str:
-    if request.strategy_type == "buy_and_hold":
-        return "buy_and_hold"
-    if request.strategy_type == "dca_accumulation":
-        return "dca_accumulation"
-    if request.strategy_type == "signal_strategy":
-        return "signal_strategy"
-    return "rsi_mean_reversion"
+    # Explicit map (no silent catch-all). The four LaunchStrategyType values are all
+    # covered; anything unexpected fails loudly instead of being rewritten to RSI.
+    template = _LAUNCH_TEMPLATE_BY_STRATEGY_TYPE.get(request.strategy_type)
+    if template is None:
+        raise ValueError("unsupported_strategy_type")
+    return template
 
 
 def validate_launch_supported(request: LaunchBacktestRequest) -> None:

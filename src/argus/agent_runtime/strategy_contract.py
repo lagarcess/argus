@@ -12,17 +12,15 @@ from argus.domain.backtesting.rules import (
     validate_rule_spec,
 )
 from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
+
+# Single source of truth: the runtime contract's supported execution types are derived
+# from the canonical capability registry. Re-exported here so existing importers keep
+# `from argus.agent_runtime.strategy_contract import SUPPORTED_STRATEGY_TYPES`.
+from argus.domain.capability_registry import SUPPORTED_STRATEGY_TYPES
 from argus.domain.indicators import executable_indicator_spec
 from argus.domain.slot_normalizer import normalize_template_name
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.nlp.natural_time import resolve_date_range_intent, shift_months
-
-SUPPORTED_STRATEGY_TYPES = {
-    "buy_and_hold",
-    "dca_accumulation",
-    "indicator_threshold",
-    "signal_strategy",
-}
 
 
 @dataclass(frozen=True)
