@@ -170,7 +170,11 @@ def _artifact_assumption_edit_messages(
                 "instead of inventing operations. If the user asks for something "
                 "outside the targets above (for example a strategy or entry/exit "
                 "rule change), return unsupported or needs_clarification and name "
-                "what can be changed; do not invent an operation for it. "
+                "what can be changed; do not invent an operation for it. When a "
+                "single turn mixes a supported change with an unsupported one, apply "
+                "the supported operations with outcome=ready_to_confirm and use "
+                "assistant_response to briefly state, in the user's language, what "
+                "you could not change and why. "
                 f"Today is {date.today().isoformat()}. {language_line} Return only "
                 "JSON matching the schema."
             ),

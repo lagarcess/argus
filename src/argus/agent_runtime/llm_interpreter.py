@@ -5096,6 +5096,10 @@ def _response_from_artifact_assumption_edit_plan(
                 plan.user_goal_summary or "User changed a visible confirmation assumption."
             ),
             candidate_strategy_draft=draft,
+            # Surface the model's note when an applied edit also had a part it could
+            # not change (mixed supported/unsupported), so the reply never silently
+            # drops the unsupported part. None for a clean edit.
+            assistant_response=plan.assistant_response,
             confidence=plan.confidence,
             reason_codes=["artifact_assumption_edit_planned"],
             semantic_turn_act="answer_pending_need",
