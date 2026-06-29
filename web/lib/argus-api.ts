@@ -303,6 +303,7 @@ export type SearchItem = {
   updated_at: string;
   conversation_id?: string | null;
   lifecycle?: ArtifactLifecycle | null;
+  decision_state?: DecisionState | null;
   preview?: Record<string, unknown> | null;
 };
 

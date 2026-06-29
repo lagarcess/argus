@@ -9,6 +9,7 @@ export type CommandPaletteDisplayItem = {
   updatedAt: string;
   source: "recent" | "search";
   lifecycle?: string | null;
+  decisionState?: string | null;
   preview?: Record<string, unknown> | null;
   canManageConversation: boolean;
   activation: "open_conversation";
@@ -39,6 +40,7 @@ export function commandPaletteItemFromHistory(
     updatedAt: item.created_at,
     source: "recent",
     lifecycle: null,
+    decisionState: null,
     preview: null,
     canManageConversation: true,
     activation: "open_conversation",
@@ -63,6 +65,7 @@ export function commandPaletteItemFromSearch(
     updatedAt: item.updated_at,
     source: "search",
     lifecycle: item.lifecycle ?? null,
+    decisionState: item.decision_state ?? null,
     preview: safeCommandPalettePreview(item.preview),
     canManageConversation: item.type === "chat" && Boolean(conversationId),
     activation: "open_conversation",
@@ -114,11 +117,19 @@ export function commandPaletteTypeFallback(type: SearchItem["type"]) {
 }
 
 export function commandPaletteStatusLabelKey(item: CommandPaletteDisplayItem) {
+  // Idea Ledger: a decided idea shows its decision (Promising/Rejected/...) as the
+  // status pill, which is more useful than the generic "Decided" lifecycle.
+  if (item.type === "idea" && item.decisionState) {
+    return `chat.result_card.decision_states.${item.decisionState}`;
+  }
   const status = commandPaletteStatusId(item);
   return status ? `command_palette.status.${status}` : null;
 }
 
 export function commandPaletteStatusFallback(item: CommandPaletteDisplayItem) {
+  if (item.type === "idea" && item.decisionState) {
+    return commandPaletteDecisionStateFallback(item.decisionState);
+  }
   switch (commandPaletteStatusId(item)) {
     case "archived":
       return "Archived";
