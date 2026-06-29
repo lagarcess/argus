@@ -146,6 +146,13 @@ vs ~210s serial. A final serial full-`tests/` gate is run before handoff.
 
 1. `interpreter/shared.py` — 20 cross-cutting leaf helpers + 5 shared constants
    (foundation import sink). Gate: 11 failed / 795 passed (baseline); mypy 14; ruff clean.
+2. `interpreter/audits.py` — 14 structured LLM audit-response Pydantic schemas
+   (import sink for audit modules + facade). Gate: baseline (an xdist-only extra failure
+   confirmed passing serially — load-sensitive timeout flake, not a regression); ruff clean.
+
+> Note: `pytest-xdist` can spuriously fail a timeout-sensitive test under parallel load.
+> Protocol: any failure beyond the baseline 11 is re-checked serially; only a serial
+> failure counts as a regression.
 
 ## Blocked / deferred (with reason)
 
