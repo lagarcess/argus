@@ -1526,7 +1526,7 @@ class SupabaseGateway:
         decisions_query = (
             self.client.table("decision_notes")
             .select(
-                "id,decision_state,note,evidence_artifact_id,"
+                "id,idea_id,decision_state,note,evidence_artifact_id,"
                 "source_conversation_id,updated_at"
             )
             .eq("user_id", user_id)

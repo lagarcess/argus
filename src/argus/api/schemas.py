@@ -428,6 +428,10 @@ class SearchItem(BaseModel):
     updated_at: datetime
     conversation_id: str | None = None
     lifecycle: ArtifactLifecycle | None = None
+    # Current (latest) decision for an idea result, so recall can show a status
+    # pill + filter by decision without a separate fetch. None when the idea has
+    # no decision yet, or for non-idea result types.
+    decision_state: DecisionState | None = None
     preview: dict[str, Any] | None = None
 
 

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from argus.api import state as api_state
 from argus.api.dependencies import current_user
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
-from argus.api.schemas import PaginatedSearch, SearchItem, User
+from argus.api.schemas import DecisionState, PaginatedSearch, SearchItem, User
 from argus.api.search_assembly import (
     scored_memory_search_items,
     scored_supabase_search_items,
@@ -23,10 +23,13 @@ def search(
     request: Request,
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = Query(None),
+    decision_state: DecisionState | None = Query(None),  # noqa: B008
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedSearch:
     query = q.strip().lower()
-    if not query:
+    # An empty query is allowed when filtering by decision_state (browse the
+    # ledger, e.g. "show my promising ideas"); otherwise it returns nothing.
+    if not query and decision_state is None:
         return PaginatedSearch(items=[], next_cursor=None)
     scored_items: list[tuple[int, SearchItem]] = []
     if api_state.supabase_gateway is not None:
@@ -48,6 +51,13 @@ def search(
         ),
         reverse=True,
     )
+    if decision_state is not None:
+        # Idea Ledger: narrow recall to ideas carrying the requested decision_state.
+        scored_items = [
+            pair
+            for pair in scored_items
+            if pair[1].type == "idea" and pair[1].decision_state == decision_state
+        ]
     filtered = scored_items
     if cursor:
         cursor_updated_at, cursor_id = decode_cursor(cursor, request)
