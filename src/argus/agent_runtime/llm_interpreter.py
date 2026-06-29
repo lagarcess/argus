@@ -1,3 +1,7 @@
+# ruff: noqa: F401
+# This module is now a thin facade over argus.agent_runtime.interpreter.*; it
+# re-exports relocated symbols and preserves its full original import surface so
+# external callers/tests that access ``llm_interpreter.<name>`` keep working.
 from __future__ import annotations
 
 import asyncio
