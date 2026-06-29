@@ -130,6 +130,11 @@ from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _response_from_pending_response_option_selection_audit,
     _response_needs_pending_response_option_selection_audit,
 )
+from argus.agent_runtime.interpreter.readiness_helpers import (  # noqa: F401
+    _active_artifact_asset_universe_operation_needs_planner,
+    _asset_universe_operation_clarification_response,
+    _log_runtime_readiness_step,
+)
 from argus.agent_runtime.interpreter.run_field_audits import (  # noqa: F401
     _clear_rule_or_indicator_fields,
     _date_endpoint_is_runtime_current,
@@ -2609,109 +2614,6 @@ async def _ready_active_artifact_edit_planned_response(
     if planned is None or planned.requires_clarification:
         return None
     return planned
-
-
-def _active_artifact_asset_universe_operation_needs_planner(
-    *,
-    response: LLMInterpretationResponse,
-    request: InterpretationRequest,
-) -> bool:
-    draft = response.candidate_strategy_draft
-    if not draft.asset_universe:
-        return False
-    if normalized_asset_universe_operation(draft.asset_universe_operation) is not None:
-        return False
-    snapshot = request.latest_task_snapshot
-    prior = (
-        snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
-        if snapshot is not None
-        else None
-    )
-    if prior is None:
-        return False
-    candidate_symbols = {
-        symbol
-        for value in draft.asset_universe
-        if (symbol := _normalized_ticker_symbol(value)) is not None
-    }
-    prior_symbols = {
-        symbol
-        for value in prior.asset_universe
-        if (symbol := _normalized_ticker_symbol(value)) is not None
-    }
-    return bool(candidate_symbols and candidate_symbols != prior_symbols)
-
-
-def _asset_universe_operation_clarification_response(
-    *,
-    response: LLMInterpretationResponse,
-    request: InterpretationRequest,
-) -> LLMInterpretationResponse:
-    return response.model_copy(
-        update={
-            "intent": "conversation_followup",
-            "task_relation": "continue",
-            "requires_clarification": True,
-            "assistant_response": asset_universe_operation_clarification_message(
-                language=request.user.language_preference
-            ),
-            "candidate_strategy_draft": LLMStrategyDraft(
-                raw_user_phrasing=request.current_user_message
-            ),
-            "missing_required_fields": [],
-            "ambiguous_fields": [],
-            "unsupported_constraints": [],
-            "reason_codes": list(
-                dict.fromkeys(
-                    [
-                        *response.reason_codes,
-                        "asset_universe_operation_needs_clarification",
-                    ]
-                )
-            ),
-            "semantic_turn_act": "answer_pending_need",
-        }
-    )
-
-
-def _log_runtime_readiness_step(
-    step: str,
-    *,
-    response: LLMInterpretationResponse,
-) -> None:
-    draft = response.candidate_strategy_draft
-    logger.debug(
-        "Structured interpreter runtime readiness step={} intent={} "
-        "semantic_turn_act={} strategy_type={} requires_clarification={} "
-        "has_date_range={} has_date_range_intent={} has_date_range_raw_text={} "
-        "missing_required_fields={} ambiguous_field_count={} "
-        "unsupported_constraint_count={} reason_codes={}",
-        step,
-        response.intent,
-        response.semantic_turn_act,
-        canonical_strategy_type(draft.strategy_type),
-        response.requires_clarification,
-        not _llm_value_is_empty(draft.date_range),
-        draft.date_range_intent is not None,
-        not _llm_value_is_empty(draft.date_range_raw_text),
-        list(response.missing_required_fields),
-        len(response.ambiguous_fields),
-        len(response.unsupported_constraints),
-        list(response.reason_codes),
-        step=step,
-        intent=response.intent,
-        task_relation=response.task_relation,
-        semantic_turn_act=response.semantic_turn_act,
-        requires_clarification=response.requires_clarification,
-        strategy_type=canonical_strategy_type(draft.strategy_type),
-        has_date_range=not _llm_value_is_empty(draft.date_range),
-        has_date_range_intent=draft.date_range_intent is not None,
-        has_date_range_raw_text=not _llm_value_is_empty(draft.date_range_raw_text),
-        missing_required_fields=list(response.missing_required_fields),
-        ambiguous_field_count=len(response.ambiguous_fields),
-        unsupported_constraint_count=len(response.unsupported_constraints),
-        reason_codes=list(response.reason_codes),
-    )
 
 
 def _response_can_skip_optional_runtime_readiness_audits(
