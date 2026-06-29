@@ -1,3 +1,7 @@
+# ruff: noqa: F401
+# This stage is being modularized into argus.agent_runtime.stages.interpret_internal.*;
+# it re-exports relocated symbols and preserves its full original import surface so
+# external callers/tests that access ``interpret.<name>`` keep working.
 from __future__ import annotations
 
 import asyncio
