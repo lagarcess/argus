@@ -38,6 +38,7 @@ describe("result card playground", () => {
   test("covers the required static card states without persistence or network code", () => {
     expect(resultCardPlaygroundFixtures.map((fixture) => fixture.id)).toEqual([
       "positive-single-symbol",
+      "modeled-execution-costs",
       "negative-single-symbol",
       "benchmark-underperformance-positive",
       "dca-result",
@@ -124,7 +125,11 @@ describe("result card playground", () => {
       },
     ]);
 
-    const negative = heroDeltaEvidenceView(resultCardPlaygroundFixtures[1].result);
+    const negative = heroDeltaEvidenceView(
+      resultCardPlaygroundFixtures.find(
+        (fixture) => fixture.id === "negative-single-symbol",
+      )!.result,
+    );
     expect(negative.hero.value).toBe("$820");
     expect(negative.hero.detail).toBe("-$180 loss · -18.0% total return");
     expect(negative.hero.tone).toBe("negative");
@@ -451,19 +456,18 @@ describe("result card playground", () => {
   });
 
   test("surfaces modeled execution costs in the visible trust strip", () => {
-    const view = heroDeltaEvidenceView({
-      ...resultCardPlaygroundFixtures[0].result,
-      assumptions: [
-        "Long-only",
-        "Equal weight",
-        "Modeled 10 bps fee + 5 bps slippage; net +11.8% vs gross +12.0%.",
-        "Benchmark: SPY",
-      ],
-    });
+    const modeledCosts = resultCardPlaygroundFixtures.find(
+      (fixture) => fixture.id === "modeled-execution-costs",
+    )!.result;
+    const view = heroDeltaEvidenceView(modeledCosts);
 
     expect(view.trustGroups).toEqual([
       "Stocks · Historical simulation · Modeled 10 bps fee + 5 bps slippage; net +11.8% vs gross +12.0% · Not advice",
     ]);
+    expect(view.details).toContainEqual({
+      label: "Benchmark",
+      value: "SPY (same modeled costs)",
+    });
   });
 
   test("exposes trade parameters in lightweight details when fixture facts exist", () => {

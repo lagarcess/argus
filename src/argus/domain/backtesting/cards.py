@@ -67,7 +67,7 @@ def build_result_card(
             "Solo largo",
             "Peso igual",
             "Sin comisiones/deslizamiento",
-            f"Referencia: {config['benchmark_symbol']}",
+            _benchmark_assumption(config, realism=realism, is_es=True),
         ]
         if cost_assumption is not None:
             assumptions[2] = cost_assumption
@@ -76,7 +76,7 @@ def build_result_card(
             "Long-only",
             "Equal weight",
             "No fees/slippage",
-            f"Benchmark: {config['benchmark_symbol']}",
+            _benchmark_assumption(config, realism=realism, is_es=False),
         ]
         if cost_assumption is not None:
             assumptions[2] = cost_assumption
@@ -207,6 +207,23 @@ def _execution_realism_assumption(
     if is_es:
         return f"Modela {cost_part}"
     return f"Modeled {cost_part}"
+
+
+def _benchmark_assumption(
+    config: dict[str, Any],
+    *,
+    realism: dict[str, float | bool],
+    is_es: bool,
+) -> str:
+    symbol = config["benchmark_symbol"]
+    has_modeled_costs = bool(realism["enabled"]) and (
+        float(realism["fees"]) > 0.0 or float(realism["slippage"]) > 0.0
+    )
+    if is_es:
+        suffix = " (mismos costos modelados)" if has_modeled_costs else ""
+        return f"Referencia: {symbol}{suffix}"
+    suffix = " (same modeled costs)" if has_modeled_costs else ""
+    return f"Benchmark: {symbol}{suffix}"
 
 
 def _optional_float(value: Any) -> float | None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 from datetime import date
 
 import pandas as pd
@@ -24,6 +25,10 @@ def _make_bars(
         },
         index=index,
     )
+
+
+def _stable_json(value: object) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
 @pytest.fixture(autouse=True)
@@ -489,6 +494,14 @@ def test_buy_and_hold_execution_realism_reduces_net_return_and_profit(
             abs=0.01,
         ),
     }
+    assert net_performance["benchmark_return_pct"] < gross_performance[
+        "benchmark_return_pct"
+    ]
+    assert net_performance["delta_vs_benchmark_pct"] == pytest.approx(
+        net_performance["total_return_pct"]
+        - net_performance["benchmark_return_pct"],
+        abs=0.01,
+    )
 
 
 def test_flag_off_total_return_keeps_legacy_rounding_at_tie_boundary(
@@ -547,6 +560,96 @@ def test_flag_off_total_return_keeps_legacy_rounding_at_tie_boundary(
 
     assert metrics["aggregate"]["performance"]["total_return_pct"] == 1.87
     assert metrics["by_symbol"]["TSLA"]["performance"]["total_return_pct"] == 1.87
+
+
+@pytest.mark.parametrize(
+    ("template", "symbols", "parameters"),
+    [
+        ("buy_and_hold", ["AAPL"], {}),
+        ("buy_and_hold", ["AAPL", "MSFT"], {}),
+        ("dca_accumulation", ["AAPL"], {"dca_cadence": "daily"}),
+        ("dca_accumulation", ["AAPL", "MSFT"], {"dca_cadence": "weekly"}),
+        (
+            "signal_strategy",
+            ["AAPL"],
+            {
+                "rule_spec": {
+                    "entry": {
+                        "conditions": [
+                            {
+                                "left": {"kind": "price", "field": "close"},
+                                "operator": "cross_above",
+                                "right": 101.0,
+                            }
+                        ]
+                    },
+                    "exit": {
+                        "conditions": [
+                            {
+                                "left": {"kind": "price", "field": "close"},
+                                "operator": "cross_above",
+                                "right": 109.0,
+                            }
+                        ]
+                    },
+                }
+            },
+        ),
+    ],
+)
+def test_execution_realism_flag_off_is_byte_identical(
+    monkeypatch: pytest.MonkeyPatch,
+    template: str,
+    symbols: list[str],
+    parameters: dict,
+) -> None:
+    base_payload = {
+        "template": template,
+        "asset_class": "equity",
+        "symbols": symbols,
+        "timeframe": "1D",
+        "start_date": date(2025, 1, 1),
+        "end_date": date(2025, 1, 7),
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": parameters,
+    }
+    realism_payload = {
+        **base_payload,
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 25,
+            "slippage_bps": 40,
+        },
+    }
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+
+    base_config = engine.normalize_backtest_config(base_payload)
+    realism_config = engine.normalize_backtest_config(realism_payload)
+
+    assert "_execution_realism" not in realism_config
+    assert _stable_json(realism_config) == _stable_json(base_config)
+    assert _stable_json(engine.compute_alpha_metrics(realism_config)) == _stable_json(
+        engine.compute_alpha_metrics(base_config)
+    )
+    assert _stable_json(engine.build_result_chart(realism_config)) == _stable_json(
+        engine.build_result_chart(base_config)
+    )
+    assert _stable_json(
+        engine.build_result_card(
+            realism_config,
+            engine.compute_alpha_metrics(realism_config),
+            chart=engine.build_result_chart(realism_config),
+        )
+    ) == _stable_json(
+        engine.build_result_card(
+            base_config,
+            engine.compute_alpha_metrics(base_config),
+            chart=engine.build_result_chart(base_config),
+        )
+    )
 
 
 def test_signal_strategy_execution_realism_reduces_net_return_and_profit(
@@ -663,6 +766,62 @@ def test_dca_execution_realism_reduces_net_return_and_profit(
     net_performance = net["aggregate"]["performance"]
     assert net_performance["total_return_pct"] < gross_performance["total_return_pct"]
     assert net_performance["profit"] < gross_performance["profit"]
+    assert net_performance["benchmark_return_pct"] < gross_performance[
+        "benchmark_return_pct"
+    ]
+
+
+def test_dca_execution_realism_drag_increases_with_more_fills(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_payload = {
+        "template": "dca_accumulation",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": date(2025, 1, 1),
+        "end_date": date(2025, 1, 7),
+        "side": "long",
+        "starting_capital": 100,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10,
+            "slippage_bps": 5,
+        },
+    }
+    daily_payload = {**base_payload, "parameters": {"dca_cadence": "daily"}}
+    weekly_payload = {**base_payload, "parameters": {"dca_cadence": "weekly"}}
+
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    daily_gross = engine.compute_alpha_metrics(
+        engine.normalize_backtest_config(daily_payload)
+    )
+    weekly_gross = engine.compute_alpha_metrics(
+        engine.normalize_backtest_config(weekly_payload)
+    )
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    daily_net = engine.compute_alpha_metrics(engine.normalize_backtest_config(daily_payload))
+    weekly_net = engine.compute_alpha_metrics(
+        engine.normalize_backtest_config(weekly_payload)
+    )
+
+    assert daily_net["aggregate"]["efficiency"]["total_trades"] > weekly_net[
+        "aggregate"
+    ][
+        "efficiency"
+    ]["total_trades"]
+    daily_profit_drag = (
+        daily_gross["aggregate"]["performance"]["profit"]
+        - daily_net["aggregate"]["performance"]["profit"]
+    )
+    weekly_profit_drag = (
+        weekly_gross["aggregate"]["performance"]["profit"]
+        - weekly_net["aggregate"]["performance"]["profit"]
+    )
+    assert daily_profit_drag > weekly_profit_drag
 
 
 def test_multi_symbol_aggregate_uses_equal_weight_capital() -> None:
@@ -689,6 +848,43 @@ def test_multi_symbol_aggregate_uses_equal_weight_capital() -> None:
         abs=0.05,
     )
     assert set(metrics["by_symbol"]) == {"AAPL", "MSFT"}
+
+
+def test_multi_symbol_execution_costs_are_not_double_counted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    config = engine.normalize_backtest_config(
+        {
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL", "MSFT"],
+            "timeframe": "1D",
+            "start_date": date(2025, 1, 1),
+            "end_date": date(2025, 1, 7),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "SPY",
+            "parameters": {},
+            "_execution_realism": {
+                "enabled": True,
+                "fee_bps": 10,
+                "slippage_bps": 5,
+            },
+        }
+    )
+
+    metrics = engine.compute_alpha_metrics(config)
+    per_symbol_profit = sum(
+        symbol_metrics["performance"]["profit"]
+        for symbol_metrics in metrics["by_symbol"].values()
+    )
+
+    assert metrics["aggregate"]["performance"]["profit"] == pytest.approx(
+        per_symbol_profit,
+        abs=0.01,
+    )
 
 
 def test_indicator_signals_use_user_selected_thresholds(
@@ -962,7 +1158,7 @@ def test_build_result_card_shows_execution_realism_cost_and_effect(
         "Long-only",
         "Equal weight",
         "Modeled 10 bps fee + 5 bps slippage; net +11.8% vs gross +12.0%.",
-        "Benchmark: SPY",
+        "Benchmark: SPY (same modeled costs)",
     ]
     assert "Execution realism enabled" not in card["assumptions"]
 

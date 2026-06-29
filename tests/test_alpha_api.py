@@ -446,7 +446,10 @@ def test_backtest_rejects_explicit_asset_class_conflict() -> None:
     }
 
 
-def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None:
+def test_backtest_run_normalizes_defaults_persists_metrics_and_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 

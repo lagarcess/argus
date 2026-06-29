@@ -161,6 +161,8 @@ def compute_alpha_metrics(
                 close=benchmark_normalized,
                 entries=entries,
                 contribution=allocation_capital,
+                fees=float(realism["fees"]),
+                slippage=float(realism["slippage"]),
             )
             if has_modeled_costs:
                 gross_symbol_equity, _ = _dca_equity_curve(
@@ -210,7 +212,13 @@ def compute_alpha_metrics(
                         dtype=float,
                     )
                 )
-            benchmark_equity = benchmark_normalized * allocation_capital
+            benchmark_equity = _benchmark_buy_and_hold_equity(
+                close=benchmark_normalized,
+                allocation_capital=allocation_capital,
+                fees=float(realism["fees"]),
+                slippage=float(realism["slippage"]),
+                timeframe=config["timeframe"],
+            )
             if has_modeled_costs:
                 # Equity-based math captures the entry-cost hit at t0 that a
                 # pct_change return series cannot see.
@@ -303,6 +311,33 @@ def _execution_realism_has_costs(realism: dict[str, float | bool]) -> bool:
     return bool(realism["enabled"]) and (
         float(realism["fees"]) > 0.0 or float(realism["slippage"]) > 0.0
     )
+
+
+def _benchmark_buy_and_hold_equity(
+    *,
+    close: pd.Series,
+    allocation_capital: float,
+    fees: float,
+    slippage: float,
+    timeframe: str,
+) -> pd.Series:
+    if fees <= 0.0 and slippage <= 0.0:
+        return close * allocation_capital
+    entries = pd.Series(False, index=close.index, dtype=bool)
+    if not entries.empty:
+        entries.iloc[0] = True
+    exits = pd.Series(False, index=close.index, dtype=bool)
+    portfolio = vbt.Portfolio.from_signals(
+        close=close,
+        entries=entries,
+        exits=exits,
+        fees=fees,
+        slippage=slippage,
+        init_cash=allocation_capital,
+        freq=_vbt_freq(timeframe),
+        accumulate=False,
+    )
+    return pd.Series(portfolio.value().values, index=close.index, dtype=float)
 
 
 def _execution_realism_performance_summary(
