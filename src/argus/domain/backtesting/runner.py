@@ -117,8 +117,6 @@ def compute_alpha_metrics(
     build_benchmark_curve_func=build_benchmark_curve,
 ) -> dict[str, Any]:
     by_symbol: dict[str, Any] = {}
-    symbol_returns: list[pd.Series] = []
-    benchmark_returns_aligned: list[pd.Series] = []
     symbol_equity_curves: list[pd.Series] = []
     benchmark_equity_curves: list[pd.Series] = []
     periods_per_year = _periods_per_year(config["timeframe"])
@@ -126,6 +124,7 @@ def compute_alpha_metrics(
     end = date.fromisoformat(config["end_date"])
     allocation_capital = float(config["starting_capital"]) / len(config["symbols"])
     realism = _execution_realism_settings(config)
+    has_modeled_costs = _execution_realism_has_costs(realism)
     is_dca = config["template"] == "dca_accumulation"
 
     for symbol in config["symbols"]:
@@ -154,6 +153,8 @@ def compute_alpha_metrics(
                 close=close,
                 entries=entries,
                 contribution=allocation_capital,
+                fees=float(realism["fees"]),
+                slippage=float(realism["slippage"]),
             )
             benchmark_equity, benchmark_invested_capital = _dca_equity_curve(
                 close=benchmark_normalized,
@@ -161,8 +162,6 @@ def compute_alpha_metrics(
                 contribution=allocation_capital,
             )
             invested_capital = max(invested_capital, benchmark_invested_capital)
-            strategy_returns = symbol_equity.pct_change().fillna(0.0)
-            benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
             by_symbol[symbol] = _compute_metrics_from_equity(
                 strategy_equity=symbol_equity,
                 benchmark_equity=benchmark_equity,
@@ -185,19 +184,28 @@ def compute_alpha_metrics(
             symbol_equity = pd.Series(
                 portfolio.value().values, index=close.index, dtype=float
             )
-            strategy_returns = symbol_equity.pct_change().fillna(0.0)
             benchmark_equity = benchmark_normalized * allocation_capital
-            benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
-            by_symbol[symbol] = _compute_metrics(
-                strategy_returns=strategy_returns,
-                benchmark_returns=benchmark_returns,
-                allocation_capital=allocation_capital,
-                periods_per_year=periods_per_year,
-                trade_count=_execution_fill_count(execution_events),
-            )
+            if has_modeled_costs:
+                # Equity-based math captures the entry-cost hit at t0 that a
+                # pct_change return series cannot see.
+                by_symbol[symbol] = _compute_metrics_from_equity(
+                    strategy_equity=symbol_equity,
+                    benchmark_equity=benchmark_equity,
+                    invested_capital=allocation_capital,
+                    periods_per_year=periods_per_year,
+                    trade_count=_execution_fill_count(execution_events),
+                )
+            else:
+                # No modeled costs: keep the legacy returns-based computation
+                # bit-for-bit so flag-off output stays byte-identical.
+                by_symbol[symbol] = _compute_metrics(
+                    strategy_returns=symbol_equity.pct_change().fillna(0.0),
+                    benchmark_returns=benchmark_equity.pct_change().fillna(0.0),
+                    allocation_capital=allocation_capital,
+                    periods_per_year=periods_per_year,
+                    trade_count=_execution_fill_count(execution_events),
+                )
 
-        symbol_returns.append(strategy_returns)
-        benchmark_returns_aligned.append(benchmark_returns)
         symbol_equity_curves.append(symbol_equity)
         benchmark_equity_curves.append(benchmark_equity)
 
@@ -207,9 +215,6 @@ def compute_alpha_metrics(
     aggregate_benchmark_equity = (
         pd.concat(benchmark_equity_curves, axis=1).ffill().bfill().sum(axis=1)
     )
-    aggregate_strategy_returns = aggregate_strategy_equity.pct_change().fillna(0.0)
-    aggregate_benchmark_returns = aggregate_benchmark_equity.pct_change().fillna(0.0)
-
     trade_count = sum(row["efficiency"]["total_trades"] for row in by_symbol.values())
     if is_dca:
         aggregate_invested = allocation_capital * max(trade_count, 1)
@@ -221,13 +226,23 @@ def compute_alpha_metrics(
             trade_count=trade_count,
         )
     else:
-        aggregate_metrics = _compute_metrics(
-            strategy_returns=aggregate_strategy_returns,
-            benchmark_returns=aggregate_benchmark_returns,
-            allocation_capital=float(config["starting_capital"]),
-            periods_per_year=periods_per_year,
-            trade_count=trade_count,
-        )
+        aggregate_invested = float(config["starting_capital"])
+        if has_modeled_costs:
+            aggregate_metrics = _compute_metrics_from_equity(
+                strategy_equity=aggregate_strategy_equity,
+                benchmark_equity=aggregate_benchmark_equity,
+                invested_capital=aggregate_invested,
+                periods_per_year=periods_per_year,
+                trade_count=trade_count,
+            )
+        else:
+            aggregate_metrics = _compute_metrics(
+                strategy_returns=aggregate_strategy_equity.pct_change().fillna(0.0),
+                benchmark_returns=aggregate_benchmark_equity.pct_change().fillna(0.0),
+                allocation_capital=aggregate_invested,
+                periods_per_year=periods_per_year,
+                trade_count=trade_count,
+            )
     value_summary = portfolio_value_summary(aggregate_strategy_equity)
     if value_summary is not None:
         aggregate_metrics.setdefault("performance", {})[
@@ -238,3 +253,9 @@ def compute_alpha_metrics(
         "aggregate": aggregate_metrics,
         "by_symbol": by_symbol,
     }
+
+
+def _execution_realism_has_costs(realism: dict[str, float | bool]) -> bool:
+    return bool(realism["enabled"]) and (
+        float(realism["fees"]) > 0.0 or float(realism["slippage"]) > 0.0
+    )

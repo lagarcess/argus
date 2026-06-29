@@ -192,9 +192,13 @@ def _dca_equity_curve(
     close: pd.Series,
     entries: pd.Series,
     contribution: float,
+    fees: float = 0.0,
+    slippage: float = 0.0,
 ) -> tuple[pd.Series, float]:
     entry_mask = entries.reindex(close.index).fillna(False).astype(bool)
-    shares_bought = (contribution / close).where(entry_mask, 0.0)
+    fill_price = close * (1.0 + slippage)
+    cash_per_share = fill_price * (1.0 + fees)
+    shares_bought = (contribution / cash_per_share).where(entry_mask, 0.0)
     cumulative_shares = shares_bought.cumsum()
     equity = cumulative_shares * close
     invested_capital = float(entry_mask.sum()) * contribution

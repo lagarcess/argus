@@ -199,11 +199,15 @@ def _dca_equity_curve(
     close: pd.Series,
     entries: pd.Series,
     contribution: float,
+    fees: float = 0.0,
+    slippage: float = 0.0,
 ) -> tuple[pd.Series, float]:
     return _execution._dca_equity_curve(
         close=close,
         entries=entries,
         contribution=contribution,
+        fees=fees,
+        slippage=slippage,
     )
 
 
