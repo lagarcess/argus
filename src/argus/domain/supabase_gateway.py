@@ -1604,10 +1604,31 @@ class SupabaseGateway:
                 ),
             )
         ]
+        # Idea Ledger: roll up each idea's CURRENT (latest) decision_state from the
+        # UNFILTERED decisions, so the status survives a search that matched the idea
+        # by title/summary but not its decision text, and so an empty-query status
+        # browse (q="" + a decision_state filter, which the /search router permits)
+        # still returns ideas. raw["decisions"] below is query-filtered and must NOT
+        # be used for this rollup.
+        idea_decision_state: dict[str, Any] = {}
+        idea_decision_ts: dict[str, Any] = {}
+        for drow in decisions_raw:
+            idea_key = str(drow.get("idea_id") or "")
+            state = drow.get("decision_state")
+            if not idea_key or not state:
+                continue
+            ts = drow.get("updated_at")
+            prior_ts = idea_decision_ts.get(idea_key)
+            if idea_key not in idea_decision_state or (
+                ts is not None and (prior_ts is None or ts >= prior_ts)
+            ):
+                idea_decision_ts[idea_key] = ts
+                idea_decision_state[idea_key] = state
         ideas = [
-            row
+            {**row, "decision_state": idea_decision_state.get(str(row.get("id")))}
             for row in ideas_raw
-            if search_text_matches_query(
+            if not normalized_query
+            or search_text_matches_query(
                 query=normalized_query,
                 text=f"{row.get('title', '')} {row.get('summary') or ''}",
             )

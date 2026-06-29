@@ -107,12 +107,6 @@ def scored_supabase_search_items(
         )
     for row in raw.get("runs", []):
         scored_items.append(_scored_supabase_run(row=row, query=query))
-    decision_state_by_idea = _latest_decision_state_by_idea(
-        [
-            (row.get("idea_id"), row.get("decision_state"), row.get("updated_at"))
-            for row in raw.get("decisions", [])
-        ]
-    )
     for row in raw.get("ideas", []):
         item = SearchItem(
             type="idea",
@@ -122,7 +116,9 @@ def scored_supabase_search_items(
             updated_at=row["updated_at"],
             conversation_id=row.get("source_conversation_id"),
             lifecycle=row.get("lifecycle"),
-            decision_state=decision_state_by_idea.get(str(row["id"])),
+            # Rolled up per idea from UNFILTERED decisions in the gateway
+            # (search_rows), so it survives query-filtered decision rows.
+            decision_state=cast("DecisionState | None", row.get("decision_state")),
             preview={
                 "digest": row.get("summary"),
             },
