@@ -477,6 +477,18 @@ def test_buy_and_hold_execution_realism_reduces_net_return_and_profit(
     net_performance = net["aggregate"]["performance"]
     assert net_performance["total_return_pct"] < gross_performance["total_return_pct"]
     assert net_performance["profit"] < gross_performance["profit"]
+    assert net_performance["execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+        "gross_total_return_pct": gross_performance["total_return_pct"],
+        "net_total_return_pct": net_performance["total_return_pct"],
+        "return_drag_pct": pytest.approx(
+            gross_performance["total_return_pct"]
+            - net_performance["total_return_pct"],
+            abs=0.01,
+        ),
+    }
 
 
 def test_flag_off_total_return_keeps_legacy_rounding_at_tie_boundary(
@@ -900,6 +912,59 @@ def test_build_result_card_dca_assumptions_name_recurring_contribution() -> None
         "Sin comisiones/deslizamiento",
         "Referencia: SPY",
     ]
+
+
+def test_build_result_card_shows_execution_realism_cost_and_effect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    config = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-01-07",
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {},
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+        },
+    }
+    metrics = {
+        "aggregate": {
+            "performance": {
+                "total_return_pct": 11.83,
+                "delta_vs_benchmark_pct": 5.83,
+                "profit": 1183.0,
+                "execution_realism": {
+                    "enabled": True,
+                    "fee_bps": 10.0,
+                    "slippage_bps": 5.0,
+                    "gross_total_return_pct": 12.0,
+                    "net_total_return_pct": 11.83,
+                    "return_drag_pct": 0.17,
+                },
+            },
+            "risk": {"max_drawdown_pct": 0.0},
+            "efficiency": {"win_rate": 0.0, "total_trades": 1},
+        }
+    }
+
+    card = engine.build_result_card(config, metrics)
+
+    assert card["assumptions"] == [
+        "Long-only",
+        "Equal weight",
+        "Modeled 10 bps fee + 5 bps slippage; net +11.8% vs gross +12.0%.",
+        "Benchmark: SPY",
+    ]
+    assert "Execution realism enabled" not in card["assumptions"]
 
 
 def test_build_result_card_hides_win_rate_when_no_meaningful_closed_trades() -> None:

@@ -57,6 +57,11 @@ def build_result_card(
 
     status_label = "Simulación Completa" if is_es else "Simulation Complete"
 
+    cost_assumption = _execution_realism_assumption(
+        realism=realism,
+        performance=performance,
+        is_es=is_es,
+    )
     if is_es:
         assumptions = [
             "Solo largo",
@@ -64,8 +69,8 @@ def build_result_card(
             "Sin comisiones/deslizamiento",
             f"Referencia: {config['benchmark_symbol']}",
         ]
-        if bool(realism["enabled"]):
-            assumptions[2] = "Realismo de ejecución activado"
+        if cost_assumption is not None:
+            assumptions[2] = cost_assumption
     else:
         assumptions = [
             "Long-only",
@@ -73,8 +78,8 @@ def build_result_card(
             "No fees/slippage",
             f"Benchmark: {config['benchmark_symbol']}",
         ]
-        if bool(realism["enabled"]):
-            assumptions[2] = "Execution realism enabled"
+        if cost_assumption is not None:
+            assumptions[2] = cost_assumption
     if is_dca:
         assumptions = _dca_assumptions(config, is_es=is_es) + assumptions
 
@@ -169,6 +174,55 @@ def _should_show_win_rate(config: dict[str, Any], efficiency: dict[str, Any]) ->
     if config["template"] in {"buy_and_hold", "dca_accumulation"}:
         return False
     return int(efficiency.get("total_trades", 0) or 0) > 1
+
+
+def _execution_realism_assumption(
+    *,
+    realism: dict[str, float | bool],
+    performance: dict[str, Any],
+    is_es: bool,
+) -> str | None:
+    if not bool(realism["enabled"]):
+        return None
+    fee_bps = float(realism["fees"]) * 10000.0
+    slippage_bps = float(realism["slippage"]) * 10000.0
+    if fee_bps <= 0.0 and slippage_bps <= 0.0:
+        return None
+    cost_part = (
+        f"{_format_bps(fee_bps)} bps fee + {_format_bps(slippage_bps)} bps slippage"
+    )
+    if is_es:
+        cost_part = (
+            f"comisión de {_format_bps(fee_bps)} bps + "
+            f"deslizamiento de {_format_bps(slippage_bps)} bps"
+        )
+    effect = performance.get("execution_realism")
+    if isinstance(effect, dict):
+        gross = _optional_float(effect.get("gross_total_return_pct"))
+        net = _optional_float(effect.get("net_total_return_pct"))
+        if gross is not None and net is not None:
+            if is_es:
+                return f"Modela {cost_part}; neto {net:+.1f}% vs bruto {gross:+.1f}%."
+            return f"Modeled {cost_part}; net {net:+.1f}% vs gross {gross:+.1f}%."
+    if is_es:
+        return f"Modela {cost_part}"
+    return f"Modeled {cost_part}"
+
+
+def _optional_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_bps(value: float) -> str:
+    rounded = round(value, 2)
+    if rounded.is_integer():
+        return str(int(rounded))
+    return f"{rounded:g}"
 
 
 def _dca_assumptions(config: dict[str, Any], *, is_es: bool) -> list[str]:

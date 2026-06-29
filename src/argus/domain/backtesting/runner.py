@@ -119,6 +119,7 @@ def compute_alpha_metrics(
     by_symbol: dict[str, Any] = {}
     symbol_equity_curves: list[pd.Series] = []
     benchmark_equity_curves: list[pd.Series] = []
+    gross_symbol_equity_curves: list[pd.Series] = []
     periods_per_year = _periods_per_year(config["timeframe"])
     start = date.fromisoformat(config["start_date"])
     end = date.fromisoformat(config["end_date"])
@@ -161,6 +162,13 @@ def compute_alpha_metrics(
                 entries=entries,
                 contribution=allocation_capital,
             )
+            if has_modeled_costs:
+                gross_symbol_equity, _ = _dca_equity_curve(
+                    close=close,
+                    entries=entries,
+                    contribution=allocation_capital,
+                )
+                gross_symbol_equity_curves.append(gross_symbol_equity)
             invested_capital = max(invested_capital, benchmark_invested_capital)
             by_symbol[symbol] = _compute_metrics_from_equity(
                 strategy_equity=symbol_equity,
@@ -184,6 +192,24 @@ def compute_alpha_metrics(
             symbol_equity = pd.Series(
                 portfolio.value().values, index=close.index, dtype=float
             )
+            if has_modeled_costs:
+                gross_portfolio = vbt.Portfolio.from_signals(
+                    close=close,
+                    entries=entries,
+                    exits=exits,
+                    fees=0.0,
+                    slippage=0.0,
+                    init_cash=allocation_capital,
+                    freq=_vbt_freq(config["timeframe"]),
+                    accumulate=False,
+                )
+                gross_symbol_equity_curves.append(
+                    pd.Series(
+                        gross_portfolio.value().values,
+                        index=close.index,
+                        dtype=float,
+                    )
+                )
             benchmark_equity = benchmark_normalized * allocation_capital
             if has_modeled_costs:
                 # Equity-based math captures the entry-cost hit at t0 that a
@@ -243,6 +269,24 @@ def compute_alpha_metrics(
                 periods_per_year=periods_per_year,
                 trade_count=trade_count,
             )
+    if has_modeled_costs and gross_symbol_equity_curves:
+        gross_aggregate_equity = (
+            pd.concat(gross_symbol_equity_curves, axis=1).ffill().bfill().sum(axis=1)
+        )
+        gross_metrics = _compute_metrics_from_equity(
+            strategy_equity=gross_aggregate_equity,
+            benchmark_equity=aggregate_benchmark_equity,
+            invested_capital=aggregate_invested,
+            periods_per_year=periods_per_year,
+            trade_count=trade_count,
+        )
+        aggregate_metrics.setdefault("performance", {})[
+            "execution_realism"
+        ] = _execution_realism_performance_summary(
+            realism=realism,
+            gross_performance=gross_metrics["performance"],
+            net_performance=aggregate_metrics["performance"],
+        )
     value_summary = portfolio_value_summary(aggregate_strategy_equity)
     if value_summary is not None:
         aggregate_metrics.setdefault("performance", {})[
@@ -259,3 +303,21 @@ def _execution_realism_has_costs(realism: dict[str, float | bool]) -> bool:
     return bool(realism["enabled"]) and (
         float(realism["fees"]) > 0.0 or float(realism["slippage"]) > 0.0
     )
+
+
+def _execution_realism_performance_summary(
+    *,
+    realism: dict[str, float | bool],
+    gross_performance: dict[str, Any],
+    net_performance: dict[str, Any],
+) -> dict[str, Any]:
+    gross_return = float(gross_performance["total_return_pct"])
+    net_return = float(net_performance["total_return_pct"])
+    return {
+        "enabled": True,
+        "fee_bps": round(float(realism["fees"]) * 10000.0, 4),
+        "slippage_bps": round(float(realism["slippage"]) * 10000.0, 4),
+        "gross_total_return_pct": gross_return,
+        "net_total_return_pct": net_return,
+        "return_drag_pct": round(gross_return - net_return, 2),
+    }

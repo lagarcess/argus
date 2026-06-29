@@ -450,6 +450,22 @@ describe("result card playground", () => {
     });
   });
 
+  test("surfaces modeled execution costs in the visible trust strip", () => {
+    const view = heroDeltaEvidenceView({
+      ...resultCardPlaygroundFixtures[0].result,
+      assumptions: [
+        "Long-only",
+        "Equal weight",
+        "Modeled 10 bps fee + 5 bps slippage; net +11.8% vs gross +12.0%.",
+        "Benchmark: SPY",
+      ],
+    });
+
+    expect(view.trustGroups).toEqual([
+      "Stocks · Historical simulation · Modeled 10 bps fee + 5 bps slippage; net +11.8% vs gross +12.0% · Not advice",
+    ]);
+  });
+
   test("exposes trade parameters in lightweight details when fixture facts exist", () => {
     const trade = heroDeltaEvidenceView(
       resultCardPlaygroundFixtures.find((fixture) => fixture.id === "trade-based-strategy")!.result,

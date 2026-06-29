@@ -302,7 +302,11 @@ export function heroDeltaEvidenceView(
       value: worstDrop?.value ?? copy.unavailable,
     },
     timeframeDisplay: facts.timeframeDisplay,
-    trustGroups: compactTrustGroups(copy, result.assetClass),
+    trustGroups: compactTrustGroups(
+      copy,
+      result.assetClass,
+      modeledExecutionCostAssumption(result),
+    ),
     details: facts.details,
   };
 }
@@ -310,8 +314,17 @@ export function heroDeltaEvidenceView(
 export function compactTrustGroups(
   copy = defaultResultCardDisplayCopy,
   assetClass?: AssetClass,
+  modeledCostAssumption?: string,
 ) {
   const assetClassLabel = assetClass ? copy.assetClassLabel(assetClass) : undefined;
+  if (modeledCostAssumption) {
+    const isSpanish = modeledCostAssumption.toLowerCase().startsWith("modela");
+    const historical = isSpanish ? "Simulación histórica" : "Historical simulation";
+    const notAdvice = isSpanish ? "No es asesoría" : "Not advice";
+    return [
+      `${assetClassLabel ? `${assetClassLabel} · ` : ""}${historical} · ${modeledCostAssumption} · ${notAdvice}`,
+    ];
+  }
   return [
     assetClassLabel ? `${assetClassLabel} · ${copy.trustStrip}` : copy.trustStrip,
   ];
@@ -474,6 +487,13 @@ function normalizedAssumptions(result: StrategyResultPayload) {
     .map((assumption) => assumption.trim().replace(/[.]+$/, ""))
     .filter(Boolean)
     .filter((assumption) => !assumption.toLowerCase().startsWith("universe:"));
+}
+
+function modeledExecutionCostAssumption(result: StrategyResultPayload) {
+  return normalizedAssumptions(result).find((assumption) => {
+    const normalized = assumption.toLowerCase();
+    return normalized.startsWith("modeled ") || normalized.startsWith("modela ");
+  });
 }
 
 function assumptionValue(assumptions: string[], label: string) {
