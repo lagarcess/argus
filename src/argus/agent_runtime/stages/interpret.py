@@ -195,6 +195,15 @@ from argus.agent_runtime.stages.interpret_internal.date_contract import (  # noq
     _strategy_date_range_needs_current_message_repair,
     _strategy_has_non_executable_timeframe_label,
 )
+from argus.agent_runtime.stages.interpret_internal.offline_recovery import (  # noqa: F401
+    _LATEST_RESULT_SAVE_REQUESTED_REASON,
+    _current_setup_phrase,
+    _latest_result_save_requested,
+    _offline_interpreter_unavailable_result,
+    _offline_recovery_message,
+    _pending_assumption_edit_was_not_applied,
+    _strategies_enabled,
+)
 from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
     _field_base,
     _should_preserve_prior_asset_context,
@@ -272,7 +281,6 @@ from argus.nlp.natural_time import (
 from loguru import logger
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
-_LATEST_RESULT_SAVE_REQUESTED_REASON = "latest_result_save_requested"
 _BACKTEST_ASSET_CLASSES = frozenset(get_args(BacktestAssetClass))
 
 
@@ -2234,56 +2242,6 @@ def _resolve_asset_candidate_safely(
         return None
 
 
-def _offline_interpreter_unavailable_result(
-    *,
-    user: UserState,
-    snapshot: TaskSnapshot | None = None,
-    current_user_message: str = "",
-    selected_thread_metadata: dict[str, Any] | None = None,
-) -> StageResult:
-    effective_profile = resolve_effective_response_profile(
-        user=user,
-        explicit_overrides=None,
-    )
-    decision = InterpretDecision(
-        intent="conversation_followup",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary="Structured interpretation was unavailable for this turn.",
-        candidate_strategy_draft=StrategySummary(),
-        missing_required_fields=[],
-        optional_parameter_opportunity=[],
-        confidence=0.0,
-        arbitration_mode="deterministic",
-        reason_codes=["llm_interpreter_unavailable"],
-        effective_response_profile=effective_profile,
-        semantic_turn_act=None,
-    )
-    stage_patch: dict[str, Any] = {
-        "assistant_response": _offline_recovery_message(
-            snapshot,
-            current_user_message=current_user_message,
-            selected_thread_metadata=selected_thread_metadata or {},
-            language=user.language_preference,
-        ),
-    }
-    stage_patch.update(
-        recovery_state_stage_patch(
-            "interpreter_unavailable",
-            language=user.language_preference,
-            retryable=True,
-        )
-    )
-    retry_last_turn = retry_last_turn_stage_patch(current_user_message)
-    if retry_last_turn is not None:
-        stage_patch.update(retry_last_turn)
-    return StageResult(
-        outcome="ready_to_respond",
-        decision=decision,
-        stage_patch=stage_patch,
-    )
-
-
 async def _interpreter_unavailable_result(
     *,
     state: RunState,
@@ -2712,79 +2670,6 @@ async def _private_alpha_save_request_result_if_applicable(
         ),
         stage_patch={"assistant_response": response},
     )
-
-
-def _strategies_enabled() -> bool:
-    raw = os.getenv("ARGUS_STRATEGIES_ENABLED", "false").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
-
-
-def _latest_result_save_requested(decision: InterpretDecision) -> bool:
-    return _LATEST_RESULT_SAVE_REQUESTED_REASON in decision.reason_codes
-
-
-def _offline_recovery_message(
-    snapshot: TaskSnapshot | None,
-    *,
-    current_user_message: str = "",
-    selected_thread_metadata: dict[str, Any] | None = None,
-    language: str = "en",
-) -> str:
-    if snapshot is not None and snapshot.pending_strategy_summary is not None:
-        strategy = snapshot.pending_strategy_summary
-        setup_phrase = _current_setup_phrase(strategy)
-        if _pending_assumption_edit_was_not_applied(
-            current_user_message=current_user_message,
-            selected_thread_metadata=selected_thread_metadata or {},
-        ):
-            return recovery_message("assumption_edit_unapplied", language=language)
-        if snapshot.active_confirmation_reference is None:
-            return recovery_message(
-                "setup_change_unapplied",
-                language=language,
-                setup_phrase=setup_phrase,
-            )
-        assumptions_response = _draft_assumptions_response(snapshot)
-        action_guidance = recovery_message(
-            "confirmation_action_guidance",
-            language=language,
-        )
-        if assumptions_response is not None:
-            return f"{assumptions_response} {action_guidance}"
-        return recovery_message(
-            "confirmation_change_unapplied",
-            language=language,
-            setup_phrase=setup_phrase,
-            action_guidance=action_guidance,
-        )
-    if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
-        return recovery_message(
-            "latest_result_followup_unavailable",
-            language=language,
-        )
-    return recovery_message("interpreter_unavailable", language=language)
-
-
-def _current_setup_phrase(strategy: StrategySummary) -> str:
-    assets = [symbol for symbol in strategy.asset_universe if symbol]
-    asset_label = ", ".join(assets)
-    strategy_label = display_strategy_type(strategy).strip().lower()
-    if asset_label and strategy_label:
-        return f"{asset_label} {strategy_label} setup"
-    if asset_label:
-        return f"{asset_label} setup"
-    if strategy_label:
-        return f"current {strategy_label} setup"
-    return "current setup"
-
-
-def _pending_assumption_edit_was_not_applied(
-    *,
-    current_user_message: str,
-    selected_thread_metadata: dict[str, Any],
-) -> bool:
-    requested_field = _field_base(str(selected_thread_metadata.get("requested_field") or ""))
-    return requested_field == "assumption" and bool(current_user_message.strip())
 
 
 def _strategy_with_contextual_merge(
