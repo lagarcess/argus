@@ -428,6 +428,7 @@ class SearchItem(BaseModel):
     updated_at: datetime
     conversation_id: str | None = None
     lifecycle: ArtifactLifecycle | None = None
+    decision_state: DecisionState | None = None
     preview: dict[str, Any] | None = None
 
 

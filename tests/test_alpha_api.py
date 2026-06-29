@@ -1378,6 +1378,121 @@ def test_search_orders_p1_artifacts_before_source_conversation() -> None:
         assert ordered_types.index(artifact_type) < chat_index
 
 
+def test_search_idea_result_carries_latest_decision_state() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    idea = Idea(
+        id="idea-ledger-status",
+        source_conversation_id="conversation-ledger-status",
+        title="NVDA momentum ledger idea",
+        summary="NVDA momentum ledger summary",
+        lifecycle="decided",
+        active_version_id="version-ledger-status",
+        created_at=now - timedelta(minutes=10),
+        updated_at=now,
+    )
+    older_decision = DecisionNote(
+        id="decision-ledger-older",
+        idea_id=idea.id,
+        idea_version_id="version-ledger-status",
+        evidence_artifact_id="artifact-ledger-status",
+        source_conversation_id="conversation-ledger-status",
+        decision_state="watching",
+        note="Initial watch.",
+        created_at=now - timedelta(minutes=5),
+        updated_at=now - timedelta(minutes=5),
+    )
+    latest_decision = DecisionNote(
+        id="decision-ledger-latest",
+        idea_id=idea.id,
+        idea_version_id="version-ledger-status",
+        evidence_artifact_id="artifact-ledger-status",
+        source_conversation_id="conversation-ledger-status",
+        decision_state="promising",
+        note="Upgraded after a fresh re-run.",
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.ideas[idea.id] = idea
+    api_state.store.idea_owners[idea.id] = user_id
+    for decision in (older_decision, latest_decision):
+        api_state.store.decision_notes[decision.id] = decision
+        api_state.store.decision_note_owners[decision.id] = user_id
+
+    response = client.get("/api/v1/search?q=ledger&limit=10")
+
+    assert response.status_code == 200
+    idea_items = [item for item in response.json()["items"] if item["type"] == "idea"]
+    assert idea_items, "expected the saved idea in search results"
+    assert idea_items[0]["decision_state"] == "promising"
+
+
+def test_search_decision_state_filter_returns_only_matching_ideas() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    promising_idea = Idea(
+        id="idea-ledger-promising",
+        source_conversation_id="conversation-ledger-promising",
+        title="QQQ trend idea",
+        summary="QQQ trend summary",
+        lifecycle="decided",
+        active_version_id="version-ledger-promising",
+        created_at=now,
+        updated_at=now,
+    )
+    rejected_idea = Idea(
+        id="idea-ledger-rejected",
+        source_conversation_id="conversation-ledger-rejected",
+        title="ARKK reversion idea",
+        summary="ARKK reversion summary",
+        lifecycle="decided",
+        active_version_id="version-ledger-rejected",
+        created_at=now,
+        updated_at=now,
+    )
+    promising_decision = DecisionNote(
+        id="decision-ledger-promising",
+        idea_id=promising_idea.id,
+        idea_version_id="version-ledger-promising",
+        evidence_artifact_id="artifact-ledger-promising",
+        source_conversation_id="conversation-ledger-promising",
+        decision_state="promising",
+        note="Keep.",
+        created_at=now,
+        updated_at=now,
+    )
+    rejected_decision = DecisionNote(
+        id="decision-ledger-rejected",
+        idea_id=rejected_idea.id,
+        idea_version_id="version-ledger-rejected",
+        evidence_artifact_id="artifact-ledger-rejected",
+        source_conversation_id="conversation-ledger-rejected",
+        decision_state="rejected",
+        note="Drop.",
+        created_at=now,
+        updated_at=now,
+    )
+    for idea in (promising_idea, rejected_idea):
+        api_state.store.ideas[idea.id] = idea
+        api_state.store.idea_owners[idea.id] = user_id
+    for decision in (promising_decision, rejected_decision):
+        api_state.store.decision_notes[decision.id] = decision
+        api_state.store.decision_note_owners[decision.id] = user_id
+
+    response = client.get("/api/v1/search?q=&decision_state=promising&limit=20")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert items, "expected the promising idea"
+    assert all(item["type"] == "idea" for item in items)
+    assert all(item["decision_state"] == "promising" for item in items)
+    returned_ids = {item["id"] for item in items}
+    assert promising_idea.id in returned_ids
+    assert rejected_idea.id not in returned_ids
+
+
 def test_search_preserves_pinned_chat_above_p1_artifacts() -> None:
     client = _client()
     user_id = api_state.store.get_or_create_dev_user().id

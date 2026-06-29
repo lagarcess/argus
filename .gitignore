@@ -37,6 +37,7 @@ htmlcov/
 .vscode/
 .idea/
 .cursor/
+.claude/
 
 # Logs
 *.log

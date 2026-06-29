@@ -1466,3 +1466,97 @@ def test_gateway_history_filters_chats_without_visible_messages() -> None:
     assert {row["id"] for row in default_rows["conversations"]} == {"conv-active"}
     assert {row["id"] for row in archived_rows["conversations"]} == {"conv-archived"}
     assert {row["id"] for row in deleted_rows["conversations"]} == {"conv-deleted"}
+
+
+class _SearchRowsTable:
+    """Fake table that drives the search_rows query chain over canned rows."""
+
+    def __init__(self, rows: list[dict[str, Any]]) -> None:
+        self._rows = [dict(r) for r in rows]
+        self._range: tuple[int, int] | None = None
+        self._limit: int | None = None
+
+    def select(self, *_args: object, **_kwargs: object):
+        return self
+
+    def eq(self, *_args: object, **_kwargs: object):
+        return self
+
+    def is_(self, *_args: object, **_kwargs: object):
+        return self
+
+    def order(self, *_args: object, **_kwargs: object):
+        return self
+
+    def range(self, start: int, end: int):
+        self._range = (start, end)
+        return self
+
+    def limit(self, count: int):
+        self._limit = count
+        return self
+
+    def execute(self):
+        rows = self._rows
+        if self._range is not None:
+            start, end = self._range
+            rows = rows[start : end + 1]
+        elif self._limit is not None:
+            rows = rows[: self._limit]
+        return SimpleNamespace(data=[dict(r) for r in rows])
+
+
+class _SearchRowsClient:
+    def __init__(self, rows_by_table: dict[str, list[dict[str, Any]]]) -> None:
+        self._rows_by_table = rows_by_table
+
+    def table(self, name: str):
+        return _SearchRowsTable(self._rows_by_table.get(name, []))
+
+
+def _idea_ledger_search_client() -> _SearchRowsClient:
+    return _SearchRowsClient(
+        {
+            "ideas": [
+                {
+                    "id": "idea-1",
+                    "title": "AAPL momentum",
+                    "summary": "momentum thesis",
+                    "lifecycle": "decided",
+                    "active_version_id": "ver-1",
+                    "source_conversation_id": "conv-1",
+                    "updated_at": "2026-06-29T12:00:00Z",
+                }
+            ],
+            "decision_notes": [
+                {
+                    "id": "dec-1",
+                    "idea_id": "idea-1",
+                    "decision_state": "promising",
+                    "note": "keep",
+                    "evidence_artifact_id": "art-1",
+                    "source_conversation_id": "conv-1",
+                    "updated_at": "2026-06-29T12:00:00Z",
+                }
+            ],
+        }
+    )
+
+
+def test_search_rows_rolls_up_idea_decision_state_from_unfiltered_decisions():
+    gateway = SupabaseGateway(client=_idea_ledger_search_client())
+
+    raw = gateway.search_rows(user_id="user-1", query="momentum", limit=None)
+
+    assert len(raw["ideas"]) == 1
+    assert raw["ideas"][0]["decision_state"] == "promising"
+    assert raw["decisions"] == []
+
+
+def test_search_rows_empty_query_status_browse_returns_ideas():
+    gateway = SupabaseGateway(client=_idea_ledger_search_client())
+
+    raw = gateway.search_rows(user_id="user-1", query="", limit=None)
+
+    assert len(raw["ideas"]) == 1
+    assert raw["ideas"][0]["decision_state"] == "promising"

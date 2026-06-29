@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from argus.api import state as api_state
 from argus.api.memory_ownership import memory_object_visible
-from argus.api.schemas import SearchItem, User
+from argus.api.schemas import DecisionState, SearchItem, User
 from argus.api.search_utils import score_search_item
 from argus.domain.evidence import (
     evidence_preview_from_artifact,
@@ -10,6 +12,24 @@ from argus.domain.evidence import (
 )
 
 ScoredSearchItem = tuple[int, SearchItem]
+
+
+def _latest_decision_state_by_idea(
+    decisions: list[tuple[Any, Any, Any]],
+) -> dict[str, DecisionState]:
+    """Map each idea_id to its most-recent decision_state."""
+    latest: dict[str, tuple[Any, DecisionState]] = {}
+    for idea_id, decision_state, updated_at in decisions:
+        if not idea_id or not decision_state:
+            continue
+        key = str(idea_id)
+        state = cast(DecisionState, str(decision_state))
+        prior = latest.get(key)
+        if prior is None:
+            latest[key] = (updated_at, state)
+        elif updated_at is not None and (prior[0] is None or updated_at >= prior[0]):
+            latest[key] = (updated_at, state)
+    return {idea_id: state for idea_id, (_ts, state) in latest.items()}
 
 
 def scored_supabase_search_items(
@@ -90,6 +110,7 @@ def scored_supabase_search_items(
             updated_at=row["updated_at"],
             conversation_id=row.get("source_conversation_id"),
             lifecycle=row.get("lifecycle"),
+            decision_state=cast("DecisionState | None", row.get("decision_state")),
             preview={
                 "digest": row.get("summary"),
             },
@@ -240,6 +261,13 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
         haystack = f"{title} {' '.join(run.symbols)} {run.config_snapshot.get('template', '')}"
         if query in haystack.lower():
             scored_items.append(_scored_memory_run(run=run, query=query))
+    decision_state_by_idea = _latest_decision_state_by_idea(
+        [
+            (decision.idea_id, decision.decision_state, decision.updated_at)
+            for decision in api_state.store.decision_notes.values()
+            if api_state.store.decision_note_owners.get(decision.id) == user.id
+        ]
+    )
     for idea in api_state.store.ideas.values():
         if api_state.store.idea_owners.get(idea.id) != user.id:
             continue
@@ -253,6 +281,7 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
                 updated_at=idea.updated_at,
                 conversation_id=idea.source_conversation_id,
                 lifecycle=idea.lifecycle,
+                decision_state=decision_state_by_idea.get(idea.id),
                 preview={
                     "digest": idea.summary,
                 },
