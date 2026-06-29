@@ -17,13 +17,7 @@ ScoredSearchItem = tuple[int, SearchItem]
 def _latest_decision_state_by_idea(
     decisions: list[tuple[Any, Any, Any]],
 ) -> dict[str, DecisionState]:
-    """Map each idea_id to its most-recent decision_state.
-
-    An idea accrues one decision per evidence version; the *current* decision is
-    the latest by ``updated_at``. Entries missing an idea_id or state are skipped.
-    Comparison stays within a single source (all str timestamps from Supabase, or
-    all datetimes from the memory store), so ordering is consistent.
-    """
+    """Map each idea_id to its most-recent decision_state."""
     latest: dict[str, tuple[Any, DecisionState]] = {}
     for idea_id, decision_state, updated_at in decisions:
         if not idea_id or not decision_state:
@@ -116,8 +110,6 @@ def scored_supabase_search_items(
             updated_at=row["updated_at"],
             conversation_id=row.get("source_conversation_id"),
             lifecycle=row.get("lifecycle"),
-            # Rolled up per idea from UNFILTERED decisions in the gateway
-            # (search_rows), so it survives query-filtered decision rows.
             decision_state=cast("DecisionState | None", row.get("decision_state")),
             preview={
                 "digest": row.get("summary"),

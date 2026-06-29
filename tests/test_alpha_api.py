@@ -1379,9 +1379,6 @@ def test_search_orders_p1_artifacts_before_source_conversation() -> None:
 
 
 def test_search_idea_result_carries_latest_decision_state() -> None:
-    # Idea Ledger: a saved idea's search result carries its CURRENT (latest)
-    # decision_state so recall can show a status pill + filter by status. An idea
-    # accrues one decision per version; the newest wins.
     client = _client()
     user_id = api_state.store.get_or_create_dev_user().id
     now = utcnow()
@@ -1432,8 +1429,6 @@ def test_search_idea_result_carries_latest_decision_state() -> None:
 
 
 def test_search_decision_state_filter_returns_only_matching_ideas() -> None:
-    # Idea Ledger browse: ?decision_state=promising returns only ideas whose
-    # current decision is promising (empty query allowed for a pure status browse).
     client = _client()
     user_id = api_state.store.get_or_create_dev_user().id
     now = utcnow()

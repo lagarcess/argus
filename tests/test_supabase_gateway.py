@@ -1469,8 +1469,7 @@ def test_gateway_history_filters_chats_without_visible_messages() -> None:
 
 
 class _SearchRowsTable:
-    """Minimal fake supporting the search_rows query chain
-    (select/eq/order/range/limit/execute) over canned rows for one table."""
+    """Fake table that drives the search_rows query chain over canned rows."""
 
     def __init__(self, rows: list[dict[str, Any]]) -> None:
         self._rows = [dict(r) for r in rows]
@@ -1516,9 +1515,6 @@ class _SearchRowsClient:
 
 
 def _idea_ledger_search_client() -> _SearchRowsClient:
-    # An idea found by its title/summary, plus a decision whose text does NOT contain
-    # the query term (no evidence row; unrelated note) — so the decision row gets
-    # query-filtered out, but the idea's status must still roll up.
     return _SearchRowsClient(
         {
             "ideas": [
@@ -1548,24 +1544,16 @@ def _idea_ledger_search_client() -> _SearchRowsClient:
 
 
 def test_search_rows_rolls_up_idea_decision_state_from_unfiltered_decisions():
-    # Regression (PR #132 / Codex P2): an idea matched by title/summary must carry its
-    # latest decision_state even when the decision row is filtered out for not matching
-    # the query. The rollup must use the UNFILTERED decisions, not raw["decisions"].
     gateway = SupabaseGateway(client=_idea_ledger_search_client())
 
     raw = gateway.search_rows(user_id="user-1", query="momentum", limit=None)
 
     assert len(raw["ideas"]) == 1
     assert raw["ideas"][0]["decision_state"] == "promising"
-    # The decision row did not match "momentum", so it is query-filtered out — which is
-    # exactly why the rollup must not depend on raw["decisions"].
     assert raw["decisions"] == []
 
 
 def test_search_rows_empty_query_status_browse_returns_ideas():
-    # Regression (PR #132 / Codex P1): an empty-query status browse (q="" + a
-    # decision_state filter, which the /search router permits) must still return ideas
-    # in Supabase mode, with their decision_state attached.
     gateway = SupabaseGateway(client=_idea_ledger_search_client())
 
     raw = gateway.search_rows(user_id="user-1", query="", limit=None)
