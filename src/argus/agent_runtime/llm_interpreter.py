@@ -58,6 +58,12 @@ from argus.agent_runtime.interpreter.audits import (  # noqa: F401
     StrategyFamilyContinuityAudit,
     SupportedStrategyCapabilityConflictAudit,
 )
+from argus.agent_runtime.interpreter.capability_context_audits import (  # noqa: F401
+    _capability_side_question_audit_messages,
+    _context_question_audit_messages,
+    _response_had_unsubstantiated_asset_removed,
+    _response_needs_context_question_audit,
+)
 from argus.agent_runtime.interpreter.dca_audits import (  # noqa: F401
     _capability_required_missing_fields_for_canonical_strategy,
     _dca_contract_audit_messages,
@@ -1647,19 +1653,6 @@ def _response_needs_capability_side_question_audit(
     return _is_vague_strategy_start(response)
 
 
-def _response_had_unsubstantiated_asset_removed(
-    response: LLMInterpretationResponse,
-) -> bool:
-    return any(
-        reason_code.startswith("asset_grounding_audit_")
-        and (
-            "removed_unsubstantiated" in reason_code
-            or "cleared_suspicious" in reason_code
-        )
-        for reason_code in response.reason_codes
-    )
-
-
 def _capability_audit_unavailable_response_if_safe(
     *,
     response: LLMInterpretationResponse,
@@ -1695,45 +1688,6 @@ def _capability_audit_unavailable_response_if_safe(
             ),
         }
     )
-
-
-def _capability_side_question_audit_messages(
-    *,
-    response: LLMInterpretationResponse,
-    request: InterpretationRequest,
-) -> list[dict[str, str]]:
-    pending_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).strip()
-    return [
-        {
-            "role": "system",
-            "content": (
-                "You are Argus's runtime arbitration audit. Decide whether the "
-                "current user message is a capability or education side-question, "
-                "even if the previous turn asked for a missing field. Use semantic "
-                "meaning, not keywords. A capability side-question asks what Argus "
-                "supports, what it can run, what supported concepts mean, what assets "
-                "or indicators are available, or what limits apply. Return false for "
-                "messages that supply assets, dates, sizing, cadence, rule details, "
-                "approvals, result follow-ups, market-news/feed requests, or provider "
-                "data requests. Choose one focus value only when true: "
-                "supported_indicators, supported_strategies, limits, assets, or general."
-            ),
-        },
-        {
-            "role": "system",
-            "content": (
-                "Current structured interpretation: "
-                f"{response.model_dump(mode='json', exclude_none=True)}"
-            ),
-        },
-        {
-            "role": "system",
-            "content": f"Pending requested field, if any: {pending_field or 'none'}",
-        },
-        {"role": "user", "content": request.current_user_message},
-    ]
 
 
 async def _context_question_audited_response(
@@ -1802,50 +1756,6 @@ async def _context_question_audited_response(
     )
 
 
-def _response_needs_context_question_audit(
-    *,
-    response: LLMInterpretationResponse,
-    request: InterpretationRequest,
-) -> bool:
-    if response.context_question_focus is not None:
-        return False
-    if response.capability_question_focus not in {
-        None,
-        "general",
-        "limits",
-        "supported_strategies",
-    }:
-        return False
-    if response.semantic_turn_act in {
-        "approval",
-        "retry_failed_action",
-        "result_followup",
-    }:
-        return False
-    if _llm_strategy_draft_has_concrete_execution_target(
-        response.candidate_strategy_draft
-    ):
-        return False
-    pending_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).strip()
-    if _field_path_base(pending_field) == "refinement":
-        return False
-    if _response_targets_latest_result_followup(response=response, request=request):
-        return False
-    if (
-        response.intent == "strategy_drafting"
-        and response.semantic_turn_act == "unsupported_request"
-        and response.requires_clarification
-        and not response.missing_required_fields
-    ):
-        return True
-    return (
-        response.intent == "conversation_followup"
-        and response.semantic_turn_act == "educational_question"
-    )
-
-
 async def _unsupported_context_question_audited_response(
     *,
     response: LLMInterpretationResponse,
@@ -1866,46 +1776,6 @@ async def _unsupported_context_question_audited_response(
         force=True,
     )
     return repaired if repaired is not response else None
-
-
-def _context_question_audit_messages(
-    *,
-    response: LLMInterpretationResponse,
-    request: InterpretationRequest,
-) -> list[dict[str, str]]:
-    pending_field = str(
-        request.selected_thread_metadata.get("requested_field") or ""
-    ).strip()
-    return [
-        {
-            "role": "system",
-            "content": (
-                "You are Argus's runtime arbitration audit. Decide whether the "
-                "current user message is standalone market or macro context "
-                "curiosity that should be answered as bounded context and connected "
-                "to a historical experiment. Use semantic meaning, not keywords. "
-                "Return true for macro backdrop, inflation/rates/Fed/recession, "
-                "corporate events such as splits/dividends/earnings context, or "
-                "movers/most-active/unusual-move curiosity. Return false when the "
-                "user supplies executable strategy details, answers a pending field, "
-                "asks what Argus supports, approves a run, or targets a visible "
-                "result. Choose one focus only when true: macro_context, "
-                "corporate_events, or market_movers."
-            ),
-        },
-        {
-            "role": "system",
-            "content": (
-                "Current structured interpretation: "
-                f"{response.model_dump(mode='json', exclude_none=True)}"
-            ),
-        },
-        {
-            "role": "system",
-            "content": f"Pending requested field, if any: {pending_field or 'none'}",
-        },
-        {"role": "user", "content": request.current_user_message},
-    ]
 
 
 async def _strategy_family_continuity_audited_response(
