@@ -95,6 +95,12 @@ from argus.agent_runtime.stages.interpret_actions import (
 from argus.agent_runtime.stages.interpret_actions import (
     structured_action_stage_result_if_applicable as _structured_action_stage_result_if_applicable,
 )
+from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
+    _field_base,
+    _should_preserve_prior_asset_context,
+    _strategy_supplies_executable_rule_edit,
+    _supported_experiment_fact_packet,
+)
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
     CapabilityQuestionFocus,
@@ -2530,16 +2536,6 @@ def _format_market_mover_symbol(*, symbol: str, percent_change: Any) -> str:
     return f"{symbol} ({text}%)"
 
 
-def _supported_experiment_fact_packet() -> str:
-    families = "; ".join(EXECUTABLE_STRATEGY_FAMILIES)
-    return (
-        f"{families}. Macro, news, corporate-action, and movers context may frame "
-        "a question or explain backdrop, but cannot alter simulation truth or become "
-        "the executable rule. Suggested next experiments must stay inside these "
-        "families instead of inventing unregistered triggers or holding-period rules."
-    )
-
-
 def _context_curiosity_recovery_answer(
     focus: ContextQuestionFocus,
     *,
@@ -3175,10 +3171,6 @@ def _is_ambiguous_asset_resolution(item: ResolutionProvenance | dict[str, Any]) 
         and item.resolution_status == "ambiguous"
         and _field_base(item.field) == "asset_universe"
     )
-
-
-def _field_base(field_name: str) -> str:
-    return field_name.split("[", 1)[0]
 
 
 def _supported_timeframes(contract: Any) -> tuple[str, ...]:
@@ -4080,27 +4072,6 @@ def _should_preserve_pending_strategy_family(
     return True
 
 
-def _should_preserve_prior_asset_context(
-    *,
-    prior: StrategySummary,
-    selected_thread_metadata: dict[str, Any],
-    semantic_turn_act: str | None,
-    task_relation: str,
-) -> bool:
-    if not prior.asset_universe:
-        return False
-    if semantic_turn_act != "answer_pending_need":
-        return False
-    if task_relation not in {"continue", "refine"}:
-        return False
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field == "asset_universe":
-        return False
-    return selected_thread_metadata.get("last_stage_outcome") == "await_user_reply"
-
-
 def _strategy_asset_universe_is_field_owned_indicator_context(
     strategy: StrategySummary,
     *,
@@ -4433,15 +4404,6 @@ def _strategy_supplies_contextual_rule_edit(
         or prior.asset_class
         or prior.capital_amount is not None
         or prior.position_size is not None
-    )
-
-
-def _strategy_supplies_executable_rule_edit(strategy: StrategySummary) -> bool:
-    return bool(
-        strategy_rule(strategy, "entry")
-        or strategy_rule(strategy, "exit")
-        or _valid_rule_spec_from_strategy(strategy)
-        or canonical_indicator_parameters_from_strategy(strategy)
     )
 
 
