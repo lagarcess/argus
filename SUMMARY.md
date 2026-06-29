@@ -111,22 +111,22 @@ concern modules — verified acyclic by AST graph analysis):
 | # | Module | Members | Concern | Status |
 |---|--------|---------|---------|--------|
 | 1 | `interpreter/shared.py` | 20 fn + 5 const | cross-cutting leaf helpers + constants (import sink) | **done** |
-| 2 | `interpreter/audits.py` | 14 classes | structured LLM audit-response schemas (import sink) | planned |
-| 3 | `interpreter/artifact_assumption_edit.py` | 6 fn | artifact assumption-edit application (brief named cluster) | planned |
-| 4 | `interpreter/asset_grounding.py` | 8 fn | asset-symbol normalization + grounding helpers | planned |
-| 5 | `interpreter/dca_audits.py` | 11 fn | DCA contract / family-continuity audit helpers | planned |
-| 6 | `interpreter/executable_grounding.py` | 6 fn | executable-strategy grounding audit | planned |
-| 7 | `interpreter/signal_rule.py` | 18 fn | signal-rule recovery / planning / grounding helpers | planned |
-| 8 | `interpreter/focused_extraction.py` | 7 fn | focused-strategy extraction messages / merge | planned |
-| 9 | `interpreter/strategy_builder.py` | 35 fn | `_strategy_from_llm`, slot cleaning, capital grounding, indicator defaults | planned |
-| 10 | `interpreter/draft_shape.py` | 18 fn | LLM strategy-draft shape predicates / underfill checks | planned |
-| 11 | `interpreter/run_field_audits.py` | 36 fn | stated-run-field fidelity, capability-conflict, latest-result routing helpers | planned |
-| 12 | `interpreter/capability_context_audits.py` | 4 fn | capability/context Q&A audit helpers | planned |
-| 13 | `interpreter/pending_option.py` | 10 fn | pending-response-option selection | planned |
-| 14 | `interpreter/readiness_helpers.py` | 3 fn | asset-universe-operation + readiness logging | planned |
-| 15 | `interpreter/starting_capital.py` | 6 fn | starting-capital audit helpers | planned |
-| 16 | `interpreter/strategy_repair_predicates.py` | 7 fn | strategy-repair predicates, vague-start, execution anchors | planned |
-| 17 | `interpreter/temporal_repair.py` | 11 fn | temporal/date-window repair + focused-date extraction | planned |
+| 2 | `interpreter/audits.py` | 14 classes | structured LLM audit-response schemas (import sink) | done |
+| 3 | `interpreter/artifact_assumption_edit.py` | 6 fn | artifact assumption-edit application (brief named cluster) | done |
+| 4 | `interpreter/asset_grounding.py` | 8 fn | asset-symbol normalization + grounding helpers | done |
+| 5 | `interpreter/dca_audits.py` | 11 fn | DCA contract / family-continuity audit helpers | done |
+| 6 | `interpreter/executable_grounding.py` | 6 fn | executable-strategy grounding audit | done |
+| 7 | `interpreter/signal_rule.py` | 18 fn | signal-rule recovery / planning / grounding helpers | done |
+| 8 | `interpreter/focused_extraction.py` | 7 fn | focused-strategy extraction messages / merge | done |
+| 9 | `interpreter/strategy_builder.py` | 35 fn | `_strategy_from_llm`, slot cleaning, capital grounding, indicator defaults | done |
+| 10 | `interpreter/draft_shape.py` | 18 fn | LLM strategy-draft shape predicates / underfill checks | done |
+| 11 | `interpreter/run_field_audits.py` | 36 fn | stated-run-field fidelity, capability-conflict, latest-result routing helpers | done |
+| 12 | `interpreter/capability_context_audits.py` | 4 fn | capability/context Q&A audit helpers | done |
+| 13 | `interpreter/pending_option.py` | 10 fn | pending-response-option selection | done |
+| 14 | `interpreter/readiness_helpers.py` | 3 fn | asset-universe-operation + readiness logging | done |
+| 15 | `interpreter/starting_capital.py` | 6 fn | starting-capital audit helpers | done |
+| 16 | `interpreter/strategy_repair_predicates.py` | 7 fn | strategy-repair predicates, vague-start, execution anchors | done |
+| 17 | `interpreter/temporal_repair.py` | 11 fn | temporal/date-window repair + focused-date extraction | done |
 
 The pinned core (87 fn / ~4,121 LOC, incl. `OpenRouterStructuredInterpreter`) and
 `_selected_thread_metadata_context` (17 LOC, not worth a module) stay in the facade.
@@ -137,24 +137,65 @@ into the local venv only — **not** added to `pyproject`/`poetry.lock`; invisib
 deliverable). Validated to reproduce the exact baseline (11 failed / 795 passed) in ~85s
 vs ~210s serial. A final serial full-`tests/` gate is run before handoff.
 
-`stages/interpret.py`: analyzed separately (335 monkeypatches, dominated by
-`resolve_asset` 304×); module map TBD — see Phase 0 findings carry over.
+## Module map — `stages/interpret.py`
+
+New package: `src/argus/agent_runtime/stages/interpret_internal/`. Same facade + re-export
+discipline. The monkeypatch surface for `interpret` patches **imported names** (incl.
+**string-form** `monkeypatch.setattr("…stages.interpret.invoke_openrouter_chat_completion", …)`
+17×, `resolve_asset`, `date`, `fetch_alpaca_market_movers_packet`, …) but **no private
+functions**. Pinned (under the full patched set): 48 fn / ~2,728 LOC (the public
+`interpret_stage*`, the `_stage_result_from_interpretation` orchestrator, every
+LLM-invoking compose function). Movable: 115 fn / ~2,290 LOC.
+
+| # | Module | Members | Concern | Status |
+|---|--------|---------|---------|--------|
+| 1 | `interpret_internal/shared.py` | 4 fn | cross-cutting leaf helpers (import sink) | done |
+| 2 | `interpret_internal/answer_composition.py` | 21 fn + 1 cls + 2 const | non-LLM answer-composition support (packet grounding, fact packets) | done |
+| 3 | `interpret_internal/asset_resolution.py` | 59 fn + 1 cls + 3 const | asset resolution / canonicalization / requested-asset / artifact-target / indicator-simplification | done |
+| 4 | `interpret_internal/date_contract.py` | 6 fn + 1 const | current-message date/run-field contract | done |
+| 5 | `interpret_internal/contextual_merge.py` | 19 fn + 1 const | strategy contextual-merge across turns | done |
+| 6 | `interpret_internal/offline_recovery.py` | 6 fn + 1 const | interpreter-unavailable / offline recovery results | done |
+| 7 | `interpret_internal/route_repair.py` | 2 fn | pending-need route repair | done |
 
 ---
 
-## Per-commit log
+## Results (handoff state)
 
-1. `interpreter/shared.py` — 20 cross-cutting leaf helpers + 5 shared constants
-   (foundation import sink). Gate: 11 failed / 795 passed (baseline); mypy 14; ruff clean.
-2. `interpreter/audits.py` — 14 structured LLM audit-response Pydantic schemas
-   (import sink for audit modules + facade). Gate: baseline (an xdist-only extra failure
-   confirmed passing serially — load-sensitive timeout flake, not a regression); ruff clean.
+| File | Before | After | Reduction | Modules |
+|------|-------:|------:|----------:|--------:|
+| `llm_interpreter.py` | 10,467 | 5,279 | −50% | 18 |
+| `stages/interpret.py` | 5,621 | 3,159 | −44% | 7 |
 
-> Note: `pytest-xdist` can spuriously fail a timeout-sensitive test under parallel load.
-> Protocol: any failure beyond the baseline 11 is re-checked serially; only a serial
-> failure counts as a regression.
+- **Tests:** `tests/agent_runtime/` green vs baseline (11 pre-existing failures unchanged,
+  795 passing) — re-confirmed serially after every commit-batch and at the end.
+- **mypy:** 14 errors (= baseline), relocated across the new modules; no new errors.
+- **ruff:** clean across `src/argus/agent_runtime/`.
+- **27 behavior-preserving commits**, not squashed; left **unpushed** for review.
+
+## Process notes / lessons (for the reviewer)
+
+1. **Monkeypatch pinning is the governing constraint.** Tests patch module-level names on
+   `interpreter_module` / `interpret_module`. A call site that moves resolves the name in its
+   new module namespace, so the patch silently misses → behavior change. Every call site of a
+   patched name therefore stays in the facade. This (not cohesion) sets the floor on facade size.
+2. **String-form patches matter.** `interpret` is also patched via
+   `monkeypatch.setattr("dotted.path.name", …)`, which an AST scan for `setattr(obj, "name", …)`
+   misses. Omitting `invoke_openrouter_chat_completion` first produced a real 28-failure
+   regression; adding the string-form targets to the pinned set fixed it. (`llm_interpreter`
+   has **no** string-form patches — verified.)
+3. **Facade import surface is part of behavior.** Tests access `module.<ImportedType>` (e.g.
+   `llm_interpreter.LLMDateRangeIntent`, 93×). `ruff --fix` removing a now-unused facade import
+   silently drops that attribute. Fixed with a file-level `# ruff: noqa: F401` on both facades.
+4. **Decorated symbols** (`@dataclass`) must be removed from the decorator line, not the
+   `class`/`def` line, or an orphaned decorator is left behind.
+5. **Gating:** `pytest-xdist` (`-n 12`, local-venv only) reproduces the baseline ~3× faster but
+   can spuriously fail timeout-sensitive tests under load; any failure beyond the baseline 11 is
+   re-verified serially before it counts as a regression. A final serial gate confirms.
 
 ## Blocked / deferred (with reason)
 
-- **`llm_interpreter.py` cannot reach < ~1,500 lines** without breaking the test
-  monkeypatch surface (see "Hard constraint" above). Documented, not forced.
+- **Neither facade reaches < ~1,500 lines**, because the test monkeypatch surface pins
+  ~4,121 LOC (llm_interpreter) / ~2,728 LOC (interpret) of call sites to the facade.
+  Forcing it below would require changing the tests' patch seams — a behavior-adjacent,
+  out-of-scope change. Documented per the brief's stop-and-document rule; not forced.
+- The pre-existing 11 test failures and 14 mypy errors are **untouched** (out of scope).
