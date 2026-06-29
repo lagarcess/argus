@@ -167,7 +167,13 @@ LLM-invoking compose function). Movable: 115 fn / ~2,290 LOC.
 | `stages/interpret.py` | 5,621 | 3,159 | −44% | 7 |
 
 - **Tests:** `tests/agent_runtime/` green vs baseline (11 pre-existing failures unchanged,
-  795 passing) — re-confirmed serially after every commit-batch and at the end.
+  795 passing) — re-confirmed serially after the full llm_interpreter and interpret work.
+- **Full `tests/` final gate:** `14 failed / 1593 passed / 1 skipped`. The 14 = the 11
+  documented `agent_runtime` failures + 3 outside `agent_runtime`
+  (`test_phase6_api_structure.py::test_api_main_is_only_app_entrypoint`,
+  `test_openrouter_policy.py::test_requested_asset_answer_uses_semantic_candidate_audit_before_provider_validation` ×2).
+  **All 3 were verified to fail identically on baseline `805b8d4`** → pre-existing, not
+  regressions. No new failures anywhere.
 - **mypy:** 14 errors (= baseline), relocated across the new modules; no new errors.
 - **ruff:** clean across `src/argus/agent_runtime/`.
 - **27 behavior-preserving commits**, not squashed; left **unpushed** for review.
