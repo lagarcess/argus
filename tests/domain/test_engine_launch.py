@@ -552,6 +552,90 @@ def test_launch_envelope_carries_replayable_engine_config(
     assert result.envelope.resolved_parameters["engine_config"] == seen_configs[0]
 
 
+def test_launch_adapter_propagates_execution_realism_to_engine_config_when_flag_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    request = LaunchBacktestRequest.model_validate(
+        {
+            "strategy_type": "buy_and_hold",
+            "symbol": "AAPL",
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            "entry_rule": None,
+            "exit_rule": None,
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1000.0,
+            "position_size": None,
+            "cadence": None,
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+            "_execution_realism": {
+                "enabled": True,
+                "fee_bps": 10.0,
+                "slippage_bps": 5.0,
+            },
+        }
+    )
+    seen_configs: list[dict[str, Any]] = []
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+
+    def fake_compute_alpha_metrics(config: dict[str, Any], **_: Any) -> dict[str, Any]:
+        seen_configs.append(dict(config))
+        return {
+            "aggregate": {
+                "performance": {
+                    "profit": 350.0,
+                    "total_return_pct": 35.0,
+                    "benchmark_return_pct": 26.9,
+                    "delta_vs_benchmark_pct": 8.1,
+                },
+                "risk": {"max_drawdown_pct": -15.5},
+                "efficiency": {"total_trades": 1, "win_rate": 1.0},
+            },
+            "by_symbol": {
+                "AAPL": {
+                    "performance": {
+                        "total_return_pct": 35.0,
+                        "benchmark_return_pct": 26.9,
+                    }
+                }
+            },
+        }
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        fake_compute_alpha_metrics,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_chart",
+        lambda config: None,
+    )
+
+    result = run_launch_backtest(request)
+
+    assert request.execution_realism == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
+    assert seen_configs[0]["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
+    assert result.envelope.resolved_parameters["engine_config"] == seen_configs[0]
+
+
 def test_persisted_config_snapshot_replays_key_metrics(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -24,6 +24,7 @@ from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
     resolve_executable_date_range,
 )
+from argus.domain.backtesting.config import _execution_realism_feature_enabled
 from argus.domain.engine_launch.results import (
     is_user_safe_failure_code,
     user_safe_failure_detail,
@@ -293,7 +294,7 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         else _resolve_capital_amount(strategy, optional_parameters, strategy_type)
     )
 
-    return {
+    payload = {
         "strategy_type": strategy_type,
         "symbol": symbol,
         "symbols": symbols,
@@ -325,6 +326,10 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         ),
         "language": language,
     }
+    execution_realism = _resolve_execution_realism(strategy)
+    if execution_realism is not None:
+        payload["_execution_realism"] = execution_realism
+    return payload
 
 
 def _build_tool_call_record(
@@ -1057,6 +1062,31 @@ def _resolve_parameters(optional_parameters: dict[str, Any]) -> dict[str, Any]:
     # execute. Leaking display assumptions into this namespace makes a valid card
     # fail at run time with unsupported_parameters.
     return {}
+
+
+def _resolve_execution_realism(strategy: dict[str, Any]) -> dict[str, Any] | None:
+    if not _execution_realism_feature_enabled():
+        return None
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return None
+    fee_rate = _as_optional_float(extra_parameters.get("fee_rate"))
+    slippage = _as_optional_float(extra_parameters.get("slippage"))
+    if (fee_rate is None or fee_rate == 0.0) and (
+        slippage is None or slippage == 0.0
+    ):
+        return None
+    return {
+        "enabled": True,
+        "fee_bps": _decimal_rate_to_bps(fee_rate),
+        "slippage_bps": _decimal_rate_to_bps(slippage),
+    }
+
+
+def _decimal_rate_to_bps(value: float | None) -> float:
+    if value is None:
+        return 0.0
+    return value * 10000.0
 
 
 def _resolve_risk_rules(strategy: dict[str, Any]) -> list[dict[str, Any]]:
