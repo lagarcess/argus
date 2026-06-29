@@ -1,8 +1,10 @@
 # Private Alpha Next Roadmap
 
-Status: P1 checkpoint closed; P2 board defined; P2.0 guardrail gate + P2.1
-capability truth are the active next slices
-Date: 2026-06-26
+Status: P2.0 + P2.1 DONE (spine gate, capability registry, conversational edit
+contract — landed on `codex/private-alpha-next`, tip `0fb32c1`, local/not pushed).
+Remaining P2 reframed end-to-end around the compounding loop (see "P2 end-to-end"
+under Milestones). Fees/slippage realism is an async isolated workstream (issue #130).
+Date: 2026-06-28
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
 
@@ -295,13 +297,79 @@ disease cannot recur silently.
 
 #### Milestones
 
-Each milestone owns a PMF gate, is demoable in a founder-guided session, and is
-one revertable slice family. Sequence: P2.0 (now, ongoing) -> P2.1 (foundation)
--> P2.2 -> P2.3. P2.4 and P2.5 parallelize around the spine; start P2.5
-instrumentation early so founder-guided sessions generate gate signal from day
-one.
+Each slice owns a PMF gate, is demoable in a founder-guided session, and is one
+revertable slice family.
 
-##### P2.0 Spine guardrail gate (active now)
+##### P2 end-to-end: the compounding loop (AUTHORITATIVE slicing, 2026-06-28)
+
+Evidence-grounded after a live walkthrough + code grounding pass. The decision memo's
+moat is the loop where ideas are tested, remembered, compared, and trusted (memo §4.1,
+§5.6, §5.7). P2's remaining work IS closing that loop. The P2.x specs further below
+remain the per-slice detail (PMF gates, verification, stop conditions); this is the
+authoritative sequence.
+
+DONE + landed on `codex/private-alpha-next` (tip `0fb32c1`, local/not pushed):
+
+- P2.0 spine guardrail gate (tripwires live).
+- P2.1.a capability registry (single derivation surface).
+- Conversational edit contract (messy multi-op edits + chips -> one typed operation
+  set, no silent drop, language-aware, model-voiced honesty note; 6 commits; verified
+  unit + live probe EN/ES + EN browser). NOTE: the capability-honesty interpreter
+  polish (the old "P2.1.b") was reassessed as LOW-VALUE — MACD is reachable via a
+  generic `signal_strategy` rule, and draft strategies already 422 — so it is OFF the
+  critical path.
+
+THE LOOP'S REMAINING LINKS (the swing) — sequence 1 -> 2 -> 3, then 4:
+
+1. **Refine -> linked version** (ACTIVE NEXT). BUILT BUT MIS-ROUTED: the "Refine idea"
+   turn tags its pending state `requested_field:"refinement"`
+   (`api/chat/result_actions.py`), which the edit contract's trigger
+   (`_request_targets_pending_artifact_assumption_edit`) does not recognize — so refine
+   edits BYPASS the operations planner and fall to the generic interpreter (drops the
+   edit / loses asset+date context; observed live). The context IS reconstructed
+   (`agent_runtime/artifacts/drafts.py:draft_from_result_metadata`). FIX: route refine
+   through the landed edit contract + emit a new `IdeaVersion` linked to the prior idea
+   (P1 spine supports lineage). Small, reuses the edit contract, UNBLOCKS comparison.
+   Spec: `docs/specs/private-alpha-next-refine-to-version.md`.
+
+2. **Comparison readout** (= P2.3 detail below). Greenfield, but stands on the BUILT P1
+   spine (each `IdeaVersion`/`EvidenceArtifact` carries its metrics; a `compare_started`
+   event is pre-registered in the observability envelope). "vs your last version" —
+   return Δ, drawdown Δ, what changed; short, model-voiced. The differentiator from
+   one-off output. Needs Slice 1 (clean versions to compare).
+
+3. **Idea Ledger** (folds in part of recall). Omnisearch recall is BUILT (typed-artifact
+   search + right-panel preview for Conversation/Backtest/Evidence/Decision/Idea). GAP =
+   a status-organized PORTFOLIO view (promising/watching/rejected/revisit, by
+   asset/theme; memo §4.1). Extends Omnisearch; not a new dashboard.
+
+4. **Freshness on return** (= memo §5.6 SOTA north — the MOAT-DEFINER, and the biggest).
+   Greenfield at the user surface: freshness infra (`context/freshness.py`) exists for
+   context packets, not saved ideas. Memo's model: memory tells what mattered, web tells
+   what changed, backtest tells what the evidence says, the artifact tells what to
+   trust/revisit/discard. Smallest version: saved ideas show "Last reviewed" + a
+   re-run-on-fresh-data delta + "what changed since I saved this?". The full version
+   needs the research/web lane (Perplexity/Sonar — currently design-only). Phase LAST;
+   its own arc.
+
+SUPPORTING LAYERS (around the loop, not the swing):
+
+- **Fees/slippage realism** (= P2.2 below): ASYNC, isolated — GitHub issue
+  `lagarcess/argus#130` + worktree `codex/engine-realism` (flag-gated
+  `ARGUS_ENABLE_EXECUTION_REALISM`, default off; cherry-pick per phase). Off the critical
+  path; the founder deliberately disclaims assumptions for the PMF stage.
+- **Recovery + language-agnostic** (= P2.4 below): works, but on HARDCODED per-language
+  copy (`api/chat/streaming.py:47` `assistant_copy_for_result`, `recovery_messages.py`) —
+  debt AND the blocker to scaling past Spanish. Retire the tables -> model-voiced;
+  prove parity by eval.
+- **Measurement** (= P2.5 below): the `argus_observability_event/v1` envelope is BUILT
+  but non-emitting; wire emitting + append-only CostLedger + eval harness so each slice
+  produces PMF signal. Weave in early; do not gate the loop on it.
+
+"P2 done" = Argus **remembers, compares, and stays honest about staleness** — the memo's
+moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
+
+##### P2.0 Spine guardrail gate (DONE — landed)
 
 - Outcome: the six cross-cutting invariants above become an enforced review
   contract plus automated tripwire tests that fail when a deterministic text
@@ -318,7 +386,7 @@ one.
 - Stop conditions: if enforcing a rule requires changing runtime behavior, stop
   and split that into its owning milestone.
 
-##### P2.1 Capability truth, done right (spec first)
+##### P2.1 Capability truth (DONE — registry + edit contract landed; honesty polish deprioritized)
 
 - Outcome: Argus stops overpromising. It honestly tells the user, in their own
   language, what it can and cannot run yet (for example "I can't run MACD yet,
@@ -369,7 +437,7 @@ one.
 - PMF gate: users describe a decision Argus clarified; trust foundation for all
   later slices.
 
-##### P2.2 Backtest credibility ladder and engine boundary
+##### P2.2 Backtest credibility — fees/slippage realism (ASYNC: Codex issue #130, worktree codex/engine-realism)
 
 - Outcome: results carry assumptions a user can explain without founder help.
 - Scope: a `BacktestEngine` interface with the current engine as an adapter (no
@@ -417,10 +485,15 @@ one.
 - Start instrumentation early, in parallel with P2.1-P2.3, so gates are
   measurable as features land.
 
-##### Design candidate: Conversational edit contract (macro pattern)
+##### Conversational edit contract (macro pattern) — DONE (landed `0fb32c1`)
 
-Status: design-only, not yet sliced or scheduled. Founder-identified 2026-06-27.
-Captured here so it stays current and pickup-ready; do not implement until sliced.
+Status: BUILT + LANDED on `codex/private-alpha-next` (6 commits). Typed `EditOperation`
+(add/remove/replace/set/clear × assets/benchmark/dates/capital/DCA/timeframe/fees/
+slippage), deterministic applier (multi-op, no silent drop), language-aware planner,
+conflict-aware prompt, model-voiced honesty note. Verified unit + live probe EN/ES + EN
+browser. Spec: `docs/specs/private-alpha-next-conversational-edit-contract.md`. The
+remaining seam is loop **Slice 1 (refine -> linked version)** above — refine routes to
+the wrong brain. Original design notes preserved below for reference.
 
 - Idea: the confirmation-card action chips (Run backtest, Change dates, Change
   asset, Adjust assumptions, Cancel) and natural-language turn edits should be two
@@ -454,9 +527,10 @@ Stop immediately and escalate to the founder if:
 - a slice grows beyond one revertable commit family;
 - live browser QA fails after tests pass, especially Spanish parity.
 
-Until a milestone is activated, do not implement its runtime, backend, schema, or
-UI changes. P2.0 and P2.1 are the only active slices; P2.2-P2.5 are defined but
-not yet authorized for implementation.
+Until a slice is activated, do not implement its runtime, backend, schema, or UI
+changes. ACTIVE NEXT: loop Slice 1 (refine -> linked version). Fees/slippage realism
+is async/isolated (issue #130). Loop Slices 2-4 and the supporting layers (recovery,
+measurement) are defined and sequenced but not yet authorized for implementation.
 
 ## Parallelization Rules
 
