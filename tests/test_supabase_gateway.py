@@ -1466,3 +1466,109 @@ def test_gateway_history_filters_chats_without_visible_messages() -> None:
     assert {row["id"] for row in default_rows["conversations"]} == {"conv-active"}
     assert {row["id"] for row in archived_rows["conversations"]} == {"conv-archived"}
     assert {row["id"] for row in deleted_rows["conversations"]} == {"conv-deleted"}
+
+
+class _SearchRowsTable:
+    """Minimal fake supporting the search_rows query chain
+    (select/eq/order/range/limit/execute) over canned rows for one table."""
+
+    def __init__(self, rows: list[dict[str, Any]]) -> None:
+        self._rows = [dict(r) for r in rows]
+        self._range: tuple[int, int] | None = None
+        self._limit: int | None = None
+
+    def select(self, *_args: object, **_kwargs: object):
+        return self
+
+    def eq(self, *_args: object, **_kwargs: object):
+        return self
+
+    def is_(self, *_args: object, **_kwargs: object):
+        return self
+
+    def order(self, *_args: object, **_kwargs: object):
+        return self
+
+    def range(self, start: int, end: int):
+        self._range = (start, end)
+        return self
+
+    def limit(self, count: int):
+        self._limit = count
+        return self
+
+    def execute(self):
+        rows = self._rows
+        if self._range is not None:
+            start, end = self._range
+            rows = rows[start : end + 1]
+        elif self._limit is not None:
+            rows = rows[: self._limit]
+        return SimpleNamespace(data=[dict(r) for r in rows])
+
+
+class _SearchRowsClient:
+    def __init__(self, rows_by_table: dict[str, list[dict[str, Any]]]) -> None:
+        self._rows_by_table = rows_by_table
+
+    def table(self, name: str):
+        return _SearchRowsTable(self._rows_by_table.get(name, []))
+
+
+def _idea_ledger_search_client() -> _SearchRowsClient:
+    # An idea found by its title/summary, plus a decision whose text does NOT contain
+    # the query term (no evidence row; unrelated note) — so the decision row gets
+    # query-filtered out, but the idea's status must still roll up.
+    return _SearchRowsClient(
+        {
+            "ideas": [
+                {
+                    "id": "idea-1",
+                    "title": "AAPL momentum",
+                    "summary": "momentum thesis",
+                    "lifecycle": "decided",
+                    "active_version_id": "ver-1",
+                    "source_conversation_id": "conv-1",
+                    "updated_at": "2026-06-29T12:00:00Z",
+                }
+            ],
+            "decision_notes": [
+                {
+                    "id": "dec-1",
+                    "idea_id": "idea-1",
+                    "decision_state": "promising",
+                    "note": "keep",
+                    "evidence_artifact_id": "art-1",
+                    "source_conversation_id": "conv-1",
+                    "updated_at": "2026-06-29T12:00:00Z",
+                }
+            ],
+        }
+    )
+
+
+def test_search_rows_rolls_up_idea_decision_state_from_unfiltered_decisions():
+    # Regression (PR #132 / Codex P2): an idea matched by title/summary must carry its
+    # latest decision_state even when the decision row is filtered out for not matching
+    # the query. The rollup must use the UNFILTERED decisions, not raw["decisions"].
+    gateway = SupabaseGateway(client=_idea_ledger_search_client())
+
+    raw = gateway.search_rows(user_id="user-1", query="momentum", limit=None)
+
+    assert len(raw["ideas"]) == 1
+    assert raw["ideas"][0]["decision_state"] == "promising"
+    # The decision row did not match "momentum", so it is query-filtered out — which is
+    # exactly why the rollup must not depend on raw["decisions"].
+    assert raw["decisions"] == []
+
+
+def test_search_rows_empty_query_status_browse_returns_ideas():
+    # Regression (PR #132 / Codex P1): an empty-query status browse (q="" + a
+    # decision_state filter, which the /search router permits) must still return ideas
+    # in Supabase mode, with their decision_state attached.
+    gateway = SupabaseGateway(client=_idea_ledger_search_client())
+
+    raw = gateway.search_rows(user_id="user-1", query="", limit=None)
+
+    assert len(raw["ideas"]) == 1
+    assert raw["ideas"][0]["decision_state"] == "promising"
