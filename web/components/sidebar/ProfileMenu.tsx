@@ -526,7 +526,7 @@ export default function ProfileMenu({
             aria-label={t("settings.profile.close", "Close profile")}
           />
           <div
-            className="relative w-full max-w-sm overflow-hidden rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
+            className="relative w-full max-w-sm overflow-visible rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
             role="dialog"
             aria-modal="true"
             aria-labelledby="argus-profile-modal-title"
