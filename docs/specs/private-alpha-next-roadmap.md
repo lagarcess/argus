@@ -323,8 +323,8 @@ DONE + landed on `codex/private-alpha-next` (tip `d1c630e`, pushed):
 - Idea Ledger — lightweight recall (loop Slice 3): saved-idea decision status surfaced
   in Omnisearch + a `?decision_state=` filter (#132, merged).
 - Spine modularization: `llm_interpreter.py` + `stages/interpret.py` split into cohesive
-  submodule packages behind behavior-preserving re-export facades (#133, merged; closes
-  #131).
+  submodule packages behind behavior-preserving re-export facades (#133, merged;
+  addresses #131 — issue kept OPEN until it lands on `main`).
 - `codex/p2.1a-capability-registry` is SUPERSEDED — its deploy work (onboarding-flag
   gate, grok-4.3/claude-haiku model swap, deploy contract, widened LLM timeouts) is
   already in integration; the branch carries no unique runtime. Retire it, no rescue.
