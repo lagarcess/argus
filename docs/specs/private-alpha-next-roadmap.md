@@ -1,10 +1,12 @@
 # Private Alpha Next Roadmap
 
 Status: P2.0 + P2.1 DONE (spine gate, capability registry, conversational edit
-contract — landed on `codex/private-alpha-next`, tip `0fb32c1`, local/not pushed).
-Remaining P2 reframed end-to-end around the compounding loop (see "P2 end-to-end"
-under Milestones). Fees/slippage realism is an async isolated workstream (issue #130).
-Date: 2026-06-28
+contract). Idea Ledger lightweight recall (#132) and spine modularization (#133)
+merged into `codex/private-alpha-next` (tip `d1c630e`). Remaining P2 reframed
+end-to-end around the compounding loop (see "P2 end-to-end" under Milestones).
+Fees/slippage realism is an async isolated workstream (issue #130); the clean-checkout
+test gate before `main` is issue #134.
+Date: 2026-06-29
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
 
@@ -308,7 +310,7 @@ moat is the loop where ideas are tested, remembered, compared, and trusted (memo
 remain the per-slice detail (PMF gates, verification, stop conditions); this is the
 authoritative sequence.
 
-DONE + landed on `codex/private-alpha-next` (tip `0fb32c1`, local/not pushed):
+DONE + landed on `codex/private-alpha-next` (tip `d1c630e`, pushed):
 
 - P2.0 spine guardrail gate (tripwires live).
 - P2.1.a capability registry (single derivation surface).
@@ -318,6 +320,14 @@ DONE + landed on `codex/private-alpha-next` (tip `0fb32c1`, local/not pushed):
   polish (the old "P2.1.b") was reassessed as LOW-VALUE — MACD is reachable via a
   generic `signal_strategy` rule, and draft strategies already 422 — so it is OFF the
   critical path.
+- Idea Ledger — lightweight recall (loop Slice 3): saved-idea decision status surfaced
+  in Omnisearch + a `?decision_state=` filter (#132, merged).
+- Spine modularization: `llm_interpreter.py` + `stages/interpret.py` split into cohesive
+  submodule packages behind behavior-preserving re-export facades (#133, merged; closes
+  #131).
+- `codex/p2.1a-capability-registry` is SUPERSEDED — its deploy work (onboarding-flag
+  gate, grok-4.3/claude-haiku model swap, deploy contract, widened LLM timeouts) is
+  already in integration; the branch carries no unique runtime. Retire it, no rescue.
 
 THE LOOP'S REMAINING LINKS (the swing) — sequence 1 -> 2 -> 3, then 4:
 
@@ -338,10 +348,12 @@ THE LOOP'S REMAINING LINKS (the swing) — sequence 1 -> 2 -> 3, then 4:
    return Δ, drawdown Δ, what changed; short, model-voiced. The differentiator from
    one-off output. Needs Slice 1 (clean versions to compare).
 
-3. **Idea Ledger** (folds in part of recall). Omnisearch recall is BUILT (typed-artifact
-   search + right-panel preview for Conversation/Backtest/Evidence/Decision/Idea). GAP =
-   a status-organized PORTFOLIO view (promising/watching/rejected/revisit, by
-   asset/theme; memo §4.1). Extends Omnisearch; not a new dashboard.
+3. **Idea Ledger** (folds in part of recall). LIGHTWEIGHT VERSION LANDED (#132): each
+   saved idea's current decision_state surfaces as a status pill in Omnisearch, plus a
+   `?decision_state=` filter. Omnisearch recall was already BUILT (typed-artifact search
+   + right-panel preview for Conversation/Backtest/Evidence/Decision/Idea). REMAINING =
+   the status-organized PORTFOLIO view (promising/watching/rejected/revisit, by
+   asset/theme; memo §4.1) + the UI filter chip. Extends Omnisearch; not a new dashboard.
 
 4. **Freshness on return** (= memo §5.6 SOTA north — the MOAT-DEFINER, and the biggest).
    Greenfield at the user surface: freshness infra (`context/freshness.py`) exists for
@@ -365,6 +377,11 @@ SUPPORTING LAYERS (around the loop, not the swing):
 - **Measurement** (= P2.5 below): the `argus_observability_event/v1` envelope is BUILT
   but non-emitting; wire emitting + append-only CostLedger + eval harness so each slice
   produces PMF signal. Weave in early; do not gate the loop on it.
+- **Release-gate health** (P2.5-adjacent; blocks `main`, NOT a loop slice): the suite is
+  not green in a clean checkout on the current date — 11 failures (date-coupled date
+  repairs, conversational-contract benchmark/audit cases, one `api/main.py` structural
+  guard). Make it date-stable + clean-checkout-green before the proven branch -> `main`
+  promotion. Issue #134.
 
 "P2 done" = Argus **remembers, compares, and stays honest about staleness** — the memo's
 moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
