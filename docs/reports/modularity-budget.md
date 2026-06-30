@@ -4,10 +4,11 @@ Generated for the initial lightweight guardrail baseline.
 
 ## Guardrail behavior
 
-- The budget is intentionally narrow and non-refactoring: it watches known large production files only.
-- Current line counts are recorded in `.agent/modularity_budget.json`.
+- The budget is intentionally narrow and non-refactoring: only explicitly watched large production files can fail CI.
+- Current watched-file line counts are recorded in `.agent/modularity_budget.json`.
 - CI fails only when a watched file grows by more than `75` lines beyond its recorded baseline.
-- The guard prints the top watched offenders on every run so follow-up refactors can be planned without blocking unrelated work.
+- The script also scans production source roots (`src`, `web`) and prints the top current large files so newly large files are visible without becoming surprise blockers.
+- Frontend tests, E2E tests, lockfiles, build output, and dependencies are excluded from the production-source offender scan.
 
 ## Current top offenders
 

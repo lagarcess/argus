@@ -1,6 +1,15 @@
 {
   "allowed_growth_lines": 75,
   "top_offender_count": 10,
+  "scan_roots": ["src", "web"],
+  "scan_extensions": [".py", ".ts", ".tsx"],
+  "scan_exclude_globs": [
+    "web/node_modules/**",
+    "web/.next/**",
+    "web/bun.lock",
+    "web/__tests__/**",
+    "web/e2e/**"
+  ],
   "watched_files": {
     "src/argus/agent_runtime/llm_interpreter.py": 5279,
     "src/argus/agent_runtime/stages/interpret.py": 3159,
