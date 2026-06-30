@@ -504,8 +504,11 @@
         "system": "Sistema"
       }
     },
+    "preferences": {
+      "title": "Preferencias"
+    },
     "data": {
-      "title": "Datos e información",
+      "title": "Controles de datos",
       "archived_chats": "Chats archivados",
       "recently_deleted": "Borrados recientemente",
       "close_recently_deleted": "Cerrar borrados recientemente",
@@ -524,12 +527,13 @@
       "delete_all_success_other": "Se movieron {{count}} conversaciones a Borrados recientemente.",
       "delete_all_empty": "No hay conversaciones para eliminar.",
       "delete_all_error": "No se pudieron eliminar las conversaciones. Inténtalo de nuevo.",
-      "security": "Seguridad"
+      "security": "Seguridad",
+      "usage": "Uso"
     },
     "help": {
-      "title": "Ayuda",
-      "terms": "Términos de Servicio",
-      "privacy": "Política de Privacidad",
+      "title": "Ayuda y legal",
+      "terms": "Términos de uso",
+      "privacy": "Política de privacidad",
       "release_notes": "Notas de la versión"
     },
     "about": {

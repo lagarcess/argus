@@ -504,8 +504,11 @@
         "system": "System"
       }
     },
+    "preferences": {
+      "title": "Preferences"
+    },
     "data": {
-      "title": "Data & Information",
+      "title": "Data Controls",
       "archived_chats": "Archived chats",
       "recently_deleted": "Recently deleted",
       "close_recently_deleted": "Close recently deleted",
@@ -524,11 +527,12 @@
       "delete_all_success_other": "Moved {{count}} conversations to Recently Deleted.",
       "delete_all_empty": "No conversations to delete.",
       "delete_all_error": "Couldn’t delete conversations. Try again.",
-      "security": "Security"
+      "security": "Security",
+      "usage": "Usage"
     },
     "help": {
-      "title": "Help",
-      "terms": "Terms of Service",
+      "title": "Help & Legal",
+      "terms": "Terms of Use",
       "privacy": "Privacy Policy",
       "release_notes": "Release Notes"
     },

@@ -194,11 +194,11 @@ export default function LandingPage() {
 
           <p className="mt-4 w-full px-4 text-center text-[11px] md:text-[12px] text-zinc-500 tracking-tight">
             {t('landing.legal_prefix', 'By joining, you agree to our')}{" "}
-            <a href="#" className="font-semibold text-zinc-800 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors">
+            <a href="/terms" className="font-semibold text-zinc-800 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors">
               {t('landing.terms')}
             </a>{" "}
             {t('common.and', 'and')}{" "}
-            <a href="#" className="font-semibold text-zinc-800 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors">
+            <a href="/privacy" className="font-semibold text-zinc-800 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors">
               {t('landing.privacy')}
             </a>.
           </p>

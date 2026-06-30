@@ -1505,6 +1505,95 @@ describe("Argus Alpha frontend contract", () => {
     );
   });
 
+  test("profile menu groups data controls preferences and legal links", () => {
+    const profileMenu = readFileSync(
+      join(root, "components/sidebar/ProfileMenu.tsx"),
+      "utf-8",
+    );
+    const en = readFileSync(
+      join(root, "public/locales/en/common.json"),
+      "utf-8",
+    );
+    const es = readFileSync(
+      join(root, "public/locales/es-419/common.json"),
+      "utf-8",
+    );
+
+    const dataStart = profileMenu.indexOf('{activeSubmenu === "data"');
+    const preferencesStart = profileMenu.indexOf(
+      '{activeSubmenu === "settings"',
+    );
+    const legalStart = profileMenu.indexOf('{activeSubmenu === "help"');
+    expect(dataStart).toBeGreaterThan(-1);
+    expect(preferencesStart).toBeGreaterThan(dataStart);
+    expect(legalStart).toBeGreaterThan(preferencesStart);
+
+    const dataBlock = profileMenu.slice(dataStart, preferencesStart);
+    const preferencesBlock = profileMenu.slice(preferencesStart, legalStart);
+    const legalBlock = profileMenu.slice(legalStart);
+
+    expect(en).toContain('"title": "Data Controls"');
+    expect(en).toContain('"title": "Preferences"');
+    expect(en).toContain('"title": "Help & Legal"');
+    expect(en).toContain('"usage": "Usage"');
+    expect(es).toContain('"title": "Controles de datos"');
+    expect(es).toContain('"title": "Preferencias"');
+    expect(es).toContain('"title": "Ayuda y legal"');
+    expect(es).toContain('"usage": "Uso"');
+
+    expect(dataBlock).toContain("settings.data.security");
+    expect(dataBlock).toContain("settings.data.usage");
+    expect(dataBlock).toContain("disabled");
+    expect(dataBlock).toContain("settings.profile.delete_account");
+    expect(dataBlock).toContain("settings.profile.delete_account_note");
+    expect(dataBlock).toContain("handleOpenDeleteRequest");
+    expect(dataBlock).toContain("hover:bg-[#d66d75]/10");
+    expect(preferencesBlock).toContain("settings.preferences.title");
+    expect(preferencesBlock).toContain("settings.app.appearance");
+    expect(preferencesBlock).toContain("settings.app.language");
+    expect(preferencesBlock).toContain("settings.app.sidebar");
+    expect(preferencesBlock).not.toContain("settings.app.security");
+    expect(legalBlock).toContain('href="/terms"');
+    expect(legalBlock).toContain('href="/privacy"');
+    expect(legalBlock).toContain("settings.help.release_notes");
+    expect(legalBlock).toContain("disabled");
+    expect(profileMenu).toContain('href="/terms"');
+    expect(profileMenu).toContain('href="/privacy"');
+  });
+
+  test("alpha legal pages exist and disclose terms privacy and providers", () => {
+    const termsPath = join(root, "app/terms/page.tsx");
+    const privacyPath = join(root, "app/privacy/page.tsx");
+
+    expect(existsSync(termsPath)).toBe(true);
+    expect(existsSync(privacyPath)).toBe(true);
+
+    const terms = readFileSync(termsPath, "utf-8");
+    const privacy = readFileSync(privacyPath, "utf-8");
+
+    expect(terms).toContain("Effective date: June 30, 2026");
+    expect(terms).toContain("No investment advice");
+    expect(terms).toContain("not a broker");
+    expect(terms).toContain("Historical simulations are hypothetical");
+    expect(terms).toContain("TradingView Lightweight Charts");
+    expect(terms).toContain("NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL");
+    expect(terms).toContain("font-display");
+    expect(terms).not.toContain("TODO");
+
+    expect(privacy).toContain("Effective date: June 30, 2026");
+    expect(privacy).toContain("OpenRouter");
+    expect(privacy).toContain("Supabase");
+    expect(privacy).toContain("Render");
+    expect(privacy).toContain("Alpaca");
+    expect(privacy).toContain("Kraken");
+    expect(privacy).toContain("TradingView Lightweight Charts");
+    expect(privacy).toContain("PostHog");
+    expect(privacy).toContain("prompts may be sent");
+    expect(privacy).toContain("NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL");
+    expect(privacy).toContain("font-display");
+    expect(privacy).not.toContain("TODO");
+  });
+
   test("profile menu delete all conversations is recoverable and outcome-aware", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const chat = readFileSync(
@@ -1599,9 +1688,12 @@ describe("Argus Alpha frontend contract", () => {
     expect(page).toContain('type AuthMode = "intro" | "signup" | "login"');
     expect(page).toContain('updateAuthMode("signup")');
     expect(page).toContain('const showLogin = () => updateAuthMode("login")');
+    expect(page).toContain('href="/terms"');
+    expect(page).toContain('href="/privacy"');
     expect(page).not.toContain('const authHref = "/chat"');
     expect(page).not.toContain("href={authHref}");
     expect(page).not.toContain('href="/login"');
+    expect(page).not.toContain('href="#"');
   });
 
   test("auth exits return to the clean front door", () => {
