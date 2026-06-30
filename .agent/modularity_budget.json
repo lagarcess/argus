@@ -1,0 +1,22 @@
+{
+  "allowed_growth_lines": 75,
+  "top_offender_count": 10,
+  "watched_files": {
+    "src/argus/agent_runtime/llm_interpreter.py": 5279,
+    "src/argus/agent_runtime/stages/interpret.py": 3159,
+    "web/components/chat/ChatInterface.tsx": 2523,
+    "src/argus/domain/supabase_gateway.py": 2036,
+    "src/argus/agent_runtime/stages/explain.py": 1574,
+    "src/argus/api/routers/agent.py": 1393,
+    "src/argus/agent_runtime/stages/interpret_internal/asset_resolution.py": 1302,
+    "src/argus/api/chat/breakdown.py": 1242,
+    "web/lib/argus-api.ts": 1179,
+    "src/argus/agent_runtime/result_followups.py": 1138,
+    "src/argus/agent_runtime/stages/execute.py": 1137,
+    "web/components/chat/ChatInput.tsx": 1107,
+    "src/argus/agent_runtime/interpreter/run_field_audits.py": 1076,
+    "src/argus/agent_runtime/stages/interpret_actions.py": 1062,
+    "src/argus/api/chat/backtest_jobs.py": 1037,
+    "src/argus/llm/openrouter.py": 1015
+  }
+}
