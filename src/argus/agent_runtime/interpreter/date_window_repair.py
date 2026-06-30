@@ -12,6 +12,7 @@ from argus.agent_runtime.interpreter.run_field_audits import (
 )
 from argus.agent_runtime.interpreter.shared import (
     _date_range_from_intent_or_bounded_evidence,
+    _draft_has_semantic_date_window_evidence,
     _draft_semantic_evidence_spans,
     _field_path_base,
     _has_complete_date_range_payload,
@@ -175,6 +176,55 @@ def _request_has_pending_date_answer_context(
     if not request.current_user_message.strip():
         return False
     return _request_has_active_strategy_context(request)
+
+
+def _draft_complete_date_range_matches_current_turn_date_evidence(
+    draft: LLMStrategyDraft,
+    *,
+    request: InterpretationRequest,
+) -> bool:
+    expected = _date_range_from_intent_or_bounded_evidence(
+        draft,
+        language=request.user.language_preference,
+    )
+    if expected is None:
+        return False
+    normalized = normalize_date_range_candidate(draft.date_range)
+    if not isinstance(normalized, dict):
+        return False
+    if not _has_complete_date_range_payload(normalized):
+        return False
+    try:
+        resolved = resolve_date_range(normalized)
+    except Exception:
+        resolved = None
+    current = (
+        resolved.payload
+        if resolved is not None and not resolved.used_default
+        else normalized
+    )
+    current_message_range = _date_range_from_current_turn_message(request)
+    if current_message_range is not None:
+        return _normalized_stated_field(current) == _normalized_stated_field(
+            current_message_range
+        )
+    if not _date_range_intent_can_safely_suppress_focused_repair(draft):
+        return False
+    return _normalized_stated_field(current) == _normalized_stated_field(expected)
+
+
+def _date_range_intent_can_safely_suppress_focused_repair(
+    draft: LLMStrategyDraft,
+) -> bool:
+    intent = draft.date_range_intent
+    if intent is None:
+        return False
+    if intent.kind != "calendar_year":
+        return _draft_has_semantic_date_window_evidence(draft)
+    if intent.year is None:
+        return False
+    evidence = str(intent.evidence or "").strip()
+    return evidence == str(intent.year)
 
 
 def _response_has_repairable_current_turn_date_gap(

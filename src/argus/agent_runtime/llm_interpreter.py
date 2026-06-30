@@ -68,6 +68,21 @@ from argus.agent_runtime.interpreter.capability_context_audits import (  # noqa:
     _response_had_unsubstantiated_asset_removed,
     _response_needs_context_question_audit,
 )
+from argus.agent_runtime.interpreter.date_window_repair import (  # noqa: F401
+    _clear_auto_simplified_strategy_when_rule_is_ambiguous,
+    _current_turn_has_relative_window_evidence,
+    _date_range_from_current_turn_message,
+    _date_range_intent_can_safely_suppress_focused_repair,
+    _draft_complete_date_range_matches_current_turn_date_evidence,
+    _draft_has_supported_capability_shape_for_date_repair,
+    _focused_date_window_extraction_messages,
+    _pending_supported_execution_date_answer_can_use_focused_audit,
+    _request_has_pending_date_answer_context,
+    _response_from_focused_date_window_extraction,
+    _response_has_ambiguous_rule_fields,
+    _response_has_repairable_current_turn_date_gap,
+    _response_needs_temporal_runtime_repair,
+)
 from argus.agent_runtime.interpreter.dca_audits import (  # noqa: F401
     _capability_required_missing_fields_for_canonical_strategy,
     _dca_contract_audit_messages,
@@ -272,19 +287,6 @@ from argus.agent_runtime.interpreter.strategy_repair_predicates import (  # noqa
     _response_needs_structured_strategy_repair,
     _supported_partial_draft_has_repairable_shape,
     _vague_strategy_start_as_guidance,
-)
-from argus.agent_runtime.interpreter.temporal_repair import (  # noqa: F401
-    _clear_auto_simplified_strategy_when_rule_is_ambiguous,
-    _current_turn_has_relative_window_evidence,
-    _date_range_from_current_turn_message,
-    _draft_has_supported_capability_shape_for_date_repair,
-    _focused_date_window_extraction_messages,
-    _pending_supported_execution_date_answer_can_use_focused_audit,
-    _request_has_pending_date_answer_context,
-    _response_from_focused_date_window_extraction,
-    _response_has_ambiguous_rule_fields,
-    _response_has_repairable_current_turn_date_gap,
-    _response_needs_temporal_runtime_repair,
 )
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedDateWindowExtraction,
@@ -3282,54 +3284,6 @@ def _complete_date_range_needs_current_turn_date_audit(
         return True
     return True
 
-
-def _draft_complete_date_range_matches_current_turn_date_evidence(
-    draft: LLMStrategyDraft,
-    *,
-    request: InterpretationRequest,
-) -> bool:
-    expected = _date_range_from_intent_or_bounded_evidence(
-        draft,
-        language=request.user.language_preference,
-    )
-    if expected is None:
-        return False
-    normalized = normalize_date_range_candidate(draft.date_range)
-    if not isinstance(normalized, dict):
-        return False
-    if not _has_complete_date_range_payload(normalized):
-        return False
-    try:
-        resolved = resolve_date_range(normalized)
-    except Exception:
-        resolved = None
-    current = (
-        resolved.payload
-        if resolved is not None and not resolved.used_default
-        else normalized
-    )
-    current_message_range = _date_range_from_current_turn_message(request)
-    if current_message_range is not None:
-        return _normalized_stated_field(current) == _normalized_stated_field(
-            current_message_range
-        )
-    if not _date_range_intent_can_safely_suppress_focused_repair(draft):
-        return False
-    return _normalized_stated_field(current) == _normalized_stated_field(expected)
-
-
-def _date_range_intent_can_safely_suppress_focused_repair(
-    draft: LLMStrategyDraft,
-) -> bool:
-    intent = draft.date_range_intent
-    if intent is None:
-        return False
-    if intent.kind != "calendar_year":
-        return _draft_has_semantic_date_window_evidence(draft)
-    if intent.year is None:
-        return False
-    evidence = str(intent.evidence or "").strip()
-    return evidence == str(intent.year)
 
 
 async def _plan_pending_artifact_assumption_edit(
