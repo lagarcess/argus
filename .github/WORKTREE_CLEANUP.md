@@ -1,0 +1,28 @@
+# Argus Worktree Cleanup
+
+Use `.github/cleanup-worktree.sh` before deleting a disposable Argus worktree
+to reclaim dependency, build, and test-cache disk space.
+
+Safe mode removes known generated bloat and keeps local untracked files such as
+`.env` and `web/.env.local` intact:
+
+```bash
+.github/cleanup-worktree.sh /path/to/worktree
+```
+
+For a worktree that is definitely disposable, wipe all ignored and untracked
+files too:
+
+```bash
+.github/cleanup-worktree.sh /path/to/worktree --wipe-untracked
+```
+
+Then remove the worktree:
+
+```bash
+git worktree remove /path/to/worktree
+git worktree prune
+```
+
+Do not use `--wipe-untracked` in a worktree that may contain unsaved source,
+notes, screenshots, or local environment files that need to be preserved.
