@@ -137,7 +137,6 @@ from argus.agent_runtime.interpreter.readiness_helpers import (  # noqa: F401
 )
 from argus.agent_runtime.interpreter.run_field_audits import (  # noqa: F401
     _clear_rule_or_indicator_fields,
-    _date_endpoint_is_runtime_current,
     _date_evidence_tokens_from_text,
     _dca_response_needs_semantic_field_audit,
     _draft_capital_needs_stated_run_field_audit,
@@ -310,6 +309,7 @@ from argus.agent_runtime.rule_specs import (
 )
 from argus.agent_runtime.run_field_contract import (
     current_message_execution_context_tokens,
+    field_fidelity_tokens,
 )
 from argus.agent_runtime.signal_rule_repair import (
     repair_signal_rule_plan,
@@ -2381,6 +2381,19 @@ async def _response_ready_for_runtime(
         request=request,
     )
     if supported_date_gap_response is not None:
+        readiness_blocker = _optional_runtime_readiness_audit_blocker(
+            response=supported_date_gap_response,
+            request=request,
+        )
+        if readiness_blocker is None:
+            return supported_date_gap_response
+        if readiness_blocker == "stated_run_field_fidelity":
+            audited_response = await _audit_stated_run_fields(
+                response=supported_date_gap_response,
+                preferred_model=preferred_model,
+                request=request,
+            )
+            return audited_response or supported_date_gap_response
         return await _stated_run_field_audited_response(
             response=supported_date_gap_response,
             preferred_model=preferred_model,
@@ -2736,6 +2749,8 @@ def _optional_runtime_readiness_audit_blocker(
         request=request,
     ):
         return "date_range_reconciliation"
+    if _response_needs_stated_timeframe_fidelity_audit(response):
+        return "stated_run_field_fidelity"
     if (
         canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
         and _dca_response_needs_semantic_field_audit(response)
@@ -2775,6 +2790,17 @@ def _draft_asset_universe_has_exact_provider_symbols(
         if resolution.asset.canonical_symbol.upper() != symbol.upper():
             return False
     return True
+
+
+def _response_needs_stated_timeframe_fidelity_audit(
+    response: LLMInterpretationResponse,
+) -> bool:
+    if "stated_run_field_fidelity_audit" in response.reason_codes:
+        return False
+    draft = response.candidate_strategy_draft
+    return _llm_value_is_empty(draft.timeframe) and _draft_has_timeframe_evidence_for_audit(
+        draft
+    )
 
 
 def _draft_has_supported_default_benchmark(draft: LLMStrategyDraft) -> bool:
@@ -3247,9 +3273,63 @@ def _complete_date_range_needs_current_turn_date_audit(
     has_semantic_date_evidence = _draft_has_semantic_date_window_evidence(draft)
     if has_semantic_date_evidence:
         return False
+    if _draft_complete_date_range_matches_current_turn_date_evidence(
+        draft,
+        request=request,
+    ):
+        return False
     if resolve_date_range_intent(draft.date_range_intent) is not None:
         return True
     return True
+
+
+def _draft_complete_date_range_matches_current_turn_date_evidence(
+    draft: LLMStrategyDraft,
+    *,
+    request: InterpretationRequest,
+) -> bool:
+    expected = _date_range_from_intent_or_bounded_evidence(
+        draft,
+        language=request.user.language_preference,
+    )
+    if expected is None:
+        return False
+    normalized = normalize_date_range_candidate(draft.date_range)
+    if not isinstance(normalized, dict):
+        return False
+    if not _has_complete_date_range_payload(normalized):
+        return False
+    try:
+        resolved = resolve_date_range(normalized)
+    except Exception:
+        resolved = None
+    current = (
+        resolved.payload
+        if resolved is not None and not resolved.used_default
+        else normalized
+    )
+    current_message_range = _date_range_from_current_turn_message(request)
+    if current_message_range is not None:
+        return _normalized_stated_field(current) == _normalized_stated_field(
+            current_message_range
+        )
+    if not _date_range_intent_can_safely_suppress_focused_repair(draft):
+        return False
+    return _normalized_stated_field(current) == _normalized_stated_field(expected)
+
+
+def _date_range_intent_can_safely_suppress_focused_repair(
+    draft: LLMStrategyDraft,
+) -> bool:
+    intent = draft.date_range_intent
+    if intent is None:
+        return False
+    if intent.kind != "calendar_year":
+        return _draft_has_semantic_date_window_evidence(draft)
+    if intent.year is None:
+        return False
+    evidence = str(intent.evidence or "").strip()
+    return evidence == str(intent.year)
 
 
 async def _plan_pending_artifact_assumption_edit(
@@ -4264,6 +4344,11 @@ def _response_has_current_message_date_range_reconciliation(
         return True
     if has_partial_explicit_date_range(draft.date_range):
         return True
+    if _draft_complete_date_range_matches_current_turn_date_evidence(
+        draft,
+        request=request,
+    ):
+        return False
     if (
         resolve_date_range_intent(draft.date_range_intent) is not None
         and _draft_has_semantic_date_window_evidence(draft)
@@ -4771,6 +4856,11 @@ def _response_from_focused_strategy_extraction(
     asset_universe, resolved_asset_class = _canonical_asset_universe_from_llm_extraction(
         extraction.asset_universe
     )
+    extraction_date_range = extraction.date_range
+    if _llm_value_is_empty(extraction_date_range):
+        resolved_date_intent = resolve_date_range_intent(extraction.date_range_intent)
+        if resolved_date_intent is not None:
+            extraction_date_range = resolved_date_intent.payload
     if strategy_type is None:
         return LLMInterpretationResponse(
             intent="unsupported_or_out_of_scope",
@@ -4785,7 +4875,7 @@ def _response_from_focused_strategy_extraction(
                 asset_universe=asset_universe,
                 asset_class=extraction.asset_class or resolved_asset_class,
                 timeframe=extraction.timeframe,
-                date_range=extraction.date_range,
+                date_range=extraction_date_range,
                 date_range_raw_text=extraction.date_range_raw_text,
                 date_range_intent=extraction.date_range_intent,
                 comparison_baseline=extraction.comparison_baseline,
@@ -4848,7 +4938,7 @@ def _response_from_focused_strategy_extraction(
             asset_universe=asset_universe,
             asset_class=extraction.asset_class or resolved_asset_class,
             timeframe=extraction.timeframe,
-            date_range=extraction.date_range,
+            date_range=extraction_date_range,
             date_range_raw_text=extraction.date_range_raw_text,
             date_range_intent=extraction.date_range_intent,
             comparison_baseline=extraction.comparison_baseline,
@@ -5110,6 +5200,13 @@ def _normalize_response_for_runtime_context(
 def _request_current_turn_has_material_execution_evidence(
     request: InterpretationRequest,
 ) -> bool:
+    if _current_message_has_numeric_execution_fact(request.current_user_message):
+        return current_turn_has_material_execution_evidence(
+            request.current_user_message,
+            has_provider_asset_mention=False,
+            active_strategy_context=_request_has_active_strategy_context(request),
+            requested_field=request.selected_thread_metadata.get("requested_field"),
+        )
     return current_turn_has_material_execution_evidence(
         request.current_user_message,
         has_provider_asset_mention=bool(
@@ -5118,6 +5215,13 @@ def _request_current_turn_has_material_execution_evidence(
         or _request_has_provider_exact_execution_asset(request),
         active_strategy_context=_request_has_active_strategy_context(request),
         requested_field=request.selected_thread_metadata.get("requested_field"),
+    )
+
+
+def _current_message_has_numeric_execution_fact(message: str) -> bool:
+    return any(
+        any(char.isdigit() for char in token)
+        for token in field_fidelity_tokens(str(message or ""))
     )
 
 
@@ -5275,5 +5379,3 @@ def _resolve_asset_candidate(
         candidates=(resolved,),
         provenance=provenance,
     )
-
-

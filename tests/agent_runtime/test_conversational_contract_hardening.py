@@ -2236,8 +2236,9 @@ def test_unresolved_llm_benchmark_is_not_preserved_without_user_request(
     )
 
     assert result.outcome == "ready_for_confirmation"
-    assert result.decision.candidate_strategy_draft.comparison_baseline is None
+    assert result.decision.candidate_strategy_draft.comparison_baseline == "SPY"
     assert "unstated_benchmark_symbol_cleared" in result.decision.reason_codes
+    assert "default_benchmark_applied" in result.decision.reason_codes
 
 
 @pytest.mark.parametrize(
@@ -2295,8 +2296,13 @@ def test_provider_valid_llm_benchmark_is_not_preserved_without_user_request(
     )
 
     assert result.outcome == "ready_for_confirmation"
-    assert result.decision.candidate_strategy_draft.comparison_baseline is None
+    assert (
+        result.decision.candidate_strategy_draft.comparison_baseline
+        != noisy_benchmark
+    )
+    assert result.decision.candidate_strategy_draft.comparison_baseline == "SPY"
     assert "unstated_benchmark_symbol_cleared" in result.decision.reason_codes
+    assert "default_benchmark_applied" in result.decision.reason_codes
 
 
 def test_explicit_structured_benchmark_is_provider_validated_and_preserved(
@@ -5842,6 +5848,191 @@ def test_stated_run_fidelity_audit_skips_aligned_focused_repair_capital() -> Non
     )
 
     assert not _response_needs_stated_run_field_fidelity_audit(
+        response=response,
+        request=request,
+    )
+
+
+def test_optional_readiness_does_not_trust_unprovenanced_relative_date_intent(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as llm_module
+    from argus.agent_runtime.llm_interpreter import (
+        _optional_runtime_readiness_audit_blocker,
+        _response_can_skip_optional_runtime_readiness_audits,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    monkeypatch.setattr(
+        llm_module,
+        "_draft_asset_universe_has_exact_provider_symbols",
+        lambda _draft: True,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to test Apple in 2024.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            strategy_thesis="AAPL buy and hold.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2026-01-01", "end": "2026-06-30"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="year_to_date",
+                year=2026,
+            ),
+            capital_amount=10000,
+            comparison_baseline="SPY",
+            field_provenance={
+                "capital_amount": "explicit_user",
+                "comparison_baseline": "explicit_user",
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "if i bought AAPL in 2024 with 10k, compare it with SPY"
+        ),
+        user=UserState(user_id="user-1"),
+    )
+
+    assert (
+        _optional_runtime_readiness_audit_blocker(
+            response=response,
+            request=request,
+        )
+        == "date_range_reconciliation"
+    )
+    assert not _response_can_skip_optional_runtime_readiness_audits(
+        response=response,
+        request=request,
+    )
+
+
+def test_runtime_date_normalization_preserves_complete_unprovenanced_date_range() -> None:
+    from argus.agent_runtime.llm_interpreter import (
+        _response_with_resolved_runtime_date_range,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to test Apple in 2024.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            strategy_thesis="AAPL buy and hold.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            date_range_intent=LLMDateRangeIntent(
+                kind="year_to_date",
+                year=2026,
+            ),
+            capital_amount=10000,
+            comparison_baseline="SPY",
+        ),
+        semantic_turn_act="new_idea",
+    )
+    request = InterpretationRequest(
+        current_user_message="if i bought AAPL in 2024 with 10k, compare it with SPY",
+        user=UserState(user_id="user-1"),
+    )
+
+    repaired = _response_with_resolved_runtime_date_range(
+        response=response,
+        request=request,
+    )
+
+    assert repaired.candidate_strategy_draft.date_range == {
+        "start": "2024-01-01",
+        "end": "2024-12-31",
+    }
+    assert "runtime_date_range_normalization" not in repaired.reason_codes
+
+
+def test_optional_readiness_blocks_stated_timeframe_audit_after_date_gap(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as llm_module
+    from argus.agent_runtime.llm_interpreter import (
+        _optional_runtime_readiness_audit_blocker,
+        _response_can_skip_optional_runtime_readiness_audits,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    monkeypatch.setattr(
+        llm_module,
+        "_draft_asset_universe_has_exact_provider_symbols",
+        lambda _draft: True,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants an intraday Apple test.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            strategy_thesis="AAPL buy and hold on 1h candles.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2025-06-30", "end": "2026-06-30"},
+            date_range_raw_text="last 12 months",
+            date_range_intent=LLMDateRangeIntent(
+                kind="rolling_window",
+                count=12,
+                unit="month",
+                anchor="today",
+                confidence=0.9,
+                evidence="last 12 months",
+            ),
+            capital_amount=10000,
+            comparison_baseline="SPY",
+            evidence_spans={
+                "date_range": "last 12 months",
+                "timeframe": "1h candles",
+            },
+            field_provenance={
+                "capital_amount": "explicit_user",
+                "comparison_baseline": "explicit_user",
+            },
+        ),
+        semantic_turn_act="new_idea",
+        reason_codes=["focused_strategy_extraction_repair"],
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "run AAPL on 1h candles for the last 12 months with 10k against SPY"
+        ),
+        user=UserState(user_id="user-1"),
+    )
+
+    assert (
+        _optional_runtime_readiness_audit_blocker(
+            response=response,
+            request=request,
+        )
+        == "stated_run_field_fidelity"
+    )
+    assert not _response_can_skip_optional_runtime_readiness_audits(
         response=response,
         request=request,
     )
