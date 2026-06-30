@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  Activity,
   Archive,
   ChevronRight,
   Database,
@@ -374,7 +375,123 @@ export default function ProfileMenu({
     ),
   )}`;
 
-  if (!isOpen && !activeModal) return null;
+  const deleteRequestDialog = isDeleteRequestOpen ? (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
+      <button
+        className="absolute inset-0"
+        onClick={() => {
+          if (deleteRequestState !== "submitting") {
+            setIsDeleteRequestOpen(false);
+          }
+        }}
+        aria-label={t(
+          "settings.profile.request_deletion.close",
+          "Close deletion request",
+        )}
+      />
+      <div
+        className="relative w-full max-w-sm rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="argus-delete-request-title"
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h3
+            id="argus-delete-request-title"
+            className="font-display text-[16px] font-medium text-black dark:text-white"
+          >
+            {t(
+              "settings.profile.request_deletion.title",
+              "Request account deletion",
+            )}
+          </h3>
+          <button
+            type="button"
+            onClick={() => setIsDeleteRequestOpen(false)}
+            disabled={deleteRequestState === "submitting"}
+            className="rounded-full p-1.5 hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-white/10"
+            aria-label={t(
+              "settings.profile.request_deletion.close",
+              "Close deletion request",
+            )}
+          >
+            <X className="h-4 w-4 text-black/50 dark:text-white/50" />
+          </button>
+        </div>
+
+        {deleteRequestState === "success" ? (
+          <>
+            <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
+              {t(
+                "settings.profile.request_deletion.success",
+                "Request sent. We'll follow up by email.",
+              )}
+            </p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsDeleteRequestOpen(false)}
+                className="rounded-md bg-black px-3 py-2 text-[13px] font-medium text-white hover:bg-black/85 dark:bg-white dark:text-black dark:hover:bg-white/85"
+              >
+                {t("common.done", "Done")}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
+              {t(
+                "settings.profile.request_deletion.body",
+                "Support handles account deletion during private alpha. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
+              )}
+            </p>
+            {deleteRequestState === "error" && (
+              <p className="mt-3 text-[12px] leading-relaxed text-[#d66d75]">
+                {t(
+                  "settings.profile.request_deletion.error",
+                  "We could not submit that request yet.",
+                )}{" "}
+                <a className="underline" href={supportMailto}>
+                  {t(
+                    "settings.profile.request_deletion.email_fallback",
+                    "Email support",
+                  )}
+                </a>
+              </p>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDeleteRequestOpen(false)}
+                disabled={deleteRequestState === "submitting"}
+                className="rounded-md px-3 py-2 text-[13px] font-medium text-black/55 hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:text-white/55 dark:hover:bg-white/10"
+              >
+                {t("common.cancel", "Cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSubmitDeleteRequest()}
+                disabled={deleteRequestState === "submitting"}
+                className="rounded-md bg-[#d66d75]/12 px-3 py-2 text-[13px] font-medium text-[#b94c55] hover:bg-[#d66d75]/18 disabled:cursor-wait disabled:opacity-60 dark:text-[#e7a2a8]"
+              >
+                {deleteRequestState === "submitting"
+                  ? t(
+                      "settings.profile.request_deletion.submitting",
+                      "Sending...",
+                    )
+                  : t(
+                      "settings.profile.request_deletion.contact_support",
+                      "Contact support",
+                    )}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  ) : null;
+
+  if (!isOpen && !activeModal && !isDeleteRequestOpen) return null;
 
   // ── Active modal rendering ──────────────────────────────────────────────
   if (activeModal === "appearance") {
@@ -584,145 +701,19 @@ export default function ProfileMenu({
               )}
             </div>
 
-            {/* Danger zone */}
-            <div className="mt-4 border-t border-black/5 pt-3 dark:border-white/5">
-              <button
-                type="button"
-                onClick={handleOpenDeleteRequest}
-                className="text-[13px] text-[#d66d75]/55 transition-colors hover:text-[#d66d75] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d66d75]/25"
-              >
-                {t("settings.profile.delete_account", "Delete account")}
-              </button>
-              <p className="mt-1 max-w-[290px] text-[12px] leading-snug text-black/35 dark:text-white/35">
-                {t(
-                  "settings.profile.delete_account_note",
-                  "Request permanent deletion of your Argus account. Support will follow up by email.",
-                )}
-              </p>
-            </div>
           </div>
         </div>
       </div>
-      {isDeleteRequestOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
-          <button
-            className="absolute inset-0"
-            onClick={() => {
-              if (deleteRequestState !== "submitting") {
-                setIsDeleteRequestOpen(false);
-              }
-            }}
-            aria-label={t(
-              "settings.profile.request_deletion.close",
-              "Close deletion request",
-            )}
-          />
-          <div
-            className="relative w-full max-w-sm rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="argus-delete-request-title"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h3
-                id="argus-delete-request-title"
-                className="font-display text-[16px] font-medium text-black dark:text-white"
-              >
-                {t(
-                  "settings.profile.request_deletion.title",
-                  "Request account deletion",
-                )}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsDeleteRequestOpen(false)}
-                disabled={deleteRequestState === "submitting"}
-                className="rounded-full p-1.5 hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-white/10"
-                aria-label={t(
-                  "settings.profile.request_deletion.close",
-                  "Close deletion request",
-                )}
-              >
-                <X className="h-4 w-4 text-black/50 dark:text-white/50" />
-              </button>
-            </div>
-
-            {deleteRequestState === "success" ? (
-              <>
-                <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
-                  {t(
-                    "settings.profile.request_deletion.success",
-                    "Request sent. We'll follow up by email.",
-                  )}
-                </p>
-                <div className="mt-5 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setIsDeleteRequestOpen(false)}
-                    className="rounded-md bg-black px-3 py-2 text-[13px] font-medium text-white hover:bg-black/85 dark:bg-white dark:text-black dark:hover:bg-white/85"
-                  >
-                    {t("common.done", "Done")}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
-                  {t(
-                    "settings.profile.request_deletion.body",
-                    "Support handles account deletion during private alpha. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
-                  )}
-                </p>
-                {deleteRequestState === "error" && (
-                  <p className="mt-3 text-[12px] leading-relaxed text-[#d66d75]">
-                    {t(
-                      "settings.profile.request_deletion.error",
-                      "We could not submit that request yet.",
-                    )}{" "}
-                    <a className="underline" href={supportMailto}>
-                      {t(
-                        "settings.profile.request_deletion.email_fallback",
-                        "Email support",
-                      )}
-                    </a>
-                  </p>
-                )}
-                <div className="mt-5 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsDeleteRequestOpen(false)}
-                    disabled={deleteRequestState === "submitting"}
-                    className="rounded-md px-3 py-2 text-[13px] font-medium text-black/55 hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:text-white/55 dark:hover:bg-white/10"
-                  >
-                    {t("common.cancel", "Cancel")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleSubmitDeleteRequest()}
-                    disabled={deleteRequestState === "submitting"}
-                    className="rounded-md bg-[#d66d75]/12 px-3 py-2 text-[13px] font-medium text-[#b94c55] hover:bg-[#d66d75]/18 disabled:cursor-wait disabled:opacity-60 dark:text-[#e7a2a8]"
-                  >
-                    {deleteRequestState === "submitting"
-                      ? t(
-                          "settings.profile.request_deletion.submitting",
-                          "Sending...",
-                        )
-                      : t(
-                          "settings.profile.request_deletion.contact_support",
-                          "Contact support",
-                        )}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {deleteRequestDialog}
       </>
     );
   }
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return typeof document !== "undefined" && deleteRequestDialog
+      ? createPortal(deleteRequestDialog, document.body)
+      : deleteRequestDialog;
+  }
 
   // ── Menu rendering ──────────────────────────────────────────────────────
 
@@ -760,7 +751,7 @@ export default function ProfileMenu({
         >
           <div className="flex items-center gap-2.5">
             <Database className="h-4 w-4 text-black/50 dark:text-white/50" />
-            {t("settings.data.title", "Data")}
+            {t("settings.data.title", "Data Controls")}
           </div>
           <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
         </button>
@@ -786,6 +777,20 @@ export default function ProfileMenu({
               {t("settings.data.recently_deleted", "Recently Deleted")}
             </button>
             <button
+              disabled
+              className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25"
+            >
+              <Shield className="h-3.5 w-3.5 text-black/25 dark:text-white/25" />
+              {t("settings.data.security", "Security")}
+            </button>
+            <button
+              disabled
+              className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25"
+            >
+              <Activity className="h-3.5 w-3.5 text-black/25 dark:text-white/25" />
+              {t("settings.data.usage", "Usage")}
+            </button>
+            <button
               onClick={handleDeleteAllConversations}
               className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 dark:hover:bg-[#d66d75]/10"
             >
@@ -794,11 +799,27 @@ export default function ProfileMenu({
                 {t("settings.data.delete_all_conversations", "Delete all conversations")}
               </span>
             </button>
+            <button
+              type="button"
+              onClick={handleOpenDeleteRequest}
+              className="flex w-full flex-col items-start gap-1 px-3.5 py-2 text-left text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d66d75]/25 dark:hover:bg-[#d66d75]/10"
+            >
+              <span className="flex items-center gap-2.5 text-[13px] font-medium">
+                <Trash2 className="h-3.5 w-3.5" />
+                {t("settings.profile.delete_account", "Delete account")}
+              </span>
+              <span className="pl-6 text-[11px] leading-snug text-black/35 dark:text-white/35">
+                {t(
+                  "settings.profile.delete_account_note",
+                  "Request permanent deletion of your Argus account. Support will follow up by email.",
+                )}
+              </span>
+            </button>
           </div>
         )}
       </div>
 
-      {/* Settings (includes Language) */}
+      {/* Preferences */}
       <div
         className="relative"
         onMouseEnter={() => handleSubmenuEnter("settings")}
@@ -810,12 +831,13 @@ export default function ProfileMenu({
         >
           <div className="flex items-center gap-2.5">
             <Palette className="h-4 w-4 text-black/50 dark:text-white/50" />
-            {t("common.settings", "Settings")}
+            {t("settings.preferences.title", "Preferences")}
           </div>
           <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
         </button>
         {activeSubmenu === "settings" && (
           <div
+            aria-label={t("settings.preferences.title", "Preferences")}
             className="absolute bottom-0 left-full ml-1.5 min-w-[220px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
@@ -847,13 +869,6 @@ export default function ProfileMenu({
                 {t("settings.app.sidebar", "Sidebar")}
               </button>
             )}
-            <button
-              disabled
-              className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25"
-            >
-              <Shield className="h-3.5 w-3.5 text-black/25 dark:text-white/25" />
-              {t("settings.app.security", "Security")}
-            </button>
           </div>
         )}
       </div>
@@ -870,7 +885,7 @@ export default function ProfileMenu({
         >
           <div className="flex items-center gap-2.5">
             <HelpCircle className="h-4 w-4 text-black/50 dark:text-white/50" />
-            {t("settings.help.title", "Help")}
+            {t("settings.help.title", "Help & Legal")}
           </div>
           <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
         </button>
@@ -881,14 +896,14 @@ export default function ProfileMenu({
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
           >
-            <button disabled className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25">
+            <a href="/terms" className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
               <FileText className="h-3.5 w-3.5" />
-              {t("settings.help.terms", "Terms of Service")}
-            </button>
-            <button disabled className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25">
+              {t("settings.help.terms", "Terms of Use")}
+            </a>
+            <a href="/privacy" className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
               <Shield className="h-3.5 w-3.5" />
               {t("settings.help.privacy", "Privacy Policy")}
-            </button>
+            </a>
             <button disabled className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25">
               <BookOpen className="h-3.5 w-3.5" />
               {t("settings.help.release_notes", "Release Notes")}
@@ -971,11 +986,22 @@ export default function ProfileMenu({
 
       {/* Footer links */}
       <div className="my-1 border-t border-black/5 dark:border-white/5" />
-      <div className="px-3.5 py-1.5 text-[10px] text-black/25 dark:text-white/25">
-        {t("settings.help.terms", "Terms of Service")} · {t("settings.help.privacy", "Privacy Policy")}
+      <div className="flex items-center gap-1 px-3.5 py-1.5 text-[10px] text-black/25 dark:text-white/25">
+        <a href="/terms" className="transition-colors hover:text-black dark:hover:text-white">
+          {t("settings.help.terms", "Terms of Use")}
+        </a>
+        <span aria-hidden="true">·</span>
+        <a href="/privacy" className="transition-colors hover:text-black dark:hover:text-white">
+          {t("settings.help.privacy", "Privacy Policy")}
+        </a>
       </div>
     </div>
   );
 
-  return typeof document !== "undefined" ? createPortal(menu, document.body) : null;
+  return typeof document !== "undefined" ? (
+    <>
+      {createPortal(menu, document.body)}
+      {deleteRequestDialog ? createPortal(deleteRequestDialog, document.body) : null}
+    </>
+  ) : null;
 }

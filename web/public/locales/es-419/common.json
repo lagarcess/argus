@@ -39,6 +39,86 @@
     "and": "y",
     "tap_to_cancel": "Toca en cualquier otro lugar para cancelar"
   },
+  "legal": {
+    "eyebrow": "Legal de alfa privada",
+    "effective_date": "Fecha de entrada en vigor: 30 de junio de 2026",
+    "footer_label": "Alfa privada de Argus",
+    "back_to_argus": "Volver a Argus",
+    "terms": {
+      "title": "Términos de uso",
+      "intro": "Argus es un producto en alfa privada para investigación educativa de inversión. Estos términos describen la experiencia actual de testers y no reemplazan una revisión legal final.",
+      "sections": {
+        "no_investment_advice": {
+          "title": "No es asesoría de inversión",
+          "body": "Argus ofrece herramientas educativas que te ayudan a estructurar y revisar ideas de inversión. Argus no ofrece asesoría de inversión, legal, fiscal, contable ni financiera. Tú eres responsable de tus propias decisiones."
+        },
+        "no_brokerage": {
+          "title": "Sin relación de corretaje ni trading",
+          "body": "Argus no es broker, dealer, asesor de inversión, fiduciario, bolsa, custodio ni centro de negociación. Argus no custodia fondos, no coloca órdenes, no ejecuta operaciones ni se conecta a cuentas de corretaje."
+        },
+        "historical_simulations": {
+          "title": "Las simulaciones históricas son hipotéticas",
+          "body": "Las simulaciones históricas son hipotéticas y dependen de los supuestos, la disponibilidad de datos, los activos compatibles, las referencias predeterminadas y los periodos que se muestran en el producto. Los rendimientos simulados no garantizan resultados futuros."
+        },
+        "alpha_changes": {
+          "title": "Disponibilidad y cambios de la alfa",
+          "body": "Argus está en alfa privada. Las funciones pueden cambiar, fallar, reiniciarse o eliminarse sin aviso. Podemos limitar el acceso, suspender cuentas o retirar contenido que genere riesgos de seguridad, abuso, cumplimiento u operación."
+        },
+        "eligibility": {
+          "title": "Elegibilidad",
+          "body": "Debes tener edad suficiente para celebrar un acuerdo vinculante en tu jurisdicción y poder usar Argus conforme a la ley aplicable. No uses Argus en nombre de otra persona u organización salvo que tengas autorización para hacerlo."
+        },
+        "acceptable_use": {
+          "title": "Uso aceptable",
+          "body": "No uses Argus para infringir la ley, abusar del servicio, aplicar ingeniería inversa a sistemas privados, sobrecargar proveedores, enviar datos sensibles de terceros ni presentar resultados generados como asesoría profesional."
+        },
+        "third_party_services": {
+          "title": "Servicios de terceros",
+          "body": "Argus depende de servicios de terceros para hosting, autenticación, datos de mercado, acceso a modelos y renderizado de gráficos. TradingView Lightweight Charts se usa para renderizar gráficos y mostrar atribución, no como fuente de datos de mercado de Argus."
+        },
+        "account_support": {
+          "title": "Soporte de cuenta",
+          "body_before_email": "Durante la alfa privada, las solicitudes de soporte y eliminación de cuenta se gestionan manualmente. Contacta a",
+          "body_after_email": " o usa la solicitud de eliminación de cuenta dentro de la app."
+        }
+      }
+    },
+    "privacy": {
+      "title": "Política de privacidad",
+      "intro": "Esta política explica qué maneja Argus durante la alfa privada para que testers sepan qué ocurre con los datos de cuenta, conversaciones, comentarios y solicitudes respaldadas por proveedores.",
+      "sections": {
+        "data_collect": {
+          "title": "Datos que recopilamos",
+          "body": "Argus puede recopilar detalles de cuenta, estado de autenticación, conversaciones, ideas de inversión que envíes, registros guardados del producto, comentarios, solicitudes de soporte, información básica del navegador y dispositivo, eventos de uso, logs y diagnósticos de errores."
+        },
+        "data_use": {
+          "title": "Cómo usamos los datos",
+          "body": "Usamos datos para operar el producto, autenticar usuarios, guardar y restaurar conversaciones, generar y revisar simulaciones históricas, depurar fallas, proteger el servicio, responder soporte y mejorar la calidad de la alfa privada."
+        },
+        "ai_market_data": {
+          "title": "Proveedores de IA y datos de mercado",
+          "body": "El contenido de conversaciones y prompts puede enviarse a OpenRouter y proveedores de modelos para que Argus interprete solicitudes y redacte respuestas. Los datos de mercado y el descubrimiento de activos pueden usar proveedores como Alpaca y Kraken. La disponibilidad de proveedores puede afectar símbolos compatibles, periodos y resultados."
+        },
+        "infrastructure": {
+          "title": "Infraestructura y servicios del producto",
+          "body": "Argus usa Supabase para autenticación y persistencia del producto, Render para hosting, OpenRouter para acceso a modelos y PostHog solo si la analítica de producto se habilita intencionalmente. TradingView Lightweight Charts se usa como biblioteca de gráficos con atribución; no es la fuente de datos de mercado de Argus."
+        },
+        "access_retention": {
+          "title": "Acceso y retención",
+          "body": "El acceso del fundador y administradores se limita a operar, depurar, proteger y mejorar la alfa privada. Conservamos datos mientras tu cuenta esté activa, mientras sean necesarios para soporte o seguridad, o mientras los registros operativos lo requieran."
+        },
+        "your_controls": {
+          "title": "Tus controles",
+          "body_before_email": "Puedes archivar o eliminar conversaciones en la app. Durante la alfa privada, la eliminación de cuentas se gestiona manualmente mediante la solicitud dentro de la app o contactando a",
+          "body_after_email": "."
+        },
+        "sale_personal_info": {
+          "title": "Venta de información personal",
+          "body": "Argus no vende información personal durante la alfa privada. Si esto cambia, la política y los controles del producto deben actualizarse antes de enviar ese comportamiento."
+        }
+      }
+    }
+  },
   "feedback": {
     "title": "Enviar comentarios",
     "title_bug": "Reportar un error",
@@ -504,8 +584,11 @@
         "system": "Sistema"
       }
     },
+    "preferences": {
+      "title": "Preferencias"
+    },
     "data": {
-      "title": "Datos e información",
+      "title": "Controles de datos",
       "archived_chats": "Chats archivados",
       "recently_deleted": "Borrados recientemente",
       "close_recently_deleted": "Cerrar borrados recientemente",
@@ -524,12 +607,13 @@
       "delete_all_success_other": "Se movieron {{count}} conversaciones a Borrados recientemente.",
       "delete_all_empty": "No hay conversaciones para eliminar.",
       "delete_all_error": "No se pudieron eliminar las conversaciones. Inténtalo de nuevo.",
-      "security": "Seguridad"
+      "security": "Seguridad",
+      "usage": "Uso"
     },
     "help": {
-      "title": "Ayuda",
-      "terms": "Términos de Servicio",
-      "privacy": "Política de Privacidad",
+      "title": "Ayuda y legal",
+      "terms": "Términos de uso",
+      "privacy": "Política de privacidad",
       "release_notes": "Notas de la versión"
     },
     "about": {
