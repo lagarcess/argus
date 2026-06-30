@@ -39,6 +39,86 @@
     "and": "and",
     "tap_to_cancel": "Tap elsewhere to cancel"
   },
+  "legal": {
+    "eyebrow": "Private Alpha Legal",
+    "effective_date": "Effective date: June 30, 2026",
+    "footer_label": "Argus private alpha",
+    "back_to_argus": "Back to Argus",
+    "terms": {
+      "title": "Terms of Use",
+      "intro": "Argus is a private alpha product for educational investing research. These terms describe the current tester experience and do not replace final legal review.",
+      "sections": {
+        "no_investment_advice": {
+          "title": "No investment advice",
+          "body": "Argus provides educational tools that help you structure and review investing ideas. Argus does not provide investment, legal, tax, accounting, or financial advice. You are responsible for your own decisions."
+        },
+        "no_brokerage": {
+          "title": "No brokerage or trading relationship",
+          "body": "Argus is not a broker, dealer, investment adviser, fiduciary, exchange, custodian, or trading venue. Argus does not hold funds, place orders, execute trades, or connect to brokerage accounts."
+        },
+        "historical_simulations": {
+          "title": "Historical simulations are hypothetical",
+          "body": "Historical simulations are hypothetical and depend on the assumptions, data availability, asset support, benchmark defaults, and time windows shown in the product. Simulated returns are not guarantees of future performance."
+        },
+        "alpha_changes": {
+          "title": "Alpha availability and changes",
+          "body": "Argus is in private alpha. Features may change, break, reset, or be removed without notice. We may limit access, suspend accounts, or remove content that creates security, abuse, compliance, or operational risk."
+        },
+        "eligibility": {
+          "title": "Eligibility",
+          "body": "You must be old enough to form a binding agreement in your jurisdiction and allowed to use Argus under applicable law. Do not use Argus on behalf of another person or organization unless you are authorized to do so."
+        },
+        "acceptable_use": {
+          "title": "Acceptable use",
+          "body": "Do not use Argus to break the law, abuse the service, reverse engineer private systems, overload providers, submit sensitive third-party data, or present generated output as professional advice."
+        },
+        "third_party_services": {
+          "title": "Third-party services",
+          "body": "Argus relies on third-party services for hosting, authentication, market data, model access, and chart rendering. TradingView Lightweight Charts is used for chart rendering and attribution, not as an Argus market data source."
+        },
+        "account_support": {
+          "title": "Account support",
+          "body_before_email": "During private alpha, account deletion and support requests are handled manually. Contact",
+          "body_after_email": " or use the in-app account deletion request."
+        }
+      }
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "intro": "This policy explains what Argus handles during private alpha so testers know what happens to account data, conversations, feedback, and provider-backed requests.",
+      "sections": {
+        "data_collect": {
+          "title": "Data we collect",
+          "body": "Argus may collect account details, authentication state, conversations, investing ideas you submit, saved product records, feedback, support requests, browser and device basics, usage events, logs, and error diagnostics."
+        },
+        "data_use": {
+          "title": "How we use data",
+          "body": "We use data to run the product, authenticate users, save and restore conversations, generate and review historical simulations, debug failures, protect the service, respond to support, and improve private alpha quality."
+        },
+        "ai_market_data": {
+          "title": "AI and market data providers",
+          "body": "Conversation content and prompts may be sent to OpenRouter and model providers so Argus can interpret requests and draft responses. Market data and asset discovery may use providers such as Alpaca and Kraken. Provider availability can affect supported symbols, time windows, and results."
+        },
+        "infrastructure": {
+          "title": "Infrastructure and product services",
+          "body": "Argus uses Supabase for authentication and product persistence, Render for hosting, OpenRouter for model access, and PostHog only if product analytics are intentionally enabled. TradingView Lightweight Charts is used as a charting library with attribution; it is not the source of Argus market data."
+        },
+        "access_retention": {
+          "title": "Access and retention",
+          "body": "Founder and administrator access is limited to operating, debugging, securing, and improving the private alpha. We keep data while your account is active, while needed for support or security, or while required by operational records."
+        },
+        "your_controls": {
+          "title": "Your controls",
+          "body_before_email": "You can archive or delete conversations in the app. During private alpha, account deletion is handled manually through the in-app request or by contacting",
+          "body_after_email": "."
+        },
+        "sale_personal_info": {
+          "title": "Sale of personal information",
+          "body": "Argus does not sell personal information during private alpha. If this changes, the policy and product controls must be updated before that behavior ships."
+        }
+      }
+    }
+  },
   "feedback": {
     "title": "Provide feedback",
     "title_bug": "Report a Bug",

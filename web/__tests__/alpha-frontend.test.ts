@@ -1564,34 +1564,66 @@ describe("Argus Alpha frontend contract", () => {
   test("alpha legal pages exist and disclose terms privacy and providers", () => {
     const termsPath = join(root, "app/terms/page.tsx");
     const privacyPath = join(root, "app/privacy/page.tsx");
+    const legalPagePath = join(root, "components/legal/AlphaLegalPage.tsx");
 
     expect(existsSync(termsPath)).toBe(true);
     expect(existsSync(privacyPath)).toBe(true);
+    expect(existsSync(legalPagePath)).toBe(true);
 
     const terms = readFileSync(termsPath, "utf-8");
     const privacy = readFileSync(privacyPath, "utf-8");
+    const legalPage = readFileSync(legalPagePath, "utf-8");
+    const en = readFileSync(
+      join(root, "public/locales/en/common.json"),
+      "utf-8",
+    );
+    const es = readFileSync(
+      join(root, "public/locales/es-419/common.json"),
+      "utf-8",
+    );
 
-    expect(terms).toContain("Effective date: June 30, 2026");
-    expect(terms).toContain("No investment advice");
-    expect(terms).toContain("not a broker");
-    expect(terms).toContain("Historical simulations are hypothetical");
-    expect(terms).toContain("TradingView Lightweight Charts");
+    expect(terms).toContain('kind="terms"');
     expect(terms).toContain("NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL");
-    expect(terms).toContain("font-display");
     expect(terms).not.toContain("TODO");
-
-    expect(privacy).toContain("Effective date: June 30, 2026");
-    expect(privacy).toContain("OpenRouter");
-    expect(privacy).toContain("Supabase");
-    expect(privacy).toContain("Render");
-    expect(privacy).toContain("Alpaca");
-    expect(privacy).toContain("Kraken");
-    expect(privacy).toContain("TradingView Lightweight Charts");
-    expect(privacy).toContain("PostHog");
-    expect(privacy).toContain("prompts may be sent");
+    expect(privacy).toContain('kind="privacy"');
     expect(privacy).toContain("NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL");
-    expect(privacy).toContain("font-display");
     expect(privacy).not.toContain("TODO");
+
+    expect(legalPage).toContain('"use client"');
+    expect(legalPage).toContain("useTranslation");
+    expect(legalPage).toContain("legal.terms.title");
+    expect(legalPage).toContain("legal.privacy.title");
+    expect(legalPage).toContain("font-display");
+    expect(legalPage).toContain("body_before_email");
+    expect(legalPage).toContain("mailto:${supportEmail}");
+
+    expect(en).toContain('"effective_date": "Effective date: June 30, 2026"');
+    expect(en).toContain('"title": "No investment advice"');
+    expect(en).toContain("not a broker");
+    expect(en).toContain("Historical simulations are hypothetical");
+    expect(en).toContain("OpenRouter");
+    expect(en).toContain("Supabase");
+    expect(en).toContain("Render");
+    expect(en).toContain("Alpaca");
+    expect(en).toContain("Kraken");
+    expect(en).toContain("TradingView Lightweight Charts");
+    expect(en).toContain("PostHog");
+    expect(en).toContain("prompts may be sent");
+
+    expect(es).toContain(
+      '"effective_date": "Fecha de entrada en vigor: 30 de junio de 2026"',
+    );
+    expect(es).toContain("No es asesoría de inversión");
+    expect(es).toContain("Argus no es broker");
+    expect(es).toContain("Las simulaciones históricas son hipotéticas");
+    expect(es).toContain("OpenRouter");
+    expect(es).toContain("Supabase");
+    expect(es).toContain("Render");
+    expect(es).toContain("Alpaca");
+    expect(es).toContain("Kraken");
+    expect(es).toContain("TradingView Lightweight Charts");
+    expect(es).toContain("PostHog");
+    expect(es).toContain("prompts puede enviarse");
   });
 
   test("profile menu delete all conversations is recoverable and outcome-aware", () => {
