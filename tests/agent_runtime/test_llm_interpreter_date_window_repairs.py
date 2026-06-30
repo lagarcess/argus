@@ -180,6 +180,14 @@ async def test_current_year_so_far_repairs_llm_year_end_date_range(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.nlp import natural_time as natural_time_module
+
+    class FrozenDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return cls(2026, 6, 30)
+
+    monkeypatch.setattr(natural_time_module, "date", FrozenDate)
 
     async def repair_stub(*, failed_response, request, **kwargs):
         del kwargs
@@ -193,6 +201,12 @@ async def test_current_year_so_far_repairs_llm_year_end_date_range(
                 asset_universe=["AAPL"],
                 asset_class="equity",
                 date_range={"start": "2026-01-01", "end": "2026-12-31"},
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="year_to_date",
+                    year=2026,
+                    confidence=0.9,
+                    evidence="2026 so far",
+                ),
                 comparison_baseline="QQQ",
             ),
             request=request,
@@ -231,7 +245,21 @@ async def test_current_year_so_far_repairs_llm_year_end_date_range(
     assert ready_response.candidate_strategy_draft.comparison_baseline == "QQQ"
     assert ready_response.candidate_strategy_draft.date_range == {
         "start": "2026-01-01",
-            "end": date.today().isoformat(),
+        "end": "2026-06-30",
+    }
+    shifted_resolution = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(
+            kind="year_to_date",
+            year=2026,
+            confidence=0.9,
+            evidence="2026 so far",
+        ),
+        today=date(2027, 1, 15),
+    )
+    assert shifted_resolution is not None
+    assert shifted_resolution.payload == {
+        "start": "2026-01-01",
+        "end": "2026-12-31",
     }
 
 @pytest.mark.asyncio

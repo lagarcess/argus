@@ -77,7 +77,13 @@ def _response_needs_temporal_runtime_repair(
     ):
         return True
     if _current_turn_has_relative_window_evidence(request):
-        return True
+        return (
+            resolved_from_draft is None
+            or not isinstance(draft.date_range, dict)
+            or has_partial_explicit_date_range(draft.date_range)
+            or _normalized_stated_field(draft.date_range)
+            != _normalized_stated_field(resolved_from_draft)
+        )
     if (
         resolved_from_draft is not None
         and isinstance(draft.date_range, dict)

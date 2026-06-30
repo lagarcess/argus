@@ -22,6 +22,7 @@ from argus.agent_runtime.interpreter.executable_grounding import (
 )
 from argus.agent_runtime.interpreter.shared import (
     _bounded_date_evidence_candidates,
+    _date_range_from_bounded_evidence,
     _date_range_from_intent_or_bounded_evidence,
     _date_range_with_fidelity_audit,
     _draft_has_comparison_baseline_evidence,
@@ -469,11 +470,63 @@ def _resolved_runtime_date_range_from_draft(
         except Exception:
             resolved = None
         if resolved is not None and not resolved.used_default:
+            current_message_range = (
+                _runtime_date_range_from_current_message_or_draft_evidence(
+                    draft,
+                    request=request,
+                )
+            )
+            if (
+                current_message_range is not None
+                and _normalized_stated_field(resolved.payload)
+                != _normalized_stated_field(current_message_range)
+            ):
+                return current_message_range
             return resolved.payload
     return _date_range_from_intent_or_bounded_evidence(
         draft,
         language=request.user.language_preference,
     )
+
+
+def _runtime_date_range_from_current_message_or_draft_evidence(
+    draft: LLMStrategyDraft,
+    *,
+    request: InterpretationRequest,
+) -> dict[str, str] | None:
+    bounded = _date_range_from_bounded_evidence(
+        draft,
+        language=request.user.language_preference,
+    )
+    if bounded is not None:
+        return bounded
+    if not _date_range_intent_evidence_matches_current_message(draft, request=request):
+        return None
+    resolved = resolve_date_range_intent(draft.date_range_intent)
+    if resolved is None:
+        return None
+    return resolved.payload
+
+
+def _date_range_intent_evidence_matches_current_message(
+    draft: LLMStrategyDraft,
+    *,
+    request: InterpretationRequest,
+) -> bool:
+    evidence = str(getattr(draft.date_range_intent, "evidence", "") or "").strip()
+    if not evidence:
+        return False
+    evidence_text = evidence.casefold()
+    current_message = request.current_user_message.casefold()
+    if evidence_text in current_message:
+        return True
+    for candidate in _bounded_date_evidence_candidates(draft):
+        candidate_text = str(candidate or "").strip().casefold()
+        if candidate_text and (
+            evidence_text in candidate_text or candidate_text in evidence_text
+        ):
+            return True
+    return False
 
 
 def _pending_dca_assumption_reply_needs_stated_run_field_audit(
