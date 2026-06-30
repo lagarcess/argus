@@ -215,14 +215,17 @@ Codex should own or closely supervise this:
      readiness context at
      `docs/archive/private-alpha-controlled-readiness-panel.md`.
 
-2. **Research Lab product spec**
+2. **Evidence-aware idea loop source thesis**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
-     saved research, and monitoring belong in a dedicated spec before code.
-   - The active refined draft is
-     `docs/specs/evidence-aware-idea-loop.md`. It supersedes the narrower
-     "research first" framing by defining direct test, education, light
-     evidence, deep research, and monitoring lanes.
-   - This branch may refine that spec, but it must not implement the
+     saved research, and monitoring remain design/reference material until the
+     active roadmap starts a bounded slice.
+   - `docs/specs/evidence-aware-idea-loop.md` is preserved in `docs/specs/` as
+     the source thesis that informed
+     `docs/specs/private-alpha-next-decision-memo.md`. It is not the active
+     sequencing document.
+   - Use the decision memo for current strategy and
+     `docs/specs/private-alpha-next-roadmap.md` for current execution. This
+     branch may refine the source thesis, but it must not implement the
      evidence-aware idea loop without explicit approval.
 
 ## Known Non-Blocking Debt

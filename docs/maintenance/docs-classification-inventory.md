@@ -2,12 +2,14 @@
 
 ## Summary
 
-Snapshot note: refreshed after the clean P0 continuity reintegration on
-`codex/private-alpha-next-reintegration` at `bbd9f10`.
+Snapshot note: refreshed for `codex/private-alpha-next` after P2.0/P2.1 landed
+and after the evidence-aware loop was reclassified as source thesis for the
+decision memo.
 
 Current source stack after the canon docs:
 
-1. `docs/specs/private-alpha-next-roadmap.md` is the active P1 execution board.
+1. `docs/specs/private-alpha-next-roadmap.md` is the active Private Alpha Next
+   execution board.
 2. `docs/specs/private-alpha-next-decision-memo.md` is the active strategic
    north star and slice-onboarding source.
 3. `docs/specs/private-alpha-ci-cd-sota.md`,
@@ -19,11 +21,8 @@ Quarantine branches are reference material only. Do not broad cherry-pick
 runtime work from `codex/private-alpha-next-quarantine-fc231e8`; promote only
 small, reviewed, revertable slices.
 
-Snapshot note: refreshed for the `codex/private-alpha-next` CI/CD SOTA mission.
-For this branch, `docs/specs/private-alpha-ci-cd-sota.md` is the current active
-goal. `docs/specs/private-alpha-next-integration.md` remains staging/process
-context, and `docs/specs/private-alpha-next-decision-memo.md` is future context
-only.
+Release-discipline note: `docs/specs/private-alpha-ci-cd-sota.md` remains the
+release-gate reference. It does not own Private Alpha Next product sequencing.
 
 Archive pass: high-confidence stale private-alpha specs and completed checkpoint
 docs were moved from `docs/specs/` to `docs/archive/` so active agents do not
@@ -50,8 +49,8 @@ mistake them for current command sources.
 | `docs/archive/private-alpha-readiness-orchestration.md` | archived branch-specific context | Coordination note for `codex/private-alpha-readiness-clean`; not the current Private Alpha Next roadmap. | Keep archived for readiness-lane archaeology. | Readiness lane |
 | `docs/archive/private-alpha-controlled-readiness-panel.md` | archived branch/lane-specific context | Controlled-alpha readiness panel for readiness decisions; useful evidence but not the active roadmap. | Keep archived for readiness-lane archaeology. | Readiness lane |
 | `docs/archive/private-alpha-performance-readiness-audit.md` | archived branch/lane-specific context | Supporting performance addendum for the controlled readiness slice. | Keep archived for readiness-lane archaeology. | Readiness lane |
-| `docs/specs/evidence-aware-idea-loop.md` | future/later context | Active refined product spec for the post-conversation-trust direction. It keeps direct test, education, light evidence, deep research, and monitoring as lanes into one durable idea loop. | Keep as future product context. | Future |
-| `docs/archive/research-lab-thesis.md` | archived historical evidence | Earlier Research Lab thesis draft. It is retained for context and explicitly refined by `docs/specs/evidence-aware-idea-loop.md`. | Keep archived for product archaeology. | Superseded by active evidence-aware loop spec. |
+| `docs/specs/evidence-aware-idea-loop.md` | source thesis / strategic background | Source product thesis for the durable idea loop. It directly informed `docs/specs/private-alpha-next-decision-memo.md`, which now owns current strategy. | Keep in `docs/specs/` with a clear source-thesis banner; do not treat as the active sequencing doc. | Provenance for the current decision memo |
+| `docs/archive/research-lab-thesis.md` | archived historical evidence | Earlier Research Lab thesis draft. It is retained for context and refined by `docs/specs/evidence-aware-idea-loop.md`, which then informed the decision memo. | Keep archived for product archaeology. | Superseded by evidence-aware source thesis and current decision memo |
 | `docs/archive/private-alpha-backtest-execution-capacity.md` | archived historical evidence | Draft from 2026-06-05; later release/runtime docs own active deployment discipline and architecture truth. | Keep archived for runtime-capacity archaeology. | Historical capacity draft |
 | `docs/archive/agent-architecture.md` | archived historical evidence | Proposed architecture from 2026-04-29. Predates the conversation trust milestone. | Keep archived for architecture archaeology. | Stale date |
 | `docs/CONVERSATIONAL_RUNTIME.md` | unclear/needs owner decision | Status is "Active Alpha implementation", but unclear if it's canon, active spec, or superseded by `docs/ARCHITECTURE.md`. | Decide if canon or stale/superseded. |  |

@@ -1,6 +1,7 @@
 # Conversational Edit Contract — Design Spec
 
-Status: design-first (spec before implementation). In progress on `codex/edit-contract`.
+Status: Built + landed on `codex/private-alpha-next` (`0fb32c1`); retained as
+the conversational edit contract reference.
 Date: 2026-06-28 (updated — chips + iterative back-and-forth are core, not a fast-follow)
 Branch family: `codex/private-alpha-next`
 Sequence: first build slice of the P2 "make it trustworthy" track; sibling to
