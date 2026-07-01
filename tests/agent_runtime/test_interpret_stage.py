@@ -6632,7 +6632,7 @@ def test_interpreter_unavailable_spanish_pending_strategy_applies_calendar_year_
     )
 
 
-def test_interpreter_unavailable_pending_simplification_accepts_messy_buy_hold_choice(
+def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choice(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -6659,6 +6659,13 @@ def test_interpreter_unavailable_pending_simplification_accepts_messy_buy_hold_c
         state=RunState.new(
             current_user_message="yeah compare w/ buy and hold pls",
             recent_thread_history=[],
+            action_context={
+                "type": "select_response_option",
+                "label": "Compare with buy and hold",
+                "payload": {
+                    "replacement_values": {"strategy_type": "buy_and_hold"},
+                },
+            },
         ),
         user=UserState(user_id="u1"),
         latest_task_snapshot=snapshot,
@@ -6705,8 +6712,32 @@ def test_interpreter_unavailable_pending_simplification_accepts_messy_buy_hold_c
     )
 
 
-def test_interpreter_unavailable_pending_simplification_accepts_spanish_buy_hold_choice(
+@pytest.mark.parametrize(
+    ("message", "typed_selection", "expected_strategy_type", "expected_rule"),
+    [
+        (
+            "sí, usa una regla RSI compatible",
+            {"simplify_logic": "rsi_only"},
+            "indicator_threshold",
+            "rsi_threshold",
+        ),
+        (
+            "usa el cruce de medias móviles",
+            {
+                "strategy_type": "signal_strategy",
+                "rule_family": "moving_average_crossover",
+            },
+            "signal_strategy",
+            "moving_average_crossover",
+        ),
+    ],
+)
+def test_interpreter_unavailable_pending_simplification_uses_typed_selection(
     monkeypatch,
+    message: str,
+    typed_selection: dict[str, object],
+    expected_strategy_type: str,
+    expected_rule: str,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -6730,8 +6761,15 @@ def test_interpreter_unavailable_pending_simplification_accepts_spanish_buy_hold
 
     result = interpret_stage(
         state=RunState.new(
-            current_user_message="sí, compáralo con comprar y mantener porfa",
+            current_user_message=message,
             recent_thread_history=[],
+            action_context={
+                "type": "select_response_option",
+                "label": message,
+                "payload": {
+                    "replacement_values": typed_selection,
+                },
+            },
         ),
         user=UserState(user_id="u1", language_preference="es-419"),
         latest_task_snapshot=snapshot,
@@ -6744,7 +6782,7 @@ def test_interpreter_unavailable_pending_simplification_accepts_spanish_buy_hold
                     {
                         "label": "Use a supported RSI threshold rule",
                         "replacement_values": {
-                            "strategy_type": "indicator_threshold",
+                            "simplify_logic": "rsi_only",
                         },
                     },
                     {
@@ -6757,7 +6795,8 @@ def test_interpreter_unavailable_pending_simplification_accepts_spanish_buy_hold
                     {
                         "label": "Use a supported moving-average crossover",
                         "replacement_values": {
-                            "strategy_type": "moving_average_crossover",
+                            "strategy_type": "signal_strategy",
+                            "rule_family": "moving_average_crossover",
                         },
                     },
                 ],
@@ -6768,10 +6807,18 @@ def test_interpreter_unavailable_pending_simplification_accepts_spanish_buy_hold
 
     assert result.outcome == "needs_clarification"
     strategy = result.decision.candidate_strategy_draft
-    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.strategy_type == expected_strategy_type
     assert strategy.asset_universe == ["TSLA"]
-    assert strategy.entry_logic is None
     assert strategy.strategy_thesis is None
+    if expected_rule == "rsi_threshold":
+        assert strategy.extra_parameters["indicator_parameters"] == {
+            "indicator": "rsi",
+            "indicator_period": 14,
+            "entry_threshold": 30.0,
+            "exit_threshold": 55.0,
+        }
+    else:
+        assert strategy.entry_rule["type"] == expected_rule
     assert result.decision.missing_required_fields == ["date_range"]
     assert "pending_response_option_interpreter_unavailable_repaired" in (
         result.decision.reason_codes

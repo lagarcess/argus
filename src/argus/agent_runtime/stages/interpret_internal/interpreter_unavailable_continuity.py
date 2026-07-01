@@ -24,6 +24,9 @@ from argus.agent_runtime.interpreter.pending_option import (
 )
 from argus.agent_runtime.interpreter.strategy_builder import _strategy_from_llm
 from argus.agent_runtime.resolution import AssetResolution
+from argus.agent_runtime.simplification_option_contract import (
+    simplification_option_matches_selection,
+)
 from argus.agent_runtime.stages.artifact_context import (
     active_confirmation_effective_strategy,
 )
@@ -40,7 +43,6 @@ from argus.agent_runtime.stages.interpret_types import (
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import RunState, StrategySummary, TaskSnapshot
-from argus.agent_runtime.strategy_contract import canonical_strategy_type
 from argus.domain.indicators import draft_only_indicator_from_text
 
 ResolveAssetCandidate = Callable[..., AssetResolution | None]
@@ -68,8 +70,9 @@ def pending_response_option_when_interpreter_unavailable(
         user=user,
     )
     options = _pending_response_intent_options(request)
-    option_index = _pending_response_option_index_from_text(
-        current_user_message,
+    option_index = _pending_response_option_index_from_typed_selection(
+        state=state,
+        selected_thread_metadata=selected_thread_metadata,
         options=options,
     )
     if option_index is None:
@@ -313,96 +316,100 @@ def structured_interpretation_has_complete_typed_asset_patch(
     )
 
 
-def _pending_response_option_index_from_text(
-    text: str,
+def _pending_response_option_index_from_typed_selection(
     *,
+    state: RunState,
+    selected_thread_metadata: dict[str, Any],
     options: list[dict[str, Any]],
 ) -> int | None:
-    user_tokens = _pending_option_selection_tokens(text)
-    if not user_tokens:
+    if not options:
         return None
-    best_index: int | None = None
-    best_overlap = 0
-    tied = False
-    for index, option in enumerate(options):
-        option_tokens = _pending_option_selection_tokens(
-            " ".join(
-                [
-                    str(option.get("label") or ""),
-                    _pending_option_replacement_selection_terms(
-                        option.get("replacement_values")
-                    ),
-                ]
+    for index in _typed_selected_option_indices(
+        state=state,
+        selected_thread_metadata=selected_thread_metadata,
+    ):
+        if 0 <= index < len(options):
+            return index
+    for selected_values in _typed_selected_replacement_values(
+        state=state,
+        selected_thread_metadata=selected_thread_metadata,
+    ):
+        matches = [
+            index
+            for index, option in enumerate(options)
+            if simplification_option_matches_selection(
+                option_replacement_values=option.get("replacement_values"),
+                selected_replacement_values=selected_values,
             )
-        )
-        overlap = len(user_tokens & option_tokens)
-        if overlap < 2:
-            continue
-        if overlap > best_overlap:
-            best_index = index
-            best_overlap = overlap
-            tied = False
-        elif overlap == best_overlap:
-            tied = True
-    return None if tied else best_index
+        ]
+        if len(matches) == 1:
+            return matches[0]
+    return None
 
 
-def _pending_option_replacement_selection_terms(value: Any) -> str:
-    if not isinstance(value, dict):
-        return ""
-    terms: list[str] = []
-    strategy_type = canonical_strategy_type(value.get("strategy_type"))
-    if strategy_type == "buy_and_hold":
-        terms.extend(["buy hold", "buy and hold", "compra mantener"])
-    elif strategy_type == "indicator_threshold":
-        terms.extend(["indicator threshold", "rsi threshold"])
-    elif strategy_type == "moving_average_crossover":
-        terms.extend(["moving average crossover"])
-    for key in ("requested_field", "cadence", "timeframe", "comparison_baseline"):
-        if value.get(key) not in (None, "", [], {}):
-            terms.append(str(value[key]))
-    return " ".join(terms)
+def _typed_selected_option_indices(
+    *,
+    state: RunState,
+    selected_thread_metadata: dict[str, Any],
+) -> list[int]:
+    indices: list[int] = []
+    for payload in _typed_selection_payloads(
+        state=state,
+        selected_thread_metadata=selected_thread_metadata,
+    ):
+        for key in (
+            "option_index",
+            "selected_option_index",
+            "response_option_index",
+        ):
+            index = payload.get(key)
+            if isinstance(index, int) and not isinstance(index, bool):
+                indices.append(index)
+    return indices
 
 
-def _pending_option_selection_tokens(value: str) -> set[str]:
-    normalized = (
-        str(value or "")
-        .casefold()
-        .replace("&", " and ")
-        .replace("/", " ")
-        .replace("-", " ")
-    )
-    chars = [char if char.isalnum() else " " for char in normalized]
-    aliases = {
-        "w": "with",
-        "ma": "moving",
-        "comprar": "compra",
-        "mantén": "mantener",
-        "manten": "mantener",
-    }
-    stopwords = {
-        "a",
-        "an",
-        "and",
-        "con",
-        "el",
-        "la",
-        "los",
-        "ok",
-        "okay",
-        "pls",
-        "please",
-        "porfa",
-        "si",
-        "sí",
-        "the",
-        "use",
-        "with",
-        "yeah",
-        "y",
-    }
-    return {
-        token
-        for raw_token in "".join(chars).split()
-        if (token := aliases.get(raw_token, raw_token)) not in stopwords
-    }
+def _typed_selected_replacement_values(
+    *,
+    state: RunState,
+    selected_thread_metadata: dict[str, Any],
+) -> list[dict[str, Any]]:
+    selections: list[dict[str, Any]] = []
+    for payload in _typed_selection_payloads(
+        state=state,
+        selected_thread_metadata=selected_thread_metadata,
+    ):
+        for key in (
+            "replacement_values",
+            "selected_replacement_values",
+            "response_option_replacement_values",
+        ):
+            value = payload.get(key)
+            if isinstance(value, dict):
+                selections.append(dict(value))
+        option = payload.get("response_option")
+        if isinstance(option, dict) and isinstance(option.get("replacement_values"), dict):
+            selections.append(dict(option["replacement_values"]))
+    return selections
+
+
+def _typed_selection_payloads(
+    *,
+    state: RunState,
+    selected_thread_metadata: dict[str, Any],
+) -> list[dict[str, Any]]:
+    payloads: list[dict[str, Any]] = []
+    if state.structured_action is not None:
+        payloads.append(dict(state.structured_action.payload))
+    for key in (
+        "response_option_selection",
+        "selected_response_option",
+        "chat_action",
+        "structured_action",
+    ):
+        value = selected_thread_metadata.get(key)
+        if isinstance(value, dict):
+            payloads.append(value)
+            nested_payload = value.get("payload")
+            if isinstance(nested_payload, dict):
+                payloads.append(nested_payload)
+    return payloads

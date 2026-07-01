@@ -532,15 +532,20 @@ async def _stage_result_from_interpretation(
                 "requires_clarification": True,
             }
         )
-    incoming_strategy, supported_indicator_simplification_applied = (
-        _strategy_with_supported_indicator_simplification(
-            strategy=incoming_strategy,
-            snapshot=snapshot,
-            selected_thread_metadata=selected_thread_metadata,
-            semantic_turn_act=interpretation.semantic_turn_act,
-            task_relation=interpretation.task_relation,
-        )
+    typed_pending_option_applied = (
+        "pending_response_option_selected" in interpretation.reason_codes
     )
+    supported_indicator_simplification_applied = False
+    if not typed_pending_option_applied:
+        incoming_strategy, supported_indicator_simplification_applied = (
+            _strategy_with_supported_indicator_simplification(
+                strategy=incoming_strategy,
+                snapshot=snapshot,
+                selected_thread_metadata=selected_thread_metadata,
+                semantic_turn_act=interpretation.semantic_turn_act,
+                task_relation=interpretation.task_relation,
+            )
+        )
     if supported_indicator_simplification_applied:
         interpretation = interpretation.model_copy(
             update={

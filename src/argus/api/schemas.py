@@ -447,6 +447,7 @@ ChatActionType = Literal[
     "refine_strategy",
     "save_strategy",
     "retry_failed_action",
+    "select_response_option",
 ]
 
 

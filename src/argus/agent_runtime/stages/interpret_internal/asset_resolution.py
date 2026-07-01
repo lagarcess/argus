@@ -51,6 +51,7 @@ from argus.agent_runtime.strategy_contract import (
 )
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
+    strategy_has_executable_signal_rule,
 )
 from argus.agent_runtime.strategy_requirements import (
     valid_rule_spec_from_strategy as _valid_rule_spec_from_strategy,
@@ -1190,6 +1191,16 @@ def _missing_fields_for_interpretation(
         strategy,
         contract=contract,
     )
+    if (
+        "pending_response_option_selected" in interpretation.reason_codes
+        and (
+            executable_strategy_type(strategy) == "indicator_threshold"
+            or strategy_has_executable_signal_rule(strategy)
+        )
+    ):
+        required_missing_fields = [
+            field for field in required_missing_fields if field != "strategy_thesis"
+        ]
     if executable_strategy_type(strategy) not in SUPPORTED_STRATEGY_TYPES:
         required_missing_fields = list(
             dict.fromkeys(["entry_logic", *required_missing_fields])

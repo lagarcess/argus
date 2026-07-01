@@ -505,7 +505,7 @@ def test_clarify_unsupported_recovery_llm_failure_uses_structured_fallback() -> 
     assert "TSLA" in prompt
     assert "Use a supported RSI threshold rule" in prompt
     assert "Compare with buy and hold" in prompt
-    assert "Use a moving-average crossover" in prompt
+    assert "Use a supported moving-average crossover" in prompt
 
 
 def test_clarify_spanish_unsupported_recovery_fallback_uses_structured_options() -> None:
@@ -527,9 +527,21 @@ def test_clarify_spanish_unsupported_recovery_fallback_uses_structured_options()
                 "raw_value": "ATR 14",
                 "explanation": "ATR 14 no define cuándo comprar o vender.",
                 "simplification_options": [
-                    {"label": "Usar una regla RSI compatible"},
-                    {"label": "Comparar con comprar y mantener"},
-                    {"label": "Usar un cruce de medias móviles"},
+                    {
+                        "label": "Use a supported RSI threshold rule",
+                        "replacement_values": {"simplify_logic": "rsi_only"},
+                    },
+                    {
+                        "label": "Compare with buy and hold",
+                        "replacement_values": {"strategy_type": "buy_and_hold"},
+                    },
+                    {
+                        "label": "Use a moving-average crossover",
+                        "replacement_values": {
+                            "strategy_type": "signal_strategy",
+                            "rule_family": "moving_average_crossover",
+                        },
+                    },
                 ],
             }
         ]
@@ -549,7 +561,8 @@ def test_clarify_spanish_unsupported_recovery_fallback_uses_structured_options()
     assert "TSLA" in prompt
     assert "Usar una regla RSI compatible" in prompt
     assert "Comparar con comprar y mantener" in prompt
-    assert "Usar un cruce de medias móviles" in prompt
+    assert "Usar un cruce de medias móviles compatible" in prompt
+    assert "Use a moving-average crossover" not in prompt
     assert "¿Qué camino quieres usar:" in prompt
 
 

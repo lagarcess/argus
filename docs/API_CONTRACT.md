@@ -1228,6 +1228,10 @@ Soft delete conversation.
   gating (for example `ARGUS_STRATEGIES_ENABLED=false`) and must not create a
   hidden saved-strategy object when the Strategies surface is disabled.
 - `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose. Assistant message metadata must record `result_breakdown_source`, `result_breakdown_fallback_used`, and, when applicable, `result_breakdown_failure_mode` so optional Explain-result fallback does not masquerade as the normal LLM path.
+- `select_response_option` is valid only for typed response-intent options. Its
+  payload must identify the selected option through `option_index` or
+  `replacement_values`. Labels are display text only and must not drive runtime
+  selection.
 
 ### Conversation Artifact Continuity Contract
 

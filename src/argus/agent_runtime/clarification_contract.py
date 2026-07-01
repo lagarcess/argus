@@ -4,6 +4,9 @@ from typing import Any
 
 from argus.agent_runtime.presentation_i18n import runtime_locale
 from argus.agent_runtime.recovery_messages import recovery_message
+from argus.agent_runtime.simplification_option_contract import (
+    localized_simplification_option_label,
+)
 from argus.agent_runtime.state.models import StrategySummary
 
 OFFLINE_CLARIFICATION_FALLBACK = recovery_message(
@@ -93,13 +96,12 @@ def _unsupported_recovery_fallback(
     response_intent: dict[str, Any],
     strategy: StrategySummary | dict[str, Any] | None,
 ) -> str | None:
-    options = _option_labels(response_intent)
+    locale = runtime_locale(language)
+    options = _option_labels(response_intent, locale=locale)
     if not options:
         return None
     raw_value = _unsupported_raw_value(response_intent)
     symbol = _primary_symbol(strategy)
-    locale = runtime_locale(language)
-    options = [_localized_option_label(option, locale=locale) for option in options]
     joined_options = _join_options(options, locale=locale)
     if locale == "es-419":
         subject = raw_value or "Esa regla"
@@ -116,19 +118,7 @@ def _unsupported_recovery_fallback(
     )
 
 
-def _localized_option_label(label: str, *, locale: str) -> str:
-    if locale != "es-419":
-        return label
-    return {
-        "Use a supported RSI threshold rule": "Usar una regla RSI compatible",
-        "Compare with buy and hold": "Comparar con comprar y mantener",
-        "Use a supported moving-average crossover": (
-            "Usar un cruce de medias móviles compatible"
-        ),
-    }.get(label, label)
-
-
-def _option_labels(response_intent: dict[str, Any]) -> list[str]:
+def _option_labels(response_intent: dict[str, Any], *, locale: str) -> list[str]:
     raw_options = response_intent.get("options")
     if not isinstance(raw_options, list):
         return []
@@ -136,12 +126,15 @@ def _option_labels(response_intent: dict[str, Any]) -> list[str]:
     for option in raw_options:
         if not isinstance(option, dict):
             continue
-        label = option.get("label")
-        if not isinstance(label, str):
+        label = localized_simplification_option_label(
+            label=option.get("label"),
+            replacement_values=option.get("replacement_values"),
+            locale=locale,
+        )
+        if label is None:
             continue
-        cleaned = label.strip()
-        if cleaned and cleaned not in labels:
-            labels.append(cleaned)
+        if label not in labels:
+            labels.append(label)
     return labels[:3]
 
 

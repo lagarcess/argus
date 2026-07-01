@@ -73,6 +73,7 @@ export type ChatActionOption = {
     | "refine_strategy"
     | "save_strategy"
     | "retry_failed_action"
+    | "select_response_option"
     | "retry_last_turn"
     | "retry_load_conversation";
   presentation?: "confirmation" | "result";
