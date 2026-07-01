@@ -207,7 +207,7 @@ Argus is chat-first, AI-first, and trust-first. The assistant should help a norm
 
 These principles come from the recent modular monolith / LangGraph migration plans in `docs/superpowers/plans/` and must not regress:
 
-- **LLM-first interpretation**: Normal user language must reach the structured LLM interpreter before routing decisions. Do not add regex, hardcoded language gates, or legacy NLU shortcuts before the interpreter.
+- **LLM-first interpretation**: Normal user language must reach the structured LLM interpreter before routing decisions. Do not add regex, hardcoded language gates, localized stop-word or alias tables, display-label token matching, or legacy NLU shortcuts before the interpreter. Offline fallback choices must use typed action metadata such as button ids or `replacement_values`, not per-language phrasebooks.
 - **Deterministic guardrails after interpretation**: Code validates facts the LLM cannot own: asset resolution, provider availability, same-asset constraints, max symbol limits, date/data windows, executable indicator support, benchmark defaults, and required fields.
 - **One active chat brain**: The LangGraph runtime is the only active conversational runtime. Do not restore or recreate a parallel legacy orchestrator, state machine, or second intent taxonomy.
 - **LangGraph owns runtime memory**: Runtime thread state belongs in the LangGraph checkpointer using `thread_id == conversation_id`. Supabase owns product persistence such as messages, conversations, backtest runs, strategies, collections, feedback, and usage counters.

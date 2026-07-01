@@ -712,7 +712,7 @@ If not, it likely should wait.
 
 When writing any code that touches `agent_runtime/`, ask:
 
-1. **Does this add a regex or early-return gate before the LLM call?** If yes, stop. Move the logic to the LLM system prompt instead.
+1. **Does this add a regex, localized stop-word/alias table, display-label token matcher, or early-return gate before the LLM call?** If yes, stop. Move language interpretation to the LLM system prompt or consume typed action metadata instead.
 2. **Does this store derived state in `TaskSnapshot`?** If yes, stop. Compute it fresh from `pending_strategy_summary` instead.
 3. **Does this add natural language strings to a stage file?** If yes, stop. The LLM generates the response; stage files orchestrate only.
 4. **Does this use `.invoke()` on the graph in production?** If yes, stop. Use `astream_events()` instead.

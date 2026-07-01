@@ -1050,6 +1050,7 @@ Argus supports English and Spanish (Latin America) in Alpha.
 ## Runtime Language Contract
 - User input may arrive in any supported language, currently English or Spanish (Latin America).
 - LLM interpretation owns natural-language semantics and must return canonical machine fields; runtime code must not branch on localized whole-turn phrases before interpretation.
+- Offline or degraded-mode recovery may apply typed action metadata such as button ids, `chat_action`, or `replacement_values`; it must not infer semantic choices from localized display labels, stop-word lists, or alias phrasebooks.
 - User-facing assistant prose should follow the resolved `language`, while executable fields such as `strategy_type`, `asset_class`, `timeframe`, `cadence`, `date_range`, `date_range_intent`, and `comparison_baseline` remain language-neutral.
 - Locale-specific rendering, such as compact dates and currency/number formats, belongs in locale-aware presentation code, not backend prose contracts.
 - Capability registries may keep machine compatibility aliases such as snake_case legacy identifiers, but they must not become natural-language phrasebooks in English, Spanish, or future languages.
