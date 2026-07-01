@@ -2,11 +2,18 @@
 
 Status: P2.0 + P2.1 DONE (spine gate, capability registry, conversational edit
 contract). Idea Ledger lightweight recall (#132) and spine modularization (#133)
-merged into `codex/private-alpha-next` (tip `d1c630e`). Remaining P2 reframed
-end-to-end around the compounding loop (see "P2 end-to-end" under Milestones).
-Fees/slippage realism is an async isolated workstream (issue #130); the clean-checkout
-test gate before `main` is issue #134.
-Date: 2026-06-29
+merged into `codex/private-alpha-next`; recent follow-ups include modularity
+budget guardrails (#136), the clean-checkout suite gate repair (#135), alpha
+legal/Data Controls surfaces (#137), and date-window helper cleanup (#138).
+Remaining P2 is reframed end-to-end around decision-memo execution gates, with
+the compounding loop as the highest-leverage PMF gate. Fees/slippage realism is
+an async isolated workstream (issue #130).
+Current pointer: PR #139 (`codex/chat-continuity-regression-repair`) is the
+active in-flight Gate B / P2.4 reliability repair for chat continuity,
+unsupported-recovery continuation, confirmation-card edits, RSI threshold edits,
+Recents attention, and Omnisearch default-on QA. After PR #139 lands or is
+closed, return to Gate A Slice 1: refine -> linked `IdeaVersion`.
+Date: 2026-07-01
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
 
@@ -302,15 +309,64 @@ disease cannot recur silently.
 Each slice owns a PMF gate, is demoable in a founder-guided session, and is one
 revertable slice family.
 
-##### P2 end-to-end: the compounding loop (AUTHORITATIVE slicing, 2026-06-28)
+##### P2 end-to-end: decision memo execution gates (AUTHORITATIVE board, 2026-07-01)
 
 Evidence-grounded after a live walkthrough + code grounding pass. The decision memo's
 moat is the loop where ideas are tested, remembered, compared, and trusted (memo §4.1,
-§5.6, §5.7). P2's remaining work IS closing that loop. The P2.x specs further below
-remain the per-slice detail (PMF gates, verification, stop conditions); this is the
-authoritative sequence.
+§5.6, §5.7). P2's remaining work is closing that loop. Treat the items below as
+execution gates, not as a second roadmap and not as hard order dependencies. The
+P2.x specs further below remain the per-slice detail (PMF gates, verification, stop
+conditions); this is the decision-memo board that classifies what is highest
+leverage, what can run in parallel, and what stays deferred.
 
-DONE + landed on `codex/private-alpha-next` (tip `d1c630e`, pushed):
+**Gate A: memory-backed compounding loop (highest leverage).**
+
+End-to-end shape: messy idea -> canonical idea -> backtest/evidence artifact ->
+saved decision -> refine creates a linked version -> compare versions -> revisit
+later with context. This includes structured Argus product memory earlier in the
+plan than generic retrieval work: `Idea`, `IdeaVersion`, `EvidenceArtifact`,
+`DecisionNote`, user-confirmed `MemoryRecord`, and retrieval from those product
+objects are the contract. RAG, graph RAG, agentic RAG, Mem0, Zep, Graphiti, and
+similar tools are optional implementation leverage behind that contract, not the
+source of truth.
+
+**Gate B: trust, recovery, and measurement (runs alongside Gate A).**
+
+Wire product events, eval cases, cost/latency ledger, correlation IDs, recovery
+tests, Spanish parity, and browser QA evidence as the loop lands. This is not a
+separate product surface; it makes founder-guided sessions measurable and keeps
+runtime behavior honest. Current active work: PR #139 is a Gate B/P2.4 repair
+slice, not a replacement for the Gate A product swing.
+
+**Gate C: evidence credibility (parallel, isolated).**
+
+Execution realism, fees/slippage, benchmark clarity, data assumptions, and the
+`BacktestEngine` boundary improve the trustworthiness of evidence artifacts. This
+work is async under issue #130 and must remain flag-safe and surgically replayed
+from any stale branch evidence; do not broad-merge an old engine branch.
+
+**Gate D: memory controls and privacy (required for memory expansion).**
+
+Memory must be earned opt-in, inspectable, editable, deletable, resettable, and
+explainable ("why was this used?"). Alpha legal/Data Controls work (#137) is the
+surface to extend. Do not add automatic broad personalization memory before these
+controls exist.
+
+**Parallel design/prototype lanes.**
+
+These may progress without touching the runtime spine: sanitized public excerpt
+design/mock, voice-to-composer STT prototype, thin iOS shell proof, broker/export
+packet design, security/privacy review, and monetization/entitlement architecture.
+They become implementation work only when the active gate explicitly starts them.
+
+**Avoid for now.**
+
+Do not add generic RAG as canonical memory, always-on automatic memory, a new
+dashboard competing with chat, public raw conversation links, broker sandbox auth
+or execution, speech-to-speech, a native iOS release, payments, or a second chat
+interpreter/orchestrator.
+
+DONE + landed on `codex/private-alpha-next`:
 
 - P2.0 spine guardrail gate (tripwires live).
 - P2.1.a capability registry (single derivation surface).
@@ -370,18 +426,22 @@ SUPPORTING LAYERS (around the loop, not the swing):
   `lagarcess/argus#130` + worktree `codex/engine-realism` (flag-gated
   `ARGUS_ENABLE_EXECUTION_REALISM`, default off; cherry-pick per phase). Off the critical
   path; the founder deliberately disclaims assumptions for the PMF stage.
-- **Recovery + language-agnostic** (= P2.4 below): works, but on HARDCODED per-language
-  copy (`api/chat/streaming.py:47` `assistant_copy_for_result`, `recovery_messages.py`) —
-  debt AND the blocker to scaling past Spanish. Retire the tables -> model-voiced;
-  prove parity by eval.
+- **Recovery + language-agnostic** (= P2.4 below): PR #139 is the active in-flight
+  repair for concrete chat-continuity regressions in this layer (unsupported ATR
+  recovery continuation, confirmation-card edits, pending date answers, RSI threshold
+  edits, Recents attention, and Omnisearch default-on QA). It also tightens the
+  localized phrasebook anti-pattern by requiring degraded fallbacks to consume typed
+  ids/payloads instead of display-label text. Remaining broader P2.4 work is retiring
+  hardcoded per-language recovery copy (`api/chat/streaming.py:47`
+  `assistant_copy_for_result`, `recovery_messages.py`) toward model-voiced parity
+  proven by eval.
 - **Measurement** (= P2.5 below): the `argus_observability_event/v1` envelope is BUILT
   but non-emitting; wire emitting + append-only CostLedger + eval harness so each slice
   produces PMF signal. Weave in early; do not gate the loop on it.
-- **Release-gate health** (P2.5-adjacent; blocks `main`, NOT a loop slice): the suite is
-  not green in a clean checkout on the current date — 11 failures (date-coupled date
-  repairs, conversational-contract benchmark/audit cases, one `api/main.py` structural
-  guard). Make it date-stable + clean-checkout-green before the proven branch -> `main`
-  promotion. Issue #134.
+- **Release-gate health** (P2.5-adjacent; blocks `main`, NOT a loop slice): the clean
+  checkout suite gate from issue #134 was repaired by PR #135. Keep rerunning the exact
+  clean-checkout gate before branch promotion or `main` promotion instead of treating
+  the repair as permanent proof for future SHAs.
 
 "P2 done" = Argus **remembers, compares, and stays honest about staleness** — the memo's
 moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
@@ -545,9 +605,11 @@ Stop immediately and escalate to the founder if:
 - live browser QA fails after tests pass, especially Spanish parity.
 
 Until a slice is activated, do not implement its runtime, backend, schema, or UI
-changes. ACTIVE NEXT: loop Slice 1 (refine -> linked version). Fees/slippage realism
-is async/isolated (issue #130). Loop Slices 2-4 and the supporting layers (recovery,
-measurement) are defined and sequenced but not yet authorized for implementation.
+changes. CURRENT ACTIVE PR: #139, Gate B/P2.4 reliability repair. ACTIVE NEXT after
+#139 is resolved: loop Slice 1 (refine -> linked version). Fees/slippage realism is
+async/isolated (issue #130). Loop Slices 2-4 and the broader supporting layers
+(recovery, measurement) are defined and sequenced but not yet authorized for
+implementation unless their gate explicitly starts.
 
 ## Parallelization Rules
 
