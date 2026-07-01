@@ -2119,6 +2119,10 @@ def test_interpreter_sends_pending_field_metadata_with_artifact_context(
     )
 
     assert result is not None
+    assert result.candidate_strategy_draft.strategy_type == "indicator_threshold"
+    assert result.candidate_strategy_draft.asset_universe == ["GOOGL"]
+    assert result.candidate_strategy_draft.asset_class == "equity"
+    assert "requested_asset_answer_provider_resolution" in result.reason_codes
     wire_text = "\n".join(message["content"] for message in seen_messages)
     assert "Selected thread metadata JSON" in wire_text
     assert '"requested_field": "asset_universe"' in wire_text

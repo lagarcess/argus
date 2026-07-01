@@ -142,6 +142,7 @@ from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _response_from_pending_response_option_selection_audit,
     _response_needs_pending_response_option_selection_audit,
 )
+from argus.agent_runtime.interpreter import requested_asset_answer as _requested_asset_answer
 from argus.agent_runtime.interpreter.readiness_helpers import (  # noqa: F401
     _active_artifact_asset_universe_operation_needs_planner,
     _asset_universe_operation_clarification_response,
@@ -1363,43 +1364,14 @@ async def _requested_asset_answer_candidate_audited_response(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
-    if not _response_needs_requested_asset_answer_candidate_audit(
+    return await _requested_asset_answer.requested_asset_answer_candidate_audited_response(
         response=response,
+        preferred_model=preferred_model,
         request=request,
-    ):
-        return response
-    messages = _requested_asset_answer_candidate_audit_messages(
-        response=response,
-        request=request,
+        invoke_schema=invoke_openrouter_json_schema,
+        resolve_asset_candidate=_resolve_asset_candidate,
+        model_candidates=_unique_repair_models,
     )
-    for model_name in _unique_repair_models(preferred_model):
-        try:
-            audit = await invoke_openrouter_json_schema(
-                task="interpretation",
-                messages=messages,
-                schema_model=AssetAnswerCandidateAudit,
-                schema_name="AssetAnswerCandidateAudit",
-                model_name=model_name,
-            )
-        except Exception as exc:
-            log_openrouter_failure(
-                task="interpretation",
-                model_name=model_name,
-                exc=exc,
-                message=(
-                    "Requested asset-answer candidate audit failed; trying next "
-                    "candidate model"
-                ),
-            )
-            continue
-        repaired = _response_from_requested_asset_answer_candidate_audit(
-            response=response,
-            request=request,
-            audit=audit,
-        )
-        if repaired is not None:
-            return repaired
-    return response
 
 
 def _response_from_requested_asset_answer_candidate_audit(
@@ -1408,55 +1380,12 @@ def _response_from_requested_asset_answer_candidate_audit(
     request: InterpretationRequest,
     audit: Any,
 ) -> LLMInterpretationResponse | None:
-    if not isinstance(audit, AssetAnswerCandidateAudit) or audit.confidence < 0.6:
-        return None
-    candidate_symbols = [
-        str(symbol or "").strip()
-        for symbol in audit.candidate_symbols[:3]
-        if str(symbol or "").strip()
-    ]
-    if audit.needs_clarification and not candidate_symbols:
-        return None
-    prior_symbols = _prior_strategy_symbols(request)
-    for index, candidate in enumerate(candidate_symbols):
-        resolution = _resolve_asset_candidate(
-            candidate,
-            field=f"asset_universe[{index}]",
-            source="llm_extraction",
-        )
-        if resolution.status != "resolved" or resolution.asset is None:
-            continue
-        if resolution.asset.canonical_symbol in prior_symbols:
-            continue
-        draft = response.candidate_strategy_draft.model_copy(deep=True)
-        draft.asset_universe = [resolution.asset.canonical_symbol]
-        draft.asset_class = resolution.asset.asset_class
-        draft.raw_user_phrasing = draft.raw_user_phrasing or request.current_user_message
-        missing = [
-            field
-            for field in response.missing_required_fields
-            if _field_path_base(field) != "asset_universe"
-        ]
-        return response.model_copy(
-            update={
-                "intent": "backtest_execution",
-                "task_relation": "continue",
-                "requires_clarification": bool(missing),
-                "candidate_strategy_draft": draft,
-                "missing_required_fields": missing,
-                "assistant_response": None,
-                "semantic_turn_act": "answer_pending_need",
-                "reason_codes": list(
-                    dict.fromkeys(
-                        [
-                            *response.reason_codes,
-                            "requested_asset_answer_candidate_audit",
-                        ]
-                    )
-                ),
-            }
-        )
-    return None
+    return _requested_asset_answer.response_from_requested_asset_answer_candidate_audit(
+        response=response,
+        request=request,
+        audit=audit,
+        resolve_asset_candidate=_resolve_asset_candidate,
+    )
 
 
 def _response_needs_requested_asset_answer_candidate_audit(
@@ -1464,19 +1393,23 @@ def _response_needs_requested_asset_answer_candidate_audit(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
-    if _selected_requested_field_base(request) != "asset_universe":
-        return False
-    if not request.current_user_message.strip():
-        return False
-    if response.semantic_turn_act in {
-        "approval",
-        "result_followup",
-        "retry_failed_action",
-    }:
-        return False
-    if _draft_has_valid_requested_asset_update(response.candidate_strategy_draft, request):
-        return False
-    return bool(_prior_strategy_symbols(request))
+    return _requested_asset_answer.response_needs_requested_asset_answer_candidate_audit(
+        response=response,
+        request=request,
+        resolve_asset_candidate=_resolve_asset_candidate,
+    )
+
+
+def _response_is_requested_asset_answer_patch(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    return _requested_asset_answer.response_is_requested_asset_answer_patch(
+        response=response,
+        request=request,
+        resolve_asset_candidate=_resolve_asset_candidate,
+    )
 
 
 def _response_is_audited_requested_asset_answer_patch(
@@ -1484,26 +1417,9 @@ def _response_is_audited_requested_asset_answer_patch(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
-    if _selected_requested_field_base(request) != "asset_universe":
-        return False
-    if "requested_asset_answer_candidate_audit" not in response.reason_codes:
-        return False
-    if response.semantic_turn_act != "answer_pending_need":
-        return False
-    if response.intent != "backtest_execution":
-        return False
-    if response.assistant_response:
-        return False
-    if response.candidate_strategy_draft is None:
-        return False
-    draft = response.candidate_strategy_draft
-    return bool(
-        draft.asset_universe
-        and draft.asset_class
-        and _draft_has_valid_requested_asset_update(
-            draft,
-            request,
-        )
+    return _response_is_requested_asset_answer_patch(
+        response=response,
+        request=request,
     )
 
 
@@ -1511,21 +1427,11 @@ def _draft_has_valid_requested_asset_update(
     draft: LLMStrategyDraft,
     request: InterpretationRequest,
 ) -> bool:
-    prior_symbols = _prior_strategy_symbols(request)
-    for index, symbol in enumerate(draft.asset_universe):
-        candidate = str(symbol or "").strip()
-        if not candidate:
-            continue
-        resolution = _resolve_asset_candidate(
-            candidate,
-            field=f"asset_universe[{index}]",
-            source="llm_extraction",
-        )
-        if resolution.status != "resolved" or resolution.asset is None:
-            continue
-        if resolution.asset.canonical_symbol not in prior_symbols:
-            return True
-    return False
+    return _requested_asset_answer.draft_has_valid_requested_asset_update(
+        draft,
+        request,
+        resolve_asset_candidate=_resolve_asset_candidate,
+    )
 
 
 _ASSET_TOKEN_MAP = str.maketrans(
@@ -2222,7 +2128,7 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
     )
-    if _response_is_audited_requested_asset_answer_patch(
+    if _response_is_requested_asset_answer_patch(
         response=response,
         request=request,
     ):
