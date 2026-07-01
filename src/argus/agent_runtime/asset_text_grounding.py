@@ -39,7 +39,10 @@ def grounded_asset_mentions_from_text(
     for phrase in _asset_candidate_phrases(text):
         if _candidate_overlaps_excluded_tokens(phrase, excluded):
             continue
-        resolution = resolve_candidate(phrase)
+        try:
+            resolution = resolve_candidate(phrase)
+        except Exception:
+            resolution = None
         if resolution is None:
             continue
         if resolution.status != "resolved" or resolution.asset is None:
@@ -84,13 +87,16 @@ def provider_ticker_mentions_from_text(
         for token in (excluded_tokens or set())
         if token.strip()
     }
-    for token in _asset_candidate_tokens(text):
+    for token in _expanded_asset_candidate_tokens(text):
         candidate = token.lstrip("$").strip()
         if not candidate or candidate.lower() in excluded:
             continue
         if not is_ticker_like_query(candidate):
             continue
-        resolution = resolve_candidate(candidate)
+        try:
+            resolution = resolve_candidate(candidate)
+        except Exception:
+            resolution = None
         if resolution is None:
             continue
         if resolution.status != "resolved" or resolution.asset is None:
@@ -115,6 +121,47 @@ def provider_ticker_mentions_from_text(
         if len(mentions) >= limit:
             break
     return mentions
+
+
+def provider_grounded_asset_evidence_from_text(
+    text: str,
+    *,
+    resolve_candidate: ResolveAssetCandidate,
+    excluded_tokens: set[str] | None = None,
+    limit: int = 10,
+) -> list[dict[str, str]]:
+    mentions = [
+        *grounded_asset_mentions_from_text(
+            text,
+            resolve_candidate=resolve_candidate,
+            excluded_tokens=excluded_tokens,
+            limit=limit,
+        ),
+        *provider_ticker_mentions_from_text(
+            text,
+            resolve_candidate=resolve_candidate,
+            excluded_tokens=excluded_tokens,
+            limit=limit,
+        ),
+    ]
+    evidence: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for mention in mentions:
+        symbol = str(getattr(mention.asset, "canonical_symbol", "") or "").strip()
+        if not symbol:
+            continue
+        raw_text = str(getattr(mention, "raw_text", "") or "").strip()
+        key = (symbol.upper(), raw_text.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        item = {"symbol": symbol.upper()}
+        if raw_text:
+            item["raw_text"] = raw_text
+        evidence.append(item)
+        if len(evidence) >= limit:
+            break
+    return evidence
 
 
 def _candidate_overlaps_excluded_tokens(phrase: str, excluded_tokens: set[str]) -> bool:
@@ -165,7 +212,33 @@ def _asset_candidate_phrases(message: str) -> list[str]:
                 continue
             seen.add(phrase)
             phrases.append(phrase)
+    for token in _expanded_asset_candidate_tokens(message):
+        if token in seen:
+            continue
+        if not any(char.isalpha() for char in token):
+            continue
+        seen.add(token)
+        phrases.append(token)
     return phrases
+
+
+def _expanded_asset_candidate_tokens(message: str) -> list[str]:
+    tokens: list[str] = []
+    seen: set[str] = set()
+    for token in _asset_candidate_tokens(message):
+        for candidate in _split_compound_asset_token(token):
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            tokens.append(candidate)
+    return tokens
+
+
+def _split_compound_asset_token(token: str) -> list[str]:
+    candidates = [token]
+    if "/" in token:
+        candidates.extend(part for part in token.split("/") if part)
+    return candidates
 
 
 def _asset_candidate_tokens(message: str) -> list[str]:

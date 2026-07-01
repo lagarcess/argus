@@ -4,6 +4,7 @@ Behavior-preserving relocation from llm_interpreter.py (issue #131)."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from argus.agent_runtime.artifact_edit_planner import (
@@ -20,8 +21,16 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
     LLMStrategyDraft,
 )
+from argus.agent_runtime.resolution import AssetResolution
+from argus.agent_runtime.rule_specs import indicator_parameters_from_strategy
+from argus.agent_runtime.stages.artifact_context import (
+    active_confirmation_effective_strategy,
+)
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+from argus.agent_runtime.state.models import StrategySummary
 from argus.nlp.natural_time import resolve_date_range_intent
+
+ResolveAssetCandidate = Callable[..., AssetResolution | None]
 
 
 def _normalized_ticker_symbol(value: Any) -> str | None:
@@ -59,17 +68,53 @@ def _request_targets_pending_artifact_assumption_edit(
 
 
 def _current_artifact_asset_universe(request: InterpretationRequest) -> list[str]:
-    snapshot = request.latest_task_snapshot
-    if snapshot is None:
-        return []
-    prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
-    if prior is not None and prior.asset_universe:
-        return list(prior.asset_universe)
-    reference = snapshot.active_confirmation_reference
+    strategy = _current_artifact_strategy(request)
+    if strategy is not None and strategy.asset_universe:
+        return list(strategy.asset_universe)
+    reference = (
+        request.latest_task_snapshot.active_confirmation_reference
+        if request.latest_task_snapshot is not None
+        else None
+    )
     reference_assets = getattr(reference, "asset_universe", None)
     if reference_assets:
         return list(reference_assets)
     return []
+
+
+def _current_artifact_strategy(request: InterpretationRequest) -> StrategySummary | None:
+    snapshot = request.latest_task_snapshot
+    if snapshot is None:
+        return None
+    prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    if snapshot.active_confirmation_reference is not None:
+        effective = active_confirmation_effective_strategy(
+            snapshot=snapshot,
+            fallback=prior or StrategySummary(),
+        )
+        if effective != StrategySummary():
+            return effective
+    return prior
+
+
+def asset_edit_symbol_resolver(
+    resolve_asset_candidate: ResolveAssetCandidate,
+) -> Callable[[str], str | None]:
+    def _resolve(raw_symbol: str) -> str | None:
+        resolution = resolve_asset_candidate(
+            raw_symbol,
+            field="asset_edit",
+            source="user_mention",
+        )
+        if (
+            resolution is not None
+            and resolution.status == "resolved"
+            and resolution.asset
+        ):
+            return resolution.asset.canonical_symbol
+        return None
+
+    return _resolve
 
 
 def _apply_resolved_edit_to_draft(
@@ -78,6 +123,7 @@ def _apply_resolved_edit_to_draft(
     draft: LLMStrategyDraft,
     field_provenance: dict[str, str],
     extra_parameters: dict[str, Any],
+    allow_indicator_parameters: bool = False,
 ) -> None:
     if resolved.asset_universe is not None:
         draft.asset_universe = list(resolved.asset_universe)
@@ -118,6 +164,25 @@ def _apply_resolved_edit_to_draft(
     if resolved.slippage is not None:
         extra_parameters["slippage"] = resolved.slippage
         field_provenance["slippage"] = "explicit_user"
+    if resolved.indicator_parameters and allow_indicator_parameters:
+        draft.strategy_type = "indicator_threshold"
+        draft.indicator = "rsi"
+        indicator_parameters = {
+            "indicator": "rsi",
+            **resolved.indicator_parameters,
+        }
+        if "indicator_period" in resolved.indicator_parameters:
+            draft.indicator_period = int(resolved.indicator_parameters["indicator_period"])
+            field_provenance["indicator_period"] = "explicit_user"
+        if "entry_threshold" in resolved.indicator_parameters:
+            draft.entry_threshold = float(resolved.indicator_parameters["entry_threshold"])
+            field_provenance["entry_threshold"] = "explicit_user"
+        if "exit_threshold" in resolved.indicator_parameters:
+            draft.exit_threshold = float(resolved.indicator_parameters["exit_threshold"])
+            field_provenance["exit_threshold"] = "explicit_user"
+        extra_parameters["indicator"] = "rsi"
+        extra_parameters["indicator_parameters"] = indicator_parameters
+        field_provenance["indicator_parameters"] = "explicit_user"
 
 
 def _apply_legacy_flat_edit_fields(
@@ -168,23 +233,44 @@ def _apply_legacy_flat_edit_fields(
         field_provenance["slippage"] = "explicit_user"
 
 
+def _current_artifact_uses_rsi(request: InterpretationRequest) -> bool:
+    strategy = _current_artifact_strategy(request)
+    if strategy is None:
+        return False
+    parameters = indicator_parameters_from_strategy(strategy)
+    indicator = str(
+        parameters.get("indicator")
+        or strategy.extra_parameters.get("indicator")
+        or ""
+    ).strip().casefold()
+    return indicator == "rsi"
+
+
 def _response_from_artifact_assumption_edit_plan(
     *,
     plan: ArtifactAssumptionEditPlan,
     request: InterpretationRequest,
+    asset_symbol_resolver: Callable[[str], str | None] | None = None,
 ) -> LLMInterpretationResponse:
     draft = LLMStrategyDraft(raw_user_phrasing=request.current_user_message)
+    current_strategy = _current_artifact_strategy(request)
+    if current_strategy is not None and current_strategy.strategy_type:
+        draft.strategy_type = current_strategy.strategy_type
     field_provenance: dict[str, str] = {}
     extra_parameters: dict[str, Any] = {}
     if plan.operations:
+        allow_indicator_parameters = _current_artifact_uses_rsi(request)
+        resolved = apply_edit_operations(
+            plan.operations,
+            current_asset_universe=_current_artifact_asset_universe(request),
+            asset_symbol_resolver=asset_symbol_resolver,
+        )
         _apply_resolved_edit_to_draft(
-            apply_edit_operations(
-                plan.operations,
-                current_asset_universe=_current_artifact_asset_universe(request),
-            ),
+            resolved,
             draft=draft,
             field_provenance=field_provenance,
             extra_parameters=extra_parameters,
+            allow_indicator_parameters=allow_indicator_parameters,
         )
     else:
         _apply_legacy_flat_edit_fields(
@@ -199,6 +285,24 @@ def _response_from_artifact_assumption_edit_plan(
         draft.field_provenance = field_provenance
 
     if plan.outcome == "ready_to_confirm":
+        if plan.operations and not field_provenance and not extra_parameters:
+            return LLMInterpretationResponse(
+                intent="conversation_followup",
+                task_relation="continue",
+                requires_clarification=True,
+                user_goal_summary=(
+                    plan.user_goal_summary
+                    or "The requested assumption change cannot be applied here."
+                ),
+                candidate_strategy_draft=draft,
+                assistant_response=(
+                    plan.assistant_response
+                    or "I can change RSI thresholds only on an active RSI confirmation card."
+                ),
+                confidence=plan.confidence,
+                reason_codes=["artifact_assumption_edit_planned"],
+                semantic_turn_act="unsupported_request",
+            )
         return LLMInterpretationResponse(
             intent="backtest_execution",
             task_relation="continue",

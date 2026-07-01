@@ -339,8 +339,10 @@ def _render_clarification_response(
             direct_question=direct_question,
         )
         if context:
-            return f"{context} {direct_question}".strip()
-        return direct_question
+            return _collapse_adjacent_duplicate_sentences(
+                f"{context} {direct_question}".strip()
+            )
+        return _collapse_adjacent_duplicate_sentences(direct_question)
     return question
 
 

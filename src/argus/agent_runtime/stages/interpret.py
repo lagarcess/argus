@@ -1,4 +1,4 @@
-# ruff: noqa: F401
+# ruff: noqa: F401, I001
 # This stage is being modularized into argus.agent_runtime.stages.interpret_internal.*;
 # it re-exports relocated symbols and preserves its full original import surface so
 # external callers/tests that access ``interpret.<name>`` keep working.
@@ -11,7 +11,10 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, cast, get_args
 
-from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
+from argus.agent_runtime.artifact_edit_planner import (
+    apply_edit_operations,
+    plan_artifact_assumption_edit,
+)
 from argus.agent_runtime.artifacts.asset_edits import (
     normalized_asset_universe_operation,
     same_asset_universe,
@@ -35,6 +38,12 @@ from argus.agent_runtime.capabilities.answers import (
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.extraction import detect_unsupported_constraints
+from argus.agent_runtime.interpreter.pending_option import (
+    _apply_pending_response_option_replacement,
+    _llm_draft_from_strategy_summary,
+    _pending_response_intent_options,
+)
+from argus.agent_runtime.interpreter.strategy_builder import _strategy_from_llm
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
@@ -58,9 +67,6 @@ from argus.agent_runtime.result_followups import (
     fallback_private_alpha_save_response,
 )
 from argus.agent_runtime.rule_specs import (
-    indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
-)
-from argus.agent_runtime.rule_specs import (
     moving_average_crossover_text,
     opposite_moving_average_crossover_rule,
     strategy_rule,
@@ -76,6 +82,7 @@ from argus.agent_runtime.semantic_integrity import (
 from argus.agent_runtime.stages.artifact_context import (
     RESULT_EXPLANATION_TARGET_INFERRED,
     RESULT_FOLLOWUP_TARGET_INFERRED,
+    active_confirmation_effective_strategy,
 )
 from argus.agent_runtime.stages.artifact_context import (
     draft_assumptions_response as _draft_assumptions_response,
@@ -167,6 +174,7 @@ from argus.agent_runtime.stages.interpret_internal.asset_resolution import (  # 
     _strategy_route_expected,
     _strategy_supplies_contextual_rule_edit,
     _strategy_with_default_template_for_complete_no_rule_shape,
+    _strategy_with_current_message_draft_only_indicator_text,
     _strategy_with_execution_defaults,
     _strategy_with_hidden_context_guard,
     _strategy_with_pending_resolution_affirmation,
@@ -185,6 +193,15 @@ from argus.agent_runtime.stages.interpret_internal.asset_resolution import (  # 
     _without_stale_requested_asset_rejection_constraints,
     _without_weak_implicit_current_symbols,
     _without_weak_implicit_short_symbol_mentions,
+)
+from argus.agent_runtime.stages.interpret_internal.artifact_edit_repair import (
+    apply_resolved_artifact_edit_to_strategy_summary as _apply_resolved_artifact_edit_to_strategy_summary,
+)
+from argus.agent_runtime.stages.interpret_internal.artifact_edit_repair import (
+    asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
+)
+from argus.agent_runtime.stages.interpret_internal.artifact_edit_repair import (
+    strategy_summary_uses_rsi as _strategy_summary_uses_rsi,
 )
 from argus.agent_runtime.stages.interpret_internal.contextual_merge import (  # noqa: F401
     CONTEXTUAL_EDIT_TURN_ACTS,
@@ -207,6 +224,9 @@ from argus.agent_runtime.stages.interpret_internal.contextual_merge import (  # 
     _strategy_supplies_execution_context,
     _strategy_uses_rule_or_indicator_context,
     _strategy_with_contextual_merge,
+)
+from argus.agent_runtime.stages.interpret_internal.date_answer_repair import (
+    pending_date_answer_route_repair_interpretation as _pending_date_answer_route_repair_interpretation,
 )
 from argus.agent_runtime.stages.interpret_internal.date_contract import (  # noqa: F401
     _DATE_RANGE_EVIDENCE_KEYS,
@@ -269,7 +289,6 @@ from argus.agent_runtime.strategy_contract import (
     display_strategy_type,
     executable_strategy_type,
     has_partial_explicit_date_range,
-    strategy_can_be_approved,
 )
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
@@ -291,6 +310,7 @@ from argus.domain.backtesting.config import (
 from argus.domain.indicators import (
     EXECUTABLE_INDICATORS,
     IndicatorExecutionSpec,
+    draft_only_indicator_from_text,
     executable_indicator_spec,
     normalize_indicator_parameters,
 )
@@ -401,113 +421,6 @@ async def interpret_stage_async(
     )
 
 
-def _pending_date_answer_route_repair_interpretation(
-    *,
-    current_user_message: str,
-    language: str | None,
-    snapshot: TaskSnapshot | None,
-    selected_thread_metadata: dict[str, Any],
-    reason_code: str = "pending_date_answer_route_repaired",
-    user_goal_summary: str = (
-        "User supplied the requested date range after structured interpretation "
-        "misrouted the pending-field answer."
-    ),
-) -> StructuredInterpretation | None:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field != "date_range":
-        return None
-    if snapshot is None or snapshot.pending_strategy_summary is None:
-        return None
-    if snapshot.latest_backtest_result_reference is not None:
-        return None
-    last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
-    if last_stage_outcome and last_stage_outcome != "await_user_reply":
-        return None
-    prior = _active_strategy_from_snapshot(snapshot)
-    if prior is None:
-        return None
-    if not _prior_strategy_allows_pending_date_answer_fallback(prior):
-        return None
-    current_date = date.today()
-    text = current_user_message.strip()
-    if not text:
-        return None
-    languages = dateparser_languages_for_user_language(language)
-    resolved_range = resolve_date_range_text(
-        text,
-        today=current_date,
-        languages=languages,
-    )
-    date_range: dict[str, str] | None = None
-    date_range_intent: dict[str, Any] | None = None
-    if resolved_range is not None:
-        date_range = resolved_range.payload
-    else:
-        endpoint = parse_date_text(
-            text,
-            today=current_date,
-            endpoint="end",
-            languages=languages,
-            prefer_dates_from="past",
-        )
-        if endpoint is None:
-            return None
-        endpoint_patch = {
-            "kind": "endpoint_patch",
-            "endpoint": "end",
-            "end": endpoint.isoformat(),
-            "confidence": 0.8,
-            "evidence": text,
-        }
-        prior_intent = prior.extra_parameters.get("date_range_intent")
-        resolved_patch = resolve_date_range_endpoint_patch(
-            prior_intent,
-            endpoint_patch,
-            today=current_date,
-        )
-        if resolved_patch is not None:
-            date_range = resolved_patch.payload
-            date_range_intent = {
-                **endpoint_patch,
-                "base_intent": prior_intent,
-            }
-        else:
-            date_range = {"end": endpoint.isoformat()}
-            date_range_intent = endpoint_patch
-    if date_range is None:
-        return None
-    extra_parameters: dict[str, Any] = {
-        "date_range_raw_text": text,
-        "evidence_spans": {"date_range": text},
-    }
-    if date_range_intent is not None:
-        extra_parameters["date_range_intent"] = date_range_intent
-    return StructuredInterpretation(
-        intent="backtest_execution",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary=user_goal_summary,
-        candidate_strategy_draft=StrategySummary(
-            date_range=date_range,
-            extra_parameters=extra_parameters,
-        ),
-        missing_required_fields=[],
-        semantic_turn_act="answer_pending_need",
-        reason_codes=[reason_code],
-    )
-
-
-def _prior_strategy_allows_pending_date_answer_fallback(
-    prior: StrategySummary,
-) -> bool:
-    if not strategy_can_be_approved(prior):
-        return False
-    endpoints = _date_range_endpoints(prior.date_range)
-    return endpoints is not None and all(endpoints)
-
-
 async def _call_structured_interpreter(
     structured_interpreter: StructuredInterpreter,
     request: InterpretationRequest,
@@ -589,6 +502,18 @@ async def _stage_result_from_interpretation(
                 "semantic_turn_act": "educational_question",
             },
         )
+    planned_active_confirmation_edit = (
+        await _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            selected_thread_metadata=selected_thread_metadata,
+            interpretation=interpretation,
+            capability_contract=capability_contract,
+        )
+    )
+    if planned_active_confirmation_edit is not None:
+        return planned_active_confirmation_edit
     incoming_strategy = _strategy_with_contextual_merge(
         strategy=interpretation.candidate_strategy_draft,
         snapshot=snapshot,
@@ -743,10 +668,14 @@ async def _stage_result_from_interpretation(
         )
         benchmark_reason_codes.extend(unstated_benchmark_reason_codes)
     current_message_asset_grounding_reason_codes: list[str] = []
-    if expects_strategy_route and _should_apply_current_message_asset_grounding(
-        semantic_turn_act=original_semantic_turn_act,
-        selected_thread_metadata=selected_thread_metadata,
-        snapshot=snapshot,
+    if (
+        expects_strategy_route
+        and "artifact_assumption_edit_planned" not in interpretation.reason_codes
+        and _should_apply_current_message_asset_grounding(
+            semantic_turn_act=original_semantic_turn_act,
+            selected_thread_metadata=selected_thread_metadata,
+            snapshot=snapshot,
+        )
     ):
         strategy, current_message_asset_grounding_reason_codes = (
             _strategy_with_current_message_asset_grounding(
@@ -806,6 +735,29 @@ async def _stage_result_from_interpretation(
     )
     strategy = integrity_report.strategy
     optional_parameter_values = integrity_report.optional_parameter_values
+    if expects_strategy_route:
+        strategy, draft_only_indicator_text_preserved = (
+            _strategy_with_current_message_draft_only_indicator_text(
+                strategy=strategy,
+                interpretation=interpretation,
+                current_user_message=state.current_user_message,
+            )
+        )
+        if draft_only_indicator_text_preserved:
+            interpretation = interpretation.model_copy(
+                update={
+                    "requires_clarification": True,
+                    "assistant_response": None,
+                    "reason_codes": list(
+                        dict.fromkeys(
+                            [
+                                *interpretation.reason_codes,
+                                "draft_only_indicator_text_preserved",
+                            ]
+                        )
+                    ),
+                }
+            )
     unsupported_constraints = [
         *interpretation.unsupported_constraints,
         *integrity_report.unsupported_constraints,
@@ -897,6 +849,15 @@ async def _stage_result_from_interpretation(
         strategy=strategy,
         constraints=unsupported_constraints,
     )
+    unsupported_strategy_logic_owns_pending_need = any(
+        constraint.category == "unsupported_strategy_logic"
+        for constraint in unsupported_constraints
+    )
+    if (
+        unsupported_strategy_logic_owns_pending_need
+        and "draft_only_indicator_text_preserved" in interpretation.reason_codes
+    ):
+        missing_required_fields = []
     pending_date_edit_reason_codes: list[str] = []
     if _pending_date_edit_reuses_prior_date_range(
         strategy=strategy,
@@ -1454,6 +1415,11 @@ def _explicit_date_range_from_strategy_for_repair(
         resolved = resolve_date_range_intent(intent, today=current_date)
         if resolved is not None:
             intent_range = resolved.payload
+    if intent_range is not None and _date_range_intent_is_explicit_user_range(
+        strategy,
+        intent,
+    ):
+        return intent_range
     if bounded_evidence_range is not None:
         if intent_range is None:
             return bounded_evidence_range
@@ -1471,6 +1437,27 @@ def _explicit_date_range_from_strategy_for_repair(
         }
         return payload or None
     return None
+
+
+def _date_range_intent_is_explicit_user_range(
+    strategy: StrategySummary,
+    intent: Any,
+) -> bool:
+    if not isinstance(intent, dict):
+        return False
+    if str(intent.get("kind") or "").strip() != "explicit_range":
+        return False
+    if intent.get("start") in (None, "", [], {}) or intent.get("end") in (
+        None,
+        "",
+        [],
+        {},
+    ):
+        return False
+    field_provenance = strategy.extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        return False
+    return field_provenance.get("date_range") == "explicit_user"
 
 
 def _date_range_from_strategy_bounded_evidence(
@@ -1501,13 +1488,6 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
 ) -> StructuredInterpretation:
-    if (
-        interpretation.semantic_turn_act == "answer_pending_need"
-        and not interpretation.requires_clarification
-    ):
-        return interpretation
-    if _candidate_strategy_has_backtest_shape(interpretation.candidate_strategy_draft):
-        return interpretation
     requested_field = _field_base(
         str(selected_thread_metadata.get("requested_field") or "")
     )
@@ -1516,11 +1496,30 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
     if last_stage_outcome and last_stage_outcome != "await_user_reply":
         return interpretation
+    candidate_endpoints = _date_range_endpoints(
+        interpretation.candidate_strategy_draft.date_range
+    )
+    if interpretation.candidate_strategy_draft.date_range not in (None, "", [], {}):
+        return interpretation
+    if candidate_endpoints is not None and any(candidate_endpoints):
+        return interpretation
+    if (
+        interpretation.semantic_turn_act != "answer_pending_need"
+        and not interpretation.requires_clarification
+        and _candidate_strategy_has_backtest_shape(interpretation.candidate_strategy_draft)
+    ):
+        return interpretation
     repaired = _pending_date_answer_route_repair_interpretation(
         current_user_message=current_user_message,
         language=language,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
+        today=date.today(),
+        reason_code=(
+            "pending_date_answer_current_message_repaired"
+            if interpretation.semantic_turn_act == "answer_pending_need"
+            else "pending_date_answer_route_repaired"
+        ),
     )
     if repaired is None:
         return interpretation
@@ -2171,6 +2170,7 @@ async def _interpreter_unavailable_result(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any] | None = None,
 ) -> StageResult:
+    selected_metadata = selected_thread_metadata or {}
     result_followup = await _latest_result_followup_when_interpreter_unavailable(
         user=user,
         snapshot=snapshot,
@@ -2178,6 +2178,44 @@ async def _interpreter_unavailable_result(
     )
     if result_followup is not None:
         return result_followup
+    pending_option = _pending_response_option_when_interpreter_unavailable(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        current_user_message=current_user_message,
+        selected_thread_metadata=selected_metadata,
+    )
+    if pending_option is not None:
+        return await _stage_result_from_interpretation(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            interpretation=pending_option,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_metadata,
+        )
+    if snapshot is None or snapshot.active_confirmation_reference is None:
+        pending_date_answer = _pending_date_answer_route_repair_interpretation(
+            current_user_message=current_user_message,
+            language=user.language_preference,
+            snapshot=snapshot,
+            selected_thread_metadata=selected_metadata,
+            today=date.today(),
+            reason_code="pending_date_answer_interpreter_unavailable_repaired",
+            user_goal_summary=(
+                "User supplied the requested date range while structured "
+                "interpretation was unavailable."
+            ),
+        )
+        if pending_date_answer is not None:
+            return await _stage_result_from_interpretation(
+                state=state,
+                user=user,
+                snapshot=snapshot,
+                interpretation=pending_date_answer,
+                capability_contract=capability_contract,
+                selected_thread_metadata=selected_metadata,
+            )
     active_confirmation_followup = (
         await _active_confirmation_followup_when_interpreter_unavailable(
             state=state,
@@ -2185,17 +2223,270 @@ async def _interpreter_unavailable_result(
             snapshot=snapshot,
             current_user_message=current_user_message,
             capability_contract=capability_contract,
-            selected_thread_metadata=selected_thread_metadata or {},
+            selected_thread_metadata=selected_metadata,
         )
     )
     if active_confirmation_followup is not None:
         return active_confirmation_followup
+    draft_only_indicator_recovery = (
+        await _draft_only_indicator_recovery_when_interpreter_unavailable(
+            user=user,
+            snapshot=snapshot,
+            current_user_message=current_user_message,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_metadata,
+        )
+    )
+    if draft_only_indicator_recovery is not None:
+        return draft_only_indicator_recovery
     return _offline_interpreter_unavailable_result(
         user=user,
         snapshot=snapshot,
         current_user_message=current_user_message,
-        selected_thread_metadata=selected_thread_metadata or {},
+        selected_thread_metadata=selected_metadata,
     )
+
+
+def _pending_response_option_when_interpreter_unavailable(
+    *,
+    state: RunState,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+    selected_thread_metadata: dict[str, Any],
+) -> StructuredInterpretation | None:
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return None
+    if not current_user_message.strip():
+        return None
+    request = InterpretationRequest(
+        current_user_message=current_user_message,
+        recent_thread_history=list(state.recent_thread_history),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+        user=user,
+    )
+    options = _pending_response_intent_options(request)
+    option_index = _pending_response_option_index_from_text(
+        current_user_message,
+        options=options,
+    )
+    if option_index is None:
+        return None
+    replacement_values = options[option_index].get("replacement_values")
+    if not isinstance(replacement_values, dict):
+        return None
+    draft = _llm_draft_from_strategy_summary(snapshot.pending_strategy_summary)
+    replacement_result = _apply_pending_response_option_replacement(
+        draft=draft,
+        replacement_values=replacement_values,
+        current_missing=[],
+    )
+    strategy = _strategy_from_llm(replacement_result["draft"])
+    missing_fields = list(replacement_result["missing_fields"])
+    return StructuredInterpretation(
+        intent="strategy_drafting" if missing_fields else "backtest_execution",
+        task_relation="continue",
+        requires_clarification=bool(missing_fields),
+        user_goal_summary=(
+            "User selected a pending simplification option while structured "
+            "interpretation was unavailable."
+        ),
+        candidate_strategy_draft=strategy,
+        missing_required_fields=missing_fields,
+        semantic_turn_act="answer_pending_need",
+        reason_codes=[
+            "pending_response_option_selected",
+            "pending_response_option_interpreter_unavailable_repaired",
+        ],
+    )
+
+
+async def _draft_only_indicator_recovery_when_interpreter_unavailable(
+    *,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+    capability_contract: Any,
+    selected_thread_metadata: dict[str, Any],
+) -> StageResult | None:
+    if snapshot is not None:
+        return None
+    text = current_user_message.strip()
+    if not text:
+        return None
+    indicator = draft_only_indicator_from_text(text)
+    if indicator is None:
+        return None
+
+    def _resolve_candidate(query: str) -> AssetResolution | None:
+        return _resolve_asset_candidate_safely(
+            query,
+            field="asset_universe",
+            source="user_mention",
+        )
+
+    mentions = provider_ticker_mentions_from_text(
+        text,
+        resolve_candidate=_resolve_candidate,
+        limit=5,
+    )
+    if not mentions:
+        return None
+    symbols: list[str] = []
+    asset_classes: set[str] = set()
+    provenance: list[ResolutionProvenance] = []
+    for mention in mentions:
+        asset = mention.asset
+        symbol = str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
+        asset_class = str(getattr(asset, "asset_class", "") or "").strip()
+        if not symbol or not asset_class:
+            continue
+        if symbol not in symbols:
+            symbols.append(symbol)
+        asset_classes.add(asset_class)
+        provenance.append(mention.resolution.provenance)
+    if not symbols or len(asset_classes) != 1:
+        return None
+    asset_class = next(iter(asset_classes))
+    strategy = StrategySummary(
+        raw_user_phrasing=text,
+        strategy_thesis=text,
+        asset_universe=symbols[:5],
+        asset_class=asset_class,
+        comparison_baseline=_default_benchmark_for_asset_class(
+            asset_class,
+            symbols=symbols[:5],
+        ),
+        resolution_provenance=_dedupe_resolution_provenance(provenance),
+        extra_parameters={
+            "unsupported_indicator": indicator.key,
+            "unsupported_indicator_label": indicator.label,
+        },
+    )
+    interpretation = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary=(
+            "Structured interpretation was unavailable, but the user supplied "
+            "a provider-backed asset and a draft-only indicator."
+        ),
+        candidate_strategy_draft=strategy,
+        missing_required_fields=[],
+        assistant_response=None,
+        semantic_turn_act="new_idea",
+        reason_codes=[
+            "llm_interpreter_unavailable_draft_only_indicator_recovered",
+            "draft_only_indicator_text_preserved",
+        ],
+    )
+    return await _stage_result_from_interpretation(
+        state=RunState.new(
+            current_user_message=current_user_message,
+            recent_thread_history=[],
+        ),
+        user=user,
+        snapshot=None,
+        interpretation=interpretation,
+        capability_contract=capability_contract,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+
+
+def _pending_response_option_index_from_text(
+    text: str,
+    *,
+    options: list[dict[str, Any]],
+) -> int | None:
+    user_tokens = _pending_option_selection_tokens(text)
+    if not user_tokens:
+        return None
+    best_index: int | None = None
+    best_overlap = 0
+    tied = False
+    for index, option in enumerate(options):
+        option_tokens = _pending_option_selection_tokens(
+            " ".join(
+                [
+                    str(option.get("label") or ""),
+                    _pending_option_replacement_selection_terms(
+                        option.get("replacement_values")
+                    ),
+                ]
+            )
+        )
+        overlap = len(user_tokens & option_tokens)
+        if overlap < 2:
+            continue
+        if overlap > best_overlap:
+            best_index = index
+            best_overlap = overlap
+            tied = False
+        elif overlap == best_overlap:
+            tied = True
+    return None if tied else best_index
+
+
+def _pending_option_replacement_selection_terms(value: Any) -> str:
+    if not isinstance(value, dict):
+        return ""
+    terms: list[str] = []
+    strategy_type = canonical_strategy_type(value.get("strategy_type"))
+    if strategy_type == "buy_and_hold":
+        terms.extend(["buy hold", "buy and hold", "compra mantener"])
+    elif strategy_type == "indicator_threshold":
+        terms.extend(["indicator threshold", "rsi threshold"])
+    elif strategy_type == "moving_average_crossover":
+        terms.extend(["moving average crossover"])
+    for key in ("requested_field", "cadence", "timeframe", "comparison_baseline"):
+        if value.get(key) not in (None, "", [], {}):
+            terms.append(str(value[key]))
+    return " ".join(terms)
+
+
+def _pending_option_selection_tokens(value: str) -> set[str]:
+    normalized = (
+        str(value or "")
+        .casefold()
+        .replace("&", " and ")
+        .replace("/", " ")
+        .replace("-", " ")
+    )
+    chars = [char if char.isalnum() else " " for char in normalized]
+    aliases = {
+        "w": "with",
+        "ma": "moving",
+        "comprar": "compra",
+        "mantén": "mantener",
+        "manten": "mantener",
+    }
+    stopwords = {
+        "a",
+        "an",
+        "and",
+        "con",
+        "el",
+        "la",
+        "los",
+        "ok",
+        "okay",
+        "pls",
+        "please",
+        "porfa",
+        "si",
+        "sí",
+        "the",
+        "use",
+        "with",
+        "yeah",
+        "y",
+    }
+    return {
+        token
+        for raw_token in "".join(chars).split()
+        if (token := aliases.get(raw_token, raw_token)) not in stopwords
+    }
 
 
 async def _planned_active_confirmation_edit_when_interpreter_unavailable(
@@ -2207,45 +2498,18 @@ async def _planned_active_confirmation_edit_when_interpreter_unavailable(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
-    prior_strategy = snapshot.pending_strategy_summary
     active_confirmation = snapshot.active_confirmation_reference
-    if prior_strategy is None or active_confirmation is None:
+    if active_confirmation is None:
         return None
-    def _resolve_candidate(query: str) -> AssetResolution | None:
-        return _resolve_asset_candidate_safely(
-            query,
-            field="asset_universe[0]",
-            source="user_mention",
-        )
-
-    current_mentions = {
-        symbol
-        for mention in provider_ticker_mentions_from_text(
-            current_user_message,
-            resolve_candidate=_resolve_candidate,
-            excluded_tokens=current_message_execution_context_tokens(
-                current_user_message,
-                strategy_type=prior_strategy.strategy_type,
-            ),
-            limit=10,
-        )
-        if (
-            symbol := _normalized_symbol(
-                getattr(mention.asset, "canonical_symbol", None)
-            )
-        )
-        is not None
-    }
-    prior_symbols = {
-        str(symbol or "").strip().upper()
-        for symbol in prior_strategy.asset_universe
-        if str(symbol or "").strip()
-    }
-    prior_benchmark = str(prior_strategy.comparison_baseline or "").strip().upper()
-    prior_context_symbols = set(prior_symbols)
-    if prior_benchmark:
-        prior_context_symbols.add(prior_benchmark)
-    if not current_mentions or current_mentions <= prior_context_symbols:
+    prior_strategy = active_confirmation_effective_strategy(
+        snapshot=snapshot,
+        fallback=(
+            snapshot.pending_strategy_summary
+            or snapshot.confirmed_strategy_summary
+            or StrategySummary()
+        ),
+    )
+    if not prior_strategy.asset_universe:
         return None
     plan = await plan_artifact_assumption_edit(
         current_user_message=current_user_message,
@@ -2257,7 +2521,20 @@ async def _planned_active_confirmation_edit_when_interpreter_unavailable(
         return None
     candidate = StrategySummary(raw_user_phrasing=current_user_message)
     field_provenance: dict[str, str] = {}
-    if plan.asset_universe:
+    if plan.operations:
+        _apply_resolved_artifact_edit_to_strategy_summary(
+            apply_edit_operations(
+                plan.operations,
+                current_asset_universe=prior_strategy.asset_universe,
+                asset_symbol_resolver=_asset_edit_symbol_resolver(
+                    _resolve_asset_candidate_safely
+                ),
+            ),
+            candidate=candidate,
+            field_provenance=field_provenance,
+            allow_indicator_parameters=_strategy_summary_uses_rsi(prior_strategy),
+        )
+    elif plan.asset_universe:
         operation = normalized_asset_universe_operation(
             plan.asset_universe_operation
         )
@@ -2276,6 +2553,12 @@ async def _planned_active_confirmation_edit_when_interpreter_unavailable(
         if baseline:
             candidate.comparison_baseline = baseline
             field_provenance["comparison_baseline"] = "explicit_user"
+    if plan.initial_capital is not None:
+        candidate.capital_amount = float(plan.initial_capital)
+        field_provenance["capital_amount"] = "starting_capital"
+    if plan.timeframe is not None:
+        candidate.timeframe = str(plan.timeframe)
+        field_provenance["timeframe"] = "explicit_user"
     if not field_provenance:
         return None
     candidate.extra_parameters["field_provenance"] = field_provenance
@@ -2300,6 +2583,79 @@ async def _planned_active_confirmation_edit_when_interpreter_unavailable(
         interpretation=interpretation,
         capability_contract=capability_contract,
         selected_thread_metadata=selected_thread_metadata,
+    )
+
+
+async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
+    *,
+    state: RunState,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+    interpretation: StructuredInterpretation,
+    capability_contract: Any,
+) -> StageResult | None:
+    if snapshot is None or snapshot.active_confirmation_reference is None:
+        return None
+    if "artifact_assumption_edit_planned" in interpretation.reason_codes:
+        return None
+    if _structured_interpretation_has_complete_typed_asset_patch(interpretation):
+        return None
+    if not _structured_interpretation_has_supported_artifact_assumption_edit(
+        interpretation
+    ):
+        return None
+    return await _planned_active_confirmation_edit_when_interpreter_unavailable(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        current_user_message=state.current_user_message,
+        capability_contract=capability_contract,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+
+
+def _structured_interpretation_has_supported_artifact_assumption_edit(
+    interpretation: StructuredInterpretation,
+) -> bool:
+    if interpretation.semantic_turn_act in {
+        "approval",
+        "educational_question",
+        "result_followup",
+        "retry_failed_action",
+    }:
+        return False
+    if interpretation.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    strategy = interpretation.candidate_strategy_draft
+    extra_parameters = strategy.extra_parameters or {}
+    return bool(strategy.asset_universe) and (
+        normalized_asset_universe_operation(
+            extra_parameters.get("asset_universe_operation")
+        )
+        is not None
+    )
+
+
+def _structured_interpretation_has_complete_typed_asset_patch(
+    interpretation: StructuredInterpretation,
+) -> bool:
+    strategy = interpretation.candidate_strategy_draft
+    if not strategy.asset_universe:
+        return False
+    extra_parameters = strategy.extra_parameters or {}
+    if (
+        normalized_asset_universe_operation(
+            extra_parameters.get("asset_universe_operation")
+        )
+        is None
+    ):
+        return False
+    return bool(
+        strategy.date_range in (None, {}, "")
+        and strategy.capital_amount is None
+        and strategy.position_size is None
+        and strategy.timeframe in (None, "")
     )
 
 

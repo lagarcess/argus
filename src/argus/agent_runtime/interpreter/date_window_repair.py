@@ -388,6 +388,22 @@ def _response_from_focused_date_window_extraction(
             **dict(draft.evidence_spans or {}),
             "date_range": raw_text,
         }
+    if pending_date_answer:
+        supported_pending_draft = _supported_pending_strategy_draft_for_date_answer(
+            request
+        )
+        if supported_pending_draft is not None:
+            supported_pending_draft.date_range = draft.date_range
+            supported_pending_draft.date_range_intent = draft.date_range_intent
+            supported_pending_draft.date_range_raw_text = draft.date_range_raw_text
+            supported_pending_draft.evidence_spans = {
+                **dict(supported_pending_draft.evidence_spans or {}),
+                **dict(draft.evidence_spans or {}),
+            }
+            repaired.candidate_strategy_draft = supported_pending_draft
+            repaired.unsupported_constraints = []
+            repaired.ambiguous_fields = []
+            draft = repaired.candidate_strategy_draft
     if not has_partial_explicit_date_range(draft.date_range):
         repaired.missing_required_fields = [
             field
@@ -438,3 +454,28 @@ def _response_from_focused_date_window_extraction(
         )
     )
     return repaired
+
+
+def _supported_pending_strategy_draft_for_date_answer(
+    request: InterpretationRequest,
+) -> LLMStrategyDraft | None:
+    snapshot = request.latest_task_snapshot
+    if snapshot is None:
+        return None
+    pending_strategy = (
+        snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    )
+    if pending_strategy is None:
+        return None
+    strategy_type = canonical_strategy_type(pending_strategy.strategy_type)
+    if strategy_type not in SUPPORTED_STRATEGY_TYPES:
+        return None
+    payload = pending_strategy.model_dump(mode="python")
+    draft_fields = set(LLMStrategyDraft.model_fields)
+    draft_payload = {
+        key: value
+        for key, value in payload.items()
+        if key in draft_fields and value not in (None, "", [], {})
+    }
+    draft_payload["strategy_type"] = strategy_type
+    return LLMStrategyDraft.model_validate(draft_payload)

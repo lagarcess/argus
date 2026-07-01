@@ -5045,6 +5045,131 @@ async def test_pending_date_answer_overrides_macro_context_interpretation(
     assert ready_response.context_question_focus is None
     assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
 
+
+@pytest.mark.asyncio
+async def test_pending_date_answer_overrides_stale_unsupported_atr_context(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="calendar year 2024",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="calendar_year",
+                    year=2024,
+                    confidence=0.94,
+                    evidence="calendar year 2024",
+                ),
+                confidence=0.94,
+                evidence="calendar year 2024",
+            )
+        if schema_name == "AssetGroundingAudit":
+            return interpreter_module.AssetGroundingAudit(
+                grounded_symbols=["TSLA"],
+                confidence=0.95,
+            )
+        if schema_name == "CapabilitySideQuestionAudit":
+            return interpreter_module.CapabilitySideQuestionAudit(
+                is_capability_question=False,
+                confidence=0.95,
+            )
+        if schema_name == "DcaContractAudit":
+            return interpreter_module.DcaContractAudit(
+                is_recurring_buy_request=False,
+                confidence=0.95,
+            )
+        if schema_name == "SupportedStrategyCapabilityConflictAudit":
+            return interpreter_module.SupportedStrategyCapabilityConflictAudit(
+                selected_strategy_type=None,
+                drop_unsupported_strategy_logic=False,
+                keep_unsupported_strategy_logic=True,
+                confidence=0.95,
+            )
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit(confidence=0.9)
+        if schema_name == "StatedStartingCapitalAudit":
+            return interpreter_module.StatedStartingCapitalAudit(
+                starting_capital=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold TSLA.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User answered the pending date question.",
+        assistant_response="ATR is not executable for Alpha.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="calendar year 2024",
+            strategy_type="signal_strategy",
+            strategy_thesis="Buy TSLA based on ATR.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            indicator="atr",
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="ATR",
+                explanation="ATR is not an executable Alpha indicator.",
+                simplification_labels=["Buy and hold instead"],
+            )
+        ],
+        semantic_turn_act="unsupported_request",
+        artifact_target="active_confirmation",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="calendar year 2024",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "requested_field": "date_range",
+            },
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    expected_range = interpreter_module.resolve_date_range_intent(
+        interpreter_module.LLMDateRangeIntent(kind="calendar_year", year=2024)
+    )
+    assert expected_range is not None
+    assert "FocusedDateWindowExtraction" in calls
+    assert ready_response.intent == "backtest_execution"
+    assert ready_response.task_relation == "continue"
+    assert ready_response.semantic_turn_act == "answer_pending_need"
+    assert ready_response.requires_clarification is False
+    assert ready_response.assistant_response is None
+    assert ready_response.unsupported_constraints == []
+    assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
+
+
 @pytest.mark.asyncio
 async def test_executable_supported_fields_clear_stale_clarification_prose(
     monkeypatch,

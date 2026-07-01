@@ -1775,7 +1775,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(settings).toContain("{showSubscriptionSection && (");
   });
 
-  test("sidebar private-alpha flags hide strategies and omnisearch without hiding recents", () => {
+  test("sidebar keeps strategies flagged while omnisearch is enabled by default", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -1791,6 +1791,9 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(flags).toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
     expect(flags).toContain("NEXT_PUBLIC_OMNISEARCH_ENABLED");
+    expect(flags).toContain(
+      'process.env.NEXT_PUBLIC_OMNISEARCH_ENABLED !== "false"',
+    );
     expect(chat).toContain("{omnisearchEnabled && searchOverlayOpen && (");
     expect(sidebar).toContain("strategiesEnabled");
     expect(sidebar).toContain("omnisearchEnabled");

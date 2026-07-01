@@ -57,6 +57,7 @@ from argus.agent_runtime.strategy_requirements import (
 )
 from argus.domain.indicators import (
     IndicatorExecutionSpec,
+    draft_only_indicator_from_text,
     executable_indicator_spec,
     normalize_indicator_parameters,
 )
@@ -985,6 +986,38 @@ def _unsupported_strategy_logic_constraint(
             "unsupported_strategy_logic"
         ),
     )
+
+
+def _strategy_with_current_message_draft_only_indicator_text(
+    *,
+    strategy: StrategySummary,
+    interpretation: StructuredInterpretation,
+    current_user_message: str,
+) -> tuple[StrategySummary, bool]:
+    if executable_strategy_type(strategy) in SUPPORTED_STRATEGY_TYPES:
+        return strategy, False
+    if _strategy_supplies_executable_rule_edit(strategy):
+        return strategy, False
+    if not (
+        strategy.asset_universe
+        or strategy.strategy_type
+        or strategy.entry_logic
+        or strategy.exit_logic
+        or strategy.rule_spec
+    ):
+        return strategy, False
+    missing_field_bases = {
+        _field_base(str(field)) for field in interpretation.missing_required_fields
+    }
+    if not missing_field_bases.intersection(
+        {"strategy_type", "entry_logic", "exit_logic"}
+    ):
+        return strategy, False
+    if draft_only_indicator_from_text(current_user_message) is None:
+        return strategy, False
+    updated = strategy.model_copy(deep=True)
+    updated.raw_user_phrasing = str(current_user_message or "").strip() or None
+    return updated, updated.raw_user_phrasing is not None
 
 
 def _strategy_has_unstructured_strategy_thesis(strategy: StrategySummary) -> bool:

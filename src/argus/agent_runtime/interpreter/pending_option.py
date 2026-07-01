@@ -10,6 +10,7 @@ from typing import Any
 from argus.agent_runtime.interpreter.audits import PendingResponseOptionSelectionAudit
 from argus.agent_runtime.interpreter.dca_audits import _dca_contract_missing_fields
 from argus.agent_runtime.interpreter.shared import (
+    _field_path_base,
     _llm_strategy_draft_has_extractable_fields,
     _supported_dca_cadence_value,
 )
@@ -291,7 +292,15 @@ def _apply_pending_response_option_replacement(
         repaired.comparison_baseline = str(
             replacement_values["comparison_baseline"]
         ).strip()
-    if canonical_strategy_type(repaired.strategy_type) != "dca_accumulation":
+    strategy_type = canonical_strategy_type(repaired.strategy_type)
+    if strategy_type in {
+        "buy_and_hold",
+        "dca_accumulation",
+    }:
+        _clear_rule_or_indicator_fields(repaired)
+    if strategy_type == "buy_and_hold":
+        _clear_rule_strategy_text(repaired)
+    if strategy_type != "dca_accumulation":
         _clear_dca_recurring_fields(repaired)
 
     missing_fields = _missing_fields_after_pending_option(
@@ -343,6 +352,37 @@ def _clear_dca_recurring_fields(draft: LLMStrategyDraft) -> None:
     draft.extra_parameters = extra_parameters
 
 
+def _clear_rule_strategy_text(draft: LLMStrategyDraft) -> None:
+    draft.raw_user_phrasing = None
+    draft.strategy_thesis = None
+
+
+def _clear_rule_or_indicator_fields(draft: LLMStrategyDraft) -> None:
+    draft.entry_logic = None
+    draft.exit_logic = None
+    draft.entry_rule = None
+    draft.exit_rule = None
+    draft.rule_spec = None
+    draft.indicator = None
+    draft.indicator_period = None
+    draft.entry_threshold = None
+    draft.exit_threshold = None
+    extra_parameters = dict(draft.extra_parameters or {})
+    for key in (
+        "indicator",
+        "indicator_parameters",
+        "indicator_period",
+        "entry_threshold",
+        "exit_threshold",
+        "entry_rule",
+        "exit_rule",
+        "rule_spec",
+        "simplify_logic",
+    ):
+        extra_parameters.pop(key, None)
+    draft.extra_parameters = extra_parameters
+
+
 def _missing_fields_after_pending_option(
     draft: LLMStrategyDraft,
     *,
@@ -352,4 +392,24 @@ def _missing_fields_after_pending_option(
     missing = list(current_missing)
     if isinstance(requested_field, str) and requested_field.strip():
         missing = list(dict.fromkeys([*missing, requested_field.strip()]))
+    if canonical_strategy_type(draft.strategy_type) != "dca_accumulation":
+        present_fields: set[str] = set()
+        if draft.asset_universe:
+            present_fields.add("asset_universe")
+        if draft.date_range not in (None, "", [], {}):
+            present_fields.add("date_range")
+        stale_fields = {
+            "cadence",
+            "capital_amount",
+            "entry_logic",
+            "exit_logic",
+            "recurring_contribution",
+            "strategy_type",
+        }
+        return [
+            field
+            for field in missing
+            if _field_path_base(field) not in present_fields
+            and _field_path_base(field) not in stale_fields
+        ]
     return _dca_contract_missing_fields(missing, draft=draft)

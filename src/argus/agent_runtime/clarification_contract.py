@@ -39,6 +39,12 @@ def intent_clarification_fallback(
 ) -> str | None:
     if not isinstance(response_intent, dict):
         return None
+    if response_intent.get("kind") == "unsupported_recovery":
+        return _unsupported_recovery_fallback(
+            language=language,
+            response_intent=response_intent,
+            strategy=strategy,
+        )
     if response_intent.get("kind") != "clarification":
         return None
     needs = response_intent.get("semantic_needs")
@@ -79,6 +85,90 @@ def intent_clarification_fallback(
             return "¿Qué quieres ajustar de esta idea?"
         return "What would you like to change?"
     return None
+
+
+def _unsupported_recovery_fallback(
+    *,
+    language: str | None,
+    response_intent: dict[str, Any],
+    strategy: StrategySummary | dict[str, Any] | None,
+) -> str | None:
+    options = _option_labels(response_intent)
+    if not options:
+        return None
+    raw_value = _unsupported_raw_value(response_intent)
+    symbol = _primary_symbol(strategy)
+    locale = runtime_locale(language)
+    options = [_localized_option_label(option, locale=locale) for option in options]
+    joined_options = _join_options(options, locale=locale)
+    if locale == "es-419":
+        subject = raw_value or "Esa regla"
+        symbol_suffix = f" para {symbol}" if symbol else ""
+        return (
+            f"{subject} no define por sí solo cuándo comprar o vender"
+            f"{symbol_suffix}. ¿Qué camino quieres usar: {joined_options}?"
+        )
+    subject = raw_value or "That rule"
+    symbol_suffix = f" for {symbol}" if symbol else ""
+    return (
+        f"{subject} does not define when to buy or sell{symbol_suffix} on its own. "
+        f"Which supported direction should I use: {joined_options}?"
+    )
+
+
+def _localized_option_label(label: str, *, locale: str) -> str:
+    if locale != "es-419":
+        return label
+    return {
+        "Use a supported RSI threshold rule": "Usar una regla RSI compatible",
+        "Compare with buy and hold": "Comparar con comprar y mantener",
+        "Use a supported moving-average crossover": (
+            "Usar un cruce de medias móviles compatible"
+        ),
+    }.get(label, label)
+
+
+def _option_labels(response_intent: dict[str, Any]) -> list[str]:
+    raw_options = response_intent.get("options")
+    if not isinstance(raw_options, list):
+        return []
+    labels: list[str] = []
+    for option in raw_options:
+        if not isinstance(option, dict):
+            continue
+        label = option.get("label")
+        if not isinstance(label, str):
+            continue
+        cleaned = label.strip()
+        if cleaned and cleaned not in labels:
+            labels.append(cleaned)
+    return labels[:3]
+
+
+def _unsupported_raw_value(response_intent: dict[str, Any]) -> str | None:
+    facts = response_intent.get("facts")
+    if not isinstance(facts, dict):
+        return None
+    constraints = facts.get("unsupported_constraints")
+    if not isinstance(constraints, list):
+        return None
+    for constraint in constraints:
+        if not isinstance(constraint, dict):
+            continue
+        raw_value = constraint.get("raw_value")
+        if isinstance(raw_value, str) and raw_value.strip():
+            return raw_value.strip()
+    return None
+
+
+def _join_options(options: list[str], *, locale: str) -> str:
+    if len(options) <= 1:
+        return options[0] if options else ""
+    if len(options) == 2:
+        conjunction = " o " if locale == "es-419" else " or "
+        return conjunction.join(options)
+    conjunction = "o" if locale == "es-419" else "or"
+    return f"{', '.join(options[:-1])}, {conjunction} {options[-1]}"
 
 
 def _primary_symbol(strategy: StrategySummary | dict[str, Any] | None) -> str | None:

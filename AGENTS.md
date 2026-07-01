@@ -416,11 +416,12 @@ versioned, manual QA should use `live_provider` so symbol recognition exercises
 the same provider-backed resolution path production will use.
 
 ### Feature Flags (All Private-Alpha)
-Keep these disabled unless explicitly testing:
+Keep deferred surfaces disabled unless explicitly testing. Omnisearch is enabled
+by default and should only be disabled for a targeted regression check:
 ```bash
 NEXT_PUBLIC_STRATEGIES_ENABLED=false
 NEXT_PUBLIC_COLLECTIONS_ENABLED=false
-NEXT_PUBLIC_OMNISEARCH_ENABLED=false
+NEXT_PUBLIC_OMNISEARCH_ENABLED=true
 NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED=false
 ```

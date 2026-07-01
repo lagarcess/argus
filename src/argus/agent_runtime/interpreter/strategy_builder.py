@@ -709,28 +709,71 @@ def _unsupported_from_llm(item: LLMUnsupportedConstraint) -> UnsupportedConstrai
         "That exact indicator rule is not executable yet, but Argus can reframe it "
         "into a supported historical test."
     )
+    typed_options = [
+        SimplificationOption(
+            label=_humanize_simplification_label(option.label),
+            replacement_values=dict(option.replacement_values or {}),
+        )
+        for option in item.simplification_options
+        if dict(option.replacement_values or {})
+    ]
+    label_options = [
+        SimplificationOption(
+            label=_humanize_simplification_label(label),
+            replacement_values={},
+        )
+        for label in item.simplification_labels
+    ]
     return UnsupportedConstraint(
         category=item.category,
         raw_value=item.raw_value,
         explanation=explanation,
-        simplification_options=[
-            SimplificationOption(
-                label=_humanize_simplification_label(label), replacement_values={}
-            )
-            for label in item.simplification_labels
-        ],
+        simplification_options=_dedupe_simplification_options(
+            typed_options or label_options
+        ),
     )
 
 
+def _dedupe_simplification_options(
+    options: list[SimplificationOption],
+) -> list[SimplificationOption]:
+    deduped: list[SimplificationOption] = []
+    seen: set[tuple[str, tuple[tuple[str, str], ...]]] = set()
+    for option in options:
+        replacement_items = tuple(
+            sorted(
+                (key, repr(value))
+                for key, value in option.replacement_values.items()
+            )
+        )
+        key = (
+            option.label,
+            replacement_items,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(option)
+    return deduped
+
+
 def _humanize_simplification_label(label: str) -> str:
-    normalized = label.strip().lower().replace("-", "_").replace(" ", "_")
+    normalized = _normalized_simplification_label(label)
     labels = {
         "rsi_preset": "Use the supported RSI rule",
         "supported_rsi_strategy": "Use the supported RSI rule",
+        "use_the_supported_rsi_rule": "Use the supported RSI rule",
         "buy_and_hold": "Compare with buy and hold",
+        "buy_and_hold_instead": "Compare with buy and hold",
+        "compare_with_buy_and_hold": "Compare with buy and hold",
         "dca_accumulation": "Try recurring buys",
+        "try_recurring_buys": "Try recurring buys",
     }
     return labels.get(normalized, label.strip())
+
+
+def _normalized_simplification_label(label: str) -> str:
+    return label.strip().lower().replace("-", "_").replace(" ", "_")
 
 
 def _dedupe_resolution_provenance(

@@ -202,6 +202,90 @@ def test_confirmation_payload_visibility_match_includes_benchmark_contract() -> 
     )
 
 
+def test_confirmation_payload_visibility_match_includes_rsi_threshold_contract() -> None:
+    from argus.agent_runtime.stages.artifact_context import (
+        confirmation_payload_matches_visible_strategy,
+    )
+
+    visible_strategy = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Buy TSLA when RSI falls below 20 and sell above 60.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=1000,
+        comparison_baseline="SPY",
+        extra_parameters={
+            "indicator_parameters": {
+                "indicator": "rsi",
+                "indicator_period": 14,
+                "entry_threshold": 20,
+                "exit_threshold": 60,
+            }
+        },
+    )
+    payload = _validated_confirmation_payload(visible_strategy)
+    payload["launch_payload"]["entry_rule"] = {
+        "indicator": "rsi",
+        "operator": "below",
+        "period": 14,
+        "threshold": 30.0,
+    }
+    payload["launch_payload"]["exit_rule"] = {
+        "indicator": "rsi",
+        "operator": "above",
+        "period": 14,
+        "threshold": 70.0,
+    }
+
+    assert not confirmation_payload_matches_visible_strategy(
+        payload,
+        visible_strategy,
+    )
+
+
+def test_confirmation_payload_validation_rejects_stale_rsi_threshold_launch_payload() -> None:
+    from argus.agent_runtime.confirmation_artifacts import (
+        validate_confirmation_execution_payload,
+    )
+
+    visible_strategy = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Buy TSLA when RSI falls below 20 and sell above 60.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=1000,
+        comparison_baseline="SPY",
+        extra_parameters={
+            "indicator_parameters": {
+                "indicator": "rsi",
+                "indicator_period": 14,
+                "entry_threshold": 20,
+                "exit_threshold": 60,
+            }
+        },
+    )
+    payload = _validated_confirmation_payload(visible_strategy)
+    payload["launch_payload"]["entry_rule"] = {
+        "indicator": "rsi",
+        "operator": "below",
+        "period": 14,
+        "threshold": 30.0,
+    }
+    payload["launch_payload"]["exit_rule"] = {
+        "indicator": "rsi",
+        "operator": "above",
+        "period": 14,
+        "threshold": 70.0,
+    }
+
+    validation = validate_confirmation_execution_payload(payload)
+
+    assert validation.executable is False
+    assert validation.failure_code == "launch_payload_rule_mismatch"
+
+
 def test_active_confirmation_effective_strategy_does_not_overwrite_visible_benchmark() -> None:
     from argus.agent_runtime.stages.artifact_context import (
         active_confirmation_effective_strategy,
@@ -6182,6 +6266,134 @@ def test_pending_simplification_option_removes_unsupported_dca_cap_before_confir
     assert "total_budget" not in strategy.extra_parameters
     assert "total_capital" not in strategy.extra_parameters
     assert result.decision.unsupported_constraints == []
+
+
+def test_unsupported_strategy_logic_requires_typed_simplification_replacements() -> None:
+    from argus.agent_runtime.interpreter.strategy_builder import _unsupported_from_llm
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMSimplificationOption,
+        LLMUnsupportedConstraint,
+    )
+
+    constraint = _unsupported_from_llm(
+        LLMUnsupportedConstraint(
+            category="unsupported_strategy_logic",
+            raw_value="ATR",
+            explanation="ATR is draft-only.",
+            simplification_options=[
+                LLMSimplificationOption(
+                    label="Comparar con compra y mantener",
+                    replacement_values={"strategy_type": "buy_and_hold"},
+                )
+            ],
+            simplification_labels=["comparar con compra y mantener"],
+        )
+    )
+
+    option = constraint.simplification_options[0]
+    assert option.label == "Comparar con compra y mantener"
+    assert option.replacement_values == {"strategy_type": "buy_and_hold"}
+
+
+def test_unsupported_strategy_logic_localized_labels_are_display_only() -> None:
+    from argus.agent_runtime.interpreter.strategy_builder import _unsupported_from_llm
+    from argus.agent_runtime.llm_interpreter_types import LLMUnsupportedConstraint
+
+    constraint = _unsupported_from_llm(
+        LLMUnsupportedConstraint(
+            category="unsupported_strategy_logic",
+            raw_value="ATR",
+            explanation="ATR is draft-only.",
+            simplification_labels=["comparar con compra y mantener"],
+        )
+    )
+
+    option = constraint.simplification_options[0]
+    assert option.label == "comparar con compra y mantener"
+    assert option.replacement_values == {}
+
+
+def test_pending_buy_hold_simplification_clears_stale_indicator_rule() -> None:
+    from argus.agent_runtime.interpreter.pending_option import (
+        _apply_pending_response_option_replacement,
+    )
+    from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
+
+    result = _apply_pending_response_option_replacement(
+        draft=LLMStrategyDraft(
+            strategy_type="signal_strategy",
+            strategy_thesis="Buy TSLA based on ATR.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            indicator="atr",
+            entry_logic="Buy when ATR rises.",
+            extra_parameters={"indicator": "atr"},
+        ),
+        replacement_values={"strategy_type": "buy_and_hold"},
+        current_missing=["date_range"],
+    )
+
+    draft = result["draft"]
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.asset_universe == ["TSLA"]
+    assert draft.indicator is None
+    assert draft.entry_logic is None
+    assert draft.extra_parameters == {}
+    assert result["missing_fields"] == ["date_range"]
+
+
+def test_pending_buy_hold_simplification_clears_stale_indicator_thesis() -> None:
+    from argus.agent_runtime.interpreter.pending_option import (
+        _apply_pending_response_option_replacement,
+    )
+    from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
+
+    result = _apply_pending_response_option_replacement(
+        draft=LLMStrategyDraft(
+            raw_user_phrasing="Test TSLA with an ATR 14 trading rule",
+            strategy_type="signal_strategy",
+            strategy_thesis="Backtest TSLA using an ATR 14 rule",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            indicator="atr",
+            entry_logic="Buy when ATR rises.",
+            extra_parameters={"indicator": "atr"},
+        ),
+        replacement_values={"strategy_type": "buy_and_hold"},
+        current_missing=["date_range"],
+    )
+
+    draft = result["draft"]
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.strategy_thesis is None
+    assert draft.raw_user_phrasing is None
+
+
+def test_pending_buy_hold_simplification_does_not_invent_english_thesis() -> None:
+    from argus.agent_runtime.interpreter.pending_option import (
+        _apply_pending_response_option_replacement,
+    )
+    from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
+
+    result = _apply_pending_response_option_replacement(
+        draft=LLMStrategyDraft(
+            raw_user_phrasing="Prueba TSLA con ATR 14",
+            strategy_type="signal_strategy",
+            strategy_thesis="Comprar TSLA usando ATR 14",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            indicator="atr",
+            entry_logic="Comprar cuando ATR sube.",
+            extra_parameters={"indicator": "atr"},
+        ),
+        replacement_values={"strategy_type": "buy_and_hold"},
+        current_missing=["date_range"],
+    )
+
+    draft = result["draft"]
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.strategy_thesis is None
+    assert draft.raw_user_phrasing is None
 
 
 def test_runnable_clarification_candidate_still_uses_stated_run_fidelity_audit() -> None:

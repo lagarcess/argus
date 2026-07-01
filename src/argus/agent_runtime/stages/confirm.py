@@ -28,6 +28,7 @@ from argus.domain.market_data.capabilities import (
     latest_complete_data_adjustment,
     market_data_window_violation,
 )
+from argus.nlp.natural_time import resolve_date_range_intent
 from loguru import logger
 from pydantic import ValidationError
 
@@ -41,6 +42,8 @@ def confirm_stage(
     logger.debug("Confirm stage started")
     strategy = _strategy_payload(state.candidate_strategy_draft)
     strategy = _strategy_with_runtime_language(strategy, language=language)
+    strategy = _strategy_with_explicit_date_intent(strategy)
+    strategy = _strategy_without_incompatible_rule_fields(strategy)
     strategy = _strategy_with_latest_complete_data_adjustment(strategy)
     logger.debug(
         "Confirm stage latest complete data adjustment checked",
@@ -337,6 +340,44 @@ def _strategy_with_runtime_language(
     extra_parameters = dict(strategy.get("extra_parameters") or {})
     extra_parameters["language"] = normalized
     return {**strategy, "extra_parameters": extra_parameters}
+
+
+def _strategy_with_explicit_date_intent(strategy: dict[str, Any]) -> dict[str, Any]:
+    extra_parameters = _strategy_extra_parameters(strategy)
+    if extra_parameters is None:
+        return strategy
+    intent = extra_parameters.get("date_range_intent")
+    if not isinstance(intent, dict):
+        return strategy
+    if str(intent.get("kind") or "").strip() == "endpoint_patch":
+        return strategy
+    field_provenance = extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        return strategy
+    provenance = str(field_provenance.get("date_range") or "").strip()
+    if provenance not in {"explicit_user", "user"}:
+        return strategy
+    resolved = resolve_date_range_intent(intent, today=_today())
+    if resolved is None:
+        return strategy
+    return {**strategy, "date_range": resolved.payload}
+
+
+def _strategy_without_incompatible_rule_fields(
+    strategy: dict[str, Any],
+) -> dict[str, Any]:
+    strategy_type = canonical_strategy_type(
+        strategy.get("strategy_type"),
+        entry_logic=strategy.get("entry_logic"),
+        exit_logic=strategy.get("exit_logic"),
+        cadence=strategy.get("cadence"),
+    )
+    if strategy_type != "indicator_threshold":
+        return strategy
+    cleaned = dict(strategy)
+    for key in ("entry_rule", "exit_rule", "rule_spec"):
+        cleaned.pop(key, None)
+    return cleaned
 
 
 def _strategy_extra_parameters(strategy: dict[str, Any]) -> dict[str, Any] | None:

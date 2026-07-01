@@ -258,6 +258,8 @@ def confirmation_payload_matches_visible_strategy(
     if not isinstance(payload_strategy, dict):
         return False
     visible_strategy = strategy.model_dump(mode="python")
+    if not _launch_payload_matches_visible_strategy(payload, visible_strategy):
+        return False
     if launch_binding_values_match(
         left=payload_strategy,
         right=visible_strategy,
@@ -271,6 +273,15 @@ def confirmation_payload_matches_visible_strategy(
         left=effective_payload_strategy.model_dump(mode="python"),
         right=visible_strategy,
     )
+
+
+def _launch_payload_matches_visible_strategy(
+    payload: dict[str, Any],
+    visible_strategy: dict[str, Any],
+) -> bool:
+    validation_payload = dict(payload)
+    validation_payload["strategy"] = visible_strategy
+    return validate_confirmation_execution_payload(validation_payload).executable
 
 
 def launch_binding_values_match(

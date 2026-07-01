@@ -38,6 +38,7 @@ from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
     canonical_strategy_type,
     executable_strategy_type,
+    resolve_date_range_intent,
 )
 from argus.domain.indicators import executable_indicator_spec
 
@@ -104,6 +105,10 @@ def _strategy_with_contextual_merge(
         semantic_turn_act=semantic_turn_act,
         task_relation=task_relation,
     )
+    if normalized_asset_universe_operation(
+        strategy.extra_parameters.get("asset_universe_operation")
+    ) is not None:
+        preserve_prior_asset_context = False
     preserve_prior_money_context = _should_preserve_prior_money_context(
         selected_thread_metadata=selected_thread_metadata,
         semantic_turn_act=semantic_turn_act,
@@ -579,6 +584,11 @@ def _merge_contextual_extra_parameters(
             and isinstance(value, dict)
             and isinstance(merged.get(key), dict)
         ):
+            if _date_range_intent_replaces_prior_intent(
+                prior=merged.get(key),
+                incoming=value,
+            ):
+                merged = _without_stale_date_evidence(merged)
             base_intent = dict(merged[key])
             if (
                 str(value.get("kind") or "").strip() == "endpoint_patch"
@@ -590,6 +600,41 @@ def _merge_contextual_extra_parameters(
                 continue
         merged[key] = value
     return merged
+
+
+def _date_range_intent_replaces_prior_intent(
+    *,
+    prior: Any,
+    incoming: dict[str, Any],
+) -> bool:
+    if not isinstance(prior, dict):
+        return False
+    incoming_resolution = resolve_date_range_intent(incoming)
+    prior_resolution = resolve_date_range_intent(prior)
+    if incoming_resolution is None:
+        return False
+    if prior_resolution is None:
+        return True
+    return _date_range_endpoints(incoming_resolution.payload) != _date_range_endpoints(
+        prior_resolution.payload
+    )
+
+
+def _without_stale_date_evidence(extra_parameters: dict[str, Any]) -> dict[str, Any]:
+    cleaned = dict(extra_parameters)
+    cleaned.pop("date_range_raw_text", None)
+    evidence_spans = cleaned.get("evidence_spans")
+    if isinstance(evidence_spans, dict):
+        evidence = {
+            key: value
+            for key, value in evidence_spans.items()
+            if _field_base(str(key)) != "date_range"
+        }
+        if evidence:
+            cleaned["evidence_spans"] = evidence
+        else:
+            cleaned.pop("evidence_spans", None)
+    return cleaned
 
 
 def _declared_strategy_family(strategy: StrategySummary) -> str | None:

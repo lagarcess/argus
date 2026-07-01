@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date
 from typing import Any, Literal
 
@@ -35,6 +36,9 @@ class EditOperation(BaseModel):
         "timeframe",
         "fees",
         "slippage",
+        "indicator_entry_threshold",
+        "indicator_exit_threshold",
+        "indicator_period",
     ]
     symbols: list[str] = Field(default_factory=list)
     value: str | None = None
@@ -155,15 +159,20 @@ def _artifact_assumption_edit_messages(
                 "- timeframe (use value, compact such as 1D or 1h): set the bar "
                 "size.\n"
                 "- fees (use number) and slippage (use number): set as decimal "
-                "fractions when explicitly supplied.\n\n"
+                "fractions when explicitly supplied.\n"
+                "- indicator_entry_threshold and indicator_exit_threshold (use "
+                "number): set tunable RSI buy/entry and sell/exit thresholds on "
+                "an existing RSI confirmation. Use indicator_period for a tunable "
+                "RSI lookback period.\n\n"
                 "Execution limits the system enforces (do not propose operations "
                 "that break them): one asset class per run (equities and crypto "
                 "cannot mix), at most 5 traded symbols, long-only, and the "
                 "benchmark must match the traded asset class. If the user's edit "
                 "would break a limit, return needs_clarification, explain the limit "
                 "plainly, and offer the closest in-limit alternative (for example "
-                "switching the whole run to that asset class). The strategy type and "
-                "its entry/exit rule parameters are not editable here.\n\n"
+                "switching the whole run to that asset class). The strategy family "
+                "itself is not editable here except for the explicitly listed "
+                "tunable RSI indicator parameters.\n\n"
                 "Return outcome=ready_to_confirm when operations contains at least "
                 "one applicable change. If the user asks what is currently set, "
                 "return needs_clarification with a concise assistant_response "
@@ -174,7 +183,9 @@ def _artifact_assumption_edit_messages(
                 "single turn mixes a supported change with an unsupported one, apply "
                 "the supported operations with outcome=ready_to_confirm and use "
                 "assistant_response to briefly state, in the user's language, what "
-                "you could not change and why. "
+                "you could not change and why. For mixed add and remove turns, use "
+                "separate asset operations; do not collapse the removed asset into "
+                "the final traded list. "
                 f"Today is {date.today().isoformat()}. {language_line} Return only "
                 "JSON matching the schema."
             ),
@@ -206,7 +217,10 @@ def _has_supported_edit(
                 active_confirmation=active_confirmation,
             ),
         )
-        return resolved.has_changes()
+        return resolved.has_changes() or any(
+            _operation_has_supported_carrier(operation)
+            for operation in plan.operations
+        )
     asset_operation = normalized_asset_universe_operation(
         plan.asset_universe_operation
     )
@@ -241,6 +255,28 @@ def _has_supported_edit(
     )
 
 
+def _operation_has_supported_carrier(operation: EditOperation) -> bool:
+    target = operation.target
+    op = operation.op
+    if target == "asset":
+        if op == "clear":
+            return True
+        return op in {"add", "remove", "replace"} and any(
+            str(symbol or "").strip() for symbol in operation.symbols
+        )
+    if target == "benchmark":
+        if op == "clear":
+            return True
+        return op in {"set", "replace"} and bool((operation.value or "").strip())
+    if target == "date_window":
+        return op in {"set", "replace"} and operation.date_window is not None
+    if target in _NUMBER_TARGETS or target in _INDICATOR_PARAMETER_TARGETS:
+        return op in {"set", "replace"} and operation.number is not None
+    if target in _TEXT_TARGETS:
+        return op in {"set", "replace"} and bool((operation.value or "").strip())
+    return False
+
+
 def _reference_asset_universe(
     *,
     prior_strategy: dict[str, Any] | None,
@@ -270,6 +306,11 @@ def _unique_models(preferred_model: str) -> list[str]:
 
 
 _NUMBER_TARGETS = {"capital", "recurring_contribution", "fees", "slippage"}
+_INDICATOR_PARAMETER_TARGETS = {
+    "indicator_entry_threshold": "entry_threshold",
+    "indicator_exit_threshold": "exit_threshold",
+    "indicator_period": "indicator_period",
+}
 _TEXT_TARGETS = {"cadence", "timeframe"}
 
 
@@ -291,6 +332,7 @@ class ResolvedArtifactEdit(BaseModel):
     timeframe: str | None = None
     fee_rate: float | None = None
     slippage: float | None = None
+    indicator_parameters: dict[str, float | int] = Field(default_factory=dict)
     applied: list[str] = Field(default_factory=list)
     unsupported: list[str] = Field(default_factory=list)
 
@@ -302,6 +344,7 @@ def apply_edit_operations(
     operations: list[EditOperation],
     *,
     current_asset_universe: Any = None,
+    asset_symbol_resolver: Callable[[str], str | None] | None = None,
 ) -> ResolvedArtifactEdit:
     """Resolve a messy, multi-operation edit turn against the current card.
 
@@ -320,12 +363,19 @@ def apply_edit_operations(
         op = operation.op
 
         if target == "asset":
-            patch = normalized_asset_symbols(operation.symbols)
+            patch = _normalized_operation_symbols(
+                operation.symbols,
+                asset_symbol_resolver=asset_symbol_resolver,
+            )
             if op == "add":
                 working_assets = normalized_asset_symbols([*working_assets, *patch])
             elif op == "remove":
                 removal = set(patch)
+                before_assets = list(working_assets)
                 working_assets = [s for s in working_assets if s not in removal]
+                if working_assets == before_assets:
+                    resolved.unsupported.append(f"{op}.{target}")
+                    continue
             elif op == "replace":
                 working_assets = patch
             elif op == "clear":
@@ -376,6 +426,21 @@ def apply_edit_operations(
                 resolved.unsupported.append(f"{op}.{target}")
             continue
 
+        if target in _INDICATOR_PARAMETER_TARGETS:
+            if op in {"set", "replace"} and operation.number is not None:
+                parameter_key = _INDICATOR_PARAMETER_TARGETS[target]
+                value: float | int = float(operation.number)
+                if parameter_key == "indicator_period":
+                    value = int(value)
+                    if value <= 0:
+                        resolved.unsupported.append(f"{op}.{target}")
+                        continue
+                resolved.indicator_parameters[parameter_key] = value
+                resolved.applied.append(f"set.{target}")
+            else:
+                resolved.unsupported.append(f"{op}.{target}")
+            continue
+
         if target in _TEXT_TARGETS:
             if op in {"set", "replace"} and (operation.value or "").strip():
                 cleaned = operation.value.strip()
@@ -395,3 +460,42 @@ def apply_edit_operations(
         resolved.asset_universe_operation = "replace"
 
     return resolved
+
+
+def _normalized_operation_symbols(
+    symbols: list[str],
+    *,
+    asset_symbol_resolver: Callable[[str], str | None] | None,
+) -> list[str]:
+    resolved_symbols: list[str] = []
+    for symbol in symbols:
+        raw_symbol = str(symbol or "").strip()
+        if not raw_symbol:
+            continue
+        matched = False
+        for candidate in _operation_symbol_candidates(raw_symbol):
+            if "/" in raw_symbol and candidate == raw_symbol and matched:
+                continue
+            try:
+                resolved_symbol = (
+                    asset_symbol_resolver(candidate) if asset_symbol_resolver else None
+                )
+            except Exception:
+                resolved_symbol = None
+            if resolved_symbol:
+                resolved_symbols.extend(normalized_asset_symbols([resolved_symbol]))
+                matched = True
+        if not matched:
+            resolved_symbols.extend(normalized_asset_symbols([raw_symbol]))
+    return resolved_symbols
+
+
+def _operation_symbol_candidates(raw_symbol: str) -> list[str]:
+    if "/" in raw_symbol:
+        candidates = [
+            *(part.strip() for part in raw_symbol.split("/") if part.strip()),
+            raw_symbol,
+        ]
+    else:
+        candidates = [raw_symbol]
+    return list(dict.fromkeys(candidates))
