@@ -53,6 +53,7 @@ def test_llm_interpreter_does_not_merge_prior_dca_into_fresh_strategy(
     assert strategy.cadence is None
     assert strategy.capital_amount is None
 
+
 def test_llm_interpreter_removes_stale_indicator_limit_when_user_only_said_drops(
     monkeypatch,
 ) -> None:
@@ -105,6 +106,7 @@ def test_llm_interpreter_removes_stale_indicator_limit_when_user_only_said_drops
     assert result.candidate_strategy_draft.capital_amount is None
     assert result.unsupported_constraints == []
 
+
 def test_llm_interpreter_accepts_structured_date_ranges(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -150,6 +152,7 @@ def test_llm_interpreter_accepts_structured_date_ranges(monkeypatch) -> None:
         "start": "2025-01-01",
         "end": "2026-05-03",
     }
+
 
 def test_llm_interpreter_keeps_relative_date_contract_when_model_invents_dates(
     monkeypatch,
@@ -214,6 +217,7 @@ def test_llm_interpreter_keeps_relative_date_contract_when_model_invents_dates(
     assert expected_range is not None
     assert strategy.date_range == expected_range.payload
 
+
 def test_llm_interpreter_preserves_user_since_year_when_model_defaults_period(
     monkeypatch,
 ) -> None:
@@ -273,6 +277,7 @@ def test_llm_interpreter_preserves_user_since_year_when_model_defaults_period(
     assert strategy.capital_amount == 500
     assert strategy.cadence == "monthly"
 
+
 def test_llm_interpreter_rejects_invented_dca_cadence(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -330,6 +335,7 @@ def test_llm_interpreter_rejects_invented_dca_cadence(monkeypatch) -> None:
     assert strategy.assumptions == []
     assert result.missing_required_fields == ["capital_amount", "cadence"]
 
+
 def test_llm_interpreter_rejects_invented_dca_contribution_amount(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -370,6 +376,7 @@ def test_llm_interpreter_rejects_invented_dca_contribution_amount(monkeypatch) -
     strategy = result.candidate_strategy_draft
     assert strategy.strategy_type == "dca_accumulation"
     assert strategy.capital_amount is None
+
 
 @pytest.mark.asyncio
 async def test_dca_contribution_role_audit_demotes_total_budget(monkeypatch) -> None:
@@ -431,6 +438,7 @@ async def test_dca_contribution_role_audit_demotes_total_budget(monkeypatch) -> 
     assert draft.total_capital == 200000
     assert "capital_amount" in audited.missing_required_fields
     assert "dca_total_budget_role_audited" in audited.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_dca_contribution_role_audit_preserves_recurring_amount_with_cap(
@@ -516,6 +524,7 @@ async def test_dca_contribution_role_audit_preserves_recurring_amount_with_cap(
     assert "dca_recurring_contribution_grounded_in_current_message" in (
         audited.reason_codes
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -624,9 +633,7 @@ async def test_pending_response_option_selection_applies_structured_payload(
                     "options": [
                         {
                             "label": "Run recurring buys only",
-                            "replacement_values": {
-                                "ignore_initial_capital": True
-                            },
+                            "replacement_values": {"ignore_initial_capital": True},
                         }
                     ],
                 },
@@ -651,6 +658,7 @@ async def test_pending_response_option_selection_applies_structured_payload(
     assert draft.field_provenance.get("capital_amount") == "recurring_contribution"
     assert "total_capital" not in draft.field_provenance
     assert "pending_response_option_selected" in audited.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_pending_response_option_selection_wins_over_generic_asset_parse(
@@ -732,9 +740,7 @@ async def test_pending_response_option_selection_wins_over_generic_asset_parse(
                     "options": [
                         {
                             "label": "Run recurring buys only",
-                            "replacement_values": {
-                                "ignore_initial_capital": True
-                            },
+                            "replacement_values": {"ignore_initial_capital": True},
                         }
                     ],
                 },
@@ -750,11 +756,13 @@ async def test_pending_response_option_selection_wins_over_generic_asset_parse(
     assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
     assert result.candidate_strategy_draft.capital_amount == 750
     assert result.candidate_strategy_draft.cadence == "quarterly"
-    assert result.candidate_strategy_draft.extra_parameters.get(
-        "recurring_contribution"
-    ) == 750
+    assert (
+        result.candidate_strategy_draft.extra_parameters.get("recurring_contribution")
+        == 750
+    )
     assert "total_budget" not in result.candidate_strategy_draft.extra_parameters
     assert "pending_response_option_selected" in result.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_pending_response_option_selection_handles_approval_like_answer(
@@ -828,9 +836,7 @@ async def test_pending_response_option_selection_handles_approval_like_answer(
                     "options": [
                         {
                             "label": "Run recurring buys only",
-                            "replacement_values": {
-                                "ignore_initial_capital": True
-                            },
+                            "replacement_values": {"ignore_initial_capital": True},
                         }
                     ],
                 },
@@ -845,6 +851,7 @@ async def test_pending_response_option_selection_handles_approval_like_answer(
     assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
     assert "total_budget" not in result.candidate_strategy_draft.extra_parameters
     assert "pending_response_option_selected" in result.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_dca_contribution_role_audit_preserves_current_recurring_amount(
@@ -915,6 +922,7 @@ async def test_dca_contribution_role_audit_preserves_current_recurring_amount(
         audited.reason_codes
     )
     assert calls == ["DcaContributionRoleAudit"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -1039,6 +1047,7 @@ async def test_dca_contract_audit_recovers_recurring_buy_shape_before_capability
     assert "cadence" not in repaired.missing_required_fields
     assert "dca_contract_audit" in repaired.reason_codes
 
+
 @pytest.mark.asyncio
 async def test_dca_contract_audit_preserves_optional_cap_on_ready_dca_shape(
     monkeypatch,
@@ -1128,6 +1137,7 @@ async def test_dca_contract_audit_preserves_optional_cap_on_ready_dca_shape(
     assert draft.extra_parameters["total_budget"] == 3000
     assert "dca_contract_audit" in repaired.reason_codes
 
+
 def test_llm_interpreter_rejects_invented_initial_capital(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -1167,6 +1177,7 @@ def test_llm_interpreter_rejects_invented_initial_capital(monkeypatch) -> None:
     )
 
     assert "initial_capital" not in result.candidate_strategy_draft.extra_parameters
+
 
 def test_llm_interpreter_drops_unstated_buy_hold_execution_defaults(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -1216,6 +1227,7 @@ def test_llm_interpreter_drops_unstated_buy_hold_execution_defaults(monkeypatch)
     assert strategy.risk_rules == []
     assert "field_provenance" not in strategy.extra_parameters
 
+
 def test_llm_interpreter_preserves_grounded_initial_capital(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -1257,6 +1269,7 @@ def test_llm_interpreter_preserves_grounded_initial_capital(monkeypatch) -> None
 
     assert result.candidate_strategy_draft.extra_parameters["initial_capital"] == 10000
     assert result.candidate_strategy_draft.capital_amount == 10000
+
 
 def test_llm_interpreter_maps_grounded_total_capital_to_non_dca_starting_capital(
     monkeypatch,
@@ -1318,6 +1331,231 @@ def test_llm_interpreter_maps_grounded_total_capital_to_non_dca_starting_capital
     assert strategy.extra_parameters["field_provenance"]["capital_amount"] == (
         "starting_capital"
     )
+
+
+def test_pending_signal_parameter_answer_preserves_prior_asset_when_verb_is_ticker(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        user_goal_summary="User supplied the moving-average periods.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="usa 50 y 200 dias",
+            language="es-419",
+            strategy_type="signal_strategy",
+            strategy_thesis="Use a 50/200 moving-average crossover.",
+            asset_universe=["USA"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            entry_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+            exit_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bearish",
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="usa 50 y 200 dias",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="signal_strategy",
+                    strategy_thesis="Test TSLA with a moving-average crossover.",
+                    asset_universe=["TSLA"],
+                    asset_class="equity",
+                    date_range={"start": "2024-01-01", "end": "2024-12-31"},
+                )
+            ),
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "requested_field": "entry_logic",
+            },
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.asset_class == "equity"
+    assert strategy.entry_rule["fast_period"] == 50
+    assert strategy.exit_rule["slow_period"] == 200
+
+
+def test_pending_signal_parameter_answer_honors_typed_asset_override(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        user_goal_summary="User supplied a different asset and the moving-average periods.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="usa google con 50 y 200 dias",
+            language="es-419",
+            strategy_type="signal_strategy",
+            strategy_thesis="Use Google with a 50/200 moving-average crossover.",
+            asset_universe=["GOOGL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            entry_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+            exit_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bearish",
+            },
+            field_provenance={"asset_universe": "explicit_user"},
+            evidence_spans={"asset_universe": "google"},
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="usa google con 50 y 200 dias",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="signal_strategy",
+                    strategy_thesis="Test TSLA with a moving-average crossover.",
+                    asset_universe=["TSLA"],
+                    asset_class="equity",
+                    date_range={"start": "2024-01-01", "end": "2024-12-31"},
+                )
+            ),
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "requested_field": "entry_logic",
+            },
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.asset_universe == ["GOOGL"]
+    assert strategy.asset_class == "equity"
+    assert strategy.entry_rule["fast_period"] == 50
+    assert "pending_non_asset_answer_preserved_prior_asset" not in result.reason_codes
+
+
+def test_pending_signal_parameter_repair_preserves_prior_asset_without_field_metadata(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        user_goal_summary="User supplied the moving-average periods.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="usa 50 y 200 dias",
+            language="es-419",
+            strategy_type="signal_strategy",
+            strategy_thesis="Use a 50/200 moving-average crossover.",
+            asset_universe=["USA"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            entry_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+            exit_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bearish",
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="usa 50 y 200 dias",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="signal_strategy",
+                    strategy_thesis="Test TSLA with a moving-average crossover.",
+                    asset_universe=["TSLA"],
+                    asset_class="equity",
+                    date_range={"start": "2024-01-01", "end": "2024-12-31"},
+                )
+            ),
+            selected_thread_metadata={"last_stage_outcome": "await_user_reply"},
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.asset_class == "equity"
+    assert strategy.entry_rule["fast_period"] == 50
+    assert "pending_non_asset_answer_preserved_prior_asset" in result.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_latest_result_routing_audit_repairs_capability_misroute(
@@ -1389,6 +1627,7 @@ async def test_latest_result_routing_audit_repairs_capability_misroute(
     assert repaired.capability_question_focus is None
     assert "latest_result_routing_audit" in repaired.reason_codes
 
+
 @pytest.mark.asyncio
 async def test_latest_result_routing_audit_refines_general_followup_focus(
     monkeypatch,
@@ -1437,9 +1676,7 @@ async def test_latest_result_routing_audit_refines_general_followup_focus(
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary="User asks what to try next.",
-        assistant_response=(
-            "Try MACD or a Bollinger Band filter next."
-        ),
+        assistant_response=("Try MACD or a Bollinger Band filter next."),
         semantic_turn_act="result_followup",
         result_followup_focus="general",
     )
@@ -1461,6 +1698,7 @@ async def test_latest_result_routing_audit_refines_general_followup_focus(
     assert repaired.result_followup_focus == "next_experiment"
     assert repaired.assistant_response is None
     assert "latest_result_routing_audit" in repaired.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_latest_result_routing_audit_marks_save_request(
@@ -1528,6 +1766,7 @@ async def test_latest_result_routing_audit_marks_save_request(
     assert repaired.assistant_response is None
     assert "latest_result_routing_audit" in repaired.reason_codes
     assert "latest_result_save_requested" in repaired.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_latest_result_save_audit_can_mark_general_routing(
@@ -1602,6 +1841,7 @@ async def test_latest_result_save_audit_can_mark_general_routing(
     ]
     assert "latest_result_save_requested" in repaired.reason_codes
 
+
 @pytest.mark.asyncio
 async def test_latest_result_save_audit_runs_after_non_general_result_focus(
     monkeypatch,
@@ -1675,6 +1915,7 @@ async def test_latest_result_save_audit_runs_after_non_general_result_focus(
     ]
     assert repaired.result_followup_focus == "why_underperformed"
     assert "latest_result_save_requested" in repaired.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_latest_result_routing_audit_repairs_copied_underfilled_strategy(
@@ -1758,6 +1999,7 @@ async def test_latest_result_routing_audit_repairs_copied_underfilled_strategy(
     assert repaired.missing_required_fields == []
     assert "latest_result_routing_audit" in repaired.reason_codes
 
+
 @pytest.mark.asyncio
 async def test_latest_result_routing_audit_refines_what_tested_when_user_asks_benchmark_why(
     monkeypatch,
@@ -1827,6 +2069,7 @@ async def test_latest_result_routing_audit_refines_what_tested_when_user_asks_be
     assert repaired.result_followup_focus == "why_underperformed"
     assert repaired.assistant_response is None
     assert "latest_result_routing_audit" in repaired.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_latest_result_routing_audit_checks_copied_executable_result_shape(
@@ -1912,6 +2155,7 @@ async def test_latest_result_routing_audit_checks_copied_executable_result_shape
     assert repaired.assistant_response is None
     assert "latest_result_routing_audit" in repaired.reason_codes
 
+
 def test_llm_interpreter_honors_explicit_buy_and_hold_over_entry_like_phrase(
     monkeypatch,
 ) -> None:
@@ -1959,6 +2203,7 @@ def test_llm_interpreter_honors_explicit_buy_and_hold_over_entry_like_phrase(
     assert strategy.exit_logic is None
     assert result.requires_clarification is False
 
+
 def test_llm_interpreter_preserves_actual_user_phrasing_when_model_rewrites_it(
     monkeypatch,
 ) -> None:
@@ -2005,6 +2250,7 @@ def test_llm_interpreter_preserves_actual_user_phrasing_when_model_rewrites_it(
     assert strategy.strategy_thesis == user_message
     assert strategy.date_range == {"start": "2025-01-01", "end": "today"}
 
+
 def test_focused_strategy_repair_prompt_covers_starter_capability_shapes() -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -2024,6 +2270,7 @@ def test_focused_strategy_repair_prompt_covers_starter_capability_shapes() -> No
     assert "supported buy_and_hold simulation" in prompt
     assert "recurring fixed-amount purchase" in prompt
 
+
 def test_dca_required_fields_accept_resolved_date_range_intent() -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -2042,9 +2289,11 @@ def test_dca_required_fields_accept_resolved_date_range_intent() -> None:
         ),
     )
 
-    missing = interpreter_module._capability_required_missing_fields_for_canonical_strategy(
-        ["date_range"],
-        draft=draft,
+    missing = (
+        interpreter_module._capability_required_missing_fields_for_canonical_strategy(
+            ["date_range"],
+            draft=draft,
+        )
     )
     expected_range = interpreter_module.resolve_date_range_intent(
         interpreter_module.LLMDateRangeIntent(
@@ -2058,6 +2307,7 @@ def test_dca_required_fields_accept_resolved_date_range_intent() -> None:
     assert expected_range is not None
     assert missing == []
     assert draft.date_range == expected_range.payload
+
 
 @pytest.mark.asyncio
 async def test_complete_absolute_run_skips_optional_runtime_readiness_audits(
@@ -2155,6 +2405,7 @@ async def test_complete_absolute_run_skips_optional_runtime_readiness_audits(
     ]
     assert ready_response.candidate_strategy_draft.comparison_baseline == "SPY"
     assert ready_response.candidate_strategy_draft.capital_amount == 10000
+
 
 @pytest.mark.asyncio
 async def test_missing_starting_capital_rechecks_before_optional_runtime_audits(
@@ -2262,11 +2513,13 @@ async def test_missing_starting_capital_rechecks_before_optional_runtime_audits(
     ]
     assert ready_response.candidate_strategy_draft.comparison_baseline == "SPY"
     assert ready_response.candidate_strategy_draft.capital_amount == 10000
-    assert ready_response.candidate_strategy_draft.field_provenance[
-        "capital_amount"
-    ] == "starting_capital"
+    assert (
+        ready_response.candidate_strategy_draft.field_provenance["capital_amount"]
+        == "starting_capital"
+    )
     assert "stated_starting_capital_recheck" in ready_response.reason_codes
     assert "stated_run_field_fidelity_audit" in ready_response.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_failed_capital_recheck_uses_focused_strategy_repair_before_baseline(
@@ -2379,10 +2632,12 @@ async def test_failed_capital_recheck_uses_focused_strategy_repair_before_baseli
 
     assert calls == ["StatedStartingCapitalAudit", "FocusedStrategyExtraction"]
     assert ready_response.candidate_strategy_draft.capital_amount == 10000
-    assert ready_response.candidate_strategy_draft.field_provenance[
-        "capital_amount"
-    ] == "starting_capital"
+    assert (
+        ready_response.candidate_strategy_draft.field_provenance["capital_amount"]
+        == "starting_capital"
+    )
     assert "focused_strategy_extraction_repair" in ready_response.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_focused_strategy_repair_recovers_omitted_provider_assets(
@@ -2412,8 +2667,7 @@ async def test_focused_strategy_repair_recovers_omitted_provider_assets(
                 language="es-419",
                 strategy_type="buy_and_hold",
                 strategy_thesis=(
-                    "Comprar y mantener AAPL y MSFT con pesos iguales y "
-                    "10000 dólares."
+                    "Comprar y mantener AAPL y MSFT con pesos iguales y " "10000 dólares."
                 ),
                 asset_universe=[],
                 date_range={"start": "2025-01-01", "end": "2026-06-05"},
@@ -2474,6 +2728,7 @@ async def test_focused_strategy_repair_recovers_omitted_provider_assets(
         response=repaired,
         request=request,
     )
+
 
 @pytest.mark.asyncio
 async def test_missing_turn_act_underfilled_strategy_repairs_before_baseline_audits(
@@ -2593,6 +2848,7 @@ async def test_missing_turn_act_underfilled_strategy_repairs_before_baseline_aud
     }
     assert ready_response.candidate_strategy_draft.capital_amount == 10000
 
+
 def test_unprovenanced_non_default_benchmark_blocks_runtime_fast_path(
     monkeypatch,
 ) -> None:
@@ -2641,12 +2897,11 @@ def test_unprovenanced_non_default_benchmark_blocks_runtime_fast_path(
         request=request,
     )
 
+
 def test_relative_window_evidence_blocks_optional_readiness_fast_path() -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
-    message = (
-        "Compra y mantén AAPL durante los últimos 2 años con 10000 dolares."
-    )
+    message = "Compra y mantén AAPL durante los últimos 2 años con 10000 dolares."
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
@@ -2681,6 +2936,7 @@ def test_relative_window_evidence_blocks_optional_readiness_fast_path() -> None:
         response=response,
         request=request,
     )
+
 
 @pytest.mark.asyncio
 async def test_dca_repair_uses_focused_date_audit_from_bounded_evidence_span(
@@ -2817,6 +3073,7 @@ async def test_dca_repair_uses_focused_date_audit_from_bounded_evidence_span(
     assert ready_response.missing_required_fields == []
     assert ready_response.candidate_strategy_draft.date_range == expected_range.payload
 
+
 @pytest.mark.asyncio
 async def test_counterfactual_bitcoin_ytd_starter_gets_focused_repair(
     monkeypatch,
@@ -2938,6 +3195,7 @@ async def test_counterfactual_bitcoin_ytd_starter_gets_focused_repair(
     )
     result = interpreter._to_runtime_interpretation(ready_response, request=request)
     assert result.candidate_strategy_draft.asset_universe == ["BTC"]
+
 
 @pytest.mark.asyncio
 async def test_weekly_nvidia_dca_starter_gets_focused_repair(
@@ -3078,6 +3336,7 @@ async def test_weekly_nvidia_dca_starter_gets_focused_repair(
     assert draft.field_provenance["recurring_contribution"] == "explicit_user"
     assert draft.field_provenance["cadence"] == "explicit_user"
 
+
 @pytest.mark.asyncio
 async def test_dca_capability_conflict_repair_does_not_stop_underfilled(
     monkeypatch,
@@ -3214,6 +3473,7 @@ async def test_dca_capability_conflict_repair_does_not_stop_underfilled(
     assert draft.capital_amount == 250
     assert draft.cadence == "weekly"
 
+
 @pytest.mark.asyncio
 async def test_vague_guidance_does_not_preempt_focused_strategy_extraction(
     monkeypatch,
@@ -3314,6 +3574,7 @@ async def test_vague_guidance_does_not_preempt_focused_strategy_extraction(
     assert draft.asset_universe == ["NVDA"]
     assert draft.recurring_contribution == 250
     assert draft.cadence == "weekly"
+
 
 @pytest.mark.asyncio
 async def test_explicit_model_timeout_churn_uses_focused_strategy_repair(
@@ -3427,6 +3688,7 @@ async def test_explicit_model_timeout_churn_uses_focused_strategy_repair(
     assert result.candidate_strategy_draft.capital_amount == 250
     assert result.candidate_strategy_draft.cadence == "weekly"
     assert "focused_strategy_extraction_repair" in result.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_explicit_model_timeout_churn_does_not_repair_nonmaterial_refinement(

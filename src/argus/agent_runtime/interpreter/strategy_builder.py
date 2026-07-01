@@ -33,6 +33,7 @@ from argus.agent_runtime.rule_specs import (
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
 )
+from argus.agent_runtime.run_field_contract import field_fidelity_tokens
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import (
     ResolutionProvenance,
@@ -352,8 +353,110 @@ def _merge_prior_strategy(
     request: InterpretationRequest,
     response: LLMInterpretationResponse,
 ) -> None:
-    del strategy, request, response
+    requested_field = _selected_requested_field_base(request)
+    prior = _prior_strategy_from_request(request)
+    if prior is None or not prior.asset_universe:
+        return None
+    operation = normalized_asset_universe_operation(
+        strategy.extra_parameters.get("asset_universe_operation")
+    )
+    if operation is not None:
+        return None
+    if not _should_preserve_prior_asset_for_pending_answer(
+        strategy=strategy,
+        prior=prior,
+        request=request,
+        response=response,
+        requested_field=requested_field,
+    ):
+        return None
+
+    strategy.asset_universe = list(prior.asset_universe)
+    if prior.asset_class:
+        strategy.asset_class = prior.asset_class
+    if "pending_non_asset_answer_preserved_prior_asset" not in response.reason_codes:
+        response.reason_codes.append("pending_non_asset_answer_preserved_prior_asset")
     return None
+
+
+def _prior_strategy_from_request(
+    request: InterpretationRequest,
+) -> StrategySummary | None:
+    snapshot = request.latest_task_snapshot
+    if snapshot is None:
+        return None
+    return snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+
+
+def _should_preserve_prior_asset_for_pending_answer(
+    *,
+    strategy: StrategySummary,
+    prior: StrategySummary,
+    request: InterpretationRequest,
+    response: LLMInterpretationResponse,
+    requested_field: str,
+) -> bool:
+    if requested_field == "asset_universe":
+        return False
+    if _current_turn_has_explicit_asset_override(
+        strategy=strategy,
+        current_user_message=request.current_user_message,
+    ):
+        return False
+    if response.semantic_turn_act == "answer_pending_need" and requested_field:
+        return True
+    if response.task_relation != "continue":
+        return False
+    if not _message_has_numeric_execution_fact(request.current_user_message):
+        return False
+    prior_type = canonical_strategy_type(prior.strategy_type)
+    current_type = canonical_strategy_type(strategy.strategy_type)
+    if prior_type and current_type and prior_type == current_type:
+        return True
+    return prior_type == "signal_strategy" and _strategy_has_rule_semantics(strategy)
+
+
+def _message_has_numeric_execution_fact(message: str) -> bool:
+    return any(
+        any(character.isdigit() for character in token)
+        for token in field_fidelity_tokens(str(message or ""))
+    )
+
+
+def _current_turn_has_explicit_asset_override(
+    *,
+    strategy: StrategySummary,
+    current_user_message: str,
+) -> bool:
+    for symbol in strategy.asset_universe:
+        target = _compact_asset_evidence_token(symbol)
+        if not target:
+            continue
+        if _strategy_has_explicit_asset_evidence(
+            strategy,
+            symbol=symbol,
+            current_user_message=current_user_message,
+        ):
+            return True
+        if _message_has_uppercase_asset_token(current_user_message, target=target):
+            return True
+    return False
+
+
+def _message_has_uppercase_asset_token(message: str | None, *, target: str) -> bool:
+    for token in str(message or "").split():
+        cleaned = "".join(
+            character
+            for character in token.strip()
+            if character.isalnum() or character in {"/", "-"}
+        )
+        if not cleaned or cleaned != cleaned.upper():
+            continue
+        if not any(character.isalpha() and character.isupper() for character in cleaned):
+            continue
+        if _compact_asset_evidence_token(cleaned) == target:
+            return True
+    return False
 
 
 def _field_owned_indicator_asset_candidate(
@@ -440,16 +543,17 @@ def _message_has_cashtag_for_asset(message: str | None, *, target: str) -> bool:
             for character in token.strip()
             if character.isalnum() or character == "$"
         )
-        if cleaned.startswith("$") and _compact_asset_evidence_token(cleaned[1:]) == target:
+        if (
+            cleaned.startswith("$")
+            and _compact_asset_evidence_token(cleaned[1:]) == target
+        ):
             return True
     return False
 
 
 def _compact_asset_evidence_token(value: Any) -> str:
     return "".join(
-        character.casefold()
-        for character in str(value or "")
-        if character.isalnum()
+        character.casefold() for character in str(value or "") if character.isalnum()
     )
 
 
@@ -741,10 +845,7 @@ def _dedupe_simplification_options(
     seen: set[tuple[str, tuple[tuple[str, str], ...]]] = set()
     for option in options:
         replacement_items = tuple(
-            sorted(
-                (key, repr(value))
-                for key, value in option.replacement_values.items()
-            )
+            sorted((key, repr(value)) for key, value in option.replacement_values.items())
         )
         key = (
             option.label,
