@@ -6396,6 +6396,97 @@ def test_pending_buy_hold_simplification_does_not_invent_english_thesis() -> Non
     assert draft.raw_user_phrasing is None
 
 
+def test_pending_rsi_simplification_materializes_supported_threshold_rule() -> None:
+    from argus.agent_runtime.interpreter.pending_option import (
+        _apply_pending_response_option_replacement,
+    )
+    from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
+
+    result = _apply_pending_response_option_replacement(
+        draft=LLMStrategyDraft(
+            raw_user_phrasing="Test TSLA with ATR 14",
+            strategy_type="signal_strategy",
+            strategy_thesis="Backtest TSLA using an ATR 14 rule",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            indicator="atr",
+            entry_logic="Buy when ATR rises.",
+            extra_parameters={"indicator": "atr"},
+        ),
+        replacement_values={"simplify_logic": "rsi_only"},
+        current_missing=["date_range"],
+    )
+
+    draft = result["draft"]
+    assert draft.strategy_type == "indicator_threshold"
+    assert draft.indicator == "rsi"
+    assert draft.indicator_period == 14
+    assert draft.entry_threshold == 30
+    assert draft.exit_threshold == 55
+    assert draft.entry_logic == "Buy when RSI(14) drops to 30 or below"
+    assert draft.exit_logic == "Sell when RSI(14) rises to 55 or above"
+    assert draft.strategy_thesis is None
+    assert draft.extra_parameters["indicator"] == "rsi"
+    assert draft.extra_parameters["indicator_parameters"] == {
+        "indicator": "rsi",
+        "indicator_period": 14,
+        "entry_threshold": 30.0,
+        "exit_threshold": 55.0,
+    }
+    assert result["missing_fields"] == ["date_range"]
+
+
+def test_pending_crossover_simplification_materializes_supported_signal_rule() -> None:
+    from argus.agent_runtime.interpreter.pending_option import (
+        _apply_pending_response_option_replacement,
+    )
+    from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
+
+    result = _apply_pending_response_option_replacement(
+        draft=LLMStrategyDraft(
+            raw_user_phrasing="Prueba TSLA con ATR 14",
+            strategy_type="signal_strategy",
+            strategy_thesis="Comprar TSLA usando ATR 14",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            indicator="atr",
+            entry_logic="Comprar cuando ATR sube.",
+            extra_parameters={"indicator": "atr"},
+        ),
+        replacement_values={
+            "strategy_type": "signal_strategy",
+            "rule_family": "moving_average_crossover",
+        },
+        current_missing=["date_range"],
+    )
+
+    draft = result["draft"]
+    assert draft.strategy_type == "signal_strategy"
+    assert draft.entry_rule == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    assert draft.exit_rule == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bearish",
+    }
+    assert draft.entry_logic == "50-day SMA crosses above 200-day SMA"
+    assert draft.exit_logic == "50-day SMA crosses below 200-day SMA"
+    assert draft.strategy_thesis is None
+    assert draft.indicator is None
+    assert draft.extra_parameters["entry_rule"] == draft.entry_rule
+    assert draft.extra_parameters["exit_rule"] == draft.exit_rule
+    assert result["missing_fields"] == ["date_range"]
+
+
 def test_runnable_clarification_candidate_still_uses_stated_run_fidelity_audit() -> None:
     from argus.agent_runtime.llm_interpreter import (
         _response_needs_stated_run_field_fidelity_audit,

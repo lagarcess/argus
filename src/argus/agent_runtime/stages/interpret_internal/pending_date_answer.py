@@ -1,4 +1,4 @@
-"""Pending date-answer repair helpers for interpret stage."""
+"""Pending date-answer interpretation helpers for interpret stage."""
 
 from __future__ import annotations
 
@@ -22,13 +22,13 @@ from argus.nlp.natural_time import (
     dateparser_languages_for_user_language,
     parse_date_text,
     resolve_calendar_year_intent_text,
-    resolve_date_range_intent,
     resolve_date_range_endpoint_patch,
+    resolve_date_range_intent,
     resolve_date_range_text,
 )
 
 
-def pending_date_answer_route_repair_interpretation(
+def pending_date_answer_interpretation(
     *,
     current_user_message: str,
     language: str | None,

@@ -1,4 +1,4 @@
-"""Helpers for repairing active confirmation-card edits in interpret stage."""
+"""Helpers for applying active confirmation-card edits in interpret stage."""
 
 from __future__ import annotations
 

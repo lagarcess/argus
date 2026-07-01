@@ -20,9 +20,14 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMRiskRule,
     LLMStrategyDraft,
 )
+from argus.agent_runtime.rule_specs import (
+    moving_average_crossover_text,
+    opposite_moving_average_crossover_rule,
+)
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import canonical_strategy_type
+from argus.domain.indicators import normalize_indicator_parameters
 
 
 def _response_needs_pending_response_option_selection_audit(
@@ -292,6 +297,7 @@ def _apply_pending_response_option_replacement(
         repaired.comparison_baseline = str(
             replacement_values["comparison_baseline"]
         ).strip()
+    _apply_supported_logic_replacement(repaired, replacement_values)
     strategy_type = canonical_strategy_type(repaired.strategy_type)
     if strategy_type in {
         "buy_and_hold",
@@ -309,6 +315,102 @@ def _apply_pending_response_option_replacement(
         current_missing=current_missing,
     )
     return {"draft": repaired, "missing_fields": missing_fields}
+
+
+def _apply_supported_logic_replacement(
+    draft: LLMStrategyDraft,
+    replacement_values: dict[str, Any],
+) -> None:
+    if replacement_values.get("simplify_logic") == "rsi_only":
+        _apply_rsi_threshold_replacement(draft, replacement_values)
+        return
+    if replacement_values.get("rule_family") == "moving_average_crossover":
+        _apply_moving_average_crossover_replacement(draft, replacement_values)
+        return
+    if replacement_values.get("strategy_type") == "moving_average_crossover":
+        _apply_moving_average_crossover_replacement(draft, replacement_values)
+
+
+def _apply_rsi_threshold_replacement(
+    draft: LLMStrategyDraft,
+    replacement_values: dict[str, Any],
+) -> None:
+    _clear_rule_or_indicator_fields(draft)
+    _clear_rule_strategy_text(draft)
+    raw_parameters = {
+        key: replacement_values[key]
+        for key in (
+            "period",
+            "indicator_period",
+            "entry_threshold",
+            "exit_threshold",
+            "buy_threshold",
+            "sell_threshold",
+        )
+        if key in replacement_values
+    }
+    parameters = normalize_indicator_parameters("rsi", raw_parameters)
+    draft.strategy_type = "indicator_threshold"
+    draft.indicator = "rsi"
+    draft.indicator_period = int(parameters["indicator_period"])
+    draft.entry_threshold = float(parameters["entry_threshold"])
+    draft.exit_threshold = float(parameters["exit_threshold"])
+    extra_parameters = dict(draft.extra_parameters or {})
+    extra_parameters["indicator"] = "rsi"
+    extra_parameters["indicator_parameters"] = parameters
+    draft.extra_parameters = extra_parameters
+    draft.entry_logic = _rsi_threshold_text(
+        "entry",
+        period=draft.indicator_period,
+        threshold=draft.entry_threshold,
+    )
+    draft.exit_logic = _rsi_threshold_text(
+        "exit",
+        period=draft.indicator_period,
+        threshold=draft.exit_threshold,
+    )
+
+
+def _apply_moving_average_crossover_replacement(
+    draft: LLMStrategyDraft,
+    replacement_values: dict[str, Any],
+) -> None:
+    _clear_rule_or_indicator_fields(draft)
+    _clear_rule_strategy_text(draft)
+    entry_rule = _moving_average_crossover_rule_from_replacement(replacement_values)
+    exit_rule = opposite_moving_average_crossover_rule(entry_rule)
+    draft.strategy_type = "signal_strategy"
+    draft.entry_rule = entry_rule
+    draft.exit_rule = exit_rule
+    draft.entry_logic = moving_average_crossover_text(entry_rule)
+    draft.exit_logic = moving_average_crossover_text(exit_rule)
+    extra_parameters = dict(draft.extra_parameters or {})
+    extra_parameters["entry_rule"] = entry_rule
+    extra_parameters["exit_rule"] = exit_rule
+    draft.extra_parameters = extra_parameters
+
+
+def _moving_average_crossover_rule_from_replacement(
+    replacement_values: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "type": "moving_average_crossover",
+        "fast_indicator": str(replacement_values.get("fast_indicator") or "sma"),
+        "fast_period": int(replacement_values.get("fast_period") or 50),
+        "slow_indicator": str(replacement_values.get("slow_indicator") or "sma"),
+        "slow_period": int(replacement_values.get("slow_period") or 200),
+        "direction": str(replacement_values.get("direction") or "bullish"),
+    }
+
+
+def _rsi_threshold_text(side: str, *, period: int, threshold: float) -> str:
+    direction = "drops to" if side == "entry" else "rises to"
+    comparator = "or below" if side == "entry" else "or above"
+    return f"{'Buy' if side == 'entry' else 'Sell'} when RSI({period}) {direction} {_format_number(threshold)} {comparator}"
+
+
+def _format_number(value: float) -> str:
+    return str(int(value)) if float(value).is_integer() else f"{value:g}"
 
 
 def _clear_dca_total_budget_fields(draft: LLMStrategyDraft) -> None:

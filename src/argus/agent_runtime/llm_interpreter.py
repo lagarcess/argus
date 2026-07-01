@@ -231,6 +231,7 @@ from argus.agent_runtime.interpreter.signal_rule import (  # noqa: F401
     _signal_rule_planning_context_from_prior,
     _supported_signal_rule_planning_response,
 )
+from argus.agent_runtime.interpreter import simplification_options as _options
 from argus.agent_runtime.interpreter.starting_capital import (  # noqa: F401
     _draft_has_grounded_non_dca_starting_capital,
     _focused_strategy_extraction_has_material_fields,
@@ -292,7 +293,6 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMDateRangeIntent,
     LLMInterpretationResponse,
     LLMRiskRule,
-    LLMSimplificationOption,
     LLMStrategyDraft,
     LLMUnsupportedConstraint,
 )
@@ -841,14 +841,11 @@ class OpenRouterStructuredInterpreter:
             "safe default. Do not invent it; if the user does not provide the amount and "
             "there is no prior strategy amount to preserve, leave capital_amount null and "
             "mark the amount as missing. "
-            "For product questions or education, set assistant_response and do not "
-            "force a backtest. Keep prose concise, no emoji, no decorative markdown, "
+            "For product questions or education, set assistant_response; do not force a backtest. Keep prose concise, no emoji, no decorative markdown, "
             "and no generic chatbot openers. For unsupported requests, acknowledge the understood "
             "intent, explain the limitation, and offer executable simplifications. "
-            "When an unsupported constraint has simplification choices, populate "
-            "simplification_options with display labels plus canonical "
-            "replacement_values; simplification_labels are display-only and must "
-            "not carry executable meaning.\n\n"
+            "For simplification choices, put executable meaning in canonical "
+            "replacement_values; labels are display-only.\n\n"
             "semantic_turn_act is the routing source of truth. Use approval when the "
             "user clearly approves a pending confirmation; in that case set intent to "
             "backtest_execution, task_relation to continue, requires_clarification to "
@@ -1333,20 +1330,7 @@ def _response_with_mixed_asset_guardrail_from_symbols(
                     "Argus Alpha cannot run equity, crypto, and currency pairs "
                     "together in one simulation yet."
                 ),
-                simplification_options=[
-                    LLMSimplificationOption(
-                        label="Run the strategy with stock symbols only",
-                        replacement_values={"asset_class": "equity"},
-                    ),
-                    LLMSimplificationOption(
-                        label="Run the strategy with crypto symbols only",
-                        replacement_values={"asset_class": "crypto"},
-                    ),
-                    LLMSimplificationOption(
-                        label="Split into separate asset-class runs",
-                        replacement_values={"split_runs": True},
-                    ),
-                ],
+                simplification_options=_options.asset_class_simplification_options(),
             )
         )
     missing_required_fields = [
@@ -2634,11 +2618,12 @@ async def _ready_active_artifact_edit_planned_response(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
-    if (
-        _selected_requested_field_base(request) == "asset_universe"
-        and response.semantic_turn_act == "educational_question"
-    ):
-        return None
+    if _selected_requested_field_base(request) == "asset_universe":
+        snapshot = request.latest_task_snapshot
+        if snapshot is None or snapshot.active_confirmation_reference is None:
+            return None
+        if response.semantic_turn_act == "educational_question":
+            return None
     if not _request_targets_pending_artifact_assumption_edit(request):
         return None
     if response.semantic_turn_act in {
@@ -3560,20 +3545,7 @@ def _augment_strategy_assets_from_resolvable_context(
                         "Argus Alpha cannot run equity, crypto, and currency pairs "
                         "together in one simulation yet."
                     ),
-                    simplification_options=[
-                        LLMSimplificationOption(
-                            label="Run the strategy with stock symbols only",
-                            replacement_values={"asset_class": "equity"},
-                        ),
-                        LLMSimplificationOption(
-                            label="Run the strategy with crypto symbols only",
-                            replacement_values={"asset_class": "crypto"},
-                        ),
-                        LLMSimplificationOption(
-                            label="Split into separate asset-class runs",
-                            replacement_values={"split_runs": True},
-                        ),
-                    ],
+                    simplification_options=_options.asset_class_simplification_options(),
                 )
             )
         repaired.requires_clarification = True
@@ -4919,23 +4891,9 @@ def _response_from_focused_strategy_extraction(
                         extraction.assistant_response
                         or "This idea depends on strategy logic that is not executable yet."
                     ),
-                    simplification_options=[
-                        LLMSimplificationOption(
-                            label="Use a supported RSI threshold rule",
-                            replacement_values={"simplify_logic": "rsi_only"},
-                        ),
-                        LLMSimplificationOption(
-                            label="Compare with buy and hold",
-                            replacement_values={"strategy_type": "buy_and_hold"},
-                        ),
-                        LLMSimplificationOption(
-                            label="Use a supported moving-average crossover",
-                            replacement_values={
-                                "strategy_type": "signal_strategy",
-                                "rule_family": "moving_average_crossover",
-                            },
-                        ),
-                    ],
+                    simplification_options=(
+                        _options.unsupported_strategy_logic_simplification_options()
+                    ),
                 )
             ],
             confidence=extraction.confidence,
@@ -5309,20 +5267,7 @@ def _validate_capability_boundaries(
                         "Argus Alpha cannot run equity, crypto, and currency pairs "
                         "together in one simulation yet."
                     ),
-                    simplification_options=[
-                        LLMSimplificationOption(
-                            label="Run the strategy with stock symbols only",
-                            replacement_values={"asset_class": "equity"},
-                        ),
-                        LLMSimplificationOption(
-                            label="Run the strategy with crypto symbols only",
-                            replacement_values={"asset_class": "crypto"},
-                        ),
-                        LLMSimplificationOption(
-                            label="Split into separate asset-class runs",
-                            replacement_values={"split_runs": True},
-                        ),
-                    ],
+                    simplification_options=_options.asset_class_simplification_options(),
                 )
             )
     if invalid_symbols and not any(
