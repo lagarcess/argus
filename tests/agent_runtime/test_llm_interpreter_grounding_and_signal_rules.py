@@ -4174,6 +4174,87 @@ async def test_supported_rule_repair_audits_dropped_user_stated_capital(
         == "starting_capital"
     )
 
+
+@pytest.mark.asyncio
+async def test_pending_signal_rule_answer_uses_entry_rule_metadata(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[dict[str, object]] = []
+
+    async def plan_stub(**kwargs):
+        calls.append(kwargs)
+        assert kwargs["current_user_message"] == "usa 50 y 200 dias"
+        assert kwargs["prior_strategy"]["asset_universe"] == ["TSLA"]
+        return _sma_50_200_crossover_plan(
+            strategy_thesis="Test TSLA with a 50/200 moving-average crossover."
+        )
+
+    monkeypatch.setattr(interpreter_module, "repair_signal_rule_plan", plan_stub)
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied the moving-average periods.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="usa 50 y 200 dias",
+            language="es-419",
+            strategy_type="buy_and_hold",
+            strategy_thesis="usa el cruce de medias moviles compatible",
+            asset_universe=["USA"],
+            asset_class="equity",
+            date_range={"start": "2025-12-13", "end": "2026-07-01"},
+            date_range_raw_text="50 y 200 dias",
+            field_provenance={"asset_universe": "explicit_user"},
+            evidence_spans={
+                "asset_universe": "usa",
+                "entry_rule": "50 y 200 dias",
+                "date_range": "50 y 200 dias",
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+    request = InterpretationRequest(
+        current_user_message="usa 50 y 200 dias",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="signal_strategy",
+                strategy_thesis="Test TSLA with a moving-average crossover.",
+                asset_universe=["TSLA"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+                entry_logic="Use a moving-average crossover.",
+            )
+        ),
+        selected_thread_metadata={
+            "requested_field": "entry_rule",
+            "last_stage_outcome": "await_user_reply",
+        },
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    repaired = await interpreter_module._signal_rule_checked_response(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+    runtime = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )._to_runtime_interpretation(repaired, request=request)
+
+    assert calls
+    assert repaired.candidate_strategy_draft.strategy_type == "signal_strategy"
+    assert "signal_rule_plan_repair" in repaired.reason_codes
+    strategy = runtime.candidate_strategy_draft
+    assert strategy.strategy_type == "signal_strategy"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.rule_spec is not None
+    assert "pending_non_asset_answer_preserved_prior_asset" in runtime.reason_codes
+
+
 @pytest.mark.asyncio
 async def test_vague_valuation_idea_is_audited_before_buy_hold_confirmation(
     monkeypatch,

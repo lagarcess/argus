@@ -644,6 +644,66 @@ def test_spanish_atr_llm_indicator_metadata_routes_to_unsupported_recovery() -> 
     assert "Comparar con comprar y mantener" in clarification.patch["assistant_prompt"]
 
 
+def test_supported_strategy_label_with_explicit_unsupported_indicator_needs_recovery() -> None:
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="El usuario quiere probar TSLA con ATR 14 durante 2024.",
+        assistant_response=(
+            "Listo para probar comprar y mantener TSLA del 1 de enero de 2024 "
+            "al 31 de diciembre de 2024."
+        ),
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="Prueba TSLA con ATR 14 durante 2024 con $1,000",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Prueba TSLA con ATR 14 durante 2024 con $1,000",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            capital_amount=1000,
+            extra_parameters={
+                "language": "es-419",
+                "evidence_spans": {
+                    "indicator": "ATR 14",
+                    "date_range": "durante 2024",
+                    "asset_universe": "TSLA",
+                    "capital_amount": "$1,000",
+                },
+                "field_provenance": {
+                    "indicator": "explicit_user",
+                    "date_range": "explicit_user",
+                    "asset_universe": "explicit_user",
+                    "capital_amount": "explicit_user",
+                    "indicator_period": "explicit_user",
+                },
+                "raw_strategy_type": "signal_strategy",
+                "date_range_raw_text": "durante 2024",
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="Prueba TSLA con ATR 14 durante 2024 con $1,000",
+        response=response,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision is not None
+    assert result.decision.unsupported_constraints
+    constraint = result.decision.unsupported_constraints[0]
+    assert constraint.category == "unsupported_strategy_logic"
+    assert "ATR 14" in constraint.raw_value
+    assert result.decision.missing_required_fields == []
+    assert "assistant_response" not in result.patch
+    assert "explicit_unsupported_indicator_overrode_strategy_label" in (
+        result.decision.reason_codes
+    )
+
+
 def test_executable_artifact_patch_does_not_require_strategy_thesis() -> None:
     response = StructuredInterpretation(
         intent="backtest_execution",
@@ -6825,6 +6885,194 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_selection(
     )
 
 
+def test_interpreter_unavailable_pending_simplification_uses_nested_intent_and_spanish_text(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior_date_range = {"start": "2024-01-01", "end": "2024-12-31"}
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="Prueba TSLA con una regla ATR 14 durante 2024",
+            strategy_type="signal_strategy",
+            strategy_thesis="Prueba TSLA con una regla ATR 14.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+            date_range=prior_date_range,
+            capital_amount=1000,
+            entry_logic="regla ATR 14",
+            refinement_of="unsupported_atr_rule",
+        )
+    )
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "semantic_needs": ["simplification_choice"],
+        "options": [
+            {
+                "label": "Use a supported RSI threshold rule",
+                "replacement_values": {"simplify_logic": "rsi_only"},
+            },
+            {
+                "label": "Compare with buy and hold",
+                "replacement_values": {"strategy_type": "buy_and_hold"},
+            },
+            {
+                "label": "Use a supported moving-average crossover",
+                "replacement_values": {
+                    "strategy_type": "signal_strategy",
+                    "rule_family": "moving_average_crossover",
+                },
+            },
+        ],
+    }
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="usa el cruce de medias moviles compatible",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "pending_strategy": {"response_intent": response_intent},
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "signal_strategy"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.date_range == prior_date_range
+    assert strategy.capital_amount == 1000
+    assert strategy.entry_rule == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    assert strategy.exit_rule["direction"] == "bearish"
+    assert "pending_response_option_interpreter_unavailable_repaired" in (
+        result.decision.reason_codes
+    )
+
+
+def test_pending_simplification_typed_choice_overrides_llm_atr_baggage(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior_date_range = {"start": "2024-01-01", "end": "2024-12-31"}
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="Prueba TSLA con ATR 14 durante 2024 con $1,000",
+            strategy_type=None,
+            strategy_thesis="Prueba TSLA con ATR 14 durante 2024 con $1,000",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+            date_range=prior_date_range,
+            capital_amount=1000,
+            entry_logic="ATR 14",
+            extra_parameters={
+                "evidence_spans": {
+                    "indicator": "ATR 14",
+                    "date_range": "durante 2024",
+                    "asset_universe": "TSLA",
+                    "capital_amount": "$1,000",
+                },
+                "date_range_raw_text": "durante 2024",
+            },
+        )
+    )
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "semantic_needs": ["simplification_choice"],
+        "options": [
+            {
+                "label": "Use a supported RSI threshold rule",
+                "replacement_values": {"simplify_logic": "rsi_only"},
+            },
+            {
+                "label": "Compare with buy and hold",
+                "replacement_values": {"strategy_type": "buy_and_hold"},
+            },
+            {
+                "label": "Use a supported moving-average crossover",
+                "replacement_values": {
+                    "strategy_type": "signal_strategy",
+                    "rule_family": "moving_average_crossover",
+                },
+            },
+        ],
+    }
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="strategy_drafting",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="User chose buy and hold, but ATR baggage remained.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing="sí mejor comparar con comprar y mantener, porfa",
+                strategy_thesis="sí mejor comparar con comprar y mantener, porfa",
+                asset_universe=["TSLA"],
+                asset_class="equity",
+                comparison_baseline="SPY",
+                date_range=prior_date_range,
+                capital_amount=1000,
+                entry_logic="ATR 14",
+            ),
+            assistant_response=(
+                "Perfecto, compararemos TSLA contra comprar y mantener durante "
+                "2024 con $1,000. ¿Quieres usar el ATR 14 como regla de entrada?"
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="sí mejor comparar con comprar y mantener, porfa",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "pending_strategy": {"response_intent": response_intent},
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert len(interpreter.requests) == 1
+    assert result.outcome == "ready_for_confirmation"
+    assert "assistant_response" not in result.stage_patch
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.date_range == prior_date_range
+    assert strategy.capital_amount == 1000
+    assert strategy.entry_logic is None
+    assert "pending_response_option_selected" in result.decision.reason_codes
+    assert "pending_response_option_typed_selection_applied" in (
+        result.decision.reason_codes
+    )
+
+
 def test_interpreter_unavailable_pending_date_does_not_apply_raw_date_text(
     monkeypatch,
 ) -> None:
@@ -6988,6 +7236,199 @@ def test_pending_signal_rule_answer_uses_structured_interpreter(
     assert strategy.entry_rule["slow_period"] == 50
     assert strategy.exit_rule["direction"] == "bearish"
     assert "typed_pending_signal_rule_answer_applied" not in result.decision.reason_codes
+
+
+def test_pending_signal_rule_answer_preserves_context_when_llm_labels_new_idea(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior_date_range = {"start": "2024-01-01", "end": "2024-12-31"}
+    entry_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    exit_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bearish",
+    }
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="signal_strategy",
+            strategy_thesis="Test TSLA with a moving-average crossover.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range=prior_date_range,
+            entry_logic="Use a moving-average crossover.",
+        )
+    )
+
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="User supplied the moving-average periods.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="signal_strategy",
+                strategy_thesis="Use a 50/200 moving-average crossover.",
+                asset_universe=["USA"],
+                asset_class="equity",
+                date_range={"start": "2025-12-13", "end": "2026-07-01"},
+                entry_logic="50-day SMA crosses above 200-day SMA",
+                exit_logic="50-day SMA crosses below 200-day SMA",
+                entry_rule=entry_rule,
+                exit_rule=exit_rule,
+                extra_parameters={
+                    "date_range_raw_text": "50 y 200 dias",
+                    "field_provenance": {"asset_universe": "explicit_user"},
+                    "evidence_spans": {
+                        "asset_universe": "usa",
+                        "date_range": "50 y 200 dias",
+                        "entry_rule": "50 y 200 dias",
+                    },
+                },
+            ),
+            semantic_turn_act="new_idea",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="usa 50 y 200 dias",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "entry_rule",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert len(interpreter.requests) == 1
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "signal_strategy"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.date_range == prior_date_range
+    assert strategy.entry_rule == entry_rule
+    assert strategy.exit_rule == exit_rule
+
+
+def test_complete_spanish_pending_crossover_answer_suppresses_stale_question(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior_date_range = {"start": "2024-01-01", "end": "2024-12-31"}
+    entry_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    exit_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bearish",
+    }
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="signal_strategy",
+            strategy_thesis="Test TSLA with a moving-average crossover.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range=prior_date_range,
+            capital_amount=1000,
+            entry_logic="Use a moving-average crossover.",
+        )
+    )
+
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="User supplied the moving-average periods.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="signal_strategy",
+                strategy_thesis="Use a 50/200 moving-average crossover.",
+                asset_universe=["USA"],
+                asset_class="equity",
+                date_range={"start": "2025-12-13", "end": "2026-07-01"},
+                capital_amount=1000,
+                entry_logic="50-day SMA crosses above 200-day SMA",
+                exit_logic="50-day SMA crosses below 200-day SMA",
+                entry_rule=entry_rule,
+                exit_rule=exit_rule,
+                comparison_baseline="SPY",
+                extra_parameters={
+                    "date_range_raw_text": "50 y 200 dias",
+                    "field_provenance": {"asset_universe": "explicit_user"},
+                    "evidence_spans": {
+                        "asset_universe": "usa",
+                        "date_range": "50 y 200 dias",
+                        "entry_rule": "50 y 200 dias",
+                    },
+                },
+            ),
+            assistant_response=(
+                "¿Quieres entrar cuando la media de 50 días cruza ARRIBA "
+                "de la media de 200 días, o ABAJO?"
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="usa 50 y 200 dias",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "entry_rule",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert len(interpreter.requests) == 1
+    assert result.outcome == "ready_for_confirmation"
+    assert "assistant_response" not in result.stage_patch
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "signal_strategy"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.date_range == prior_date_range
+    assert strategy.capital_amount == 1000
+    assert strategy.entry_rule == entry_rule
+    assert strategy.exit_rule == exit_rule
 
 
 def test_interpreter_unavailable_does_not_infer_missing_signal_rule_from_text(

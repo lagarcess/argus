@@ -23,6 +23,10 @@ from argus.agent_runtime.stages.artifact_context import (
     RESULT_EXPLANATION_TARGET_INFERRED,
     RESULT_FOLLOWUP_TARGET_INFERRED,
 )
+from argus.agent_runtime.stages.interpret_internal.draft_only_indicator_evidence import (
+    explicit_draft_only_indicator_evidence,
+    strategy_type_is_user_selected,
+)
 from argus.agent_runtime.stages.interpret_internal.shared import (
     _field_base,
     _should_preserve_prior_asset_context,
@@ -994,11 +998,33 @@ def _strategy_with_current_message_draft_only_indicator_text(
     strategy: StrategySummary,
     interpretation: StructuredInterpretation,
     current_user_message: str,
-) -> tuple[StrategySummary, bool]:
+) -> tuple[StrategySummary, list[str]]:
+    explicit_indicator = explicit_draft_only_indicator_evidence(
+        strategy=strategy,
+        current_user_message=current_user_message,
+    )
+    if explicit_indicator is not None:
+        if _strategy_supplies_executable_rule_edit(strategy):
+            return strategy, []
+        if strategy_type_is_user_selected(strategy):
+            return strategy, []
+        updated = strategy.model_copy(deep=True)
+        updated.strategy_type = None
+        extra_parameters = dict(updated.extra_parameters or {})
+        for key in ("raw_strategy_type", "strategy_type", "template"):
+            extra_parameters.pop(key, None)
+        updated.extra_parameters = extra_parameters
+        updated.raw_user_phrasing = str(current_user_message or "").strip() or None
+        _indicator, raw_indicator_text = explicit_indicator
+        updated.entry_logic = updated.entry_logic or raw_indicator_text
+        return updated, [
+            "draft_only_indicator_text_preserved",
+            "explicit_unsupported_indicator_overrode_strategy_label",
+        ]
     if executable_strategy_type(strategy) in SUPPORTED_STRATEGY_TYPES:
-        return strategy, False
+        return strategy, []
     if _strategy_supplies_executable_rule_edit(strategy):
-        return strategy, False
+        return strategy, []
     if not (
         strategy.asset_universe
         or strategy.strategy_type
@@ -1006,19 +1032,21 @@ def _strategy_with_current_message_draft_only_indicator_text(
         or strategy.exit_logic
         or strategy.rule_spec
     ):
-        return strategy, False
+        return strategy, []
     missing_field_bases = {
         _field_base(str(field)) for field in interpretation.missing_required_fields
     }
     if not missing_field_bases.intersection(
         {"strategy_type", "entry_logic", "exit_logic"}
     ):
-        return strategy, False
+        return strategy, []
     if draft_only_indicator_from_text(current_user_message) is None:
-        return strategy, False
+        return strategy, []
     updated = strategy.model_copy(deep=True)
     updated.raw_user_phrasing = str(current_user_message or "").strip() or None
-    return updated, updated.raw_user_phrasing is not None
+    if updated.raw_user_phrasing is None:
+        return strategy, []
+    return updated, ["draft_only_indicator_text_preserved"]
 
 
 def _strategy_has_unstructured_strategy_thesis(strategy: StrategySummary) -> bool:

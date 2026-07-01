@@ -893,6 +893,40 @@ def test_clarification_renderer_collapses_duplicates_after_direct_question_appen
     )
 
 
+def test_clarification_renderer_collapses_repeated_context_block_before_question() -> None:
+    first = (
+        "El ATR 14 es un indicador de volatilidad que aún no podemos ejecutar "
+        "como regla de entrada o salida."
+    )
+    second = "Podemos probar TSLA en 2024 con $1,000 de otras formas."
+    direct = (
+        "¿Te interesa usar un cruce de medias móviles, una regla de RSI, "
+        "o simplemente comparar con comprar y mantener?"
+    )
+    request = ClarificationRequest(
+        current_user_message="Prueba TSLA con ATR 14 durante 2024 con $1,000",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="signal_strategy",
+            asset_universe=["TSLA"],
+        ),
+        response_intent={
+            "kind": "unsupported_recovery",
+            "semantic_needs": ["simplification_choice"],
+        },
+        language="es-419",
+    )
+    response = ClarificationResponse(
+        question=f"{first} {second} {first} {second} {direct}",
+        question_targets=["simplification_choice"],
+        directly_asks_user=True,
+        detail_targets=["simplification_choice"],
+    )
+
+    rendered = _render_clarification_response(response, request=request)
+
+    assert rendered == f"{first} {second} {direct}"
+
+
 def test_clarifier_system_prompt_enforces_user_language() -> None:
     clarifier = OpenRouterClarificationGenerator()
     request = clarifier.request_model(

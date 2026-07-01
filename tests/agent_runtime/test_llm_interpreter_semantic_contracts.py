@@ -1427,7 +1427,7 @@ def test_pending_signal_parameter_answer_honors_typed_asset_override(
         task_relation="continue",
         user_goal_summary="User supplied a different asset and the moving-average periods.",
         candidate_strategy_draft=LLMStrategyDraft(
-            raw_user_phrasing="usa google con 50 y 200 dias",
+            raw_user_phrasing="usa $GOOGL con 50 y 200 dias",
             language="es-419",
             strategy_type="signal_strategy",
             strategy_thesis="Use Google with a 50/200 moving-average crossover.",
@@ -1451,7 +1451,7 @@ def test_pending_signal_parameter_answer_honors_typed_asset_override(
                 "direction": "bearish",
             },
             field_provenance={"asset_universe": "explicit_user"},
-            evidence_spans={"asset_universe": "google"},
+            evidence_spans={"asset_universe": "$GOOGL"},
         ),
         semantic_turn_act="answer_pending_need",
     )
@@ -1459,7 +1459,7 @@ def test_pending_signal_parameter_answer_honors_typed_asset_override(
     result = interpreter._to_runtime_interpretation(
         response,
         request=InterpretationRequest(
-            current_user_message="usa google con 50 y 200 dias",
+            current_user_message="usa $GOOGL con 50 y 200 dias",
             recent_thread_history=[],
             latest_task_snapshot=TaskSnapshot(
                 pending_strategy_summary=StrategySummary(
@@ -1483,6 +1483,83 @@ def test_pending_signal_parameter_answer_honors_typed_asset_override(
     assert strategy.asset_class == "equity"
     assert strategy.entry_rule["fast_period"] == 50
     assert "pending_non_asset_answer_preserved_prior_asset" not in result.reason_codes
+
+
+def test_pending_signal_parameter_answer_ignores_lowercase_verb_asset_evidence(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        user_goal_summary="User supplied the moving-average periods.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="usa 50 y 200 dias",
+            language="es-419",
+            strategy_type="signal_strategy",
+            strategy_thesis="Use a 50/200 moving-average crossover.",
+            asset_universe=["USA"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            entry_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+            exit_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bearish",
+            },
+            field_provenance={"asset_universe": "explicit_user"},
+            evidence_spans={"asset_universe": "usa"},
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="usa 50 y 200 dias",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="signal_strategy",
+                    strategy_thesis="Test TSLA with a moving-average crossover.",
+                    asset_universe=["TSLA"],
+                    asset_class="equity",
+                    date_range={"start": "2024-01-01", "end": "2024-12-31"},
+                )
+            ),
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "requested_field": "entry_logic",
+            },
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.asset_class == "equity"
+    assert strategy.entry_rule["fast_period"] == 50
+    assert "pending_non_asset_answer_preserved_prior_asset" in result.reason_codes
 
 
 def test_pending_signal_parameter_repair_preserves_prior_asset_without_field_metadata(

@@ -122,7 +122,7 @@ def _request_targets_pending_signal_rule(request: InterpretationRequest) -> bool
     requested_field = _field_path_base(
         request.selected_thread_metadata.get("requested_field")
     )
-    return requested_field in {"entry_logic", "exit_logic"}
+    return requested_field in {"entry_logic", "exit_logic", "entry_rule", "exit_rule"}
 
 
 def _pending_signal_rule_planning_response(

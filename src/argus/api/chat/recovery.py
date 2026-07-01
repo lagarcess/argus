@@ -401,11 +401,30 @@ def _metadata_invalidates_pending_strategy(metadata: dict[str, Any]) -> bool:
     if isinstance(action, dict) and action.get("type") == "cancel_confirmation":
         return True
     stage_outcome = str(metadata.get("agent_runtime_stage_outcome") or "")
+    if stage_outcome == "ready_to_respond" and _metadata_has_pending_response_intent(
+        metadata
+    ):
+        return False
     return stage_outcome in {
         "execution_succeeded",
         "ready_to_respond",
         "end_run",
     }
+
+
+def _metadata_has_pending_response_intent(metadata: dict[str, Any]) -> bool:
+    pending_strategy = metadata.get("pending_strategy")
+    if not isinstance(pending_strategy, dict):
+        return False
+    response_intent = pending_strategy.get("response_intent")
+    if not isinstance(response_intent, dict):
+        return False
+    needs = response_intent.get("semantic_needs")
+    options = response_intent.get("options")
+    return bool(
+        (isinstance(needs, list) and needs)
+        or (isinstance(options, list) and options)
+    )
 
 
 def latest_result_fallback_context(

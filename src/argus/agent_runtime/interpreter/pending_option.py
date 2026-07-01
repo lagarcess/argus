@@ -272,6 +272,9 @@ def _apply_pending_response_option_replacement(
         _clear_dca_total_budget_fields(repaired)
     if "strategy_type" in replacement_values:
         repaired.strategy_type = str(replacement_values["strategy_type"])
+        field_provenance = dict(repaired.field_provenance or {})
+        field_provenance["strategy_type"] = "pending_response_option"
+        repaired.field_provenance = field_provenance
     if "initial_capital" in replacement_values:
         value = replacement_values.get("initial_capital")
         if value is not None:

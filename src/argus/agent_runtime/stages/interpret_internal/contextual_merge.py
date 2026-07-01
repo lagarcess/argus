@@ -24,6 +24,7 @@ from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
 )
 from argus.agent_runtime.stages.interpret_internal.date_contract import (
     _date_range_endpoints,
+    _strategy_date_evidence_candidates,
 )
 from argus.agent_runtime.stages.interpret_internal.shared import (
     _field_base,
@@ -41,11 +42,25 @@ from argus.agent_runtime.strategy_contract import (
     resolve_date_range_intent,
 )
 from argus.domain.indicators import executable_indicator_spec
+from argus.nlp.natural_time import resolve_date_range_text
 
 CONTEXTUAL_EDIT_TURN_ACTS = {
     "answer_pending_need",
     "approval",
     "refine_current_idea",
+}
+
+_PENDING_RULE_FIELD_BASES = {
+    "entry_logic",
+    "exit_logic",
+    "entry_rule",
+    "exit_rule",
+    "rule_spec",
+    "indicator",
+    "indicator_period",
+    "entry_threshold",
+    "exit_threshold",
+    "indicator_parameters",
 }
 
 
@@ -105,13 +120,31 @@ def _strategy_with_contextual_merge(
         semantic_turn_act=semantic_turn_act,
         task_relation=task_relation,
     )
-    if normalized_asset_universe_operation(
-        strategy.extra_parameters.get("asset_universe_operation")
-    ) is not None:
+    if _should_preserve_prior_asset_for_pending_rule_answer(
+        prior=prior,
+        strategy=strategy,
+        selected_thread_metadata=selected_thread_metadata,
+        task_relation=task_relation,
+        current_user_message=current_user_message,
+    ):
+        preserve_prior_asset_context = True
+    if (
+        normalized_asset_universe_operation(
+            strategy.extra_parameters.get("asset_universe_operation")
+        )
+        is not None
+    ):
         preserve_prior_asset_context = False
     preserve_prior_money_context = _should_preserve_prior_money_context(
         selected_thread_metadata=selected_thread_metadata,
         semantic_turn_act=semantic_turn_act,
+    )
+    preserve_prior_date_context = _should_preserve_prior_date_context(
+        strategy=strategy,
+        selected_thread_metadata=selected_thread_metadata,
+        semantic_turn_act=semantic_turn_act,
+        task_relation=task_relation,
+        current_user_message=current_user_message,
     )
     asset_field_requested = (
         _field_base(str(selected_thread_metadata.get("requested_field") or ""))
@@ -160,6 +193,8 @@ def _strategy_with_contextual_merge(
             "position_size",
         }:
             continue
+        if preserve_prior_date_context and key in {"date_range", "timeframe"}:
+            continue
         if value in (None, "", [], {}):
             continue
         if key == "date_range" and isinstance(value, dict):
@@ -194,6 +229,8 @@ def _strategy_with_contextual_merge(
                 }
             if preserve_prior_money_context and isinstance(value, dict):
                 value = _extra_parameters_without_unrequested_money_context(value)
+            if preserve_prior_date_context and isinstance(value, dict):
+                value = _extra_parameters_without_unrequested_date_context(value)
             merged.extra_parameters = _merge_contextual_extra_parameters(
                 base=merged.extra_parameters,
                 incoming=value if isinstance(value, dict) else {},
@@ -223,6 +260,117 @@ def _should_preserve_prior_money_context(
         str(selected_thread_metadata.get("requested_field") or "")
     )
     return requested_field in {"asset_universe", "date_range", "timeframe"}
+
+
+def _should_preserve_prior_date_context(
+    *,
+    strategy: StrategySummary,
+    selected_thread_metadata: dict[str, Any],
+    semantic_turn_act: str | None,
+    task_relation: str,
+    current_user_message: str | None,
+) -> bool:
+    del semantic_turn_act
+    if task_relation not in {"continue", "refine", "new_task"}:
+        return False
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return False
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field not in _PENDING_RULE_FIELD_BASES:
+        return False
+    return not _strategy_has_current_turn_date_evidence(
+        strategy=strategy,
+        current_user_message=current_user_message,
+    )
+
+
+def _strategy_has_current_turn_date_evidence(
+    *,
+    strategy: StrategySummary,
+    current_user_message: str | None,
+) -> bool:
+    for candidate in [
+        str(current_user_message or ""),
+        *_strategy_date_evidence_candidates(strategy),
+    ]:
+        if resolve_date_range_text(candidate, languages=("en", "es")) is not None:
+            return True
+    intent = strategy.extra_parameters.get("date_range_intent")
+    return isinstance(intent, dict) and resolve_date_range_intent(intent) is not None
+
+
+def _should_preserve_prior_asset_for_pending_rule_answer(
+    *,
+    prior: StrategySummary,
+    strategy: StrategySummary,
+    selected_thread_metadata: dict[str, Any],
+    task_relation: str,
+    current_user_message: str | None,
+) -> bool:
+    if not prior.asset_universe:
+        return False
+    if task_relation not in {"continue", "refine", "new_task"}:
+        return False
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return False
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field not in _PENDING_RULE_FIELD_BASES:
+        return False
+    return not _current_turn_has_strong_asset_override(
+        strategy=strategy,
+        current_user_message=current_user_message,
+    )
+
+
+def _current_turn_has_strong_asset_override(
+    *,
+    strategy: StrategySummary,
+    current_user_message: str | None,
+) -> bool:
+    for symbol in strategy.asset_universe:
+        target = _compact_asset_evidence_token(symbol)
+        if not target:
+            continue
+        if _message_has_cashtag_for_asset(current_user_message, target=target):
+            return True
+        if _message_has_uppercase_asset_token(current_user_message, target=target):
+            return True
+        if _strategy_has_strong_asset_evidence(strategy=strategy, target=target):
+            return True
+    return False
+
+
+def _strategy_has_strong_asset_evidence(
+    *,
+    strategy: StrategySummary,
+    target: str,
+) -> bool:
+    evidence_spans = strategy.extra_parameters.get("evidence_spans")
+    if isinstance(evidence_spans, dict):
+        for field_name, evidence in evidence_spans.items():
+            if _field_base(str(field_name)) != "asset_universe":
+                continue
+            evidence_text = str(evidence or "")
+            if _message_has_cashtag_for_asset(evidence_text, target=target):
+                return True
+            if _message_has_uppercase_asset_token(evidence_text, target=target):
+                return True
+    for item in strategy.resolution_provenance:
+        if _field_base(_provenance_field(item)) != "asset_universe":
+            continue
+        source = getattr(item, "source", None)
+        raw_text = getattr(item, "raw_text", "")
+        canonical_symbol = getattr(item, "canonical_symbol", "")
+        if str(source or "") == "user_mention" and target in {
+            _compact_asset_evidence_token(raw_text),
+            _compact_asset_evidence_token(canonical_symbol),
+        }:
+            return True
+    return False
 
 
 def _extra_parameters_without_unrequested_money_context(
@@ -267,6 +415,26 @@ def _extra_parameters_without_unrequested_money_context(
             }
             if provenance:
                 cleaned[key] = provenance
+            continue
+        cleaned[key] = value
+    return cleaned
+
+
+def _extra_parameters_without_unrequested_date_context(
+    extra_parameters: dict[str, Any],
+) -> dict[str, Any]:
+    cleaned: dict[str, Any] = {}
+    for key, value in extra_parameters.items():
+        if key in {"date_range_raw_text", "date_range_intent"}:
+            continue
+        if key == "evidence_spans" and isinstance(value, dict):
+            evidence = {
+                evidence_key: evidence_value
+                for evidence_key, evidence_value in value.items()
+                if _field_base(str(evidence_key)) != "date_range"
+            }
+            if evidence:
+                cleaned[key] = evidence
             continue
         cleaned[key] = value
     return cleaned
@@ -489,7 +657,26 @@ def _message_has_cashtag_for_asset(message: str | None, *, target: str) -> bool:
             for character in token.strip()
             if character.isalnum() or character == "$"
         )
-        if cleaned.startswith("$") and _compact_asset_evidence_token(cleaned[1:]) == target:
+        if (
+            cleaned.startswith("$")
+            and _compact_asset_evidence_token(cleaned[1:]) == target
+        ):
+            return True
+    return False
+
+
+def _message_has_uppercase_asset_token(message: str | None, *, target: str) -> bool:
+    for token in str(message or "").split():
+        cleaned = "".join(
+            character
+            for character in token.strip()
+            if character.isalnum() or character in {"/", "-"}
+        )
+        if not cleaned or cleaned != cleaned.upper():
+            continue
+        if not any(character.isalpha() and character.isupper() for character in cleaned):
+            continue
+        if _compact_asset_evidence_token(cleaned) == target:
             return True
     return False
 

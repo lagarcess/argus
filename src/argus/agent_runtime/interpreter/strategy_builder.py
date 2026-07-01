@@ -432,13 +432,43 @@ def _current_turn_has_explicit_asset_override(
         target = _compact_asset_evidence_token(symbol)
         if not target:
             continue
-        if _strategy_has_explicit_asset_evidence(
-            strategy,
-            symbol=symbol,
-            current_user_message=current_user_message,
-        ):
+        if _message_has_cashtag_for_asset(current_user_message, target=target):
             return True
         if _message_has_uppercase_asset_token(current_user_message, target=target):
+            return True
+        if _strategy_has_strong_pending_asset_override_evidence(
+            strategy=strategy,
+            symbol=symbol,
+        ):
+            return True
+    return False
+
+
+def _strategy_has_strong_pending_asset_override_evidence(
+    *,
+    strategy: StrategySummary,
+    symbol: str,
+) -> bool:
+    target = _compact_asset_evidence_token(symbol)
+    if not target:
+        return False
+    evidence_spans = strategy.extra_parameters.get("evidence_spans")
+    if isinstance(evidence_spans, dict):
+        for field_name, evidence in evidence_spans.items():
+            if _field_path_base(field_name) != "asset_universe":
+                continue
+            evidence_text = str(evidence or "")
+            if _message_has_cashtag_for_asset(evidence_text, target=target):
+                return True
+            if _message_has_uppercase_asset_token(evidence_text, target=target):
+                return True
+    for item in strategy.resolution_provenance:
+        if _field_path_base(item.field) != "asset_universe":
+            continue
+        if item.source == "user_mention" and target in {
+            _compact_asset_evidence_token(item.raw_text),
+            _compact_asset_evidence_token(item.canonical_symbol),
+        }:
             return True
     return False
 

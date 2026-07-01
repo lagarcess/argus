@@ -25,6 +25,8 @@ from argus.agent_runtime.interpreter.pending_option import (
 from argus.agent_runtime.interpreter.strategy_builder import _strategy_from_llm
 from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.simplification_option_contract import (
+    simplification_option_kind,
+    simplification_option_kind_from_selection_text,
     simplification_option_matches_selection,
 )
 from argus.agent_runtime.stages.artifact_context import (
@@ -58,6 +60,41 @@ def pending_response_option_when_interpreter_unavailable(
     current_user_message: str,
     selected_thread_metadata: dict[str, Any],
 ) -> StructuredInterpretation | None:
+    interpretation = pending_response_option_interpretation_from_typed_selection(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        current_user_message=current_user_message,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    if interpretation is None:
+        return None
+    return interpretation.model_copy(
+        update={
+            "user_goal_summary": (
+                "User selected a pending simplification option while structured "
+                "interpretation was unavailable."
+            ),
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *interpretation.reason_codes,
+                        "pending_response_option_interpreter_unavailable_repaired",
+                    ]
+                )
+            ),
+        }
+    )
+
+
+def pending_response_option_interpretation_from_typed_selection(
+    *,
+    state: RunState,
+    user: Any,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+    selected_thread_metadata: dict[str, Any],
+) -> StructuredInterpretation | None:
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
     if not current_user_message.strip():
@@ -66,7 +103,9 @@ def pending_response_option_when_interpreter_unavailable(
         current_user_message=current_user_message,
         recent_thread_history=list(state.recent_thread_history),
         latest_task_snapshot=snapshot,
-        selected_thread_metadata=selected_thread_metadata,
+        selected_thread_metadata=_selected_thread_metadata_with_nested_response_intent(
+            selected_thread_metadata
+        ),
         user=user,
     )
     options = _pending_response_intent_options(request)
@@ -93,15 +132,15 @@ def pending_response_option_when_interpreter_unavailable(
         task_relation="continue",
         requires_clarification=bool(missing_fields),
         user_goal_summary=(
-            "User selected a pending simplification option while structured "
-            "interpretation was unavailable."
+            "User selected a pending simplification option from the previous "
+            "assistant turn."
         ),
         candidate_strategy_draft=strategy,
         missing_required_fields=missing_fields,
         semantic_turn_act="answer_pending_need",
         reason_codes=[
             "pending_response_option_selected",
-            "pending_response_option_interpreter_unavailable_repaired",
+            "pending_response_option_typed_selection_applied",
         ],
     )
 
@@ -344,6 +383,17 @@ def _pending_response_option_index_from_typed_selection(
         ]
         if len(matches) == 1:
             return matches[0]
+    text_kind = simplification_option_kind_from_selection_text(
+        state.current_user_message
+    )
+    if text_kind is not None:
+        matches = [
+            index
+            for index, option in enumerate(options)
+            if simplification_option_kind(option.get("replacement_values")) == text_kind
+        ]
+        if len(matches) == 1:
+            return matches[0]
     return None
 
 
@@ -413,3 +463,17 @@ def _typed_selection_payloads(
             if isinstance(nested_payload, dict):
                 payloads.append(nested_payload)
     return payloads
+
+
+def _selected_thread_metadata_with_nested_response_intent(
+    selected_thread_metadata: dict[str, Any],
+) -> dict[str, Any]:
+    if isinstance(selected_thread_metadata.get("response_intent"), dict):
+        return selected_thread_metadata
+    pending_strategy = selected_thread_metadata.get("pending_strategy")
+    if not isinstance(pending_strategy, dict):
+        return selected_thread_metadata
+    response_intent = pending_strategy.get("response_intent")
+    if not isinstance(response_intent, dict):
+        return selected_thread_metadata
+    return {**selected_thread_metadata, "response_intent": dict(response_intent)}

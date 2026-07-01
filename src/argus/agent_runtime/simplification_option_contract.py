@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from typing import Any, Literal
 
 from argus.agent_runtime.strategy_contract import canonical_strategy_type
@@ -49,6 +51,37 @@ def simplification_option_kind(
     return None
 
 
+def simplification_option_kind_from_selection_text(
+    text: Any,
+) -> SimplificationOptionKind | None:
+    normalized = _normalized_selection_text(text)
+    if not normalized:
+        return None
+    tokens = set(normalized.split())
+    matches: set[SimplificationOptionKind] = set()
+    if "rsi" in tokens:
+        matches.add("rsi_threshold")
+    if (
+        "crossover" in tokens
+        or "cruce" in tokens
+        and _has_any_token(tokens, {"media", "medias", "movil", "moviles"})
+        or _has_phrase(normalized, "moving average")
+        or _has_phrase(normalized, "moving averages")
+    ):
+        matches.add("moving_average_crossover")
+    if (
+        _has_phrase(normalized, "buy and hold")
+        or _has_phrase(normalized, "buy hold")
+        or _has_phrase(normalized, "comprar y mantener")
+        or _has_phrase(normalized, "compra y mantener")
+        or _has_phrase(normalized, "compra y manten")
+    ):
+        matches.add("buy_and_hold")
+    if len(matches) == 1:
+        return next(iter(matches))
+    return None
+
+
 def localized_simplification_option_label(
     *,
     label: Any,
@@ -93,3 +126,23 @@ def _contains_rule_type(payload: dict[str, Any], rule_type: str) -> bool:
         if isinstance(rule, dict) and rule.get("type") == rule_type:
             return True
     return False
+
+
+def _normalized_selection_text(text: Any) -> str:
+    if not isinstance(text, str):
+        return ""
+    normalized = unicodedata.normalize("NFKD", text.casefold())
+    without_marks = "".join(
+        character
+        for character in normalized
+        if not unicodedata.combining(character)
+    )
+    return re.sub(r"[^a-z0-9]+", " ", without_marks).strip()
+
+
+def _has_phrase(text: str, phrase: str) -> bool:
+    return f" {phrase} " in f" {text} "
+
+
+def _has_any_token(tokens: set[str], candidates: set[str]) -> bool:
+    return bool(tokens.intersection(candidates))

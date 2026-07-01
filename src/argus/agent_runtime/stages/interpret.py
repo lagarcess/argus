@@ -207,6 +207,7 @@ from argus.agent_runtime.stages.interpret_internal.contextual_merge import (  # 
 )
 from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
     draft_only_indicator_interpretation_when_interpreter_unavailable as _draft_only_indicator_interpretation_when_interpreter_unavailable,
+    pending_response_option_interpretation_from_typed_selection as _pending_response_option_interpretation_from_typed_selection,
     pending_response_option_when_interpreter_unavailable as _pending_response_option_when_interpreter_unavailable,
     planned_active_confirmation_edit_interpretation as _planned_active_confirmation_edit_interpretation,
     structured_interpretation_has_complete_typed_asset_patch as _structured_interpretation_has_complete_typed_asset_patch,
@@ -389,6 +390,17 @@ async def interpret_stage_async(
             capability_contract=capability_contract,
             selected_thread_metadata=selected_metadata,
         )
+    pending_response_option_interpretation = (
+        _pending_response_option_interpretation_from_typed_selection(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            current_user_message=state.current_user_message,
+            selected_thread_metadata=selected_metadata,
+        )
+    )
+    if pending_response_option_interpretation is not None:
+        interpretation = pending_response_option_interpretation
     logger.debug(
         "Interpret stage structured interpreter completed",
         intent=interpretation.intent,
@@ -727,14 +739,14 @@ async def _stage_result_from_interpretation(
     strategy = integrity_report.strategy
     optional_parameter_values = integrity_report.optional_parameter_values
     if expects_strategy_route:
-        strategy, draft_only_indicator_text_preserved = (
+        strategy, draft_only_indicator_reason_codes = (
             _strategy_with_current_message_draft_only_indicator_text(
                 strategy=strategy,
                 interpretation=interpretation,
                 current_user_message=state.current_user_message,
             )
         )
-        if draft_only_indicator_text_preserved:
+        if draft_only_indicator_reason_codes:
             interpretation = interpretation.model_copy(
                 update={
                     "requires_clarification": True,
@@ -743,7 +755,7 @@ async def _stage_result_from_interpretation(
                         dict.fromkeys(
                             [
                                 *interpretation.reason_codes,
-                                "draft_only_indicator_text_preserved",
+                                *draft_only_indicator_reason_codes,
                             ]
                         )
                     ),
