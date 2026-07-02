@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
+from tests.evals import measurement_eval_harness as harness
 from tests.evals.measurement_eval_harness import (
     FIXTURE_DIR,
     LOCKED_EVAL_CATEGORIES,
@@ -92,6 +94,110 @@ def test_expected_fail_baselines_are_issue_tagged() -> None:
         assert case.expected_fail is not None
         assert case.expected_fail.issue.startswith("#")
         assert case.expected_fail.reason
+        assert case.expected_fail.allowed_failures
+
+
+def test_expected_fail_only_masks_allowed_failure_prefixes() -> None:
+    expected_fail = harness.ExpectedFail(
+        issue="#142",
+        reason="Known company-name asset drop.",
+        allowed_failures=("assets:", "stage_outcomes:"),
+    )
+
+    assert (
+        harness._result_status(
+            [
+                "assets: expected ['TGT', 'WMT', 'COST'], got []",
+                "stage_outcomes: expected ['ready_for_confirmation'], got ['needs']",
+            ],
+            expected_fail=expected_fail,
+        )
+        == "expected_failed"
+    )
+    assert (
+        harness._result_status(
+            [
+                "assets: expected ['TGT', 'WMT', 'COST'], got []",
+                "benchmark_symbol: expected 'SPY', got 'QQQ'",
+            ],
+            expected_fail=expected_fail,
+        )
+        == "failed"
+    )
+    assert harness._result_status([], expected_fail=expected_fail) == "passed"
+
+
+def test_prose_judge_cases_fail_when_assistant_text_is_missing(monkeypatch: Any) -> None:
+    case = harness.EvalCase(
+        id="missing-prose",
+        category="messy_spanish",
+        prompt="probar apple",
+        user_language="es-419",
+        ui_language="es-419",
+        expected=harness.TypedExpectations(
+            intent="backtest_execution",
+            capability_verdict="executable",
+            assets=("AAPL",),
+            asset_class="equity",
+            strategy_type="buy_and_hold",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            benchmark_symbol="SPY",
+            stage_outcomes=("ready_for_confirmation", "await_approval"),
+        ),
+        prose_judge_criteria=("spanish_language_integrity",),
+    )
+    interpret_patch = {
+        "intent": "backtest_execution",
+        "candidate_strategy_draft": {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL"],
+            "asset_class": "equity",
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            "comparison_baseline": "SPY",
+        },
+    }
+    confirm_patch = {
+        "confirmation_payload": {
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbols": ["AAPL"],
+                "asset_class": "equity",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "benchmark_symbol": "SPY",
+            },
+            "validation": {"executable": True},
+        }
+    }
+
+    monkeypatch.setattr(
+        harness,
+        "interpret_stage",
+        lambda **_kwargs: SimpleNamespace(
+            outcome="ready_for_confirmation",
+            patch=interpret_patch,
+        ),
+    )
+    monkeypatch.setattr(
+        harness,
+        "confirm_stage",
+        lambda **_kwargs: SimpleNamespace(
+            outcome="await_approval",
+            patch=confirm_patch,
+        ),
+    )
+    monkeypatch.setattr(
+        harness,
+        "judge_prose_quality",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("missing prose should not call the LLM judge")
+        ),
+    )
+
+    result = harness.run_eval_case(case)
+
+    assert result["status"] == "failed"
+    assert result["failed_checks"] == ["prose_judge:missing_assistant_text"]
+    assert result["prose_judge"]["failed_criteria"] == ["missing_assistant_text"]
 
 
 def test_scorecard_reports_per_category_pass_rates() -> None:

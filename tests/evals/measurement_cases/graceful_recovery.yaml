@@ -17,3 +17,21 @@ cases:
       stage_outcomes: ["needs_clarification", "await_user_reply"]
     prose_judge:
       criteria: ["recovery_tone", "honesty", "no_raw_runtime_error"]
+
+  - id: graceful_recovery_spanish_weekly_options_aapl
+    prompt: "por favor intenta probar opciones semanales de AAPL desde 2024-01-01 hasta 2024-12-31"
+    user_language: es-419
+    ui_language: es-419
+    expected:
+      intent: unsupported_or_out_of_scope
+      capability_verdict: unsupported
+      assets: ["AAPL"]
+      asset_class: equity
+      strategy_type: null
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      stage_outcomes: ["needs_clarification", "await_user_reply"]
+    prose_judge:
+      criteria: ["recovery_tone", "honesty", "spanish_language_integrity", "no_raw_runtime_error"]

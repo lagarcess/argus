@@ -62,6 +62,7 @@ Return JSON only. Use failed_criteria for any failed requested criterion.
 class ExpectedFail:
     issue: str
     reason: str
+    allowed_failures: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -201,7 +202,10 @@ def run_eval_case(
                 clarify_result=clarify_result,
             )
         )
-        if assistant_text:
+        if not assistant_text.strip():
+            judge_result = _missing_prose_judge_result(case)
+            failed_checks.append("prose_judge:missing_assistant_text")
+        else:
             judge_result = judge_prose_quality(
                 case=case,
                 assistant_text=assistant_text,
@@ -224,6 +228,7 @@ def run_eval_case(
             else {
                 "issue": case.expected_fail.issue,
                 "reason": case.expected_fail.reason,
+                "allowed_failures": list(case.expected_fail.allowed_failures),
             }
         ),
         "typed_outcome": typed_outcome,
@@ -343,6 +348,16 @@ def judge_prose_quality(*, case: EvalCase, assistant_text: str) -> dict[str, Any
     }
 
 
+def _missing_prose_judge_result(case: EvalCase) -> dict[str, Any]:
+    return {
+        "pass": False,
+        "failed_criteria": ["missing_assistant_text"],
+        "requested_criteria": list(case.prose_judge_criteria),
+        "notes": "case requested prose judging but produced no assistant text",
+        "rubric_version": PROSE_JUDGE_RUBRIC_VERSION,
+    }
+
+
 async def _judge_prose_quality_async(
     *,
     case: EvalCase,
@@ -408,6 +423,7 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             else ExpectedFail(
                 issue=str(expected_fail["issue"]),
                 reason=str(expected_fail["reason"]),
+                allowed_failures=tuple(expected_fail.get("allowed_failures") or ()),
             )
         ),
         prose_judge_criteria=tuple(raw_case.get("prose_judge", {}).get("criteria") or ()),
@@ -620,8 +636,24 @@ def _result_status(
     *,
     expected_fail: ExpectedFail | None,
 ) -> str:
-    if failed_checks and expected_fail is not None:
+    if failed_checks and _all_failures_are_expected(
+        failed_checks,
+        expected_fail=expected_fail,
+    ):
         return "expected_failed"
     if failed_checks:
         return "failed"
     return "passed"
+
+
+def _all_failures_are_expected(
+    failed_checks: list[str],
+    *,
+    expected_fail: ExpectedFail | None,
+) -> bool:
+    if expected_fail is None or not expected_fail.allowed_failures:
+        return False
+    return all(
+        any(failed_check.startswith(allowed) for allowed in expected_fail.allowed_failures)
+        for failed_check in failed_checks
+    )

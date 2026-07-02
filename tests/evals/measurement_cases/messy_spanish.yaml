@@ -15,5 +15,3 @@ cases:
         end: "2024-03-31"
       benchmark_symbol: BTC
       stage_outcomes: ["ready_for_confirmation", "await_approval"]
-    prose_judge:
-      criteria: ["spanish_language_integrity"]
