@@ -25,9 +25,11 @@ from argus.agent_runtime.benchmark_evidence import (
 )
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: F401
+    ARTIFACT_EDIT_PENDING_FIELDS,
     _apply_legacy_flat_edit_fields,
     _apply_resolved_edit_to_draft,
     _current_artifact_asset_universe,
+    _current_artifact_strategy,
     _normalized_ticker_symbol,
     _request_targets_pending_artifact_assumption_edit,
     _response_from_artifact_assumption_edit_plan,
@@ -2501,6 +2503,7 @@ async def _response_ready_for_runtime(
     planned_response = await _plan_artifact_edit_response(
         preferred_model=preferred_model,
         request=request,
+        rejected_response=response,
     )
     if planned_response is not None:
         return planned_response
@@ -2516,6 +2519,37 @@ async def _response_ready_for_runtime(
             request=request,
         )
     raise ValueError("OpenRouter interpretation returned an incomplete strategy draft")
+
+
+def _refinement_reply_needs_full_interpretation(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    """A refine reply is only an assumption edit when the response says so.
+
+    The "Refine idea" prompt invites any change, including strategy reshapes
+    ("make it recurring buys instead") that the edit-operation set cannot
+    express. Those must keep flowing through full interpretation so the
+    refine fork can produce a new draft; routing them into the planner would
+    shoehorn the reshape into cadence/contribution sets and silently keep the
+    old strategy type.
+    """
+
+    if _selected_requested_field_base(request) != "refinement":
+        return False
+    draft = response.candidate_strategy_draft
+    pending = _current_artifact_strategy(request)
+    draft_type = canonical_strategy_type(draft.strategy_type)
+    pending_type = canonical_strategy_type(pending.strategy_type) if pending else None
+    if draft_type and pending_type and draft_type != pending_type:
+        return True
+    if _active_artifact_asset_universe_operation_needs_planner(
+        response=response,
+        request=request,
+    ):
+        return False
+    return not _llm_strategy_draft_has_supported_artifact_assumption_edit(draft)
 
 
 async def _ready_active_artifact_edit_planned_response(
@@ -2536,6 +2570,11 @@ async def _ready_active_artifact_edit_planned_response(
         "approval",
         "retry_failed_action",
     }:
+        return None
+    if _refinement_reply_needs_full_interpretation(
+        response=response,
+        request=request,
+    ):
         return None
     if (
         response.semantic_turn_act == "result_followup"
@@ -2783,11 +2822,17 @@ async def _plan_artifact_edit_response(
     *,
     preferred_model: str,
     request: InterpretationRequest,
+    rejected_response: LLMInterpretationResponse | None = None,
 ) -> LLMInterpretationResponse | None:
-    planned_response = await _plan_pending_artifact_assumption_edit(
+    planned_response = None
+    if rejected_response is None or not _refinement_reply_needs_full_interpretation(
+        response=rejected_response,
         request=request,
-        preferred_model=preferred_model,
-    )
+    ):
+        planned_response = await _plan_pending_artifact_assumption_edit(
+            request=request,
+            preferred_model=preferred_model,
+        )
     if planned_response is None:
         planned_response = await _plan_focused_artifact_edit(
             model_name=preferred_model,
@@ -3259,7 +3304,7 @@ def _request_has_planner_edit_candidate_after_model_failure(
     requested_field = _field_path_base(
         request.selected_thread_metadata.get("requested_field")
     )
-    if requested_field in {"assumption", "asset_universe", "comparison_baseline"}:
+    if requested_field in ARTIFACT_EDIT_PENDING_FIELDS:
         return True
 
     snapshot = request.latest_task_snapshot

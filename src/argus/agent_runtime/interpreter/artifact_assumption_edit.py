@@ -32,6 +32,19 @@ from argus.nlp.natural_time import resolve_date_range_intent
 
 ResolveAssetCandidate = Callable[..., AssetResolution | None]
 
+# Pending requested_field values whose next user reply edits the pending
+# artifact. The result-card "Refine idea" action ("refinement",
+# api/chat/result_actions.py) and the confirmation-card assumption prompts are
+# two entry points into the same typed edit contract.
+ARTIFACT_EDIT_PENDING_FIELDS = frozenset(
+    {
+        "assumption",
+        "asset_universe",
+        "comparison_baseline",
+        "refinement",
+    }
+)
+
 
 def _normalized_ticker_symbol(value: Any) -> str | None:
     if not isinstance(value, str):
@@ -57,7 +70,7 @@ def _request_targets_pending_artifact_assumption_edit(
     )
     if not has_artifact_context:
         return False
-    if requested_field in {"assumption", "asset_universe", "comparison_baseline"}:
+    if requested_field in ARTIFACT_EDIT_PENDING_FIELDS:
         return True
     return bool(
         not requested_field
