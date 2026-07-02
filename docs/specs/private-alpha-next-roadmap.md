@@ -421,26 +421,32 @@ LANES BY GATE (the board agents execute from):
 
 **Gate A — compounding loop (highest leverage):**
 
-- **A1 Refine -> linked version (#141).** READY-SPEC now; flips to READY-BUILD
-  when the spec is founder-approved. Owns the interpret/edit spine (ownership
-  rule above). BUILT BUT MIS-ROUTED today: the "Refine idea" turn tags its
-  pending state `requested_field:"refinement"` (`api/chat/result_actions.py`),
-  which the edit contract's trigger
+- **A1 Refine routing + loop repair (#141).** ACTIVE (in flight). Owns the
+  interpret/edit spine (ownership rule above). Founder-scoped 2026-07-01:
+  repair ONLY — (a) the refine chip and natural-language edits are two entry
+  points into the same typed edit operations, with the refinement pending
+  state a first-class edit context everywhere, not a one-guard patch; (b) a
+  new idea right after a completed result may borrow its context ("same time
+  period" binds silently to the latest run's window); (c) the repeated
+  date-confirmation loop. BUILT BUT MIS-ROUTED today: the "Refine idea" turn
+  tags its pending state `requested_field:"refinement"`
+  (`api/chat/result_actions.py`), which the edit contract's trigger
   (`_request_targets_pending_artifact_assumption_edit`) does not recognize — so
   refine edits BYPASS the operations planner and fall to the generic
   interpreter (drops the edit / loses asset+date context; observed live). The
   context IS reconstructed
-  (`agent_runtime/artifacts/drafts.py:draft_from_result_metadata`). FIX: route
-  refine through the landed edit contract + emit a new `IdeaVersion` linked to
-  the prior idea (P1 spine supports lineage). UNBLOCKS comparison (A2). Note:
-  issue #141 bundles a second behavior — the repeated "same time period"
-  date-confirmation loop (`interpret_internal/pending_date_answer.py`) —
-  re-verify it against `128818f` first, since PR #139 touched that path. First
-  act: author the missing spec
+  (`agent_runtime/artifacts/drafts.py:draft_from_result_metadata`). Re-verify
+  the loop against `128818f` first, since PR #139 touched
+  `interpret_internal/pending_date_answer.py`. Spec lives with the lane:
   `docs/specs/private-alpha-next-refine-to-version.md`.
 
+- **A1b Linked IdeaVersion emission.** BLOCKED(A1); next spine-chain slice.
+  Emit a new `IdeaVersion` linked to the prior idea on refine (P1 spine
+  supports lineage). Split out of #141 by founder scope decision 2026-07-01;
+  this is the slice that UNBLOCKS comparison (A2).
+
 - **A2 Comparison readout** (= P2.3 detail below). READY-SPEC (spec + founder
-  questions now); BUILD is BLOCKED(A1) — needs clean linked versions to
+  questions now); BUILD is BLOCKED(A1b) — needs clean linked versions to
   compare. Stands on the BUILT P1 spine (each `IdeaVersion`/`EvidenceArtifact`
   carries its metrics; a `compare_started` event is pre-registered in the
   observability envelope). "vs your last version" — return Δ, drawdown Δ, what
