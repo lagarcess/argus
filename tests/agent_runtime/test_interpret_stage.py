@@ -3,12 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from argus.agent_runtime.artifact_action_recovery import artifact_action_recovery_message
+from argus.agent_runtime.artifact_edit_planner import (
+    ArtifactAssumptionEditPlan,
+    EditOperation,
+)
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
+from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+from argus.agent_runtime.stages.clarify import clarify_stage
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
@@ -120,6 +127,69 @@ def test_interpreter_unavailable_recovery_uses_user_language_and_retry_metadata(
         "retryable": True,
         "language": "es-419",
     }
+
+
+def test_interpreter_unavailable_spanish_atr_routes_to_unsupported_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def resolve_test_asset(symbol: str) -> ResolvedAssetStub:
+        resolved = str(symbol).upper()
+        if resolved not in {"TSLA", "SPY"}:
+            raise LookupError(symbol)
+        name = "Tesla Inc." if resolved == "TSLA" else "SPDR S&P 500 ETF Trust"
+        return ResolvedAssetStub(resolved, "equity", name=name)
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        resolve_test_asset,
+    )
+    message = "Prueba TSLA con una regla ATR 14"
+
+    result = interpret_stage(
+        state=RunState.new(current_user_message=message, recent_thread_history=[]),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=None,
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision is not None
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.asset_class == "equity"
+    assert strategy.raw_user_phrasing == message
+    assert result.decision.missing_required_fields == []
+    assert result.decision.unsupported_constraints
+    constraint = result.decision.unsupported_constraints[0]
+    assert constraint.category == "unsupported_strategy_logic"
+    assert "ATR 14" in constraint.raw_value
+    assert result.stage_patch.get("recovery") is None
+    assert "llm_interpreter_unavailable_draft_only_indicator_recovered" in (
+        result.decision.reason_codes
+    )
+
+    clarify_state = RunState.new(
+        current_user_message=message,
+        recent_thread_history=[],
+    )
+    clarify_state.candidate_strategy_draft = strategy
+    clarify_state.missing_required_fields = result.decision.missing_required_fields
+    clarify_state.optional_parameter_status = result.decision.to_patch()[
+        "optional_parameter_status"
+    ]
+    clarification = clarify_stage(
+        state=clarify_state,
+        contract=build_default_capability_contract(),
+        language="es-419",
+    )
+
+    assert clarification.outcome == "await_user_reply"
+    assert clarification.patch["response_intent"]["kind"] == "unsupported_recovery"
+    assert "ATR 14" in clarification.patch["assistant_prompt"]
+    assert "TSLA" in clarification.patch["assistant_prompt"]
 
 
 def validated_confirmation_payload(strategy: StrategySummary) -> dict[str, Any]:
@@ -446,6 +516,192 @@ def test_result_artifact_date_patch_overrides_stale_unsupported_logic() -> None:
     assert strategy.cadence == "monthly"
     assert result.decision.unsupported_constraints == []
     assert result.decision.missing_required_fields == []
+
+
+def test_spanish_atr_underfilled_draft_routes_to_unsupported_recovery() -> None:
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="El usuario quiere probar TSLA con ATR 14.",
+        assistant_response=(
+            "Entiendo que quieres probar TSLA con un ATR 14. ¿En qué período "
+            "de fechas quieres probar TSLA con ATR 14, y cómo debería usarse "
+            "el ATR 14: como señal de entrada o de salida?"
+        ),
+        candidate_strategy_draft=StrategySummary(
+            asset_universe=["TSLA"],
+            asset_class="equity",
+        ),
+        missing_required_fields=["strategy_type", "entry_logic", "exit_logic"],
+        semantic_turn_act="new_idea",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="Prueba TSLA con una regla ATR 14",
+        response=response,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision is not None
+    assert result.decision.unsupported_constraints
+    constraint = result.decision.unsupported_constraints[0]
+    assert constraint.category == "unsupported_strategy_logic"
+    assert "ATR 14" in constraint.raw_value
+    assert result.decision.missing_required_fields == []
+    assert "assistant_response" not in result.patch
+
+    clarify_state = RunState.new(
+        current_user_message="Prueba TSLA con una regla ATR 14",
+        recent_thread_history=[],
+    )
+    clarify_state.candidate_strategy_draft = result.decision.candidate_strategy_draft
+    clarify_state.missing_required_fields = result.decision.missing_required_fields
+    clarify_state.optional_parameter_status = result.decision.to_patch()[
+        "optional_parameter_status"
+    ]
+    clarification = clarify_stage(
+        state=clarify_state,
+        contract=build_default_capability_contract(),
+        language="es-419",
+    )
+
+    assert clarification.outcome == "await_user_reply"
+    assert clarification.patch["response_intent"]["kind"] == "unsupported_recovery"
+    assert clarification.patch["response_intent"]["semantic_needs"] == [
+        "simplification_choice"
+    ]
+    assert "ATR 14" in clarification.patch["assistant_prompt"]
+    assert "Use a supported" not in clarification.patch["assistant_prompt"]
+    assert "Comparar con comprar y mantener" in clarification.patch["assistant_prompt"]
+
+
+def test_spanish_atr_llm_indicator_metadata_routes_to_unsupported_recovery() -> None:
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="El usuario quiere probar TSLA con ATR 14.",
+        assistant_response=(
+            "Entendido, ATR 14 es un indicador de volatilidad, no una regla "
+            "de entrada o salida por sí mismo. Para ejecutar una prueba, "
+            "necesito dos cosas: ¿en qué período de fechas quieres probarlo? "
+            "Y ¿cómo debería usar el ATR 14 para decidir comprar o vender?"
+        ),
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="Prueba TSLA con una regla ATR 14",
+            strategy_thesis="Prueba TSLA con una regla ATR 14",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+            extra_parameters={
+                "indicator": "atr",
+                "indicator_parameters": {
+                    "indicator": "atr",
+                    "indicator_period": 14,
+                },
+            },
+        ),
+        missing_required_fields=["entry_logic", "exit_logic", "date_range"],
+        semantic_turn_act="new_idea",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="Prueba TSLA con una regla ATR 14",
+        response=response,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision is not None
+    assert result.decision.unsupported_constraints
+    constraint = result.decision.unsupported_constraints[0]
+    assert constraint.category == "unsupported_strategy_logic"
+    assert "ATR 14" in constraint.raw_value
+    assert result.decision.missing_required_fields == []
+    assert "assistant_response" not in result.patch
+    assert "draft_only_indicator_text_preserved" in result.decision.reason_codes
+
+    clarify_state = RunState.new(
+        current_user_message="Prueba TSLA con una regla ATR 14",
+        recent_thread_history=[],
+    )
+    clarify_state.candidate_strategy_draft = result.decision.candidate_strategy_draft
+    clarify_state.missing_required_fields = result.decision.missing_required_fields
+    clarify_state.optional_parameter_status = result.decision.to_patch()[
+        "optional_parameter_status"
+    ]
+    clarification = clarify_stage(
+        state=clarify_state,
+        contract=build_default_capability_contract(),
+        language="es-419",
+    )
+
+    assert clarification.outcome == "await_user_reply"
+    assert clarification.patch["response_intent"]["kind"] == "unsupported_recovery"
+    assert "Use a supported" not in clarification.patch["assistant_prompt"]
+    assert "Comparar con comprar y mantener" in clarification.patch["assistant_prompt"]
+
+
+def test_supported_strategy_label_with_explicit_unsupported_indicator_needs_recovery() -> None:
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="El usuario quiere probar TSLA con ATR 14 durante 2024.",
+        assistant_response=(
+            "Listo para probar comprar y mantener TSLA del 1 de enero de 2024 "
+            "al 31 de diciembre de 2024."
+        ),
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="Prueba TSLA con ATR 14 durante 2024 con $1,000",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Prueba TSLA con ATR 14 durante 2024 con $1,000",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            capital_amount=1000,
+            extra_parameters={
+                "language": "es-419",
+                "evidence_spans": {
+                    "indicator": "ATR 14",
+                    "date_range": "durante 2024",
+                    "asset_universe": "TSLA",
+                    "capital_amount": "$1,000",
+                },
+                "field_provenance": {
+                    "indicator": "explicit_user",
+                    "date_range": "explicit_user",
+                    "asset_universe": "explicit_user",
+                    "capital_amount": "explicit_user",
+                    "indicator_period": "explicit_user",
+                },
+                "raw_strategy_type": "signal_strategy",
+                "date_range_raw_text": "durante 2024",
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="Prueba TSLA con ATR 14 durante 2024 con $1,000",
+        response=response,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision is not None
+    assert result.decision.unsupported_constraints
+    constraint = result.decision.unsupported_constraints[0]
+    assert constraint.category == "unsupported_strategy_logic"
+    assert "ATR 14" in constraint.raw_value
+    assert result.decision.missing_required_fields == []
+    assert "assistant_response" not in result.patch
+    assert "explicit_unsupported_indicator_overrode_strategy_label" in (
+        result.decision.reason_codes
+    )
 
 
 def test_executable_artifact_patch_does_not_require_strategy_thesis() -> None:
@@ -4494,6 +4750,68 @@ def test_pending_date_route_repair_prefers_prior_weekday_when_today_matches(
     assert "pending_date_answer_route_repaired" in result.decision.reason_codes
 
 
+def test_pending_date_route_repair_runs_when_llm_marks_answer_but_omits_date(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="compare with buy and hold",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Compare TSLA with buy and hold.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+        )
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User answered the pending date question.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["TSLA"],
+                asset_class="equity",
+                comparison_baseline="SPY",
+            ),
+            missing_required_fields=[],
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="calendar year 2024",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="en"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.comparison_baseline == "SPY"
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert "pending_date_answer_current_message_repaired" in (
+        result.decision.reason_codes
+    )
+
+
 def test_pending_date_edit_preserves_dca_recurring_contribution_role(
     monkeypatch,
 ) -> None:
@@ -5617,6 +5935,101 @@ def test_contextual_same_asset_universe_without_operation_is_noop(
     assert "artifact_patch" not in strategy.extra_parameters
 
 
+def test_active_confirmation_llm_asset_patch_uses_planner_when_new_asset_is_grounded(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def resolve_asset_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        aliases = {
+            "AAPL": "AAPL",
+            "APPLE": "AAPL",
+            "GOOGL": "GOOGL",
+            "GOOGLE": "GOOGL",
+            "MICROSOFT": "MSFT",
+            "MSFT": "MSFT",
+            "TSLA": "TSLA",
+            "TESLA": "TSLA",
+        }
+        canonical = aliases.get(normalized, normalized)
+        return ResolvedAssetStub(canonical, "equity")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_asset_stub)
+    planner_calls: list[dict[str, Any]] = []
+
+    async def plan_stub(**kwargs: Any) -> ArtifactAssumptionEditPlan:
+        planner_calls.append(kwargs)
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(op="add", target="asset", symbols=["GOOGL"]),
+                EditOperation(op="remove", target="asset", symbols=["Microsoft"]),
+                EditOperation(op="set", target="capital", number=75000),
+                EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window=LLMDateRangeIntent(
+                        kind="explicit_range",
+                        start="2026-03-01",
+                        end="2026-06-05",
+                        confidence=0.95,
+                        evidence="3/1/26 thru june 5 2026",
+                    ),
+                ),
+            ],
+            confidence=0.94,
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "plan_artifact_assumption_edit",
+        plan_stub,
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2026-01-01", "end": "2026-06-30"},
+        capital_amount=100000,
+        timeframe="1D",
+        comparison_baseline="SPY",
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User changed the visible card.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            asset_universe=["MSFT"],
+            asset_class="equity",
+            date_range={"start": "2026-03-01", "end": "2026-06-05"},
+            capital_amount=75000,
+            extra_parameters={"asset_universe_operation": "replace"},
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message=(
+            "ok tweak the card: add Google/GOOGL, ditch Microsoft, "
+            "make cash seventy five grand, dates 3/1/26 thru june 5 2026"
+        ),
+        response=response,
+        snapshot=task_snapshot_with_confirmation(pending),
+    )
+
+    assert planner_calls
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL", "TSLA", "GOOGL"]
+    assert strategy.capital_amount == 75000
+    assert strategy.date_range == {"start": "2026-03-01", "end": "2026-06-05"}
+    assert "artifact_assumption_edit_planned" in result.decision.reason_codes
+
+
 def test_contextual_asset_append_preserves_benchmark_and_setup(
     monkeypatch,
 ) -> None:
@@ -5889,6 +6302,250 @@ def test_contextual_asset_append_over_five_symbols_requires_correction(
     )
 
 
+def test_mixed_confirmation_edit_uses_current_explicit_date_intent(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(
+            {"microsoft": "MSFT"}.get(str(symbol).casefold(), symbol.upper()),
+            "equity",
+        ),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, Microsoft, and TSLA.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2026-01-01", "end": "2026-06-30"},
+        capital_amount=100000,
+        timeframe="1D",
+        comparison_baseline="SPY",
+        extra_parameters={
+            "date_range_raw_text": "from January 1, 2026 to June 30, 2026",
+            "date_range_intent": {
+                "kind": "explicit_range",
+                "start": "2026-01-01",
+                "end": "2026-06-30",
+            },
+            "evidence_spans": {
+                "date_range": "from January 1, 2026 to June 30, 2026",
+            },
+            "field_provenance": {"date_range": "explicit_user"},
+        },
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary=(
+            "User added GOOGL, removed Microsoft, changed capital, and set dates."
+        ),
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold AAPL, TSLA, and GOOGL.",
+            asset_universe=["AAPL", "TSLA", "GOOGL"],
+            asset_class="equity",
+            date_range={"start": "2026-01-01", "end": "2026-06-30"},
+            capital_amount=75000,
+            timeframe="1D",
+            extra_parameters={
+                "asset_universe_operation": "replace",
+                "date_range_intent": {
+                    "kind": "explicit_range",
+                    "start": "2026-03-01",
+                    "end": "2026-06-05",
+                },
+                "field_provenance": {
+                    "asset_universe": "explicit_user",
+                    "capital_amount": "starting_capital",
+                    "date_range": "explicit_user",
+                },
+            },
+        ),
+        semantic_turn_act="refine_current_idea",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message=(
+            "add GOOGL, remove Microsoft, set capital to $75,000, "
+            "date March 1, 2026 to June 5, 2026"
+        ),
+        response=response,
+        snapshot=task_snapshot_with_confirmation(pending),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL", "TSLA", "GOOGL"]
+    assert strategy.capital_amount == 75000
+    assert strategy.date_range == {"start": "2026-03-01", "end": "2026-06-05"}
+
+
+def test_bilingual_confirmation_date_edit_prefers_typed_intent_over_raw_parse(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, GOOG, and TSLA.",
+        asset_universe=["AAPL", "GOOG", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=100000,
+        timeframe="1D",
+        comparison_baseline="SPY",
+        extra_parameters={
+            "date_range_intent": {
+                "kind": "explicit_range",
+                "start": "2024-01-01",
+                "end": "2024-12-31",
+                "evidence": "Jan 1 2024 to Dec 31 2024",
+            },
+            "field_provenance": {"date_range": "explicit_user"},
+        },
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User changed the pending date range.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold AAPL, GOOG, and TSLA.",
+            asset_universe=["AAPL", "GOOG", "TSLA"],
+            asset_class="equity",
+            date_range={"start": "2025-04-01", "end": "2026-12-31"},
+            capital_amount=100000,
+            timeframe="1D",
+            comparison_baseline="SPY",
+            extra_parameters={
+                "date_range_raw_text": (
+                    "cambia la fecha a marzo 2 del 2025 a April 14 del 2026"
+                ),
+                "date_range_intent": {
+                    "kind": "explicit_range",
+                    "start": "2025-03-02",
+                    "end": "2026-04-14",
+                    "confidence": 0.9,
+                    "evidence": (
+                        "cambia la fecha a marzo 2 del 2025 a April 14 del 2026"
+                    ),
+                },
+                "field_provenance": {"date_range": "explicit_user"},
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="cambia la fecha a marzo 2 del 2025 a April 14 del 2026",
+        response=response,
+        user=UserState(user_id="u1", language_preference="en"),
+        snapshot=task_snapshot_with_confirmation(pending),
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == {"start": "2025-03-02", "end": "2026-04-14"}
+
+
+def test_interpreter_unavailable_mixed_confirmation_edit_preserves_all_operations(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(
+            {"microsoft": "MSFT"}.get(str(symbol).casefold(), symbol.upper()),
+            "equity",
+        ),
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "provider_ticker_mentions_from_text",
+        lambda *args, **kwargs: [
+            SimpleNamespace(asset=SimpleNamespace(canonical_symbol="GOOGL"))
+        ],
+    )
+
+    async def planned_edit(**kwargs: Any) -> ArtifactAssumptionEditPlan:
+        del kwargs
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary=(
+                "User added GOOGL, removed Microsoft, changed capital, and set dates."
+            ),
+            operations=[
+                EditOperation(op="add", target="asset", symbols=["GOOGL"]),
+                EditOperation(op="remove", target="asset", symbols=["Microsoft"]),
+                EditOperation(op="set", target="capital", number=75000),
+                EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window=LLMDateRangeIntent(
+                        kind="explicit_range",
+                        start="2026-03-01",
+                        end="2026-06-05",
+                    ),
+                ),
+            ],
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "plan_artifact_assumption_edit",
+        planned_edit,
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, Microsoft, and TSLA.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2025-01-01", "end": "2025-12-31"},
+        capital_amount=100000,
+        timeframe="1D",
+        comparison_baseline="SPY",
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "add GOOGL, remove Microsoft, set capital to $75,000, "
+                "date March 1, 2026 to June 5, 2026"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=task_snapshot_with_confirmation(pending),
+        selected_thread_metadata={"last_stage_outcome": "await_user_reply"},
+        structured_interpreter=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL", "TSLA", "GOOGL"]
+    assert strategy.date_range == {"start": "2026-03-01", "end": "2026-06-05"}
+    assert strategy.capital_amount == 75000
+    assert strategy.timeframe == "1D"
+    assert strategy.comparison_baseline == "SPY"
+
+
 def test_interpreter_unavailable_does_not_parse_pending_date_from_text(
     monkeypatch,
 ) -> None:
@@ -5930,6 +6587,490 @@ def test_interpreter_unavailable_does_not_parse_pending_date_from_text(
         "assistant_response"
     ].lower()
     assert "interpreter" not in result.patch["assistant_response"].lower()
+
+
+def test_interpreter_unavailable_pending_supported_strategy_applies_calendar_year_text(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="Use buy and hold instead",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Backtest TSLA using an ATR 14 rule",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+            refinement_of="prior_atr_draft",
+            extra_parameters={
+                "raw_strategy_type": "buy_and_hold",
+                "field_provenance": {"strategy_type": "explicit_user"},
+            },
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="calendar year 2024",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.comparison_baseline == "SPY"
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert "pending_date_answer_interpreter_unavailable_repaired" in (
+        result.decision.reason_codes
+    )
+
+
+def test_interpreter_unavailable_spanish_pending_strategy_applies_calendar_year_text(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="ok, mejor compra y mantén TSLA",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Compra y mantén TSLA",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+            refinement_of="prior_atr_draft",
+            extra_parameters={
+                "raw_strategy_type": "buy_and_hold",
+                "language": "es-419",
+                "field_provenance": {"strategy_type": "explicit_user"},
+            },
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="año calendario 2024",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.comparison_baseline == "SPY"
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert "pending_date_answer_interpreter_unavailable_repaired" in (
+        result.decision.reason_codes
+    )
+
+
+def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choice(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="Test TSLA with an ATR 14 trading rule",
+            strategy_type="signal_strategy",
+            strategy_thesis="Backtest TSLA using an ATR 14 rule.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+            entry_logic="ATR 14 trading rule",
+            refinement_of="unsupported_atr_rule",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="yeah compare w/ buy and hold pls",
+            recent_thread_history=[],
+            action_context={
+                "type": "select_response_option",
+                "label": "Compare with buy and hold",
+                "payload": {
+                    "replacement_values": {"strategy_type": "buy_and_hold"},
+                },
+            },
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "unsupported_recovery",
+                "semantic_needs": ["simplification_choice"],
+                "options": [
+                    {
+                        "label": "Use a supported RSI threshold rule",
+                        "replacement_values": {
+                            "strategy_type": "indicator_threshold",
+                        },
+                    },
+                    {
+                        "label": "Compare with buy and hold",
+                        "replacement_values": {
+                            "strategy_type": "buy_and_hold",
+                            "requested_field": "date_range",
+                        },
+                    },
+                    {
+                        "label": "Use a supported moving-average crossover",
+                        "replacement_values": {
+                            "strategy_type": "moving_average_crossover",
+                        },
+                    },
+                ],
+            },
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "needs_clarification"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.entry_logic is None
+    assert strategy.strategy_thesis is None
+    assert result.decision.missing_required_fields == ["date_range"]
+    assert "pending_response_option_interpreter_unavailable_repaired" in (
+        result.decision.reason_codes
+    )
+
+
+@pytest.mark.parametrize(
+    ("message", "typed_selection", "expected_strategy_type", "expected_rule"),
+    [
+        (
+            "sí, usa una regla RSI compatible",
+            {"simplify_logic": "rsi_only"},
+            "indicator_threshold",
+            "rsi_threshold",
+        ),
+        (
+            "usa el cruce de medias móviles",
+            {
+                "strategy_type": "signal_strategy",
+                "rule_family": "moving_average_crossover",
+            },
+            "signal_strategy",
+            "moving_average_crossover",
+        ),
+    ],
+)
+def test_interpreter_unavailable_pending_simplification_uses_typed_selection(
+    monkeypatch,
+    message: str,
+    typed_selection: dict[str, object],
+    expected_strategy_type: str,
+    expected_rule: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="Prueba TSLA con una regla ATR 14",
+            strategy_type="signal_strategy",
+            strategy_thesis="Prueba TSLA con una regla ATR 14.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+            entry_logic="regla ATR 14",
+            refinement_of="unsupported_atr_rule",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=message,
+            recent_thread_history=[],
+            action_context={
+                "type": "select_response_option",
+                "label": message,
+                "payload": {
+                    "replacement_values": typed_selection,
+                },
+            },
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "unsupported_recovery",
+                "semantic_needs": ["simplification_choice"],
+                "options": [
+                    {
+                        "label": "Use a supported RSI threshold rule",
+                        "replacement_values": {
+                            "simplify_logic": "rsi_only",
+                        },
+                    },
+                    {
+                        "label": "Compare with buy and hold",
+                        "replacement_values": {
+                            "strategy_type": "buy_and_hold",
+                            "requested_field": "date_range",
+                        },
+                    },
+                    {
+                        "label": "Use a supported moving-average crossover",
+                        "replacement_values": {
+                            "strategy_type": "signal_strategy",
+                            "rule_family": "moving_average_crossover",
+                        },
+                    },
+                ],
+            },
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "needs_clarification"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == expected_strategy_type
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.strategy_thesis is None
+    if expected_rule == "rsi_threshold":
+        assert strategy.extra_parameters["indicator_parameters"] == {
+            "indicator": "rsi",
+            "indicator_period": 14,
+            "entry_threshold": 30.0,
+            "exit_threshold": 55.0,
+        }
+    else:
+        assert strategy.entry_rule["type"] == expected_rule
+    assert result.decision.missing_required_fields == ["date_range"]
+    assert "pending_response_option_interpreter_unavailable_repaired" in (
+        result.decision.reason_codes
+    )
+
+
+def test_interpreter_unavailable_pending_simplification_uses_nested_intent_and_spanish_text(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior_date_range = {"start": "2024-01-01", "end": "2024-12-31"}
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="Prueba TSLA con una regla ATR 14 durante 2024",
+            strategy_type="signal_strategy",
+            strategy_thesis="Prueba TSLA con una regla ATR 14.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+            date_range=prior_date_range,
+            capital_amount=1000,
+            entry_logic="regla ATR 14",
+            refinement_of="unsupported_atr_rule",
+        )
+    )
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "semantic_needs": ["simplification_choice"],
+        "options": [
+            {
+                "label": "Use a supported RSI threshold rule",
+                "replacement_values": {"simplify_logic": "rsi_only"},
+            },
+            {
+                "label": "Compare with buy and hold",
+                "replacement_values": {"strategy_type": "buy_and_hold"},
+            },
+            {
+                "label": "Use a supported moving-average crossover",
+                "replacement_values": {
+                    "strategy_type": "signal_strategy",
+                    "rule_family": "moving_average_crossover",
+                },
+            },
+        ],
+    }
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="usa el cruce de medias moviles compatible",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "pending_strategy": {"response_intent": response_intent},
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "signal_strategy"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.date_range == prior_date_range
+    assert strategy.capital_amount == 1000
+    assert strategy.entry_rule == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    assert strategy.exit_rule["direction"] == "bearish"
+    assert "pending_response_option_interpreter_unavailable_repaired" in (
+        result.decision.reason_codes
+    )
+
+
+def test_pending_simplification_typed_choice_overrides_llm_atr_baggage(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior_date_range = {"start": "2024-01-01", "end": "2024-12-31"}
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="Prueba TSLA con ATR 14 durante 2024 con $1,000",
+            strategy_type=None,
+            strategy_thesis="Prueba TSLA con ATR 14 durante 2024 con $1,000",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+            date_range=prior_date_range,
+            capital_amount=1000,
+            entry_logic="ATR 14",
+            extra_parameters={
+                "evidence_spans": {
+                    "indicator": "ATR 14",
+                    "date_range": "durante 2024",
+                    "asset_universe": "TSLA",
+                    "capital_amount": "$1,000",
+                },
+                "date_range_raw_text": "durante 2024",
+            },
+        )
+    )
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "semantic_needs": ["simplification_choice"],
+        "options": [
+            {
+                "label": "Use a supported RSI threshold rule",
+                "replacement_values": {"simplify_logic": "rsi_only"},
+            },
+            {
+                "label": "Compare with buy and hold",
+                "replacement_values": {"strategy_type": "buy_and_hold"},
+            },
+            {
+                "label": "Use a supported moving-average crossover",
+                "replacement_values": {
+                    "strategy_type": "signal_strategy",
+                    "rule_family": "moving_average_crossover",
+                },
+            },
+        ],
+    }
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="strategy_drafting",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="User chose buy and hold, but ATR baggage remained.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing="sí mejor comparar con comprar y mantener, porfa",
+                strategy_thesis="sí mejor comparar con comprar y mantener, porfa",
+                asset_universe=["TSLA"],
+                asset_class="equity",
+                comparison_baseline="SPY",
+                date_range=prior_date_range,
+                capital_amount=1000,
+                entry_logic="ATR 14",
+            ),
+            assistant_response=(
+                "Perfecto, compararemos TSLA contra comprar y mantener durante "
+                "2024 con $1,000. ¿Quieres usar el ATR 14 como regla de entrada?"
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="sí mejor comparar con comprar y mantener, porfa",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "pending_strategy": {"response_intent": response_intent},
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert len(interpreter.requests) == 1
+    assert result.outcome == "ready_for_confirmation"
+    assert "assistant_response" not in result.stage_patch
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.date_range == prior_date_range
+    assert strategy.capital_amount == 1000
+    assert strategy.entry_logic is None
+    assert "pending_response_option_selected" in result.decision.reason_codes
+    assert "pending_response_option_typed_selection_applied" in (
+        result.decision.reason_codes
+    )
 
 
 def test_interpreter_unavailable_pending_date_does_not_apply_raw_date_text(
@@ -6095,6 +7236,199 @@ def test_pending_signal_rule_answer_uses_structured_interpreter(
     assert strategy.entry_rule["slow_period"] == 50
     assert strategy.exit_rule["direction"] == "bearish"
     assert "typed_pending_signal_rule_answer_applied" not in result.decision.reason_codes
+
+
+def test_pending_signal_rule_answer_preserves_context_when_llm_labels_new_idea(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior_date_range = {"start": "2024-01-01", "end": "2024-12-31"}
+    entry_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    exit_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bearish",
+    }
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="signal_strategy",
+            strategy_thesis="Test TSLA with a moving-average crossover.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range=prior_date_range,
+            entry_logic="Use a moving-average crossover.",
+        )
+    )
+
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="User supplied the moving-average periods.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="signal_strategy",
+                strategy_thesis="Use a 50/200 moving-average crossover.",
+                asset_universe=["USA"],
+                asset_class="equity",
+                date_range={"start": "2025-12-13", "end": "2026-07-01"},
+                entry_logic="50-day SMA crosses above 200-day SMA",
+                exit_logic="50-day SMA crosses below 200-day SMA",
+                entry_rule=entry_rule,
+                exit_rule=exit_rule,
+                extra_parameters={
+                    "date_range_raw_text": "50 y 200 dias",
+                    "field_provenance": {"asset_universe": "explicit_user"},
+                    "evidence_spans": {
+                        "asset_universe": "usa",
+                        "date_range": "50 y 200 dias",
+                        "entry_rule": "50 y 200 dias",
+                    },
+                },
+            ),
+            semantic_turn_act="new_idea",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="usa 50 y 200 dias",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "entry_rule",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert len(interpreter.requests) == 1
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "signal_strategy"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.date_range == prior_date_range
+    assert strategy.entry_rule == entry_rule
+    assert strategy.exit_rule == exit_rule
+
+
+def test_complete_spanish_pending_crossover_answer_suppresses_stale_question(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior_date_range = {"start": "2024-01-01", "end": "2024-12-31"}
+    entry_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    exit_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bearish",
+    }
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="signal_strategy",
+            strategy_thesis="Test TSLA with a moving-average crossover.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range=prior_date_range,
+            capital_amount=1000,
+            entry_logic="Use a moving-average crossover.",
+        )
+    )
+
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="User supplied the moving-average periods.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="signal_strategy",
+                strategy_thesis="Use a 50/200 moving-average crossover.",
+                asset_universe=["USA"],
+                asset_class="equity",
+                date_range={"start": "2025-12-13", "end": "2026-07-01"},
+                capital_amount=1000,
+                entry_logic="50-day SMA crosses above 200-day SMA",
+                exit_logic="50-day SMA crosses below 200-day SMA",
+                entry_rule=entry_rule,
+                exit_rule=exit_rule,
+                comparison_baseline="SPY",
+                extra_parameters={
+                    "date_range_raw_text": "50 y 200 dias",
+                    "field_provenance": {"asset_universe": "explicit_user"},
+                    "evidence_spans": {
+                        "asset_universe": "usa",
+                        "date_range": "50 y 200 dias",
+                        "entry_rule": "50 y 200 dias",
+                    },
+                },
+            ),
+            assistant_response=(
+                "¿Quieres entrar cuando la media de 50 días cruza ARRIBA "
+                "de la media de 200 días, o ABAJO?"
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="usa 50 y 200 dias",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "entry_rule",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert len(interpreter.requests) == 1
+    assert result.outcome == "ready_for_confirmation"
+    assert "assistant_response" not in result.stage_patch
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "signal_strategy"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.date_range == prior_date_range
+    assert strategy.capital_amount == 1000
+    assert strategy.entry_rule == entry_rule
+    assert strategy.exit_rule == exit_rule
 
 
 def test_interpreter_unavailable_does_not_infer_missing_signal_rule_from_text(
@@ -6999,6 +8333,89 @@ def test_interpreter_unavailable_active_confirmation_plans_benchmark_edit(
     assert strategy.comparison_baseline == "QQQ"
     assert strategy.date_range == {"start": "2023-01-01", "end": "2026-06-19"}
     assert strategy.capital_amount == 100000
+
+
+def test_interpreter_unavailable_active_rsi_confirmation_plans_threshold_edit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    pending = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Backtest TSLA with an RSI threshold rule.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=1000,
+        timeframe="1D",
+        comparison_baseline="SPY",
+        entry_logic="Buy when RSI(14) drops to 30 or below",
+        exit_logic="Sell when RSI(14) rises to 70 or above",
+        extra_parameters={
+            "indicator": "rsi",
+            "indicator_parameters": {
+                "indicator": "rsi",
+                "indicator_period": 14,
+                "entry_threshold": 30,
+                "exit_threshold": 70,
+            },
+        },
+    )
+
+    async def plan_stub(**kwargs: Any):
+        assert kwargs["current_user_message"] == (
+            "baja la entrada RSI a 20 y la salida a 60, porfa"
+        )
+        return artifact_edit_planner.ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed the visible RSI thresholds.",
+            operations=[
+                EditOperation(
+                    op="set",
+                    target="indicator_entry_threshold",
+                    number=20,
+                ),
+                EditOperation(
+                    op="set",
+                    target="indicator_exit_threshold",
+                    number=60,
+                ),
+            ],
+            confidence=0.93,
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "plan_artifact_assumption_edit",
+        plan_stub,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "baja la entrada RSI a 20 y la salida a 60, porfa"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=task_snapshot_with_confirmation(pending),
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "indicator_threshold"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert strategy.extra_parameters["indicator_parameters"]["entry_threshold"] == 20
+    assert strategy.extra_parameters["indicator_parameters"]["exit_threshold"] == 60
+    assert "artifact_assumption_edit_planned" in result.decision.reason_codes
 
 
 def test_interpreter_unavailable_planner_ignores_same_asset_universe_without_operation(

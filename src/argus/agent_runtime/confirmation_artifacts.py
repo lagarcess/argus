@@ -6,7 +6,10 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
-from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
+from argus.agent_runtime.rule_specs import (
+    executable_rule_spec_from_strategy,
+    indicator_threshold_rule,
+)
 from argus.agent_runtime.state.models import ArtifactReference
 from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
@@ -151,8 +154,17 @@ def _strategy_contract_failure(
     ):
         return "launch_payload_rule_mismatch"
 
-    if expected_strategy_type == "indicator_threshold" and request.rule_spec is not None:
-        return "launch_payload_rule_mismatch"
+    if expected_strategy_type == "indicator_threshold":
+        expected_entry_rule = indicator_threshold_rule(strategy, "entry")
+        expected_exit_rule = indicator_threshold_rule(strategy, "exit")
+        if (
+            expected_entry_rule is None
+            or expected_exit_rule is None
+            or _normalized_rule_payload(request.entry_rule) != expected_entry_rule
+            or _normalized_rule_payload(request.exit_rule) != expected_exit_rule
+            or request.rule_spec is not None
+        ):
+            return "launch_payload_rule_mismatch"
 
     return None
 
@@ -204,3 +216,26 @@ def _optional_benchmark(confirmation_payload: dict[str, Any]) -> str | None:
     if isinstance(value, str) and value.strip():
         return value.strip().upper()
     return None
+
+
+def _normalized_rule_payload(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(value, dict) or not value:
+        return None
+    normalized = dict(value)
+    indicator = normalized.get("indicator")
+    if isinstance(indicator, str):
+        normalized["indicator"] = indicator.strip().lower()
+    operator = normalized.get("operator")
+    if isinstance(operator, str):
+        normalized["operator"] = operator.strip().lower()
+    if "period" in normalized:
+        try:
+            normalized["period"] = int(str(normalized["period"]))
+        except (TypeError, ValueError):
+            pass
+    if "threshold" in normalized:
+        try:
+            normalized["threshold"] = float(str(normalized["threshold"]))
+        except (TypeError, ValueError):
+            pass
+    return normalized

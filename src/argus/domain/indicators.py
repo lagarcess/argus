@@ -378,6 +378,34 @@ def search_indicators(query: str, *, limit: int = 12) -> list[IndicatorInfo]:
     return [item for _, item in scored[: max(1, min(limit, 25))]]
 
 
+def draft_only_indicator_from_text(text: str) -> IndicatorInfo | None:
+    normalized = _normalize_indicator_lookup_text(text)
+    if not normalized:
+        return None
+    words = set(normalized.split())
+    padded = f" {normalized} "
+    for item in _KNOWN_INDICATORS.values():
+        if item.support_status != "draft_only":
+            continue
+        for phrase in _indicator_lookup_phrases(item):
+            normalized_phrase = _normalize_indicator_lookup_text(phrase)
+            if not normalized_phrase:
+                continue
+            if " " in normalized_phrase:
+                if f" {normalized_phrase} " in padded:
+                    return item
+                continue
+            if normalized_phrase in words:
+                return item
+            if any(
+                word.startswith(normalized_phrase)
+                and word[len(normalized_phrase) :].isdigit()
+                for word in words
+            ):
+                return item
+    return None
+
+
 def executable_indicator_spec(value: str | None) -> IndicatorExecutionSpec | None:
     if not value:
         return None
@@ -387,6 +415,19 @@ def executable_indicator_spec(value: str | None) -> IndicatorExecutionSpec | Non
         compact = normalized.replace(" ", "_")
         key = _EXECUTABLE_INDICATOR_ALIASES.get(compact)
     return EXECUTABLE_INDICATORS.get(key or normalized)
+
+
+def _indicator_lookup_phrases(item: IndicatorInfo) -> tuple[str, ...]:
+    return tuple(dict.fromkeys((item.key, item.label, *item.aliases)))
+
+
+def _normalize_indicator_lookup_text(text: str) -> str:
+    return " ".join(
+        "".join(
+            character.lower() if character.isalnum() else " "
+            for character in str(text or "")
+        ).split()
+    )
 
 
 def detect_executable_indicator_key(

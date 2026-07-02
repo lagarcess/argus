@@ -129,10 +129,29 @@ class LLMStrategyDraft(BaseModel):
     extra_parameters: dict[str, Any] = Field(default_factory=dict)
 
 
+class LLMSimplificationOption(BaseModel):
+    label: str
+    replacement_values: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Canonical action payload for this simplification option. Labels are "
+            "display text only; executable recovery must use this structured "
+            "payload, for example {'strategy_type': 'buy_and_hold'}."
+        ),
+    )
+
+
 class LLMUnsupportedConstraint(BaseModel):
     category: str
     raw_value: str
     explanation: str
+    simplification_options: list[LLMSimplificationOption] = Field(
+        default_factory=list,
+        description=(
+            "Language-neutral simplification actions. Populate replacement_values "
+            "with the canonical payload; keep label as display text."
+        ),
+    )
     simplification_labels: list[str] = Field(default_factory=list)
 
 

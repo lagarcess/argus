@@ -33,6 +33,7 @@ from argus.agent_runtime.rule_specs import (
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
 )
+from argus.agent_runtime.run_field_contract import field_fidelity_tokens
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import (
     ResolutionProvenance,
@@ -352,8 +353,140 @@ def _merge_prior_strategy(
     request: InterpretationRequest,
     response: LLMInterpretationResponse,
 ) -> None:
-    del strategy, request, response
+    requested_field = _selected_requested_field_base(request)
+    prior = _prior_strategy_from_request(request)
+    if prior is None or not prior.asset_universe:
+        return None
+    operation = normalized_asset_universe_operation(
+        strategy.extra_parameters.get("asset_universe_operation")
+    )
+    if operation is not None:
+        return None
+    if not _should_preserve_prior_asset_for_pending_answer(
+        strategy=strategy,
+        prior=prior,
+        request=request,
+        response=response,
+        requested_field=requested_field,
+    ):
+        return None
+
+    strategy.asset_universe = list(prior.asset_universe)
+    if prior.asset_class:
+        strategy.asset_class = prior.asset_class
+    if "pending_non_asset_answer_preserved_prior_asset" not in response.reason_codes:
+        response.reason_codes.append("pending_non_asset_answer_preserved_prior_asset")
     return None
+
+
+def _prior_strategy_from_request(
+    request: InterpretationRequest,
+) -> StrategySummary | None:
+    snapshot = request.latest_task_snapshot
+    if snapshot is None:
+        return None
+    return snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+
+
+def _should_preserve_prior_asset_for_pending_answer(
+    *,
+    strategy: StrategySummary,
+    prior: StrategySummary,
+    request: InterpretationRequest,
+    response: LLMInterpretationResponse,
+    requested_field: str,
+) -> bool:
+    if requested_field == "asset_universe":
+        return False
+    if _current_turn_has_explicit_asset_override(
+        strategy=strategy,
+        current_user_message=request.current_user_message,
+    ):
+        return False
+    if response.semantic_turn_act == "answer_pending_need" and requested_field:
+        return True
+    if response.task_relation != "continue":
+        return False
+    if not _message_has_numeric_execution_fact(request.current_user_message):
+        return False
+    prior_type = canonical_strategy_type(prior.strategy_type)
+    current_type = canonical_strategy_type(strategy.strategy_type)
+    if prior_type and current_type and prior_type == current_type:
+        return True
+    return prior_type == "signal_strategy" and _strategy_has_rule_semantics(strategy)
+
+
+def _message_has_numeric_execution_fact(message: str) -> bool:
+    return any(
+        any(character.isdigit() for character in token)
+        for token in field_fidelity_tokens(str(message or ""))
+    )
+
+
+def _current_turn_has_explicit_asset_override(
+    *,
+    strategy: StrategySummary,
+    current_user_message: str,
+) -> bool:
+    for symbol in strategy.asset_universe:
+        target = _compact_asset_evidence_token(symbol)
+        if not target:
+            continue
+        if _message_has_cashtag_for_asset(current_user_message, target=target):
+            return True
+        if _message_has_uppercase_asset_token(current_user_message, target=target):
+            return True
+        if _strategy_has_strong_pending_asset_override_evidence(
+            strategy=strategy,
+            symbol=symbol,
+        ):
+            return True
+    return False
+
+
+def _strategy_has_strong_pending_asset_override_evidence(
+    *,
+    strategy: StrategySummary,
+    symbol: str,
+) -> bool:
+    target = _compact_asset_evidence_token(symbol)
+    if not target:
+        return False
+    evidence_spans = strategy.extra_parameters.get("evidence_spans")
+    if isinstance(evidence_spans, dict):
+        for field_name, evidence in evidence_spans.items():
+            if _field_path_base(field_name) != "asset_universe":
+                continue
+            evidence_text = str(evidence or "")
+            if _message_has_cashtag_for_asset(evidence_text, target=target):
+                return True
+            if _message_has_uppercase_asset_token(evidence_text, target=target):
+                return True
+    for item in strategy.resolution_provenance:
+        if _field_path_base(item.field) != "asset_universe":
+            continue
+        if item.source == "user_mention" and target in {
+            _compact_asset_evidence_token(item.raw_text),
+            _compact_asset_evidence_token(item.canonical_symbol),
+        }:
+            return True
+    return False
+
+
+def _message_has_uppercase_asset_token(message: str | None, *, target: str) -> bool:
+    for token in str(message or "").split():
+        cleaned = "".join(
+            character
+            for character in token.strip()
+            if character.isalnum() or character in {"/", "-"}
+        )
+        if not cleaned or cleaned != cleaned.upper():
+            continue
+        if not any(character.isalpha() and character.isupper() for character in cleaned):
+            continue
+        if _compact_asset_evidence_token(cleaned) == target:
+            return True
+    return False
 
 
 def _field_owned_indicator_asset_candidate(
@@ -440,16 +573,17 @@ def _message_has_cashtag_for_asset(message: str | None, *, target: str) -> bool:
             for character in token.strip()
             if character.isalnum() or character == "$"
         )
-        if cleaned.startswith("$") and _compact_asset_evidence_token(cleaned[1:]) == target:
+        if (
+            cleaned.startswith("$")
+            and _compact_asset_evidence_token(cleaned[1:]) == target
+        ):
             return True
     return False
 
 
 def _compact_asset_evidence_token(value: Any) -> str:
     return "".join(
-        character.casefold()
-        for character in str(value or "")
-        if character.isalnum()
+        character.casefold() for character in str(value or "") if character.isalnum()
     )
 
 
@@ -709,28 +843,68 @@ def _unsupported_from_llm(item: LLMUnsupportedConstraint) -> UnsupportedConstrai
         "That exact indicator rule is not executable yet, but Argus can reframe it "
         "into a supported historical test."
     )
+    typed_options = [
+        SimplificationOption(
+            label=_humanize_simplification_label(option.label),
+            replacement_values=dict(option.replacement_values or {}),
+        )
+        for option in item.simplification_options
+        if dict(option.replacement_values or {})
+    ]
+    label_options = [
+        SimplificationOption(
+            label=_humanize_simplification_label(label),
+            replacement_values={},
+        )
+        for label in item.simplification_labels
+    ]
     return UnsupportedConstraint(
         category=item.category,
         raw_value=item.raw_value,
         explanation=explanation,
-        simplification_options=[
-            SimplificationOption(
-                label=_humanize_simplification_label(label), replacement_values={}
-            )
-            for label in item.simplification_labels
-        ],
+        simplification_options=_dedupe_simplification_options(
+            typed_options or label_options
+        ),
     )
 
 
+def _dedupe_simplification_options(
+    options: list[SimplificationOption],
+) -> list[SimplificationOption]:
+    deduped: list[SimplificationOption] = []
+    seen: set[tuple[str, tuple[tuple[str, str], ...]]] = set()
+    for option in options:
+        replacement_items = tuple(
+            sorted((key, repr(value)) for key, value in option.replacement_values.items())
+        )
+        key = (
+            option.label,
+            replacement_items,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(option)
+    return deduped
+
+
 def _humanize_simplification_label(label: str) -> str:
-    normalized = label.strip().lower().replace("-", "_").replace(" ", "_")
+    normalized = _normalized_simplification_label(label)
     labels = {
         "rsi_preset": "Use the supported RSI rule",
         "supported_rsi_strategy": "Use the supported RSI rule",
+        "use_the_supported_rsi_rule": "Use the supported RSI rule",
         "buy_and_hold": "Compare with buy and hold",
+        "buy_and_hold_instead": "Compare with buy and hold",
+        "compare_with_buy_and_hold": "Compare with buy and hold",
         "dca_accumulation": "Try recurring buys",
+        "try_recurring_buys": "Try recurring buys",
     }
     return labels.get(normalized, label.strip())
+
+
+def _normalized_simplification_label(label: str) -> str:
+    return label.strip().lower().replace("-", "_").replace(" ", "_")
 
 
 def _dedupe_resolution_provenance(

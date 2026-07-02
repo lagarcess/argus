@@ -88,6 +88,22 @@ def freeze_state_payload(value: Any) -> Any:
     return value
 
 
+def thaw_state_payload(value: Any) -> Any:
+    if isinstance(value, MappingProxyType):
+        return {
+            key: thaw_state_payload(nested_value) for key, nested_value in value.items()
+        }
+    if isinstance(value, dict):
+        return {
+            key: thaw_state_payload(nested_value) for key, nested_value in value.items()
+        }
+    if isinstance(value, list | tuple):
+        return [thaw_state_payload(item) for item in value]
+    if isinstance(value, set | frozenset):
+        return [thaw_state_payload(item) for item in value]
+    return deepcopy(value)
+
+
 class ConversationMessage(BaseModel):
     role: MessageRole
     content: str
@@ -160,7 +176,7 @@ class SimplificationOption(BaseModel):
 
     @field_serializer("replacement_values")
     def serialize_replacement_values(self, value: dict[str, Any]) -> dict[str, Any]:
-        return {key: deepcopy(nested_value) for key, nested_value in value.items()}
+        return thaw_state_payload(value)
 
 
 class UnsupportedConstraint(BaseModel):
@@ -244,6 +260,7 @@ StructuredActionType = Literal[
     "refine_strategy",
     "save_strategy",
     "retry_failed_action",
+    "select_response_option",
 ]
 
 

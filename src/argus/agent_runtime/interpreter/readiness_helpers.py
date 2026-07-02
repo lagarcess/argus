@@ -18,7 +18,11 @@ from argus.agent_runtime.llm_interpreter_types import (
 from argus.agent_runtime.presentation_i18n import (
     asset_universe_operation_clarification_message,
 )
+from argus.agent_runtime.stages.artifact_context import (
+    active_confirmation_effective_strategy,
+)
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import canonical_strategy_type
 
 
@@ -30,14 +34,25 @@ def _active_artifact_asset_universe_operation_needs_planner(
     draft = response.candidate_strategy_draft
     if not draft.asset_universe:
         return False
-    if normalized_asset_universe_operation(draft.asset_universe_operation) is not None:
-        return False
     snapshot = request.latest_task_snapshot
+    has_active_confirmation = (
+        snapshot is not None and snapshot.active_confirmation_reference is not None
+    )
+    if (
+        not has_active_confirmation
+        and normalized_asset_universe_operation(draft.asset_universe_operation) is not None
+    ):
+        return False
     prior = (
         snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
         if snapshot is not None
         else None
     )
+    if snapshot is not None and snapshot.active_confirmation_reference is not None:
+        prior = active_confirmation_effective_strategy(
+            snapshot=snapshot,
+            fallback=prior or StrategySummary(),
+        )
     if prior is None:
         return False
     candidate_symbols = {

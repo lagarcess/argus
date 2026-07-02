@@ -37,6 +37,8 @@ describe("chat conversation attention state", () => {
 
     expect(chat).toContain('from "@/lib/chat-attention-state"');
     expect(chat).toContain("markConversationAttentionIfOutOfFocus(targetConversationId)");
+    expect(chat).toContain("markSettledStreamAttention(activeStreamTargetConversationId)");
+    expect(chat).toContain("if (!canApplyOwnedUpdate) {\n          markSettledStreamAttention(activeStreamTargetConversationId)");
     expect(chat).toContain("clearConversationAttention(conversationId)");
     expect(chat).toContain("attentionConversationIds={attentionConversationIds}");
     expect(sidebar).toContain("attentionConversationIds?: ReadonlySet<string>");

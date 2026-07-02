@@ -53,7 +53,9 @@ this candidate.
   - `argus-backtests` latest deploy/status: Pending live Render proof
   - active workflow task verified: Pending live Render proof
   - real workflow task verified: Pending live Render proof
-- Feature flags: private-alpha defaults disabled for strategies, collections, omnisearch, exploratory suggestions, and private-alpha onboarding in local smoke
+- Feature flags: private-alpha defaults disabled for strategies, collections,
+  exploratory suggestions, and private-alpha onboarding in local smoke;
+  omnisearch is enabled by default unless a targeted regression check disables it
 - Render config audit command: Pending live run, expected `.github/render-env-sync.sh release-config-audit --expect-mode real-workflow`
 - Secret rotation / least-privilege owner: Founder/operator confirmation pending before tester exposure
 

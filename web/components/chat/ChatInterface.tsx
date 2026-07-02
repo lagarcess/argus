@@ -846,6 +846,11 @@ export default function ChatInterface() {
     }
   }
 
+  function markSettledStreamAttention(activeStreamTargetConversationId?: string | null) {
+    schedulePostTurnHistoryRefresh(activeStreamTargetConversationId);
+    markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
+  }
+
   const loadMoreHistory = () => {
     if (!historyNextCursor || isLoadingMoreHistory) return;
     setIsLoadingMoreHistory(true);
@@ -1365,6 +1370,7 @@ export default function ChatInterface() {
       }
       if (event.event === "error") {
         if (!canApplyOwnedUpdate) {
+          markSettledStreamAttention(activeStreamTargetConversationId);
           return;
         }
         const errorPayload = event.data as typeof event.data & Record<string, unknown>;
@@ -1403,10 +1409,11 @@ export default function ChatInterface() {
             ),
           ),
         );
-        markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
+        markSettledStreamAttention(activeStreamTargetConversationId);
       }
       if (event.event === "final") {
         if (!canApplyOwnedUpdate) {
+          markSettledStreamAttention(activeStreamTargetConversationId);
           return;
         }
         setStreamStatus(null);
@@ -1575,13 +1582,13 @@ export default function ChatInterface() {
       }
       if (event.event === "done") {
         if (!canApplyOwnedUpdate) {
+          markSettledStreamAttention(activeStreamTargetConversationId);
           return;
         }
         setStreamStatus(null);
         setIsStreamingResponse(false);
         activeStreamConversationIdRef.current = null;
-        schedulePostTurnHistoryRefresh(activeStreamTargetConversationId);
-        markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
+        markSettledStreamAttention(activeStreamTargetConversationId);
       }
     };
 

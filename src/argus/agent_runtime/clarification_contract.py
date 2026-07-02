@@ -4,6 +4,9 @@ from typing import Any
 
 from argus.agent_runtime.presentation_i18n import runtime_locale
 from argus.agent_runtime.recovery_messages import recovery_message
+from argus.agent_runtime.simplification_option_contract import (
+    localized_simplification_option_label,
+)
 from argus.agent_runtime.state.models import StrategySummary
 
 OFFLINE_CLARIFICATION_FALLBACK = recovery_message(
@@ -39,6 +42,12 @@ def intent_clarification_fallback(
 ) -> str | None:
     if not isinstance(response_intent, dict):
         return None
+    if response_intent.get("kind") == "unsupported_recovery":
+        return _unsupported_recovery_fallback(
+            language=language,
+            response_intent=response_intent,
+            strategy=strategy,
+        )
     if response_intent.get("kind") != "clarification":
         return None
     needs = response_intent.get("semantic_needs")
@@ -79,6 +88,80 @@ def intent_clarification_fallback(
             return "¿Qué quieres ajustar de esta idea?"
         return "What would you like to change?"
     return None
+
+
+def _unsupported_recovery_fallback(
+    *,
+    language: str | None,
+    response_intent: dict[str, Any],
+    strategy: StrategySummary | dict[str, Any] | None,
+) -> str | None:
+    locale = runtime_locale(language)
+    options = _option_labels(response_intent, locale=locale)
+    if not options:
+        return None
+    raw_value = _unsupported_raw_value(response_intent)
+    symbol = _primary_symbol(strategy)
+    joined_options = _join_options(options, locale=locale)
+    if locale == "es-419":
+        subject = raw_value or "Esa regla"
+        symbol_suffix = f" para {symbol}" if symbol else ""
+        return (
+            f"{subject} no define por sí solo cuándo comprar o vender"
+            f"{symbol_suffix}. ¿Qué camino quieres usar: {joined_options}?"
+        )
+    subject = raw_value or "That rule"
+    symbol_suffix = f" for {symbol}" if symbol else ""
+    return (
+        f"{subject} does not define when to buy or sell{symbol_suffix} on its own. "
+        f"Which supported direction should I use: {joined_options}?"
+    )
+
+
+def _option_labels(response_intent: dict[str, Any], *, locale: str) -> list[str]:
+    raw_options = response_intent.get("options")
+    if not isinstance(raw_options, list):
+        return []
+    labels: list[str] = []
+    for option in raw_options:
+        if not isinstance(option, dict):
+            continue
+        label = localized_simplification_option_label(
+            label=option.get("label"),
+            replacement_values=option.get("replacement_values"),
+            locale=locale,
+        )
+        if label is None:
+            continue
+        if label not in labels:
+            labels.append(label)
+    return labels[:3]
+
+
+def _unsupported_raw_value(response_intent: dict[str, Any]) -> str | None:
+    facts = response_intent.get("facts")
+    if not isinstance(facts, dict):
+        return None
+    constraints = facts.get("unsupported_constraints")
+    if not isinstance(constraints, list):
+        return None
+    for constraint in constraints:
+        if not isinstance(constraint, dict):
+            continue
+        raw_value = constraint.get("raw_value")
+        if isinstance(raw_value, str) and raw_value.strip():
+            return raw_value.strip()
+    return None
+
+
+def _join_options(options: list[str], *, locale: str) -> str:
+    if len(options) <= 1:
+        return options[0] if options else ""
+    if len(options) == 2:
+        conjunction = " o " if locale == "es-419" else " or "
+        return conjunction.join(options)
+    conjunction = "o" if locale == "es-419" else "or"
+    return f"{', '.join(options[:-1])}, {conjunction} {options[-1]}"
 
 
 def _primary_symbol(strategy: StrategySummary | dict[str, Any] | None) -> str | None:

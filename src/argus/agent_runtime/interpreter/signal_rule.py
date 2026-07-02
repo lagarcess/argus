@@ -13,6 +13,7 @@ from argus.agent_runtime.interpreter.shared import (
 )
 from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
+    LLMSimplificationOption,
     LLMStrategyDraft,
     LLMUnsupportedConstraint,
 )
@@ -121,7 +122,7 @@ def _request_targets_pending_signal_rule(request: InterpretationRequest) -> bool
     requested_field = _field_path_base(
         request.selected_thread_metadata.get("requested_field")
     )
-    return requested_field in {"entry_logic", "exit_logic"}
+    return requested_field in {"entry_logic", "exit_logic", "entry_rule", "exit_rule"}
 
 
 def _pending_signal_rule_planning_response(
@@ -348,10 +349,22 @@ def _response_from_signal_rule_plan(
                     plan.assistant_response
                     or "This idea depends on strategy logic that is not executable yet."
                 ),
-                simplification_labels=[
-                    "Use a supported RSI threshold rule",
-                    "Compare with buy and hold",
-                    "Use a supported moving-average crossover",
+                simplification_options=[
+                    LLMSimplificationOption(
+                        label="Use a supported RSI threshold rule",
+                        replacement_values={"simplify_logic": "rsi_only"},
+                    ),
+                    LLMSimplificationOption(
+                        label="Compare with buy and hold",
+                        replacement_values={"strategy_type": "buy_and_hold"},
+                    ),
+                    LLMSimplificationOption(
+                        label="Use a supported moving-average crossover",
+                        replacement_values={
+                            "strategy_type": "signal_strategy",
+                            "rule_family": "moving_average_crossover",
+                        },
+                    ),
                 ],
             ),
         ]

@@ -297,7 +297,9 @@ release blocker.
 5. No per-language copy tables or branches in the runtime (`if locale ==
    "es-419"`, `_english_*` helpers, `" y "` versus `" and "` connectors).
    Capability, clarification, and recovery copy is model-voiced; English/Spanish
-   parity is proven by eval, not hardcoded.
+   parity is proven by eval, not hardcoded. Localized stop-word lists, alias
+   tables, or display-label token matching for semantic choice selection are the
+   same anti-pattern; degraded fallbacks must consume typed ids / payloads.
 6. Backend stays canonical truth; the frontend renders backend-provided state and
    never invents it; one LLM intent-classification call per turn.
 

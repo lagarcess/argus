@@ -2478,6 +2478,62 @@ def test_pending_refinement_fallback_carries_source_result_reference() -> None:
     assert fallback.selected_thread_metadata["source_result_run_id"] == run.id
 
 
+def test_pending_response_intent_fallback_survives_ready_to_respond_outcome() -> None:
+    from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "semantic_needs": ["simplification_choice"],
+        "options": [
+            {
+                "label": "Compare with buy and hold",
+                "replacement_values": {"strategy_type": "buy_and_hold"},
+            }
+        ],
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content=(
+            "ATR 14 is not executable directly. Choose RSI, buy and hold, "
+            "or moving-average crossover."
+        ),
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": None,
+                    "strategy_thesis": "Test TSLA with ATR 14 during 2024.",
+                    "asset_universe": ["TSLA"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                    "capital_amount": 1000,
+                    "entry_logic": "ATR 14",
+                },
+                "requested_field": None,
+                "missing_required_fields": [],
+                "response_intent": response_intent,
+            },
+        },
+    )
+
+    fallback = pending_strategy_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    assert fallback.latest_task_snapshot is not None
+    assert fallback.latest_task_snapshot.pending_strategy_summary is not None
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["response_intent"] == response_intent
+
+
 def test_pending_edit_prompt_takes_precedence_over_older_confirmation_fallback() -> None:
     from argus.api.chat.recovery import (
         confirmation_metadata_fallback_context,

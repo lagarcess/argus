@@ -339,8 +339,10 @@ def _render_clarification_response(
             direct_question=direct_question,
         )
         if context:
-            return f"{context} {direct_question}".strip()
-        return direct_question
+            return _collapse_adjacent_duplicate_sentences(
+                f"{context} {direct_question}".strip()
+            )
+        return _collapse_adjacent_duplicate_sentences(direct_question)
     return question
 
 
@@ -364,22 +366,25 @@ def _collapse_adjacent_duplicate_sentences(text: str) -> str:
 def _collapse_repeated_sentence_block(sentences: list[str]) -> list[str]:
     if len(sentences) < 2:
         return sentences
-    identities = [_sentence_identity(sentence) for sentence in sentences]
-    for block_size in range(1, (len(sentences) // 2) + 1):
-        if len(sentences) % block_size != 0:
-            continue
-        block = identities[:block_size]
-        if not all(block):
-            continue
-        repeats = len(sentences) // block_size
-        if repeats < 2:
-            continue
-        if all(
-            identities[index : index + block_size] == block
-            for index in range(block_size, len(identities), block_size)
-        ):
-            return sentences[:block_size]
-    return sentences
+    collapsed = list(sentences)
+    changed = True
+    while changed:
+        changed = False
+        identities = [_sentence_identity(sentence) for sentence in collapsed]
+        for block_size in range(1, (len(collapsed) // 2) + 1):
+            for start in range(0, len(collapsed) - (block_size * 2) + 1):
+                block = identities[start : start + block_size]
+                if not all(block):
+                    continue
+                next_start = start + block_size
+                if identities[next_start : next_start + block_size] != block:
+                    continue
+                del collapsed[next_start : next_start + block_size]
+                changed = True
+                break
+            if changed:
+                break
+    return collapsed
 
 
 def _sentence_identity(sentence: str) -> str:

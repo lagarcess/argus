@@ -1,4 +1,4 @@
-# ruff: noqa: F401
+# ruff: noqa: F401, I001
 # This module is now a thin facade over argus.agent_runtime.interpreter.*; it
 # re-exports relocated symbols and preserves its full original import surface so
 # external callers/tests that access ``llm_interpreter.<name>`` keep working.
@@ -13,12 +13,8 @@ from typing import Any
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from loguru import logger
 
-from argus.agent_runtime.artifact_edit_planner import (
-    plan_artifact_assumption_edit,
-)
-from argus.agent_runtime.artifacts.asset_edits import (
-    normalized_asset_universe_operation,
-)
+from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
+from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
@@ -35,6 +31,7 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: 
     _normalized_ticker_symbol,
     _request_targets_pending_artifact_assumption_edit,
     _response_from_artifact_assumption_edit_plan,
+    asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
 )
 from argus.agent_runtime.interpreter.asset_grounding import (  # noqa: F401
     _artifact_target_from_response,
@@ -145,6 +142,7 @@ from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _response_from_pending_response_option_selection_audit,
     _response_needs_pending_response_option_selection_audit,
 )
+from argus.agent_runtime.interpreter import requested_asset_answer as _requested_asset_answer
 from argus.agent_runtime.interpreter.readiness_helpers import (  # noqa: F401
     _active_artifact_asset_universe_operation_needs_planner,
     _asset_universe_operation_clarification_response,
@@ -234,6 +232,7 @@ from argus.agent_runtime.interpreter.signal_rule import (  # noqa: F401
     _signal_rule_planning_context_from_prior,
     _supported_signal_rule_planning_response,
 )
+from argus.agent_runtime.interpreter import simplification_options as _options
 from argus.agent_runtime.interpreter.starting_capital import (  # noqa: F401
     _draft_has_grounded_non_dca_starting_capital,
     _focused_strategy_extraction_has_material_fields,
@@ -298,9 +297,7 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMStrategyDraft,
     LLMUnsupportedConstraint,
 )
-from argus.agent_runtime.presentation_i18n import (
-    asset_universe_operation_clarification_message,
-)
+from argus.agent_runtime.presentation_i18n import asset_universe_operation_clarification_message
 from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
@@ -313,9 +310,7 @@ from argus.agent_runtime.run_field_contract import (
     current_message_execution_context_tokens,
     field_fidelity_tokens,
 )
-from argus.agent_runtime.signal_rule_repair import (
-    repair_signal_rule_plan,
-)
+from argus.agent_runtime.signal_rule_repair import repair_signal_rule_plan
 from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
     StructuredInterpretation,
@@ -847,10 +842,11 @@ class OpenRouterStructuredInterpreter:
             "safe default. Do not invent it; if the user does not provide the amount and "
             "there is no prior strategy amount to preserve, leave capital_amount null and "
             "mark the amount as missing. "
-            "For product questions or education, set assistant_response and do not "
-            "force a backtest. Keep prose concise, no emoji, no decorative markdown, "
+            "For product questions or education, set assistant_response; do not force a backtest. Keep prose concise, no emoji, no decorative markdown, "
             "and no generic chatbot openers. For unsupported requests, acknowledge the understood "
-            "intent, explain the limitation, and offer executable simplifications.\n\n"
+            "intent, explain the limitation, and offer executable simplifications. "
+            "For simplification choices, put executable meaning in canonical "
+            "replacement_values; labels are display-only.\n\n"
             "semantic_turn_act is the routing source of truth. Use approval when the "
             "user clearly approves a pending confirmation; in that case set intent to "
             "backtest_execution, task_relation to continue, requires_clarification to "
@@ -1335,11 +1331,7 @@ def _response_with_mixed_asset_guardrail_from_symbols(
                     "Argus Alpha cannot run equity, crypto, and currency pairs "
                     "together in one simulation yet."
                 ),
-                simplification_labels=[
-                    "Run one asset class at a time",
-                    "Run the equity symbols only",
-                    "Run the crypto or currency pair symbols only",
-                ],
+                simplification_options=_options.asset_class_simplification_options(),
             )
         )
     missing_required_fields = [
@@ -1372,43 +1364,14 @@ async def _requested_asset_answer_candidate_audited_response(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
-    if not _response_needs_requested_asset_answer_candidate_audit(
+    return await _requested_asset_answer.requested_asset_answer_candidate_audited_response(
         response=response,
+        preferred_model=preferred_model,
         request=request,
-    ):
-        return response
-    messages = _requested_asset_answer_candidate_audit_messages(
-        response=response,
-        request=request,
+        invoke_schema=invoke_openrouter_json_schema,
+        resolve_asset_candidate=_resolve_asset_candidate,
+        model_candidates=_unique_repair_models,
     )
-    for model_name in _unique_repair_models(preferred_model):
-        try:
-            audit = await invoke_openrouter_json_schema(
-                task="interpretation",
-                messages=messages,
-                schema_model=AssetAnswerCandidateAudit,
-                schema_name="AssetAnswerCandidateAudit",
-                model_name=model_name,
-            )
-        except Exception as exc:
-            log_openrouter_failure(
-                task="interpretation",
-                model_name=model_name,
-                exc=exc,
-                message=(
-                    "Requested asset-answer candidate audit failed; trying next "
-                    "candidate model"
-                ),
-            )
-            continue
-        repaired = _response_from_requested_asset_answer_candidate_audit(
-            response=response,
-            request=request,
-            audit=audit,
-        )
-        if repaired is not None:
-            return repaired
-    return response
 
 
 def _response_from_requested_asset_answer_candidate_audit(
@@ -1417,55 +1380,12 @@ def _response_from_requested_asset_answer_candidate_audit(
     request: InterpretationRequest,
     audit: Any,
 ) -> LLMInterpretationResponse | None:
-    if not isinstance(audit, AssetAnswerCandidateAudit) or audit.confidence < 0.6:
-        return None
-    candidate_symbols = [
-        str(symbol or "").strip()
-        for symbol in audit.candidate_symbols[:3]
-        if str(symbol or "").strip()
-    ]
-    if audit.needs_clarification and not candidate_symbols:
-        return None
-    prior_symbols = _prior_strategy_symbols(request)
-    for index, candidate in enumerate(candidate_symbols):
-        resolution = _resolve_asset_candidate(
-            candidate,
-            field=f"asset_universe[{index}]",
-            source="llm_extraction",
-        )
-        if resolution.status != "resolved" or resolution.asset is None:
-            continue
-        if resolution.asset.canonical_symbol in prior_symbols:
-            continue
-        draft = response.candidate_strategy_draft.model_copy(deep=True)
-        draft.asset_universe = [resolution.asset.canonical_symbol]
-        draft.asset_class = resolution.asset.asset_class
-        draft.raw_user_phrasing = draft.raw_user_phrasing or request.current_user_message
-        missing = [
-            field
-            for field in response.missing_required_fields
-            if _field_path_base(field) != "asset_universe"
-        ]
-        return response.model_copy(
-            update={
-                "intent": "backtest_execution",
-                "task_relation": "continue",
-                "requires_clarification": bool(missing),
-                "candidate_strategy_draft": draft,
-                "missing_required_fields": missing,
-                "assistant_response": None,
-                "semantic_turn_act": "answer_pending_need",
-                "reason_codes": list(
-                    dict.fromkeys(
-                        [
-                            *response.reason_codes,
-                            "requested_asset_answer_candidate_audit",
-                        ]
-                    )
-                ),
-            }
-        )
-    return None
+    return _requested_asset_answer.response_from_requested_asset_answer_candidate_audit(
+        response=response,
+        request=request,
+        audit=audit,
+        resolve_asset_candidate=_resolve_asset_candidate,
+    )
 
 
 def _response_needs_requested_asset_answer_candidate_audit(
@@ -1473,19 +1393,23 @@ def _response_needs_requested_asset_answer_candidate_audit(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
-    if _selected_requested_field_base(request) != "asset_universe":
-        return False
-    if not request.current_user_message.strip():
-        return False
-    if response.semantic_turn_act in {
-        "approval",
-        "result_followup",
-        "retry_failed_action",
-    }:
-        return False
-    if _draft_has_valid_requested_asset_update(response.candidate_strategy_draft, request):
-        return False
-    return bool(_prior_strategy_symbols(request))
+    return _requested_asset_answer.response_needs_requested_asset_answer_candidate_audit(
+        response=response,
+        request=request,
+        resolve_asset_candidate=_resolve_asset_candidate,
+    )
+
+
+def _response_is_requested_asset_answer_patch(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    return _requested_asset_answer.response_is_requested_asset_answer_patch(
+        response=response,
+        request=request,
+        resolve_asset_candidate=_resolve_asset_candidate,
+    )
 
 
 def _response_is_audited_requested_asset_answer_patch(
@@ -1493,21 +1417,9 @@ def _response_is_audited_requested_asset_answer_patch(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
-    if _selected_requested_field_base(request) != "asset_universe":
-        return False
-    if "requested_asset_answer_candidate_audit" not in response.reason_codes:
-        return False
-    if response.semantic_turn_act != "answer_pending_need":
-        return False
-    if response.intent != "backtest_execution":
-        return False
-    if response.assistant_response:
-        return False
-    if response.candidate_strategy_draft is None:
-        return False
-    return _draft_has_valid_requested_asset_update(
-        response.candidate_strategy_draft,
-        request,
+    return _response_is_requested_asset_answer_patch(
+        response=response,
+        request=request,
     )
 
 
@@ -1515,21 +1427,11 @@ def _draft_has_valid_requested_asset_update(
     draft: LLMStrategyDraft,
     request: InterpretationRequest,
 ) -> bool:
-    prior_symbols = _prior_strategy_symbols(request)
-    for index, symbol in enumerate(draft.asset_universe):
-        candidate = str(symbol or "").strip()
-        if not candidate:
-            continue
-        resolution = _resolve_asset_candidate(
-            candidate,
-            field=f"asset_universe[{index}]",
-            source="llm_extraction",
-        )
-        if resolution.status != "resolved" or resolution.asset is None:
-            continue
-        if resolution.asset.canonical_symbol not in prior_symbols:
-            return True
-    return False
+    return _requested_asset_answer.draft_has_valid_requested_asset_update(
+        draft,
+        request,
+        resolve_asset_candidate=_resolve_asset_candidate,
+    )
 
 
 _ASSET_TOKEN_MAP = str.maketrans(
@@ -2226,7 +2128,7 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
     )
-    if _response_is_audited_requested_asset_answer_patch(
+    if _response_is_requested_asset_answer_patch(
         response=response,
         request=request,
     ):
@@ -2622,6 +2524,12 @@ async def _ready_active_artifact_edit_planned_response(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
+    if _selected_requested_field_base(request) == "asset_universe":
+        snapshot = request.latest_task_snapshot
+        if snapshot is None or snapshot.active_confirmation_reference is None:
+            return None
+        if response.semantic_turn_act == "educational_question":
+            return None
     if not _request_targets_pending_artifact_assumption_edit(request):
         return None
     if response.semantic_turn_act in {
@@ -2651,6 +2559,12 @@ async def _ready_active_artifact_edit_planned_response(
     if _llm_strategy_draft_has_supported_artifact_assumption_edit(
         response.candidate_strategy_draft
     ):
+        planned = await _plan_pending_artifact_assumption_edit(
+            request=request,
+            preferred_model=preferred_model,
+        )
+        if planned is not None:
+            return planned
         return None
     planned = await _plan_pending_artifact_assumption_edit(
         request=request,
@@ -2659,7 +2573,6 @@ async def _ready_active_artifact_edit_planned_response(
     if planned is None or planned.requires_clarification:
         return None
     return planned
-
 
 def _response_can_skip_optional_runtime_readiness_audits(
     *,
@@ -2728,8 +2641,6 @@ def _optional_runtime_readiness_audit_blocker(
         return "executable_strategy_grounding"
     if _response_needs_supported_strategy_capability_conflict_audit(response):
         return "capability_conflict"
-    if _response_needs_temporal_runtime_repair(response=response, request=request):
-        return "temporal_runtime_repair"
     if not _draft_asset_universe_has_exact_provider_symbols(draft):
         return "asset_universe_not_exact_provider_symbols"
     if _response_needs_missing_benchmark_fidelity_audit(response):
@@ -2746,13 +2657,15 @@ def _optional_runtime_readiness_audit_blocker(
         draft
     ) and not _draft_has_supported_default_benchmark(draft):
         return "unprovenanced_benchmark"
+    if _response_needs_stated_timeframe_fidelity_audit(response):
+        return "stated_run_field_fidelity"
     if _response_has_current_message_date_range_reconciliation(
         response=response,
         request=request,
     ):
         return "date_range_reconciliation"
-    if _response_needs_stated_timeframe_fidelity_audit(response):
-        return "stated_run_field_fidelity"
+    if _response_needs_temporal_runtime_repair(response=response, request=request):
+        return "temporal_runtime_repair"
     if (
         canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
         and _dca_response_needs_semantic_field_audit(response)
@@ -3205,7 +3118,7 @@ def _response_needs_focused_date_window_intent_repair(
         "result_followup",
         "retry_failed_action",
         "unsupported_request",
-    }:
+    } and not pending_date_answer:
         return False
     if response.semantic_turn_act == "educational_question" and not pending_date_answer:
         return False
@@ -3219,6 +3132,8 @@ def _response_needs_focused_date_window_intent_repair(
         resolve_date_range_intent(draft.date_range_intent) is not None
         and has_semantic_date_evidence
     ):
+        if _complete_date_range_matches_resolved_intent(draft):
+            return False
         return True
     has_complete_date_range = _has_complete_date_range_payload(
         normalize_date_range_candidate(draft.date_range)
@@ -3257,6 +3172,21 @@ def _response_needs_focused_date_window_intent_repair(
     return has_repairable_current_turn_date_gap
 
 
+def _complete_date_range_matches_resolved_intent(draft: LLMStrategyDraft) -> bool:
+    normalized = normalize_date_range_candidate(draft.date_range)
+    if not (
+        isinstance(normalized, dict)
+        and _has_complete_date_range_payload(normalized)
+    ):
+        return False
+    resolved = resolve_date_range_intent(draft.date_range_intent)
+    if resolved is None:
+        return False
+    return _normalized_stated_field(normalized) == _normalized_stated_field(
+        resolved.payload
+    )
+
+
 def _complete_date_range_needs_current_turn_date_audit(
     *,
     response: LLMInterpretationResponse,
@@ -3279,6 +3209,8 @@ def _complete_date_range_needs_current_turn_date_audit(
         draft,
         request=request,
     ):
+        return False
+    if _complete_date_range_matches_resolved_intent(draft):
         return False
     if resolve_date_range_intent(draft.date_range_intent) is not None:
         return True
@@ -3315,7 +3247,10 @@ async def _plan_pending_artifact_assumption_edit(
     )
     if plan is None:
         return None
-    return _response_from_artifact_assumption_edit_plan(plan=plan, request=request)
+    resolver = _asset_edit_symbol_resolver(_resolve_asset_candidate)
+    return _response_from_artifact_assumption_edit_plan(
+        plan=plan, request=request, asset_symbol_resolver=resolver
+    )
 
 
 def _request_has_planner_edit_candidate_after_model_failure(
@@ -3516,11 +3451,7 @@ def _augment_strategy_assets_from_resolvable_context(
                         "Argus Alpha cannot run equity, crypto, and currency pairs "
                         "together in one simulation yet."
                     ),
-                    simplification_labels=[
-                        "Run one asset class at a time",
-                        "Run the equity symbols only",
-                        "Run the crypto or currency pair symbols only",
-                    ],
+                    simplification_options=_options.asset_class_simplification_options(),
                 )
             )
         repaired.requires_clarification = True
@@ -4866,11 +4797,9 @@ def _response_from_focused_strategy_extraction(
                         extraction.assistant_response
                         or "This idea depends on strategy logic that is not executable yet."
                     ),
-                    simplification_labels=[
-                        "Use a supported RSI threshold rule",
-                        "Compare with buy and hold",
-                        "Use a supported moving-average crossover",
-                    ],
+                    simplification_options=(
+                        _options.unsupported_strategy_logic_simplification_options()
+                    ),
                 )
             ],
             confidence=extraction.confidence,
@@ -5244,11 +5173,7 @@ def _validate_capability_boundaries(
                         "Argus Alpha cannot run equity, crypto, and currency pairs "
                         "together in one simulation yet."
                     ),
-                    simplification_labels=[
-                        "Run one asset class at a time",
-                        "Run the equity symbols only",
-                        "Run the crypto or currency pair symbols only",
-                    ],
+                    simplification_options=_options.asset_class_simplification_options(),
                 )
             )
     if invalid_symbols and not any(

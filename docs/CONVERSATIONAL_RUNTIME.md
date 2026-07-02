@@ -121,6 +121,14 @@ Result actions are available only after a completed run:
 - `refine_strategy`
 - `save_strategy`
 
+Response-option actions may answer a structured clarification choice:
+
+- `select_response_option`
+
+These actions must carry typed option metadata such as `option_index` or
+`replacement_values`. The runtime may use that metadata in degraded recovery,
+but it must not infer the chosen option from translated display labels.
+
 `save_strategy` belongs inside the result card when Strategies are enabled. It saves from canonical run/result state, not reconstructed frontend prose. Under private-alpha defaults (`NEXT_PUBLIC_STRATEGIES_ENABLED=false`, `ARGUS_STRATEGIES_ENABLED=false`), hide Save in the UI and respond to save intent by reminding the user that the result remains available in conversation/history instead of creating a hidden strategy object.
 
 ## Persistence Boundary

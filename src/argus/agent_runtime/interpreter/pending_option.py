@@ -10,6 +10,7 @@ from typing import Any
 from argus.agent_runtime.interpreter.audits import PendingResponseOptionSelectionAudit
 from argus.agent_runtime.interpreter.dca_audits import _dca_contract_missing_fields
 from argus.agent_runtime.interpreter.shared import (
+    _field_path_base,
     _llm_strategy_draft_has_extractable_fields,
     _supported_dca_cadence_value,
 )
@@ -19,9 +20,14 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMRiskRule,
     LLMStrategyDraft,
 )
+from argus.agent_runtime.rule_specs import (
+    moving_average_crossover_text,
+    opposite_moving_average_crossover_rule,
+)
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import canonical_strategy_type
+from argus.domain.indicators import normalize_indicator_parameters
 
 
 def _response_needs_pending_response_option_selection_audit(
@@ -266,6 +272,9 @@ def _apply_pending_response_option_replacement(
         _clear_dca_total_budget_fields(repaired)
     if "strategy_type" in replacement_values:
         repaired.strategy_type = str(replacement_values["strategy_type"])
+        field_provenance = dict(repaired.field_provenance or {})
+        field_provenance["strategy_type"] = "pending_response_option"
+        repaired.field_provenance = field_provenance
     if "initial_capital" in replacement_values:
         value = replacement_values.get("initial_capital")
         if value is not None:
@@ -291,7 +300,16 @@ def _apply_pending_response_option_replacement(
         repaired.comparison_baseline = str(
             replacement_values["comparison_baseline"]
         ).strip()
-    if canonical_strategy_type(repaired.strategy_type) != "dca_accumulation":
+    _apply_supported_logic_replacement(repaired, replacement_values)
+    strategy_type = canonical_strategy_type(repaired.strategy_type)
+    if strategy_type in {
+        "buy_and_hold",
+        "dca_accumulation",
+    }:
+        _clear_rule_or_indicator_fields(repaired)
+    if strategy_type == "buy_and_hold":
+        _clear_rule_strategy_text(repaired)
+    if strategy_type != "dca_accumulation":
         _clear_dca_recurring_fields(repaired)
 
     missing_fields = _missing_fields_after_pending_option(
@@ -300,6 +318,102 @@ def _apply_pending_response_option_replacement(
         current_missing=current_missing,
     )
     return {"draft": repaired, "missing_fields": missing_fields}
+
+
+def _apply_supported_logic_replacement(
+    draft: LLMStrategyDraft,
+    replacement_values: dict[str, Any],
+) -> None:
+    if replacement_values.get("simplify_logic") == "rsi_only":
+        _apply_rsi_threshold_replacement(draft, replacement_values)
+        return
+    if replacement_values.get("rule_family") == "moving_average_crossover":
+        _apply_moving_average_crossover_replacement(draft, replacement_values)
+        return
+    if replacement_values.get("strategy_type") == "moving_average_crossover":
+        _apply_moving_average_crossover_replacement(draft, replacement_values)
+
+
+def _apply_rsi_threshold_replacement(
+    draft: LLMStrategyDraft,
+    replacement_values: dict[str, Any],
+) -> None:
+    _clear_rule_or_indicator_fields(draft)
+    _clear_rule_strategy_text(draft)
+    raw_parameters = {
+        key: replacement_values[key]
+        for key in (
+            "period",
+            "indicator_period",
+            "entry_threshold",
+            "exit_threshold",
+            "buy_threshold",
+            "sell_threshold",
+        )
+        if key in replacement_values
+    }
+    parameters = normalize_indicator_parameters("rsi", raw_parameters)
+    draft.strategy_type = "indicator_threshold"
+    draft.indicator = "rsi"
+    draft.indicator_period = int(parameters["indicator_period"])
+    draft.entry_threshold = float(parameters["entry_threshold"])
+    draft.exit_threshold = float(parameters["exit_threshold"])
+    extra_parameters = dict(draft.extra_parameters or {})
+    extra_parameters["indicator"] = "rsi"
+    extra_parameters["indicator_parameters"] = parameters
+    draft.extra_parameters = extra_parameters
+    draft.entry_logic = _rsi_threshold_text(
+        "entry",
+        period=draft.indicator_period,
+        threshold=draft.entry_threshold,
+    )
+    draft.exit_logic = _rsi_threshold_text(
+        "exit",
+        period=draft.indicator_period,
+        threshold=draft.exit_threshold,
+    )
+
+
+def _apply_moving_average_crossover_replacement(
+    draft: LLMStrategyDraft,
+    replacement_values: dict[str, Any],
+) -> None:
+    _clear_rule_or_indicator_fields(draft)
+    _clear_rule_strategy_text(draft)
+    entry_rule = _moving_average_crossover_rule_from_replacement(replacement_values)
+    exit_rule = opposite_moving_average_crossover_rule(entry_rule)
+    draft.strategy_type = "signal_strategy"
+    draft.entry_rule = entry_rule
+    draft.exit_rule = exit_rule
+    draft.entry_logic = moving_average_crossover_text(entry_rule)
+    draft.exit_logic = moving_average_crossover_text(exit_rule)
+    extra_parameters = dict(draft.extra_parameters or {})
+    extra_parameters["entry_rule"] = entry_rule
+    extra_parameters["exit_rule"] = exit_rule
+    draft.extra_parameters = extra_parameters
+
+
+def _moving_average_crossover_rule_from_replacement(
+    replacement_values: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "type": "moving_average_crossover",
+        "fast_indicator": str(replacement_values.get("fast_indicator") or "sma"),
+        "fast_period": int(replacement_values.get("fast_period") or 50),
+        "slow_indicator": str(replacement_values.get("slow_indicator") or "sma"),
+        "slow_period": int(replacement_values.get("slow_period") or 200),
+        "direction": str(replacement_values.get("direction") or "bullish"),
+    }
+
+
+def _rsi_threshold_text(side: str, *, period: int, threshold: float) -> str:
+    direction = "drops to" if side == "entry" else "rises to"
+    comparator = "or below" if side == "entry" else "or above"
+    return f"{'Buy' if side == 'entry' else 'Sell'} when RSI({period}) {direction} {_format_number(threshold)} {comparator}"
+
+
+def _format_number(value: float) -> str:
+    return str(int(value)) if float(value).is_integer() else f"{value:g}"
 
 
 def _clear_dca_total_budget_fields(draft: LLMStrategyDraft) -> None:
@@ -343,6 +457,37 @@ def _clear_dca_recurring_fields(draft: LLMStrategyDraft) -> None:
     draft.extra_parameters = extra_parameters
 
 
+def _clear_rule_strategy_text(draft: LLMStrategyDraft) -> None:
+    draft.raw_user_phrasing = None
+    draft.strategy_thesis = None
+
+
+def _clear_rule_or_indicator_fields(draft: LLMStrategyDraft) -> None:
+    draft.entry_logic = None
+    draft.exit_logic = None
+    draft.entry_rule = None
+    draft.exit_rule = None
+    draft.rule_spec = None
+    draft.indicator = None
+    draft.indicator_period = None
+    draft.entry_threshold = None
+    draft.exit_threshold = None
+    extra_parameters = dict(draft.extra_parameters or {})
+    for key in (
+        "indicator",
+        "indicator_parameters",
+        "indicator_period",
+        "entry_threshold",
+        "exit_threshold",
+        "entry_rule",
+        "exit_rule",
+        "rule_spec",
+        "simplify_logic",
+    ):
+        extra_parameters.pop(key, None)
+    draft.extra_parameters = extra_parameters
+
+
 def _missing_fields_after_pending_option(
     draft: LLMStrategyDraft,
     *,
@@ -352,4 +497,24 @@ def _missing_fields_after_pending_option(
     missing = list(current_missing)
     if isinstance(requested_field, str) and requested_field.strip():
         missing = list(dict.fromkeys([*missing, requested_field.strip()]))
+    if canonical_strategy_type(draft.strategy_type) != "dca_accumulation":
+        present_fields: set[str] = set()
+        if draft.asset_universe:
+            present_fields.add("asset_universe")
+        if draft.date_range not in (None, "", [], {}):
+            present_fields.add("date_range")
+        stale_fields = {
+            "cadence",
+            "capital_amount",
+            "entry_logic",
+            "exit_logic",
+            "recurring_contribution",
+            "strategy_type",
+        }
+        return [
+            field
+            for field in missing
+            if _field_path_base(field) not in present_fields
+            and _field_path_base(field) not in stale_fields
+        ]
     return _dca_contract_missing_fields(missing, draft=draft)

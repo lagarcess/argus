@@ -17,6 +17,7 @@ from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_requirements import (
     valid_rule_spec_from_strategy as _valid_rule_spec_from_strategy,
 )
+from argus.domain.indicators import executable_indicator_spec
 
 
 def _supported_experiment_fact_packet() -> str:
@@ -55,9 +56,11 @@ def _should_preserve_prior_asset_context(
 
 
 def _strategy_supplies_executable_rule_edit(strategy: StrategySummary) -> bool:
+    indicator_parameters = canonical_indicator_parameters_from_strategy(strategy)
+    indicator = str(indicator_parameters.get("indicator") or "").strip()
     return bool(
         strategy_rule(strategy, "entry")
         or strategy_rule(strategy, "exit")
         or _valid_rule_spec_from_strategy(strategy)
-        or canonical_indicator_parameters_from_strategy(strategy)
+        or (indicator and executable_indicator_spec(indicator) is not None)
     )

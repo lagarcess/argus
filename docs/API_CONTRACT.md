@@ -1050,6 +1050,7 @@ Argus supports English and Spanish (Latin America) in Alpha.
 ## Runtime Language Contract
 - User input may arrive in any supported language, currently English or Spanish (Latin America).
 - LLM interpretation owns natural-language semantics and must return canonical machine fields; runtime code must not branch on localized whole-turn phrases before interpretation.
+- Offline or degraded-mode recovery may apply typed action metadata such as button ids, `chat_action`, or `replacement_values`; it must not infer semantic choices from localized display labels, stop-word lists, or alias phrasebooks.
 - User-facing assistant prose should follow the resolved `language`, while executable fields such as `strategy_type`, `asset_class`, `timeframe`, `cadence`, `date_range`, `date_range_intent`, and `comparison_baseline` remain language-neutral.
 - Locale-specific rendering, such as compact dates and currency/number formats, belongs in locale-aware presentation code, not backend prose contracts.
 - Capability registries may keep machine compatibility aliases such as snake_case legacy identifiers, but they must not become natural-language phrasebooks in English, Spanish, or future languages.
@@ -1227,6 +1228,10 @@ Soft delete conversation.
   gating (for example `ARGUS_STRATEGIES_ENABLED=false`) and must not create a
   hidden saved-strategy object when the Strategies surface is disabled.
 - `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose. Assistant message metadata must record `result_breakdown_source`, `result_breakdown_fallback_used`, and, when applicable, `result_breakdown_failure_mode` so optional Explain-result fallback does not masquerade as the normal LLM path.
+- `select_response_option` is valid only for typed response-intent options. Its
+  payload must identify the selected option through `option_index` or
+  `replacement_values`. Labels are display text only and must not drive runtime
+  selection.
 
 ### Conversation Artifact Continuity Contract
 

@@ -207,7 +207,7 @@ Argus is chat-first, AI-first, and trust-first. The assistant should help a norm
 
 These principles come from the recent modular monolith / LangGraph migration plans in `docs/superpowers/plans/` and must not regress:
 
-- **LLM-first interpretation**: Normal user language must reach the structured LLM interpreter before routing decisions. Do not add regex, hardcoded language gates, or legacy NLU shortcuts before the interpreter.
+- **LLM-first interpretation**: Normal user language must reach the structured LLM interpreter before routing decisions. Do not add regex, hardcoded language gates, localized stop-word or alias tables, display-label token matching, or legacy NLU shortcuts before the interpreter. Offline fallback choices must use typed action metadata such as button ids or `replacement_values`, not per-language phrasebooks.
 - **Deterministic guardrails after interpretation**: Code validates facts the LLM cannot own: asset resolution, provider availability, same-asset constraints, max symbol limits, date/data windows, executable indicator support, benchmark defaults, and required fields.
 - **One active chat brain**: The LangGraph runtime is the only active conversational runtime. Do not restore or recreate a parallel legacy orchestrator, state machine, or second intent taxonomy.
 - **LangGraph owns runtime memory**: Runtime thread state belongs in the LangGraph checkpointer using `thread_id == conversation_id`. Supabase owns product persistence such as messages, conversations, backtest runs, strategies, collections, feedback, and usage counters.
@@ -416,11 +416,12 @@ versioned, manual QA should use `live_provider` so symbol recognition exercises
 the same provider-backed resolution path production will use.
 
 ### Feature Flags (All Private-Alpha)
-Keep these disabled unless explicitly testing:
+Keep deferred surfaces disabled unless explicitly testing. Omnisearch is enabled
+by default and should only be disabled for a targeted regression check:
 ```bash
 NEXT_PUBLIC_STRATEGIES_ENABLED=false
 NEXT_PUBLIC_COLLECTIONS_ENABLED=false
-NEXT_PUBLIC_OMNISEARCH_ENABLED=false
+NEXT_PUBLIC_OMNISEARCH_ENABLED=true
 NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED=false
 ```
