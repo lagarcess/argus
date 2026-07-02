@@ -8,11 +8,11 @@ legal/Data Controls surfaces (#137), and date-window helper cleanup (#138).
 Remaining P2 is reframed end-to-end around decision-memo execution gates, with
 the compounding loop as the highest-leverage PMF gate. Fees/slippage realism is
 an async isolated workstream (issue #130).
-Current pointer: PR #139 (`codex/chat-continuity-regression-repair`) is the
-active in-flight Gate B / P2.4 reliability repair for chat continuity,
-unsupported-recovery continuation, confirmation-card edits, RSI threshold edits,
-Recents attention, and Omnisearch default-on QA. After PR #139 lands or is
-closed, return to Gate A Slice 1: refine -> linked `IdeaVersion`.
+Current pointer: PR #139 (`codex/chat-continuity-regression-repair`) is MERGED
+at `128818f`. Promotion to `main` is PAUSED pending the trust fixes (#140,
+#141, #142). Execution runs off the P2 execution board below: point an agent at
+any READY lane. The interpret/edit spine has exactly one owner lane at a time
+(currently A1, issue #141).
 Date: 2026-07-01
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
@@ -311,15 +311,35 @@ disease cannot recur silently.
 Each slice owns a PMF gate, is demoable in a founder-guided session, and is one
 revertable slice family.
 
-##### P2 end-to-end: decision memo execution gates (AUTHORITATIVE board, 2026-07-01)
+##### P2 execution board: decision memo gates + unlock status (AUTHORITATIVE, 2026-07-01)
 
 Evidence-grounded after a live walkthrough + code grounding pass. The decision memo's
 moat is the loop where ideas are tested, remembered, compared, and trusted (memo §4.1,
 §5.6, §5.7). P2's remaining work is closing that loop. Treat the items below as
 execution gates, not as a second roadmap and not as hard order dependencies. The
 P2.x specs further below remain the per-slice detail (PMF gates, verification, stop
-conditions); this is the decision-memo board that classifies what is highest
-leverage, what can run in parallel, and what stays deferred.
+conditions).
+
+How to use this board: each gate lists lanes with an unlock status. Point an
+agent at any READY lane without waiting on the others; the status IS the
+authorization. Status legend:
+
+- READY-BUILD: implement now (fresh worktree from `origin/codex/private-alpha-next`,
+  child branch, tests, browser QA, review, one revertable slice family).
+- READY-SPEC: write the spec and ask the founder product questions now;
+  implementation stays locked until the board flips the lane to READY-BUILD.
+- SCOUT: diagnosis, reproduction fixtures, and failing tests only. No runtime
+  edits.
+- ASYNC: isolated lane in its own worktree; cherry-pick discipline, no merge
+  pressure, never blocks the board.
+- BLOCKED(x): do not start; waiting on the named unlock.
+- DESIGN-ONLY: notes/mocks allowed; no runtime, schema, or UI code.
+
+Spine ownership rule: exactly one lane at a time may edit the interpret/edit
+spine (`agent_runtime/stages/*`, `agent_runtime/interpreter/*`,
+`llm_interpreter*.py`, `artifact_edit_planner.py`). The current owner is lane
+A1 (#141). Parallel runtime lanes keep new logic in their own modules, touch
+shared dispatch minimally, and take rebase duty; the spine owner merges first.
 
 **Gate A: memory-backed compounding loop (highest leverage).**
 
@@ -337,8 +357,9 @@ source of truth.
 Wire product events, eval cases, cost/latency ledger, correlation IDs, recovery
 tests, Spanish parity, and browser QA evidence as the loop lands. This is not a
 separate product surface; it makes founder-guided sessions measurable and keeps
-runtime behavior honest. Current active work: PR #139 is a Gate B/P2.4 repair
-slice, not a replacement for the Gate A product swing.
+runtime behavior honest. PR #139 (merged `128818f`) was a Gate B/P2.4 repair
+slice, not a replacement for the Gate A product swing; issues #140 and #142
+continue this gate.
 
 **Gate C: evidence credibility (parallel, isolated).**
 
@@ -383,67 +404,114 @@ DONE + landed on `codex/private-alpha-next`:
 - Spine modularization: `llm_interpreter.py` + `stages/interpret.py` split into cohesive
   submodule packages behind behavior-preserving re-export facades (#133, merged;
   addresses #131 — issue kept OPEN until it lands on `main`).
+- Gate B/P2.4 chat-continuity regression repair (#139, merged `128818f`):
+  unsupported-recovery continuation, confirmation-card edits, pending date
+  answers, RSI threshold edits, Recents attention, Omnisearch default-on QA;
+  degraded fallbacks now consume typed ids/payloads instead of display-label
+  text.
 - `codex/p2.1a-capability-registry` is SUPERSEDED — its deploy work (onboarding-flag
   gate, grok-4.3/claude-haiku model swap, deploy contract, widened LLM timeouts) is
   already in integration; the branch carries no unique runtime. Retire it, no rescue.
 
-THE LOOP'S REMAINING LINKS (the swing) — sequence 1 -> 2 -> 3, then 4:
+LANES BY GATE (the board agents execute from):
 
-1. **Refine -> linked version** (ACTIVE NEXT). BUILT BUT MIS-ROUTED: the "Refine idea"
-   turn tags its pending state `requested_field:"refinement"`
-   (`api/chat/result_actions.py`), which the edit contract's trigger
-   (`_request_targets_pending_artifact_assumption_edit`) does not recognize — so refine
-   edits BYPASS the operations planner and fall to the generic interpreter (drops the
-   edit / loses asset+date context; observed live). The context IS reconstructed
-   (`agent_runtime/artifacts/drafts.py:draft_from_result_metadata`). FIX: route refine
-   through the landed edit contract + emit a new `IdeaVersion` linked to the prior idea
-   (P1 spine supports lineage). Small, reuses the edit contract, UNBLOCKS comparison.
-   Spec: `docs/specs/private-alpha-next-refine-to-version.md`.
+**Gate A — compounding loop (highest leverage):**
 
-2. **Comparison readout** (= P2.3 detail below). Greenfield, but stands on the BUILT P1
-   spine (each `IdeaVersion`/`EvidenceArtifact` carries its metrics; a `compare_started`
-   event is pre-registered in the observability envelope). "vs your last version" —
-   return Δ, drawdown Δ, what changed; short, model-voiced. The differentiator from
-   one-off output. Needs Slice 1 (clean versions to compare).
+- **A1 Refine -> linked version (#141).** READY-SPEC now; flips to READY-BUILD
+  when the spec is founder-approved. Owns the interpret/edit spine (ownership
+  rule above). BUILT BUT MIS-ROUTED today: the "Refine idea" turn tags its
+  pending state `requested_field:"refinement"` (`api/chat/result_actions.py`),
+  which the edit contract's trigger
+  (`_request_targets_pending_artifact_assumption_edit`) does not recognize — so
+  refine edits BYPASS the operations planner and fall to the generic
+  interpreter (drops the edit / loses asset+date context; observed live). The
+  context IS reconstructed
+  (`agent_runtime/artifacts/drafts.py:draft_from_result_metadata`). FIX: route
+  refine through the landed edit contract + emit a new `IdeaVersion` linked to
+  the prior idea (P1 spine supports lineage). UNBLOCKS comparison (A2). Note:
+  issue #141 bundles a second behavior — the repeated "same time period"
+  date-confirmation loop (`interpret_internal/pending_date_answer.py`) —
+  re-verify it against `128818f` first, since PR #139 touched that path. First
+  act: author the missing spec
+  `docs/specs/private-alpha-next-refine-to-version.md`.
 
-3. **Idea Ledger** (folds in part of recall). LIGHTWEIGHT VERSION LANDED (#132): each
-   saved idea's current decision_state surfaces as a status pill in Omnisearch, plus a
-   `?decision_state=` filter. Omnisearch recall was already BUILT (typed-artifact search
-   + right-panel preview for Conversation/Backtest/Evidence/Decision/Idea). REMAINING =
-   the status-organized PORTFOLIO view (promising/watching/rejected/revisit, by
-   asset/theme; memo §4.1) + the UI filter chip. Extends Omnisearch; not a new dashboard.
+- **A2 Comparison readout** (= P2.3 detail below). READY-SPEC (spec + founder
+  questions now); BUILD is BLOCKED(A1) — needs clean linked versions to
+  compare. Stands on the BUILT P1 spine (each `IdeaVersion`/`EvidenceArtifact`
+  carries its metrics; a `compare_started` event is pre-registered in the
+  observability envelope). "vs your last version" — return Δ, drawdown Δ, what
+  changed; short, model-voiced. The differentiator from one-off output.
 
-4. **Freshness on return** (= memo §5.6 SOTA north — the MOAT-DEFINER, and the biggest).
-   Greenfield at the user surface: freshness infra (`context/freshness.py`) exists for
-   context packets, not saved ideas. Memo's model: memory tells what mattered, web tells
-   what changed, backtest tells what the evidence says, the artifact tells what to
-   trust/revisit/discard. Smallest version: saved ideas show "Last reviewed" + a
-   re-run-on-fresh-data delta + "what changed since I saved this?". The full version
-   needs the research/web lane (Perplexity/Sonar — currently design-only). Phase LAST;
-   its own arc.
+- **A3 Idea Ledger portfolio view.** READY-BUILD, off-spine (Omnisearch/web
+  plus read-side API only; no interpret/edit code). Lightweight recall LANDED
+  (#132): decision-state pill + `?decision_state=` filter. REMAINING = the
+  status-organized PORTFOLIO view (promising/watching/rejected/revisit, by
+  asset/theme; memo §4.1) + the UI filter chip. Extends Omnisearch; not a new
+  dashboard. Frontend renders backend-provided state only.
 
-SUPPORTING LAYERS (around the loop, not the swing):
+- **A4 Freshness on return** (memo §5.6 SOTA north — the MOAT-DEFINER, the
+  biggest). BLOCKED(research/web lane; A1-A3 landing first); design notes
+  allowed. Freshness infra (`context/freshness.py`) exists for context packets,
+  not saved ideas. Smallest version: saved ideas show "Last reviewed" + a
+  re-run-on-fresh-data delta + "what changed since I saved this?". Phase LAST;
+  its own arc.
 
-- **Fees/slippage realism** (= P2.2 below): ASYNC, isolated — GitHub issue
-  `lagarcess/argus#130` + worktree `codex/engine-realism` (flag-gated
-  `ARGUS_ENABLE_EXECUTION_REALISM`, default off; cherry-pick per phase). Off the critical
-  path; the founder deliberately disclaims assumptions for the PMF stage.
-- **Recovery + language-agnostic** (= P2.4 below): PR #139 is the active in-flight
-  repair for concrete chat-continuity regressions in this layer (unsupported ATR
-  recovery continuation, confirmation-card edits, pending date answers, RSI threshold
-  edits, Recents attention, and Omnisearch default-on QA). It also tightens the
-  localized phrasebook anti-pattern by requiring degraded fallbacks to consume typed
-  ids/payloads instead of display-label text. Remaining broader P2.4 work is retiring
-  hardcoded per-language recovery copy (`api/chat/streaming.py:47`
-  `assistant_copy_for_result`, `recovery_messages.py`) toward model-voiced parity
-  proven by eval.
-- **Measurement** (= P2.5 below): the `argus_observability_event/v1` envelope is BUILT
-  but non-emitting; wire emitting + append-only CostLedger + eval harness so each slice
-  produces PMF signal. Weave in early; do not gate the loop on it.
-- **Release-gate health** (P2.5-adjacent; blocks `main`, NOT a loop slice): the clean
-  checkout suite gate from issue #134 was repaired by PR #135. Keep rerunning the exact
-  clean-checkout gate before branch promotion or `main` promotion instead of treating
-  the repair as permanent proof for future SHAs.
+**Gate B — trust, recovery, measurement:**
+
+- **B1 Latest-result answers from run facts (#140).** READY-BUILD in parallel
+  with A1 under the module-boundary contract: new logic lives in its own
+  `stages/interpret_internal/` module (pattern: `requested_asset_answer.py`),
+  thin dispatch hook only, rebases onto A1 at merge time. Scope fence: answer
+  from canonical `backtest_runs`/result facts (peak date/value, drawdown date)
+  or state the limitation via typed payloads; preserve `result_run_id` in
+  response metadata. Do NOT rework recovery copy here (that is B4).
+
+- **B2 Asset preservation in messy company-name prompts (#142).** SCOUT now:
+  reproduction fixtures, failing regression tests (Target + Walmart + Costco
+  DCA), and a diagnosis of WHERE assets drop (interpreter extraction vs.
+  grounding vs. draft build). BUILD stays BLOCKED(scout verdict) because
+  `interpret_internal/asset_resolution.py` sits on A1's spine surface and the
+  fix may be interpreter-context work. Spine rules apply: provider-backed name
+  resolution feeds INTO interpretation as context/tools, never a post-LLM text
+  rescan.
+
+- **B3 Measurement wiring** (= P2.5 below). READY-BUILD, off-spine: wire the
+  BUILT non-emitting `argus_observability_event/v1` envelope to PostHog, add
+  the append-only CostLedger, stand up the eval harness over the locked
+  categories. Emission hooks + persistence only; no interpret logic. Weave in
+  early; do not gate the loop on it.
+
+- **B4 Recovery-copy retirement** (= P2.4 remainder). READY-SPEC; BUILD is
+  BLOCKED(B3 eval harness) so English/Spanish parity is proven by eval, not
+  hardcoded. Retire per-language recovery copy
+  (`api/chat/streaming.py` `assistant_copy_for_result`,
+  `recovery_messages.py`) toward model-voiced parity.
+
+**Gate C — evidence credibility:**
+
+- **C1 Execution realism — fees/slippage** (= P2.2 below). ASYNC: GitHub issue
+  `lagarcess/argus#130` + worktree `codex/engine-realism`, flag-gated
+  `ARGUS_ENABLE_EXECUTION_REALISM` (default off), cherry-pick per phase. Off
+  the critical path; the founder deliberately disclaims assumptions for the PMF
+  stage.
+
+**Gate D — memory controls and privacy:**
+
+- **D1 Memory controls spec** (inspect/edit/delete/reset/"why was this
+  used?"). READY-SPEC (spec + founder questions; extends the #137 Data
+  Controls surface). BUILD is BLOCKED(user-confirmed `MemoryRecord` landing in
+  the Gate A contract). No automatic broad personalization memory before these
+  controls exist.
+
+**Design-only lanes** (all READY for notes/mocks; no runtime, schema, or UI
+code): sanitized public excerpt design, voice-to-composer STT prototype, thin
+iOS shell proof, broker/export packet design, security/privacy review,
+monetization/entitlement architecture.
+
+**Standing release discipline** (blocks `main`, not a lane): rerun the exact
+clean-checkout suite gate (issue #134 / PR #135) before any branch or `main`
+promotion instead of treating the repair as permanent proof for future SHAs.
+Promotion to `main` stays PAUSED pending #140-#142.
 
 "P2 done" = Argus **remembers, compares, and stays honest about staleness** — the memo's
 moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
@@ -606,12 +674,13 @@ Stop immediately and escalate to the founder if:
 - a slice grows beyond one revertable commit family;
 - live browser QA fails after tests pass, especially Spanish parity.
 
-Until a slice is activated, do not implement its runtime, backend, schema, or UI
-changes. CURRENT ACTIVE PR: #139, Gate B/P2.4 reliability repair. ACTIVE NEXT after
-#139 is resolved: loop Slice 1 (refine -> linked version). Fees/slippage realism is
-async/isolated (issue #130). Loop Slices 2-4 and the broader supporting layers
-(recovery, measurement) are defined and sequenced but not yet authorized for
-implementation unless their gate explicitly starts.
+Until a lane is READY on the execution board, do not implement its runtime,
+backend, schema, or UI changes. The board status is the authorization:
+READY-BUILD lanes may implement now, READY-SPEC lanes may write specs and ask
+the founder questions only, SCOUT lanes may add fixtures/failing tests only,
+and BLOCKED/DESIGN-ONLY lanes stay out of runtime. The interpret/edit spine has
+one owner lane at a time (currently A1, #141); parallel runtime lanes take
+rebase duty.
 
 ## Parallelization Rules
 
