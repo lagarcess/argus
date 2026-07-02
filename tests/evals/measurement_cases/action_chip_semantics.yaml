@@ -1,0 +1,71 @@
+category: action_chip_semantics
+cases:
+  - id: action_chip_run_visible_confirmation_aapl
+    prompt: ""
+    user_language: en
+    ui_language: en
+    action:
+      type: run_backtest
+      label: "Run visible simulation"
+      presentation: confirmation
+      payload:
+        confirmation_id: "eval-confirm-aapl-2024"
+    snapshot:
+      pending_strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL for calendar year 2024."
+        asset_universe: ["AAPL"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+    confirmation_payload:
+      confirmation_id: "eval-confirm-aapl-2024"
+      artifact_id: "eval-confirm-aapl-2024"
+      strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL for calendar year 2024."
+        asset_universe: ["AAPL"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+      optional_parameters: {}
+      launch_payload:
+        strategy_type: buy_and_hold
+        symbol: AAPL
+        symbols: ["AAPL"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        entry_rule: null
+        exit_rule: null
+        rule_spec: null
+        sizing_mode: capital_amount
+        capital_amount: 1000
+        position_size: null
+        cadence: null
+        parameters: {}
+        risk_rules: []
+        benchmark_symbol: SPY
+        language: en
+      validation:
+        status: ready_to_run
+        executable: true
+    expected:
+      intent: backtest_execution
+      capability_verdict: approved_for_execution
+      assets: ["AAPL"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      stage_outcomes: ["approved_for_execution"]

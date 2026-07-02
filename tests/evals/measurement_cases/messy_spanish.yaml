@@ -1,0 +1,19 @@
+category: messy_spanish
+cases:
+  - id: messy_spanish_btc_hold_q1_2024
+    prompt: "quiero probar, nada complicado, comprar y mantener bitcoin desde enero 2024 hasta marzo 2024"
+    user_language: es-419
+    ui_language: es-419
+    expected:
+      intent: ["backtest_execution", "strategy_drafting"]
+      capability_verdict: executable
+      assets: ["BTC"]
+      asset_class: crypto
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2024-01-01"
+        end: "2024-03-31"
+      benchmark_symbol: BTC
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]
+    prose_judge:
+      criteria: ["spanish_language_integrity"]
