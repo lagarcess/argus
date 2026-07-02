@@ -233,5 +233,5 @@ def test_scorecard_reports_per_category_pass_rates() -> None:
         "failed": 0,
         "expected_failed": 1,
         "skipped": 0,
-        "pass_rate": 1.0,
+        "pass_rate": 0.0,
     }

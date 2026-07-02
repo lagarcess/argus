@@ -303,8 +303,9 @@ def scorecard_for_results(results: list[dict[str, Any]]) -> dict[str, Any]:
             + int(bucket["failed"])
             + int(bucket["expected_failed"])
         )
-        passed = int(bucket["passed"]) + int(bucket["expected_failed"])
-        bucket["pass_rate"] = 0.0 if denominator == 0 else round(passed / denominator, 4)
+        bucket["pass_rate"] = (
+            0.0 if denominator == 0 else round(int(bucket["passed"]) / denominator, 4)
+        )
 
     return {
         "schema_version": 1,
