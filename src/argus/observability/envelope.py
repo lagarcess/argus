@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -160,7 +160,7 @@ class ArgusEventEnvelope(BaseModel):
 
     schema_version: str = "argus_observability_event/v1"
     event_id: str = Field(default_factory=lambda: str(uuid4()))
-    occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     environment: str = Field(default_factory=_default_environment)
     privacy_mode: PrivacyMode = "metadata_only"
     event_type: EventType
