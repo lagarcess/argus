@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from argus.api.chat.measurement_events import emit_runtime_measurement_events
+import asyncio
+import threading
+
+import pytest
+from argus.api.chat.measurement_events import (
+    emit_runtime_measurement_events,
+    schedule_runtime_measurement_events_after_stream,
+)
 
 
 def test_runtime_boundary_emits_continuity_mismatch_event(monkeypatch) -> None:
@@ -86,3 +93,32 @@ def test_runtime_boundary_emits_compare_started_from_explicit_metadata(
             },
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_runtime_measurement_scheduler_runs_after_terminal_frames(
+    monkeypatch,
+) -> None:
+    observed: list[str] = []
+    emitted = threading.Event()
+
+    def fake_emit(**_: object) -> None:
+        observed.append("capture")
+        emitted.set()
+
+    monkeypatch.setattr(
+        "argus.api.chat.measurement_events.emit_runtime_measurement_events",
+        fake_emit,
+    )
+
+    observed.extend(["final", "done"])
+    schedule_runtime_measurement_events_after_stream(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        runtime_result={},
+        metadata={},
+    )
+
+    assert observed == ["final", "done"]
+    assert await asyncio.to_thread(emitted.wait, 1)
+    assert observed == ["final", "done", "capture"]

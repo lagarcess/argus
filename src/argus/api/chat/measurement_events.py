@@ -1,8 +1,46 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
+from loguru import logger
+
 from argus.observability.product_events import capture_product_event
+
+
+def schedule_runtime_measurement_events_after_stream(
+    *,
+    user_id: str,
+    conversation_id: str,
+    runtime_result: dict[str, Any],
+    metadata: dict[str, Any],
+) -> None:
+    runtime_result_snapshot = dict(runtime_result)
+    metadata_snapshot = dict(metadata)
+
+    async def _run() -> None:
+        try:
+            await asyncio.to_thread(
+                emit_runtime_measurement_events,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                runtime_result=runtime_result_snapshot,
+                metadata=metadata_snapshot,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Runtime measurement event emission failed",
+                error=str(exc),
+                conversation_id=conversation_id,
+            )
+
+    try:
+        asyncio.get_running_loop().create_task(_run())
+    except RuntimeError:
+        logger.warning(
+            "Runtime measurement event emission skipped without running loop",
+            conversation_id=conversation_id,
+        )
 
 
 def emit_runtime_measurement_events(

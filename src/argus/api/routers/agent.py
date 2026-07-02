@@ -40,7 +40,9 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
-from argus.api.chat.measurement_events import emit_runtime_measurement_events
+from argus.api.chat.measurement_events import (
+    schedule_runtime_measurement_events_after_stream,
+)
 from argus.api.chat.onboarding import (
     parse_onboarding_control_message,
     persist_onboarding_update,
@@ -1285,14 +1287,14 @@ async def chat_stream(
                     and assistant_text
                 ):
                     yield sse_data({"type": "token", "content": assistant_text})
-                emit_runtime_measurement_events(
+                yield sse_data({"type": "final", "payload": runtime_result})
+                yield sse_done()
+                schedule_runtime_measurement_events_after_stream(
                     user_id=user.id,
                     conversation_id=conversation.id,
                     runtime_result=runtime_result,
                     metadata=metadata,
                 )
-                yield sse_data({"type": "final", "payload": runtime_result})
-                yield sse_done()
                 schedule_artifact_naming(
                     assistant_message=persisted_text,
                     current_run=result_action_run or run,
