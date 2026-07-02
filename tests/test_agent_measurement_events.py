@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from argus.api.routers.agent import emit_runtime_measurement_events
+from argus.api.chat.measurement_events import emit_runtime_measurement_events
 
 
 def test_runtime_boundary_emits_continuity_mismatch_event(monkeypatch) -> None:
@@ -10,7 +10,7 @@ def test_runtime_boundary_emits_continuity_mismatch_event(monkeypatch) -> None:
         observed.append({"kind": kind, **kwargs})
 
     monkeypatch.setattr(
-        "argus.api.routers.agent.capture_product_event",
+        "argus.api.chat.measurement_events.capture_product_event",
         fake_capture,
         raising=False,
     )
@@ -55,7 +55,7 @@ def test_runtime_boundary_emits_compare_started_from_explicit_metadata(
         observed.append({"kind": kind, **kwargs})
 
     monkeypatch.setattr(
-        "argus.api.routers.agent.capture_product_event",
+        "argus.api.chat.measurement_events.capture_product_event",
         fake_capture,
         raising=False,
     )
