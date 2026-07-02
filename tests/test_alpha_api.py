@@ -1493,6 +1493,166 @@ def test_search_decision_state_filter_returns_only_matching_ideas() -> None:
     assert rejected_idea.id not in returned_ids
 
 
+def test_search_ledger_groups_are_backend_ordered_and_counted() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    ideas = [
+        Idea(
+            id="idea-ledger-group-promising-1",
+            source_conversation_id="conversation-ledger-group-promising-1",
+            title="AAPL promising idea",
+            summary="AAPL promising summary",
+            lifecycle="decided",
+            active_version_id="version-ledger-group-promising-1",
+            created_at=now - timedelta(minutes=3),
+            updated_at=now - timedelta(minutes=3),
+        ),
+        Idea(
+            id="idea-ledger-group-promising-2",
+            source_conversation_id="conversation-ledger-group-promising-2",
+            title="MSFT promising idea",
+            summary="MSFT promising summary",
+            lifecycle="decided",
+            active_version_id="version-ledger-group-promising-2",
+            created_at=now - timedelta(minutes=2),
+            updated_at=now - timedelta(minutes=2),
+        ),
+        Idea(
+            id="idea-ledger-group-watching",
+            source_conversation_id="conversation-ledger-group-watching",
+            title="BTC watching idea",
+            summary="BTC watching summary",
+            lifecycle="decided",
+            active_version_id="version-ledger-group-watching",
+            created_at=now - timedelta(minutes=1),
+            updated_at=now - timedelta(minutes=1),
+        ),
+    ]
+    decisions = [
+        DecisionNote(
+            id="decision-ledger-group-promising-1",
+            idea_id=ideas[0].id,
+            idea_version_id="version-ledger-group-promising-1",
+            evidence_artifact_id="artifact-ledger-group-promising-1",
+            source_conversation_id=ideas[0].source_conversation_id,
+            decision_state="promising",
+            note="Keep reviewing.",
+            created_at=now - timedelta(minutes=3),
+            updated_at=now - timedelta(minutes=3),
+        ),
+        DecisionNote(
+            id="decision-ledger-group-promising-2",
+            idea_id=ideas[1].id,
+            idea_version_id="version-ledger-group-promising-2",
+            evidence_artifact_id="artifact-ledger-group-promising-2",
+            source_conversation_id=ideas[1].source_conversation_id,
+            decision_state="promising",
+            note="Still promising.",
+            created_at=now - timedelta(minutes=2),
+            updated_at=now - timedelta(minutes=2),
+        ),
+        DecisionNote(
+            id="decision-ledger-group-watching",
+            idea_id=ideas[2].id,
+            idea_version_id="version-ledger-group-watching",
+            evidence_artifact_id="artifact-ledger-group-watching",
+            source_conversation_id=ideas[2].source_conversation_id,
+            decision_state="watching",
+            note="Watch for a better window.",
+            created_at=now - timedelta(minutes=1),
+            updated_at=now - timedelta(minutes=1),
+        ),
+    ]
+    for idea in ideas:
+        api_state.store.ideas[idea.id] = idea
+        api_state.store.idea_owners[idea.id] = user_id
+    for decision in decisions:
+        api_state.store.decision_notes[decision.id] = decision
+        api_state.store.decision_note_owners[decision.id] = user_id
+
+    response = client.get("/api/v1/search?q=&include_ledger_groups=true&limit=20")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ledger_groups"] == [
+        {"decision_state": "promising", "count": 2},
+        {"decision_state": "watching", "count": 1},
+        {"decision_state": "rejected", "count": 0},
+        {"decision_state": "revisit_later", "count": 0},
+    ]
+    assert {item["id"] for item in payload["items"]} == {idea.id for idea in ideas}
+    assert all(item["type"] == "idea" for item in payload["items"])
+
+
+def test_search_decision_state_filter_keeps_unfiltered_ledger_groups() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    promising_idea = Idea(
+        id="idea-ledger-filter-group-promising",
+        source_conversation_id="conversation-ledger-filter-group-promising",
+        title="NVDA promising idea",
+        summary="NVDA promising summary",
+        lifecycle="decided",
+        active_version_id="version-ledger-filter-group-promising",
+        created_at=now,
+        updated_at=now,
+    )
+    watching_idea = Idea(
+        id="idea-ledger-filter-group-watching",
+        source_conversation_id="conversation-ledger-filter-group-watching",
+        title="ETH watching idea",
+        summary="ETH watching summary",
+        lifecycle="decided",
+        active_version_id="version-ledger-filter-group-watching",
+        created_at=now,
+        updated_at=now,
+    )
+    promising_decision = DecisionNote(
+        id="decision-ledger-filter-group-promising",
+        idea_id=promising_idea.id,
+        idea_version_id="version-ledger-filter-group-promising",
+        evidence_artifact_id="artifact-ledger-filter-group-promising",
+        source_conversation_id=promising_idea.source_conversation_id,
+        decision_state="promising",
+        note="Promising.",
+        created_at=now,
+        updated_at=now,
+    )
+    watching_decision = DecisionNote(
+        id="decision-ledger-filter-group-watching",
+        idea_id=watching_idea.id,
+        idea_version_id="version-ledger-filter-group-watching",
+        evidence_artifact_id="artifact-ledger-filter-group-watching",
+        source_conversation_id=watching_idea.source_conversation_id,
+        decision_state="watching",
+        note="Watching.",
+        created_at=now,
+        updated_at=now,
+    )
+    for idea in (promising_idea, watching_idea):
+        api_state.store.ideas[idea.id] = idea
+        api_state.store.idea_owners[idea.id] = user_id
+    for decision in (promising_decision, watching_decision):
+        api_state.store.decision_notes[decision.id] = decision
+        api_state.store.decision_note_owners[decision.id] = user_id
+
+    response = client.get(
+        "/api/v1/search?q=&decision_state=promising&include_ledger_groups=true&limit=20"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["id"] for item in payload["items"]] == [promising_idea.id]
+    assert payload["ledger_groups"] == [
+        {"decision_state": "promising", "count": 1},
+        {"decision_state": "watching", "count": 1},
+        {"decision_state": "rejected", "count": 0},
+        {"decision_state": "revisit_later", "count": 0},
+    ]
+
+
 def test_search_preserves_pinned_chat_above_p1_artifacts() -> None:
     client = _client()
     user_id = api_state.store.get_or_create_dev_user().id

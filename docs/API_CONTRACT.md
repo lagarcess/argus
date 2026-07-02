@@ -1987,6 +1987,10 @@ Global omni-search across conversations and typed recall objects.
 - `q`
 - `limit`
 - `cursor`
+- `decision_state`: optional Idea Ledger browse filter. Valid values:
+  `watching`, `promising`, `rejected`, `revisit_later`.
+- `include_ledger_groups`: optional boolean. When true, the response includes
+  backend-owned Idea Ledger decision-state groups and counts.
 
 **Response:**
 ```json
@@ -2022,7 +2026,13 @@ Global omni-search across conversations and typed recall objects.
       }
     }
   ],
-  "next_cursor": null
+  "next_cursor": null,
+  "ledger_groups": [
+    { "decision_state": "promising", "count": 2 },
+    { "decision_state": "watching", "count": 1 },
+    { "decision_state": "rejected", "count": 0 },
+    { "decision_state": "revisit_later", "count": 0 }
+  ]
 }
 ```
 
@@ -2066,6 +2076,12 @@ the top-level `id`, `type`, `conversation_id`, and `lifecycle` fields; `preview`
 is reserved for grounded display context such as digest, symbols, benchmark,
 assumptions, compact metrics summaries, quick take, and breakdown context when
 available.
+
+When `include_ledger_groups=true`, `ledger_groups` is the source of truth for
+Idea Ledger group order and counts. Empty groups must be returned with
+`count = 0`; clients must not synthesize missing groups or counts locally.
+Clients localize the stable `decision_state` enum for display, but must keep the
+enum value from the backend attached to filters, pills, and grouped rows.
 
 For typed P1 objects, Omnisearch treats artifacts as first-class results and
 the source conversation as provenance. Evidence-like objects do not expose chat

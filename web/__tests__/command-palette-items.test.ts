@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import {
   commandPaletteItemFromSearch,
+  commandPaletteGroupsByLedgerState,
   commandPaletteStatusFallback,
   commandPaletteStatusLabelKey,
   commandPaletteOpenFallback,
@@ -292,5 +293,50 @@ describe("command palette items", () => {
     expect(fields.find((field) => field.id === "metrics")?.value).toBe(
       "Rendimiento total 12.3% · Benchmark return 8.1%",
     );
+  });
+
+  test("groups ledger ideas by backend-provided decision state order and counts", () => {
+    const promisingItem = commandPaletteItemFromSearch({
+      type: "idea",
+      id: "idea-promising",
+      title: "AAPL idea",
+      matched_text: "AAPL idea",
+      updated_at: "2026-06-19T00:00:00.000Z",
+      conversation_id: "conversation-1",
+      lifecycle: "decided",
+      decision_state: "promising",
+      preview: { digest: "AAPL idea digest." },
+    })!;
+    const watchingItem = commandPaletteItemFromSearch({
+      type: "idea",
+      id: "idea-watching",
+      title: "BTC idea",
+      matched_text: "BTC idea",
+      updated_at: "2026-06-18T00:00:00.000Z",
+      conversation_id: "conversation-2",
+      lifecycle: "decided",
+      decision_state: "watching",
+      preview: { digest: "BTC idea digest." },
+    })!;
+
+    const groups = commandPaletteGroupsByLedgerState(
+      [promisingItem, watchingItem],
+      [
+        { decision_state: "promising", count: 2 },
+        { decision_state: "watching", count: 1 },
+        { decision_state: "rejected", count: 0 },
+        { decision_state: "revisit_later", count: 0 },
+      ],
+    );
+
+    expect(groups.map((group) => [group.decisionState, group.count])).toEqual([
+      ["promising", 2],
+      ["watching", 1],
+      ["rejected", 0],
+      ["revisit_later", 0],
+    ]);
+    expect(groups[0].items).toEqual([promisingItem]);
+    expect(groups[1].items).toEqual([watchingItem]);
+    expect(groups[2].items).toEqual([]);
   });
 });

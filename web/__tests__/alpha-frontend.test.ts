@@ -1226,6 +1226,8 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(palette).toContain("searchGlobal({ q: trimmed, limit: 30 })");
     expect(palette).toContain("commandPaletteItemFromSearch");
+    expect(palette).toContain("commandPaletteGroupsByLedgerState");
+    expect(palette).toContain('t("command_palette.ledger.title", "Idea Ledger")');
     expect(palette).toContain("commandPaletteSelectedPreview(previewItem, displayItems)");
     expect(palette).toContain("setPreviewItem(null)");
     expect(adapter).toContain("command_palette.open_source_conversation");
@@ -1253,6 +1255,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).toContain('t("command_palette.search_placeholder", "Search Argus...")');
     expect(palette).toContain("loadMoreSearch");
     expect(api).toContain("cursor?: string");
+    expect(api).toContain("decisionState?: DecisionState | null");
+    expect(api).toContain("includeLedgerGroups?: boolean");
+    expect(api).toContain('searchParams.append("decision_state", decisionState)');
+    expect(api).toContain('searchParams.append("include_ledger_groups", "true")');
     expect(api).toContain("export async function searchGlobal");
   });
 
