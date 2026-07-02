@@ -149,9 +149,18 @@ def _unsupported_raw_value(response_intent: dict[str, Any]) -> str | None:
         if not isinstance(constraint, dict):
             continue
         raw_value = constraint.get("raw_value")
-        if isinstance(raw_value, str) and raw_value.strip():
-            return raw_value.strip()
+        if not isinstance(raw_value, str):
+            continue
+        value = raw_value.strip()
+        if value and not _looks_like_internal_code(value):
+            return value
     return None
+
+
+def _looks_like_internal_code(value: str) -> bool:
+    # raw_value should carry the user's own words; a spaceless snake_case
+    # token is an internal reason code and must never render in prose.
+    return "_" in value and " " not in value
 
 
 def _join_options(options: list[str], *, locale: str) -> str:

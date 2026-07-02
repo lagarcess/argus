@@ -234,6 +234,29 @@ def _launch_validation_failure(error_code: str) -> dict[str, Any]:
                 },
             ),
         }
+    if error_code == "invalid_chronological_date_range":
+        return {
+            "outcome": "needs_clarification",
+            "missing_required_fields": ["date_range"],
+            "requested_field": "date_range",
+            "assistant_prompt": None,
+            "optional_parameter_status": _with_unsupported_constraint(
+                {},
+                {
+                    "category": "invalid_date_window",
+                    "raw_value": "selected date range",
+                    "explanation": (
+                        "The requested window is not usable because the start "
+                        "date is not before the end date."
+                    ),
+                    "simplification_options": [
+                        {"label": "Choose a new start date"},
+                        {"label": "Choose a new end date"},
+                        {"label": "Change the date range"},
+                    ],
+                },
+            ),
+        }
     if error_code == "indicator_data_insufficient":
         return {
             "outcome": "needs_clarification",
