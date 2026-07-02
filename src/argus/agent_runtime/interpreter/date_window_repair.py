@@ -4,6 +4,10 @@ Behavior-preserving relocation from llm_interpreter.py (issue #131)."""
 
 from __future__ import annotations
 
+from typing import Any
+
+from loguru import logger
+
 from argus.agent_runtime.interpreter.draft_shape import (
     _request_has_active_strategy_context,
 )
@@ -227,6 +231,123 @@ def _date_range_intent_can_safely_suppress_focused_repair(
         return False
     evidence = str(intent.evidence or "").strip()
     return evidence == str(intent.year)
+
+
+def _draft_with_pending_strategy_gaps_filled(
+    draft: LLMStrategyDraft,
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMStrategyDraft:
+    """Fill a pending-answer patch draft from the pending strategy.
+
+    A date answer only names the window; the assets, cadence, and sizing
+    already live on the pending strategy. Without them the draft cannot pass
+    required-shape checks and the runtime would re-ask, which is the repeated
+    confirmation loop from issue #141.
+    """
+
+    if response.semantic_turn_act != "answer_pending_need":
+        return draft
+    snapshot = request.latest_task_snapshot
+    pending = snapshot.pending_strategy_summary if snapshot is not None else None
+    if pending is None:
+        return draft
+    updates: dict[str, Any] = {}
+    provenance = dict(draft.field_provenance or {})
+    if not draft.asset_universe and pending.asset_universe:
+        updates["asset_universe"] = list(pending.asset_universe)
+        provenance.setdefault("asset_universe", "prior_strategy_state")
+    if not draft.asset_class and pending.asset_class:
+        updates["asset_class"] = pending.asset_class
+    if not draft.strategy_type and pending.strategy_type:
+        updates["strategy_type"] = pending.strategy_type
+    if not draft.strategy_thesis and pending.strategy_thesis:
+        updates["strategy_thesis"] = pending.strategy_thesis
+    if not draft.cadence and pending.cadence:
+        updates["cadence"] = pending.cadence
+    if draft.capital_amount is None and pending.capital_amount is not None:
+        updates["capital_amount"] = pending.capital_amount
+        provenance.setdefault("capital_amount", "prior_strategy_state")
+    pending_contribution = pending.extra_parameters.get("recurring_contribution")
+    if draft.recurring_contribution is None and isinstance(
+        pending_contribution, (int, float)
+    ):
+        updates["recurring_contribution"] = float(pending_contribution)
+        provenance.setdefault("recurring_contribution", "prior_strategy_state")
+    if not updates:
+        return draft
+    if provenance != (draft.field_provenance or {}):
+        updates["field_provenance"] = provenance
+    return draft.model_copy(update=updates)
+
+
+def _response_with_latest_result_window_bound(
+    response: LLMInterpretationResponse,
+    *,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    """Bind a same_as_latest_result date intent to the canonical run window.
+
+    The interpreter names the reference ("same time period"); only the
+    canonical latest completed result owns the dates. Without a completed
+    result the intent stays unresolved and the normal date clarification
+    applies.
+    """
+
+    draft = response.candidate_strategy_draft
+    intent = draft.date_range_intent
+    if intent is None or intent.kind != "same_as_latest_result":
+        return response
+    window = _latest_result_date_window(request)
+    if window is None:
+        logger.debug(
+            "Latest result window binding skipped: reference named but no "
+            "canonical window available has_snapshot={} has_reference={}",
+            request.latest_task_snapshot is not None,
+            request.latest_task_snapshot is not None
+            and request.latest_task_snapshot.latest_backtest_result_reference
+            is not None,
+        )
+        return response
+    logger.debug(
+        "Latest result window bound start={} end={}",
+        window["start"],
+        window["end"],
+    )
+    bound_draft = draft.model_copy(
+        update={
+            "date_range": dict(window),
+            "date_range_intent": LLMDateRangeIntent(
+                kind="explicit_range",
+                start=window["start"],
+                end=window["end"],
+                confidence=intent.confidence,
+                evidence=intent.evidence,
+            ),
+        }
+    )
+    bound_draft = _draft_with_pending_strategy_gaps_filled(
+        bound_draft,
+        response=response,
+        request=request,
+    )
+    missing_required_fields = [
+        field
+        for field in response.missing_required_fields
+        if _field_path_base(field) != "date_range"
+    ]
+    return response.model_copy(
+        update={
+            "candidate_strategy_draft": bound_draft,
+            "missing_required_fields": missing_required_fields,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [*response.reason_codes, "latest_result_window_bound"]
+                )
+            ),
+        }
+    )
 
 
 def _response_has_repairable_current_turn_date_gap(

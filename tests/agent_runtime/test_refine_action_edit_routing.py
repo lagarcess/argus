@@ -382,3 +382,180 @@ def test_refine_planned_edit_merges_full_confirmation_from_pending_draft() -> No
     assert strategy.cadence == "monthly"
     assert strategy.extra_parameters.get("recurring_contribution") == 500
     assert result.outcome == "ready_for_confirmation"
+
+
+@pytest.mark.asyncio
+async def test_refine_date_window_reply_routes_to_edit_planner(
+    monkeypatch,
+) -> None:
+    """A refine reply that only changes the window ("change the date range to
+    2021") must reach the planner: EditOperation supports date_window, so
+    date-only evidence is planner-expressible even though it is not an
+    assumption-field edit (PR #148 review)."""
+
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(interpreter_module, "resolve_asset", _nvda_resolve_stub)
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="strategy_drafting",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User moved the refine draft to calendar 2021.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing="change the date range to 2021",
+                    strategy_type="dca_accumulation",
+                    date_range_intent=LLMDateRangeIntent(
+                        kind="calendar_year",
+                        year=2021,
+                        confidence=0.9,
+                        evidence="2021",
+                    ),
+                    evidence_spans={"date_range": "2021"},
+                ),
+                semantic_turn_act="refine_current_idea",
+                artifact_target="pending_refinement",
+            )
+        if schema_model.__name__ != "ArtifactAssumptionEditPlan":
+            raise ValueError(f"unexpected schema request: {schema_model.__name__}")
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User moved the window to calendar 2021.",
+            operations=[
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window=LLMDateRangeIntent(
+                        kind="calendar_year",
+                        year=2021,
+                        confidence=0.9,
+                        evidence="2021",
+                    ),
+                ),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        _refine_state_request("change the date range to 2021")
+    )
+
+    assert result is not None
+    # Direct readiness route: no fallback or repair detours.
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+    assert result.candidate_strategy_draft.date_range == {
+        "start": "2021-01-01",
+        "end": "2021-12-31",
+    }
+
+
+@pytest.mark.asyncio
+async def test_refine_cadence_reply_routes_to_edit_planner(
+    monkeypatch,
+) -> None:
+    """"Make it weekly" after Refine idea is a planner-expressible cadence
+    edit and must not fall through to full interpretation (PR #148 review)."""
+
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(interpreter_module, "resolve_asset", _nvda_resolve_stub)
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="strategy_drafting",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User wants weekly buys in the refine draft.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing="make it weekly",
+                    strategy_type="dca_accumulation",
+                    cadence="weekly",
+                    field_provenance={"cadence": "explicit_user"},
+                ),
+                semantic_turn_act="refine_current_idea",
+                artifact_target="pending_refinement",
+            )
+        if schema_model.__name__ != "ArtifactAssumptionEditPlan":
+            raise ValueError(f"unexpected schema request: {schema_model.__name__}")
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User switched the cadence to weekly.",
+            operations=[
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="cadence",
+                    value="weekly",
+                ),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(_refine_state_request("make it weekly"))
+
+    assert result is not None
+    # Direct readiness route: no fallback or repair detours.
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+    assert result.candidate_strategy_draft.cadence == "weekly"
