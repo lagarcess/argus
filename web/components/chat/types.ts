@@ -179,10 +179,15 @@ export type StrategyConfirmationPayload = {
   summary: string;
   strategy_type?: string;
   display_facts?: ConfirmationDisplayFacts;
+  capabilities?: StrategyConfirmationCapabilities;
   date_range?: StrategyConfirmationDateRange;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];
+};
+
+export type StrategyConfirmationCapabilities = {
+  execution_costs_editable?: boolean;
 };
 
 export type Message = {

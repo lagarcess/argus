@@ -819,3 +819,25 @@ def test_runtime_confirmation_card_carries_active_confirmation_identity() -> Non
         action for action in card["actions"] if action["type"] == "run_backtest"
     )
     assert run_action["payload"]["confirmation_id"] == "confirm-1"
+
+
+def test_runtime_confirmation_card_flag_off_omits_capabilities(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+
+    card = runtime_confirmation_card(_confirmation_result_with_draft_costs())
+
+    assert card is not None
+    assert "capabilities" not in card
+
+
+def test_runtime_confirmation_card_flag_on_marks_execution_costs_editable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+
+    card = runtime_confirmation_card(_confirmation_result_with_draft_costs())
+
+    assert card is not None
+    assert card["capabilities"] == {"execution_costs_editable": True}

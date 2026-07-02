@@ -226,6 +226,10 @@ def runtime_confirmation_card(
     }
     if display_facts:
         card["display_facts"] = display_facts
+    if _execution_realism_feature_enabled():
+        # Backend capability truth: the engine can apply fee/slippage
+        # assumptions, so the confirmation surface may offer editing them.
+        card["capabilities"] = {"execution_costs_editable": True}
     asset_class = _confirmation_asset_class(strategy)
     if asset_class is not None:
         card["asset_class"] = asset_class

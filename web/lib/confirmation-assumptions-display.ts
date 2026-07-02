@@ -131,10 +131,11 @@ function modeledCostDisplay(facts: ConfirmationDisplayFacts, t: Translate) {
   }
   const feeBps = formatBps((fees ?? 0) * 10000);
   const slippageBps = formatBps((slippage ?? 0) * 10000);
-  return t(
-    "chat.confirmation.assumptions.modeled_costs",
-    `Modeled costs: ${feeBps} bps fee + ${slippageBps} bps slippage`,
-  );
+  return t("chat.confirmation.assumptions.modeled_costs", {
+    defaultValue: "Modeled costs: {{fee}} bps fee + {{slippage}} bps slippage",
+    fee: feeBps,
+    slippage: slippageBps,
+  });
 }
 
 function numericValue(value: number | string | null | undefined) {

@@ -326,7 +326,7 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         ),
         "language": language,
     }
-    execution_realism = _resolve_execution_realism(strategy)
+    execution_realism = _resolve_execution_realism(strategy, optional_parameters)
     if execution_realism is not None:
         payload["_execution_realism"] = execution_realism
     return payload
@@ -1064,17 +1064,33 @@ def _resolve_parameters(optional_parameters: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
-def _resolve_execution_realism(strategy: dict[str, Any]) -> dict[str, Any] | None:
+def _resolve_execution_realism(
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     if not _execution_realism_feature_enabled():
         return None
     extra_parameters = strategy.get("extra_parameters")
     if not isinstance(extra_parameters, dict):
-        return None
+        extra_parameters = {}
     fee_rate = _as_optional_float(extra_parameters.get("fee_rate"))
     slippage = _as_optional_float(extra_parameters.get("slippage"))
-    if (fee_rate is None or fee_rate == 0.0) and (
-        slippage is None or slippage == 0.0
-    ):
+    if isinstance(optional_parameters, dict):
+        if fee_rate is None:
+            fee_rate = _as_optional_float(
+                _resolve_optional_value(optional_parameters, "fees")
+            )
+        if slippage is None:
+            slippage = _as_optional_float(
+                _resolve_optional_value(optional_parameters, "slippage")
+            )
+    # Costs are opt-in and never negative: values at or below zero mean the
+    # component is not modeled.
+    if fee_rate is None or fee_rate <= 0.0:
+        fee_rate = 0.0
+    if slippage is None or slippage <= 0.0:
+        slippage = 0.0
+    if fee_rate == 0.0 and slippage == 0.0:
         return None
     return {
         "enabled": True,

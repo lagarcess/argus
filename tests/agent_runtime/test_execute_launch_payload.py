@@ -136,3 +136,66 @@ def test_launch_payload_omits_execution_realism_when_flag_off(monkeypatch) -> No
     payload = _launch_payload(state)
 
     assert "_execution_realism" not in payload
+
+
+def test_launch_payload_reads_execution_realism_from_optional_parameters(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    state = RunState.new(
+        current_user_message="Backtest Tesla with 0.1% fees.",
+        recent_thread_history=[],
+    )
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Buy and hold Tesla with requested fees.",
+            "asset_universe": ["TSLA"],
+            "asset_class": "equity",
+            "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+            "capital_amount": 10000,
+        },
+        "optional_parameters": {
+            "fees": {"label": "Fees", "source": "user", "value": 0.001},
+            "slippage": {"label": "Slippage", "source": "default", "value": 0.0},
+        },
+    }
+
+    payload = _launch_payload(state)
+
+    assert payload["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 0.0,
+    }
+
+
+def test_launch_payload_ignores_negative_execution_cost_values(monkeypatch) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    state = RunState.new(
+        current_user_message="Backtest Tesla.",
+        recent_thread_history=[],
+    )
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Buy and hold Tesla.",
+            "asset_universe": ["TSLA"],
+            "asset_class": "equity",
+            "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+            "capital_amount": 10000,
+            "extra_parameters": {
+                "fee_rate": -0.001,
+                "slippage": 0.0005,
+            },
+        },
+        "optional_parameters": {},
+    }
+
+    payload = _launch_payload(state)
+
+    assert payload["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 0.0,
+        "slippage_bps": 5.0,
+    }

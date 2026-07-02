@@ -2736,7 +2736,10 @@ def test_confirm_stage_preserves_user_indicator_period_in_launch_payload() -> No
     assert launch_payload["exit_rule"]["period"] == 7
 
 
-def test_confirm_stage_blocks_unsupported_nonzero_fee_assumption() -> None:
+def test_confirm_stage_blocks_unsupported_nonzero_fee_assumption(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
     state = RunState.new(
         current_user_message="Backtest Tesla with fees.",
         recent_thread_history=[],
@@ -2760,6 +2763,34 @@ def test_confirm_stage_blocks_unsupported_nonzero_fee_assumption() -> None:
     ][0]
     assert constraint["category"] == "unsupported_execution_assumption"
     assert constraint["raw_value"] == "custom trading fees"
+
+
+def test_confirm_stage_accepts_nonzero_costs_when_execution_realism_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    state = RunState.new(
+        current_user_message="Backtest Tesla with 0.1% fees.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Backtest Tesla with fees.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range="last year",
+    )
+    state.optional_parameter_status = {"fees": 0.001, "slippage": 0.0005}
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_approval"
+    launch_payload = result.patch["confirmation_payload"]["launch_payload"]
+    assert launch_payload["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
 
 
 def test_confirm_stage_clarifies_vague_signal_before_ready_card() -> None:

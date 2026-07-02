@@ -72,6 +72,34 @@ card remain byte-identical to the pre-feature path.
   and
   `tests/section3/test_engine_simulation.py::test_multi_symbol_execution_costs_are_not_double_counted`.
 
+## Phase 5 - Editable Costs On The Confirmation Card
+
+- The confirmation card now carries backend capability truth: when
+  `ARGUS_ENABLE_EXECUTION_REALISM` is on, the card payload includes
+  `capabilities.execution_costs_editable: true`; with the flag off the field is
+  absent and the card renders exactly as today.
+- The assumptions band shows the current fee/slippage truth (already present)
+  and, when the capability is on, adds an "Edit costs" chip that opens a small
+  inline editor. Inputs are percent-per-trade, validated non-negative (slippage
+  capped at the declared 5% capability range). Applying composes the canonical
+  natural-language edit ("Set fees to X% and slippage to Y% per trade.") and
+  sends it through the existing `adjust_assumptions` action flow, so both the
+  chip and free-typed edits converge on the existing typed fees/slippage edit
+  operations. No changes to `artifact_edit_planner.py` or the interpreter.
+- Capability gates opened for the flag-on path only: the confirm stage no
+  longer bounces nonzero fees/slippage as unsupported when the engine flag is
+  on (flag off keeps today's bounce), and the launch payload now also reads
+  fees/slippage from resolved optional parameters when the draft has none.
+  Negative values are never modeled.
+- Default remains no fees and no slippage; costs are user opt-in per idea.
+- Proof:
+  `tests/agent_runtime/test_conversation_stages.py::test_confirm_stage_accepts_nonzero_costs_when_execution_realism_enabled`,
+  `tests/agent_runtime/test_execute_launch_payload.py::test_launch_payload_reads_execution_realism_from_optional_parameters`,
+  `tests/agent_runtime/test_execute_launch_payload.py::test_launch_payload_ignores_negative_execution_cost_values`,
+  `tests/test_runtime_confirmation_card.py::test_runtime_confirmation_card_flag_on_marks_execution_costs_editable`,
+  `tests/test_runtime_confirmation_card.py::test_runtime_confirmation_card_flag_off_omits_capabilities`,
+  and `web/__tests__/confirmation-cost-edit.test.ts`.
+
 ## Cross-Commit Byte-Identity Audit
 
 Beyond the in-suite tests (which compare HEAD to HEAD), the flag-off prime
