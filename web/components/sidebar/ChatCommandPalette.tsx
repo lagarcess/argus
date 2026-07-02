@@ -693,7 +693,7 @@ export default function ChatCommandPalette({
                         )}
                       </span>
                     </div>
-                    {group.items.length === 0 && isLedgerGroup ? (
+                    {group.items.length === 0 && isLedgerGroup && group.count === 0 ? (
                       <p className="px-2 py-2 text-[12px] text-black/30 dark:text-white/30">
                         {t(
                           "command_palette.ledger.no_saved_ideas",
