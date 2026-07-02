@@ -205,6 +205,10 @@ from argus.agent_runtime.stages.interpret_internal.contextual_merge import (  # 
     _strategy_uses_rule_or_indicator_context,
     _strategy_with_contextual_merge,
 )
+from argus.agent_runtime.stages.interpret_internal.current_message_assets import (
+    ambiguous_asset_fields_from_current_message as _ambiguous_asset_fields_from_current_message,
+    symbols_corroborated_by_strategy_text as _symbols_corroborated_by_strategy_text,
+)
 from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
     draft_only_indicator_interpretation_when_interpreter_unavailable as _draft_only_indicator_interpretation_when_interpreter_unavailable,
     pending_response_option_interpretation_from_typed_selection as _pending_response_option_interpretation_from_typed_selection,
@@ -778,6 +782,7 @@ async def _stage_result_from_interpretation(
             )
         )
     ambiguous_fields = list(interpretation.ambiguous_fields)
+    current_message_ambiguous_asset_fields: list[AmbiguousField] = []
     if requested_asset_answer_applied:
         ambiguous_fields = []
     elif pending_resolution_applied:
@@ -786,6 +791,18 @@ async def _stage_result_from_interpretation(
             for field in ambiguous_fields
             if _field_base(field.field_name) != "asset_universe"
         ]
+    elif expects_strategy_route and interpretation.task_relation == "new_task":
+        current_message_ambiguous_asset_fields = (
+            _ambiguous_asset_fields_from_current_message(
+                strategy=strategy,
+                current_user_message=state.current_user_message,
+                resolve_candidate=lambda query: _resolve_asset_candidate_safely(
+                    query,
+                    field="asset_universe[0]",
+                    source="user_mention",
+                ),
+            )
+        )
     if integrity_report.evidence.normalized_date_range is not None:
         ambiguous_fields = [
             field
@@ -808,6 +825,13 @@ async def _stage_result_from_interpretation(
                 fields=ambiguous_fields,
             )
         )
+        if current_message_ambiguous_asset_fields:
+            ambiguous_fields = _dedupe_ambiguous_fields(
+                [
+                    *ambiguous_fields,
+                    *current_message_ambiguous_asset_fields,
+                ]
+            )
         unsupported_constraints = _dedupe_unsupported_constraints(
             [
                 *unsupported_constraints,
@@ -2695,12 +2719,6 @@ def _strategy_with_current_message_asset_grounding(
             strategy=strategy,
             current_user_message=current_user_message,
         )
-    if _message_explicitly_mentions_symbol(
-        current_user_message,
-        symbols=strategy.asset_universe,
-    ):
-        return strategy, []
-
     def _resolve_candidate(query: str) -> AssetResolution | None:
         return _resolve_asset_candidate_safely(
             query,
@@ -2714,6 +2732,11 @@ def _strategy_with_current_message_asset_grounding(
         if symbol is not None
     ]
     current_symbol_set = set(current_symbols)
+    artifact_patch = strategy.extra_parameters.get("artifact_patch")
+    asset_patch_operation = None
+    if isinstance(artifact_patch, dict):
+        operation = artifact_patch.get("asset_universe_operation") or ""
+        asset_patch_operation = str(operation).strip().casefold()
     benchmark_symbol = _normalized_symbol(strategy.comparison_baseline)
     mentions = grounded_asset_mentions_from_text(
         current_user_message,
@@ -2769,39 +2792,76 @@ def _strategy_with_current_message_asset_grounding(
         benchmark_symbol=benchmark_symbol,
         current_user_message=current_user_message,
     )
-    grounded_symbols = _symbols_corroborated_by_strategy_text(
+    strong_current_symbol_set = {
+        symbol
+        for symbol in grounded_symbols
+        if _grounded_symbols_have_name_support(symbols=[symbol], mentions=mentions)
+        or _message_explicitly_mentions_symbol(
+            current_user_message,
+            symbols=[symbol],
+        )
+    }
+    strategy_corroborated_symbols = _symbols_corroborated_by_strategy_text(
         symbols=grounded_symbols,
         strategy=strategy,
         benchmark_symbol=benchmark_symbol,
+        resolve_candidate=_resolve_candidate,
     )
+    allowed_symbol_set = {*strategy_corroborated_symbols, *strong_current_symbol_set}
+    grounded_symbols = [
+        symbol for symbol in grounded_symbols if symbol in allowed_symbol_set
+    ]
     grounded_symbol_set = set(grounded_symbols)
     if not grounded_symbol_set:
         return strategy, []
-    retained_symbols = [
-        symbol for symbol in current_symbols if symbol in grounded_symbol_set
-    ]
-    weak_current_symbols = _weak_implicit_current_symbol_set(
-        current_symbols=current_symbols,
-        benchmark_symbol=benchmark_symbol,
-        current_user_message=current_user_message,
-    )
-    if retained_symbols:
-        repaired_symbols = retained_symbols
-    elif current_symbol_set and current_symbol_set.issubset(grounded_symbol_set):
+    if asset_patch_operation == "replace":
         return strategy, []
+    if asset_patch_operation == "append":
+        repaired_symbols = list(dict.fromkeys([*current_symbols, *grounded_symbols]))
     else:
-        alternate_grounded_symbols = [
-            symbol for symbol in grounded_symbols if symbol not in current_symbol_set
+        retained_symbols = [
+            symbol for symbol in current_symbols if symbol in grounded_symbol_set
         ]
-        if current_symbol_set and not current_symbol_set.issubset(weak_current_symbols):
-            if not _grounded_symbols_have_name_support(
-                symbols=alternate_grounded_symbols,
-                mentions=mentions,
+        weak_current_symbols = _weak_implicit_current_symbol_set(
+            current_symbols=current_symbols,
+            benchmark_symbol=benchmark_symbol,
+            current_user_message=current_user_message,
+        )
+        if current_symbol_set and current_symbol_set.issubset(grounded_symbol_set):
+            alternate_grounded_symbols = [
+                symbol for symbol in grounded_symbols if symbol not in current_symbol_set
+            ]
+            if alternate_grounded_symbols and not (
+                _grounded_symbols_have_name_support(
+                    symbols=alternate_grounded_symbols,
+                    mentions=mentions,
+                )
+                or _message_explicitly_mentions_symbol(
+                    current_user_message,
+                    symbols=alternate_grounded_symbols,
+                )
             ):
                 return strategy, []
-        if current_symbol_set and len(alternate_grounded_symbols) != 1:
-            return strategy, []
-        repaired_symbols = alternate_grounded_symbols or grounded_symbols
+            repaired_symbols = (
+                grounded_symbols if alternate_grounded_symbols else retained_symbols
+            )
+        elif retained_symbols:
+            repaired_symbols = retained_symbols
+        else:
+            alternate_grounded_symbols = [
+                symbol for symbol in grounded_symbols if symbol not in current_symbol_set
+            ]
+            if current_symbol_set and not current_symbol_set.issubset(
+                weak_current_symbols
+            ):
+                if not _grounded_symbols_have_name_support(
+                    symbols=alternate_grounded_symbols,
+                    mentions=mentions,
+                ):
+                    return strategy, []
+            if current_symbol_set and len(alternate_grounded_symbols) != 1:
+                return strategy, []
+            repaired_symbols = alternate_grounded_symbols or grounded_symbols
     if repaired_symbols == current_symbols:
         return strategy, []
 
@@ -2825,12 +2885,17 @@ def _strategy_with_current_message_asset_grounding(
     elif len(asset_classes) > 1:
         updated.asset_class = "mixed"
     updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
-    updated.resolution_provenance = _dedupe_resolution_provenance(
-        [
+    retained_provenance = (
+        list(updated.resolution_provenance)
+        if asset_patch_operation == "append"
+        else [
             item
             for item in updated.resolution_provenance
             if _field_base(_provenance_field(item)) != "asset_universe"
         ]
+    )
+    updated.resolution_provenance = _dedupe_resolution_provenance(
+        retained_provenance
         + [
             mention.resolution.provenance
             for mention in mentions
@@ -2841,54 +2906,6 @@ def _strategy_with_current_message_asset_grounding(
         ]
     )
     return updated, ["current_message_asset_grounding_repaired"]
-
-
-def _symbols_corroborated_by_strategy_text(
-    *,
-    symbols: list[str],
-    strategy: StrategySummary,
-    benchmark_symbol: str | None,
-) -> list[str]:
-    if len(symbols) <= 1:
-        return symbols
-    strategy_text = str(strategy.strategy_thesis or "").strip()
-    if not strategy_text:
-        return symbols
-
-    def _resolve_candidate(query: str) -> AssetResolution | None:
-        return _resolve_asset_candidate_safely(
-            query,
-            field="asset_universe[0]",
-            source="user_mention",
-        )
-
-    semantic_mentions = grounded_asset_mentions_from_text(
-        strategy_text,
-        resolve_candidate=_resolve_candidate,
-        excluded_tokens=current_message_execution_context_tokens(
-            strategy_text,
-            strategy_type=strategy.strategy_type,
-        ),
-        limit=5,
-    )
-    if not semantic_mentions:
-        return symbols
-
-    semantic_symbols = {
-        symbol
-        for mention in semantic_mentions
-        if (
-            symbol := _normalized_symbol(
-                getattr(mention.asset, "canonical_symbol", None)
-            )
-        )
-        and symbol != benchmark_symbol
-    }
-    if not semantic_symbols:
-        return symbols
-    filtered = [symbol for symbol in symbols if symbol in semantic_symbols]
-    return filtered or symbols
-
 
 def _strategy_with_missing_asset_grounded_from_current_message(
     *,
