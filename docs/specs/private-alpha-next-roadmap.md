@@ -476,14 +476,18 @@ LANES BY GATE (the board agents execute from):
   or state the limitation via typed payloads; preserve `result_run_id` in
   response metadata. Do NOT rework recovery copy here (that is B4).
 
-- **B2 Asset preservation in messy company-name prompts (#142).** SCOUT now:
-  reproduction fixtures, failing regression tests (Target + Walmart + Costco
-  DCA), and a diagnosis of WHERE assets drop (interpreter extraction vs.
-  grounding vs. draft build). BUILD stays BLOCKED(scout verdict) because
-  `interpret_internal/asset_resolution.py` sits on A1's spine surface and the
-  fix may be interpreter-context work. Spine rules apply: provider-backed name
-  resolution feeds INTO interpretation as context/tools, never a post-LLM text
-  rescan.
+- **B2 Asset preservation in messy company-name prompts (#142).** ACTIVE (in
+  flight). Scout verdict 2026-07-01: runs FREE of A1 — #142 lives on the
+  first-pass `interpret -> asset resolution -> canonicalize -> confirmation`
+  path, A1 in post-result refine/typed-edit routing. Likely drop zone:
+  `asset_text_grounding.py`, `resolution.py`, `stages/interpret.py`
+  (confirmation just renders `asset_universe`; the loss is upstream). Repro
+  target: `tests/agent_runtime/test_interpret_stage.py` asserting TGT + WMT +
+  COST all survive to confirmation. Discipline: keep the fix in
+  grounding/resolution modules and touch `stages/interpret.py` minimally;
+  between this lane and A1, whoever lands second rebases and reruns the
+  interpret suite. Spine rules apply: provider-backed name resolution feeds
+  INTO interpretation as context/tools, never a post-LLM text rescan.
 
 - **B3 Measurement wiring** (= P2.5 below). READY-BUILD, off-spine: wire the
   BUILT non-emitting `argus_observability_event/v1` envelope to PostHog, add
