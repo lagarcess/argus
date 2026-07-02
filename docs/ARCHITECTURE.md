@@ -343,13 +343,18 @@ Provider ownership:
 - Provider-specific windows are execution truth. Kraken OHLC returns only the latest 720 candles per interval, so the runtime must ask the user to shorten the request or widen the timeframe when the requested window cannot be served.
 - Backtests remain single asset class per run: `equity`, `crypto`, or `currency_pair`.
 
-### PostHog (When Enabled)
+### PostHog (Server-Side Product Analytics)
 
 **Use for:**
 
-- Analytics
-- Funnels
-- Feature flags
+- Measurement-only product analytics for the approved private-alpha event set.
+- Aggregate funnels, retention, and loop-health questions.
+
+**Do not use for:**
+
+- Frontend autocapture or session replay.
+- Person profiles.
+- Feature flags or product behavior decisions in this slice.
 
 ### Observability Stack
 

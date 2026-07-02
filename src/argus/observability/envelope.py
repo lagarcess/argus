@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import hashlib
+import os
 from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import uuid4
 
+import httpx
+from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
 PrivacyMode = Literal["raw_alpha", "redacted_default", "metadata_only", "disabled"]
@@ -119,6 +123,36 @@ _BLOCKED_KEY_PARTS = (
     "token",
     "transcript",
 )
+_POSTHOG_US_HOST = "https://us.i.posthog.com"
+_POSTHOG_EU_HOST = "https://eu.i.posthog.com"
+_POSTHOG_CAPTURE_PATH = "/i/v0/e/"
+_POSTHOG_DEFAULT_TIMEOUT_SECONDS = 0.75
+_HASHED_ID_FIELDS = (
+    "session_id",
+    "conversation_id",
+    "turn_id",
+    "message_id",
+    "job_id",
+    "backtest_run_id",
+)
+
+
+def _clean_env(name: str) -> str | None:
+    value = os.getenv(name)
+    if value is None:
+        return None
+    stripped = value.strip().strip("\"'")
+    return stripped or None
+
+
+def _default_environment() -> str:
+    return (
+        _clean_env("APP_ENV")
+        or _clean_env("ARGUS_ENV")
+        or _clean_env("ARGUS_APP_ENV")
+        or _clean_env("ENVIRONMENT")
+        or "local"
+    )
 
 
 class ArgusEventEnvelope(BaseModel):
@@ -127,7 +161,7 @@ class ArgusEventEnvelope(BaseModel):
     schema_version: str = "argus_observability_event/v1"
     event_id: str = Field(default_factory=lambda: str(uuid4()))
     occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    environment: str = "local"
+    environment: str = Field(default_factory=_default_environment)
     privacy_mode: PrivacyMode = "metadata_only"
     event_type: EventType
     event_action: EventAction
@@ -155,9 +189,10 @@ class ArgusEventEnvelope(BaseModel):
 
 
 class EventCaptureResult(BaseModel):
-    status: Literal["suppressed"]
-    reason: Literal["p1_measurement_only"]
+    status: Literal["captured", "suppressed", "failed"]
+    reason: str | None = None
     event_id: str
+    destination: Literal["posthog"] | None = None
 
 
 def build_event_envelope(
@@ -178,15 +213,78 @@ def build_event_envelope(
 
 
 def live_analytics_sink_enabled() -> bool:
-    return False
+    return (
+        _posthog_project_token() is not None
+        and _posthog_ingestion_host() is not None
+    )
 
 
 def capture_event(envelope: ArgusEventEnvelope) -> EventCaptureResult:
+    if envelope.privacy_mode == "disabled":
+        return EventCaptureResult(
+            status="suppressed",
+            reason="privacy_mode_disabled",
+            event_id=envelope.event_id,
+            destination=None,
+        )
+    api_key = _posthog_project_token()
+    if api_key is None:
+        return EventCaptureResult(
+            status="suppressed",
+            reason="posthog_not_configured",
+            event_id=envelope.event_id,
+            destination=None,
+        )
+    capture_url = _posthog_capture_url()
+    if capture_url is None:
+        return EventCaptureResult(
+            status="suppressed",
+            reason="posthog_region_not_configured",
+            event_id=envelope.event_id,
+            destination=None,
+        )
+    payload = posthog_event_payload(envelope, api_key=api_key)
+    try:
+        response = httpx.post(
+            capture_url,
+            json=payload,
+            timeout=_posthog_timeout_seconds(),
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        logger.warning(
+            "PostHog product event capture failed",
+            error=str(exc),
+            event_id=envelope.event_id,
+            event_type=envelope.event_type,
+            feature_area=envelope.feature_area,
+        )
+        return EventCaptureResult(
+            status="failed",
+            reason="posthog_capture_failed",
+            event_id=envelope.event_id,
+            destination="posthog",
+        )
     return EventCaptureResult(
-        status="suppressed",
-        reason="p1_measurement_only",
+        status="captured",
+        reason=None,
         event_id=envelope.event_id,
+        destination="posthog",
     )
+
+
+def posthog_event_payload(
+    envelope: ArgusEventEnvelope,
+    *,
+    api_key: str,
+) -> dict[str, Any]:
+    return {
+        "api_key": api_key,
+        "event": envelope.event_type,
+        "distinct_id": envelope.actor_hash or envelope.event_id,
+        "timestamp": envelope.occurred_at.isoformat(),
+        "properties": _posthog_event_properties(envelope),
+    }
 
 
 def sanitize_observability_attributes(value: dict[str, Any]) -> dict[str, Any]:
@@ -223,3 +321,87 @@ def _sanitize_value(value: Any) -> Any:
 def _blocked_key(key: str) -> bool:
     normalized = key.strip().lower()
     return any(part in normalized for part in _BLOCKED_KEY_PARTS)
+
+
+def _posthog_event_properties(envelope: ArgusEventEnvelope) -> dict[str, Any]:
+    properties: dict[str, Any] = {
+        "$process_person_profile": False,
+        "schema_version": envelope.schema_version,
+        "event_id": envelope.event_id,
+        "occurred_at": envelope.occurred_at.isoformat(),
+        "environment": envelope.environment,
+        "privacy_mode": "metadata_only",
+        "event_type": envelope.event_type,
+        "event_action": envelope.event_action,
+        "feature_area": envelope.feature_area,
+    }
+    if envelope.actor_hash:
+        properties["actor_hash"] = envelope.actor_hash
+    for field_name in _HASHED_ID_FIELDS:
+        value = getattr(envelope, field_name)
+        if isinstance(value, str) and value.strip():
+            properties[f"{field_name}_hash"] = _hash_identifier(
+                field_name,
+                value.strip(),
+            )
+    for field_name in (
+        "status",
+        "latency_ms",
+        "error_category",
+        "sampling_rate",
+        "retention_class",
+    ):
+        value = getattr(envelope, field_name)
+        if value not in (None, "", [], {}):
+            properties[field_name] = value
+    if envelope.attributes:
+        properties["attributes"] = sanitize_observability_attributes(
+            envelope.attributes
+        )
+    return properties
+
+
+def _hash_identifier(namespace: str, value: str) -> str:
+    digest = hashlib.sha256(f"argus:{namespace}:{value}".encode("utf-8")).hexdigest()
+    return digest[:24]
+
+
+def _posthog_project_token() -> str | None:
+    return _clean_env("POSTHOG_PROJECT_TOKEN")
+
+
+def _posthog_capture_url() -> str | None:
+    host = _posthog_ingestion_host()
+    if host is None:
+        return None
+    return f"{host.rstrip('/')}{_POSTHOG_CAPTURE_PATH}"
+
+
+def _posthog_ingestion_host() -> str | None:
+    explicit_host = _clean_env("POSTHOG_HOST")
+    if explicit_host is not None:
+        normalized = explicit_host.rstrip("/")
+        if normalized == "https://us.posthog.com":
+            return _POSTHOG_US_HOST
+        if normalized == "https://eu.posthog.com":
+            return _POSTHOG_EU_HOST
+        return normalized
+    raw_region = _clean_env("POSTHOG_REGION")
+    if raw_region is None:
+        return None
+    region = raw_region.lower().replace("_", "-").replace(" ", "-")
+    if region in {"us", "us-cloud", "us-cloud-hosted"}:
+        return _POSTHOG_US_HOST
+    if region in {"eu", "eu-cloud", "eu-cloud-hosted"}:
+        return _POSTHOG_EU_HOST
+    return None
+
+
+def _posthog_timeout_seconds() -> float:
+    raw = _clean_env("ARGUS_POSTHOG_TIMEOUT_SECONDS")
+    if raw is None:
+        return _POSTHOG_DEFAULT_TIMEOUT_SECONDS
+    try:
+        return max(0.1, float(raw))
+    except ValueError:
+        return _POSTHOG_DEFAULT_TIMEOUT_SECONDS

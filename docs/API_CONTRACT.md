@@ -2093,9 +2093,13 @@ owner actions such as rename, archive, or delete.
 
 # 17.1 Private Alpha Observability Envelope
 
-P1 defines a stable measurement envelope for future analytics, cost, and eval
-readiness. This is a contract-only surface in the current slice: Argus can build
-and sanitize event envelopes, but live analytics emission remains disabled.
+P1 defines a stable measurement envelope for product analytics, future cost
+accounting, and eval readiness. B3 slice 2 emits the approved product-event set
+to PostHog when `POSTHOG_PROJECT_TOKEN` and an explicit PostHog region or host
+are configured. If the token is missing, capture is suppressed with
+`reason = "posthog_not_configured"`. If the region/host is missing or
+unsupported, capture is suppressed with
+`reason = "posthog_region_not_configured"`.
 
 Event envelope schema version: `argus_observability_event/v1`.
 
@@ -2135,9 +2139,30 @@ Privacy posture:
   receipts, provider/model metadata, auth tokens, API keys, broker credentials,
   account balances, exact holdings, payment identifiers, and similar sensitive
   payloads before capture.
-- `capture_event` returns a suppressed result with
-  `reason = "p1_measurement_only"` in this slice. PostHog, cost-ledger tables,
-  and eval-result persistence are future implementation surfaces.
+- PostHog receives only the sanitized projection. Raw identifiers are hashed
+  before emission.
+- Capture is server-side only. Frontend PostHog, autocapture, session replay,
+  and product behavior reads from analytics remain out of scope.
+- Person profiles are disabled per event with `$process_person_profile = false`.
+- Current PostHog region is US Cloud, selected deliberately for the private
+  alpha compliance posture via `POSTHOG_REGION=us` / `https://us.i.posthog.com`.
+
+Approved product events:
+- `evidence_capture`
+- `decision_capture`
+- `recall_usage`
+- `continuity_mismatch`
+- `compare_started`
+- `eval_readiness`
+
+Each approved product event sets `attributes.product_event` to the registered
+name above while preserving the envelope `event_type` taxonomy and
+`event_action` state model from memo 15.5.
+
+Deferred surfaces:
+- Append-only provider cost ledger.
+- Durable eval run/case result persistence.
+- Product dashboards or feature decisions based on analytics.
 
 ---
 

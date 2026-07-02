@@ -1273,6 +1273,46 @@ def test_search_supports_cursor_and_mixed_types() -> None:
     assert first_ids.isdisjoint(second_ids)
 
 
+def test_search_emits_recall_usage_product_event(monkeypatch) -> None:
+    observed: list[dict[str, object]] = []
+
+    def fake_capture(kind: str, **kwargs: object) -> None:
+        observed.append({"kind": kind, **kwargs})
+
+    monkeypatch.setattr(
+        "argus.api.routers.search.capture_product_event",
+        fake_capture,
+        raising=False,
+    )
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    memory_conversation(
+        title="Tesla recall source",
+        title_source="user_renamed",
+        language="en",
+        user_id=user_id,
+    )
+
+    response = client.get("/api/v1/search?q=tesla&limit=20")
+
+    assert response.status_code == 200
+    assert observed == [
+        {
+            "kind": "recall_usage",
+            "user_id": user_id,
+            "status": "completed",
+            "attributes": {
+                "query_present": True,
+                "decision_state_filter_present": False,
+                "result_count": 1,
+                "returned_types": ["chat"],
+                "has_more": False,
+                "source": "memory",
+            },
+        }
+    ]
+
+
 def test_search_orders_p1_artifacts_before_source_conversation() -> None:
     client = _client()
     user_id = api_state.store.get_or_create_dev_user().id

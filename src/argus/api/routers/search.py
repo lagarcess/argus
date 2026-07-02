@@ -19,6 +19,7 @@ from argus.api.search_assembly import (
     scored_supabase_search_items,
 )
 from argus.api.search_utils import search_rank_key
+from argus.observability.product_events import capture_product_event
 
 router = APIRouter(prefix="/api/v1", tags=["search"])
 
@@ -124,6 +125,19 @@ def search(
     if has_more and page_items:
         _, last_item = page_items[-1]
         next_cursor = encode_cursor(last_item.updated_at.isoformat(), last_item.id)
+    capture_product_event(
+        "recall_usage",
+        user_id=user.id,
+        status="completed",
+        attributes={
+            "query_present": bool(query),
+            "decision_state_filter_present": decision_state is not None,
+            "result_count": len(page_items),
+            "returned_types": _returned_types(page_items),
+            "has_more": has_more,
+            "source": "supabase" if api_state.supabase_gateway is not None else "memory",
+        },
+    )
     return PaginatedSearch(
         items=[item for _, item in page_items],
         next_cursor=next_cursor,
@@ -145,3 +159,11 @@ def _ledger_groups_from_items(
         SearchLedgerGroup(decision_state=state, count=counts[state])
         for state in LEDGER_DECISION_STATE_ORDER
     ]
+
+
+def _returned_types(page_items: list[tuple[int, SearchItem]]) -> list[str]:
+    returned: list[str] = []
+    for _, item in page_items:
+        if item.type not in returned:
+            returned.append(item.type)
+    return returned
