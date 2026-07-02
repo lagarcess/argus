@@ -59,10 +59,12 @@ Done behavior:
   multi-turn edits, reload, and run handoff.
 - max 5 symbols is enforced with clarification rather than silent truncation.
 
-Do not reopen P0 unless a new reproducible bug appears. The quarantine branch
-`codex/private-alpha-next-quarantine-fc231e8` remains read-only reference
-material for ideas, tests, and failure evidence. Do not broad cherry-pick
-runtime code from quarantine.
+Do not reopen P0 unless a new reproducible bug appears. The quarantine work is
+preserved as local tags `archive/quarantine-fc231e8` and
+`archive/p2.1-quarantine` (branches deleted 2026-07-01, all salvageable content
+verified landed or on the execution board) — read-only reference material for
+ideas, tests, and failure evidence. Do not broad cherry-pick runtime code from
+quarantine.
 
 ## What P1 Means
 
@@ -273,8 +275,10 @@ branch used `import re` or `if "word" in message`; the spine was broken with
 heuristics that pass a naive grep, so the prohibitions below name mechanisms, not
 just regex.
 
-These branches remain read-only reference for product direction, anti-patterns,
-UI ideas, and test inspiration. Do not broad cherry-pick runtime code from them.
+This work is preserved as local tags (`archive/quarantine-fc231e8`,
+`archive/p2.1-quarantine`; the branches themselves were deleted 2026-07-01) —
+read-only reference for product direction, anti-patterns, UI ideas, and test
+inspiration. Do not broad cherry-pick runtime code from the tags.
 
 #### Cross-cutting invariants (the P2.0 guardrail gate, inherited by every slice)
 
