@@ -965,6 +965,112 @@ class PostgresBacktestJobGateway:
                 row = cur.fetchone()
         return _json_safe(row)
 
+    def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
+        from psycopg.types.json import Jsonb
+
+        with self._connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into public.cost_ledger_entries (
+                      source,
+                      service,
+                      provider,
+                      model,
+                      feature_area,
+                      task,
+                      user_id,
+                      conversation_id,
+                      message_id,
+                      backtest_run_id,
+                      backtest_job_id,
+                      route_receipt_id,
+                      request_id,
+                      correlation_id,
+                      provider_request_id,
+                      upstream_id,
+                      usage_metadata,
+                      input_tokens,
+                      output_tokens,
+                      total_tokens,
+                      billable_unit,
+                      billable_quantity,
+                      cost_amount,
+                      cost_currency,
+                      cost_source,
+                      latency_ms,
+                      status,
+                      metadata,
+                      occurred_at
+                    )
+                    values (
+                      %(source)s,
+                      %(service)s,
+                      %(provider)s,
+                      %(model)s,
+                      %(feature_area)s,
+                      %(task)s,
+                      %(user_id)s,
+                      %(conversation_id)s,
+                      %(message_id)s,
+                      %(backtest_run_id)s,
+                      %(backtest_job_id)s,
+                      %(route_receipt_id)s,
+                      %(request_id)s,
+                      %(correlation_id)s,
+                      %(provider_request_id)s,
+                      %(upstream_id)s,
+                      %(usage_metadata)s,
+                      %(input_tokens)s,
+                      %(output_tokens)s,
+                      %(total_tokens)s,
+                      %(billable_unit)s,
+                      %(billable_quantity)s,
+                      %(cost_amount)s,
+                      %(cost_currency)s,
+                      %(cost_source)s,
+                      %(latency_ms)s,
+                      %(status)s,
+                      %(metadata)s,
+                      %(occurred_at)s
+                    )
+                    returning *
+                    """,
+                    {
+                        "source": entry["source"],
+                        "service": entry["service"],
+                        "provider": entry["provider"],
+                        "model": entry.get("model"),
+                        "feature_area": entry["feature_area"],
+                        "task": entry.get("task"),
+                        "user_id": entry.get("user_id"),
+                        "conversation_id": entry.get("conversation_id"),
+                        "message_id": entry.get("message_id"),
+                        "backtest_run_id": entry.get("backtest_run_id"),
+                        "backtest_job_id": entry.get("backtest_job_id"),
+                        "route_receipt_id": entry.get("route_receipt_id"),
+                        "request_id": entry.get("request_id"),
+                        "correlation_id": entry["correlation_id"],
+                        "provider_request_id": entry.get("provider_request_id"),
+                        "upstream_id": entry.get("upstream_id"),
+                        "usage_metadata": Jsonb(entry.get("usage_metadata") or {}),
+                        "input_tokens": entry.get("input_tokens"),
+                        "output_tokens": entry.get("output_tokens"),
+                        "total_tokens": entry.get("total_tokens"),
+                        "billable_unit": entry.get("billable_unit") or "unknown",
+                        "billable_quantity": entry.get("billable_quantity"),
+                        "cost_amount": entry.get("cost_amount"),
+                        "cost_currency": entry.get("cost_currency") or "USD",
+                        "cost_source": entry.get("cost_source") or "unavailable",
+                        "latency_ms": entry.get("latency_ms"),
+                        "status": entry.get("status") or "succeeded",
+                        "metadata": Jsonb(entry.get("metadata") or {}),
+                        "occurred_at": entry.get("occurred_at") or utcnow_iso(),
+                    },
+                )
+                row = cur.fetchone()
+        return _json_safe(row)
+
     def link_backtest_job_result(
         self,
         *,

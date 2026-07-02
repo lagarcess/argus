@@ -311,6 +311,98 @@ def test_postgres_backtest_job_gateway_reuses_connection_in_context(
     assert connect_calls == 1
 
 
+def test_postgres_backtest_job_gateway_appends_cost_ledger_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows.backtest_job import PostgresBacktestJobGateway
+
+    captured: dict[str, object] = {}
+
+    class FakeCursor:
+        def __enter__(self) -> FakeCursor:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def execute(self, query: str, params: object = None) -> None:
+            captured["query"] = query
+            captured["params"] = params
+
+        def fetchone(self) -> dict[str, object]:
+            return {
+                "id": "ledger-1",
+                "source": "render_workflow",
+                "correlation_id": "workflow:render-run:job-1:run-1",
+            }
+
+    class FakeConnection:
+        def __enter__(self) -> FakeConnection:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def cursor(self) -> FakeCursor:
+            return FakeCursor()
+
+    def fake_connect(self: PostgresBacktestJobGateway) -> FakeConnection:
+        del self
+        return FakeConnection()
+
+    monkeypatch.setattr(PostgresBacktestJobGateway, "_connect", fake_connect)
+    gateway = PostgresBacktestJobGateway("postgres://example")
+
+    row = gateway.create_cost_ledger_entry(
+        entry={
+            "source": "render_workflow",
+            "service": "openrouter",
+            "provider": "openrouter",
+            "model": "openai/gpt-4.1-mini",
+            "feature_area": "result_readout",
+            "task": "result_summary",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "backtest_run_id": "run-1",
+            "backtest_job_id": "job-1",
+            "route_receipt_id": "receipt-1",
+            "correlation_id": "workflow:render-run:job-1:run-1",
+            "usage_metadata": {"prompt_tokens": 21, "completion_tokens": 9},
+            "input_tokens": 21,
+            "output_tokens": 9,
+            "total_tokens": 30,
+            "billable_unit": "token",
+            "billable_quantity": 30,
+            "cost_amount": 0.0009,
+            "cost_currency": "USD",
+            "cost_source": "provider_reported",
+            "latency_ms": 42,
+            "status": "succeeded",
+            "metadata": {"source": "render_workflow"},
+            "occurred_at": "2026-07-02T18:00:00+00:00",
+        }
+    )
+
+    assert row["id"] == "ledger-1"
+    assert "insert into public.cost_ledger_entries" in str(captured["query"]).lower()
+    params = captured["params"]
+    assert isinstance(params, dict)
+    assert params["source"] == "render_workflow"
+    assert params["service"] == "openrouter"
+    assert params["feature_area"] == "result_readout"
+    assert params["backtest_job_id"] == "job-1"
+    assert params["route_receipt_id"] == "receipt-1"
+    assert params["correlation_id"] == "workflow:render-run:job-1:run-1"
+    assert params["usage_metadata"].obj == {
+        "prompt_tokens": 21,
+        "completion_tokens": 9,
+    }
+    assert params["metadata"].obj == {"source": "render_workflow"}
+    assert params["billable_quantity"] == 30
+    assert params["cost_amount"] == 0.0009
+    assert params["occurred_at"] == "2026-07-02T18:00:00+00:00"
+
+
 def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_run() -> (
     None
 ):
