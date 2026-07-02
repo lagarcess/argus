@@ -489,11 +489,23 @@ LANES BY GATE (the board agents execute from):
   interpret suite. Spine rules apply: provider-backed name resolution feeds
   INTO interpretation as context/tools, never a post-LLM text rescan.
 
-- **B3 Measurement wiring** (= P2.5 below). READY-BUILD, off-spine: wire the
-  BUILT non-emitting `argus_observability_event/v1` envelope to PostHog, add
-  the append-only CostLedger, stand up the eval harness over the locked
-  categories. Emission hooks + persistence only; no interpret logic. Weave in
-  early; do not gate the loop on it.
+- **B3 Measurement wiring** (= P2.5 below). READY-BUILD, off-spine. One lane,
+  THREE atomic slices in this ORDER, each its own PR — never combined into one
+  push:
+  (1) **Eval harness** over the locked categories. First because it is
+  zero-runtime-risk (reads behavior only) and gives every in-flight lane a
+  rerunnable EN/ES parity gate; it is also the B4 unlock. Its PR gets a Fable
+  review before anyone trusts it as a landing gate.
+  (2) **Product events**: wire the BUILT non-emitting
+  `argus_observability_event/v1` envelope to PostHog. Founder prerequisite
+  before this slice starts: PostHog project + API key provisioned and
+  redaction-tier sign-off (memo 15.5 posture).
+  (3) **Append-only CostLedger**: the only schema-touching slice — reversible,
+  minimal migration with docs updated in the same slice; goes last so it is
+  informed by the events slice.
+  The order is leverage-driven, not a hard chain: if PostHog provisioning
+  stalls slice 2, slice 3 may proceed. Emission hooks + persistence only; no
+  interpret logic. Weave in early; do not gate the loop on it.
 
 - **B4 Recovery-copy retirement** (= P2.4 remainder). READY-SPEC; BUILD is
   BLOCKED(B3 eval harness) so English/Spanish parity is proven by eval, not
