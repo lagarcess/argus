@@ -250,6 +250,78 @@ class _RecordingInterpreter:
         return self.response
 
 
+def test_refine_edit_plans_offline_when_interpreter_unavailable(
+    monkeypatch,
+) -> None:
+    """Live failure mode: every interpretation model failed and the refine
+    reply died in generic "could not safely apply" recovery copy. The offline
+    planner must serve refine pending drafts the way it serves confirmation
+    cards.
+    """
+
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    async def plan_stub(**kwargs):
+        assert kwargs["current_user_message"] == "change the asset to NVDA"
+        assert kwargs["prior_strategy"]["asset_universe"] == ["AAPL", "MSFT"]
+        return artifact_edit_planner.ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="User swapped the refine draft to NVDA.",
+            operations=[
+                artifact_edit_planner.EditOperation(
+                    op="replace",
+                    target="asset",
+                    symbols=["NVDA"],
+                ),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "plan_artifact_assumption_edit",
+        plan_stub,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="change the asset to NVDA",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="backtest_execution",
+            completed=False,
+            pending_strategy_summary=_refine_pending_strategy(),
+            latest_backtest_result_reference=ArtifactReference(
+                artifact_kind="backtest_result",
+                artifact_id="run-141",
+                artifact_status="completed",
+            ),
+        ),
+        selected_thread_metadata={
+            "latest_task_type": "backtest_execution",
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "refinement",
+            "source_result_run_id": "run-141",
+        },
+        structured_interpreter=_RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.date_range == {"start": "2020-02-01", "end": "2026-07-02"}
+    assert strategy.extra_parameters.get("recurring_contribution") == 500
+    assert "artifact_assumption_edit_planned" in result.decision.reason_codes
+
+
 def test_refine_planned_edit_merges_full_confirmation_from_pending_draft() -> None:
     """Stage-level AC: the confirmation produced by a refine edit must carry
     the resolved prior date range, assets, and contribution — not a sparse or

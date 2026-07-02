@@ -244,13 +244,69 @@ async def planned_active_confirmation_edit_interpretation(
             or StrategySummary()
         ),
     )
+    return await _planned_artifact_edit_interpretation(
+        prior_strategy=prior_strategy,
+        active_confirmation_payload=active_confirmation.model_dump(mode="json"),
+        current_user_message=current_user_message,
+        resolve_asset_candidate=resolve_asset_candidate,
+        plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit_fn,
+        artifact_target="active_confirmation",
+        default_goal_summary="User changed a visible confirmation assumption.",
+    )
+
+
+async def planned_pending_refinement_edit_interpretation(
+    *,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+    selected_thread_metadata: dict[str, Any],
+    resolve_asset_candidate: ResolveAssetCandidate,
+    plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit
+    | None = None,
+) -> StructuredInterpretation | None:
+    """Offline edit planning for the result-card refine pending state.
+
+    A refine draft has a pending strategy and a source result but no active
+    confirmation card, so the confirmation-scoped offline planner never
+    engages; without this path a refine reply during model outages dies in
+    generic recovery copy.
+    """
+
+    requested_field = str(
+        selected_thread_metadata.get("requested_field") or ""
+    ).partition(".")[0]
+    if requested_field != "refinement":
+        return None
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return None
+    return await _planned_artifact_edit_interpretation(
+        prior_strategy=snapshot.pending_strategy_summary,
+        active_confirmation_payload=None,
+        current_user_message=current_user_message,
+        resolve_asset_candidate=resolve_asset_candidate,
+        plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit_fn,
+        artifact_target="pending_refinement",
+        default_goal_summary="User changed the refine draft.",
+    )
+
+
+async def _planned_artifact_edit_interpretation(
+    *,
+    prior_strategy: StrategySummary,
+    active_confirmation_payload: dict[str, Any] | None,
+    current_user_message: str,
+    resolve_asset_candidate: ResolveAssetCandidate,
+    plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit | None,
+    artifact_target: str,
+    default_goal_summary: str,
+) -> StructuredInterpretation | None:
     if not prior_strategy.asset_universe:
         return None
     planner = plan_artifact_assumption_edit_fn or _plan_artifact_assumption_edit
     plan: ArtifactAssumptionEditPlan | None = await planner(
         current_user_message=current_user_message,
         prior_strategy=prior_strategy.model_dump(mode="json"),
-        active_confirmation=active_confirmation.model_dump(mode="json"),
+        active_confirmation=active_confirmation_payload,
         preferred_model="",
     )
     if plan is None or plan.outcome != "ready_to_confirm":
@@ -300,14 +356,12 @@ async def planned_active_confirmation_edit_interpretation(
         intent="backtest_execution",
         task_relation="continue",
         requires_clarification=False,
-        user_goal_summary=(
-            plan.user_goal_summary or "User changed a visible confirmation assumption."
-        ),
+        user_goal_summary=plan.user_goal_summary or default_goal_summary,
         candidate_strategy_draft=candidate,
         confidence=plan.confidence,
         reason_codes=["artifact_assumption_edit_planned"],
         semantic_turn_act="answer_pending_need",
-        artifact_target="active_confirmation",
+        artifact_target=artifact_target,
     )
 
 

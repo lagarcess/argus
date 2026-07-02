@@ -210,6 +210,7 @@ from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_conti
     pending_response_option_interpretation_from_typed_selection as _pending_response_option_interpretation_from_typed_selection,
     pending_response_option_when_interpreter_unavailable as _pending_response_option_when_interpreter_unavailable,
     planned_active_confirmation_edit_interpretation as _planned_active_confirmation_edit_interpretation,
+    planned_pending_refinement_edit_interpretation as _planned_pending_refinement_edit_interpretation,
     structured_interpretation_has_complete_typed_asset_patch as _structured_interpretation_has_complete_typed_asset_patch,
     structured_interpretation_has_supported_artifact_assumption_edit as _structured_interpretation_has_supported_artifact_assumption_edit,
 )
@@ -2174,6 +2175,22 @@ async def _interpreter_unavailable_result(
     selected_thread_metadata: dict[str, Any] | None = None,
 ) -> StageResult:
     selected_metadata = selected_thread_metadata or {}
+    planned_refinement_edit = await _planned_pending_refinement_edit_interpretation(
+        snapshot=snapshot,
+        current_user_message=current_user_message,
+        selected_thread_metadata=selected_metadata,
+        resolve_asset_candidate=_resolve_asset_candidate_safely,
+        plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+    )
+    if planned_refinement_edit is not None:
+        return await _stage_result_from_interpretation(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            interpretation=planned_refinement_edit,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_metadata,
+        )
     result_followup = await _latest_result_followup_when_interpreter_unavailable(
         user=user,
         snapshot=snapshot,
