@@ -59,7 +59,6 @@ def build_result_card(
 
     cost_assumption = _execution_realism_assumption(
         realism=realism,
-        performance=performance,
         is_es=is_es,
     )
     if is_es:
@@ -146,7 +145,7 @@ def build_result_card(
             "payload": {},
         },
     ]
-    return {
+    card = {
         "title": f"{symbols} {template_display}",
         "symbols": list(config["symbols"]),
         "strategy_label": template_display,
@@ -168,6 +167,26 @@ def build_result_card(
         "actions": actions,
         "chart": chart,
     }
+    execution_costs = _execution_costs_payload(performance)
+    if execution_costs is not None:
+        card["execution_costs"] = execution_costs
+    return card
+
+
+def _execution_costs_payload(performance: dict[str, Any]) -> dict[str, Any] | None:
+    # Structured cost evidence for the client: present only when the engine
+    # actually modeled costs, so idealized cards stay byte-identical.
+    effect = performance.get("execution_realism")
+    if not isinstance(effect, dict) or not bool(effect.get("enabled")):
+        return None
+    return {
+        "fee_bps": effect.get("fee_bps"),
+        "slippage_bps": effect.get("slippage_bps"),
+        "gross_total_return_pct": effect.get("gross_total_return_pct"),
+        "net_total_return_pct": effect.get("net_total_return_pct"),
+        "return_drag_pct": effect.get("return_drag_pct"),
+        "benchmark_treatment": "same_modeled_costs",
+    }
 
 
 def _should_show_win_rate(config: dict[str, Any], efficiency: dict[str, Any]) -> bool:
@@ -179,34 +198,25 @@ def _should_show_win_rate(config: dict[str, Any], efficiency: dict[str, Any]) ->
 def _execution_realism_assumption(
     *,
     realism: dict[str, float | bool],
-    performance: dict[str, Any],
     is_es: bool,
 ) -> str | None:
+    # One tight honesty line; the gross-vs-net numbers live in the details
+    # pane, so the strip only states that returns already include the costs.
     if not bool(realism["enabled"]):
         return None
     fee_bps = float(realism["fees"]) * 10000.0
     slippage_bps = float(realism["slippage"]) * 10000.0
     if fee_bps <= 0.0 and slippage_bps <= 0.0:
         return None
-    cost_part = (
-        f"{_format_bps(fee_bps)} bps fee + {_format_bps(slippage_bps)} bps slippage"
-    )
     if is_es:
-        cost_part = (
-            f"comisión de {_format_bps(fee_bps)} bps + "
+        return (
+            f"Neto de comisión de {_format_bps(fee_bps)} bps + "
             f"deslizamiento de {_format_bps(slippage_bps)} bps"
         )
-    effect = performance.get("execution_realism")
-    if isinstance(effect, dict):
-        gross = _optional_float(effect.get("gross_total_return_pct"))
-        net = _optional_float(effect.get("net_total_return_pct"))
-        if gross is not None and net is not None:
-            if is_es:
-                return f"Modela {cost_part}; neto {net:+.1f}% vs bruto {gross:+.1f}%."
-            return f"Modeled {cost_part}; net {net:+.1f}% vs gross {gross:+.1f}%."
-    if is_es:
-        return f"Modela {cost_part}"
-    return f"Modeled {cost_part}"
+    return (
+        f"Net of {_format_bps(fee_bps)} bps fee + "
+        f"{_format_bps(slippage_bps)} bps slippage"
+    )
 
 
 def _benchmark_assumption(
@@ -224,15 +234,6 @@ def _benchmark_assumption(
         return f"Referencia: {symbol}{suffix}"
     suffix = " (same modeled costs)" if has_modeled_costs else ""
     return f"Benchmark: {symbol}{suffix}"
-
-
-def _optional_float(value: Any) -> float | None:
-    if isinstance(value, bool):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _format_bps(value: float) -> str:

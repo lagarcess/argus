@@ -390,7 +390,12 @@
         "cadence": "Cadencia",
         "contribution": "Contribución",
         "entry_rule": "Regla de entrada",
-        "exit_rule": "Regla de salida"
+        "exit_rule": "Regla de salida",
+        "gross_return": "Retorno bruto",
+        "net_return": "Neto de costos",
+        "modeled_costs": "Costos modelados",
+        "modeled_costs_value": "comisión de {{fee}} bps + deslizamiento de {{slippage}} bps",
+        "benchmark_same_costs": "{{benchmark}} (mismos costos modelados)"
       },
       "timeframe": {
         "daily": "Datos diarios",

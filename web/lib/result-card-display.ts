@@ -51,6 +51,11 @@ export type ResultCardDisplayCopy = {
   contributionLabel: string;
   entryRuleLabel: string;
   exitRuleLabel: string;
+  grossReturnLabel: string;
+  netReturnLabel: string;
+  modeledCostsLabel: string;
+  modeledCostsValue: (feeBps: string, slippageBps: string) => string;
+  benchmarkSameCostsValue: (benchmark: string) => string;
   dailyData: string;
   hourlyData: string;
   intervalData: (amount: number, unit: string) => string;
@@ -98,6 +103,12 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   contributionLabel: "Contribution",
   entryRuleLabel: "Entry rule",
   exitRuleLabel: "Exit rule",
+  grossReturnLabel: "Gross return",
+  netReturnLabel: "Net of costs",
+  modeledCostsLabel: "Costs modeled",
+  modeledCostsValue: (feeBps, slippageBps) =>
+    `${feeBps} bps fee + ${slippageBps} bps slippage`,
+  benchmarkSameCostsValue: (benchmark) => `${benchmark} (same modeled costs)`,
   dailyData: "Daily data",
   hourlyData: "Hourly data",
   intervalData: (amount, unit) => `${amount}-${unit} data`,
@@ -318,7 +329,10 @@ export function compactTrustGroups(
 ) {
   const assetClassLabel = assetClass ? copy.assetClassLabel(assetClass) : undefined;
   if (modeledCostAssumption) {
-    const isSpanish = modeledCostAssumption.toLowerCase().startsWith("modela");
+    const normalizedCostAssumption = modeledCostAssumption.toLowerCase();
+    const isSpanish =
+      normalizedCostAssumption.startsWith("neto de") ||
+      normalizedCostAssumption.startsWith("modela");
     const historical = isSpanish ? "Simulación histórica" : "Historical simulation";
     const notAdvice = isSpanish ? "No es asesoría" : "Not advice";
     return [
@@ -407,11 +421,17 @@ function executionFacts(
     timeframe ? { label: copy.timeframeLabel, value: timeframe } : undefined,
     side ? { label: copy.sideLabel, value: side } : undefined,
     allocation ? { label: copy.allocationLabel, value: allocation } : undefined,
-    benchmark ? { label: copy.benchmarkLabel, value: benchmark } : undefined,
+    benchmark
+      ? {
+          label: copy.benchmarkLabel,
+          value: withBenchmarkCostTreatment(benchmark, result, copy),
+        }
+      : undefined,
     contribution?.cadence ? { label: copy.cadenceLabel, value: contribution.cadence } : undefined,
     contribution?.amount ? { label: copy.contributionLabel, value: contribution.amount } : undefined,
     entryRule ? { label: copy.entryRuleLabel, value: entryRule } : undefined,
     exitRule ? { label: copy.exitRuleLabel, value: exitRule } : undefined,
+    ...executionCostDetails(result, copy),
   ].filter((detail): detail is EvidenceMetric => Boolean(detail));
 
   return {
@@ -419,6 +439,69 @@ function executionFacts(
     benchmark,
     details,
   };
+}
+
+function withBenchmarkCostTreatment(
+  benchmark: string,
+  result: StrategyResultPayload,
+  copy: ResultCardDisplayCopy,
+): string {
+  // State the benchmark cost treatment from the structured payload; skip when
+  // the value already carries it (older persisted cards fall back to the
+  // backend assumption string, which includes the marker).
+  if (
+    result.executionCosts?.benchmark_treatment === "same_modeled_costs" &&
+    !benchmark.includes("(")
+  ) {
+    return copy.benchmarkSameCostsValue(benchmark);
+  }
+  return benchmark;
+}
+
+function executionCostDetails(
+  result: StrategyResultPayload,
+  copy: ResultCardDisplayCopy,
+): (EvidenceMetric | undefined)[] {
+  // Structured cost evidence from the backend artifact payload; present only
+  // when the engine modeled non-zero costs.
+  const costs = result.executionCosts;
+  if (!costs) {
+    return [];
+  }
+  const gross = finiteNumber(costs.gross_total_return_pct);
+  const net = finiteNumber(costs.net_total_return_pct);
+  const feeBps = finiteNumber(costs.fee_bps);
+  const slippageBps = finiteNumber(costs.slippage_bps);
+  if (gross === undefined || net === undefined) {
+    return [];
+  }
+  return [
+    { label: copy.grossReturnLabel, value: formatSignedPercent(gross) },
+    { label: copy.netReturnLabel, value: formatSignedPercent(net) },
+    feeBps === undefined && slippageBps === undefined
+      ? undefined
+      : {
+          label: copy.modeledCostsLabel,
+          value: copy.modeledCostsValue(
+            formatBpsValue(feeBps ?? 0),
+            formatBpsValue(slippageBps ?? 0),
+          ),
+        },
+  ];
+}
+
+function finiteNumber(value: number | null | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function formatSignedPercent(value: number): string {
+  const rounded = value.toFixed(1);
+  return `${value > 0 ? "+" : ""}${rounded}%`;
+}
+
+function formatBpsValue(value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  return String(rounded);
 }
 
 function portfolioValueSummaryDetails(
@@ -492,7 +575,13 @@ function normalizedAssumptions(result: StrategyResultPayload) {
 function modeledExecutionCostAssumption(result: StrategyResultPayload) {
   return normalizedAssumptions(result).find((assumption) => {
     const normalized = assumption.toLowerCase();
-    return normalized.startsWith("modeled ") || normalized.startsWith("modela ");
+    return (
+      normalized.startsWith("net of ") ||
+      normalized.startsWith("neto de ") ||
+      // Older persisted cards carry the longer modeled-cost phrasing.
+      normalized.startsWith("modeled ") ||
+      normalized.startsWith("modela ")
+    );
   });
 }
 

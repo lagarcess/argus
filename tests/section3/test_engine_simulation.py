@@ -1157,10 +1157,55 @@ def test_build_result_card_shows_execution_realism_cost_and_effect(
     assert card["assumptions"] == [
         "Long-only",
         "Equal weight",
-        "Modeled 10 bps fee + 5 bps slippage; net +11.8% vs gross +12.0%.",
+        "Net of 10 bps fee + 5 bps slippage",
         "Benchmark: SPY (same modeled costs)",
     ]
     assert "Execution realism enabled" not in card["assumptions"]
+    assert card["execution_costs"] == {
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+        "gross_total_return_pct": 12.0,
+        "net_total_return_pct": 11.83,
+        "return_drag_pct": 0.17,
+        "benchmark_treatment": "same_modeled_costs",
+    }
+
+
+def test_build_result_card_omits_execution_costs_without_modeled_costs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-01-07",
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {},
+    }
+    metrics = {
+        "aggregate": {
+            "performance": {
+                "total_return_pct": 12.0,
+                "delta_vs_benchmark_pct": 6.0,
+                "profit": 1200.0,
+            },
+            "risk": {"max_drawdown_pct": 0.0},
+            "efficiency": {"win_rate": 0.0, "total_trades": 1},
+        }
+    }
+
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    flag_off_card = engine.build_result_card(config, metrics)
+    assert "execution_costs" not in flag_off_card
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    flag_on_zero_cost_card = engine.build_result_card(config, metrics)
+    assert "execution_costs" not in flag_on_zero_cost_card
 
 
 def test_build_result_card_hides_win_rate_when_no_meaningful_closed_trades() -> None:

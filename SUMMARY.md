@@ -100,6 +100,25 @@ card remain byte-identical to the pre-feature path.
   `tests/test_runtime_confirmation_card.py::test_runtime_confirmation_card_flag_off_omits_capabilities`,
   and `web/__tests__/confirmation-cost-edit.test.ts`.
 
+## Phase 6 - Result Card Cost Evidence
+
+- The result card always carries one honest assumption line: idealized runs
+  keep "No fees/slippage" and cost-modeled runs keep the modeled-cost line with
+  net vs gross (both were already in place; unchanged here).
+- The backend result card payload now includes a structured
+  `execution_costs` block (`fee_bps`, `slippage_bps`, `gross_total_return_pct`,
+  `net_total_return_pct`, `return_drag_pct`,
+  `benchmark_treatment: "same_modeled_costs"`) only when the engine modeled
+  non-zero costs. Idealized cards are byte-identical to before.
+- The view-details pane renders a cost section from that structured payload —
+  Gross return, Net of costs, Costs modeled, and the benchmark cost treatment —
+  never parsed from prose and never invented client-side. Cards without the
+  block render exactly as today, including old persisted cards.
+- Proof:
+  `tests/section3/test_engine_simulation.py::test_build_result_card_shows_execution_realism_cost_and_effect`,
+  `tests/section3/test_engine_simulation.py::test_build_result_card_omits_execution_costs_without_modeled_costs`,
+  and the `web/__tests__/result-card-playground.test.ts` cost-evidence tests.
+
 ## Cross-Commit Byte-Identity Audit
 
 Beyond the in-suite tests (which compare HEAD to HEAD), the flag-off prime

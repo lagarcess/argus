@@ -574,6 +574,23 @@ function resultDisplayCopy(
     ),
     entryRuleLabel: t("chat.result_card.details.entry_rule", "Entry rule"),
     exitRuleLabel: t("chat.result_card.details.exit_rule", "Exit rule"),
+    grossReturnLabel: t("chat.result_card.details.gross_return", "Gross return"),
+    netReturnLabel: t("chat.result_card.details.net_return", "Net of costs"),
+    modeledCostsLabel: t(
+      "chat.result_card.details.modeled_costs",
+      "Costs modeled",
+    ),
+    modeledCostsValue: (feeBps, slippageBps) =>
+      t("chat.result_card.details.modeled_costs_value", {
+        defaultValue: "{{fee}} bps fee + {{slippage}} bps slippage",
+        fee: feeBps,
+        slippage: slippageBps,
+      }),
+    benchmarkSameCostsValue: (benchmark) =>
+      t("chat.result_card.details.benchmark_same_costs", {
+        defaultValue: "{{benchmark}} (same modeled costs)",
+        benchmark,
+      }),
     dailyData: t("chat.result_card.timeframe.daily", "Daily data"),
     hourlyData: t("chat.result_card.timeframe.hourly", "Hourly data"),
     intervalData: (amount, unit) =>

@@ -144,6 +144,12 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       symbols: ["AAPL"],
       assetClass: "equity",
       period: "January 1, 2025 to January 7, 2025",
+      dateRange: {
+        start: "2025-01-01",
+        end: "2025-01-07",
+        display: "January 1, 2025 to January 7, 2025",
+      },
+      configSnapshot: { benchmark_symbol: "SPY" },
       statusLabel: "Simulation Complete",
       metrics: [
         { label: "Ending value", value: "$1,000 -> $1,118" },
@@ -154,14 +160,28 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       assumptions: [
         "Long-only",
         "Equal weight",
-        "Modeled 10 bps fee + 5 bps slippage; net +11.8% vs gross +12.0%.",
+        "Net of 10 bps fee + 5 bps slippage",
         "Benchmark: SPY (same modeled costs)",
       ],
+      executionCosts: {
+        fee_bps: 10,
+        slippage_bps: 5,
+        gross_total_return_pct: 12.0,
+        net_total_return_pct: 11.8,
+        return_drag_pct: 0.2,
+        benchmark_treatment: "same_modeled_costs",
+      },
       actions: resultActions,
       chart: {
         kind: "portfolio_equity",
         currency: "USD",
         base_value: 1000,
+        value_summary: {
+          peak_value: 1118,
+          lowest_value: 1000,
+          currency: "USD",
+          source: "strategy_portfolio_equity_close",
+        },
         series: [
           { time: "2025-01-01", value: 1000 },
           { time: "2025-01-02", value: 1018 },
