@@ -16,6 +16,7 @@ class FakeBacktestJobGateway:
         self.created_runs: list[dict[str, object]] = []
         self.failed_updates: list[dict[str, object]] = []
         self.route_receipts: list[dict[str, object]] = []
+        self.cost_ledger_entries: list[dict[str, object]] = []
 
     def fetch_job(self, job_id: str) -> dict[str, object] | None:
         if self.row["id"] != job_id:
@@ -121,6 +122,7 @@ class FakeBacktestJobGateway:
         metadata: dict[str, object] | None = None,
     ) -> dict[str, object]:
         row = {
+            "id": f"receipt-{len(self.route_receipts) + 1}",
             "user_id": user_id,
             "conversation_id": conversation_id,
             "run_id": run_id,
@@ -129,6 +131,11 @@ class FakeBacktestJobGateway:
             **receipt,
         }
         self.route_receipts.append(row)
+        return row
+
+    def create_cost_ledger_entry(self, *, entry: dict[str, object]) -> dict[str, object]:
+        row = {"id": f"ledger-{len(self.cost_ledger_entries) + 1}", **entry}
+        self.cost_ledger_entries.append(row)
         return row
 
 
@@ -457,6 +464,12 @@ def test_run_backtest_job_persists_result_summary_route_receipts(
             schema_name="QuickTakeDraft",
             latency_ms=42,
             outcome="succeeded",
+            token_usage={
+                "prompt_tokens": 21,
+                "completion_tokens": 9,
+                "total_tokens": 30,
+            },
+            usage_cost_usd=0.0009,
             context_packet_ids=["packet-1"],
         )
         return ResultReadout(
@@ -508,6 +521,17 @@ def test_run_backtest_job_persists_result_summary_route_receipts(
     assert receipt["failure_mode"] is None
     assert receipt["fallback_used"] is False
     assert receipt["context_packet_ids"] == ["packet-1"]
+    assert len(gateway.cost_ledger_entries) == 1
+    ledger_entry = gateway.cost_ledger_entries[0]
+    assert ledger_entry["source"] == "render_workflow"
+    assert ledger_entry["provider"] == "openrouter"
+    assert ledger_entry["model"] == "unit-test-model"
+    assert ledger_entry["backtest_run_id"] == "run-workflow"
+    assert ledger_entry["backtest_job_id"] == job["id"]
+    assert ledger_entry["route_receipt_id"] == "receipt-1"
+    assert ledger_entry["correlation_id"] == f"workflow:local-run:{job['id']}:run-workflow"
+    assert ledger_entry["total_tokens"] == 30
+    assert ledger_entry["cost_amount"] == 0.0009
 
 
 def test_run_backtest_job_uses_mainline_llm_quick_take_path(

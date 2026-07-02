@@ -10,6 +10,11 @@ from argus.agent_runtime.capabilities.contract import (
     build_default_capability_contract,
 )
 from argus.domain.indicators import EXECUTABLE_INDICATORS
+from argus.llm.openrouter import OpenRouterRouteReceipt
+from argus.observability.cost_ledger import (
+    CostLedgerGateway,
+    persist_openrouter_cost_ledger_entries,
+)
 from argus.observability.product_events import capture_product_event
 
 MANIFEST_PATH = Path(__file__).with_name("chat_runtime_scenarios.json")
@@ -153,6 +158,26 @@ def build_semantic_judge_messages(
         },
         {"role": "user", "content": json.dumps(payload, sort_keys=True)},
     ]
+
+
+def persist_eval_harness_cost_ledger_entries(
+    *,
+    gateway: CostLedgerGateway,
+    receipts: list[OpenRouterRouteReceipt],
+    eval_suite_id: str,
+    eval_case_id: str,
+) -> None:
+    persist_openrouter_cost_ledger_entries(
+        gateway=gateway,
+        receipts=receipts,
+        source="eval_harness",
+        feature_area="eval_readiness",
+        correlation_id=f"eval:{eval_suite_id}:{eval_case_id}",
+        metadata={
+            "eval_suite_id": eval_suite_id,
+            "eval_case_id": eval_case_id,
+        },
+    )
 
 
 def parse_sse_events(raw_stream: str) -> list[dict[str, Any]]:

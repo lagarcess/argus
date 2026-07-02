@@ -91,6 +91,9 @@ class BacktestJobGateway(Protocol):
     ) -> dict[str, Any]:
         """Persist LLM route telemetry produced during workflow execution."""
 
+    def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
+        """Append provider/runtime spend produced during workflow execution."""
+
 
 class BacktestTool(Protocol):
     def run(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -375,12 +378,31 @@ def _persist_result_readout_route_receipts(
     }
     for receipt in receipts:
         try:
-            gateway.create_route_receipt(
+            created = gateway.create_route_receipt(
                 user_id=user_id,
                 conversation_id=conversation_id,
                 run_id=result_run_id,
                 metadata=metadata,
                 receipt=receipt.as_dict(),
+            )
+            from argus.observability.cost_ledger import (
+                persist_openrouter_cost_ledger_entries,
+            )
+
+            persist_openrouter_cost_ledger_entries(
+                gateway=gateway,
+                receipts=[receipt],
+                source="render_workflow",
+                feature_area="result_readout",
+                user_id=user_id,
+                conversation_id=conversation_id,
+                backtest_run_id=result_run_id,
+                backtest_job_id=job_id,
+                route_receipt_rows=[created],
+                correlation_id=(
+                    f"workflow:{workflow_run_id}:{job_id}:{result_run_id}"
+                ),
+                metadata=metadata,
             )
         except Exception as exc:
             logger.warning(

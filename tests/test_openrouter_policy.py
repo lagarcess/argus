@@ -3268,6 +3268,79 @@ def test_route_receipt_capture_collects_current_runtime_calls() -> None:
     assert captured[0].as_dict()["context_packet_ids"] == ["packet-1"]
 
 
+def test_direct_json_schema_route_receipt_preserves_provider_usage_cost(
+    monkeypatch,
+) -> None:
+    openrouter.clear_openrouter_route_receipts()
+
+    class FakeAsyncClient:
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def post(self, _url: str, **_kwargs: Any) -> object:
+            class FakeResponse:
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict[str, Any]:
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": LLMInterpretationResponse(
+                                        intent="conversation_followup",
+                                        task_relation="new_task",
+                                        requires_clarification=False,
+                                        user_goal_summary="what Argus supports",
+                                        assistant_response=(
+                                            "I can help test supported ideas."
+                                        ),
+                                        uses_latest_result_context=False,
+                                        confidence=0.91,
+                                        semantic_turn_act="educational_question",
+                                    ).model_dump_json()
+                                }
+                            }
+                        ],
+                        "usage": {
+                            "prompt_tokens": 12,
+                            "completion_tokens": 6,
+                            "total_tokens": 18,
+                            "cost": 0.00054,
+                        },
+                    }
+
+            return FakeResponse()
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "structured/primary")
+    monkeypatch.setattr(
+        openrouter.httpx, "AsyncClient", lambda **_kwargs: FakeAsyncClient()
+    )
+
+    result = asyncio.run(
+        openrouter.invoke_openrouter_json_schema(
+            task="interpretation",
+            messages=[{"role": "user", "content": "what can you do?"}],
+            schema_model=LLMInterpretationResponse,
+            schema_name="LLMInterpretationResponse",
+        )
+    )
+
+    assert result is not None
+    receipt = openrouter.get_openrouter_route_receipts()[0]
+    assert receipt.token_usage == {
+        "prompt_tokens": 12,
+        "completion_tokens": 6,
+        "total_tokens": 18,
+    }
+    assert receipt.usage_cost_usd == 0.00054
+    assert receipt.as_dict()["usage_cost_usd"] == 0.00054
+
+
 def test_route_receipt_latency_summary_keeps_failure_and_context_evidence() -> None:
     openrouter.clear_openrouter_route_receipts()
     openrouter.record_openrouter_route_receipt(
