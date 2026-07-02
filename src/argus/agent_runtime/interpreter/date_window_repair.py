@@ -16,6 +16,7 @@ from argus.agent_runtime.interpreter.shared import (
     _draft_semantic_evidence_spans,
     _field_path_base,
     _has_complete_date_range_payload,
+    _latest_result_date_window,
     _llm_strategy_draft_has_concrete_execution_target,
     _llm_strategy_draft_has_rule_or_indicator_fields,
     _llm_value_is_empty,
@@ -24,6 +25,7 @@ from argus.agent_runtime.interpreter.shared import (
 )
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedDateWindowExtraction,
+    LLMDateRangeIntent,
     LLMInterpretationResponse,
     LLMStrategyDraft,
 )
@@ -328,6 +330,12 @@ def _focused_date_window_extraction_messages(
                 "anchor=today, confidence, and evidence. For year-to-date, return "
                 "kind=year_to_date. For a calendar year, return kind=calendar_year "
                 "and year. For since-style windows, return kind=since and start. "
+                "When the current message reuses the previous or latest test's "
+                "window ('same time period', 'mismo periodo', 'the same period as "
+                "the test we just ran', any language), set has_date_window=true "
+                "and return kind=same_as_latest_result with the reference phrase "
+                "as evidence and no start/end; the runtime binds the dates from "
+                "the canonical result. "
                 "For explicit calendar start/end endpoints, return date_range with "
                 "ISO dates or the canonical sentinel today/current_date. Never put "
                 "prose or shorthand relative windows inside date_range start/end. "
@@ -361,12 +369,28 @@ def _response_from_focused_date_window_extraction(
     )
     changed = False
     if extraction.date_range_intent is not None:
-        intent_resolution = resolve_date_range_intent(extraction.date_range_intent)
-        if intent_resolution is None:
-            return None
-        draft.date_range_intent = extraction.date_range_intent
-        draft.date_range = intent_resolution.payload
-        changed = True
+        if str(extraction.date_range_intent.kind or "") == "same_as_latest_result":
+            window = _latest_result_date_window(request)
+            if window is None:
+                return None
+            draft.date_range_intent = LLMDateRangeIntent(
+                kind="explicit_range",
+                start=window["start"],
+                end=window["end"],
+                confidence=extraction.date_range_intent.confidence,
+                evidence=extraction.date_range_intent.evidence,
+            )
+            draft.date_range = dict(window)
+            changed = True
+        else:
+            intent_resolution = resolve_date_range_intent(
+                extraction.date_range_intent
+            )
+            if intent_resolution is None:
+                return None
+            draft.date_range_intent = extraction.date_range_intent
+            draft.date_range = intent_resolution.payload
+            changed = True
     elif extraction.date_range is not None:
         normalized_date_range = normalize_date_range_candidate(extraction.date_range)
         if not _has_complete_date_range_payload(normalized_date_range):

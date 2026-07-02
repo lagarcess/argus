@@ -92,6 +92,29 @@ def _selected_requested_field_base(request: InterpretationRequest) -> str:
     return _field_path_base(request.selected_thread_metadata.get("requested_field"))
 
 
+def _latest_result_date_window(
+    request: InterpretationRequest,
+) -> dict[str, str] | None:
+    """Canonical date window of the latest completed result, if any."""
+
+    from argus.agent_runtime.artifacts.drafts import draft_from_result_metadata
+
+    snapshot = request.latest_task_snapshot
+    reference = (
+        snapshot.latest_backtest_result_reference if snapshot is not None else None
+    )
+    if reference is None:
+        return None
+    date_range = draft_from_result_metadata(dict(reference.metadata)).date_range
+    if not isinstance(date_range, dict):
+        return None
+    start = str(date_range.get("start") or "").strip()
+    end = str(date_range.get("end") or "").strip()
+    if not start or not end:
+        return None
+    return {"start": start, "end": end}
+
+
 def _supported_dca_cadence_value(value: Any) -> str | None:
     normalized_value = normalize_parameter_value(
         "dca_accumulation",

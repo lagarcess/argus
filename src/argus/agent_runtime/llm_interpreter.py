@@ -15,7 +15,6 @@ from loguru import logger
 
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
 from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
-from argus.agent_runtime.artifacts.drafts import draft_from_result_metadata
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
@@ -212,6 +211,7 @@ from argus.agent_runtime.interpreter.shared import (  # noqa: F401
     _llm_value_is_empty,
     _natural_time_language_candidates_from_hints,
     _normalized_stated_field,
+    _latest_result_date_window,
     _selected_requested_field_base,
     _supported_dca_cadence_value,
 )
@@ -641,7 +641,17 @@ class OpenRouterStructuredInterpreter:
                     f"{active_confirmation if active_confirmation else 'none'}\n"
                     f"Latest result fact bank JSON, if any: "
                     f"{latest_result if latest_result else 'none'}\n"
-                    f"Latest failed action JSON, if any: "
+                    + (
+                        "When the current message reuses the latest result's "
+                        "window ('same time period', 'mismo periodo', 'same "
+                        "dates as before', any language), set "
+                        "date_range_intent.kind=same_as_latest_result with the "
+                        "reference phrase as evidence and leave start/end "
+                        "empty; do not copy dates and do not ask for dates.\n"
+                        if latest_result
+                        else ""
+                    )
+                    + f"Latest failed action JSON, if any: "
                     f"{latest_failed_action if latest_failed_action else 'none'}\n"
                     f"Selected thread metadata JSON, if any: "
                     f"{_selected_thread_metadata_context(request.selected_thread_metadata)}"
@@ -3112,7 +3122,12 @@ async def _focused_date_window_audited_response(
             request=request,
         )
         if repaired is not None:
-            return repaired
+            # The focused extraction can name the latest-result reference; the
+            # binder runs again because normalization already passed.
+            return _response_with_latest_result_window_bound(
+                repaired,
+                request=request,
+            )
     return None
 
 
@@ -5052,25 +5067,6 @@ def _structured_interpretation_has_required_shape(
     return False
 
 
-def _latest_result_date_window(
-    request: InterpretationRequest,
-) -> dict[str, str] | None:
-    snapshot = request.latest_task_snapshot
-    reference = (
-        snapshot.latest_backtest_result_reference if snapshot is not None else None
-    )
-    if reference is None:
-        return None
-    date_range = draft_from_result_metadata(dict(reference.metadata)).date_range
-    if not isinstance(date_range, dict):
-        return None
-    start = str(date_range.get("start") or "").strip()
-    end = str(date_range.get("end") or "").strip()
-    if not start or not end:
-        return None
-    return {"start": start, "end": end}
-
-
 def _draft_with_pending_strategy_gaps_filled(
     draft: LLMStrategyDraft,
     *,
@@ -5139,7 +5135,20 @@ def _response_with_latest_result_window_bound(
         return response
     window = _latest_result_date_window(request)
     if window is None:
+        logger.debug(
+            "Latest result window binding skipped: reference named but no "
+            "canonical window available has_snapshot={} has_reference={}",
+            request.latest_task_snapshot is not None,
+            request.latest_task_snapshot is not None
+            and request.latest_task_snapshot.latest_backtest_result_reference
+            is not None,
+        )
         return response
+    logger.debug(
+        "Latest result window bound start={} end={}",
+        window["start"],
+        window["end"],
+    )
     bound_draft = draft.model_copy(
         update={
             "date_range": dict(window),
