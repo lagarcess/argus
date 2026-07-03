@@ -538,6 +538,12 @@ monetization/entitlement architecture.
 clean-checkout suite gate (issue #134 / PR #135) before any branch or `main`
 promotion instead of treating the repair as permanent proof for future SHAs.
 Promotion to `main` stays PAUSED pending #140-#142.
+Once the eval harness (B3 slice 1, PR #143) merges, it is a landing gate:
+runtime-behavior PRs run the live eval suite once pre-merge; every `main`
+promotion candidate runs the full live suite on its exact SHA with no
+unexpected failures (expected-fails only for open issue-tagged bugs); rerun
+the suite after any interpreter model or provider change. Integration stays a
+fast checkpoint; `main` is the heavyweight gate.
 
 "P2 done" = Argus **remembers, compares, and stays honest about staleness** — the memo's
 moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
