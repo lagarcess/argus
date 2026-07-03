@@ -492,10 +492,13 @@ LANES BY GATE (the board agents execute from):
 - **B3 Measurement wiring** (= P2.5 below). READY-BUILD, off-spine. One lane,
   THREE atomic slices in this ORDER, each its own PR — never combined into one
   push:
-  (1) **Eval harness** over the locked categories. First because it is
-  zero-runtime-risk (reads behavior only) and gives every in-flight lane a
-  rerunnable EN/ES parity gate; it is also the B4 unlock. Its PR gets a Fable
-  review before anyone trusts it as a landing gate.
+  (1) **Eval harness** — MERGED (PR #143 at `e303aa3`, Fable-reviewed).
+  `tests/evals/` with typed-outcome fixtures, prose-only judge
+  (`argus-prose-quality-v1`), issue-tagged expected-fails (#142), gitignored
+  scorecards, live spend behind `ARGUS_RUN_LIVE_EVALS=1`. Run policy: see
+  `tests/evals/README.md` + the standing release discipline below. The
+  landing gate is LIVE — runtime-behavior PRs run the live suite pre-merge
+  from now on.
   (2) **Product events**: wire the BUILT non-emitting
   `argus_observability_event/v1` envelope to PostHog. Founder prerequisite
   before this slice starts: PostHog project + API key provisioned and
