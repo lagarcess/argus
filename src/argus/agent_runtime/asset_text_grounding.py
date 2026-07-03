@@ -65,43 +65,6 @@ def grounded_asset_mentions_from_text(
     return mentions
 
 
-def ambiguous_asset_resolutions_from_text(
-    text: str,
-    *,
-    resolve_candidate: ResolveAssetCandidate,
-    excluded_tokens: set[str] | None = None,
-    limit: int = 5,
-) -> list[AssetResolution]:
-    """Return provider-ambiguous asset mentions supported by current text."""
-
-    resolutions: list[AssetResolution] = []
-    seen: set[str] = set()
-    excluded = {
-        token.strip().lstrip("$").lower()
-        for token in (excluded_tokens or set())
-        if token.strip()
-    }
-    for phrase in _asset_candidate_phrases(text):
-        if _candidate_overlaps_excluded_tokens(phrase, excluded):
-            continue
-        try:
-            resolution = resolve_candidate(phrase)
-        except Exception:
-            resolution = None
-        if resolution is None:
-            continue
-        if resolution.status != "ambiguous" or not resolution.candidates:
-            continue
-        raw_key = str(resolution.raw_text or phrase).strip().casefold()
-        if not raw_key or raw_key in seen:
-            continue
-        seen.add(raw_key)
-        resolutions.append(resolution)
-        if len(resolutions) >= limit:
-            break
-    return resolutions
-
-
 def provider_ticker_mentions_from_text(
     text: str,
     *,

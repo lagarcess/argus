@@ -54,6 +54,47 @@ def test_llm_interpreter_does_not_merge_prior_dca_into_fresh_strategy(
     assert strategy.capital_amount is None
 
 
+def test_provider_asset_context_resolves_only_llm_identified_mentions(
+    monkeypatch,
+) -> None:
+    import json
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    queries: list[str] = []
+    assets = {
+        "target": ResolvedAssetStub("TGT", "equity", name="Target Corporation"),
+        "walmart": ResolvedAssetStub("WMT", "equity", name="Walmart Inc."),
+        "costco": ResolvedAssetStub("COST", "equity", name="Costco Wholesale Corp."),
+    }
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        queries.append(query)
+        key = query.strip().casefold()
+        if key not in assets:
+            raise ValueError("invalid_symbol")
+        return assets[key]
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+
+    context = interpreter_module._provider_asset_resolution_context_from_extraction(
+        interpreter_module.LLMAssetMentionExtraction(
+            asset_mentions=[
+                {"raw_text": "target", "role": "traded_asset", "confidence": 0.9},
+                {"raw_text": "Walmart", "role": "traded_asset", "confidence": 0.9},
+                {"raw_text": "costco", "role": "traded_asset", "confidence": 0.9},
+            ]
+        )
+    )
+
+    assert queries == ["target", "Walmart", "costco"]
+    assert context is not None
+    payload = json.loads(context)
+    rows = payload["asset_resolution_candidates"]
+    assert [row["symbol"] for row in rows] == ["TGT", "WMT", "COST"]
+    assert not {"buy", "with", "every", "month", "February"} & set(queries)
+
+
 def test_llm_interpreter_removes_stale_indicator_limit_when_user_only_said_drops(
     monkeypatch,
 ) -> None:
@@ -2717,7 +2758,7 @@ async def test_failed_capital_recheck_uses_focused_strategy_repair_before_baseli
 
 
 @pytest.mark.asyncio
-async def test_focused_strategy_repair_recovers_omitted_provider_assets(
+async def test_focused_strategy_repair_canonicalizes_interpreter_identified_assets(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -2746,7 +2787,7 @@ async def test_focused_strategy_repair_recovers_omitted_provider_assets(
                 strategy_thesis=(
                     "Comprar y mantener AAPL y MSFT con pesos iguales y " "10000 dólares."
                 ),
-                asset_universe=[],
+                asset_universe=["AAPL", "MSFT"],
                 date_range={"start": "2025-01-01", "end": "2026-06-05"},
                 capital_amount=10000,
                 confidence=0.9,
@@ -2800,7 +2841,8 @@ async def test_focused_strategy_repair_recovers_omitted_provider_assets(
     assert repaired.candidate_strategy_draft.asset_class == "equity"
     assert {"AAPL", "MSFT"}.issubset(resolved_queries)
     assert set(resolved_queries) <= {"AAPL", "MSFT"}
-    assert "provider_catalog_asset_recovery" in repaired.reason_codes
+    assert "focused_strategy_extraction_repair" in repaired.reason_codes
+    assert "provider_catalog_asset_recovery" not in repaired.reason_codes
     assert interpreter_module._response_can_skip_optional_runtime_readiness_audits(
         response=repaired,
         request=request,

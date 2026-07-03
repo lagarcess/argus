@@ -47,6 +47,10 @@ from argus.agent_runtime.interpreter.asset_grounding import (  # noqa: F401
     _provider_exact_ticker_supports_extracted_symbol,
     _requested_asset_answer_candidate_audit_messages,
 )
+from argus.agent_runtime.interpreter.asset_resolution_context import (
+    provider_asset_resolution_context_for_request,
+    provider_asset_resolution_context_from_extraction,
+)
 from argus.agent_runtime.interpreter.audits import (  # noqa: F401
     AssetAnswerCandidateAudit,
     AssetGroundingAudit,
@@ -299,6 +303,7 @@ from argus.agent_runtime.interpreter.strategy_repair_predicates import (  # noqa
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedDateWindowExtraction,
     FocusedStrategyExtraction,
+    LLMAssetMentionExtraction,
     LLMAmbiguousField,
     LLMDateRangeIntent,
     LLMInterpretationResponse,
@@ -401,9 +406,22 @@ class OpenRouterStructuredInterpreter:
         """
         Executes the interpretation turn.
         """
-        messages = self._messages(request)
+        candidate_models: list[str] | None = None
         if self.model_name is None:
             candidate_models = openrouter_structured_model_candidates()
+            context_model_name = candidate_models[0] if candidate_models else ""
+        else:
+            context_model_name = self.model_name
+        asset_resolution_context = await _provider_asset_resolution_context_for_request(
+            request=request,
+            preferred_model=context_model_name,
+        )
+        messages = self._messages(
+            request,
+            asset_resolution_context=asset_resolution_context,
+        )
+        if self.model_name is None:
+            candidate_models = candidate_models or []
             for index, candidate_model in enumerate(candidate_models):
                 try:
                     response = await invoke_openrouter_json_schema(
@@ -593,7 +611,12 @@ class OpenRouterStructuredInterpreter:
             )
         return None
 
-    def _messages(self, request: InterpretationRequest) -> list[BaseMessage]:
+    def _messages(
+        self,
+        request: InterpretationRequest,
+        *,
+        asset_resolution_context: str | None = None,
+    ) -> list[BaseMessage]:
         prior_strategy = None
         active_confirmation = None
         latest_result = None
@@ -636,6 +659,26 @@ class OpenRouterStructuredInterpreter:
                     history.append(AIMessage(content=content))
                 elif item.role == "user":
                     history.append(HumanMessage(content=content))
+        asset_context_messages = (
+            [
+                SystemMessage(
+                    content=(
+                        "Provider-backed asset resolution context for "
+                        "LLM-identified current-message asset candidates. Use this "
+                        "only as extraction context: fill asset_universe from the "
+                        "resolved traded assets, fill comparison_baseline from "
+                        "resolved benchmark assets, and preserve all same-class "
+                        "traded assets the user mentioned. If a candidate is "
+                        "ambiguous, keep the raw mention in the structured field and "
+                        "mark it for clarification instead of guessing. Do not add "
+                        "ordinary non-asset words as assets.\n"
+                        f"{asset_resolution_context}"
+                    )
+                )
+            ]
+            if asset_resolution_context
+            else []
+        )
         return [
             SystemMessage(content=self._system_prompt()),
             SystemMessage(
@@ -668,6 +711,7 @@ class OpenRouterStructuredInterpreter:
                     f"{_selected_thread_metadata_context(request.selected_thread_metadata)}"
                 )
             ),
+            *asset_context_messages,
             *history,
             HumanMessage(content=request.current_user_message),
         ]
@@ -792,7 +836,12 @@ class OpenRouterStructuredInterpreter:
             "refinement targets from the user message and thread context. Do not rely on "
             "backend text-pattern extraction. If the user writes a company name like Tesla or "
             "Bitcoin, put that text or the ticker in asset_universe; the deterministic "
-            "validator will canonicalize it with the market data resolver. "
+            "validator will canonicalize it with the market data resolver. When the "
+            "user lists several company or asset names as things to buy, hold, test, "
+            "or include, preserve every mentioned traded asset in asset_universe; "
+            "do not collapse a same-class basket to only the last or most familiar "
+            "name. This applies to buy_and_hold, recurring buys, indicator ideas, "
+            "and supported signal strategies. "
             "For any strategy_drafting or backtest_execution request, always include "
             "candidate_strategy_draft and fill the extractable fields you can see: "
             "strategy_type, strategy_thesis, asset_universe, date_range, entry_logic, "
@@ -1002,6 +1051,22 @@ class OpenRouterStructuredInterpreter:
             context_question_focus=response.context_question_focus,
             artifact_target=_artifact_target_from_response(response),
         )
+
+
+async def _provider_asset_resolution_context_for_request(*, request, preferred_model):
+    return await provider_asset_resolution_context_for_request(
+        request=request,
+        preferred_model=preferred_model,
+        invoke_schema=invoke_openrouter_json_schema,
+        resolve_asset_candidate=_resolve_asset_candidate,
+    )
+
+
+def _provider_asset_resolution_context_from_extraction(extraction):
+    return provider_asset_resolution_context_from_extraction(
+        extraction,
+        resolve_asset_candidate=_resolve_asset_candidate,
+    )
 
 
 async def _asset_grounding_audited_response(
@@ -3445,9 +3510,11 @@ async def _recover_supported_signal_rule_from_draft_if_needed(
     )
     if plan is None or plan.outcome != "ready_to_confirm":
         return None
-    return _response_from_signal_rule_plan(
-        response=planning_response,
-        plan=plan,
+    return _response_with_canonical_interpreter_assets(
+        _response_from_signal_rule_plan(
+            response=planning_response,
+            plan=plan,
+        )
     )
 
 
@@ -3456,27 +3523,8 @@ def _augment_signal_planning_context_from_message(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
-    draft = response.candidate_strategy_draft
-    if draft.asset_universe:
-        return response
-    assets = _resolved_asset_mentions_from_message(request.current_user_message)
-    if not assets:
-        return response
-    repaired = response.model_copy(deep=True)
-    repaired_draft = repaired.candidate_strategy_draft
-    repaired_draft.asset_universe = [asset.canonical_symbol for asset in assets]
-    asset_classes = {asset.asset_class for asset in assets}
-    if len(asset_classes) == 1:
-        repaired_draft.asset_class = next(iter(asset_classes))
-    repaired.reason_codes = list(
-        dict.fromkeys(
-            [
-                *repaired.reason_codes,
-                "provider_catalog_asset_recovery",
-            ]
-        )
-    )
-    return repaired
+    del request
+    return response
 
 
 def _augment_strategy_assets_from_resolvable_context(
@@ -3484,127 +3532,8 @@ def _augment_strategy_assets_from_resolvable_context(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
-    asset_grounding_removed_symbols = any(
-        code in response.reason_codes
-        for code in {
-            "asset_grounding_audit_low_confidence_cleared_suspicious_symbols",
-            "asset_grounding_audit_removed_unsubstantiated_symbols",
-            "asset_grounding_audit_unavailable_cleared_suspicious_symbols",
-        }
-    )
-    draft = response.candidate_strategy_draft
-    if draft.asset_universe:
-        return response
-    if not _llm_strategy_draft_has_non_asset_strategy_anchor(draft):
-        return response
-    assets = _resolved_asset_mentions_from_values(
-        request.current_user_message,
-        exact_tickers_only=not (
-            canonical_strategy_type(draft.strategy_type) == "signal_strategy"
-            or _llm_strategy_draft_has_rule_or_indicator_fields(draft)
-        ),
-    )
-    if not assets:
-        return response
-    asset_classes = {asset.asset_class for asset in assets}
-    if asset_grounding_removed_symbols and len(asset_classes) <= 1:
-        return response
-    repaired = response.model_copy(deep=True)
-    repaired_draft = repaired.candidate_strategy_draft
-    repaired_draft.asset_universe = [asset.canonical_symbol for asset in assets]
-    if len(asset_classes) == 1:
-        repaired_draft.asset_class = next(iter(asset_classes))
-    elif len(asset_classes) > 1:
-        repaired_draft.asset_class = "mixed"
-        if not any(
-            item.category == "unsupported_asset_mix"
-            for item in repaired.unsupported_constraints
-        ):
-            repaired.unsupported_constraints.append(
-                LLMUnsupportedConstraint(
-                    category="unsupported_asset_mix",
-                    raw_value=", ".join(repaired_draft.asset_universe),
-                    explanation=(
-                        "Argus Alpha cannot run equity, crypto, and currency pairs "
-                        "together in one simulation yet."
-                    ),
-                    simplification_options=_options.asset_class_simplification_options(),
-                )
-            )
-        repaired.requires_clarification = True
-        repaired.assistant_response = None
-    repaired.missing_required_fields = [
-        field
-        for field in repaired.missing_required_fields
-        if field != "asset_universe"
-    ]
-    repaired.ambiguous_fields = [
-        field
-        for field in repaired.ambiguous_fields
-        if field.field_name != "asset_universe"
-    ]
-    if (
-        repaired.requires_clarification
-        and not repaired.missing_required_fields
-        and not repaired.ambiguous_fields
-        and not repaired.unsupported_constraints
-        and bool(canonical_strategy_type(repaired_draft.strategy_type))
-        and _llm_strategy_draft_has_extractable_fields(repaired_draft)
-        and not _llm_signal_strategy_is_underfilled(repaired_draft)
-    ):
-        repaired.requires_clarification = False
-        repaired.assistant_response = None
-    repaired.reason_codes = list(
-        dict.fromkeys(
-            [
-                *repaired.reason_codes,
-                "provider_catalog_asset_recovery",
-            ]
-        )
-    )
-    return repaired
-
-
-def _resolved_asset_mentions_from_values(
-    *values: str | None,
-    exact_tickers_only: bool = True,
-) -> list[Any]:
-    resolved_assets: list[Any] = []
-    seen: set[str] = set()
-
-    def _resolve_candidate(query: str) -> AssetResolution | None:
-        if not _asset_recovery_query_is_explicit_ticker(query):
-            return None
-        try:
-            return _resolve_asset_candidate(
-                query,
-                field="asset_universe[0]",
-                source="user_mention",
-            )
-        except ValueError:
-            return None
-
-    for value in values:
-        if not value:
-            continue
-        assets = (
-            provider_ticker_assets_from_text(
-                value,
-                resolve_candidate=_resolve_candidate,
-                limit=5,
-            )
-            if exact_tickers_only
-            else _resolved_asset_mentions_from_message(value)
-        )
-        for asset in assets:
-            symbol = asset.canonical_symbol
-            if symbol in seen:
-                continue
-            seen.add(symbol)
-            resolved_assets.append(asset)
-            if len(resolved_assets) >= 5:
-                return resolved_assets
-    return resolved_assets
+    del request
+    return response
 
 
 def _resolved_asset_mentions_from_message(message: str) -> list[Any]:
@@ -3659,9 +3588,11 @@ async def _repair_pending_signal_rule_answer_if_needed(
     )
     if plan is None:
         return None
-    return _response_from_signal_rule_plan(
-        response=planning_response,
-        plan=plan,
+    return _response_with_canonical_interpreter_assets(
+        _response_from_signal_rule_plan(
+            response=planning_response,
+            plan=plan,
+        )
     )
 
 
@@ -3681,9 +3612,11 @@ async def _plan_underfilled_signal_rule_if_needed(
     )
     if plan is None:
         return None
-    return _response_from_signal_rule_plan(
-        response=response,
-        plan=plan,
+    return _response_with_canonical_interpreter_assets(
+        _response_from_signal_rule_plan(
+            response=response,
+            plan=plan,
+        )
     )
 
 
@@ -5084,6 +5017,7 @@ def _normalize_response_for_runtime_context(
         response,
         request=request,
     )
+    response = _response_with_canonical_interpreter_assets(response)
     if _request_has_latest_result(request):
         return response
     if (
@@ -5162,6 +5096,75 @@ def _normalize_response_for_runtime_context(
     )
 
 
+def _response_with_canonical_interpreter_assets(
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse:
+    draft = response.candidate_strategy_draft
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return response
+    if not draft.asset_universe:
+        return response
+
+    canonical_symbols: list[str] = []
+    seen: set[str] = set()
+    asset_classes: set[str] = set()
+    changed = False
+    for index, value in enumerate(draft.asset_universe):
+        raw_text = str(value or "").strip()
+        if not raw_text:
+            changed = True
+            continue
+        symbol = raw_text
+        try:
+            resolution = _resolve_asset_candidate(
+                raw_text,
+                field=f"asset_universe[{index}]",
+                source="llm_extraction",
+            )
+        except Exception:
+            resolution = None
+        if (
+            resolution is not None
+            and resolution.status == "resolved"
+            and resolution.asset is not None
+        ):
+            resolved_symbol = str(
+                resolution.asset.canonical_symbol or ""
+            ).strip().upper()
+            if resolved_symbol:
+                symbol = resolved_symbol
+            asset_class = str(resolution.asset.asset_class or "").strip().lower()
+            if asset_class:
+                asset_classes.add(asset_class)
+        if symbol != raw_text:
+            changed = True
+        if symbol and symbol not in seen:
+            seen.add(symbol)
+            canonical_symbols.append(symbol)
+        elif symbol:
+            changed = True
+
+    if not canonical_symbols:
+        return response
+    resolved_asset_class: str | None = None
+    if len(asset_classes) == 1:
+        resolved_asset_class = next(iter(asset_classes))
+    elif len(asset_classes) > 1:
+        resolved_asset_class = "mixed"
+    if resolved_asset_class and draft.asset_class != resolved_asset_class:
+        changed = True
+    if not changed:
+        return response
+
+    repaired_draft = draft.model_copy(deep=True)
+    repaired_draft.asset_universe = canonical_symbols
+    if resolved_asset_class:
+        repaired_draft.asset_class = resolved_asset_class
+    return response.model_copy(
+        update={"candidate_strategy_draft": repaired_draft}
+    )
+
+
 def _request_current_turn_has_material_execution_evidence(
     request: InterpretationRequest,
 ) -> bool:
@@ -5217,11 +5220,20 @@ def _validate_capability_boundaries(
         )
         resolution_provenance.append(resolution.provenance)
         if resolution.status == "ambiguous":
+            candidate_symbols = [
+                symbol
+                for candidate in resolution.candidates
+                if (
+                    symbol := str(
+                        getattr(candidate, "canonical_symbol", "") or ""
+                    ).strip().upper()
+                )
+            ]
             response.ambiguous_fields.append(
                 LLMAmbiguousField(
                     field_name=f"asset_universe[{index}]",
                     raw_value=symbol,
-                    candidate_normalized_value=None,
+                    candidate_normalized_value=candidate_symbols or None,
                     reason_code="asset_resolution_ambiguous",
                 )
             )

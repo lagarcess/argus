@@ -351,6 +351,8 @@ def test_ambiguous_asset_clarification_preserves_requested_field_context() -> No
     assert result.outcome == "await_user_reply"
     assert result.patch["requested_field"] == "asset_universe"
     assert result.patch["ambiguous_fields"][0]["field_name"] == "asset_universe[0]"
+    assert result.patch["response_intent"]["semantic_needs"] == ["asset_target"]
+    assert clarifier.requests[0].response_intent["semantic_needs"] == ["asset_target"]
 
 
 def test_dca_full_setup_uses_llm_clarifier_with_all_missing_fields() -> None:

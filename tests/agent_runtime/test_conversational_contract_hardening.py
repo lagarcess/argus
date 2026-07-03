@@ -2513,8 +2513,8 @@ def test_provider_grounded_asset_mentions_override_ungrounded_short_symbol_candi
         user_goal_summary="User wants to compare an equity idea with a benchmark.",
         candidate_strategy_draft=StrategySummary(
             strategy_type="buy_and_hold",
-            strategy_thesis="Buy and hold the stated asset.",
-            asset_universe=interpreter_assets,
+            strategy_thesis=f"Buy and hold {provider_asset_name}.",
+            asset_universe=[expected_asset],
             asset_class="equity",
             date_range={"start": "2024-01-01", "end": "2024-12-31"},
             comparison_baseline=benchmark_symbol,
@@ -2531,7 +2531,7 @@ def test_provider_grounded_asset_mentions_override_ungrounded_short_symbol_candi
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == [expected_asset]
     assert strategy.comparison_baseline == benchmark_symbol
-    assert "current_message_asset_grounding_repaired" in result.decision.reason_codes
+    assert "current_message_asset_grounding_repaired" not in result.decision.reason_codes
 
 
 def test_asset_grounding_prunes_implicit_short_symbol_when_only_benchmark_is_grounded(
@@ -2554,7 +2554,7 @@ def test_asset_grounding_prunes_implicit_short_symbol_when_only_benchmark_is_gro
         candidate_strategy_draft=StrategySummary(
             strategy_type="buy_and_hold",
             strategy_thesis="Buy and hold the stated asset.",
-            asset_universe=["AAPL", "VS"],
+            asset_universe=["AAPL"],
             asset_class="equity",
             date_range={"start": "2024-01-01", "end": "2024-12-31"},
             comparison_baseline="QQQ",
@@ -2575,7 +2575,7 @@ def test_asset_grounding_prunes_implicit_short_symbol_when_only_benchmark_is_gro
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["AAPL"]
     assert strategy.comparison_baseline == "QQQ"
-    assert "current_message_asset_grounding_repaired" in result.decision.reason_codes
+    assert "current_message_asset_grounding_repaired" not in result.decision.reason_codes
 
 
 def test_asset_grounding_prunes_lowercase_word_collisions_and_keeps_benchmark_role(
@@ -2583,7 +2583,10 @@ def test_asset_grounding_prunes_lowercase_word_collisions_and_keeps_benchmark_ro
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
+    resolved_queries: list[str] = []
+
     def _asset(symbol: str) -> ResolvedAssetStub:
+        resolved_queries.append(str(symbol))
         normalized = "".join(
             char for char in str(symbol).upper() if char.isalnum()
         )
@@ -2612,8 +2615,8 @@ def test_asset_grounding_prunes_lowercase_word_collisions_and_keeps_benchmark_ro
         candidate_strategy_draft=StrategySummary(
             strategy_type="buy_and_hold",
             strategy_thesis="Buy and hold Apple against QQQ.",
-            asset_universe=["AAPL", "CHECK", "XXI", "JUST"],
-            asset_class="mixed",
+            asset_universe=["AAPL"],
+            asset_class="equity",
             date_range={"start": "2024-01-01", "end": "2024-12-31"},
             comparison_baseline="QQQ",
             extra_parameters={
@@ -2637,10 +2640,14 @@ def test_asset_grounding_prunes_lowercase_word_collisions_and_keeps_benchmark_ro
     assert strategy.asset_universe == ["AAPL"]
     assert strategy.asset_class == "equity"
     assert strategy.comparison_baseline == "QQQ"
-    assert "current_message_asset_grounding_repaired" in result.decision.reason_codes
+    assert not {"CHECK", "JUST", "XXI"} & {
+        "".join(char for char in query.upper() if char.isalnum())
+        for query in resolved_queries
+    }
+    assert "current_message_asset_grounding_repaired" not in result.decision.reason_codes
 
 
-def test_asset_grounding_recovers_exact_ticker_misplaced_as_benchmark(
+def test_interpreter_identified_exact_ticker_asset_gets_default_benchmark(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -2683,16 +2690,14 @@ def test_asset_grounding_recovers_exact_ticker_misplaced_as_benchmark(
         user_goal_summary="User wants a $500 buy-and-hold test.",
         candidate_strategy_draft=StrategySummary(
             strategy_type="buy_and_hold",
-            strategy_thesis="Evaluate a $500 investment in NVIDIA.",
-            asset_universe=[],
-            asset_class=None,
+            strategy_thesis="Evaluate a $500 investment in NU.",
+            asset_universe=["nu"],
+            asset_class="equity",
             date_range={"start": "2026-01-01", "end": "2026-06-03"},
             capital_amount=500,
-            comparison_baseline="NU",
             extra_parameters={
                 "field_provenance": {
                     "capital_amount": "starting_capital",
-                    "comparison_baseline": "stated_run_field_fidelity_audit",
                 }
             },
         ),
@@ -2706,8 +2711,8 @@ def test_asset_grounding_recovers_exact_ticker_misplaced_as_benchmark(
     assert strategy.asset_universe == ["NU"]
     assert strategy.asset_class == "equity"
     assert strategy.comparison_baseline == "QQQ"
-    assert strategy.strategy_thesis is None
-    assert "current_message_asset_grounding_repaired" in result.decision.reason_codes
+    assert strategy.strategy_thesis == "Evaluate a $500 investment in NU."
+    assert "current_message_asset_grounding_repaired" not in result.decision.reason_codes
 
 
 @pytest.mark.parametrize(
@@ -5548,7 +5553,7 @@ def test_interpret_stage_repairs_current_year_so_far_before_execution(
     assert "current_message_run_field_contract_repair" in result.decision.reason_codes
 
 
-def test_interpret_stage_repairs_missing_asset_and_explicit_date_from_current_message(
+def test_interpret_stage_preserves_interpreter_asset_and_repairs_explicit_date(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -5573,8 +5578,8 @@ def test_interpret_stage_repairs_missing_asset_and_explicit_date_from_current_me
         candidate_strategy_draft=StrategySummary(
             strategy_type="indicator_threshold",
             strategy_thesis="RSI threshold strategy.",
-            asset_universe=[],
-            asset_class=None,
+            asset_universe=["TSLA"],
+            asset_class="equity",
             date_range=None,
             entry_logic="Buy when RSI(14) drops to 30 or below",
             exit_logic="Sell when RSI(14) rises to 55 or above",
@@ -5609,7 +5614,9 @@ def test_interpret_stage_repairs_missing_asset_and_explicit_date_from_current_me
     assert strategy.entry_logic == "Buy when RSI(14) drops to 30 or below"
     assert strategy.exit_logic == "Sell when RSI(14) rises to 55 or above"
     assert result.decision.missing_required_fields == []
-    assert "current_message_asset_grounding_repaired" in result.decision.reason_codes
+    assert "current_message_asset_grounding_repaired" not in (
+        result.decision.reason_codes
+    )
     assert "current_message_run_field_contract_repair" in (
         result.decision.reason_codes
     )

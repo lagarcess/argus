@@ -158,6 +158,9 @@ def _strategy_contract_failure(
         expected_entry_rule = indicator_threshold_rule(strategy, "entry")
         expected_exit_rule = indicator_threshold_rule(strategy, "exit")
         if (
+            expected_entry_rule is not None
+            or expected_exit_rule is not None
+        ) and (
             expected_entry_rule is None
             or expected_exit_rule is None
             or _normalized_rule_payload(request.entry_rule) != expected_entry_rule

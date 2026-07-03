@@ -19,6 +19,36 @@ class LLMRiskRule(BaseModel):
     mode: str | None = None
 
 
+class LLMAssetMentionCandidate(BaseModel):
+    raw_text: str = Field(
+        default="",
+        description=(
+            "Exact short user-message span that names a possible traded asset, "
+            "company, ticker, crypto asset, currency pair, benchmark, or "
+            "comparison asset."
+        ),
+    )
+    role: Literal["traded_asset", "benchmark", "unknown"] = Field(
+        default="unknown",
+        description=(
+            "Use traded_asset when the user wants to buy, hold, test, or include "
+            "the asset in the strategy. Use benchmark when it is only a comparison "
+            "or reference baseline."
+        ),
+    )
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+
+
+class LLMAssetMentionExtraction(BaseModel):
+    asset_mentions: list[LLMAssetMentionCandidate] = Field(
+        default_factory=list,
+        description=(
+            "Provider-resolution candidates identified by the LLM from the current "
+            "message. Keep at most five distinct asset-like mentions."
+        ),
+    )
+
+
 class LLMDateRangeIntent(BaseModel):
     kind: (
         Literal[

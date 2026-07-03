@@ -405,7 +405,7 @@ def test_chat_stream_confirmation_uses_final_payload_without_named_events(
     assert "run" not in payload
 
 
-def test_chat_stream_persists_repaired_current_message_asset_grounding(
+def test_chat_stream_persists_provider_canonicalized_company_name_asset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.agent_runtime.capabilities.contract import (
@@ -430,7 +430,7 @@ def test_chat_stream_persists_repaired_current_message_asset_grounding(
                     raw_user_phrasing=request.current_user_message,
                     strategy_type="buy_and_hold",
                     strategy_thesis="Comprar y mantener Apple.",
-                    asset_universe=["APPLE"],
+                    asset_universe=["Apple"],
                     date_range={"start": "2025-06-16", "end": "2026-06-16"},
                     capital_amount=100000,
                 ),
@@ -460,7 +460,7 @@ def test_chat_stream_persists_repaired_current_message_asset_grounding(
                     confidence="high",
                 ),
             )
-        if raw.casefold() == "apple" and source == "user_mention":
+        if raw.casefold() == "apple":
             asset = ResolvedAsset(
                 canonical_symbol="AAPL",
                 asset_class="equity",
@@ -529,8 +529,8 @@ def test_chat_stream_persists_repaired_current_message_asset_grounding(
     )
 
     assert response.status_code == 200
-    assert ("APPLE", "llm_extraction") in provider_queries
-    assert ("Apple", "user_mention") in provider_queries
+    assert ("Apple", "llm_extraction") in provider_queries
+    assert ("Apple", "user_mention") not in provider_queries
     payload = _final_payload(response.text)
     confirmation_payload = payload["confirmation_payload"]
     strategy = confirmation_payload["strategy"]

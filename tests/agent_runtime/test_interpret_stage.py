@@ -3974,15 +3974,15 @@ def test_messy_company_name_prompt_preserves_same_class_asset_basket(
         intent="backtest_execution",
         task_relation="new_task",
         requires_clarification=False,
-        user_goal_summary="User wants monthly recurring buys in Walmart.",
+        user_goal_summary="User wants monthly recurring buys in Target, Walmart, and Costco.",
         candidate_strategy_draft=StrategySummary(
             raw_user_phrasing=message,
             strategy_type="dca_accumulation",
             strategy_thesis=(
-                "Buy Walmart with $500 monthly contributions from February 2020 "
-                "through today."
+                "Buy Target, Walmart, and Costco with $500 monthly contributions "
+                "from February 2020 through today."
             ),
-            asset_universe=["Walmart"],
+            asset_universe=["target", "Walmart", "costco"],
             asset_class="equity",
             date_range={"start": "2020-02-01", "end": "2026-07-02"},
             cadence="monthly",
@@ -4038,7 +4038,7 @@ def test_company_name_asset_basket_preservation_is_strategy_agnostic(
                 "Buy and hold Target, Walmart, and Costco with $500 starting "
                 "capital since February 2020."
             ),
-            asset_universe=["Walmart"],
+            asset_universe=["target", "Walmart", "costco"],
             asset_class="equity",
             date_range={"start": "2020-02-01", "end": "2026-07-02"},
             capital_amount=500,
@@ -4069,7 +4069,7 @@ def test_company_name_asset_basket_preservation_is_strategy_agnostic(
     assert result.decision.unsupported_constraints == []
 
 
-def test_company_name_asset_basket_preservation_scans_after_explicit_ticker(
+def test_company_name_asset_basket_canonicalizes_interpreter_identified_assets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.agent_runtime.resolution import AssetResolution
@@ -4138,7 +4138,7 @@ def test_company_name_asset_basket_preservation_scans_after_explicit_ticker(
             raw_user_phrasing=message,
             strategy_type="buy_and_hold",
             strategy_thesis="Buy and hold AAPL and Walmart with $500.",
-            asset_universe=["AAPL"],
+            asset_universe=["AAPL", "walmart"],
             asset_class="equity",
             date_range={"start": "2020-02-01", "end": "2026-07-02"},
             capital_amount=500,
@@ -4158,7 +4158,7 @@ def test_company_name_asset_basket_preservation_scans_after_explicit_ticker(
     assert result.decision.unsupported_constraints == []
 
 
-def test_ambiguous_current_message_company_name_clarifies_instead_of_dropping(
+def test_ambiguous_interpreter_identified_company_name_clarifies_instead_of_dropping(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.agent_runtime.resolution import AssetResolution
@@ -4244,7 +4244,7 @@ def test_ambiguous_current_message_company_name_clarifies_instead_of_dropping(
             raw_user_phrasing=message,
             strategy_type="buy_and_hold",
             strategy_thesis="Buy and hold AAPL and Google with $500.",
-            asset_universe=["AAPL"],
+            asset_universe=["AAPL", "google"],
             asset_class="equity",
             date_range={"start": "2020-02-01", "end": "2026-07-02"},
             capital_amount=500,
@@ -4260,13 +4260,13 @@ def test_ambiguous_current_message_company_name_clarifies_instead_of_dropping(
     assert result.decision.unsupported_constraints == []
     assert len(result.decision.ambiguous_fields) == 1
     ambiguous = result.decision.ambiguous_fields[0]
-    assert ambiguous.field_name == "asset_universe[0]"
+    assert ambiguous.field_name == "asset_universe[1]"
     assert ambiguous.raw_value == "google"
-    assert ambiguous.candidate_normalized_value == ["GOOGL", "GOOG"]
+    assert ambiguous.candidate_normalized_value is None
     assert ambiguous.reason_code == "asset_resolution_ambiguous"
 
 
-def test_current_message_asset_grounding_clears_stale_invalid_llm_symbol(
+def test_llm_extracted_company_name_canonicalizes_without_current_message_rescan(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.agent_runtime.resolution import AssetResolution
@@ -4300,7 +4300,7 @@ def test_current_message_asset_grounding_clears_stale_invalid_llm_symbol(
                     confidence="high",
                 ),
             )
-        if raw.casefold() == "apple" and source == "user_mention":
+        if raw.casefold() == "apple":
             asset = ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
             return AssetResolution(
                 status="resolved",
@@ -4346,7 +4346,7 @@ def test_current_message_asset_grounding_clears_stale_invalid_llm_symbol(
         candidate_strategy_draft=StrategySummary(
             strategy_type="buy_and_hold",
             strategy_thesis="Comprar y mantener Apple.",
-            asset_universe=["APPLE"],
+            asset_universe=["Apple"],
             date_range="past year",
             capital_amount=100000,
         ),
@@ -4359,8 +4359,8 @@ def test_current_message_asset_grounding_clears_stale_invalid_llm_symbol(
         user=UserState(user_id="u1", language_preference="es-419"),
     )
 
-    assert ("APPLE", "llm_extraction") in provider_queries
-    assert ("Apple", "user_mention") in provider_queries
+    assert ("Apple", "llm_extraction") in provider_queries
+    assert ("Apple", "user_mention") not in provider_queries
     assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["AAPL"]

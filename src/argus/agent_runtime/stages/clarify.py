@@ -412,7 +412,7 @@ def _semantic_needs_from_required_fields(fields: list[str]) -> list[PendingNeedN
     }
     needs: list[PendingNeedName] = []
     for field in fields:
-        need = field_map.get(field)
+        need = field_map.get(_field_base(field))
         if need is not None and need not in needs:
             needs.append(need)
     return needs
