@@ -11,6 +11,7 @@ from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (
     _current_artifact_strategy,
     _request_targets_pending_artifact_assumption_edit,
+    _request_targets_post_result_artifact_edit,
 )
 from argus.agent_runtime.interpreter.dca_audits import _dca_draft_has_recurring_amount
 from argus.agent_runtime.interpreter.readiness_helpers import (
@@ -183,8 +184,15 @@ def _refinement_reply_needs_full_interpretation(
     old strategy type.
     """
 
+    post_result_surface = _request_targets_post_result_artifact_edit(request)
     if _selected_requested_field_base(request) != "refinement":
-        return False
+        if not post_result_surface:
+            return False
+        # Free-form post-result turns reach the planner only when the
+        # interpreter itself says the user is refining the completed idea;
+        # new ideas and result questions keep full interpretation.
+        if response.semantic_turn_act != "refine_current_idea":
+            return True
     draft = response.candidate_strategy_draft
     pending = _current_artifact_strategy(request)
     draft_type = canonical_strategy_type(draft.strategy_type)

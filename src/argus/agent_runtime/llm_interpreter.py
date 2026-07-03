@@ -33,6 +33,7 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: 
     _edit_plan_reshapes_non_recurring_strategy,
     _normalized_ticker_symbol,
     _request_targets_pending_artifact_assumption_edit,
+    _request_targets_post_result_artifact_edit,
     _response_from_artifact_assumption_edit_plan,
     asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
 )
@@ -2552,7 +2553,10 @@ async def _ready_active_artifact_edit_planned_response(
             return None
         if response.semantic_turn_act == "educational_question":
             return None
-    if not _request_targets_pending_artifact_assumption_edit(request):
+    if not (
+        _request_targets_pending_artifact_assumption_edit(request)
+        or _request_targets_post_result_artifact_edit(request)
+    ):
         return None
     if response.semantic_turn_act in {
         "approval",
@@ -3270,7 +3274,10 @@ async def _plan_pending_artifact_assumption_edit(
     preferred_model: str,
     require_failure_edit_evidence: bool = False,
 ) -> LLMInterpretationResponse | None:
-    if not _request_targets_pending_artifact_assumption_edit(request):
+    if not (
+        _request_targets_pending_artifact_assumption_edit(request)
+        or _request_targets_post_result_artifact_edit(request)
+    ):
         return None
     if (
         require_failure_edit_evidence
@@ -3279,6 +3286,11 @@ async def _plan_pending_artifact_assumption_edit(
         return None
     snapshot = request.latest_task_snapshot
     prior_strategy = _prior_strategy_payload(request)
+    if prior_strategy is None:
+        # Post-result surface: plan against the strategy that actually ran.
+        reconstructed = _current_artifact_strategy(request)
+        if reconstructed is not None:
+            prior_strategy = reconstructed.model_dump(mode="json")
     active_confirmation = (
         snapshot.active_confirmation_reference.model_dump(mode="json")
         if snapshot is not None and snapshot.active_confirmation_reference is not None

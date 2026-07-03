@@ -883,22 +883,31 @@ def _deterministic_result_artifact_patch_stage_result_if_applicable(
         date_range.get("start") and date_range.get("end")
     ):
         return None
-    if not _decision_allows_deterministic_result_patch(
-        decision,
-        patch_fields=frozenset({"date_range"}),
-    ):
-        return None
     anchor = resolve_artifact_anchor(
         snapshot=snapshot,
         action_payload={"run_id": reference.artifact_id},
     )
-    patched = apply_patch_to_anchor(
-        anchor,
-        ArtifactPatch(
-            source="user_patch",
-            date_range=date_range,
+    planned_asset_universe = _planned_asset_universe_for_result_patch(
+        decision=decision,
+        anchor_draft=anchor.draft,
+    )
+    patch_fields = {"date_range"}
+    if planned_asset_universe is not None:
+        patch_fields.add("asset_universe")
+    if not _decision_allows_deterministic_result_patch(
+        decision,
+        patch_fields=frozenset(patch_fields),
+    ):
+        return None
+    patch = ArtifactPatch(
+        source="user_patch",
+        date_range=date_range,
+        asset_universe=planned_asset_universe,
+        asset_universe_operation=(
+            "replace" if planned_asset_universe is not None else None
         ),
     )
+    patched = apply_patch_to_anchor(anchor, patch)
     if patched is None:
         return None
     return _stage_result_from_result_artifact_patch(
@@ -907,6 +916,37 @@ def _deterministic_result_artifact_patch_stage_result_if_applicable(
         reason_code="artifact_patch_from_latest_result",
         additional_reason_codes=("artifact_date_patch_from_current_message",),
     )
+
+
+def _planned_asset_universe_for_result_patch(
+    *,
+    decision: InterpretDecision,
+    anchor_draft: StrategySummary | None,
+) -> list[str] | None:
+    """Asset change a result patch must carry instead of discarding.
+
+    Rebuilding the card from the result anchor keeps its assets; when the
+    typed edit planner already resolved a different asset set for this turn
+    ("try NVDA over the same period"), dropping it would let inherited
+    context overwrite an explicit user constraint.
+    """
+
+    if "artifact_assumption_edit_planned" not in decision.reason_codes:
+        return None
+    draft_assets = [
+        symbol
+        for symbol in decision.candidate_strategy_draft.asset_universe
+        if str(symbol).strip()
+    ]
+    if not draft_assets or anchor_draft is None:
+        return None
+
+    def normalized(symbols: list[str]) -> set[str]:
+        return {str(symbol).strip().upper() for symbol in symbols}
+
+    if normalized(draft_assets) == normalized(anchor_draft.asset_universe):
+        return None
+    return list(draft_assets)
 
 
 def _result_followup_target_was_inferred_non_patch(

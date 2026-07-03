@@ -27,6 +27,7 @@ from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.rule_specs import indicator_parameters_from_strategy
 from argus.agent_runtime.stages.artifact_context import (
     active_confirmation_effective_strategy,
+    strategy_from_result_reference,
 )
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import StrategySummary
@@ -83,6 +84,34 @@ def _request_targets_pending_artifact_assumption_edit(
     )
 
 
+def _request_targets_post_result_artifact_edit(
+    request: InterpretationRequest,
+) -> bool:
+    """Free-form post-result surface: a completed result and nothing pending.
+
+    A reply here can still be an edit of the completed strategy ("could we
+    try NVDA over the same period") — the no-chip twin of the Refine idea
+    action. Chips and natural language are two entry points to one contract,
+    so this surface may reach the same planner; response-conditioned guards
+    decide whether a specific turn actually is an edit.
+    """
+
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
+    if requested_field:
+        return False
+    snapshot = request.latest_task_snapshot
+    if snapshot is None or snapshot.latest_backtest_result_reference is None:
+        return False
+    if (
+        snapshot.pending_strategy_summary is not None
+        or snapshot.active_confirmation_reference is not None
+    ):
+        return False
+    return bool(request.current_user_message.strip())
+
+
 def _current_artifact_asset_universe(request: InterpretationRequest) -> list[str]:
     strategy = _current_artifact_strategy(request)
     if strategy is not None and strategy.asset_universe:
@@ -110,6 +139,13 @@ def _current_artifact_strategy(request: InterpretationRequest) -> StrategySummar
         )
         if effective != StrategySummary():
             return effective
+    if prior is None and snapshot.latest_backtest_result_reference is not None:
+        # Post-result surface: the canonical strategy is the one that ran.
+        reconstructed = strategy_from_result_reference(
+            snapshot.latest_backtest_result_reference
+        )
+        if reconstructed.asset_universe:
+            return reconstructed
     return prior
 
 
