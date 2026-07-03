@@ -80,6 +80,7 @@ from argus.agent_runtime.interpreter.date_window_repair import (  # noqa: F401
     _focused_date_window_extraction_messages,
     _pending_supported_execution_date_answer_can_use_focused_audit,
     _post_result_dateless_execution_draft,
+    _response_with_post_result_window_inherited,
     _request_has_pending_date_answer_context,
     _response_from_focused_date_window_extraction,
     _response_has_ambiguous_rule_fields,
@@ -5079,6 +5080,10 @@ def _normalize_response_for_runtime_context(
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
     response = _response_with_latest_result_window_bound(response, request=request)
+    response = _response_with_post_result_window_inherited(
+        response,
+        request=request,
+    )
     if _request_has_latest_result(request):
         return response
     if (

@@ -33,6 +33,7 @@ from argus.agent_runtime.interpreter.shared import (
 )
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedDateWindowExtraction,
+    LLMDateRangeIntent,
     LLMInterpretationResponse,
     LLMStrategyDraft,
 )
@@ -193,6 +194,65 @@ def _post_result_dateless_execution_draft(
     if str(draft.date_range_raw_text or "").strip():
         return False
     return _llm_strategy_draft_has_concrete_execution_target(draft)
+
+
+def _response_with_post_result_window_inherited(
+    response: LLMInterpretationResponse,
+    *,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    """Inherit the completed run's window for a dateless post-result variant.
+
+    Founder-approved continuity: a new idea or refinement right after a
+    result that names no window borrows the run's window silently — the card
+    shows it and stays editable. Binding by state (completed run + dateless
+    executable draft) needs no model cooperation and no text matching, so
+    prose proposals and bare "yes" turns can never loop.
+    """
+
+    if response.semantic_turn_act not in {"new_idea", "refine_current_idea"}:
+        return response
+    if not _post_result_dateless_execution_draft(
+        response=response,
+        request=request,
+    ):
+        return response
+    window = _latest_result_date_window(request)
+    if window is None:
+        return response
+    logger.debug(
+        "Post-result window inherited start={} end={}",
+        window["start"],
+        window["end"],
+    )
+    draft = response.candidate_strategy_draft.model_copy(
+        update={
+            "date_range": dict(window),
+            "date_range_intent": LLMDateRangeIntent(
+                kind="explicit_range",
+                start=window["start"],
+                end=window["end"],
+                confidence=0.8,
+                evidence="latest completed result window",
+            ),
+        }
+    )
+    missing_required_fields = [
+        field
+        for field in response.missing_required_fields
+        if _field_path_base(field) != "date_range"
+    ]
+    return response.model_copy(
+        update={
+            "candidate_strategy_draft": draft,
+            "missing_required_fields": missing_required_fields,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [*response.reason_codes, "latest_result_window_bound"]
+                )
+            ),
+        }
+    )
 
 
 def _request_has_pending_date_answer_context(

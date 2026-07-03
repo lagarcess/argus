@@ -305,13 +305,14 @@ def test_pending_gap_fill_ignores_boolean_recurring_contribution() -> None:
 
 
 @pytest.mark.asyncio
-async def test_post_result_dateless_draft_gets_focused_reference_check(
+async def test_post_result_dateless_draft_inherits_run_window_one_shot(
     monkeypatch,
 ) -> None:
-    """When the primary model fills everything except the window on a
-    post-result turn, the focused date extraction must get a second look
-    before Argus asks the user — it can name the latest-result reference and
-    bind silently (founder-approved behavior)."""
+    """A post-result variant that names no window inherits the completed
+    run's window by state alone — no model cooperation needed, so prose
+    proposals and bare "yes" turns can never loop (founder-approved silent
+    binding). The focused extraction stays as defense in depth but must not
+    even be needed here."""
 
     from argus.agent_runtime import llm_interpreter as interpreter_module
     from argus.agent_runtime.llm_interpreter import StatedRunFieldFidelityAudit
@@ -408,7 +409,10 @@ async def test_post_result_dateless_draft_gets_focused_reference_check(
     )
 
     assert result is not None
-    assert "FocusedDateWindowExtraction" in calls
+    # Inheritance binds during normalization; the extraction round-trip is
+    # not needed for this shape.
+    assert "FocusedDateWindowExtraction" not in calls
+    assert "latest_result_window_bound" in result.reason_codes
     draft = result.candidate_strategy_draft
     assert draft.date_range == {"start": "2020-02-01", "end": "2026-07-02"}
     assert draft.asset_universe == ["NVDA"]
