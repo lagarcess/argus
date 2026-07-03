@@ -1,0 +1,40 @@
+category: messy_english
+cases:
+  - id: messy_english_aapl_simple_hold_2024
+    prompt: "ok can you just test if apple, like simply holding it, from jan 2024 through dec 2024 did better than the market"
+    user_language: en
+    ui_language: en
+    expected:
+      intent: ["backtest_execution", "strategy_drafting"]
+      capability_verdict: executable
+      assets: ["AAPL"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]
+
+  - id: messy_english_company_name_multi_asset_issue_142
+    prompt: "try a plain hold test for target, walmart, and costco from jan 2024 through dec 2024"
+    user_language: en
+    ui_language: en
+    expected:
+      intent: ["backtest_execution", "strategy_drafting"]
+      capability_verdict: executable
+      assets: ["TGT", "WMT", "COST"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]
+    expected_fail:
+      issue: "#142"
+      reason: "Current integration can drop company-name assets before confirmation."
+      allowed_failures:
+        - "capability_verdict:"
+        - "assets:"
+        - "stage_outcomes:"

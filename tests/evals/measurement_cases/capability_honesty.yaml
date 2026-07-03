@@ -1,0 +1,19 @@
+category: capability_honesty
+cases:
+  - id: capability_honesty_options_straddle_tsla
+    prompt: "can you run an options straddle on TSLA from 2024-01-01 through 2024-12-31?"
+    user_language: en
+    ui_language: en
+    expected:
+      intent: unsupported_or_out_of_scope
+      capability_verdict: unsupported
+      assets: ["TSLA"]
+      asset_class: equity
+      strategy_type: null
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      stage_outcomes: ["needs_clarification", "await_user_reply"]
+    prose_judge:
+      criteria: ["honesty", "no_raw_runtime_error"]
