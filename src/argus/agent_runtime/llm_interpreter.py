@@ -30,6 +30,7 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: 
     _apply_resolved_edit_to_draft,
     _current_artifact_asset_universe,
     _current_artifact_strategy,
+    _edit_plan_reshapes_non_recurring_strategy,
     _normalized_ticker_symbol,
     _request_targets_pending_artifact_assumption_edit,
     _response_from_artifact_assumption_edit_plan,
@@ -2563,10 +2564,14 @@ async def _ready_active_artifact_edit_planned_response(
         request=request,
     ):
         return None
-    if (
-        response.semantic_turn_act == "result_followup"
-        and not _request_has_planner_edit_candidate_after_model_failure(request)
+    if response.semantic_turn_act == "result_followup" and (
+        _selected_requested_field_base(request) == "refinement"
+        or not _request_has_planner_edit_candidate_after_model_failure(request)
     ):
+        # A refine prompt sits right on a result card, so result fact
+        # questions ("how did it do in 2022?") are common there; the
+        # interpreter's own result classification must keep its routing
+        # instead of being overridden by a planned edit confirmation.
         return None
     if _active_artifact_asset_universe_operation_needs_planner(
         response=response,
@@ -3288,6 +3293,16 @@ async def _plan_pending_artifact_assumption_edit(
     )
     if plan is None:
         return None
+    if _selected_requested_field_base(request) == "refinement":
+        # The refine prompt invites reshapes the edit-operation set cannot
+        # express; the online guard reads the interpreter response, which the
+        # model-failure paths never have, so the plan itself is checked here.
+        prior = _current_artifact_strategy(request)
+        if _edit_plan_reshapes_non_recurring_strategy(
+            plan,
+            prior_strategy_type=prior.strategy_type if prior is not None else None,
+        ):
+            return None
     resolver = _asset_edit_symbol_resolver(_resolve_asset_candidate)
     return _response_from_artifact_assumption_edit_plan(
         plan=plan, request=request, asset_symbol_resolver=resolver

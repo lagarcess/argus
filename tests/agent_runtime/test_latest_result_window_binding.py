@@ -256,3 +256,49 @@ def test_same_period_reference_without_result_still_asks_for_dates() -> None:
     bound = _response_with_latest_result_window_bound(response, request=request)
 
     assert bound.candidate_strategy_draft.date_range is None
+
+
+def test_pending_gap_fill_ignores_boolean_recurring_contribution() -> None:
+    """A JSON boolean in the pending extra_parameters must not be coerced
+    into a $1.00 recurring contribution (bool is an int subclass)."""
+
+    from argus.agent_runtime.interpreter.date_window_repair import (
+        _draft_with_pending_strategy_gaps_filled,
+    )
+    from argus.agent_runtime.stages.interpret import InterpretationRequest
+
+    pending = StrategySummary(
+        strategy_type="dca_accumulation",
+        asset_universe=["AAPL"],
+        extra_parameters={"recurring_contribution": True},
+    )
+    request = InterpretationRequest(
+        current_user_message="same period as the last test",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="backtest_execution",
+            completed=False,
+            pending_strategy_summary=pending,
+        ),
+        selected_thread_metadata={},
+        user=UserState(user_id="u1"),
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User answered the pending date question.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="same period as the last test",
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    filled = _draft_with_pending_strategy_gaps_filled(
+        response.candidate_strategy_draft,
+        response=response,
+        request=request,
+    )
+
+    assert filled.recurring_contribution is None
+    assert "recurring_contribution" not in (filled.field_provenance or {})

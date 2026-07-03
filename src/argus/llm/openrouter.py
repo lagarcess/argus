@@ -926,19 +926,24 @@ def _json_content_without_code_fences(content: str) -> str:
     """Strip a markdown code fence around a JSON body, if present.
 
     Schema-in-prompt providers occasionally fence their JSON despite
-    instructions; strict structured outputs never do, so this is a no-op for
-    them.
+    instructions — sometimes on one line ("```json {...}```") or with prose
+    after the closing fence; strict structured outputs never fence, so this
+    is a no-op for them.
     """
 
     text = content.strip()
     if not text.startswith("```"):
         return text
-    first_newline = text.find("\n")
-    if first_newline == -1:
-        return text
-    text = text[first_newline + 1 :].rstrip()
-    if text.endswith("```"):
-        text = text[: -len("```")]
+    text = text[len("```") :]
+    info_end = 0
+    while info_end < len(text) and (
+        text[info_end].isalnum() or text[info_end] in "_-"
+    ):
+        info_end += 1
+    text = text[info_end:]
+    closing = text.rfind("```")
+    if closing != -1:
+        text = text[:closing]
     return text.strip()
 
 

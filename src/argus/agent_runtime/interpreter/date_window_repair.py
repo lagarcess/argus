@@ -16,6 +16,7 @@ from argus.agent_runtime.interpreter.run_field_audits import (
 )
 from argus.agent_runtime.interpreter.shared import (
     _date_range_from_intent_or_bounded_evidence,
+    _date_window_intent_bound_to_latest_result,
     _draft_has_semantic_date_window_evidence,
     _draft_semantic_evidence_spans,
     _field_path_base,
@@ -29,7 +30,6 @@ from argus.agent_runtime.interpreter.shared import (
 )
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedDateWindowExtraction,
-    LLMDateRangeIntent,
     LLMInterpretationResponse,
     LLMStrategyDraft,
 )
@@ -270,8 +270,10 @@ def _draft_with_pending_strategy_gaps_filled(
         updates["capital_amount"] = pending.capital_amount
         provenance.setdefault("capital_amount", "prior_strategy_state")
     pending_contribution = pending.extra_parameters.get("recurring_contribution")
-    if draft.recurring_contribution is None and isinstance(
-        pending_contribution, (int, float)
+    if (
+        draft.recurring_contribution is None
+        and isinstance(pending_contribution, (int, float))
+        and not isinstance(pending_contribution, bool)
     ):
         updates["recurring_contribution"] = float(pending_contribution)
         provenance.setdefault("recurring_contribution", "prior_strategy_state")
@@ -318,12 +320,9 @@ def _response_with_latest_result_window_bound(
     bound_draft = draft.model_copy(
         update={
             "date_range": dict(window),
-            "date_range_intent": LLMDateRangeIntent(
-                kind="explicit_range",
-                start=window["start"],
-                end=window["end"],
-                confidence=intent.confidence,
-                evidence=intent.evidence,
+            "date_range_intent": _date_window_intent_bound_to_latest_result(
+                intent,
+                latest_result_window=window,
             ),
         }
     )
@@ -494,12 +493,9 @@ def _response_from_focused_date_window_extraction(
             window = _latest_result_date_window(request)
             if window is None:
                 return None
-            draft.date_range_intent = LLMDateRangeIntent(
-                kind="explicit_range",
-                start=window["start"],
-                end=window["end"],
-                confidence=extraction.date_range_intent.confidence,
-                evidence=extraction.date_range_intent.evidence,
+            draft.date_range_intent = _date_window_intent_bound_to_latest_result(
+                extraction.date_range_intent,
+                latest_result_window=window,
             )
             draft.date_range = dict(window)
             changed = True

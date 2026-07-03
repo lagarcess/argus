@@ -14,7 +14,9 @@ from argus.agent_runtime.artifact_edit_planner import (
 )
 from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
 from argus.agent_runtime.interpreter.shared import (
+    _date_window_intent_bound_to_latest_result,
     _field_path_base,
+    _latest_result_date_window,
     _supported_dca_cadence_value,
 )
 from argus.agent_runtime.llm_interpreter_types import (
@@ -28,6 +30,7 @@ from argus.agent_runtime.stages.artifact_context import (
 )
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import StrategySummary
+from argus.agent_runtime.strategy_contract import canonical_strategy_type
 from argus.nlp.natural_time import resolve_date_range_intent
 
 ResolveAssetCandidate = Callable[..., AssetResolution | None]
@@ -137,6 +140,7 @@ def _apply_resolved_edit_to_draft(
     field_provenance: dict[str, str],
     extra_parameters: dict[str, Any],
     allow_indicator_parameters: bool = False,
+    latest_result_window: dict[str, str] | None = None,
 ) -> None:
     if resolved.asset_universe is not None:
         draft.asset_universe = list(resolved.asset_universe)
@@ -147,9 +151,17 @@ def _apply_resolved_edit_to_draft(
         draft.comparison_baseline = resolved.comparison_baseline
         field_provenance["comparison_baseline"] = "explicit_user"
     if resolved.date_window is not None:
-        intent_resolution = resolve_date_range_intent(resolved.date_window)
+        date_window_intent = _date_window_intent_bound_to_latest_result(
+            resolved.date_window,
+            latest_result_window=latest_result_window,
+        )
+        intent_resolution = (
+            resolve_date_range_intent(date_window_intent)
+            if date_window_intent is not None
+            else None
+        )
         if intent_resolution is not None:
-            draft.date_range_intent = resolved.date_window
+            draft.date_range_intent = date_window_intent
             draft.date_range = intent_resolution.payload
             field_provenance["date_range"] = "explicit_user"
     if resolved.initial_capital is not None:
@@ -246,6 +258,32 @@ def _apply_legacy_flat_edit_fields(
         field_provenance["slippage"] = "explicit_user"
 
 
+def _edit_plan_reshapes_non_recurring_strategy(
+    plan: ArtifactAssumptionEditPlan,
+    *,
+    prior_strategy_type: Any,
+) -> bool:
+    """Recurring-buy plan fields aimed at a non-recurring strategy are a
+    reshape ("make it recurring buys instead"), not an assumption edit.
+
+    The edit-operation set cannot change strategy_type, so applying such a
+    plan would silently keep the old strategy; callers must step aside and
+    let a reshape-capable interpretation path handle the turn.
+    """
+
+    proposes_recurring_fields = (
+        plan.cadence is not None
+        or plan.recurring_contribution_amount is not None
+        or any(
+            operation.target in {"cadence", "recurring_contribution"}
+            for operation in plan.operations
+        )
+    )
+    if not proposes_recurring_fields:
+        return False
+    return canonical_strategy_type(prior_strategy_type) != "dca_accumulation"
+
+
 def _current_artifact_uses_rsi(request: InterpretationRequest) -> bool:
     strategy = _current_artifact_strategy(request)
     if strategy is None:
@@ -284,6 +322,7 @@ def _response_from_artifact_assumption_edit_plan(
             field_provenance=field_provenance,
             extra_parameters=extra_parameters,
             allow_indicator_parameters=allow_indicator_parameters,
+            latest_result_window=_latest_result_date_window(request),
         )
     else:
         _apply_legacy_flat_edit_fields(

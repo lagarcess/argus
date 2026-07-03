@@ -152,6 +152,14 @@ def _response_underfills_active_artifact_assumption_edit(
         "retry_failed_action",
     }:
         return False
+    if _refinement_reply_needs_full_interpretation(
+        response=response,
+        request=request,
+    ):
+        # Reshapes and rule tweaks are full-interpretation refine replies,
+        # not assumption edits; treating them as underfilled would reject
+        # the very response the planner path steps aside for.
+        return False
     draft = response.candidate_strategy_draft
     if _llm_strategy_draft_has_supported_artifact_assumption_edit(draft):
         return False

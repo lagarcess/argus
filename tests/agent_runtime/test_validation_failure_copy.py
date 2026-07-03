@@ -54,6 +54,20 @@ def test_user_phrase_raw_value_still_renders_as_subject() -> None:
     assert "MACD golden cross" in prose
 
 
+def test_uppercase_underscore_symbol_still_renders_as_subject() -> None:
+    """User-typed pair symbols such as BTC_USDT are their own words, not
+    internal reason codes, and must keep rendering in the clarifier prose."""
+
+    prose = _unsupported_recovery_fallback(
+        language="en",
+        response_intent=_response_intent_with_raw_value("BTC_USDT"),
+        strategy=StrategySummary(asset_universe=["NVDA"]),
+    )
+
+    assert prose is not None
+    assert "BTC_USDT" in prose
+
+
 def test_chronological_validation_failure_reasks_dates_not_strategy_rule() -> None:
     failure = _launch_validation_failure("invalid_chronological_date_range")
 
