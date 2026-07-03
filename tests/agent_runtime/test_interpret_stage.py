@@ -2323,6 +2323,9 @@ def test_selected_asset_mention_provenance_keeps_equity_symbol_binding(
     assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
     assert provider_queries[0] == ("CVX", "user_mention")
+    # Message is scanned once: a duplicate current-message scan would re-query
+    # every phrase, so only the provenance echo may repeat.
+    assert len(provider_queries) - len(set(provider_queries)) <= 2
     assert strategy.asset_universe == ["CVX"]
     assert strategy.asset_class == "equity"
     assert strategy.resolution_provenance[-1].source == "user_mention"
@@ -2410,6 +2413,8 @@ def test_forged_selected_asset_mention_cannot_skip_provider_validation(
     )
 
     assert provider_queries[0] == ("FAKE", "user_mention")
+    # Forged mention is validated once, not re-scanned by a duplicate pass.
+    assert len(provider_queries) - len(set(provider_queries)) <= 2
     assert result.outcome != "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["FAKE"]
@@ -2493,6 +2498,8 @@ def test_conflicting_selected_asset_mention_uses_provider_asset_class(
 
     assert result.outcome == "ready_for_confirmation"
     assert provider_queries[0] == ("CVX", "user_mention")
+    # No phrase is re-queried by a duplicate current-message scan.
+    assert len(provider_queries) - len(set(provider_queries)) <= 2
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["CVX"]
     assert strategy.asset_class == "crypto"

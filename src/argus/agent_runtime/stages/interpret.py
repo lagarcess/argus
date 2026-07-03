@@ -21,6 +21,7 @@ from argus.agent_runtime.artifacts.strategy_edits import (
     apply_artifact_patch,
 )
 from argus.agent_runtime.asset_text_grounding import (
+    ResolveAssetCandidate,
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
     provider_ticker_mentions_from_text,
@@ -675,6 +676,7 @@ async def _stage_result_from_interpretation(
             )
         )
         benchmark_reason_codes.extend(unstated_benchmark_reason_codes)
+    current_message_asset_resolver = _memoized_current_message_asset_resolver()
     current_message_asset_grounding_reason_codes: list[str] = []
     if (
         expects_strategy_route
@@ -689,6 +691,7 @@ async def _stage_result_from_interpretation(
             _strategy_with_current_message_asset_grounding(
                 strategy=strategy,
                 current_user_message=state.current_user_message,
+                resolve_candidate=current_message_asset_resolver,
             )
         )
     if expects_strategy_route:
@@ -796,11 +799,7 @@ async def _stage_result_from_interpretation(
             _ambiguous_asset_fields_from_current_message(
                 strategy=strategy,
                 current_user_message=state.current_user_message,
-                resolve_candidate=lambda query: _resolve_asset_candidate_safely(
-                    query,
-                    field="asset_universe[0]",
-                    source="user_mention",
-                ),
+                resolve_candidate=current_message_asset_resolver,
             )
         )
     if integrity_report.evidence.normalized_date_range is not None:
@@ -826,12 +825,24 @@ async def _stage_result_from_interpretation(
             )
         )
         if current_message_ambiguous_asset_fields:
-            ambiguous_fields = _dedupe_ambiguous_fields(
-                [
-                    *ambiguous_fields,
-                    *current_message_ambiguous_asset_fields,
-                ]
-            )
+            # Skip the current-message asset ambiguity when that slot is already
+            # contested: exact-key dedupe misses it (different raw_value/reason_code)
+            # and would surface a duplicate prompt for the same slot.
+            contested_field_bases = {
+                _field_base(field.field_name) for field in ambiguous_fields
+            }
+            novel_asset_fields = [
+                field
+                for field in current_message_ambiguous_asset_fields
+                if _field_base(field.field_name) not in contested_field_bases
+            ]
+            if novel_asset_fields:
+                ambiguous_fields = _dedupe_ambiguous_fields(
+                    [
+                        *ambiguous_fields,
+                        *novel_asset_fields,
+                    ]
+                )
         unsupported_constraints = _dedupe_unsupported_constraints(
             [
                 *unsupported_constraints,
@@ -2707,23 +2718,45 @@ def _canonicalized_strategy(
     return updated
 
 
+def _resolve_current_message_asset_candidate(query: str) -> AssetResolution | None:
+    return _resolve_asset_candidate_safely(
+        query,
+        field="asset_universe[0]",
+        source="user_mention",
+    )
+
+
+def _memoized_current_message_asset_resolver() -> ResolveAssetCandidate:
+    """Resolve each candidate phrase once per turn.
+
+    Grounding and the ambiguous-asset scan walk the same phrases; a shared cache
+    keeps one provider lookup per phrase instead of re-querying the catalog twice.
+    """
+
+    cache: dict[str, AssetResolution | None] = {}
+
+    def _resolve(query: str) -> AssetResolution | None:
+        if query not in cache:
+            cache[query] = _resolve_current_message_asset_candidate(query)
+        return cache[query]
+
+    return _resolve
+
+
 def _strategy_with_current_message_asset_grounding(
     *,
     strategy: StrategySummary,
     current_user_message: str,
+    resolve_candidate: ResolveAssetCandidate | None = None,
 ) -> tuple[StrategySummary, list[str]]:
     if not current_user_message.strip():
         return strategy, []
+    _resolve_candidate = resolve_candidate or _resolve_current_message_asset_candidate
     if not strategy.asset_universe:
         return _strategy_with_missing_asset_grounded_from_current_message(
             strategy=strategy,
             current_user_message=current_user_message,
-        )
-    def _resolve_candidate(query: str) -> AssetResolution | None:
-        return _resolve_asset_candidate_safely(
-            query,
-            field="asset_universe[0]",
-            source="user_mention",
+            resolve_candidate=_resolve_candidate,
         )
 
     current_symbols = [
@@ -2911,13 +2944,9 @@ def _strategy_with_missing_asset_grounded_from_current_message(
     *,
     strategy: StrategySummary,
     current_user_message: str,
+    resolve_candidate: ResolveAssetCandidate | None = None,
 ) -> tuple[StrategySummary, list[str]]:
-    def _resolve_candidate(query: str) -> AssetResolution | None:
-        return _resolve_asset_candidate_safely(
-            query,
-            field="asset_universe[0]",
-            source="user_mention",
-        )
+    _resolve_candidate = resolve_candidate or _resolve_current_message_asset_candidate
 
     benchmark_symbol = _normalized_symbol(strategy.comparison_baseline)
     mentions = grounded_asset_mentions_from_text(
