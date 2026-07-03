@@ -107,9 +107,9 @@ async def test_refine_reply_routes_to_edit_planner_and_applies_asset_edit(
 ) -> None:
     """A post-refine NL edit must reach the planner, not rebuild the old card.
 
-    Live failure: the general interpreter classified the reply as
-    `refine_current_idea` and rematerialized the AAPL/MSFT card with the NVDA
-    edit silently dropped.
+    Without planner routing, the general interpreter classifies the reply
+    as `refine_current_idea` and rematerializes the prior card, silently
+    dropping the asset edit (#141).
     """
 
     from argus.agent_runtime import artifact_edit_planner
@@ -187,8 +187,8 @@ async def test_refine_reply_reaches_edit_planner_when_general_model_fails(
     """When the general interpreter fails, the refine reply must still get the
     focused planner attempt instead of falling to generic recovery copy.
 
-    Live failure: both general-interpretation model candidates failed and the
-    turn ended in "could not safely apply that change" recovery prose.
+    Otherwise a turn where every candidate fails lands in "could not
+    safely apply that change" recovery prose instead of the typed edit (#141).
     """
 
     from argus.agent_runtime import artifact_edit_planner
@@ -253,10 +253,9 @@ class _RecordingInterpreter:
 def test_refine_edit_plans_offline_when_interpreter_unavailable(
     monkeypatch,
 ) -> None:
-    """Live failure mode: every interpretation model failed and the refine
-    reply died in generic "could not safely apply" recovery copy. The offline
-    planner must serve refine pending drafts the way it serves confirmation
-    cards.
+    """With every interpretation model down, the offline planner must serve
+    refine pending drafts the way it serves confirmation cards; otherwise the
+    reply lands in generic "could not safely apply" recovery copy (#141).
     """
 
     from argus.agent_runtime import artifact_edit_planner
@@ -391,7 +390,7 @@ async def test_refine_date_window_reply_routes_to_edit_planner(
     """A refine reply that only changes the window ("change the date range to
     2021") must reach the planner: EditOperation supports date_window, so
     date-only evidence is planner-expressible even though it is not an
-    assumption-field edit (PR #148 review)."""
+    assumption-field edit."""
 
     from argus.agent_runtime import artifact_edit_planner
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -486,7 +485,7 @@ async def test_refine_cadence_reply_routes_to_edit_planner(
     monkeypatch,
 ) -> None:
     """"Make it weekly" after Refine idea is a planner-expressible cadence
-    edit and must not fall through to full interpretation (PR #148 review)."""
+    edit and must not fall through to full interpretation."""
 
     from argus.agent_runtime import artifact_edit_planner
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -681,9 +680,9 @@ def test_refine_same_period_offline_plan_binds_latest_result_window(
 
     async def plan_stub(**kwargs):
         del kwargs
-        # A date-only plan is the sharpest regression: with the reference
-        # unresolved it applied nothing, returned None, and the turn died in
-        # generic recovery copy.
+        # A date-only plan is the sharpest case: if the reference stays
+        # unresolved the applier produces nothing, the plan collapses to None,
+        # and the turn falls to generic recovery copy.
         return artifact_edit_planner.ArtifactAssumptionEditPlan(
             outcome="ready_to_confirm",
             user_goal_summary="User reused the latest test window.",
