@@ -499,16 +499,17 @@ LANES BY GATE (the board agents execute from):
   `tests/evals/README.md` + the standing release discipline below. The
   landing gate is LIVE — runtime-behavior PRs run the live suite pre-merge
   from now on.
-  (2) **Product events**: wire the BUILT non-emitting
-  `argus_observability_event/v1` envelope to PostHog. Founder prerequisite
-  before this slice starts: PostHog project + API key provisioned and
-  redaction-tier sign-off (memo 15.5 posture).
-  (3) **Append-only CostLedger**: the only schema-touching slice — reversible,
-  minimal migration with docs updated in the same slice; goes last so it is
-  informed by the events slice.
-  The order is leverage-driven, not a hard chain: if PostHog provisioning
-  stalls slice 2, slice 3 may proceed. Emission hooks + persistence only; no
-  interpret logic. Weave in early; do not gate the loop on it.
+  (2) **Product events** — MERGED (PR #144): server-side-only PostHog capture
+  through the sanitizer; US Cloud region recorded; frontend key stays
+  present-but-empty per the launch runbook. Review fixes landed: off-loop
+  emission (no event-loop stalls), payload built inside the guard, loud
+  unrecognized-region warning, real `privacy_mode` emission.
+  (3) **Append-only CostLedger** — MERGED (PR #145): reversible migration with
+  structural append-only enforcement (revoke before grant), correlation ids,
+  eval-run metering, shared entry normalizer; OpenRouter usage/cost parsers
+  extracted to `openrouter_usage.py` to satisfy the merged-state modularity
+  budget. Apply the migration to dev/prod Supabase at next deploy.
+  B3 lane COMPLETE — harness gates merges, events flow, spend is metered.
 
 - **B4 Recovery-copy retirement** (= P2.4 remainder). READY-SPEC; BUILD is
   BLOCKED(B3 eval harness) so English/Spanish parity is proven by eval, not
@@ -536,6 +537,25 @@ LANES BY GATE (the board agents execute from):
 code): sanitized public excerpt design, voice-to-composer STT prototype, thin
 iOS shell proof, broker/export packet design, security/privacy review,
 monetization/entitlement architecture.
+
+**Integration health (filed during #148 review verification; triaged
+2026-07-03):**
+
+- **#149** — result-followup timeout recovery is dead code on Python 3.10,
+  the version CI and deploy pin (`asyncio.TimeoutError` vs builtin mismatch;
+  aliases only on 3.11+). One-line fix; the failing test already exists.
+  Quick standalone PR; verify on a 3.10 venv.
+- **#150** — three agent_runtime tests fail at the integration fork point on
+  every Python (date-window audit drift x2, stale provenance x1) and the
+  curated CI file list never runs them. Two parts: the behavior bisect+fix is
+  spine-adjacent (queue behind #153); the systemic fix — a full-suite or
+  nightly CI job so the fixed file list stops hiding drift — is parallel-safe
+  infra, start anytime.
+- **#151** — the last surviving #141 corner: an executable-complete draft
+  plus model readiness prose never materializes the confirmation card, so
+  bare affirmations re-confirm verbally (violates "canonical payload and UI
+  prose disagree"). Spine story: queue immediately after #153 lands, before
+  or alongside A1b. RECOMMENDED addition to the `main` promotion blockers.
 
 **Standing release discipline** (blocks `main`, not a lane): rerun the exact
 clean-checkout suite gate (issue #134 / PR #135) before any branch or `main`
