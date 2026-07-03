@@ -1269,6 +1269,8 @@ async def chat_stream(
                     )
                     receipt_message_id = assistant_message.id
                 receipt_metadata = {
+                    "request_id": request.state.request_id,
+                    "source": "api_turn",
                     "stage_outcome": stage_status,
                     "conversation_mode": metadata.get("conversation_mode"),
                 }
@@ -1363,6 +1365,8 @@ async def chat_stream(
             )
             receipt_message_id = assistant_message.id
             receipt_metadata = {
+                "request_id": request.state.request_id,
+                "source": "api_turn",
                 "stage_outcome": "agent_runtime_failure",
                 "conversation_mode": "recovery",
             }

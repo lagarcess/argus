@@ -17,6 +17,14 @@ from langchain_openrouter import ChatOpenRouter
 from loguru import logger
 from pydantic import BaseModel
 
+from argus.llm.openrouter_usage import (
+    merge_openrouter_token_usage,
+    normalize_openrouter_token_usage,
+    normalize_openrouter_usage_cost,
+    openrouter_token_usage_from_payload,
+    openrouter_usage_cost_from_payload,
+)
+
 load_dotenv()
 
 OpenRouterTask = Literal[
@@ -61,6 +69,7 @@ class OpenRouterRouteReceipt:
     failure_mode: str | None = None
     fallback_used: bool = False
     token_usage: dict[str, int] | None = None
+    usage_cost_usd: float | None = None
     context_packet_ids: list[str] = field(default_factory=list)
     created_at: str = ""
 
@@ -77,6 +86,7 @@ class OpenRouterRouteReceipt:
             "failure_mode": self.failure_mode,
             "fallback_used": self.fallback_used,
             "token_usage": self.token_usage,
+            "usage_cost_usd": self.usage_cost_usd,
             "context_packet_ids": list(self.context_packet_ids),
             "created_at": self.created_at,
         }
@@ -341,6 +351,7 @@ def record_openrouter_route_receipt(
     outcome: Literal["succeeded", "failed", "skipped"],
     failure_mode: str | None = None,
     token_usage: dict[str, int] | None = None,
+    usage_cost_usd: float | None = None,
     context_packet_ids: list[str] | None = None,
 ) -> OpenRouterRouteReceipt:
     tier = openrouter_model_tier_for_task(task)
@@ -357,6 +368,7 @@ def record_openrouter_route_receipt(
         outcome=outcome,
         failure_mode=failure_mode,
         token_usage=normalize_openrouter_token_usage(token_usage),
+        usage_cost_usd=normalize_openrouter_usage_cost(usage_cost_usd),
         context_packet_ids=_normalized_context_packet_ids(context_packet_ids),
         fallback_used=bool(
             fallback_model and resolved_model == fallback_model and resolved_model != ""
@@ -379,6 +391,7 @@ def record_openrouter_route_receipt(
         latency_ms=receipt.latency_ms,
         fallback_used=receipt.fallback_used,
         token_usage=receipt.token_usage,
+        usage_cost_usd=receipt.usage_cost_usd,
         context_packet_ids=receipt.context_packet_ids,
     ).info("OpenRouter route receipt")
     return receipt
@@ -545,6 +558,7 @@ async def invoke_openrouter_json_schema(
             latency_ms=_elapsed_ms(attempt_started_at),
             outcome="succeeded",
             token_usage=openrouter_token_usage_from_payload(data),
+            usage_cost_usd=openrouter_usage_cost_from_payload(data),
             context_packet_ids=context_packet_ids,
         )
         return result
@@ -637,6 +651,7 @@ async def invoke_openrouter_chat_completion(
 
         content = _openrouter_message_content(data).strip()
         token_usage = openrouter_token_usage_from_payload(data)
+        usage_cost_usd = openrouter_usage_cost_from_payload(data)
         if not content:
             record_openrouter_route_receipt(
                 task=task,
@@ -647,6 +662,7 @@ async def invoke_openrouter_chat_completion(
                 outcome="failed",
                 failure_mode="empty_response",
                 token_usage=token_usage,
+                usage_cost_usd=usage_cost_usd,
                 context_packet_ids=context_packet_ids,
             )
             if index + 1 < len(candidate_models):
@@ -660,6 +676,7 @@ async def invoke_openrouter_chat_completion(
             latency_ms=_elapsed_ms(attempt_started_at),
             outcome="succeeded",
             token_usage=token_usage,
+            usage_cost_usd=usage_cost_usd,
             context_packet_ids=context_packet_ids,
         )
         return content
@@ -765,67 +782,13 @@ def invoke_openrouter_json_schema_sync(
             latency_ms=_elapsed_ms(attempt_started_at),
             outcome="succeeded",
             token_usage=openrouter_token_usage_from_payload(data),
+            usage_cost_usd=openrouter_usage_cost_from_payload(data),
             context_packet_ids=context_packet_ids,
         )
         return result
     if last_exc is not None:
         raise last_exc
     return None
-
-
-def openrouter_token_usage_from_payload(data: dict[str, object]) -> dict[str, int] | None:
-    usage = data.get("usage")
-    return normalize_openrouter_token_usage(usage if isinstance(usage, dict) else None)
-
-
-def openrouter_token_usage_from_message(message: object) -> dict[str, int] | None:
-    usage_metadata = getattr(message, "usage_metadata", None)
-    normalized = normalize_openrouter_token_usage(
-        usage_metadata if isinstance(usage_metadata, dict) else None
-    )
-    if normalized is not None:
-        return normalized
-    response_metadata = getattr(message, "response_metadata", None)
-    if not isinstance(response_metadata, dict):
-        return None
-    for key in ("token_usage", "usage"):
-        value = response_metadata.get(key)
-        normalized = normalize_openrouter_token_usage(
-            value if isinstance(value, dict) else None
-        )
-        if normalized is not None:
-            return normalized
-    return None
-
-
-def merge_openrouter_token_usage(
-    current: dict[str, int] | None,
-    incoming: dict[str, int] | None,
-) -> dict[str, int] | None:
-    if current is None:
-        return dict(incoming) if incoming is not None else None
-    if incoming is None:
-        return dict(current)
-    merged = dict(current)
-    for key, value in incoming.items():
-        merged[key] = value
-    return merged
-
-
-def normalize_openrouter_token_usage(
-    value: dict[str, object] | None,
-) -> dict[str, int] | None:
-    if not value:
-        return None
-    normalized: dict[str, int] = {}
-    for key, raw in value.items():
-        if not isinstance(key, str) or isinstance(raw, bool):
-            continue
-        if isinstance(raw, int):
-            normalized[key] = raw
-        elif isinstance(raw, float) and raw.is_integer():
-            normalized[key] = int(raw)
-    return normalized or None
 
 
 def _normalized_context_packet_ids(values: list[str] | None) -> list[str]:

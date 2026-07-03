@@ -183,6 +183,56 @@ def test_context_packet_and_route_receipt_persistence_payloads_are_explicit():
     assert receipt_row["context_packet_ids"] == ["packet-1"]
 
 
+def test_cost_ledger_entry_persistence_payload_is_explicit() -> None:
+    client = _RecordingSupabaseClient()
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.create_cost_ledger_entry(
+        entry={
+            "source": "api_turn",
+            "service": "openrouter",
+            "provider": "openrouter",
+            "model": "structured/primary",
+            "feature_area": "chat_runtime",
+            "task": "interpretation",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "message_id": "message-1",
+            "backtest_run_id": None,
+            "backtest_job_id": None,
+            "route_receipt_id": "receipt-1",
+            "request_id": "req-1",
+            "correlation_id": "req-1:conversation-1:message-1",
+            "usage_metadata": {
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "total_tokens": 15,
+                "usage_cost_usd": 0.00031,
+            },
+            "input_tokens": 10,
+            "output_tokens": 5,
+            "total_tokens": 15,
+            "billable_unit": "token",
+            "billable_quantity": 15,
+            "cost_amount": 0.00031,
+            "cost_currency": "USD",
+            "cost_source": "provider_reported",
+            "latency_ms": 123,
+            "status": "succeeded",
+            "metadata": {"source": "api_turn"},
+            "occurred_at": "2026-07-02T12:00:00+00:00",
+        }
+    )
+
+    payload = client.inserted_by_table["cost_ledger_entries"]
+    assert row["correlation_id"] == "req-1:conversation-1:message-1"
+    assert payload["provider"] == "openrouter"
+    assert payload["model"] == "structured/primary"
+    assert payload["total_tokens"] == 15
+    assert payload["cost_amount"] == 0.00031
+    assert payload["route_receipt_id"] == "receipt-1"
+
+
 def _completed_run(
     *,
     conversation_id: str | None = "conversation-1",

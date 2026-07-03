@@ -29,6 +29,7 @@ from argus.api.schemas import (
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
+from argus.observability.cost_ledger import normalize_cost_ledger_entry
 from supabase import Client, ClientOptions, create_client
 
 
@@ -1268,6 +1269,12 @@ class SupabaseGateway:
             "created_at": receipt.get("created_at") or _now_iso(),
         }
         created = self.client.table("route_receipts").insert(payload).execute()
+        return dict(_row_one(created) or {})
+
+    def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
+        payload = normalize_cost_ledger_entry(entry)
+        payload["occurred_at"] = payload["occurred_at"] or _now_iso()
+        created = self.client.table("cost_ledger_entries").insert(payload).execute()
         return dict(_row_one(created) or {})
 
     def health_check(self) -> dict[str, Any]:
