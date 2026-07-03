@@ -89,4 +89,11 @@ create index if not exists idx_cost_ledger_entries_source_created
 
 alter table public.cost_ledger_entries enable row level security;
 
+-- Enforce append-only structurally: strip any privileges inherited from
+-- Supabase default-privilege grants (which target service_role on new public
+-- tables), then grant back insert + select only. Without the revoke, a prior
+-- `grant all`/default-privilege grant would leave update/delete reachable for
+-- service_role and the append-only guarantee would be convention, not enforced.
+revoke all on table public.cost_ledger_entries from anon, authenticated, service_role;
+
 grant insert, select on table public.cost_ledger_entries to service_role;

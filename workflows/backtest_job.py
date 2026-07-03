@@ -10,6 +10,10 @@ from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID
 
 from argus.api.schemas import BacktestRun
+from argus.observability.cost_ledger import (
+    normalize_cost_ledger_entry,
+    persist_openrouter_cost_ledger_entries,
+)
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -385,10 +389,6 @@ def _persist_result_readout_route_receipts(
                 metadata=metadata,
                 receipt=receipt.as_dict(),
             )
-            from argus.observability.cost_ledger import (
-                persist_openrouter_cost_ledger_entries,
-            )
-
             persist_openrouter_cost_ledger_entries(
                 gateway=gateway,
                 receipts=[receipt],
@@ -399,8 +399,15 @@ def _persist_result_readout_route_receipts(
                 backtest_run_id=result_run_id,
                 backtest_job_id=job_id,
                 route_receipt_rows=[created],
-                correlation_id=(
-                    f"workflow:{workflow_run_id}:{job_id}:{result_run_id}"
+                correlation_id=":".join(
+                    part
+                    for part in (
+                        "workflow",
+                        workflow_run_id,
+                        job_id,
+                        result_run_id,
+                    )
+                    if part
                 ),
                 metadata=metadata,
             )
@@ -968,6 +975,10 @@ class PostgresBacktestJobGateway:
     def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
         from psycopg.types.json import Jsonb
 
+        params = normalize_cost_ledger_entry(entry)
+        params["usage_metadata"] = Jsonb(params["usage_metadata"])
+        params["metadata"] = Jsonb(params["metadata"])
+        params["occurred_at"] = params["occurred_at"] or utcnow_iso()
         with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -1036,37 +1047,7 @@ class PostgresBacktestJobGateway:
                     )
                     returning *
                     """,
-                    {
-                        "source": entry["source"],
-                        "service": entry["service"],
-                        "provider": entry["provider"],
-                        "model": entry.get("model"),
-                        "feature_area": entry["feature_area"],
-                        "task": entry.get("task"),
-                        "user_id": entry.get("user_id"),
-                        "conversation_id": entry.get("conversation_id"),
-                        "message_id": entry.get("message_id"),
-                        "backtest_run_id": entry.get("backtest_run_id"),
-                        "backtest_job_id": entry.get("backtest_job_id"),
-                        "route_receipt_id": entry.get("route_receipt_id"),
-                        "request_id": entry.get("request_id"),
-                        "correlation_id": entry["correlation_id"],
-                        "provider_request_id": entry.get("provider_request_id"),
-                        "upstream_id": entry.get("upstream_id"),
-                        "usage_metadata": Jsonb(entry.get("usage_metadata") or {}),
-                        "input_tokens": entry.get("input_tokens"),
-                        "output_tokens": entry.get("output_tokens"),
-                        "total_tokens": entry.get("total_tokens"),
-                        "billable_unit": entry.get("billable_unit") or "unknown",
-                        "billable_quantity": entry.get("billable_quantity"),
-                        "cost_amount": entry.get("cost_amount"),
-                        "cost_currency": entry.get("cost_currency") or "USD",
-                        "cost_source": entry.get("cost_source") or "unavailable",
-                        "latency_ms": entry.get("latency_ms"),
-                        "status": entry.get("status") or "succeeded",
-                        "metadata": Jsonb(entry.get("metadata") or {}),
-                        "occurred_at": entry.get("occurred_at") or utcnow_iso(),
-                    },
+                    params,
                 )
                 row = cur.fetchone()
         return _json_safe(row)

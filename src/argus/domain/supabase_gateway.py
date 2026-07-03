@@ -29,6 +29,7 @@ from argus.api.schemas import (
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
+from argus.observability.cost_ledger import normalize_cost_ledger_entry
 from supabase import Client, ClientOptions, create_client
 
 
@@ -1271,37 +1272,8 @@ class SupabaseGateway:
         return dict(_row_one(created) or {})
 
     def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
-        payload = {
-            "source": entry["source"],
-            "service": entry["service"],
-            "provider": entry["provider"],
-            "model": entry.get("model"),
-            "feature_area": entry["feature_area"],
-            "task": entry.get("task"),
-            "user_id": entry.get("user_id"),
-            "conversation_id": entry.get("conversation_id"),
-            "message_id": entry.get("message_id"),
-            "backtest_run_id": entry.get("backtest_run_id"),
-            "backtest_job_id": entry.get("backtest_job_id"),
-            "route_receipt_id": entry.get("route_receipt_id"),
-            "request_id": entry.get("request_id"),
-            "correlation_id": entry["correlation_id"],
-            "provider_request_id": entry.get("provider_request_id"),
-            "upstream_id": entry.get("upstream_id"),
-            "usage_metadata": entry.get("usage_metadata") or {},
-            "input_tokens": entry.get("input_tokens"),
-            "output_tokens": entry.get("output_tokens"),
-            "total_tokens": entry.get("total_tokens"),
-            "billable_unit": entry.get("billable_unit") or "unknown",
-            "billable_quantity": entry.get("billable_quantity"),
-            "cost_amount": entry.get("cost_amount"),
-            "cost_currency": entry.get("cost_currency") or "USD",
-            "cost_source": entry.get("cost_source") or "unavailable",
-            "latency_ms": entry.get("latency_ms"),
-            "status": entry.get("status") or "succeeded",
-            "metadata": entry.get("metadata") or {},
-            "occurred_at": entry.get("occurred_at") or _now_iso(),
-        }
+        payload = normalize_cost_ledger_entry(entry)
+        payload["occurred_at"] = payload["occurred_at"] or _now_iso()
         created = self.client.table("cost_ledger_entries").insert(payload).execute()
         return dict(_row_one(created) or {})
 

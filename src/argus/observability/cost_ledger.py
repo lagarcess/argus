@@ -145,9 +145,52 @@ def persist_openrouter_cost_ledger_entries(
             )
 
 
+def normalize_cost_ledger_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    """Apply canonical column defaults for one cost ledger row before insert.
+
+    Both persistence backends (the Supabase client gateway and the psycopg
+    workflow gateway) call this so the default values live in one place and the
+    two write paths cannot drift. ``occurred_at`` is left untouched here; each
+    backend fills it with its own timestamp helper when the value is absent.
+    """
+    return {
+        "source": entry["source"],
+        "service": entry["service"],
+        "provider": entry["provider"],
+        "model": entry.get("model"),
+        "feature_area": entry["feature_area"],
+        "task": entry.get("task"),
+        "user_id": entry.get("user_id"),
+        "conversation_id": entry.get("conversation_id"),
+        "message_id": entry.get("message_id"),
+        "backtest_run_id": entry.get("backtest_run_id"),
+        "backtest_job_id": entry.get("backtest_job_id"),
+        "route_receipt_id": entry.get("route_receipt_id"),
+        "request_id": entry.get("request_id"),
+        "correlation_id": entry["correlation_id"],
+        "provider_request_id": entry.get("provider_request_id"),
+        "upstream_id": entry.get("upstream_id"),
+        "usage_metadata": entry.get("usage_metadata") or {},
+        "input_tokens": entry.get("input_tokens"),
+        "output_tokens": entry.get("output_tokens"),
+        "total_tokens": entry.get("total_tokens"),
+        "billable_unit": entry.get("billable_unit") or "unknown",
+        "billable_quantity": entry.get("billable_quantity"),
+        "cost_amount": entry.get("cost_amount"),
+        "cost_currency": entry.get("cost_currency") or "USD",
+        "cost_source": entry.get("cost_source") or "unavailable",
+        "latency_ms": entry.get("latency_ms"),
+        "status": entry.get("status") or "succeeded",
+        "metadata": entry.get("metadata") or {},
+        "occurred_at": entry.get("occurred_at"),
+    }
+
+
 def _first_int(values: dict[str, int], *keys: str) -> int | None:
     for key in keys:
         value = values.get(key)
+        if isinstance(value, bool):
+            continue
         if isinstance(value, int):
             return value
     return None
