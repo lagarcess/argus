@@ -1,4 +1,4 @@
-import type { HistoryItem, SearchItem } from "./argus-api";
+import type { HistoryItem, SearchItem, SearchLedgerGroup } from "./argus-api";
 
 export type CommandPaletteDisplayItem = {
   id: string;
@@ -20,6 +20,13 @@ export type CommandPalettePreviewField = {
   labelKey: string;
   labelFallback: string;
   value: string;
+};
+
+export type CommandPaletteLedgerDisplayGroup = {
+  id: string;
+  decisionState: string;
+  count: number;
+  items: CommandPaletteDisplayItem[];
 };
 
 export type CommandPaletteItemCopy = {
@@ -88,6 +95,21 @@ export function commandPaletteSelectedPreview(
     return previewItem;
   }
   return displayItems[0] ?? null;
+}
+
+export function commandPaletteGroupsByLedgerState(
+  items: readonly CommandPaletteDisplayItem[],
+  ledgerGroups: readonly SearchLedgerGroup[],
+): CommandPaletteLedgerDisplayGroup[] {
+  return ledgerGroups.map((group) => ({
+    id: `ledger:${group.decision_state}`,
+    decisionState: group.decision_state,
+    count: group.count,
+    items: items.filter(
+      (item) =>
+        item.type === "idea" && item.decisionState === group.decision_state,
+    ),
+  }));
 }
 
 export function commandPaletteTypeLabelKey(type: SearchItem["type"]) {

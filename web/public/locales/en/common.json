@@ -658,6 +658,10 @@
     "open_conversation": "Open conversation",
     "open_source_conversation": "Open source conversation",
     "select_preview": "Select a result to preview its details.",
+    "ledger": {
+      "decision_filters": "Decision filters",
+      "no_saved_ideas": "No saved ideas in this state"
+    },
     "status": {
       "archived": "Archived",
       "captured": "Captured",

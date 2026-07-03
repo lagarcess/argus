@@ -307,6 +307,17 @@ export type SearchItem = {
   preview?: Record<string, unknown> | null;
 };
 
+export type SearchLedgerGroup = {
+  decision_state: DecisionState;
+  count: number;
+};
+
+export type SearchResponse = {
+  items: SearchItem[];
+  next_cursor: string | null;
+  ledger_groups?: SearchLedgerGroup[] | null;
+};
+
 // ─── Chat stream event types ──────────────────────────────────────────────────
 
 export type ChatStreamEvent =
@@ -863,14 +874,26 @@ export async function searchGlobal(params: {
   q: string;
   limit?: number;
   cursor?: string;
+  decisionState?: DecisionState | null;
+  includeLedgerGroups?: boolean;
 }) {
-  const { q, limit = 20, cursor } = params;
+  const {
+    q,
+    limit = 20,
+    cursor,
+    decisionState,
+    includeLedgerGroups = false,
+  } = params;
   const searchParams = new URLSearchParams({
     q,
     limit: String(limit),
   });
   if (cursor) searchParams.append("cursor", cursor);
-  return apiFetch<{ items: SearchItem[]; next_cursor: string | null }>(
+  if (decisionState) searchParams.append("decision_state", decisionState);
+  if (includeLedgerGroups) {
+    searchParams.append("include_ledger_groups", "true");
+  }
+  return apiFetch<SearchResponse>(
     `/search?${searchParams.toString()}`,
   );
 }

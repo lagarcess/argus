@@ -432,9 +432,15 @@ class SearchItem(BaseModel):
     preview: dict[str, Any] | None = None
 
 
+class SearchLedgerGroup(BaseModel):
+    decision_state: DecisionState
+    count: int
+
+
 class PaginatedSearch(BaseModel):
     items: list[SearchItem]
     next_cursor: str | None = None
+    ledger_groups: list[SearchLedgerGroup] | None = None
 
 
 ChatActionType = Literal[
