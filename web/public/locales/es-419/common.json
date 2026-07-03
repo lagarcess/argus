@@ -659,8 +659,7 @@
     "open_source_conversation": "Abrir conversación fuente",
     "select_preview": "Selecciona un resultado para ver sus detalles.",
     "ledger": {
-      "title": "Registro de ideas",
-      "all_saved_ideas": "Todas las ideas guardadas",
+      "decision_filters": "Filtros de decisión",
       "no_saved_ideas": "No hay ideas guardadas en este estado"
     },
     "status": {

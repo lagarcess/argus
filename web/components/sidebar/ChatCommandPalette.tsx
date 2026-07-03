@@ -157,6 +157,25 @@ function rawConversationId(item: HistoryItem | SearchItem) {
   return item.conversation_id ?? item.id;
 }
 
+function ledgerDecisionChipClassName(state: DecisionState, selected: boolean) {
+  const base =
+    "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:opacity-60 active:scale-[0.98]";
+  if (!selected) {
+    return `${base} border-black/8 text-black/45 hover:bg-black/[0.03] focus-visible:ring-black/15 dark:border-white/10 dark:text-white/45 dark:hover:bg-white/[0.04] dark:focus-visible:ring-white/15`;
+  }
+  switch (state) {
+    case "promising":
+      return `${base} border-[#5ba897]/34 bg-[#5ba897]/11 text-[#3f816f] focus-visible:ring-[#5ba897]/20 dark:text-[#7bc1ad]`;
+    case "rejected":
+      return `${base} border-[#d66d75]/34 bg-[#d66d75]/11 text-[#ad4e56] focus-visible:ring-[#d66d75]/18 dark:text-[#e58c93]`;
+    case "revisit_later":
+      return `${base} border-[#b79246]/34 bg-[#b79246]/11 text-[#92722d] focus-visible:ring-[#b79246]/18 dark:text-[#d7b56f]`;
+    case "watching":
+    default:
+      return `${base} border-[#6f8fb8]/34 bg-[#6f8fb8]/11 text-[#4f6f98] focus-visible:ring-[#6f8fb8]/18 dark:text-[#91afd1]`;
+  }
+}
+
 export default function ChatCommandPalette({
   onClose,
   onOpenConversation,
@@ -289,10 +308,6 @@ export default function ChatCommandPalette({
 
   const isFiltering = query.trim().length > 0;
   const isResultMode = isFiltering || isLedgerMode;
-  const ledgerTotal = useMemo(
-    () => ledgerGroups.reduce((total, group) => total + group.count, 0),
-    [ledgerGroups],
-  );
   const displayItems = useMemo(() => {
     const items = isResultMode
       ? searchResults.map((item) =>
@@ -598,41 +613,34 @@ export default function ChatCommandPalette({
         {ledgerGroups.length > 0 && (
           <div
             className="flex items-center gap-2 overflow-x-auto border-b border-black/5 px-5 py-2.5 dark:border-white/5"
-            aria-label={t("command_palette.ledger.title", "Idea Ledger")}
+            aria-label={t(
+              "command_palette.ledger.decision_filters",
+              "Decision filters",
+            )}
           >
-            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-black/35 dark:text-white/35">
-              {t("command_palette.ledger.title", "Idea Ledger")}
-            </span>
-            <button
-              type="button"
-              onClick={() => void loadLedgerBrowse(null)}
-              aria-pressed={isLedgerMode && decisionStateFilter === null}
-              disabled={isLedgerLoading}
-              className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                isLedgerMode && decisionStateFilter === null
-                  ? "border-[#5ba897]/40 bg-[#5ba897]/12 text-[#3b7f70]"
-                  : "border-black/8 text-black/45 hover:bg-black/[0.03] dark:border-white/10 dark:text-white/45 dark:hover:bg-white/[0.04]"
-              }`}
-            >
-              {t("command_palette.ledger.all_saved_ideas", "All saved ideas")}
-              <span className="ml-1 text-black/35 dark:text-white/35">
-                {ledgerTotal}
-              </span>
-            </button>
             {ledgerGroups.map((group) => {
               const selected = decisionStateFilter === group.decision_state;
               return (
                 <button
                   key={group.decision_state}
                   type="button"
-                  onClick={() => void loadLedgerBrowse(group.decision_state)}
+                  onClick={() => {
+                    const nextDecisionState =
+                      decisionStateFilter === group.decision_state
+                        ? null
+                        : group.decision_state;
+                    if (nextDecisionState === null) {
+                      clearSearchAndLedger();
+                      return;
+                    }
+                    void loadLedgerBrowse(nextDecisionState);
+                  }}
                   aria-pressed={isLedgerMode && selected}
                   disabled={isLedgerLoading}
-                  className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                    isLedgerMode && selected
-                      ? "border-[#5ba897]/40 bg-[#5ba897]/12 text-[#3b7f70]"
-                      : "border-black/8 text-black/45 hover:bg-black/[0.03] dark:border-white/10 dark:text-white/45 dark:hover:bg-white/[0.04]"
-                  }`}
+                  className={ledgerDecisionChipClassName(
+                    group.decision_state,
+                    isLedgerMode && selected,
+                  )}
                 >
                   {t(
                     `chat.result_card.decision_states.${group.decision_state}`,
