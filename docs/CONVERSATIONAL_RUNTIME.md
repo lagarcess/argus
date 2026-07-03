@@ -131,6 +131,29 @@ but it must not infer the chosen option from translated display labels.
 
 `save_strategy` belongs inside the result card when Strategies are enabled. It saves from canonical run/result state, not reconstructed frontend prose. Under private-alpha defaults (`NEXT_PUBLIC_STRATEGIES_ENABLED=false`, `ARGUS_STRATEGIES_ENABLED=false`), hide Save in the UI and respond to save intent by reminding the user that the result remains available in conversation/history instead of creating a hidden strategy object.
 
+## Post-Result Continuity
+
+After a completed result, continuity edits are one typed contract with
+multiple entry points (shipped by #141 / PR #148):
+
+- The `refine_strategy` result action opens a refinement pending state that
+  routes the next turn through the typed artifact-edit operations — the same
+  planner used by confirmation-card edits and natural-language edits. Refine
+  is a convenience entry point, not a separate interpretation path.
+- Refinement pending state is a first-class edit context: date-window and
+  cadence changes are planner-expressible edits and must not fall back to
+  generic interpretation. Strategy reshapes still fork to full interpretation.
+- A new idea immediately after a completed result may borrow that result's
+  context: references like "the same time period" bind silently to the latest
+  run's date window, and the bound values must appear on the resulting
+  confirmation card as visible assumptions, never as hidden defaults.
+- A confirmed pending date answer materializes once; repeated affirmatives
+  must not re-ask the same confirmation.
+
+Regression coverage: `tests/agent_runtime/test_refine_action_edit_routing.py`,
+`tests/agent_runtime/test_post_result_edit_routing.py`, and
+`tests/agent_runtime/test_latest_result_window_binding.py`.
+
 ## Persistence Boundary
 
 Supabase-backed persistence owns conversation continuity:
