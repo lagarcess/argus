@@ -1423,6 +1423,17 @@ def test_result_followup_after_reload_carries_latest_run_reference(
             "payload": {
                 "stage_outcome": "ready_to_respond",
                 "assistant_response": "It underperformed SPY by 4.2 percentage points.",
+                "latest_run_id": "runtime-run",
+                "result_run_id": "runtime-run",
+                "result_conversation_id": "runtime-conversation",
+                "result_fact_bank": {"run_id": "runtime-run"},
+                "response_intent": {
+                    "kind": "unsupported_recovery",
+                    "facts": {
+                        "limitation_code": "latest_result_metric_unavailable",
+                        "requested_metric": "sortino_ratio",
+                    },
+                },
             },
         }
 
@@ -1499,6 +1510,26 @@ def test_result_followup_after_reload_carries_latest_run_reference(
     )
 
     assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["latest_run_id"] == "runtime-run"
+    assert final["response_intent"]["kind"] == "unsupported_recovery"
+    assert final["response_intent"]["facts"]["requested_metric"] == "sortino_ratio"
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    latest_assistant = messages[-1]
+    assert latest_assistant["metadata"]["latest_run_id"] == "runtime-run"
+    assert latest_assistant["metadata"]["result_run_id"] == "runtime-run"
+    assert latest_assistant["metadata"]["result_conversation_id"] == (
+        "runtime-conversation"
+    )
+    assert latest_assistant["metadata"]["result_fact_bank"] == {"run_id": "runtime-run"}
+    assert latest_assistant["metadata"]["response_intent"]["kind"] == (
+        "unsupported_recovery"
+    )
+    assert latest_assistant["metadata"]["response_intent"]["facts"][
+        "requested_metric"
+    ] == "sortino_ratio"
     snapshot = captured["fallback_latest_task_snapshot"]
     reference = snapshot.latest_backtest_result_reference
     assert reference is not None
@@ -2382,6 +2413,75 @@ def test_result_followup_after_reload_preserves_saved_strategy_id() -> None:
     assert reference.metadata["latest_run_id"] == run_id
 
 
+def test_result_followup_after_process_reload_uses_canonical_run_row(
+    monkeypatch,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import latest_result_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run = BacktestRun(
+        id="run-live-reload",
+        conversation_id=conversation["id"],
+        strategy_id="strategy-live-reload",
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 8.1}}},
+        config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "rows": [
+                {"key": "total_return_pct", "label": "Total Return", "value": "+8.1%"}
+            ],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart={
+            "series": [
+                {"date": "2024-01-02", "value": 10000.0},
+                {"date": "2024-03-01", "value": 11200.0},
+            ]
+        },
+        trades=[],
+    )
+
+    class _Gateway:
+        def list_messages(self, **kwargs):
+            del kwargs
+            return []
+
+        def get_latest_completed_run_for_conversation(self, **kwargs):
+            assert kwargs == {
+                "user_id": user_id,
+                "conversation_id": conversation["id"],
+            }
+            return run
+
+    monkeypatch.setattr(api_state, "supabase_gateway", _Gateway())
+
+    fallback = latest_result_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["fallback_source"] == "backtest_runs"
+    snapshot = fallback.latest_task_snapshot
+    assert snapshot is not None
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.artifact_id == run.id
+    assert reference.metadata["run_id"] == run.id
+    assert reference.metadata["latest_run_id"] == run.id
+    assert reference.metadata["chart"] == run.chart
+
+
 def test_pending_refinement_fallback_carries_source_result_reference() -> None:
     from argus.api import state as api_state
     from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
@@ -2476,6 +2576,92 @@ def test_pending_refinement_fallback_carries_source_result_reference() -> None:
     assert fallback.selected_thread_metadata is not None
     assert fallback.selected_thread_metadata["requested_field"] == "refinement"
     assert fallback.selected_thread_metadata["source_result_run_id"] == run.id
+
+
+def test_pending_refinement_fallback_uses_response_intent_latest_run_id() -> None:
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = api_state.store.new_id()
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 35.0,
+                    "benchmark_return_pct": 24.0,
+                    "delta_vs_benchmark_pct": 11.0,
+                }
+            }
+        },
+        config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
+        conversation_result_card={"title": "AAPL buy and hold", "rows": []},
+        created_at=utcnow(),
+        chart={
+            "series": [
+                {"date": "2024-01-02", "value": 1000.0},
+                {"date": "2024-01-23", "value": 1051.63},
+            ]
+        },
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="What would you like to change?",
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "await_user_reply",
+            "chat_action": {"type": "refine_strategy", "payload": {"run_id": run.id}},
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                    "comparison_baseline": "SPY",
+                },
+                "requested_field": "refinement",
+                "missing_required_fields": ["refinement"],
+                "response_intent": {
+                    "kind": "clarification",
+                    "facts": {"latest_run_id": run.id},
+                    "requested_fields": ["refinement"],
+                },
+            },
+        },
+    )
+
+    fallback = pending_strategy_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["requested_field"] == "refinement"
+    assert fallback.selected_thread_metadata["source_result_run_id"] == run.id
+    snapshot = fallback.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.pending_strategy_summary is not None
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.artifact_id == run.id
+    assert reference.metadata["latest_run_id"] == run.id
+    assert reference.metadata["chart"] == run.chart
 
 
 def test_pending_response_intent_fallback_survives_ready_to_respond_outcome() -> None:

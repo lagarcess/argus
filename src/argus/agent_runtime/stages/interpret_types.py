@@ -43,6 +43,10 @@ SemanticTurnAct = Literal[
 ResultFollowupFocus = Literal[
     "why_underperformed",
     "max_drawdown",
+    "drawdown_date",
+    "peak_date",
+    "peak_value",
+    "result_card_fact",
     "what_tested",
     "next_experiment",
     "assumptions",
@@ -74,6 +78,7 @@ class InterpretDecision(BaseModel):
     requires_clarification: bool
     user_goal_summary: str
     candidate_strategy_draft: StrategySummary = Field(default_factory=StrategySummary)
+    detected_user_language: str | None = None
     missing_required_fields: list[str] = Field(default_factory=list)
     optional_parameter_opportunity: list[str] = Field(default_factory=list)
     confidence: float
@@ -87,6 +92,7 @@ class InterpretDecision(BaseModel):
     resolution_provenance: list[ResolutionProvenance] = Field(default_factory=list)
     semantic_turn_act: SemanticTurnAct | None = None
     result_followup_focus: ResultFollowupFocus | None = None
+    result_followup_fact_key: str | None = None
     capability_question_focus: CapabilityQuestionFocus | None = None
     context_question_focus: ContextQuestionFocus | None = None
     artifact_target: ArtifactTarget | None = None
@@ -106,6 +112,7 @@ class InterpretDecision(BaseModel):
             "task_relation": self.task_relation,
             "requires_clarification": self.requires_clarification,
             "user_goal_summary": self.user_goal_summary,
+            "detected_user_language": self.detected_user_language,
             "candidate_strategy_draft": self.candidate_strategy_draft.model_dump(
                 mode="python"
             ),
@@ -129,6 +136,7 @@ class InterpretDecision(BaseModel):
             "resolution_provenance": resolution_provenance,
             "semantic_turn_act": self.semantic_turn_act,
             "result_followup_focus": self.result_followup_focus,
+            "result_followup_fact_key": self.result_followup_fact_key,
             "capability_question_focus": self.capability_question_focus,
             "context_question_focus": self.context_question_focus,
         }
@@ -152,6 +160,7 @@ class StructuredInterpretation(BaseModel):
     task_relation: TaskRelation
     requires_clarification: bool = False
     user_goal_summary: str
+    detected_user_language: str | None = None
     candidate_strategy_draft: StrategySummary = Field(default_factory=StrategySummary)
     missing_required_fields: list[str] = Field(default_factory=list)
     assistant_response: str | None = None
@@ -164,6 +173,7 @@ class StructuredInterpretation(BaseModel):
     )
     semantic_turn_act: SemanticTurnAct | None = None
     result_followup_focus: ResultFollowupFocus | None = None
+    result_followup_fact_key: str | None = None
     capability_question_focus: CapabilityQuestionFocus | None = None
     context_question_focus: ContextQuestionFocus | None = None
     artifact_target: ArtifactTarget | None = None

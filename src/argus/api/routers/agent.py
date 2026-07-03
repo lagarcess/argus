@@ -1145,6 +1145,17 @@ async def chat_stream(
                             runtime_result["result_strategy_id"] = (
                                 saved_strategy_id_for_naming
                             )
+                for key in (
+                    "latest_run_id",
+                    "result_run_id",
+                    "result_strategy_id",
+                    "result_conversation_id",
+                    "result_fact_bank",
+                    "response_intent",
+                ):
+                    value = runtime_result.get(key)
+                    if value is not None:
+                        metadata[key] = value
                 if runtime_result.get("resolution_provenance"):
                     metadata["resolution_provenance"] = runtime_result[
                         "resolution_provenance"

@@ -321,14 +321,23 @@ def test_refine_edit_plans_offline_when_interpreter_unavailable(
     assert "artifact_assumption_edit_planned" in result.decision.reason_codes
 
 
-def test_refine_planned_edit_merges_full_confirmation_from_pending_draft() -> None:
+def test_refine_planned_edit_merges_full_confirmation_from_pending_draft(
+    monkeypatch,
+) -> None:
     """Stage-level AC: the confirmation produced by a refine edit must carry
     the resolved prior date range, assets, and contribution — not a sparse or
     rebuilt draft.
     """
 
+    from argus.agent_runtime.stages import interpret as interpret_module
     from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
     pending = _refine_pending_strategy()
     snapshot = TaskSnapshot(
         latest_task_type="backtest_execution",

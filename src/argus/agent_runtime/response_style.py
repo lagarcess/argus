@@ -35,8 +35,14 @@ def result_followup_heading(focus: str | None, *, language: str = "en") -> str:
     if resolve_recovery_language(language) == "es-419":
         if focus == "next_experiment":
             return "Qué probar después"
+        if focus in {"peak_date", "peak_value"}:
+            return "Valor máximo"
+        if focus == "drawdown_date":
+            return "Fecha de caída"
         if focus == "max_drawdown":
             return "Caída máxima"
+        if focus == "result_card_fact":
+            return "Dato del resultado"
         if focus == "what_tested":
             return "Qué se probó"
         if focus == "assumptions":
@@ -44,8 +50,14 @@ def result_followup_heading(focus: str | None, *, language: str = "en") -> str:
         return "Qué pasó"
     if focus == "next_experiment":
         return "Try next"
+    if focus in {"peak_date", "peak_value"}:
+        return "Peak value"
+    if focus == "drawdown_date":
+        return "Drawdown date"
     if focus == "max_drawdown":
         return "Drawdown"
+    if focus == "result_card_fact":
+        return "Result fact"
     if focus == "what_tested":
         return "What was tested"
     if focus == "assumptions":

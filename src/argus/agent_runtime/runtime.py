@@ -271,9 +271,14 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "next_actions",
         "failure_classification",
         "final_response_payload",
+        "response_intent",
         "resolution_provenance",
         "artifact_references",
         "latest_failed_action_reference",
+        "latest_run_id",
+        "result_run_id",
+        "result_strategy_id",
+        "result_conversation_id",
         "result_fact_bank",
         "result_action_request",
         "retry_last_turn",
@@ -307,6 +312,14 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
             and getattr(run_state, "failure_classification", None) is not None
         ):
             serialized["failure_classification"] = run_state.failure_classification
+        if (
+            "response_intent" not in serialized
+            and getattr(run_state, "response_intent", None) is not None
+        ):
+            serialized["response_intent"] = _serialize_public_value(
+                "response_intent",
+                run_state.response_intent,
+            )
         if "resolution_provenance" not in serialized and getattr(
             run_state, "resolution_provenance", None
         ):

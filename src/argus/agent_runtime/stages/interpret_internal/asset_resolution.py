@@ -23,6 +23,7 @@ from argus.agent_runtime.stages.artifact_context import (
     RESULT_EXPLANATION_TARGET_INFERRED,
     RESULT_FOLLOWUP_TARGET_INFERRED,
 )
+from argus.agent_runtime.stages.interpret_internal import latest_result_answer as lra
 from argus.agent_runtime.stages.interpret_internal.draft_only_indicator_evidence import (
     explicit_draft_only_indicator_evidence,
     strategy_type_is_user_selected,
@@ -116,6 +117,8 @@ def _validated_artifact_target(
     )
     if requested_field == "refinement" and snapshot is not None:
         if snapshot.pending_strategy_summary is not None:
+            if lra.overrides_refinement(interpretation, snapshot, proposed, reason_codes):
+                return "latest_result", reason_codes
             if proposed != "pending_refinement":
                 reason_codes.append("pending_refinement_overrode_latest_result")
             return "pending_refinement", reason_codes

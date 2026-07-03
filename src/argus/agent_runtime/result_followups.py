@@ -486,6 +486,10 @@ def result_followup_focus_question(focus: ResultFollowupFocus) -> str:
             "strategy did not underperform."
         ),
         "max_drawdown": "Explain the max drawdown for the latest run.",
+        "drawdown_date": "Explain when the largest drawdown bottomed for the latest run.",
+        "peak_date": "Explain when the latest run reached peak portfolio value.",
+        "peak_value": "Explain the peak portfolio value for the latest run.",
+        "result_card_fact": "Answer the requested factual result-card value.",
         "what_tested": "Explain what was tested in the latest run.",
         "next_experiment": "Suggest useful supported next experiments for this run.",
         "assumptions": "Explain the assumptions used by the latest run.",
@@ -861,6 +865,10 @@ def required_result_followup_fact_ids(
         required.add("symbols")
     if focus == "max_drawdown":
         required.update(fact_id for fact_id in ("max_drawdown",) if fact_id in fact_bank)
+    elif focus in {"drawdown_date", "peak_date", "peak_value", "result_card_fact"}:
+        for fact_id in ("max_drawdown", "total_return", "benchmark_comparison"):
+            if fact_id in fact_bank:
+                required.add(fact_id)
     elif focus == "what_tested":
         for fact_id in (
             "strategy",

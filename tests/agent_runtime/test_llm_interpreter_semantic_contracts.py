@@ -2233,6 +2233,91 @@ async def test_latest_result_routing_audit_checks_copied_executable_result_shape
     assert "latest_result_routing_audit" in repaired.reason_codes
 
 
+@pytest.mark.asyncio
+async def test_latest_result_routing_audit_checks_new_idea_peak_date_misroute(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[dict[str, object]] = []
+
+    async def fake_json_schema(**kwargs):
+        calls.append(kwargs)
+        schema = kwargs["schema_model"]
+        return schema(
+            targets_latest_result=True,
+            focus="peak_date",
+            fact_key="peak_date",
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["AAPL"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 22.1,
+                            "benchmark_return_pct": 18.2,
+                            "delta_vs_benchmark_pct": 3.9,
+                        }
+                    }
+                },
+                "config_snapshot": {
+                    "template": "buy_and_hold",
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                },
+            },
+        )
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User asks what date the latest result peaked.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="what date did this peak?",
+            strategy_type="buy_and_hold",
+            strategy_thesis="AAPL buy and hold",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            timeframe="1D",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=InterpretationRequest(
+            current_user_message="what date did this peak?",
+            recent_thread_history=[],
+            latest_task_snapshot=snapshot,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert calls
+    assert calls[0]["schema_model"] is interpreter_module.LatestResultRoutingAudit
+    assert repaired.semantic_turn_act == "result_followup"
+    assert repaired.result_followup_focus == "peak_date"
+    assert repaired.result_followup_fact_key == "peak_date"
+    assert repaired.artifact_target == "latest_result"
+    assert repaired.assistant_response is None
+    assert "latest_result_routing_audit" in repaired.reason_codes
+
+
 def test_llm_interpreter_honors_explicit_buy_and_hold_over_entry_like_phrase(
     monkeypatch,
 ) -> None:

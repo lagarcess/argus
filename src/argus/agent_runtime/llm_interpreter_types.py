@@ -178,6 +178,14 @@ class LLMInterpretationResponse(BaseModel):
     task_relation: Literal["new_task", "continue", "refine", "ambiguous"]
     requires_clarification: bool = False
     user_goal_summary: str
+    detected_user_language: str | None = Field(
+        default=None,
+        description=(
+            "Detected language of the current user message as a BCP-47-style code "
+            "such as en, es, or es-419. Populate this for every turn; it is typed "
+            "turn metadata, not an executable strategy field."
+        ),
+    )
     candidate_strategy_draft: LLMStrategyDraft = Field(default_factory=LLMStrategyDraft)
     missing_required_fields: list[str] = Field(default_factory=list)
     assistant_response: str | None = None
@@ -203,6 +211,15 @@ class LLMInterpretationResponse(BaseModel):
         | None
     ) = None
     result_followup_focus: ResultFollowupFocus | None = None
+    result_followup_fact_key: str | None = Field(
+        default=None,
+        description=(
+            "Optional canonical key for a factual latest-result value the user "
+            "asked about, such as total_return, benchmark_delta, peak_date, "
+            "peak_value, max_drawdown, drawdown_date, symbols, date_range, or "
+            "benchmark_symbol. Use this only with semantic_turn_act=result_followup."
+        ),
+    )
     capability_question_focus: CapabilityQuestionFocus | None = None
     context_question_focus: ContextQuestionFocus | None = None
     artifact_target: ArtifactTarget | None = None

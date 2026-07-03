@@ -338,10 +338,27 @@ def pending_strategy_metadata_fallback_context(
             selected_thread_metadata["response_intent"] = dict(response_intent)
         source_reference: ArtifactReference | None = None
         source_result = pending_payload.get("source_result")
+        response_intent_facts = (
+            response_intent.get("facts") if isinstance(response_intent, dict) else None
+        )
+        chat_action = metadata.get("chat_action")
+        chat_action_payload = (
+            chat_action.get("payload") if isinstance(chat_action, dict) else None
+        )
         raw_source_run_id = (
             source_result.get("run_id")
             if isinstance(source_result, dict)
             else metadata.get("source_result_run_id")
+            or (
+                response_intent_facts.get("latest_run_id")
+                if isinstance(response_intent_facts, dict)
+                else None
+            )
+            or (
+                chat_action_payload.get("run_id")
+                if isinstance(chat_action_payload, dict)
+                else None
+            )
         )
         if raw_source_run_id is not None:
             run = _run_by_id_for_user(
@@ -353,12 +370,9 @@ def pending_strategy_metadata_fallback_context(
                 and run.conversation_id == conversation_id
                 and run.status == "completed"
             ):
-                source_reference = result_reference_from_run(run)
-                source_reference.metadata.update(
-                    saved_strategy_metadata_from_sources(
-                        run=run,
-                        message_metadata=metadata,
-                    )
+                source_reference = _result_reference_with_response_metadata(
+                    run,
+                    message_metadata=metadata,
                 )
                 selected_thread_metadata["source_result_run_id"] = run.id
                 if run.strategy_id is not None:
@@ -449,12 +463,9 @@ def latest_result_fallback_context(
             continue
         if run.status != "completed":
             continue
-        reference = result_reference_from_run(run)
-        reference.metadata.update(
-            saved_strategy_metadata_from_sources(
-                run=run,
-                message_metadata=metadata,
-            )
+        reference = _result_reference_with_response_metadata(
+            run,
+            message_metadata=metadata,
         )
         return RuntimeFallbackContext(
             latest_task_snapshot=TaskSnapshot(
@@ -469,7 +480,50 @@ def latest_result_fallback_context(
             },
             artifact_references=[reference],
         )
-    return None
+    run = latest_completed_run_for_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+    )
+    if run is None:
+        return None
+    reference = _result_reference_with_response_metadata(run)
+    return RuntimeFallbackContext(
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="results_explanation",
+            completed=True,
+            latest_backtest_result_reference=reference,
+        ),
+        selected_thread_metadata={
+            "latest_task_type": "results_explanation",
+            "last_stage_outcome": "ready_to_respond",
+            "fallback_source": "backtest_runs",
+        },
+        artifact_references=[reference],
+    )
+
+
+def _result_reference_with_response_metadata(
+    run: BacktestRun,
+    *,
+    message_metadata: dict[str, Any] | None = None,
+) -> ArtifactReference:
+    reference = result_reference_from_run(run)
+    reference.metadata.update(
+        {
+            "result_run_id": run.id,
+            "latest_run_id": run.id,
+            "result_conversation_id": run.conversation_id,
+        }
+    )
+    if run.strategy_id is not None:
+        reference.metadata["result_strategy_id"] = run.strategy_id
+    reference.metadata.update(
+        saved_strategy_metadata_from_sources(
+            run=run,
+            message_metadata=message_metadata,
+        )
+    )
+    return reference
 
 
 def failed_action_metadata_fallback_context(
@@ -586,6 +640,22 @@ def latest_completed_run_for_conversation(
     user_id: str,
     conversation_id: str,
 ) -> BacktestRun | None:
+    if api_state.supabase_gateway is not None:
+        try:
+            run = api_state.supabase_gateway.get_latest_completed_run_for_conversation(
+                user_id=user_id,
+                conversation_id=conversation_id,
+            )
+            if run is not None:
+                return run
+        except Exception as exc:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase latest backtest run read failed; using dev memory fallback",
+                error=str(exc),
+                conversation_id=conversation_id,
+            )
     candidates = [
         run
         for run_id, run in api_state.store.backtest_runs.items()
