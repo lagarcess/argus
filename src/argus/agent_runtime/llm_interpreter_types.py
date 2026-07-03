@@ -28,6 +28,7 @@ class LLMDateRangeIntent(BaseModel):
             "calendar_year",
             "since",
             "endpoint_patch",
+            "same_as_latest_result",
         ]
         | None
     ) = Field(
@@ -35,7 +36,9 @@ class LLMDateRangeIntent(BaseModel):
         description=(
             "Canonical, language-neutral temporal intent. Use this for relative "
             "or semantic windows such as last 12 months or year to date instead "
-            "of asking deterministic code to parse localized prose."
+            "of asking deterministic code to parse localized prose. Use "
+            "same_as_latest_result when the user references the latest completed "
+            "test's window; the runtime binds the dates from the canonical run."
         ),
     )
     start: str | None = Field(

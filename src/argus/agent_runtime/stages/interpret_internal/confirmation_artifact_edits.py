@@ -5,6 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from argus.agent_runtime.artifact_edit_planner import ResolvedArtifactEdit
+from argus.agent_runtime.interpreter.shared import (
+    _date_window_intent_bound_to_latest_result,
+)
 from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
@@ -41,6 +44,7 @@ def apply_resolved_artifact_edit_to_strategy_summary(
     candidate: StrategySummary,
     field_provenance: dict[str, str],
     allow_indicator_parameters: bool = False,
+    latest_result_window: dict[str, str] | None = None,
 ) -> None:
     if resolved.asset_universe is not None:
         candidate.asset_universe = list(resolved.asset_universe)
@@ -50,11 +54,19 @@ def apply_resolved_artifact_edit_to_strategy_summary(
         candidate.comparison_baseline = resolved.comparison_baseline
         field_provenance["comparison_baseline"] = "explicit_user"
     if resolved.date_window is not None:
-        intent_resolution = resolve_date_range_intent(resolved.date_window)
-        if intent_resolution is not None:
+        date_window_intent = _date_window_intent_bound_to_latest_result(
+            resolved.date_window,
+            latest_result_window=latest_result_window,
+        )
+        intent_resolution = (
+            resolve_date_range_intent(date_window_intent)
+            if date_window_intent is not None
+            else None
+        )
+        if intent_resolution is not None and date_window_intent is not None:
             candidate.date_range = intent_resolution.payload
             candidate.extra_parameters["date_range_intent"] = (
-                resolved.date_window.model_dump(mode="python")
+                date_window_intent.model_dump(mode="python")
             )
             field_provenance["date_range"] = "explicit_user"
     if resolved.initial_capital is not None:

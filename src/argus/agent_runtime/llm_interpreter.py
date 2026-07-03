@@ -25,11 +25,15 @@ from argus.agent_runtime.benchmark_evidence import (
 )
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: F401
+    ARTIFACT_EDIT_PENDING_FIELDS,
     _apply_legacy_flat_edit_fields,
     _apply_resolved_edit_to_draft,
     _current_artifact_asset_universe,
+    _current_artifact_strategy,
+    _edit_plan_reshapes_non_recurring_strategy,
     _normalized_ticker_symbol,
     _request_targets_pending_artifact_assumption_edit,
+    _request_targets_post_result_artifact_edit,
     _response_from_artifact_assumption_edit_plan,
     asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
 )
@@ -67,6 +71,7 @@ from argus.agent_runtime.interpreter.capability_context_audits import (  # noqa:
 )
 from argus.agent_runtime.interpreter.date_window_repair import (  # noqa: F401
     _clear_auto_simplified_strategy_when_rule_is_ambiguous,
+    _response_with_latest_result_window_bound,
     _current_turn_has_relative_window_evidence,
     _date_range_from_current_turn_message,
     _date_range_intent_can_safely_suppress_focused_repair,
@@ -74,6 +79,8 @@ from argus.agent_runtime.interpreter.date_window_repair import (  # noqa: F401
     _draft_has_supported_capability_shape_for_date_repair,
     _focused_date_window_extraction_messages,
     _pending_supported_execution_date_answer_can_use_focused_audit,
+    _post_result_dateless_execution_draft,
+    _response_with_post_result_window_inherited,
     _request_has_pending_date_answer_context,
     _response_from_focused_date_window_extraction,
     _response_has_ambiguous_rule_fields,
@@ -95,6 +102,7 @@ from argus.agent_runtime.interpreter.dca_audits import (  # noqa: F401
 )
 from argus.agent_runtime.interpreter.draft_shape import (  # noqa: F401
     _elapsed_ms,
+    _refinement_reply_needs_full_interpretation,
     _llm_signal_strategy_is_underfilled,
     _llm_strategy_draft_has_executable_shape,
     _llm_strategy_draft_has_structural_execution_fields,
@@ -209,6 +217,7 @@ from argus.agent_runtime.interpreter.shared import (  # noqa: F401
     _llm_value_is_empty,
     _natural_time_language_candidates_from_hints,
     _normalized_stated_field,
+    _latest_result_date_window,
     _selected_requested_field_base,
     _supported_dca_cadence_value,
 )
@@ -638,7 +647,22 @@ class OpenRouterStructuredInterpreter:
                     f"{active_confirmation if active_confirmation else 'none'}\n"
                     f"Latest result fact bank JSON, if any: "
                     f"{latest_result if latest_result else 'none'}\n"
-                    f"Latest failed action JSON, if any: "
+                    + (
+                        "When the current message reuses the latest result's "
+                        "window ('same time period', 'mismo periodo', 'same "
+                        "dates as before', any language), set "
+                        "date_range_intent.kind=same_as_latest_result with the "
+                        "reference phrase as evidence and leave start/end "
+                        "empty; do not copy dates and do not ask for dates. "
+                        'Example: "try QQQ at $300 a month from the same time '
+                        'period" means date_range_intent={"kind": '
+                        '"same_as_latest_result", "evidence": "from the same '
+                        'time period"} plus the asset and contribution '
+                        "changes.\n"
+                        if latest_result
+                        else ""
+                    )
+                    + f"Latest failed action JSON, if any: "
                     f"{latest_failed_action if latest_failed_action else 'none'}\n"
                     f"Selected thread metadata JSON, if any: "
                     f"{_selected_thread_metadata_context(request.selected_thread_metadata)}"
@@ -668,7 +692,12 @@ class OpenRouterStructuredInterpreter:
             "count/unit, kind=year_to_date with optional year, kind=calendar_year "
             "with year, kind=since with start/year, kind=explicit_range with "
             "ISO start/end, or kind=endpoint_patch with endpoint plus ISO date or "
-            "anchor=today and day_offset for relative day edits. Do not translate "
+            "anchor=today and day_offset for relative day edits. When the user "
+            "asks for the same window as the latest completed test, in any "
+            "language ('same time period', 'mismo periodo', 'same dates as "
+            "before'), set kind=same_as_latest_result with the reference phrase "
+            "as evidence and leave start/end empty; the runtime binds the dates "
+            "from the canonical result. Do not translate "
             "these machine fields. A user-stated relative lookback anchored to the "
             "present is already a complete temporal constraint; do not ask for "
             "calendar endpoints only because the user used natural language instead "
@@ -2501,6 +2530,7 @@ async def _response_ready_for_runtime(
     planned_response = await _plan_artifact_edit_response(
         preferred_model=preferred_model,
         request=request,
+        rejected_response=response,
     )
     if planned_response is not None:
         return planned_response
@@ -2530,17 +2560,29 @@ async def _ready_active_artifact_edit_planned_response(
             return None
         if response.semantic_turn_act == "educational_question":
             return None
-    if not _request_targets_pending_artifact_assumption_edit(request):
+    if not (
+        _request_targets_pending_artifact_assumption_edit(request)
+        or _request_targets_post_result_artifact_edit(request)
+    ):
         return None
     if response.semantic_turn_act in {
         "approval",
         "retry_failed_action",
     }:
         return None
-    if (
-        response.semantic_turn_act == "result_followup"
-        and not _request_has_planner_edit_candidate_after_model_failure(request)
+    if _refinement_reply_needs_full_interpretation(
+        response=response,
+        request=request,
     ):
+        return None
+    if response.semantic_turn_act == "result_followup" and (
+        _selected_requested_field_base(request) == "refinement"
+        or not _request_has_planner_edit_candidate_after_model_failure(request)
+    ):
+        # A refine prompt sits right on a result card, so result fact
+        # questions ("how did it do in 2022?") are common there; the
+        # interpreter's own result classification must keep its routing
+        # instead of being overridden by a planned edit confirmation.
         return None
     if _active_artifact_asset_universe_operation_needs_planner(
         response=response,
@@ -2783,11 +2825,17 @@ async def _plan_artifact_edit_response(
     *,
     preferred_model: str,
     request: InterpretationRequest,
+    rejected_response: LLMInterpretationResponse | None = None,
 ) -> LLMInterpretationResponse | None:
-    planned_response = await _plan_pending_artifact_assumption_edit(
+    planned_response = None
+    if rejected_response is None or not _refinement_reply_needs_full_interpretation(
+        response=rejected_response,
         request=request,
-        preferred_model=preferred_model,
-    )
+    ):
+        planned_response = await _plan_pending_artifact_assumption_edit(
+            request=request,
+            preferred_model=preferred_model,
+        )
     if planned_response is None:
         planned_response = await _plan_focused_artifact_edit(
             model_name=preferred_model,
@@ -3061,7 +3109,12 @@ async def _focused_date_window_audited_response(
             request=request,
         )
         if repaired is not None:
-            return repaired
+            # The focused extraction can name the latest-result reference; the
+            # binder runs again because normalization already passed.
+            return _response_with_latest_result_window_bound(
+                repaired,
+                request=request,
+            )
     return None
 
 
@@ -3070,6 +3123,10 @@ def _response_needs_focused_date_window_intent_repair(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
+    if "latest_result_window_bound" in response.reason_codes:
+        # The window was bound from the canonical latest result, not from
+        # current-turn date text; re-auditing message evidence would strip it.
+        return False
     pending_date_answer = _request_has_pending_date_answer_context(request)
     if (
         response.intent not in {"strategy_drafting", "backtest_execution"}
@@ -3085,6 +3142,8 @@ def _response_needs_focused_date_window_intent_repair(
     if "focused_date_window_intent_repair" in response.reason_codes:
         return False
     draft = response.candidate_strategy_draft
+    if _post_result_dateless_execution_draft(response=response, request=request):
+        return True
     has_repairable_current_turn_date_gap = (
         _response_has_repairable_current_turn_date_gap(
             response=response,
@@ -3224,7 +3283,10 @@ async def _plan_pending_artifact_assumption_edit(
     preferred_model: str,
     require_failure_edit_evidence: bool = False,
 ) -> LLMInterpretationResponse | None:
-    if not _request_targets_pending_artifact_assumption_edit(request):
+    if not (
+        _request_targets_pending_artifact_assumption_edit(request)
+        or _request_targets_post_result_artifact_edit(request)
+    ):
         return None
     if (
         require_failure_edit_evidence
@@ -3233,6 +3295,11 @@ async def _plan_pending_artifact_assumption_edit(
         return None
     snapshot = request.latest_task_snapshot
     prior_strategy = _prior_strategy_payload(request)
+    if prior_strategy is None:
+        # Post-result surface: plan against the strategy that actually ran.
+        reconstructed = _current_artifact_strategy(request)
+        if reconstructed is not None:
+            prior_strategy = reconstructed.model_dump(mode="json")
     active_confirmation = (
         snapshot.active_confirmation_reference.model_dump(mode="json")
         if snapshot is not None and snapshot.active_confirmation_reference is not None
@@ -3247,6 +3314,16 @@ async def _plan_pending_artifact_assumption_edit(
     )
     if plan is None:
         return None
+    if _selected_requested_field_base(request) == "refinement":
+        # The refine prompt invites reshapes the edit-operation set cannot
+        # express; the online guard reads the interpreter response, which the
+        # model-failure paths never have, so the plan itself is checked here.
+        prior = _current_artifact_strategy(request)
+        if _edit_plan_reshapes_non_recurring_strategy(
+            plan,
+            prior_strategy_type=prior.strategy_type if prior is not None else None,
+        ):
+            return None
     resolver = _asset_edit_symbol_resolver(_resolve_asset_candidate)
     return _response_from_artifact_assumption_edit_plan(
         plan=plan, request=request, asset_symbol_resolver=resolver
@@ -3259,7 +3336,7 @@ def _request_has_planner_edit_candidate_after_model_failure(
     requested_field = _field_path_base(
         request.selected_thread_metadata.get("requested_field")
     )
-    if requested_field in {"assumption", "asset_universe", "comparison_baseline"}:
+    if requested_field in ARTIFACT_EDIT_PENDING_FIELDS:
         return True
 
     snapshot = request.latest_task_snapshot
@@ -5002,6 +5079,11 @@ def _normalize_response_for_runtime_context(
     *,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
+    response = _response_with_latest_result_window_bound(response, request=request)
+    response = _response_with_post_result_window_inherited(
+        response,
+        request=request,
+    )
     if _request_has_latest_result(request):
         return response
     if (

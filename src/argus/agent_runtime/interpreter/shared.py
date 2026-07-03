@@ -11,8 +11,12 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
-from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
+from argus.agent_runtime.llm_interpreter_types import (
+    LLMDateRangeIntent,
+    LLMStrategyDraft,
+)
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+from argus.agent_runtime.state.models import TaskSnapshot
 from argus.domain.slot_normalizer import normalize_parameter_value
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.nlp.natural_time import (
@@ -90,6 +94,61 @@ def _field_path_base(value: Any) -> str:
 
 def _selected_requested_field_base(request: InterpretationRequest) -> str:
     return _field_path_base(request.selected_thread_metadata.get("requested_field"))
+
+
+def _latest_result_date_window(
+    request: InterpretationRequest,
+) -> dict[str, str] | None:
+    """Canonical date window of the latest completed result, if any."""
+
+    return _latest_result_date_window_from_snapshot(request.latest_task_snapshot)
+
+
+def _latest_result_date_window_from_snapshot(
+    snapshot: TaskSnapshot | None,
+) -> dict[str, str] | None:
+    """Snapshot variant for paths that run without an interpretation request."""
+
+    from argus.agent_runtime.artifacts.drafts import draft_from_result_metadata
+
+    reference = (
+        snapshot.latest_backtest_result_reference if snapshot is not None else None
+    )
+    if reference is None:
+        return None
+    date_range = draft_from_result_metadata(dict(reference.metadata)).date_range
+    if not isinstance(date_range, dict):
+        return None
+    start = str(date_range.get("start") or "").strip()
+    end = str(date_range.get("end") or "").strip()
+    if not start or not end:
+        return None
+    return {"start": start, "end": end}
+
+
+def _date_window_intent_bound_to_latest_result(
+    intent: LLMDateRangeIntent,
+    *,
+    latest_result_window: dict[str, str] | None,
+) -> LLMDateRangeIntent | None:
+    """Ground a same_as_latest_result reference in the canonical run window.
+
+    The intent only names the reference; the latest completed result owns the
+    dates. Other kinds pass through untouched. Without a canonical window the
+    reference stays unresolved and callers keep their normal clarification.
+    """
+
+    if intent.kind != "same_as_latest_result":
+        return intent
+    if not latest_result_window:
+        return None
+    return LLMDateRangeIntent(
+        kind="explicit_range",
+        start=latest_result_window["start"],
+        end=latest_result_window["end"],
+        confidence=intent.confidence,
+        evidence=intent.evidence,
+    )
 
 
 def _supported_dca_cadence_value(value: Any) -> str | None:

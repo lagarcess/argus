@@ -16,7 +16,7 @@ from argus.agent_runtime.state.models import (
 )
 
 OPTIONAL_PARAMETER_OPT_IN_LIMIT = 3
-ARTIFACT_EDIT_CLARIFICATION_FIELDS = {"assumption"}
+ARTIFACT_EDIT_CLARIFICATION_FIELDS = {"assumption", "refinement"}
 
 
 class StructuredClarificationGenerator(Protocol):

@@ -4,6 +4,13 @@ Behavior-preserving relocation from llm_interpreter.py (issue #131)."""
 
 from __future__ import annotations
 
+from typing import Any
+
+from loguru import logger
+
+from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+    _request_targets_post_result_artifact_edit,
+)
 from argus.agent_runtime.interpreter.draft_shape import (
     _request_has_active_strategy_context,
 )
@@ -12,10 +19,12 @@ from argus.agent_runtime.interpreter.run_field_audits import (
 )
 from argus.agent_runtime.interpreter.shared import (
     _date_range_from_intent_or_bounded_evidence,
+    _date_window_intent_bound_to_latest_result,
     _draft_has_semantic_date_window_evidence,
     _draft_semantic_evidence_spans,
     _field_path_base,
     _has_complete_date_range_payload,
+    _latest_result_date_window,
     _llm_strategy_draft_has_concrete_execution_target,
     _llm_strategy_draft_has_rule_or_indicator_fields,
     _llm_value_is_empty,
@@ -24,6 +33,7 @@ from argus.agent_runtime.interpreter.shared import (
 )
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedDateWindowExtraction,
+    LLMDateRangeIntent,
     LLMInterpretationResponse,
     LLMStrategyDraft,
 )
@@ -161,6 +171,90 @@ def _response_has_ambiguous_rule_fields(response: LLMInterpretationResponse) -> 
     )
 
 
+def _post_result_dateless_execution_draft(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    """Post-result draft complete except the window.
+
+    The focused extraction must get a chance to name the latest-result
+    reference ("same time period") before the runtime asks the user for
+    dates — binding silently is the approved behavior and the primary model
+    under-reports the typed reference.
+    """
+
+    if not _request_targets_post_result_artifact_edit(request):
+        return False
+    draft = response.candidate_strategy_draft
+    if not _llm_value_is_empty(draft.date_range):
+        return False
+    if draft.date_range_intent is not None:
+        return False
+    if str(draft.date_range_raw_text or "").strip():
+        return False
+    return _llm_strategy_draft_has_concrete_execution_target(draft)
+
+
+def _response_with_post_result_window_inherited(
+    response: LLMInterpretationResponse,
+    *,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    """Inherit the completed run's window for a dateless post-result variant.
+
+    Founder-approved continuity: a new idea or refinement right after a
+    result that names no window borrows the run's window silently — the card
+    shows it and stays editable. Binding by state (completed run + dateless
+    executable draft) needs no model cooperation and no text matching, so
+    prose proposals and bare "yes" turns can never loop.
+    """
+
+    if response.semantic_turn_act not in {"new_idea", "refine_current_idea"}:
+        return response
+    if not _post_result_dateless_execution_draft(
+        response=response,
+        request=request,
+    ):
+        return response
+    window = _latest_result_date_window(request)
+    if window is None:
+        return response
+    logger.debug(
+        "Post-result window inherited start={} end={}",
+        window["start"],
+        window["end"],
+    )
+    draft = response.candidate_strategy_draft.model_copy(
+        update={
+            "date_range": dict(window),
+            "date_range_intent": LLMDateRangeIntent(
+                kind="explicit_range",
+                start=window["start"],
+                end=window["end"],
+                confidence=0.8,
+                evidence="latest completed result window",
+            ),
+        }
+    )
+    missing_required_fields = [
+        field
+        for field in response.missing_required_fields
+        if _field_path_base(field) != "date_range"
+    ]
+    return response.model_copy(
+        update={
+            "candidate_strategy_draft": draft,
+            "missing_required_fields": missing_required_fields,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [*response.reason_codes, "latest_result_window_bound"]
+                )
+            ),
+        }
+    )
+
+
 def _request_has_pending_date_answer_context(
     request: InterpretationRequest,
 ) -> bool:
@@ -225,6 +319,122 @@ def _date_range_intent_can_safely_suppress_focused_repair(
         return False
     evidence = str(intent.evidence or "").strip()
     return evidence == str(intent.year)
+
+
+def _draft_with_pending_strategy_gaps_filled(
+    draft: LLMStrategyDraft,
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMStrategyDraft:
+    """Fill a pending-answer patch draft from the pending strategy.
+
+    A date answer only names the window; the assets, cadence, and sizing
+    already live on the pending strategy. Without them the draft cannot pass
+    required-shape checks and the runtime would re-ask, which is the repeated
+    confirmation loop from issue #141.
+    """
+
+    if response.semantic_turn_act != "answer_pending_need":
+        return draft
+    snapshot = request.latest_task_snapshot
+    pending = snapshot.pending_strategy_summary if snapshot is not None else None
+    if pending is None:
+        return draft
+    updates: dict[str, Any] = {}
+    provenance = dict(draft.field_provenance or {})
+    if not draft.asset_universe and pending.asset_universe:
+        updates["asset_universe"] = list(pending.asset_universe)
+        provenance.setdefault("asset_universe", "prior_strategy_state")
+    if not draft.asset_class and pending.asset_class:
+        updates["asset_class"] = pending.asset_class
+    if not draft.strategy_type and pending.strategy_type:
+        updates["strategy_type"] = pending.strategy_type
+    if not draft.strategy_thesis and pending.strategy_thesis:
+        updates["strategy_thesis"] = pending.strategy_thesis
+    if not draft.cadence and pending.cadence:
+        updates["cadence"] = pending.cadence
+    if draft.capital_amount is None and pending.capital_amount is not None:
+        updates["capital_amount"] = pending.capital_amount
+        provenance.setdefault("capital_amount", "prior_strategy_state")
+    pending_contribution = pending.extra_parameters.get("recurring_contribution")
+    if (
+        draft.recurring_contribution is None
+        and isinstance(pending_contribution, (int, float))
+        and not isinstance(pending_contribution, bool)
+    ):
+        updates["recurring_contribution"] = float(pending_contribution)
+        provenance.setdefault("recurring_contribution", "prior_strategy_state")
+    if not updates:
+        return draft
+    if provenance != (draft.field_provenance or {}):
+        updates["field_provenance"] = provenance
+    return draft.model_copy(update=updates)
+
+
+def _response_with_latest_result_window_bound(
+    response: LLMInterpretationResponse,
+    *,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    """Bind a same_as_latest_result date intent to the canonical run window.
+
+    The interpreter names the reference ("same time period"); only the
+    canonical latest completed result owns the dates. Without a completed
+    result the intent stays unresolved and the normal date clarification
+    applies.
+    """
+
+    draft = response.candidate_strategy_draft
+    intent = draft.date_range_intent
+    if intent is None or intent.kind != "same_as_latest_result":
+        return response
+    window = _latest_result_date_window(request)
+    if window is None:
+        logger.debug(
+            "Latest result window binding skipped: reference named but no "
+            "canonical window available has_snapshot={} has_reference={}",
+            request.latest_task_snapshot is not None,
+            request.latest_task_snapshot is not None
+            and request.latest_task_snapshot.latest_backtest_result_reference
+            is not None,
+        )
+        return response
+    logger.debug(
+        "Latest result window bound start={} end={}",
+        window["start"],
+        window["end"],
+    )
+    bound_draft = draft.model_copy(
+        update={
+            "date_range": dict(window),
+            "date_range_intent": _date_window_intent_bound_to_latest_result(
+                intent,
+                latest_result_window=window,
+            ),
+        }
+    )
+    bound_draft = _draft_with_pending_strategy_gaps_filled(
+        bound_draft,
+        response=response,
+        request=request,
+    )
+    missing_required_fields = [
+        field
+        for field in response.missing_required_fields
+        if _field_path_base(field) != "date_range"
+    ]
+    return response.model_copy(
+        update={
+            "candidate_strategy_draft": bound_draft,
+            "missing_required_fields": missing_required_fields,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [*response.reason_codes, "latest_result_window_bound"]
+                )
+            ),
+        }
+    )
 
 
 def _response_has_repairable_current_turn_date_gap(
@@ -328,6 +538,12 @@ def _focused_date_window_extraction_messages(
                 "anchor=today, confidence, and evidence. For year-to-date, return "
                 "kind=year_to_date. For a calendar year, return kind=calendar_year "
                 "and year. For since-style windows, return kind=since and start. "
+                "When the current message reuses the previous or latest test's "
+                "window ('same time period', 'mismo periodo', 'the same period as "
+                "the test we just ran', any language), set has_date_window=true "
+                "and return kind=same_as_latest_result with the reference phrase "
+                "as evidence and no start/end; the runtime binds the dates from "
+                "the canonical result. "
                 "For explicit calendar start/end endpoints, return date_range with "
                 "ISO dates or the canonical sentinel today/current_date. Never put "
                 "prose or shorthand relative windows inside date_range start/end. "
@@ -361,12 +577,25 @@ def _response_from_focused_date_window_extraction(
     )
     changed = False
     if extraction.date_range_intent is not None:
-        intent_resolution = resolve_date_range_intent(extraction.date_range_intent)
-        if intent_resolution is None:
-            return None
-        draft.date_range_intent = extraction.date_range_intent
-        draft.date_range = intent_resolution.payload
-        changed = True
+        if str(extraction.date_range_intent.kind or "") == "same_as_latest_result":
+            window = _latest_result_date_window(request)
+            if window is None:
+                return None
+            draft.date_range_intent = _date_window_intent_bound_to_latest_result(
+                extraction.date_range_intent,
+                latest_result_window=window,
+            )
+            draft.date_range = dict(window)
+            changed = True
+        else:
+            intent_resolution = resolve_date_range_intent(
+                extraction.date_range_intent
+            )
+            if intent_resolution is None:
+                return None
+            draft.date_range_intent = extraction.date_range_intent
+            draft.date_range = intent_resolution.payload
+            changed = True
     elif extraction.date_range is not None:
         normalized_date_range = normalize_date_range_candidate(extraction.date_range)
         if not _has_complete_date_range_payload(normalized_date_range):

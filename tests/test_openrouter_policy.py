@@ -3574,3 +3574,85 @@ def test_direct_chat_completion_tries_configured_fallback_and_records_usage(
         "total_tokens": 19,
     }
     assert receipts[1].context_packet_ids == ["packet-1"]
+
+
+def test_anthropic_structured_calls_use_schema_in_prompt_not_response_format() -> None:
+    """Anthropic strict structured outputs reject core shapes of our schemas
+    (numeric bounds, any-typed values, open objects like extra_parameters), so
+    every native json_schema call to anthropic/* returned 400 and the
+    interpretation fallback never worked. Anthropic models get the schema
+    embedded in a system message instead; tolerant providers keep the native
+    strict response_format. Client-side pydantic validation enforces the
+    schema either way.
+    """
+
+    import json as _json
+
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    def _payload(model: str) -> dict:
+        return openrouter._json_schema_payload(
+            model=model,
+            messages=[{"role": "user", "content": "probe"}],
+            schema_model=LLMDateRangeIntent,
+            schema_name="LLMDateRangeIntent",
+            profile=openrouter_profile_for_task("interpretation"),
+        )
+
+    anthropic_payload = _payload("anthropic/claude-haiku-4.5")
+    grok_payload = _payload("x-ai/grok-4.3")
+
+    assert "response_format" not in anthropic_payload
+    assert "provider" not in anthropic_payload
+    schema_message = anthropic_payload["messages"][0]
+    assert schema_message["role"] == "system"
+    assert '"same_as_latest_result"' in schema_message["content"]
+    assert anthropic_payload["messages"][-1]["content"] == "probe"
+
+    grok_schema = grok_payload["response_format"]["json_schema"]
+    assert grok_schema["strict"] is True
+    assert "minimum" in _json.dumps(grok_schema["schema"])
+    assert grok_payload["provider"] == {"require_parameters": True}
+
+    # Client-side enforcement stays the real gate for both providers.
+    with pytest.raises(ValueError):
+        LLMDateRangeIntent(kind="explicit_range", confidence=5.0)
+
+
+def test_json_content_code_fence_stripping_is_safe() -> None:
+    fenced = '```json\n{"ok": true}\n```'
+    plain = '{"ok": true}'
+    assert openrouter._json_content_without_code_fences(fenced) == '{"ok": true}'
+    assert openrouter._json_content_without_code_fences(plain) == plain
+    # Degenerate fence-only content stays unusable either way; it must simply
+    # not crash and not fabricate JSON.
+    assert openrouter._json_content_without_code_fences("```") == ""
+
+
+def test_json_content_code_fence_stripping_handles_provider_variants() -> None:
+    """Schema-in-prompt providers fence on one line, skip the language tag,
+    or wrap the fence in prose on either side; all must still yield the body."""
+
+    single_line = '```json {"ok": true}```'
+    no_language_tag = '```\n{"ok": true}\n```'
+    inline_no_tag = '```{"ok": true}```'
+    trailing_prose = '```json\n{"ok": true}\n```\nThis JSON matches the schema.'
+    leading_prose = 'Here is the JSON:\n```json\n{"ok": true}\n```'
+    unterminated = '```json\n{"ok": true}'
+    for content in (
+        single_line,
+        no_language_tag,
+        inline_no_tag,
+        trailing_prose,
+        leading_prose,
+        unterminated,
+    ):
+        assert (
+            openrouter._json_content_without_code_fences(content) == '{"ok": true}'
+        ), content
+    # Bare JSON that happens to contain a fence inside a string stays intact.
+    bare_json_with_fence = '{"note": "wrap code in ``` blocks"}'
+    assert (
+        openrouter._json_content_without_code_fences(bare_json_with_fence)
+        == bare_json_with_fence
+    )

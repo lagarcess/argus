@@ -513,7 +513,9 @@ async def invoke_openrouter_json_schema(
                 raise ValueError(
                     "OpenRouter JSON schema response did not include content"
                 )
-            result = schema_model.model_validate_json(content)
+            result = schema_model.model_validate_json(
+                _json_content_without_code_fences(content)
+            )
         except Exception as exc:
             last_exc = exc
             record_openrouter_route_receipt(
@@ -731,7 +733,9 @@ def invoke_openrouter_json_schema_sync(
                 raise ValueError(
                     "OpenRouter JSON schema response did not include content"
                 )
-            result = schema_model.model_validate_json(content)
+            result = schema_model.model_validate_json(
+                _json_content_without_code_fences(content)
+            )
         except Exception as exc:
             last_exc = exc
             record_openrouter_route_receipt(
@@ -864,6 +868,12 @@ def _apply_reasoning_for_structured_artifact(
     payload["reasoning"] = {"effort": profile.reasoning_effort}
 
 
+_SCHEMA_IN_PROMPT_INSTRUCTION = (
+    "Return a single JSON object that validates against this JSON Schema. "
+    "Output only the JSON object, no prose, no code fences.\nJSON Schema:\n"
+)
+
+
 def _json_schema_payload(
     *,
     model: str,
@@ -872,7 +882,28 @@ def _json_schema_payload(
     schema_name: str,
     profile: OpenRouterProfile,
 ) -> dict[str, object]:
-    payload: dict[str, object] = {
+    if model.startswith("anthropic/"):
+        # Anthropic strict structured outputs reject core shapes of our
+        # schemas (numeric bounds, any-typed values, open objects such as
+        # extra_parameters), so every native json_schema call 400s. Embed the
+        # schema in a system message instead; client-side pydantic validation
+        # and the candidate retry loop own correctness either way.
+        schema_message = {
+            "role": "system",
+            "content": (
+                _SCHEMA_IN_PROMPT_INSTRUCTION
+                + json.dumps(schema_model.model_json_schema())
+            ),
+        }
+        payload: dict[str, object] = {
+            "model": model,
+            "messages": [schema_message, *messages],
+            "temperature": profile.temperature,
+            "max_tokens": profile.max_tokens,
+        }
+        _apply_reasoning_for_structured_artifact(payload, profile)
+        return payload
+    payload = {
         "model": model,
         "messages": messages,
         "response_format": {
@@ -889,6 +920,36 @@ def _json_schema_payload(
     }
     _apply_reasoning_for_structured_artifact(payload, profile)
     return payload
+
+
+def _json_content_without_code_fences(content: str) -> str:
+    """Strip a markdown code fence around a JSON body, if present.
+
+    Schema-in-prompt providers occasionally fence their JSON despite
+    instructions — sometimes on one line ("```json {...}```") or with prose
+    after the closing fence; strict structured outputs never fence, so this
+    is a no-op for them.
+    """
+
+    text = content.strip()
+    if not text.startswith("```"):
+        if text.startswith(("{", "[")) or "```" not in text:
+            return text
+        # Leading prose before a fenced body ("Here is the JSON: ```json ...").
+        # Bare JSON is returned above untouched, so a ``` inside a JSON string
+        # never triggers this.
+        text = text[text.find("```") :]
+    text = text[len("```") :]
+    info_end = 0
+    while info_end < len(text) and (
+        text[info_end].isalnum() or text[info_end] in "_-"
+    ):
+        info_end += 1
+    text = text[info_end:]
+    closing = text.rfind("```")
+    if closing != -1:
+        text = text[:closing]
+    return text.strip()
 
 
 async def _post_openrouter_json_schema(

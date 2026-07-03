@@ -9,14 +9,20 @@ from typing import Any
 
 from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+    _current_artifact_strategy,
     _request_targets_pending_artifact_assumption_edit,
+    _request_targets_post_result_artifact_edit,
 )
 from argus.agent_runtime.interpreter.dca_audits import _dca_draft_has_recurring_amount
+from argus.agent_runtime.interpreter.readiness_helpers import (
+    _active_artifact_asset_universe_operation_needs_planner,
+)
 from argus.agent_runtime.interpreter.shared import (
     _TOTAL_CAPITAL_SOURCES,
     _field_path_base,
     _llm_strategy_draft_has_extractable_fields,
     _llm_strategy_draft_has_rule_or_indicator_fields,
+    _selected_requested_field_base,
     _supported_dca_cadence_value,
 )
 from argus.agent_runtime.llm_interpreter_types import (
@@ -147,12 +153,78 @@ def _response_underfills_active_artifact_assumption_edit(
         "retry_failed_action",
     }:
         return False
+    if _refinement_reply_needs_full_interpretation(
+        response=response,
+        request=request,
+    ):
+        # Reshapes and rule tweaks are full-interpretation refine replies,
+        # not assumption edits; treating them as underfilled would reject
+        # the very response the planner path steps aside for.
+        return False
     draft = response.candidate_strategy_draft
     if _llm_strategy_draft_has_supported_artifact_assumption_edit(draft):
         return False
     if response.requires_clarification and response.assistant_response:
         return False
     return bool(response.intent in {"strategy_drafting", "backtest_execution"})
+
+
+def _refinement_reply_needs_full_interpretation(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    """A refine reply is only a planner edit when the response says so.
+
+    The "Refine idea" prompt invites any change, including strategy reshapes
+    ("make it recurring buys instead") that the edit-operation set cannot
+    express. Those must keep flowing through full interpretation so the
+    refine fork can produce a new draft; routing them into the planner would
+    shoehorn the reshape into cadence/contribution sets and silently keep the
+    old strategy type.
+    """
+
+    post_result_surface = _request_targets_post_result_artifact_edit(request)
+    if _selected_requested_field_base(request) != "refinement":
+        if not post_result_surface:
+            return False
+        # Free-form post-result turns reach the planner only when the
+        # interpreter itself says the user is refining the completed idea;
+        # new ideas and result questions keep full interpretation.
+        if response.semantic_turn_act != "refine_current_idea":
+            return True
+    draft = response.candidate_strategy_draft
+    pending = _current_artifact_strategy(request)
+    draft_type = canonical_strategy_type(draft.strategy_type)
+    pending_type = canonical_strategy_type(pending.strategy_type) if pending else None
+    if draft_type and pending_type and draft_type != pending_type:
+        return True
+    if _active_artifact_asset_universe_operation_needs_planner(
+        response=response,
+        request=request,
+    ):
+        return False
+    return not _refinement_reply_evidences_planner_edit(draft)
+
+
+def _refinement_reply_evidences_planner_edit(draft: LLMStrategyDraft) -> bool:
+    """Planner-expressible evidence in a refine reply.
+
+    EditOperation also covers date_window and cadence, so date-only or
+    cadence-only refine replies ("change the date range to 2021", "make it
+    weekly") belong on the planner path even though they are not
+    assumption-field edits.
+    """
+
+    if _llm_strategy_draft_has_supported_artifact_assumption_edit(draft):
+        return True
+    if str(draft.cadence or "").strip():
+        return True
+    return bool(
+        draft.date_range
+        or draft.date_range_intent is not None
+        or str(draft.date_range_raw_text or "").strip()
+    )
 
 
 def _llm_strategy_draft_has_supported_artifact_assumption_edit(

@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Any
 
 from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
+from argus.agent_runtime.asset_text_grounding import provider_ticker_mentions_from_text
 from argus.agent_runtime.interpreter.shared import (
     _RECURRING_CAPITAL_SOURCES,
     _TOTAL_CAPITAL_SOURCES,
@@ -24,6 +25,7 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMStrategyDraft,
     LLMUnsupportedConstraint,
 )
+from argus.agent_runtime.resolution import resolve_asset_candidate
 from argus.agent_runtime.rule_specs import (
     executable_rule_spec_from_strategy,
     moving_average_crossover_text,
@@ -403,6 +405,14 @@ def _should_preserve_prior_asset_for_pending_answer(
         current_user_message=request.current_user_message,
     ):
         return False
+    if _current_turn_names_foreign_ticker(
+        current_user_message=request.current_user_message,
+        prior=prior,
+    ):
+        # The user literally typed a ticker outside the prior set; inheriting
+        # the prior assets would overwrite an explicit constraint. Leave asset
+        # resolution to the mention itself.
+        return False
     if response.semantic_turn_act == "answer_pending_need" and requested_field:
         return True
     if response.task_relation != "continue":
@@ -414,6 +424,39 @@ def _should_preserve_prior_asset_for_pending_answer(
     if prior_type and current_type and prior_type == current_type:
         return True
     return prior_type == "signal_strategy" and _strategy_has_rule_semantics(strategy)
+
+
+def _current_turn_names_foreign_ticker(
+    *,
+    current_user_message: str,
+    prior: StrategySummary,
+) -> bool:
+    message = str(current_user_message or "").strip()
+    if not message:
+        return False
+    prior_symbols = {
+        _compact_asset_evidence_token(symbol)
+        for symbol in prior.asset_universe
+        if _compact_asset_evidence_token(symbol)
+    }
+    try:
+        mentions = provider_ticker_mentions_from_text(
+            message,
+            resolve_candidate=lambda query: resolve_asset_candidate(
+                query,
+                field="asset_universe",
+                source="user_mention",
+            ),
+        )
+    except Exception:
+        return False
+    return any(
+        _compact_asset_evidence_token(
+            getattr(mention.asset, "canonical_symbol", None)
+        )
+        not in prior_symbols
+        for mention in mentions
+    )
 
 
 def _message_has_numeric_execution_fact(message: str) -> bool:

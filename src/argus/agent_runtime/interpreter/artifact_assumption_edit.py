@@ -14,7 +14,9 @@ from argus.agent_runtime.artifact_edit_planner import (
 )
 from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
 from argus.agent_runtime.interpreter.shared import (
+    _date_window_intent_bound_to_latest_result,
     _field_path_base,
+    _latest_result_date_window,
     _supported_dca_cadence_value,
 )
 from argus.agent_runtime.llm_interpreter_types import (
@@ -25,12 +27,27 @@ from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.rule_specs import indicator_parameters_from_strategy
 from argus.agent_runtime.stages.artifact_context import (
     active_confirmation_effective_strategy,
+    strategy_from_result_reference,
 )
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import StrategySummary
+from argus.agent_runtime.strategy_contract import canonical_strategy_type
 from argus.nlp.natural_time import resolve_date_range_intent
 
 ResolveAssetCandidate = Callable[..., AssetResolution | None]
+
+# Pending requested_field values whose next user reply edits the pending
+# artifact. The result-card "Refine idea" action ("refinement",
+# api/chat/result_actions.py) and the confirmation-card assumption prompts are
+# two entry points into the same typed edit contract.
+ARTIFACT_EDIT_PENDING_FIELDS = frozenset(
+    {
+        "assumption",
+        "asset_universe",
+        "comparison_baseline",
+        "refinement",
+    }
+)
 
 
 def _normalized_ticker_symbol(value: Any) -> str | None:
@@ -57,7 +74,7 @@ def _request_targets_pending_artifact_assumption_edit(
     )
     if not has_artifact_context:
         return False
-    if requested_field in {"assumption", "asset_universe", "comparison_baseline"}:
+    if requested_field in ARTIFACT_EDIT_PENDING_FIELDS:
         return True
     return bool(
         not requested_field
@@ -65,6 +82,34 @@ def _request_targets_pending_artifact_assumption_edit(
         and snapshot.active_confirmation_reference is not None
         and request.current_user_message.strip()
     )
+
+
+def _request_targets_post_result_artifact_edit(
+    request: InterpretationRequest,
+) -> bool:
+    """Free-form post-result surface: a completed result and nothing pending.
+
+    A reply here can still be an edit of the completed strategy ("could we
+    try NVDA over the same period") — the no-chip twin of the Refine idea
+    action. Chips and natural language are two entry points to one contract,
+    so this surface may reach the same planner; response-conditioned guards
+    decide whether a specific turn actually is an edit.
+    """
+
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
+    if requested_field:
+        return False
+    snapshot = request.latest_task_snapshot
+    if snapshot is None or snapshot.latest_backtest_result_reference is None:
+        return False
+    if (
+        snapshot.pending_strategy_summary is not None
+        or snapshot.active_confirmation_reference is not None
+    ):
+        return False
+    return bool(request.current_user_message.strip())
 
 
 def _current_artifact_asset_universe(request: InterpretationRequest) -> list[str]:
@@ -94,6 +139,13 @@ def _current_artifact_strategy(request: InterpretationRequest) -> StrategySummar
         )
         if effective != StrategySummary():
             return effective
+    if prior is None and snapshot.latest_backtest_result_reference is not None:
+        # Post-result surface: the canonical strategy is the one that ran.
+        reconstructed = strategy_from_result_reference(
+            snapshot.latest_backtest_result_reference
+        )
+        if reconstructed.asset_universe:
+            return reconstructed
     return prior
 
 
@@ -124,6 +176,7 @@ def _apply_resolved_edit_to_draft(
     field_provenance: dict[str, str],
     extra_parameters: dict[str, Any],
     allow_indicator_parameters: bool = False,
+    latest_result_window: dict[str, str] | None = None,
 ) -> None:
     if resolved.asset_universe is not None:
         draft.asset_universe = list(resolved.asset_universe)
@@ -134,9 +187,17 @@ def _apply_resolved_edit_to_draft(
         draft.comparison_baseline = resolved.comparison_baseline
         field_provenance["comparison_baseline"] = "explicit_user"
     if resolved.date_window is not None:
-        intent_resolution = resolve_date_range_intent(resolved.date_window)
+        date_window_intent = _date_window_intent_bound_to_latest_result(
+            resolved.date_window,
+            latest_result_window=latest_result_window,
+        )
+        intent_resolution = (
+            resolve_date_range_intent(date_window_intent)
+            if date_window_intent is not None
+            else None
+        )
         if intent_resolution is not None:
-            draft.date_range_intent = resolved.date_window
+            draft.date_range_intent = date_window_intent
             draft.date_range = intent_resolution.payload
             field_provenance["date_range"] = "explicit_user"
     if resolved.initial_capital is not None:
@@ -233,6 +294,32 @@ def _apply_legacy_flat_edit_fields(
         field_provenance["slippage"] = "explicit_user"
 
 
+def _edit_plan_reshapes_non_recurring_strategy(
+    plan: ArtifactAssumptionEditPlan,
+    *,
+    prior_strategy_type: Any,
+) -> bool:
+    """Recurring-buy plan fields aimed at a non-recurring strategy are a
+    reshape ("make it recurring buys instead"), not an assumption edit.
+
+    The edit-operation set cannot change strategy_type, so applying such a
+    plan would silently keep the old strategy; callers must step aside and
+    let a reshape-capable interpretation path handle the turn.
+    """
+
+    proposes_recurring_fields = (
+        plan.cadence is not None
+        or plan.recurring_contribution_amount is not None
+        or any(
+            operation.target in {"cadence", "recurring_contribution"}
+            for operation in plan.operations
+        )
+    )
+    if not proposes_recurring_fields:
+        return False
+    return canonical_strategy_type(prior_strategy_type) != "dca_accumulation"
+
+
 def _current_artifact_uses_rsi(request: InterpretationRequest) -> bool:
     strategy = _current_artifact_strategy(request)
     if strategy is None:
@@ -271,6 +358,7 @@ def _response_from_artifact_assumption_edit_plan(
             field_provenance=field_provenance,
             extra_parameters=extra_parameters,
             allow_indicator_parameters=allow_indicator_parameters,
+            latest_result_window=_latest_result_date_window(request),
         )
     else:
         _apply_legacy_flat_edit_fields(
