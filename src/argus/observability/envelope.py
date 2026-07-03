@@ -243,8 +243,8 @@ def capture_event(envelope: ArgusEventEnvelope) -> EventCaptureResult:
             event_id=envelope.event_id,
             destination=None,
         )
-    payload = posthog_event_payload(envelope, api_key=api_key)
     try:
+        payload = posthog_event_payload(envelope, api_key=api_key)
         response = httpx.post(
             capture_url,
             json=payload,
@@ -330,7 +330,7 @@ def _posthog_event_properties(envelope: ArgusEventEnvelope) -> dict[str, Any]:
         "event_id": envelope.event_id,
         "occurred_at": envelope.occurred_at.isoformat(),
         "environment": envelope.environment,
-        "privacy_mode": "metadata_only",
+        "privacy_mode": envelope.privacy_mode,
         "event_type": envelope.event_type,
         "event_action": envelope.event_action,
         "feature_area": envelope.feature_area,
@@ -394,6 +394,11 @@ def _posthog_ingestion_host() -> str | None:
         return _POSTHOG_US_HOST
     if region in {"eu", "eu-cloud", "eu-cloud-hosted"}:
         return _POSTHOG_EU_HOST
+    logger.warning(
+        "Unrecognized POSTHOG_REGION; product-event capture disabled. "
+        "Set POSTHOG_REGION to a us/eu synonym or POSTHOG_HOST explicitly.",
+        posthog_region=raw_region,
+    )
     return None
 
 
