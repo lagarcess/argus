@@ -3631,20 +3631,28 @@ def test_json_content_code_fence_stripping_is_safe() -> None:
 
 def test_json_content_code_fence_stripping_handles_provider_variants() -> None:
     """Schema-in-prompt providers fence on one line, skip the language tag,
-    or append prose after the closing fence; all must still yield the body."""
+    or wrap the fence in prose on either side; all must still yield the body."""
 
     single_line = '```json {"ok": true}```'
     no_language_tag = '```\n{"ok": true}\n```'
     inline_no_tag = '```{"ok": true}```'
     trailing_prose = '```json\n{"ok": true}\n```\nThis JSON matches the schema.'
+    leading_prose = 'Here is the JSON:\n```json\n{"ok": true}\n```'
     unterminated = '```json\n{"ok": true}'
     for content in (
         single_line,
         no_language_tag,
         inline_no_tag,
         trailing_prose,
+        leading_prose,
         unterminated,
     ):
         assert (
             openrouter._json_content_without_code_fences(content) == '{"ok": true}'
         ), content
+    # Bare JSON that happens to contain a fence inside a string stays intact.
+    bare_json_with_fence = '{"note": "wrap code in ``` blocks"}'
+    assert (
+        openrouter._json_content_without_code_fences(bare_json_with_fence)
+        == bare_json_with_fence
+    )

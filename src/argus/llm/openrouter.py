@@ -933,7 +933,12 @@ def _json_content_without_code_fences(content: str) -> str:
 
     text = content.strip()
     if not text.startswith("```"):
-        return text
+        if text.startswith(("{", "[")) or "```" not in text:
+            return text
+        # Leading prose before a fenced body ("Here is the JSON: ```json ...").
+        # Bare JSON is returned above untouched, so a ``` inside a JSON string
+        # never triggers this.
+        text = text[text.find("```") :]
     text = text[len("```") :]
     info_end = 0
     while info_end < len(text) and (
