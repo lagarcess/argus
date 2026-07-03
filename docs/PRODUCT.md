@@ -253,6 +253,13 @@ Strategies surface and the result-card Save action. Completed runs remain
 revisitable through conversation/history/Recents, while Refine idea remains
 available on the result card.
 
+Saved-idea recall lives in Omnisearch, not a separate dashboard. Typed search
+results and right-panel previews cover Conversation, Backtest, Evidence,
+Decision, and Idea, and the Idea Ledger browse groups saved ideas by decision
+state (promising, watching, rejected, revisit) with filter chips. Group order
+and counts are backend-owned; the frontend renders them without synthesizing
+its own groups.
+
 ## Surface Goals
 
 - scan saved strategies quickly

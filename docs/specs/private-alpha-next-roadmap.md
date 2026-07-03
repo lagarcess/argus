@@ -445,12 +445,12 @@ LANES BY GATE (the board agents execute from):
   observability envelope). "vs your last version" — return Δ, drawdown Δ, what
   changed; short, model-voiced. The differentiator from one-off output.
 
-- **A3 Idea Ledger portfolio view.** READY-BUILD, off-spine (Omnisearch/web
-  plus read-side API only; no interpret/edit code). Lightweight recall LANDED
-  (#132): decision-state pill + `?decision_state=` filter. REMAINING = the
-  status-organized PORTFOLIO view (promising/watching/rejected/revisit, by
-  asset/theme; memo §4.1) + the UI filter chip. Extends Omnisearch; not a new
-  dashboard. Frontend renders backend-provided state only.
+- **A3 Idea Ledger portfolio view.** DONE — merged as PR #147 (`e9180c8`).
+  Saved ideas browse inside Omnisearch grouped by decision state
+  (promising/watching/rejected/revisit) with filter chips; backend-owned
+  `ledger_groups` are the source of truth for group order and counts (clients
+  must not synthesize groups — recorded in `API_CONTRACT.md`); EN/es-419
+  localized; live browser QA passed in both languages.
 
 - **A4 Freshness on return** (memo §5.6 SOTA north — the MOAT-DEFINER, the
   biggest). BLOCKED(research/web lane; A1-A3 landing first); design notes
