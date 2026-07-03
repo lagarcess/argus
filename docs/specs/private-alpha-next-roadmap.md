@@ -8,11 +8,12 @@ legal/Data Controls surfaces (#137), and date-window helper cleanup (#138).
 Remaining P2 is reframed end-to-end around decision-memo execution gates, with
 the compounding loop as the highest-leverage PMF gate. Fees/slippage realism is
 an async isolated workstream (issue #130).
-Current pointer: PR #139 (`codex/chat-continuity-regression-repair`) is MERGED
-at `128818f`. Promotion to `main` is PAUSED pending the trust fixes (#140,
-#141, #142). Execution runs off the P2 execution board below: point an agent at
-any READY lane. The interpret/edit spine has exactly one owner lane at a time
-(currently A1, issue #141).
+Current pointer: #141 refine routing is MERGED (PR #148 at `5fc7a9a`).
+Promotion to `main` is PAUSED pending #140 (not started) and #142 (PR #146 in
+review; must rebase onto `5fc7a9a` and rerun the interpret suite before merge).
+Execution runs off the P2 execution board below: point an agent at any READY
+lane. The interpret/edit spine has exactly one owner lane at a time (currently
+unowned; A1b is next in the spine chain).
 Date: 2026-07-01
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
@@ -421,29 +422,21 @@ LANES BY GATE (the board agents execute from):
 
 **Gate A — compounding loop (highest leverage):**
 
-- **A1 Refine routing + loop repair (#141).** ACTIVE (in flight). Owns the
-  interpret/edit spine (ownership rule above). Founder-scoped 2026-07-01:
-  repair ONLY — (a) the refine chip and natural-language edits are two entry
-  points into the same typed edit operations, with the refinement pending
-  state a first-class edit context everywhere, not a one-guard patch; (b) a
-  new idea right after a completed result may borrow its context ("same time
-  period" binds silently to the latest run's window); (c) the repeated
-  date-confirmation loop. BUILT BUT MIS-ROUTED today: the "Refine idea" turn
-  tags its pending state `requested_field:"refinement"`
-  (`api/chat/result_actions.py`), which the edit contract's trigger
-  (`_request_targets_pending_artifact_assumption_edit`) does not recognize — so
-  refine edits BYPASS the operations planner and fall to the generic
-  interpreter (drops the edit / loses asset+date context; observed live). The
-  context IS reconstructed
-  (`agent_runtime/artifacts/drafts.py:draft_from_result_metadata`). Re-verify
-  the loop against `128818f` first, since PR #139 touched
-  `interpret_internal/pending_date_answer.py`. Spec lives with the lane:
-  `docs/specs/private-alpha-next-refine-to-version.md`.
+- **A1 Refine routing + loop repair (#141).** DONE — merged as PR #148
+  (`5fc7a9a`). Refine chip and natural-language edits now route through the
+  typed edit contract; refinement pending state is a first-class edit context;
+  same-period references bind silently to the latest run's window; the
+  supported-edit discriminator counts date-window and cadence evidence.
+  Regression suites added: `test_refine_action_edit_routing.py`,
+  `test_post_result_edit_routing.py`, `test_latest_result_window_binding.py`.
+  Spec: `docs/specs/private-alpha-next-refine-to-version.md`.
 
-- **A1b Linked IdeaVersion emission.** BLOCKED(A1); next spine-chain slice.
-  Emit a new `IdeaVersion` linked to the prior idea on refine (P1 spine
-  supports lineage). Split out of #141 by founder scope decision 2026-07-01;
-  this is the slice that UNBLOCKS comparison (A2).
+- **A1b Linked IdeaVersion emission.** READY-BUILD — next spine-chain slice;
+  the spine is unowned until this lane starts. Emit a new `IdeaVersion` linked
+  to the prior idea on refine (P1 spine supports lineage). Split out of #141
+  by founder scope decision 2026-07-01; this is the slice that UNBLOCKS
+  comparison (A2). Prefer starting it after PR #146 lands so only one lane at
+  a time sits on the interpret surface.
 
 - **A2 Comparison readout** (= P2.3 detail below). READY-SPEC (spec + founder
   questions now); BUILD is BLOCKED(A1b) — needs clean linked versions to
@@ -468,13 +461,17 @@ LANES BY GATE (the board agents execute from):
 
 **Gate B — trust, recovery, measurement:**
 
-- **B1 Latest-result answers from run facts (#140).** READY-BUILD in parallel
-  with A1 under the module-boundary contract: new logic lives in its own
+- **B1 Latest-result answers from run facts (#140).** READY-BUILD — dispatch
+  now; it was founder-serialized behind #141, which is merged. Build on top of
+  the landed refine routing. New logic lives in its own
   `stages/interpret_internal/` module (pattern: `requested_asset_answer.py`),
-  thin dispatch hook only, rebases onto A1 at merge time. Scope fence: answer
-  from canonical `backtest_runs`/result facts (peak date/value, drawdown date)
-  or state the limitation via typed payloads; preserve `result_run_id` in
-  response metadata. Do NOT rework recovery copy here (that is B4).
+  thin dispatch hook only. Coexistence contract: consume the interpreter's
+  typed intent only; if pending edit state is active and a turn classifies as
+  a result question, answer it and leave the pending state intact — the #148
+  regression suites must stay green. Scope fence: answer from canonical
+  `backtest_runs`/result facts (peak date/value, drawdown date) or state the
+  limitation via typed payloads; preserve `result_run_id` in response
+  metadata. Do NOT rework recovery copy here (that is B4).
 
 - **B2 Asset preservation in messy company-name prompts (#142).** ACTIVE (in
   flight). Scout verdict 2026-07-01: runs FREE of A1 — #142 lives on the
@@ -484,10 +481,13 @@ LANES BY GATE (the board agents execute from):
   (confirmation just renders `asset_universe`; the loss is upstream). Repro
   target: `tests/agent_runtime/test_interpret_stage.py` asserting TGT + WMT +
   COST all survive to confirmation. Discipline: keep the fix in
-  grounding/resolution modules and touch `stages/interpret.py` minimally;
-  between this lane and A1, whoever lands second rebases and reruns the
-  interpret suite. Spine rules apply: provider-backed name resolution feeds
-  INTO interpretation as context/tools, never a post-LLM text rescan.
+  grounding/resolution modules and touch `stages/interpret.py` minimally.
+  A1 landed first (PR #148, heavy overlap on `stages/interpret.py`,
+  `llm_interpreter.py`, `strategy_builder.py`): PR #146 MUST rebase onto
+  `5fc7a9a` and rerun the interpret suite plus the new #148 regression suites
+  before merge, even if GitHub reports a clean merge. Spine rules apply:
+  provider-backed name resolution feeds INTO interpretation as context/tools,
+  never a post-LLM text rescan.
 
 - **B3 Measurement wiring** (= P2.5 below). READY-BUILD, off-spine. One lane,
   THREE atomic slices in this ORDER, each its own PR — never combined into one
