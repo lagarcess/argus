@@ -10,6 +10,7 @@ from argus.agent_runtime.capabilities.contract import (
     build_default_capability_contract,
 )
 from argus.domain.indicators import EXECUTABLE_INDICATORS
+from argus.observability.product_events import capture_product_event
 
 MANIFEST_PATH = Path(__file__).with_name("chat_runtime_scenarios.json")
 
@@ -99,6 +100,16 @@ def iter_eval_cases(
                     judge_rubric=scenario["judge_rubric"],
                 )
             )
+    capture_product_event(
+        "eval_readiness",
+        user_id=None,
+        status="completed",
+        attributes={
+            "priority": priority or "all",
+            "case_count": len(cases),
+            "scenario_count": len(source["scenarios"]),
+        },
+    )
     return cases
 
 

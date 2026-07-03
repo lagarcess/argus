@@ -185,6 +185,36 @@ def test_eval_harness_builds_judge_payload_from_runtime_capabilities() -> None:
     assert payload["runtime_output"]["route_receipts"][0]["task"] == "interpretation"
 
 
+def test_eval_case_iteration_emits_eval_readiness_product_event(monkeypatch) -> None:
+    observed: list[dict[str, object]] = []
+
+    def fake_capture(kind: str, **kwargs: object) -> None:
+        observed.append({"kind": kind, **kwargs})
+
+    monkeypatch.setattr(
+        "tests.evals.chat_runtime_eval_harness.capture_product_event",
+        fake_capture,
+        raising=False,
+    )
+
+    manifest = _load_manifest()
+    cases = iter_eval_cases(priority="must_pass")
+
+    assert cases
+    assert observed == [
+        {
+            "kind": "eval_readiness",
+            "user_id": None,
+            "status": "completed",
+            "attributes": {
+                "priority": "must_pass",
+                "case_count": len(cases),
+                "scenario_count": len(manifest["scenarios"]),
+            },
+        }
+    ]
+
+
 def test_eval_harness_parses_canonical_sse_frames() -> None:
     events = parse_sse_events(
         "\n".join(

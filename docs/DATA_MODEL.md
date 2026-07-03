@@ -504,21 +504,32 @@ service role server-side; service-role grants do not relax frontend/client RLS.
 ## 12.1.1 P1 Observability Envelope
 
 P1 defines the private-alpha observability envelope in code without adding a new
-durable analytics or cost table in this slice.
+first-party analytics or cost table in this slice.
 
 Current behavior:
 - `argus_observability_event/v1` is the canonical event-envelope schema.
 - Default privacy mode is `metadata_only`.
-- Event categories include chat interpretation, continuity, evidence capture,
-  decision capture, recall, cost-ledger entries, and eval-suite readiness.
+- Product-event categories emitted to PostHog are evidence capture, decision
+  capture, recall usage, continuity mismatch, compare started, and eval
+  readiness.
+- The exact registered product-event name is carried as
+  `attributes.product_event`; envelope `event_type` remains in the broader memo
+  15.5 event taxonomy.
 - The sanitizer strips raw prompts, transcripts, context packets, route
   receipts, provider/model metadata, auth tokens, API keys, broker credentials,
   account balances, exact holdings, payment identifiers, and similar sensitive
   payloads.
-- Live analytics capture is suppressed with `reason = "p1_measurement_only"`.
+- Raw user, session, conversation, turn, message, job, and run identifiers are
+  hashed in the PostHog projection.
+- Live PostHog capture is enabled only when `POSTHOG_PROJECT_TOKEN` and an
+  explicit PostHog region/host are present; missing token suppresses with
+  `reason = "posthog_not_configured"`, and missing or unsupported region/host
+  suppresses with `reason = "posthog_region_not_configured"`.
+- PostHog is server-side only and personless (`$process_person_profile = false`).
+- US Cloud is the current PostHog region choice for private alpha compliance
+  posture.
 
 Deferred durable surfaces:
-- PostHog product analytics wiring.
 - Append-only provider cost ledger.
 - Eval run/case result persistence.
 - Route-receipt to cost/eval/product-event joins beyond existing product

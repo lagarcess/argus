@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 
 from loguru import logger
@@ -23,6 +24,37 @@ from argus.domain.evidence import (
     build_decision_note,
 )
 from argus.domain.store import utcnow
+from argus.observability.product_events import capture_product_event
+
+
+def _emit_product_event(kind: str, **kwargs: object) -> None:
+    """Emit a product event without stalling the chat stream.
+
+    These capture calls run inside the async SSE generator; ``capture_event``
+    does a blocking ``httpx.post``, so calling it inline would hold the event
+    loop for the PostHog round-trip (up to the configured timeout) and freeze
+    every concurrent request on the worker. When a loop is running the blocking
+    capture is offloaded to a worker thread (mirroring the measurement-event
+    path); with no loop (sync callers, tests) it runs inline. Failures are
+    swallowed so emission can never surface into a user turn.
+    """
+
+    def _run() -> None:
+        try:
+            capture_product_event(kind, **kwargs)
+        except Exception as exc:
+            logger.warning(
+                "Product event emission failed",
+                error=str(exc),
+                product_event=kind,
+            )
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        _run()
+        return
+    loop.run_in_executor(None, _run)
 
 
 class EvidenceArtifactNotFoundError(LookupError):
@@ -77,6 +109,19 @@ def auto_capture_completed_backtest(
     _attach_capture_to_result_card(run=run, captured=captured)
     if supabase_capture_persisted:
         _persist_result_card_capture(user_id=user.id, run=run)
+    _emit_product_event(
+        "evidence_capture",
+        user_id=user.id,
+        conversation_id=conversation.id,
+        backtest_run_id=run.id,
+        status="completed",
+        attributes={
+            "asset_class": run.asset_class,
+            "symbol_count": len(run.symbols),
+            "benchmark_present": bool(run.benchmark_symbol),
+            "persistence": "supabase" if supabase_capture_persisted else "memory",
+        },
+    )
     return captured
 
 
@@ -150,6 +195,18 @@ def create_decision_for_evidence_artifact(
                 evidence_artifact_id=artifact.id,
             )
 
+    _emit_product_event(
+        "decision_capture",
+        user_id=user.id,
+        conversation_id=artifact.source_conversation_id,
+        backtest_run_id=artifact.source_run_id,
+        status=decision.decision_state,
+        attributes={
+            "decision_state": decision.decision_state,
+            "artifact_lifecycle": artifact.lifecycle,
+            "note_present": bool(decision.note),
+        },
+    )
     return decision, artifact
 
 

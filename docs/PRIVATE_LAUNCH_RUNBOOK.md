@@ -248,9 +248,16 @@ Keep true secrets manual in Render:
 - `ALPACA_API_KEY`
 - `ALPACA_SECRET_KEY`
 - `ARGUS_OPS_TOKEN`
+- `POSTHOG_PROJECT_TOKEN`
 
-Keep `NEXT_PUBLIC_POSTHOG_KEY` present but empty until PostHog is intentionally
-enabled.
+Keep `NEXT_PUBLIC_POSTHOG_KEY` present but empty. Product analytics capture is
+server-side only through the sanitized observability envelope.
+
+Set `POSTHOG_REGION="US Cloud"` (or normalized `us`) for US Cloud unless the
+founder explicitly changes the analytics data-region posture. US Cloud is a
+compliance-posture choice for the current private alpha, not an accidental
+default. Do not enable frontend PostHog, autocapture, session replay, or person
+profiles.
 
 Set `ARGUS_OPS_TOKEN` manually in Render for `argus-api`; it is intentionally
 `sync: false`. Keep `ARGUS_OPS_TOKEN` out of frontend environment variables.
@@ -295,8 +302,9 @@ Before sending the URL, make sure tester instructions say:
 - Market or benchmark data can be unavailable. If that happens, retry the same
   setup, change the dates, or choose a different supported asset/benchmark.
 - Feedback buttons and the feedback dialog are the primary first-session
-  listening channel. PostHog/product analytics stay disabled until the
-  privacy-safe event taxonomy, redaction, and consent posture are approved.
+  listening channel. PostHog is limited to the approved server-side product
+  events and must not receive raw prompts, credentials, balances, holdings,
+  audio, route receipts, provider/model metadata, or frontend session data.
 - Terms, Privacy Policy, and explicit alpha consent remain a founder-owned gate
   before inviting users outside the private circle.
 

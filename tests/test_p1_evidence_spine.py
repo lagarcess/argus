@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from argus.api import state as api_state
-from argus.api.schemas import BacktestRun, Conversation, User
+from argus.api.schemas import BacktestRun, Conversation, DecisionNoteCreate, User
 from argus.domain.evidence import (
     build_backtest_evidence_capture,
     evidence_preview_from_artifact,
@@ -154,6 +154,96 @@ def test_completed_backtest_auto_captures_idea_version_and_evidence() -> None:
     )
     assert run.conversation_result_card["idea_id"] == captured.idea.id
     assert run.conversation_result_card["idea_version_id"] == captured.idea_version.id
+
+
+def test_completed_backtest_capture_emits_product_event(monkeypatch) -> None:
+    from argus.api.chat.evidence import auto_capture_completed_backtest
+
+    observed: list[dict[str, object]] = []
+
+    def fake_capture(kind: str, **kwargs: object) -> None:
+        observed.append({"kind": kind, **kwargs})
+
+    monkeypatch.setattr(
+        "argus.api.chat.evidence.capture_product_event",
+        fake_capture,
+        raising=False,
+    )
+    api_state.store.reset()
+    user = _user()
+    conversation = _conversation()
+    run = _run()
+
+    auto_capture_completed_backtest(
+        user=user,
+        conversation=conversation,
+        run=run,
+    )
+
+    assert observed == [
+        {
+            "kind": "evidence_capture",
+            "user_id": user.id,
+            "conversation_id": conversation.id,
+            "backtest_run_id": run.id,
+            "status": "completed",
+            "attributes": {
+                "asset_class": "equity",
+                "symbol_count": 3,
+                "benchmark_present": True,
+                "persistence": "memory",
+            },
+        }
+    ]
+
+
+def test_decision_capture_emits_product_event(monkeypatch) -> None:
+    from argus.api.chat.evidence import (
+        auto_capture_completed_backtest,
+        create_decision_for_evidence_artifact,
+    )
+
+    observed: list[dict[str, object]] = []
+
+    def fake_capture(kind: str, **kwargs: object) -> None:
+        observed.append({"kind": kind, **kwargs})
+
+    monkeypatch.setattr(
+        "argus.api.chat.evidence.capture_product_event",
+        fake_capture,
+        raising=False,
+    )
+    api_state.store.reset()
+    user = _user()
+    conversation = _conversation()
+    run = _run()
+    captured = auto_capture_completed_backtest(
+        user=user,
+        conversation=conversation,
+        run=run,
+    )
+    observed.clear()
+
+    create_decision_for_evidence_artifact(
+        user=user,
+        artifact_id=captured.evidence_artifact.id,
+        payload=DecisionNoteCreate(decision_state="promising", note="Keep watching."),
+    )
+
+    assert observed == [
+        {
+            "kind": "decision_capture",
+            "user_id": user.id,
+            "conversation_id": conversation.id,
+            "backtest_run_id": run.id,
+            "status": "promising",
+            "attributes": {
+                "decision_state": "promising",
+                "artifact_lifecycle": "decided",
+                "note_present": True,
+            },
+        }
+    ]
 
 
 def test_completed_backtest_capture_is_idempotent_by_run_id() -> None:
