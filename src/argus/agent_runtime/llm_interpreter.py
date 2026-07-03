@@ -79,6 +79,7 @@ from argus.agent_runtime.interpreter.date_window_repair import (  # noqa: F401
     _draft_has_supported_capability_shape_for_date_repair,
     _focused_date_window_extraction_messages,
     _pending_supported_execution_date_answer_can_use_focused_audit,
+    _post_result_dateless_execution_draft,
     _request_has_pending_date_answer_context,
     _response_from_focused_date_window_extraction,
     _response_has_ambiguous_rule_fields,
@@ -651,7 +652,12 @@ class OpenRouterStructuredInterpreter:
                         "dates as before', any language), set "
                         "date_range_intent.kind=same_as_latest_result with the "
                         "reference phrase as evidence and leave start/end "
-                        "empty; do not copy dates and do not ask for dates.\n"
+                        "empty; do not copy dates and do not ask for dates. "
+                        'Example: "try QQQ at $300 a month from the same time '
+                        'period" means date_range_intent={"kind": '
+                        '"same_as_latest_result", "evidence": "from the same '
+                        'time period"} plus the asset and contribution '
+                        "changes.\n"
                         if latest_result
                         else ""
                     )
@@ -3135,6 +3141,8 @@ def _response_needs_focused_date_window_intent_repair(
     if "focused_date_window_intent_repair" in response.reason_codes:
         return False
     draft = response.candidate_strategy_draft
+    if _post_result_dateless_execution_draft(response=response, request=request):
+        return True
     has_repairable_current_turn_date_gap = (
         _response_has_repairable_current_turn_date_gap(
             response=response,

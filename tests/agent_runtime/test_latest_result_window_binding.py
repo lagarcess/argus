@@ -302,3 +302,152 @@ def test_pending_gap_fill_ignores_boolean_recurring_contribution() -> None:
 
     assert filled.recurring_contribution is None
     assert "recurring_contribution" not in (filled.field_provenance or {})
+
+
+@pytest.mark.asyncio
+async def test_post_result_dateless_draft_gets_focused_reference_check(
+    monkeypatch,
+) -> None:
+    """When the primary model fills everything except the window on a
+    post-result turn, the focused date extraction must get a second look
+    before Argus asks the user — it can name the latest-result reference and
+    bind silently (founder-approved behavior)."""
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.llm_interpreter import StatedRunFieldFidelityAudit
+    from argus.agent_runtime.llm_interpreter_types import (
+        FocusedDateWindowExtraction,
+    )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol, **kwargs: ResolvedAssetStub(
+            symbol.strip().upper(), "equity", name="NVIDIA Corporation"
+        ),
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="strategy_drafting",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary=(
+                    "User wants a $500 monthly NVDA recurring buy over the "
+                    "same window as the completed test."
+                ),
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing=(
+                        "Could we try to buy NVDA at 500 dollars a month "
+                        "from the same time period"
+                    ),
+                    strategy_type="dca_accumulation",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                    cadence="monthly",
+                    recurring_contribution=500,
+                    field_provenance={
+                        "asset_universe": "explicit_user",
+                        "recurring_contribution": "recurring_contribution",
+                    },
+                ),
+                semantic_turn_act="new_idea",
+            )
+        if schema_model.__name__ == "FocusedDateWindowExtraction":
+            return FocusedDateWindowExtraction(
+                has_date_window=True,
+                date_range_raw_text="from the same time period",
+                date_range_intent=LLMDateRangeIntent(
+                    kind="same_as_latest_result",
+                    confidence=0.9,
+                    evidence="from the same time period",
+                ),
+                confidence=0.9,
+            )
+        if schema_model.__name__ == "StatedRunFieldFidelityAudit":
+            return StatedRunFieldFidelityAudit(confidence=0.9)
+        raise ValueError(f"unexpected schema request: {schema_model.__name__}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message=(
+                "Could we try to buy NVDA at 500 dollars a month from the "
+                "same time period"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="results_explanation",
+                completed=True,
+                latest_backtest_result_reference=_completed_result_reference(),
+            ),
+            selected_thread_metadata={
+                "latest_task_type": "results_explanation",
+                "last_stage_outcome": "ready_to_respond",
+            },
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert "FocusedDateWindowExtraction" in calls
+    draft = result.candidate_strategy_draft
+    assert draft.date_range == {"start": "2020-02-01", "end": "2026-07-02"}
+    assert draft.asset_universe == ["NVDA"]
+    assert "date_range" not in [
+        str(field).partition(".")[0] for field in result.missing_required_fields
+    ]
+
+
+def test_latest_result_context_prompt_carries_worked_example() -> None:
+    """Instruction-only guidance was not enough for the primary model to emit
+    the reference intent; the context block must carry a worked example."""
+
+    from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    messages = interpreter._messages(
+        InterpretationRequest(
+            current_user_message=(
+                "Could we try to buy NVDA at 500 dollars a month from the "
+                "same time period"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="results_explanation",
+                completed=True,
+                latest_backtest_result_reference=_completed_result_reference(),
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        )
+    )
+    context_blocks = [
+        str(message.content)
+        for message in messages
+        if "Latest result fact bank" in str(message.content)
+    ]
+    assert context_blocks
+    context = context_blocks[0]
+    assert '"kind": "same_as_latest_result"' in context
+    assert "do not ask for dates" in context.lower()

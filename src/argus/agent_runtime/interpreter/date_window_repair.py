@@ -8,6 +8,9 @@ from typing import Any
 
 from loguru import logger
 
+from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+    _request_targets_post_result_artifact_edit,
+)
 from argus.agent_runtime.interpreter.draft_shape import (
     _request_has_active_strategy_context,
 )
@@ -165,6 +168,31 @@ def _response_has_ambiguous_rule_fields(response: LLMInterpretationResponse) -> 
         field.field_name in {"entry_logic", "exit_logic"}
         for field in response.ambiguous_fields
     )
+
+
+def _post_result_dateless_execution_draft(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    """Post-result draft complete except the window.
+
+    The focused extraction must get a chance to name the latest-result
+    reference ("same time period") before the runtime asks the user for
+    dates — binding silently is the approved behavior and the primary model
+    under-reports the typed reference.
+    """
+
+    if not _request_targets_post_result_artifact_edit(request):
+        return False
+    draft = response.candidate_strategy_draft
+    if not _llm_value_is_empty(draft.date_range):
+        return False
+    if draft.date_range_intent is not None:
+        return False
+    if str(draft.date_range_raw_text or "").strip():
+        return False
+    return _llm_strategy_draft_has_concrete_execution_target(draft)
 
 
 def _request_has_pending_date_answer_context(
