@@ -125,6 +125,12 @@ async def latest_result_answer_stage_result_if_applicable(
             user_message=current_user_message,
             language=answer_language,
             fact_key=requested_fact_key,
+            # The runtime computed these facts itself, so a draft that omits
+            # them from fact_ids gets them appended instead of rejected.
+            extra_appendable_fact_ids={
+                "symbols",
+                *_PAIRED_FACT_IDS.get(requested_fact_key, (requested_fact_key,)),
+            },
         )
         if not response:
             return None
@@ -176,6 +182,11 @@ async def latest_result_answer_stage_result_if_applicable(
             "available_result_facts": ", ".join(available_facts),
         },
         extra_required_fact_ids={
+            "requested_fact_unavailable",
+            "available_result_facts",
+        },
+        extra_appendable_fact_ids={
+            "symbols",
             "requested_fact_unavailable",
             "available_result_facts",
         },

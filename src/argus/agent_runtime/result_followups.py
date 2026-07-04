@@ -146,6 +146,7 @@ async def compose_result_followup_response(
     fact_key: str | None = None,
     extra_facts: dict[str, str] | None = None,
     extra_required_fact_ids: set[str] | None = None,
+    extra_appendable_fact_ids: set[str] | None = None,
     invoke_json_schema_func=invoke_openrouter_json_schema,
     log_openrouter_failure_func=log_openrouter_failure,
 ) -> str | None:
@@ -218,6 +219,7 @@ async def compose_result_followup_response(
         fact_bank=fact_bank,
         required_fact_ids=required_fact_ids,
         focus=focus,
+        extra_appendable_fact_ids=extra_appendable_fact_ids,
     )
     if rendered is None:
         record_result_followup_recovery_receipt(
@@ -582,6 +584,7 @@ def render_result_followup_draft(
     fact_bank: dict[str, str],
     required_fact_ids: set[str],
     focus: ResultFollowupFocus,
+    extra_appendable_fact_ids: set[str] | None = None,
 ) -> str | None:
     body = render_result_followup_answer_body(draft)
     if not body:
@@ -606,6 +609,7 @@ def render_result_followup_draft(
         missing_fact_ids=required_fact_ids - used_fact_ids,
         fact_bank=fact_bank,
         focus=focus,
+        extra_appendable_fact_ids=extra_appendable_fact_ids,
     )
     ordered_fact_ids.extend(appendable_missing_fact_ids)
     used_fact_ids.update(appendable_missing_fact_ids)
@@ -686,6 +690,7 @@ def appendable_missing_required_fact_ids(
     missing_fact_ids: set[str],
     fact_bank: dict[str, str],
     focus: ResultFollowupFocus,
+    extra_appendable_fact_ids: set[str] | None = None,
 ) -> list[str]:
     appendable_fact_ids = {
         "context_packet_facts",
@@ -693,6 +698,8 @@ def appendable_missing_required_fact_ids(
         "caveat",
         "relative_performance",
     }
+    if extra_appendable_fact_ids:
+        appendable_fact_ids.update(extra_appendable_fact_ids)
     if result_followup_uses_context_route(fact_bank=fact_bank, focus=focus):
         appendable_fact_ids.update(
             {

@@ -629,3 +629,48 @@ async def test_workflow_unknown_metric_during_active_confirmation_preserves_card
     assert snapshot.active_confirmation_reference is not None
     assert snapshot.pending_strategy_summary is not None
     assert snapshot.latest_backtest_result_reference is not None
+
+
+def test_render_appends_runtime_pinned_facts_instead_of_rejecting() -> None:
+    from argus.agent_runtime.result_followups import (
+        ResultFollowupDraft,
+        render_result_followup_draft,
+    )
+
+    fact_bank = {
+        "caveat": "Historical simulation evidence, not a prediction",
+        "symbols": "AAPL",
+        "peak_date": "2026-06-02",
+        "peak_value": "$1,501.36",
+    }
+    draft = ResultFollowupDraft(
+        relative_performance_claim="unknown",
+        causal_attribution_claim="none",
+        answer="The peak was $1,501.36 on June 2, 2026.",
+        answer_blocks=["The peak was $1,501.36 on June 2, 2026."],
+        fact_ids=["caveat"],
+    )
+    required = {"caveat", "symbols", "peak_date", "peak_value"}
+
+    # The runtime computed the pinned facts itself: a draft that omits them
+    # from fact_ids gets them appended as a grounded fact line.
+    rendered = render_result_followup_draft(
+        draft=draft,
+        fact_bank=fact_bank,
+        required_fact_ids=required,
+        focus="peak_date",
+        extra_appendable_fact_ids={"symbols", "peak_date", "peak_value"},
+    )
+    assert rendered is not None
+    assert "$1,501.36" in rendered
+
+    # Without the appendable extension the same draft is rejected.
+    assert (
+        render_result_followup_draft(
+            draft=draft,
+            fact_bank=fact_bank,
+            required_fact_ids=required,
+            focus="peak_date",
+        )
+        is None
+    )
