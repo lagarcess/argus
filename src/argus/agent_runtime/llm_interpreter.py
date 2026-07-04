@@ -686,7 +686,7 @@ class OpenRouterStructuredInterpreter:
             "semantic_turn_act, artifact_target, and result_followup_focus; do not "
             "translate those machine fields. Put the detected user language in "
             "detected_user_language for every turn and in candidate_strategy_draft.language when "
-            "a strategy draft is present. Put bounded date/window phrase in candidate_strategy_draft.date_range_raw_text. For relative "
+            "a strategy draft is present. Put the exact bounded date/window phrase in candidate_strategy_draft.date_range_raw_text. For relative "
             "or semantic time windows, also fill candidate_strategy_draft."
             "date_range_intent with canonical fields: kind=rolling_window with "
             "count/unit, kind=year_to_date with optional year, kind=calendar_year "

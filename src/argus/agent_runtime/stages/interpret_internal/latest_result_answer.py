@@ -12,6 +12,7 @@ from argus.agent_runtime.response_style import (
 )
 from argus.agent_runtime.result_followups import (
     date_range_label,
+    metric_number,
     result_followup_fact_bank,
 )
 from argus.agent_runtime.stages.interpret_types import (
@@ -73,6 +74,12 @@ def overrides_refinement(
         interpretation.semantic_turn_act != "result_followup"
         or snapshot.latest_backtest_result_reference is None
     ):
+        return False
+    # Only claim the latest-result target when a fact key actually resolves;
+    # otherwise leave the target as pending_refinement so the misroute guard
+    # re-prompts the user to finish their refinement instead of silently
+    # answering and stalling the refinement.
+    if _requested_fact_key(interpretation) is None:
         return False
     if proposed != "latest_result":
         reason_codes.append("latest_result_overrode_pending_refinement")
@@ -233,7 +240,9 @@ def _answer_language(*, decision: InterpretDecision, fallback: str) -> str:
     return fallback
 
 
-def _requested_fact_key(decision: InterpretDecision) -> str | None:
+def _requested_fact_key(
+    decision: InterpretDecision | StructuredInterpretation,
+) -> str | None:
     explicit_key = _normalize_fact_key(decision.result_followup_fact_key)
     if explicit_key:
         return explicit_key
@@ -340,9 +349,9 @@ def _drawdown_answer(
     language: str,
 ) -> _FactAnswer | _FactLimitation:
     drawdown = _drawdown_trough(metadata)
-    metric = _metric_float(
+    metric = metric_number(
         metadata,
-        (
+        paths=(
             ("metrics", "aggregate", "risk", "max_drawdown_pct"),
             ("metrics", "aggregate", "max_drawdown_pct"),
         ),
@@ -375,12 +384,17 @@ def _drawdown_answer(
         facts["drawdown_date"] = drawdown[0]
         facts["source"] = "chart.series"
     if fact_key == "drawdown_date" and drawdown is not None:
+        # Pair the trough DATE with the magnitude computed at that same trough,
+        # not the aggregate metric — otherwise the stated % and date can
+        # describe different drawdown points.
+        trough_formatted = _format_percent(drawdown[1], signed=False)
+        facts["max_drawdown"] = trough_formatted
         response = (
-            f"La caída más grande tocó fondo el {drawdown[0]}, con {formatted} "
+            f"La caída más grande tocó fondo el {drawdown[0]}, con {trough_formatted} "
             "por debajo del máximo anterior de la cartera."
             if _is_spanish(language)
             else (
-                f"The largest drawdown bottomed on {drawdown[0]} at {formatted} "
+                f"The largest drawdown bottomed on {drawdown[0]} at {trough_formatted} "
                 "below the prior portfolio peak."
             )
         )
@@ -574,7 +588,7 @@ def _result_fact_catalog(metadata: dict[str, Any]) -> dict[str, _CatalogFact]:
             )
 
     for key, label, paths, formatter in _metric_fact_specs():
-        value = _metric_float(metadata, paths)
+        value = metric_number(metadata, paths=paths)
         if value is None:
             continue
         _add_catalog_fact(
@@ -771,9 +785,9 @@ def _peak_value(metadata: dict[str, Any]) -> float | None:
     point = _peak_point(metadata)
     if point is not None:
         return point.value
-    return _metric_float(
+    return metric_number(
         metadata,
-        (
+        paths=(
             ("chart", "value_summary", "peak_value"),
             ("result_card", "chart", "value_summary", "peak_value"),
             ("metrics", "aggregate", "performance", "portfolio_value_range", "peak_value"),
@@ -787,9 +801,9 @@ def _lowest_value(metadata: dict[str, Any]) -> float | None:
     point = _lowest_point(metadata)
     if point is not None:
         return point.value
-    return _metric_float(
+    return metric_number(
         metadata,
-        (
+        paths=(
             ("chart", "value_summary", "lowest_value"),
             ("result_card", "chart", "value_summary", "lowest_value"),
             ("metrics", "aggregate", "performance", "portfolio_value_range", "lowest_value"),
@@ -888,17 +902,6 @@ def _rows(value: Any) -> list[Mapping[str, Any]]:
 
 def _mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
-
-
-def _metric_float(
-    metadata: dict[str, Any],
-    paths: tuple[tuple[str, ...], ...],
-) -> float | None:
-    for path in paths:
-        value = _coerce_float(_get_path(metadata, path))
-        if value is not None:
-            return value
-    return None
 
 
 def _get_path(value: Mapping[str, Any], path: tuple[str, ...]) -> Any:

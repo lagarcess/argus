@@ -184,7 +184,9 @@ def test_latest_result_fact_answer_uses_typed_turn_language() -> None:
 
     assert result is not None
     answer = result.patch["assistant_response"]
-    assert "Valor máximo" in answer
+    # A peak_date question gets a date heading, not the value heading; the body
+    # remaining in Spanish confirms the typed es-419 turn language was used.
+    assert "Fecha máxima" in answer
     assert "El valor máximo de la cartera fue $14,500.25 el 2021-11-09" in answer
     assert "The peak portfolio value" not in answer
 
@@ -218,7 +220,7 @@ async def test_workflow_latest_result_fact_answer_uses_typed_turn_language() -> 
     )
 
     assert result["stage_outcome"] == "ready_to_respond"
-    assert "Valor máximo" in result["assistant_response"]
+    assert "Fecha máxima" in result["assistant_response"]
     assert "El valor máximo de la cartera fue $14,500.25 el 2021-11-09" in (
         result["assistant_response"]
     )

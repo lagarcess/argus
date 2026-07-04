@@ -346,9 +346,8 @@ def pending_strategy_metadata_fallback_context(
             chat_action.get("payload") if isinstance(chat_action, dict) else None
         )
         raw_source_run_id = (
-            source_result.get("run_id")
-            if isinstance(source_result, dict)
-            else metadata.get("source_result_run_id")
+            (source_result.get("run_id") if isinstance(source_result, dict) else None)
+            or metadata.get("source_result_run_id")
             or (
                 response_intent_facts.get("latest_run_id")
                 if isinstance(response_intent_facts, dict)
