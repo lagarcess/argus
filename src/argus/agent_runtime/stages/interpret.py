@@ -1005,9 +1005,10 @@ async def _stage_result_from_interpretation(
     )
     if pending_artifact_followup_result is not None:
         return pending_artifact_followup_result
-    latest_result_fact_answer = _latest_result_answer_stage_result_if_applicable(
+    latest_result_fact_answer = await _latest_result_answer_stage_result_if_applicable(
         decision=decision,
         snapshot=snapshot,
+        current_user_message=state.current_user_message,
         language=user.language_preference,
     )
     if latest_result_fact_answer is not None:

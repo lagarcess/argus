@@ -246,6 +246,35 @@
       "aria_label": "Result breakdown",
       "label": "Breakdown"
     },
+    "result_followup": {
+      "headings": {
+        "peak_date": "Peak date",
+        "peak_value": "Peak value",
+        "drawdown_date": "Drawdown date",
+        "max_drawdown": "Drawdown",
+        "lowest_date": "Lowest date",
+        "lowest_value": "Lowest value",
+        "final_value": "Final value",
+        "total_return": "Total return",
+        "benchmark_return": "Benchmark return",
+        "benchmark_delta": "Against benchmark",
+        "benchmark_symbol": "Benchmark",
+        "annualized_return": "Annualized return",
+        "profit": "Profit",
+        "volatility": "Volatility",
+        "win_rate": "Win rate",
+        "profit_factor": "Profit factor",
+        "sharpe_ratio": "Sharpe ratio",
+        "trade_count": "Trades",
+        "starting_capital": "Starting capital",
+        "date_range": "Date range",
+        "symbols": "Assets",
+        "strategy": "Strategy"
+      },
+      "options": {
+        "ask_supported": "Ask about an available result fact"
+      }
+    },
     "result_trust_strip": "Historical simulation · No fees/slippage · Not advice",
     "result_trust_strip_label": "Result trust context",
     "asset_class": {

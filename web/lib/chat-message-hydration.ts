@@ -3,6 +3,7 @@ import {
   failedActionRetryActionFromMetadata,
   retryLastTurnActionFromMetadata,
 } from "./chat-retry-actions";
+import { resultFactHeadingKeyFromMetadata } from "./result-followup-heading";
 import type { ChatActionOption, Message } from "@/components/chat/types";
 
 type TextMessageHydrationOptions = {
@@ -37,6 +38,9 @@ export function hydrateTextMessageFromApi(
     actions: isAssistant && retryActions.length > 0 ? retryActions : undefined,
     contentPresentation: isAssistant
       ? runtimeFailureContentPresentation(metadata, options.contentPresentation)
+      : undefined,
+    resultFactHeadingKey: isAssistant
+      ? resultFactHeadingKeyFromMetadata(metadata)
       : undefined,
   };
 }

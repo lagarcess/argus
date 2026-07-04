@@ -214,10 +214,15 @@ class LLMInterpretationResponse(BaseModel):
     result_followup_fact_key: str | None = Field(
         default=None,
         description=(
-            "Optional canonical key for a factual latest-result value the user "
-            "asked about, such as total_return, benchmark_delta, peak_date, "
-            "peak_value, max_drawdown, drawdown_date, symbols, date_range, or "
-            "benchmark_symbol. Use this only with semantic_turn_act=result_followup."
+            "Canonical snake_case key for a factual latest-result value the user "
+            "asked about. Allowed keys: total_return, benchmark_return, "
+            "benchmark_delta, benchmark_symbol, max_drawdown, drawdown_date, "
+            "peak_date, peak_value, lowest_date, lowest_value, final_value, "
+            "annualized_return, profit, volatility, win_rate, profit_factor, "
+            "sharpe_ratio, trade_count, starting_capital, date_range, symbols, "
+            "strategy. Emit exactly one of these keys — never a synonym or free "
+            "phrase; leave unset when none fits. Use this only with "
+            "semantic_turn_act=result_followup."
         ),
     )
     capability_question_focus: CapabilityQuestionFocus | None = None
