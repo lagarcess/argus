@@ -1,10 +1,9 @@
 /**
  * Typed heading key for latest-result fact answers.
  *
- * The backend no longer bakes markdown headings into fact-answer prose; it
- * emits a typed `response_intent` whose facts carry the canonical fact key.
- * The frontend owns the heading chrome: it localizes the key via i18n and
- * silently renders nothing when a key has no translation.
+ * Fact answers carry a typed `response_intent` whose facts name the canonical
+ * fact key; the frontend localizes it via i18n and renders nothing when a key
+ * has no translation.
  */
 
 const FACT_HEADING_INTENT_KINDS = new Set([

@@ -68,8 +68,8 @@ def format_decimal(value: float) -> str:
 def normalize_fact_key(value: Any) -> str | None:
     """Mechanical fact-key canonicalization: case and separators only.
 
-    Deliberately not a synonym table — the interpreter contract is to emit
-    canonical keys, and unknown keys route to the typed limitation path.
+    Not a synonym table: the interpreter emits canonical keys, and unknown
+    keys route to the typed limitation path.
     """
 
     text = str(value or "").strip().casefold()
@@ -121,9 +121,8 @@ def enriched_result_fact_entries(metadata: dict[str, Any]) -> dict[str, str]:
 
     trough = _drawdown_trough(points)
     if trough is not None:
-        # Depth is computed at the same trough as the date so the pair always
-        # describes one drawdown point; the aggregate metric stays available
-        # separately as max_drawdown.
+        # Depth is computed at the trough that dates the drawdown; the
+        # aggregate metric remains available as max_drawdown.
         entries["drawdown_date"] = trough[0]
         entries["drawdown_depth"] = format_percent(abs(trough[1]), signed=False)
 

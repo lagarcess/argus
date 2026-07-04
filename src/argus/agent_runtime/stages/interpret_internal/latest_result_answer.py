@@ -1,15 +1,10 @@
 """Typed routing for factual latest-result questions.
 
-The runtime owns deterministic truth here — which fact was asked for, whether
-it exists in the shared result fact bank, and the typed metadata the frontend
-renders — while the LLM owns every user-visible sentence. Prose is produced by
-``compose_result_followup_response`` (schema-forced, fact-ID-pinned,
-claim-checked, with a locale-derived language instruction), so answers follow
-the user's language without any per-language branching in this module.
-
-This module must never contain user-visible copy, language gates, or fact-key
-synonym tables: the interpreter contract is to emit canonical fact keys, and
-unknown or unavailable keys route to the typed limitation path.
+The runtime resolves which fact was asked for and whether it exists in the
+shared result fact bank; ``compose_result_followup_response`` writes the
+user-visible prose in the detected turn language. Keep this module free of
+user-visible copy, language gates, and fact-key synonym tables — unknown or
+unavailable keys route to the typed limitation path.
 """
 
 from __future__ import annotations
@@ -84,10 +79,8 @@ def overrides_refinement(
         or snapshot.latest_backtest_result_reference is None
     ):
         return False
-    # Only claim the latest-result target when a fact key actually resolves;
-    # otherwise leave the target as pending_refinement so the misroute guard
-    # re-prompts the user to finish their refinement instead of silently
-    # answering and stalling the refinement.
+    # Claim the latest-result target only when a fact key resolves; otherwise
+    # the pending-refinement misroute guard re-prompts the user.
     if _requested_fact_key(interpretation) is None:
         return False
     if proposed != "latest_result":

@@ -184,8 +184,7 @@ async def test_latest_result_peak_date_answer_composes_from_typed_facts() -> Non
     )
 
     assert result is not None
-    # The LLM owns the prose; the runtime must pass it through verbatim with
-    # no baked markdown heading.
+    # Composed prose passes through verbatim — no baked markdown heading.
     assert result.patch["assistant_response"] == "COMPOSED_FACT_ANSWER"
     assert len(composer.calls) == 1
     call = composer.calls[0]
@@ -249,8 +248,7 @@ async def test_fact_answer_passes_detected_turn_language_through() -> None:
 
 @pytest.mark.asyncio
 async def test_fact_answer_is_language_agnostic_for_any_detected_language() -> None:
-    # No hardcoded language gate: a French turn reaches the composer as fr,
-    # not collapsed to English or Spanish.
+    # A French turn reaches the composer as fr — not collapsed to en or es.
     composer = _RecordingComposer()
     decision = _decision("peak_date").model_copy(
         update={"detected_user_language": "fr"}
@@ -341,8 +339,7 @@ async def test_latest_result_unknown_metric_returns_typed_limitation() -> None:
 
 @pytest.mark.asyncio
 async def test_stage_returns_none_when_composition_fails() -> None:
-    # A failed composition falls through to the pre-existing recovery chain
-    # instead of inventing deterministic prose.
+    # Failed composition falls through to the recovery chain.
     composer = _RecordingComposer(response=None)
 
     result = await latest_result_answer_stage_result_if_applicable(
@@ -423,8 +420,7 @@ async def test_workflow_latest_result_fact_answer_uses_typed_turn_language(
     assert result["assistant_response"] == (
         "El valor máximo de la cartera fue $14,500.25 el 2021-11-09."
     )
-    # No server-baked markdown heading: the frontend renders localized chrome
-    # from the typed fact key.
+    # Heading chrome is rendered by the frontend from the typed fact key.
     assert not result["assistant_response"].startswith("**")
     assert composer.calls[0]["language"] == "es-419"
     assert result["response_intent"]["facts"]["fact_key"] == "peak_date"
