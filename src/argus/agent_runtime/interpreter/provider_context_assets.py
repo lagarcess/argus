@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import Any
 
 from argus.agent_runtime.llm_interpreter_types import (
     LLMAmbiguousField,
     LLMInterpretationResponse,
 )
+from argus.agent_runtime.resolution import AssetResolution
+from argus.agent_runtime.state.models import ResolutionProvenance
+from argus.domain.market_data.assets import ResolvedAsset
+
+_PROVIDER_RESOLVED_ASSETS_KEY = "provider_resolved_assets"
 
 
 def response_with_provider_context_assets(
@@ -27,6 +33,7 @@ def response_with_provider_context_assets(
         return response
 
     resolved_symbols: list[str] = []
+    resolved_records: list[dict[str, Any]] = []
     asset_classes: set[str] = set()
     ambiguous_fields: list[LLMAmbiguousField] = []
     for row in candidate_rows[:5]:
@@ -36,6 +43,7 @@ def response_with_provider_context_assets(
         symbol = str(row.get("symbol") or "").strip().upper()
         if symbol and symbol not in resolved_symbols:
             resolved_symbols.append(symbol)
+            resolved_records.append(_resolved_asset_record_from_context_row(row))
         asset_class = str(row.get("asset_class") or "").strip().lower()
         if asset_class:
             asset_classes.add(asset_class)
@@ -46,6 +54,10 @@ def response_with_provider_context_assets(
         draft.asset_class = next(iter(asset_classes))
     elif len(asset_classes) > 1:
         draft.asset_class = "mixed"
+    if resolved_records:
+        extra_parameters = dict(draft.extra_parameters or {})
+        extra_parameters[_PROVIDER_RESOLVED_ASSETS_KEY] = resolved_records
+        draft.extra_parameters = extra_parameters
 
     if not ambiguous_fields and draft == response.candidate_strategy_draft:
         return response
@@ -64,6 +76,121 @@ def response_with_provider_context_assets(
     return response.model_copy(update=update)
 
 
+def resolution_from_strategy_context(
+    strategy: Any,
+    symbol: str,
+    *,
+    field: str,
+) -> AssetResolution | None:
+    record = _resolved_asset_record_for_symbol(strategy, symbol)
+    if record is None:
+        return None
+    canonical_symbol = str(record.get("symbol") or "").strip().upper()
+    asset_class = str(record.get("asset_class") or "").strip().lower()
+    if asset_class not in {"equity", "crypto", "currency_pair"}:
+        return None
+    asset = ResolvedAsset(
+        canonical_symbol=canonical_symbol,
+        asset_class=asset_class,  # type: ignore[arg-type]
+        name=str(record.get("name") or canonical_symbol),
+        raw_symbol=str(record.get("raw_symbol") or canonical_symbol),
+        provider=str(record.get("provider") or "provider_catalog"),
+        exchange=str(record.get("exchange") or "") or None,
+    )
+    provenance = ResolutionProvenance(
+        field=field,
+        raw_text=str(record.get("raw_text") or symbol),
+        source="llm_extraction",
+        candidate_kind="asset",
+        resolution_status="resolved",
+        canonical_symbol=canonical_symbol,
+        asset_class=asset_class,
+        validated_by="provider_catalog",
+        confidence="medium",
+    )
+    return AssetResolution(
+        status="resolved",
+        raw_text=symbol,
+        asset=asset,
+        candidates=(asset,),
+        provenance=provenance,
+    )
+
+
+def response_with_canonical_interpreter_assets(
+    response: LLMInterpretationResponse,
+    *,
+    resolve_asset_candidate: Callable[..., AssetResolution],
+) -> LLMInterpretationResponse:
+    draft = response.candidate_strategy_draft
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return response
+    if not draft.asset_universe:
+        return response
+
+    canonical_symbols: list[str] = []
+    seen: set[str] = set()
+    asset_classes: set[str] = set()
+    changed = False
+    for index, value in enumerate(draft.asset_universe):
+        raw_text = str(value or "").strip()
+        if not raw_text:
+            changed = True
+            continue
+        symbol = raw_text
+        try:
+            resolution = resolution_from_strategy_context(
+                draft,
+                raw_text,
+                field=f"asset_universe[{index}]",
+            ) or resolve_asset_candidate(
+                raw_text,
+                field=f"asset_universe[{index}]",
+                source="llm_extraction",
+                asset_class_hint=draft.asset_class,
+            )
+        except Exception:
+            resolution = None
+        if (
+            resolution is not None
+            and resolution.status == "resolved"
+            and resolution.asset is not None
+        ):
+            resolved_symbol = str(
+                resolution.asset.canonical_symbol or ""
+            ).strip().upper()
+            if resolved_symbol:
+                symbol = resolved_symbol
+            asset_class = str(resolution.asset.asset_class or "").strip().lower()
+            if asset_class:
+                asset_classes.add(asset_class)
+        if symbol != raw_text:
+            changed = True
+        if symbol and symbol not in seen:
+            seen.add(symbol)
+            canonical_symbols.append(symbol)
+        elif symbol:
+            changed = True
+
+    if not canonical_symbols:
+        return response
+    resolved_asset_class: str | None = None
+    if len(asset_classes) == 1:
+        resolved_asset_class = next(iter(asset_classes))
+    elif len(asset_classes) > 1:
+        resolved_asset_class = "mixed"
+    if resolved_asset_class and draft.asset_class != resolved_asset_class:
+        changed = True
+    if not changed:
+        return response
+
+    repaired_draft = draft.model_copy(deep=True)
+    repaired_draft.asset_universe = canonical_symbols
+    if resolved_asset_class:
+        repaired_draft.asset_class = resolved_asset_class
+    return response.model_copy(update={"candidate_strategy_draft": repaired_draft})
+
+
 def _asset_context_rows(asset_resolution_context: str | None) -> list[dict[str, Any]]:
     if not asset_resolution_context:
         return []
@@ -75,6 +202,48 @@ def _asset_context_rows(asset_resolution_context: str | None) -> list[dict[str, 
     if not isinstance(rows, list):
         return []
     return [row for row in rows if isinstance(row, dict)]
+
+
+def _resolved_asset_record_from_context_row(row: dict[str, Any]) -> dict[str, Any]:
+    symbol = str(row.get("symbol") or "").strip().upper()
+    return {
+        "raw_text": str(row.get("raw_text") or "").strip(),
+        "symbol": symbol,
+        "asset_class": str(row.get("asset_class") or "").strip().lower(),
+        "name": str(row.get("name") or symbol).strip(),
+        "raw_symbol": str(row.get("raw_symbol") or symbol).strip(),
+        "provider": str(row.get("provider") or "provider_catalog").strip(),
+        "exchange": str(row.get("exchange") or "").strip(),
+    }
+
+
+def _resolved_asset_record_for_symbol(
+    strategy: Any,
+    symbol: str,
+) -> dict[str, Any] | None:
+    extra_parameters = getattr(strategy, "extra_parameters", None)
+    if not isinstance(extra_parameters, dict):
+        return None
+    records = extra_parameters.get(_PROVIDER_RESOLVED_ASSETS_KEY)
+    if not isinstance(records, list):
+        return None
+    for record in records:
+        if isinstance(record, dict) and _provider_record_matches_symbol(record, symbol):
+            return record
+    return None
+
+
+def _provider_record_matches_symbol(record: dict[str, Any], symbol: str) -> bool:
+    normalized = str(symbol or "").strip().upper()
+    compact = normalized.replace("/", "")
+    candidates = {
+        str(record.get("symbol") or "").strip().upper(),
+        str(record.get("raw_symbol") or "").strip().upper(),
+    }
+    return any(
+        candidate and candidate.replace("/", "") == compact
+        for candidate in candidates
+    )
 
 
 def _ambiguous_field_from_context_row(row: dict[str, Any]) -> LLMAmbiguousField:

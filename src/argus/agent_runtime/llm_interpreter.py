@@ -313,7 +313,7 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMUnsupportedConstraint,
 )
 from argus.agent_runtime.presentation_i18n import asset_universe_operation_clarification_message
-from argus.agent_runtime.resolution import AssetResolution
+from argus.agent_runtime.resolution import AssetResolution, callable_accepts_keyword
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
@@ -468,6 +468,7 @@ class OpenRouterStructuredInterpreter:
             repaired_response = await _focused_strategy_repair_after_candidate_failures(
                 request=request,
                 preferred_model=candidate_models[0] if candidate_models else "",
+                asset_resolution_context=asset_resolution_context,
             )
             if repaired_response is not None:
                 self.last_status = "fallback_used"
@@ -603,6 +604,7 @@ class OpenRouterStructuredInterpreter:
         repaired_response = await _focused_strategy_repair_after_candidate_failures(
             request=request,
             preferred_model=fallback_model_name or primary_model_name,
+            asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
             self.last_status = "fallback_used"
@@ -2194,6 +2196,7 @@ async def _response_ready_for_runtime(
         response=response,
         preferred_model=preferred_model,
         request=request,
+        asset_resolution_context=asset_resolution_context,
     )
     if focused_response is not None:
         response = focused_response
@@ -2241,6 +2244,7 @@ async def _response_ready_for_runtime(
             failed_response=response,
             preferred_model=preferred_model,
             request=request,
+            asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
             return await _stated_run_field_audited_response(
@@ -2256,6 +2260,7 @@ async def _response_ready_for_runtime(
             failed_response=response,
             preferred_model=preferred_model,
             request=request,
+            asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
             return await _stated_run_field_audited_response(
@@ -2401,6 +2406,7 @@ async def _response_ready_for_runtime(
                 failed_response=response,
                 preferred_model=preferred_model,
                 request=request,
+                asset_resolution_context=asset_resolution_context,
             )
             if repaired_response is not None:
                 return await _stated_run_field_audited_response(
@@ -2429,6 +2435,7 @@ async def _response_ready_for_runtime(
             failed_response=response,
             preferred_model=preferred_model,
             request=request,
+            asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
             return await _stated_run_field_audited_response(
@@ -2458,6 +2465,7 @@ async def _response_ready_for_runtime(
             failed_response=response,
             preferred_model=preferred_model,
             request=request,
+            asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
             response = repaired_response
@@ -2466,6 +2474,7 @@ async def _response_ready_for_runtime(
             failed_response=response,
             preferred_model=preferred_model,
             request=request,
+            asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
             response = repaired_response
@@ -2474,6 +2483,7 @@ async def _response_ready_for_runtime(
             failed_response=response,
             preferred_model=preferred_model,
             request=request,
+            asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
             response = repaired_response
@@ -2482,6 +2492,7 @@ async def _response_ready_for_runtime(
             failed_response=response,
             preferred_model=preferred_model,
             request=request,
+            asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
             return await _stated_run_field_audited_response(
@@ -2497,6 +2508,7 @@ async def _response_ready_for_runtime(
             failed_response=response,
             preferred_model=preferred_model,
             request=request,
+            asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
             return await _stated_run_field_audited_response(
@@ -2509,6 +2521,7 @@ async def _response_ready_for_runtime(
             failed_response=response,
             preferred_model=preferred_model,
             request=request,
+            asset_resolution_context=asset_resolution_context,
         )
         if repaired_response is not None:
             return await _stated_run_field_audited_response(
@@ -2597,6 +2610,7 @@ async def _response_ready_for_runtime(
         failed_response=response,
         preferred_model=preferred_model,
         request=request,
+        asset_resolution_context=asset_resolution_context,
     )
     if repaired_response is not None:
         return await _stated_run_field_audited_response(
@@ -3053,6 +3067,7 @@ async def _repair_incomplete_strategy_extraction(
     failed_response: LLMInterpretationResponse,
     preferred_model: str,
     request: InterpretationRequest,
+    asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse | None:
     if not _strategy_extraction_repair_is_allowed(failed_response, request=request):
         return None
@@ -3080,7 +3095,11 @@ async def _repair_incomplete_strategy_extraction(
             request=request,
             base_response=failed_response,
         )
-        response = _normalize_response_for_runtime_context(response, request=request)
+        response = _normalize_response_for_runtime_context(
+            response,
+            request=request,
+            asset_resolution_context=asset_resolution_context,
+        )
         response = _augment_strategy_assets_from_resolvable_context(
             response=response,
             request=request,
@@ -4601,6 +4620,7 @@ async def _early_focused_strategy_repaired_response(
     response: LLMInterpretationResponse,
     preferred_model: str,
     request: InterpretationRequest,
+    asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse | None:
     blocker = _optional_runtime_readiness_audit_blocker(
         response=response,
@@ -4630,6 +4650,7 @@ async def _early_focused_strategy_repaired_response(
         failed_response=response,
         preferred_model=preferred_model,
         request=request,
+        asset_resolution_context=asset_resolution_context,
     )
     if repaired is None:
         _log_runtime_readiness_step(
@@ -4695,6 +4716,7 @@ async def _focused_strategy_repair_after_candidate_failures(
     *,
     request: InterpretationRequest,
     preferred_model: str,
+    asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse | None:
     if _request_has_active_strategy_context(
         request
@@ -4722,6 +4744,7 @@ async def _focused_strategy_repair_after_candidate_failures(
         failed_response=seed_response,
         preferred_model=preferred_model,
         request=request,
+        asset_resolution_context=asset_resolution_context,
     )
 
 
@@ -5098,69 +5121,9 @@ def _normalize_response_for_runtime_context(
 def _response_with_canonical_interpreter_assets(
     response: LLMInterpretationResponse,
 ) -> LLMInterpretationResponse:
-    draft = response.candidate_strategy_draft
-    if response.intent not in {"strategy_drafting", "backtest_execution"}:
-        return response
-    if not draft.asset_universe:
-        return response
-
-    canonical_symbols: list[str] = []
-    seen: set[str] = set()
-    asset_classes: set[str] = set()
-    changed = False
-    for index, value in enumerate(draft.asset_universe):
-        raw_text = str(value or "").strip()
-        if not raw_text:
-            changed = True
-            continue
-        symbol = raw_text
-        try:
-            resolution = _resolve_asset_candidate(
-                raw_text,
-                field=f"asset_universe[{index}]",
-                source="llm_extraction",
-            )
-        except Exception:
-            resolution = None
-        if (
-            resolution is not None
-            and resolution.status == "resolved"
-            and resolution.asset is not None
-        ):
-            resolved_symbol = str(
-                resolution.asset.canonical_symbol or ""
-            ).strip().upper()
-            if resolved_symbol:
-                symbol = resolved_symbol
-            asset_class = str(resolution.asset.asset_class or "").strip().lower()
-            if asset_class:
-                asset_classes.add(asset_class)
-        if symbol != raw_text:
-            changed = True
-        if symbol and symbol not in seen:
-            seen.add(symbol)
-            canonical_symbols.append(symbol)
-        elif symbol:
-            changed = True
-
-    if not canonical_symbols:
-        return response
-    resolved_asset_class: str | None = None
-    if len(asset_classes) == 1:
-        resolved_asset_class = next(iter(asset_classes))
-    elif len(asset_classes) > 1:
-        resolved_asset_class = "mixed"
-    if resolved_asset_class and draft.asset_class != resolved_asset_class:
-        changed = True
-    if not changed:
-        return response
-
-    repaired_draft = draft.model_copy(deep=True)
-    repaired_draft.asset_universe = canonical_symbols
-    if resolved_asset_class:
-        repaired_draft.asset_class = resolved_asset_class
-    return response.model_copy(
-        update={"candidate_strategy_draft": repaired_draft}
+    return provider_context_assets.response_with_canonical_interpreter_assets(
+        response,
+        resolve_asset_candidate=_resolve_asset_candidate,
     )
 
 
@@ -5212,18 +5175,26 @@ def _validate_capability_boundaries(
         ):
             field_owned_indicator_symbols.append(symbol)
             continue
-        resolution = _resolve_asset_candidate(
-            symbol,
-            field=f"asset_universe[{index}]",
-            source="llm_extraction",
+        resolution = (
+            provider_context_assets.resolution_from_strategy_context(
+                strategy,
+                symbol,
+                field=f"asset_universe[{index}]",
+            )
+            or _resolve_asset_candidate(
+                symbol,
+                field=f"asset_universe[{index}]",
+                source="llm_extraction",
+                asset_class_hint=strategy.asset_class,
+            )
         )
         resolution_provenance.append(resolution.provenance)
         if resolution.status == "ambiguous":
             candidate_symbols = [
-                symbol
+                normalized
                 for candidate in resolution.candidates
                 if (
-                    symbol := str(
+                    normalized := str(
                         getattr(candidate, "canonical_symbol", "") or ""
                     ).strip().upper()
                 )
@@ -5328,10 +5299,20 @@ def _resolve_asset_candidate(
     query: str,
     *,
     field: str,
-    source: ResolutionSource, resolution_mode: str = "auto",
+    source: ResolutionSource,
+    resolution_mode: str = "auto",
+    asset_class_hint: str | None = None,
 ) -> AssetResolution:
     if resolve_asset is _DEFAULT_RESOLVE_ASSET:
-        return runtime_resolve_asset_candidate(query, field=field, source=source, resolution_mode=resolution_mode)  # noqa: E501
+        kwargs: dict[str, Any] = {"field": field, "source": source}
+        if callable_accepts_keyword(runtime_resolve_asset_candidate, "resolution_mode"):
+            kwargs["resolution_mode"] = resolution_mode
+        if asset_class_hint is not None and callable_accepts_keyword(
+            runtime_resolve_asset_candidate,
+            "asset_class_hint",
+        ):
+            kwargs["asset_class_hint"] = asset_class_hint
+        return runtime_resolve_asset_candidate(query, **kwargs)
     resolved = resolve_asset(query)
     provenance = ResolutionProvenance(
         field=field,

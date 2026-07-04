@@ -30,10 +30,7 @@ async def provider_asset_resolution_context_for_request(
     ):
         return None
     messages = _asset_mention_extraction_messages(request)
-    for model_name in openrouter_structured_model_candidates(
-        preferred_model,
-        task=_INTERPRETATION_REPAIR_TASK,
-    ):
+    for model_name in _interpretation_repair_model_candidates(preferred_model):
         try:
             extraction = await invoke_schema(
                 task=_INTERPRETATION_REPAIR_TASK,
@@ -59,6 +56,28 @@ async def provider_asset_resolution_context_for_request(
     return None
 
 
+def _interpretation_repair_model_candidates(preferred_model: str) -> list[str]:
+    """Ordered repair-model fallback chain for the asset-mention preflight.
+
+    Mirrors ``_unique_repair_models`` for the interpretation_repair task: the
+    configured tier candidates first, then the preferred model, deduped. Reusing
+    only the preferred model would leave the preflight with no fallback when that
+    model times out or rejects the schema.
+    """
+    candidates = [
+        *openrouter_structured_model_candidates(task=_INTERPRETATION_REPAIR_TASK),
+        preferred_model,
+    ]
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for model_name in candidates:
+        if not model_name or model_name in seen:
+            continue
+        seen.add(model_name)
+        ordered.append(model_name)
+    return ordered
+
+
 def provider_asset_resolution_context_from_extraction(
     extraction: LLMAssetMentionExtraction,
     *,
@@ -66,7 +85,7 @@ def provider_asset_resolution_context_from_extraction(
 ) -> str | None:
     rows: list[dict[str, object]] = []
     seen: set[str] = set()
-    for mention in extraction.asset_mentions[:5]:
+    for mention in extraction.asset_mentions:
         raw_text = str(mention.raw_text or "").strip()
         raw_key = raw_text.casefold()
         if not raw_key or raw_key in seen:
@@ -79,12 +98,15 @@ def provider_asset_resolution_context_from_extraction(
             else f"asset_universe[{len(rows)}]"
         )
         try:
-            resolution = resolve_asset_candidate(
-                raw_text,
-                field=field,
-                source="llm_extraction",
-                resolution_mode=_resolution_mode_for_mention(mention),
-            )
+            resolution_kwargs: dict[str, Any] = {
+                "field": field,
+                "source": "llm_extraction",
+                "resolution_mode": _resolution_mode_for_mention(mention),
+            }
+            asset_class_hint = _asset_class_hint_for_mention(mention)
+            if asset_class_hint:
+                resolution_kwargs["asset_class_hint"] = asset_class_hint
+            resolution = resolve_asset_candidate(raw_text, **resolution_kwargs)
         except ValueError:
             continue
         row = _provider_asset_resolution_context_row(
@@ -151,17 +173,28 @@ def _asset_mention_extraction_messages(
 
 def _resolution_mode_for_mention(mention: Any) -> str:
     kind = str(getattr(mention, "mention_kind", "") or "unknown")
-    if kind == "company_name":
-        return "company_name"
-    if kind in {"ticker", "crypto", "currency_pair"}:
-        return "symbol"
     raw_text = str(getattr(mention, "raw_text", "") or "").strip()
     compact = raw_text.replace("/", "").replace("-", "").lstrip("$")
-    if raw_text.startswith("$") or "/" in raw_text or "-" in raw_text:
+    is_symbol_like = (
+        raw_text.startswith("$")
+        or "/" in raw_text
+        or "-" in raw_text
+        or (compact.isalpha() and compact == compact.upper())
+    )
+    if kind == "company_name":
+        return "company_name"
+    if kind in {"ticker", "currency_pair"}:
         return "symbol"
-    if compact.isalpha() and compact == compact.upper():
-        return "symbol"
-    return "company_name"
+    return "symbol" if is_symbol_like else "company_name"
+
+
+def _asset_class_hint_for_mention(mention: Any) -> str | None:
+    kind = str(getattr(mention, "mention_kind", "") or "unknown")
+    if kind == "crypto":
+        return "crypto"
+    if kind == "currency_pair":
+        return "currency_pair"
+    return None
 
 
 def _provider_asset_resolution_context_row(
@@ -180,6 +213,9 @@ def _provider_asset_resolution_context_row(
             "symbol": str(resolution.asset.canonical_symbol or "").strip().upper(),
             "asset_class": str(resolution.asset.asset_class or "").strip(),
             "name": str(resolution.asset.name or "").strip(),
+            "raw_symbol": str(resolution.asset.raw_symbol or "").strip(),
+            "provider": str(getattr(resolution.asset, "provider", "") or "").strip(),
+            "exchange": str(getattr(resolution.asset, "exchange", "") or "").strip(),
             "mention_kind": mention_kind,
             "confidence": confidence,
         }

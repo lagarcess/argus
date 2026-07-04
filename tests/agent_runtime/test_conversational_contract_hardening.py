@@ -912,6 +912,75 @@ def test_dca_recurring_amount_with_current_message_evidence_is_preserved(
     assert response.missing_required_fields == []
 
 
+def test_ambiguous_asset_field_records_user_mention_not_last_candidate(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as llm_module
+    from argus.agent_runtime.llm_interpreter import _validate_capability_boundaries
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    tgt = ResolvedAssetStub("TGT", "equity", name="Target Corporation")
+    tgtx = ResolvedAssetStub("TGTX", "equity", name="Targa Resources")
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        resolution_mode: str = "auto",
+        asset_class_hint: str | None = None,
+    ) -> AssetResolution:
+        return AssetResolution(
+            status="ambiguous",
+            raw_text=query,
+            asset=None,
+            candidates=(tgt, tgtx),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="ambiguous",
+                confidence="medium",
+            ),
+        )
+
+    monkeypatch.setattr(
+        llm_module, "runtime_resolve_asset_candidate", resolve_candidate
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="User wants to buy Target monthly.",
+        candidate_strategy_draft=LLMStrategyDraft(),
+    )
+    strategy = StrategySummary(
+        strategy_type="dca_accumulation",
+        asset_universe=["Target"],
+        date_range="2024",
+    )
+
+    _validate_capability_boundaries(
+        strategy=strategy,
+        response=response,
+        request=InterpretationRequest(
+            current_user_message="buy Target every month in 2024",
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert len(response.ambiguous_fields) == 1
+    ambiguous = response.ambiguous_fields[0]
+    assert ambiguous.raw_value == "Target"
+    assert ambiguous.candidate_normalized_value == ["TGT", "TGTX"]
+
+
 def test_dca_recurring_amount_semantic_provenance_handles_variation(
     monkeypatch,
 ) -> None:

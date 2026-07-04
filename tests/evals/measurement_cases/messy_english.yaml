@@ -31,10 +31,3 @@ cases:
         end: "2024-12-31"
       benchmark_symbol: SPY
       stage_outcomes: ["ready_for_confirmation", "await_approval"]
-    expected_fail:
-      issue: "#142"
-      reason: "Current integration can drop company-name assets before confirmation."
-      allowed_failures:
-        - "capability_verdict:"
-        - "assets:"
-        - "stage_outcomes:"

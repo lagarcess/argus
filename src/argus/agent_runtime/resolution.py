@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 from argus.agent_runtime.state.models import (
     ResolutionProvenance,
@@ -17,6 +18,25 @@ from argus.domain.indicators import (
 from argus.domain.market_data import ResolvedAsset, is_ticker_like_query
 from argus.domain.market_data import resolve_asset as resolve_market_asset
 from argus.domain.market_data import search_assets as search_market_assets
+
+
+def callable_accepts_keyword(fn: Callable[..., Any], name: str) -> bool:
+    """Whether ``fn`` accepts ``name`` as a keyword argument.
+
+    Interpretation and stage code inject the resolver via monkeypatch in tests;
+    some stubs predate newer keyword args (``resolution_mode``,
+    ``asset_class_hint``). Callers use this to pass those kwargs only when the
+    bound resolver actually accepts them. Unknown/unintrospectable callables are
+    assumed permissive.
+    """
+    try:
+        parameters = inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return True
+    return name in parameters or any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
 
 
 @dataclass(frozen=True)
@@ -65,6 +85,7 @@ def resolve_asset_candidate(
     field: str,
     source: ResolutionSource,
     resolution_mode: AssetResolutionMode = "auto",
+    asset_class_hint: str | None = None,
 ) -> AssetResolution:
     raw_text = str(query or "").strip()
     if not raw_text:
@@ -78,9 +99,36 @@ def resolve_asset_candidate(
             confidence="low",
         )
     if resolution_mode == "company_name":
-        return _resolve_company_name_asset(raw_text, field=field, source=source)
+        return _resolve_company_name_asset(
+            raw_text,
+            field=field,
+            source=source,
+            asset_class_hint=asset_class_hint,
+        )
+    normalized_hint = _normalized_asset_class_hint(asset_class_hint)
+    candidates: tuple[ResolvedAsset, ...] = ()
     try:
         asset = resolve_market_asset(raw_text)
+        if normalized_hint and asset.asset_class != normalized_hint:
+            candidates = (asset, *_search_assets_safely(raw_text, limit=12))
+            hinted_resolution = _symbol_hint_resolution(
+                raw_text,
+                candidates=_unique_assets(candidates),
+                asset_class_hint=normalized_hint,
+                field=field,
+                source=source,
+            )
+            if hinted_resolution is not None:
+                return hinted_resolution
+            return _asset_resolution(
+                status="unsupported",
+                raw_text=raw_text,
+                field=field,
+                source=source,
+                asset=None,
+                candidates=tuple(_unique_assets(candidates)),
+                confidence="low",
+            )
         return _asset_resolution(
             status="resolved",
             raw_text=raw_text,
@@ -165,9 +213,14 @@ def _resolve_company_name_asset(
     *,
     field: str,
     source: ResolutionSource,
+    asset_class_hint: str | None = None,
 ) -> AssetResolution:
     candidates = _unique_assets(_search_assets_safely(raw_text, limit=12))
-    ranked = _rank_company_name_candidates(raw_text, candidates)
+    ranked = _rank_company_name_candidates(
+        raw_text,
+        candidates,
+        asset_class_hint=asset_class_hint,
+    )
     if not ranked:
         return _asset_resolution(
             status="unsupported",
@@ -182,7 +235,7 @@ def _resolve_company_name_asset(
     tied = [
         asset
         for key, asset in ranked
-        if key[:3] == best_key[:3]
+        if key[:4] == best_key[:4]
     ]
     if len(tied) > 1:
         return _asset_resolution(
@@ -228,12 +281,90 @@ def _provider_name_prefix_match(raw_text: str, asset: ResolvedAsset) -> bool:
     return bool(lowered and top_name.startswith(lowered))
 
 
+def _symbol_hint_resolution(
+    raw_text: str,
+    *,
+    candidates: list[ResolvedAsset],
+    asset_class_hint: str,
+    field: str,
+    source: ResolutionSource,
+) -> AssetResolution | None:
+    ranked = _rank_symbol_hint_candidates(
+        raw_text,
+        candidates,
+        asset_class_hint=asset_class_hint,
+    )
+    if not ranked:
+        return None
+    best_key, best_asset = ranked[0]
+    tied = [asset for key, asset in ranked if key[:2] == best_key[:2]]
+    if len(tied) > 1:
+        return _asset_resolution(
+            status="ambiguous",
+            raw_text=raw_text,
+            field=field,
+            source=source,
+            asset=None,
+            candidates=tuple(tied[:5]),
+            confidence="medium",
+        )
+    return _asset_resolution(
+        status="resolved",
+        raw_text=raw_text,
+        field=field,
+        source=source,
+        asset=best_asset,
+        candidates=(best_asset,),
+        confidence="medium",
+    )
+
+
+def _rank_symbol_hint_candidates(
+    raw_text: str,
+    candidates: list[ResolvedAsset],
+    *,
+    asset_class_hint: str,
+) -> list[tuple[tuple[int, int, int, str], ResolvedAsset]]:
+    ranked: list[tuple[tuple[int, int, int, str], ResolvedAsset]] = []
+    for asset in candidates:
+        if _asset_class_hint_rank(asset, asset_class_hint) != 0:
+            continue
+        symbol_score = _symbol_hint_match_score(raw_text, asset)
+        if symbol_score > 0:
+            continue
+        ranked.append(
+            (
+                (
+                    symbol_score,
+                    _exchange_rank(asset),
+                    len(str(asset.canonical_symbol or "")),
+                    str(asset.canonical_symbol or ""),
+                ),
+                asset,
+            )
+        )
+    ranked.sort(key=lambda item: item[0])
+    return ranked
+
+
+def _symbol_hint_match_score(raw_text: str, asset: ResolvedAsset) -> int:
+    query = _compact_resolution_symbol(raw_text)
+    canonical = _compact_resolution_symbol(asset.canonical_symbol)
+    raw_symbol = _compact_resolution_symbol(getattr(asset, "raw_symbol", ""))
+    if query and query in {canonical, raw_symbol}:
+        return 0
+    return 1
+
+
 def _rank_company_name_candidates(
     raw_text: str,
     candidates: list[ResolvedAsset],
-) -> list[tuple[tuple[int, int, int, int, str], ResolvedAsset]]:
+    *,
+    asset_class_hint: str | None = None,
+) -> list[tuple[tuple[int, int, int, int, int, str], ResolvedAsset]]:
     lowered = " ".join(str(raw_text or "").casefold().split())
-    ranked: list[tuple[tuple[int, int, int, int, str], ResolvedAsset]] = []
+    normalized_hint = _normalized_asset_class_hint(asset_class_hint)
+    ranked: list[tuple[tuple[int, int, int, int, int, str], ResolvedAsset]] = []
     for asset in candidates:
         name_score = _company_name_match_score(lowered, asset)
         if name_score > 2:
@@ -242,6 +373,7 @@ def _rank_company_name_candidates(
             (
                 (
                     name_score,
+                    _asset_class_hint_rank(asset, normalized_hint),
                     _asset_class_rank(asset),
                     _exchange_rank(asset),
                     len(str(asset.canonical_symbol or "")),
@@ -258,7 +390,7 @@ def _company_name_match_score(raw_text: str, asset: ResolvedAsset) -> int:
     name = " ".join(str(asset.name or "").casefold().split())
     core_name = _provider_company_name_core(asset.name)
     if raw_text in {name, core_name}:
-        return 0
+        return 1 if _is_secondary_crypto_pair(asset) else 0
     if core_name.startswith(raw_text):
         return 1
     if name.startswith(raw_text):
@@ -271,11 +403,41 @@ def _company_name_match_score(raw_text: str, asset: ResolvedAsset) -> int:
 
 
 def _provider_company_name_core(name: str) -> str:
-    words = _normalized_name_words(name)
+    core_source = str(name or "").split("/", 1)[0]
+    words = _normalized_name_words(core_source)
     words = _without_trailing_security_phrases(words)
     while words and words[-1] in _COMPANY_NAME_TRAILING_WORDS:
         words = words[:-1]
     return " ".join(words)
+
+
+def _is_secondary_crypto_pair(asset: ResolvedAsset) -> bool:
+    if asset.asset_class != "crypto":
+        return False
+    raw_symbol = str(getattr(asset, "raw_symbol", "") or "").strip().upper()
+    if "/" not in raw_symbol:
+        return False
+    base_symbol = raw_symbol.split("/", 1)[0].strip().upper()
+    canonical = str(asset.canonical_symbol or "").strip().upper()
+    return bool(base_symbol and canonical and canonical != base_symbol)
+
+
+def _asset_class_hint_rank(asset: ResolvedAsset, asset_class_hint: str) -> int:
+    if not asset_class_hint:
+        return 0
+    return 0 if str(asset.asset_class or "").strip().lower() == asset_class_hint else 1
+
+
+def _normalized_asset_class_hint(value: str | None) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"equity", "crypto", "currency_pair"}:
+        return normalized
+    return ""
+
+
+def _compact_resolution_symbol(value: str | None) -> str:
+    raw = str(value or "").strip().lstrip("$@").upper()
+    return raw.replace("/", "").replace("-", "").replace(" ", "")
 
 
 def _normalized_name_words(value: str) -> list[str]:

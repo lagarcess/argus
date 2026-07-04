@@ -129,6 +129,111 @@ def test_interpreter_unavailable_recovery_uses_user_language_and_retry_metadata(
     }
 
 
+def test_stage_canonicalization_preserves_provider_context_asset_class(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity", name="Equity ETH"),
+    )
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["ETH"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-03-31"},
+        comparison_baseline="BTC",
+        extra_parameters={
+            "provider_resolved_assets": [
+                {
+                    "raw_text": "ethereum",
+                    "symbol": "ETH",
+                    "asset_class": "crypto",
+                    "name": "Ethereum",
+                    "raw_symbol": "ETH/USD",
+                    "provider": "kraken",
+                    "exchange": "CRYPTO",
+                }
+            ]
+        },
+    )
+
+    canonical = interpret_module._canonicalized_strategy(
+        strategy,
+        current_user_message=(
+            "backtest holding ethereum from 2024-01-01 to 2024-03-31"
+        ),
+        selected_thread_metadata={},
+    )
+
+    assert canonical.asset_universe == ["ETH"]
+    assert canonical.asset_class == "crypto"
+
+
+def test_stage_canonicalization_uses_strategy_asset_class_hint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    calls: list[str | None] = []
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        asset_class_hint: str | None = None,
+    ) -> AssetResolution:
+        calls.append(asset_class_hint)
+        asset = ResolvedAssetStub(query.upper(), asset_class_hint or "equity")
+        return AssetResolution(
+            status="resolved",
+            raw_text=query,
+            asset=asset,
+            candidates=(asset,),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol=asset.canonical_symbol,
+                asset_class=asset.asset_class,
+                validated_by="provider_catalog",
+                confidence="medium",
+            ),
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        interpret_module._DEFAULT_RESOLVE_ASSET,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "runtime_resolve_asset_candidate",
+        resolve_candidate,
+    )
+
+    canonical = interpret_module._canonicalized_strategy(
+        StrategySummary(
+            strategy_type="buy_and_hold",
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            date_range={"start": "2024-01-01", "end": "2024-03-31"},
+        ),
+        current_user_message="comprar y mantener bitcoin",
+        selected_thread_metadata={},
+    )
+
+    assert calls == ["crypto"]
+    assert canonical.asset_universe == ["BTC"]
+    assert canonical.asset_class == "crypto"
+
+
 def test_interpreter_unavailable_spanish_atr_routes_to_unsupported_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -296,6 +296,93 @@ def test_company_name_resolution_rejects_wrong_exact_symbol_when_name_search_is_
     assert result.candidates == (target,)
 
 
+def test_company_name_resolution_uses_crypto_hint_and_provider_name_core(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution
+
+    bitcoin = AssetStub(
+        "BTC",
+        "crypto",
+        "Bitcoin / US Dollar",
+        "BTC/USD",
+        exchange="CRYPTO",
+    )
+    bitcoin_cash = AssetStub(
+        "BCH",
+        "crypto",
+        "Bitcoin Cash / US Dollar",
+        "BCH/USD",
+        exchange="CRYPTO",
+    )
+    bitcoin_equity = AssetStub(
+        "BIXI",
+        "equity",
+        "Bitcoin Infrastructure Acquisition Corp Ltd. Class A Ordinary Shares",
+        "BIXI",
+        exchange="NASDAQ",
+    )
+
+    monkeypatch.setattr(
+        resolution,
+        "search_market_assets",
+        lambda query, limit=5: [bitcoin_cash, bitcoin_equity, bitcoin][:limit],
+    )
+
+    result = resolution.resolve_asset_candidate(
+        "bitcoin",
+        field="asset_universe[0]",
+        source="llm_extraction",
+        resolution_mode="company_name",
+        asset_class_hint="crypto",
+    )
+
+    assert result.status == "resolved"
+    assert result.asset is not None
+    assert result.asset.canonical_symbol == "BTC"
+    assert result.asset.asset_class == "crypto"
+
+
+def test_symbol_collision_uses_asset_class_hint_before_exact_lookup(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution
+
+    bitcoin_equity = AssetStub(
+        "BTC",
+        "equity",
+        "Bitcoin Depot Inc.",
+        "BTC",
+        exchange="NASDAQ",
+    )
+    bitcoin_crypto = AssetStub(
+        "BTC",
+        "crypto",
+        "Bitcoin / US Dollar",
+        "BTC/USD",
+        exchange="CRYPTO",
+    )
+
+    monkeypatch.setattr(resolution, "resolve_market_asset", lambda _: bitcoin_equity)
+    monkeypatch.setattr(
+        resolution,
+        "search_market_assets",
+        lambda query, limit=5: [bitcoin_equity, bitcoin_crypto][:limit],
+    )
+
+    result = resolution.resolve_asset_candidate(
+        "BTC",
+        field="asset_universe[0]",
+        source="llm_extraction",
+        asset_class_hint="crypto",
+    )
+
+    assert result.status == "resolved"
+    assert result.asset is not None
+    assert result.asset.canonical_symbol == "BTC"
+    assert result.asset.asset_class == "crypto"
+
+
 def test_currency_pair_resolution_preserves_direction(monkeypatch) -> None:
     from argus.agent_runtime import resolution
 

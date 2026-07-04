@@ -27,6 +27,7 @@ from argus.agent_runtime.capabilities.answers import (
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.extraction import detect_unsupported_constraints
+from argus.agent_runtime.interpreter import provider_context_assets
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
@@ -35,7 +36,7 @@ from argus.agent_runtime.recovery_messages import (
     recovery_state_stage_patch,
     retry_last_turn_stage_patch,
 )
-from argus.agent_runtime.resolution import AssetResolution
+from argus.agent_runtime.resolution import AssetResolution, callable_accepts_keyword
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
@@ -2125,9 +2126,15 @@ def _resolve_asset_candidate_safely(
     *,
     field: str,
     source: ResolutionSource,
+    asset_class_hint: str | None = None,
 ) -> AssetResolution | None:
     try:
-        return _resolve_asset_candidate(query, field=field, source=source)
+        return _resolve_asset_candidate(
+            query,
+            field=field,
+            source=source,
+            asset_class_hint=asset_class_hint,
+        )
     except ValueError:
         return None
 
@@ -2614,14 +2621,23 @@ def _canonicalized_strategy(
         ):
             field_owned_indicator_symbols.append(symbol)
             continue
-        resolution = _resolve_asset_candidate(
-            symbol,
-            field=f"asset_universe[{index}]",
-            source=_asset_resolution_source_for_canonicalization(
+        field = f"asset_universe[{index}]"
+        resolution = (
+            provider_context_assets.resolution_from_strategy_context(
                 updated,
-                index=index,
-                symbol=symbol,
-            ),
+                symbol,
+                field=field,
+            )
+            or _resolve_asset_candidate(
+                symbol,
+                field=field,
+                source=_asset_resolution_source_for_canonicalization(
+                    updated,
+                    index=index,
+                    symbol=symbol,
+                ),
+                asset_class_hint=updated.asset_class,
+            )
         )
         provenance.append(resolution.provenance)
         if resolution.status != "resolved" or resolution.asset is None:
@@ -2732,10 +2748,18 @@ def _strategy_with_validated_benchmark_symbol(
     if benchmark is None:
         return strategy, []
     try:
-        resolution = _resolve_asset_candidate(
-            benchmark,
-            field="comparison_baseline",
-            source="llm_extraction",
+        resolution = (
+            provider_context_assets.resolution_from_strategy_context(
+                strategy,
+                benchmark,
+                field="comparison_baseline",
+            )
+            or _resolve_asset_candidate(
+                benchmark,
+                field="comparison_baseline",
+                source="llm_extraction",
+                asset_class_hint=strategy.asset_class,
+            )
         )
     except ValueError:
         resolution = None
@@ -2761,9 +2785,16 @@ def _resolve_asset_candidate(
     *,
     field: str,
     source: ResolutionSource,
+    asset_class_hint: str | None = None,
 ) -> AssetResolution:
     if resolve_asset is _DEFAULT_RESOLVE_ASSET:
-        return runtime_resolve_asset_candidate(query, field=field, source=source)
+        kwargs: dict[str, Any] = {"field": field, "source": source}
+        if asset_class_hint is not None and callable_accepts_keyword(
+            runtime_resolve_asset_candidate,
+            "asset_class_hint",
+        ):
+            kwargs["asset_class_hint"] = asset_class_hint
+        return runtime_resolve_asset_candidate(query, **kwargs)
     resolved = resolve_asset(query)
     provenance = ResolutionProvenance(
         field=field,

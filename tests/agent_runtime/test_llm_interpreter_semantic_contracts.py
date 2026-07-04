@@ -95,13 +95,54 @@ def test_provider_asset_context_resolves_only_llm_identified_mentions(
     assert not {"buy", "with", "every", "month", "February"} & set(queries)
 
 
+def test_provider_asset_context_dedupes_before_the_five_mention_cap(
+    monkeypatch,
+) -> None:
+    import json
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    assets = {
+        "target": ResolvedAssetStub("TGT", "equity", name="Target Corporation"),
+        "walmart": ResolvedAssetStub("WMT", "equity", name="Walmart Inc."),
+        "nvidia": ResolvedAssetStub("NVDA", "equity", name="NVIDIA Corporation"),
+    }
+
+    def resolve_asset(query: str) -> ResolvedAssetStub:
+        key = query.strip().casefold()
+        if key not in assets:
+            raise ValueError("invalid_symbol")
+        return assets[key]
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+
+    # Duplicates and a blank fill the first five slots; the distinct sixth asset
+    # must still survive because dedupe/blank-filtering happen before the cap.
+    context = interpreter_module._provider_asset_resolution_context_from_extraction(
+        interpreter_module.LLMAssetMentionExtraction(
+            asset_mentions=[
+                {"raw_text": "target", "role": "traded_asset", "confidence": 0.9},
+                {"raw_text": "Target", "role": "traded_asset", "confidence": 0.9},
+                {"raw_text": "   ", "role": "traded_asset", "confidence": 0.9},
+                {"raw_text": "walmart", "role": "traded_asset", "confidence": 0.9},
+                {"raw_text": "Walmart", "role": "traded_asset", "confidence": 0.9},
+                {"raw_text": "nvidia", "role": "traded_asset", "confidence": 0.9},
+            ]
+        )
+    )
+
+    assert context is not None
+    rows = json.loads(context)["asset_resolution_candidates"]
+    assert [row["symbol"] for row in rows] == ["TGT", "WMT", "NVDA"]
+
+
 def test_provider_asset_context_uses_name_search_for_company_mentions() -> None:
     import json
 
     from argus.agent_runtime import llm_interpreter as interpreter_module
     from argus.agent_runtime.resolution import AssetResolution
 
-    calls: list[tuple[str, str]] = []
+    calls: list[tuple[str, str, str | None]] = []
     target = ResolvedAssetStub("TGT", "equity", name="Target Corporation")
 
     def resolve_candidate(
@@ -110,9 +151,10 @@ def test_provider_asset_context_uses_name_search_for_company_mentions() -> None:
         field: str,
         source: str,
         resolution_mode: str = "auto",
+        asset_class_hint: str | None = None,
     ) -> AssetResolution:
         del field, source
-        calls.append((query, resolution_mode))
+        calls.append((query, resolution_mode, asset_class_hint))
         return AssetResolution(
             status="resolved",
             raw_text=query,
@@ -145,10 +187,72 @@ def test_provider_asset_context_uses_name_search_for_company_mentions() -> None:
         resolve_asset_candidate=resolve_candidate,
     )
 
-    assert calls == [("target", "company_name")]
+    assert calls == [("target", "company_name", None)]
     assert context is not None
     rows = json.loads(context)["asset_resolution_candidates"]
     assert [row["symbol"] for row in rows] == ["TGT"]
+
+
+def test_provider_asset_context_uses_name_search_for_crypto_name_mentions() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.resolution import AssetResolution
+
+    calls: list[tuple[str, str, str | None]] = []
+    ethereum = ResolvedAssetStub("ETH", "crypto", name="Ethereum")
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        resolution_mode: str = "auto",
+        asset_class_hint: str | None = None,
+    ) -> AssetResolution:
+        del field, source
+        calls.append((query, resolution_mode, asset_class_hint))
+        return AssetResolution(
+            status="resolved",
+            raw_text=query,
+            asset=ethereum,
+            candidates=(ethereum,),
+            provenance=ResolutionProvenance(
+                field="asset_universe[0]",
+                raw_text=query,
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol="ETH",
+                asset_class="crypto",
+                validated_by="provider_catalog",
+                confidence="medium",
+            ),
+        )
+
+    context = interpreter_module.provider_asset_resolution_context_from_extraction(
+        interpreter_module.LLMAssetMentionExtraction(
+            asset_mentions=[
+                {
+                    "raw_text": "ethereum",
+                    "role": "traded_asset",
+                    "mention_kind": "crypto",
+                    "confidence": 0.9,
+                },
+                {
+                    "raw_text": "ETH",
+                    "role": "traded_asset",
+                    "mention_kind": "crypto",
+                    "confidence": 0.9,
+                },
+            ]
+        ),
+        resolve_asset_candidate=resolve_candidate,
+    )
+
+    assert calls == [
+        ("ethereum", "company_name", "crypto"),
+        ("ETH", "symbol", "crypto"),
+    ]
+    assert context is not None
 
 
 def test_provider_context_prevents_wrong_exact_symbol_for_company_name() -> None:
@@ -224,6 +328,210 @@ def test_provider_context_prevents_wrong_exact_symbol_for_company_name() -> None
         "COST",
     ]
     assert normalized.candidate_strategy_draft.asset_class == "equity"
+
+
+def test_provider_context_asset_class_survives_runtime_validation(monkeypatch) -> None:
+    import json
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity", name="Equity ETH"),
+    )
+    context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "ethereum",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "ETH",
+                    "asset_class": "crypto",
+                    "name": "Ethereum",
+                    "mention_kind": "crypto",
+                    "confidence": 0.94,
+                }
+            ]
+        }
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "backtest holding ethereum from 2024-01-01 to 2024-03-31 "
+            "against the default crypto benchmark"
+        ),
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="User wants to hold Ethereum.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["ETH"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-03-31"},
+            comparison_baseline="BTC",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    normalized = interpreter_module._normalize_response_for_runtime_context(
+        response,
+        request=request,
+        asset_resolution_context=context,
+    )
+    result = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )._to_runtime_interpretation(normalized, request=request)
+
+    assert result.candidate_strategy_draft.asset_universe == ["ETH"]
+    assert result.candidate_strategy_draft.asset_class == "crypto"
+
+
+def test_canonical_interpreter_assets_use_draft_asset_class_hint(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str | None] = []
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        resolution_mode: str = "auto",
+        asset_class_hint: str | None = None,
+    ) -> AssetResolution:
+        del resolution_mode
+        calls.append(asset_class_hint)
+        asset = ResolvedAssetStub(query.upper(), asset_class_hint or "equity")
+        return AssetResolution(
+            status="resolved",
+            raw_text=query,
+            asset=asset,
+            candidates=(asset,),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol=asset.canonical_symbol,
+                asset_class=asset.asset_class,
+                validated_by="provider_catalog",
+                confidence="medium",
+            ),
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        interpreter_module._DEFAULT_RESOLVE_ASSET,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "runtime_resolve_asset_candidate",
+        resolve_candidate,
+    )
+
+    normalized = interpreter_module._response_with_canonical_interpreter_assets(
+        LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="new_task",
+            user_goal_summary="User wants to hold Bitcoin.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                strategy_type="buy_and_hold",
+                asset_universe=["BTC"],
+                asset_class="crypto",
+                date_range={"start": "2024-01-01", "end": "2024-03-31"},
+            ),
+            semantic_turn_act="new_idea",
+        )
+    )
+
+    assert calls == ["crypto"]
+    assert normalized.candidate_strategy_draft.asset_universe == ["BTC"]
+    assert normalized.candidate_strategy_draft.asset_class == "crypto"
+
+
+@pytest.mark.asyncio
+async def test_focused_strategy_repair_applies_provider_asset_context(
+    monkeypatch,
+) -> None:
+    import json
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def invoke_schema(**kwargs):
+        del kwargs
+        return FocusedStrategyExtraction(
+            is_testable_strategy=True,
+            requires_clarification=False,
+            user_goal_summary="User wants to hold Bitcoin.",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Bitcoin.",
+            asset_universe=["BTC"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-03-31"},
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_unique_repair_models",
+        lambda preferred_model, task: ["test-model"],
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_schema,
+    )
+
+    response = await interpreter_module._repair_incomplete_strategy_extraction(
+        failed_response=LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="new_task",
+            requires_clarification=True,
+            user_goal_summary="User wants to hold Bitcoin.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing="comprar y mantener bitcoin",
+                strategy_thesis="comprar y mantener bitcoin",
+            ),
+            semantic_turn_act="new_idea",
+        ),
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="comprar y mantener bitcoin",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+        asset_resolution_context=json.dumps(
+            {
+                "asset_resolution_candidates": [
+                    {
+                        "raw_text": "bitcoin",
+                        "role": "traded_asset",
+                        "status": "resolved",
+                        "symbol": "BTC",
+                        "asset_class": "crypto",
+                        "name": "Bitcoin / US Dollar",
+                        "raw_symbol": "BTC/USD",
+                        "provider": "alpaca",
+                        "exchange": "CRYPTO",
+                        "mention_kind": "crypto",
+                        "confidence": 0.95,
+                    }
+                ]
+            }
+        ),
+    )
+
+    assert response is not None
+    assert response.candidate_strategy_draft.asset_universe == ["BTC"]
+    assert response.candidate_strategy_draft.asset_class == "crypto"
 
 
 def test_llm_interpreter_removes_stale_indicator_limit_when_user_only_said_drops(
