@@ -4013,3 +4013,54 @@ def test_fact_answer_message_does_not_invalidate_active_confirmation() -> None:
     assert fallback.latest_task_snapshot is not None
     assert fallback.latest_task_snapshot.active_confirmation_reference is not None
     assert fallback.latest_task_snapshot.latest_backtest_result_reference is not None
+
+
+def test_fact_answer_message_does_not_block_pending_strategy_fallback() -> None:
+    from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    pending_metadata = _pending_strategy_metadata()
+    pending_metadata["pending_strategy"]["strategy"]["date_range"] = {
+        "start": "2025-01-01",
+        "end": "2025-12-31",
+    }
+    pending_metadata["pending_strategy"]["source_result"] = {
+        "run_id": run_id,
+        "strategy_id": None,
+        "conversation_id": conversation["id"],
+    }
+    pending_metadata["source_result_run_id"] = run_id
+
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="What would you like to change?",
+        metadata=pending_metadata,
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The Sortino ratio is not stored for this result.",
+        metadata=_fact_answer_metadata(run_id),
+    )
+
+    fallback = pending_strategy_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    snapshot = fallback.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.pending_strategy_summary is not None
+    assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.artifact_id == run_id
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["source_result_run_id"] == run_id

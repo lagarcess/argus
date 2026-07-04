@@ -336,6 +336,11 @@ def pending_strategy_metadata_fallback_context(
         if _metadata_invalidates_pending_strategy(metadata):
             return None
         pending_payload = metadata.get("pending_strategy")
+        if (
+            not isinstance(pending_payload, dict)
+            and _metadata_is_latest_result_fact_reply(metadata)
+        ):
+            continue
         if not isinstance(pending_payload, dict):
             return None
         strategy_payload = pending_payload.get("strategy")
@@ -434,12 +439,17 @@ def pending_strategy_metadata_fallback_context(
 
 
 def _metadata_invalidates_pending_strategy(metadata: dict[str, Any]) -> bool:
-    if metadata.get("result_card") or metadata.get("result_run_id"):
+    is_latest_result_fact_reply = _metadata_is_latest_result_fact_reply(metadata)
+    if metadata.get("result_card"):
+        return True
+    if metadata.get("result_run_id") and not is_latest_result_fact_reply:
         return True
     action = metadata.get("chat_action")
     if isinstance(action, dict) and action.get("type") == "cancel_confirmation":
         return True
     stage_outcome = str(metadata.get("agent_runtime_stage_outcome") or "")
+    if is_latest_result_fact_reply and stage_outcome in {"", "ready_to_respond"}:
+        return False
     if stage_outcome == "ready_to_respond" and _metadata_has_pending_response_intent(
         metadata
     ):

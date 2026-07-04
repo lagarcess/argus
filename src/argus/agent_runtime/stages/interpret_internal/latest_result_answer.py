@@ -118,7 +118,10 @@ async def latest_result_answer_stage_result_if_applicable(
         artifact_id=reference.artifact_id,
     )
 
-    if requested_fact_key in fact_bank:
+    if (
+        requested_fact_key in fact_bank
+        and requested_fact_key not in _NON_ANSWERABLE_FACT_IDS
+    ):
         response = await compose_response_func(
             metadata=metadata,
             focus=focus,

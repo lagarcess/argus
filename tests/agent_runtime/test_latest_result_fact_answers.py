@@ -389,6 +389,54 @@ async def test_latest_result_unknown_metric_returns_typed_limitation() -> None:
 
 
 @pytest.mark.asyncio
+async def test_latest_result_context_packet_ids_routes_to_limitation() -> None:
+    composer = _RecordingComposer(response="COMPOSED_LIMITATION")
+    reference = _latest_result_reference()
+    metadata = dict(reference.metadata)
+    metadata["context_packets"] = [
+        {
+            "id": "context-packet-1",
+            "packet_type": "macro",
+            "facts": [
+                {
+                    "label": "Fed funds latest observation",
+                    "value": "5.25%",
+                }
+            ],
+        }
+    ]
+    snapshot = TaskSnapshot(
+        latest_task_type="results_explanation",
+        completed=True,
+        latest_backtest_result_reference=reference.model_copy(
+            update={"metadata": metadata}
+        ),
+        artifact_references=[
+            reference.model_copy(update={"metadata": metadata}),
+        ],
+    )
+
+    result = await latest_result_answer_stage_result_if_applicable(
+        decision=_decision("result_card_fact").model_copy(
+            update={"result_followup_fact_key": "context_packet_ids"}
+        ),
+        snapshot=snapshot,
+        current_user_message="Which context packet did this use?",
+        language="en",
+        compose_response_func=composer,
+    )
+
+    assert result is not None
+    assert result.patch["assistant_response"] == "COMPOSED_LIMITATION"
+    assert composer.calls[0].get("fact_key") is None
+    facts = result.patch["response_intent"]["facts"]
+    assert facts["limitation_code"] == "latest_result_metric_unavailable"
+    assert facts["requested_metric"] == "context_packet_ids"
+    assert "context_packet_ids" not in facts["available_result_facts"]
+    assert "latest_result_fact_limitation" in result.decision.reason_codes
+
+
+@pytest.mark.asyncio
 async def test_stage_returns_none_when_composition_fails() -> None:
     # Failed composition falls through to the recovery chain.
     composer = _RecordingComposer(response=None)
