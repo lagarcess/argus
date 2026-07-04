@@ -99,8 +99,54 @@ def _decision(focus: str) -> InterpretDecision:
     )
 
 
-def _snapshot(*, include_curve: bool = True, pending: bool = False) -> TaskSnapshot:
+def _active_confirmation_fixture() -> ArtifactReference:
+    from argus.agent_runtime.confirmation_artifacts import (
+        confirmation_artifact_reference,
+    )
+
+    payload = {
+        "strategy": {
+            "strategy_type": "dca_accumulation",
+            "strategy_thesis": "Six month recurring buys.",
+            "asset_universe": ["COST", "TGT"],
+            "asset_class": "equity",
+            "date_range": {"start": "2026-01-04", "end": "2026-07-03"},
+            "cadence": "monthly",
+        },
+        "optional_parameters": {},
+        "launch_payload": {
+            "strategy_type": "dca_accumulation",
+            "symbol": "COST",
+            "symbols": ["COST", "TGT"],
+            "timeframe": "1D",
+            "date_range": {"start": "2026-01-04", "end": "2026-07-03"},
+            "entry_rule": None,
+            "exit_rule": None,
+            "sizing_mode": "capital_amount",
+            "capital_amount": 500,
+            "position_size": None,
+            "cadence": "monthly",
+            "parameters": {"recurring_contribution": 500},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+            "language": "en",
+        },
+        "validation": {"status": "ready_to_run", "executable": True},
+    }
+    return confirmation_artifact_reference(
+        confirmation_id="confirm-6mo",
+        confirmation_payload=payload,
+    )
+
+
+def _snapshot(
+    *,
+    include_curve: bool = True,
+    pending: bool = False,
+    confirmation: bool = False,
+) -> TaskSnapshot:
     reference = _latest_result_reference(include_curve=include_curve)
+    confirmation_reference = _active_confirmation_fixture() if confirmation else None
     return TaskSnapshot(
         latest_task_type="results_explanation",
         completed=True,
@@ -114,11 +160,16 @@ def _snapshot(*, include_curve: bool = True, pending: bool = False) -> TaskSnaps
                 cadence="monthly",
                 extra_parameters={"recurring_contribution": 500},
             )
-            if pending
+            if pending or confirmation
             else None
         ),
         latest_backtest_result_reference=reference,
-        artifact_references=[reference],
+        active_confirmation_reference=confirmation_reference,
+        artifact_references=(
+            [reference, confirmation_reference]
+            if confirmation_reference is not None
+            else [reference]
+        ),
     )
 
 
@@ -522,3 +573,59 @@ async def test_workflow_result_fact_limitation_exposes_response_intent(
     facts = result["response_intent"]["facts"]
     assert facts["limitation_code"] == "latest_result_metric_unavailable"
     assert facts["requested_metric"] == "sortino_ratio"
+
+
+@pytest.mark.asyncio
+async def test_workflow_unknown_metric_during_active_confirmation_preserves_card(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    composer = _RecordingComposer(response="COMPOSED_LIMITATION")
+    monkeypatch.setattr(
+        latest_result_answer_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    interpreter = _StaticInterpreter(
+        StructuredInterpretation(
+            intent="results_explanation",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User asked for the Sortino ratio mid-confirmation.",
+            semantic_turn_act="result_followup",
+            result_followup_focus="result_card_fact",
+            result_followup_fact_key="sortino_ratio",
+            artifact_target="active_confirmation",
+            confidence=0.9,
+        )
+    )
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+    thread_id = "thread-issue-140-sortino-mid-confirmation"
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id=thread_id,
+        message="what was the sortino ratio?",
+        fallback_latest_task_snapshot=_snapshot(confirmation=True),
+        fallback_selected_thread_metadata={
+            "latest_task_type": "backtest_execution",
+            "last_stage_outcome": "await_approval",
+            "source_result_run_id": "run-140",
+        },
+    )
+
+    assert result["stage_outcome"] == "ready_to_respond"
+    assert result["assistant_response"] == "COMPOSED_LIMITATION"
+    facts = result["response_intent"]["facts"]
+    assert facts["limitation_code"] == "latest_result_metric_unavailable"
+    assert facts["requested_metric"] == "sortino_ratio"
+    assert result["result_run_id"] == "run-140"
+    state = await workflow.aget_state({"configurable": {"thread_id": thread_id}})
+    snapshot = state.values["latest_task_snapshot"]
+    # The typed limitation answer must not consume the pending confirmation.
+    assert snapshot.active_confirmation_reference is not None
+    assert snapshot.pending_strategy_summary is not None
+    assert snapshot.latest_backtest_result_reference is not None

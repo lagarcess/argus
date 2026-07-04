@@ -3884,3 +3884,132 @@ def test_show_breakdown_action_without_canonical_run_id_does_not_use_latest(
     assert captured["run"] is None
     text = _stream_payloads(response.text, "token")[0]["content"]
     assert "could not find" in text
+
+
+def _seed_completed_run(user_id: str, conversation_id: str) -> str:
+    from argus.api import state as api_state
+
+    run_id = api_state.store.new_id()
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation_id,
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={
+            "aggregate": {
+                "performance": {"total_return_pct": 46.8},
+                "risk": {"max_drawdown_pct": -13.8},
+            },
+            "by_symbol": {},
+        },
+        config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "status_label": "Simulation Complete",
+            "rows": [],
+        },
+        created_at=utcnow(),
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    return run_id
+
+
+def _fact_answer_metadata(run_id: str) -> dict[str, Any]:
+    return {
+        "conversation_mode": "confirm",
+        "agent_runtime_stage_outcome": "ready_to_respond",
+        "result_run_id": run_id,
+        "latest_run_id": run_id,
+        "response_intent": {
+            "kind": "unsupported_recovery",
+            "facts": {
+                "limitation_code": "latest_result_metric_unavailable",
+                "requested_metric": "sortino_ratio",
+            },
+        },
+    }
+
+
+def test_confirmation_fallback_preserves_latest_result_context() -> None:
+    from argus.api.chat.recovery import confirmation_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Simulation complete.",
+        metadata={
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "result_run_id": run_id,
+            "result_card": {"title": "AAPL buy and hold"},
+        },
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Ready to run the six month version.",
+        metadata=_confirmation_metadata(),
+    )
+
+    fallback = confirmation_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    snapshot = fallback.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.active_confirmation_reference is not None
+    assert snapshot.pending_strategy_summary is not None
+    # A typed result question during an active confirmation must still see the
+    # completed run, or the interpreter loses the latest-result context.
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.metadata["result_run_id"] == run_id
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["source_result_run_id"] == run_id
+
+
+def test_fact_answer_message_does_not_invalidate_active_confirmation() -> None:
+    from argus.api.chat.recovery import confirmation_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Ready to run the six month version.",
+        metadata=_confirmation_metadata(),
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The Sortino ratio is not stored for this result.",
+        metadata=_fact_answer_metadata(run_id),
+    )
+
+    fallback = confirmation_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    # The typed fact reply carries result_run_id for continuity, but it is not
+    # a new result card: the pending confirmation must stay active.
+    assert fallback is not None
+    assert fallback.latest_task_snapshot is not None
+    assert fallback.latest_task_snapshot.active_confirmation_reference is not None
+    assert fallback.latest_task_snapshot.latest_backtest_result_reference is not None

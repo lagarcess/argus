@@ -214,14 +214,16 @@ class LLMInterpretationResponse(BaseModel):
     result_followup_fact_key: str | None = Field(
         default=None,
         description=(
-            "Canonical snake_case key for a factual latest-result value the user "
-            "asked about. Allowed keys: total_return, benchmark_return, "
+            "Canonical snake_case key for the single factual latest-result value "
+            "the user asked about. Known keys: total_return, benchmark_return, "
             "benchmark_delta, benchmark_symbol, max_drawdown, drawdown_date, "
             "peak_date, peak_value, lowest_date, lowest_value, final_value, "
             "annualized_return, profit, volatility, win_rate, profit_factor, "
             "sharpe_ratio, trade_count, starting_capital, date_range, symbols, "
-            "strategy. Emit exactly one of these keys — never a synonym or free "
-            "phrase; leave unset when none fits. Use this only with "
+            "strategy. For another single result metric, emit its plain "
+            "snake_case name (for example sortino_ratio) — never a sentence or "
+            "synonym phrase. Leave unset when the question is not about one "
+            "specific result value. Use this only with "
             "semantic_turn_act=result_followup."
         ),
     )
