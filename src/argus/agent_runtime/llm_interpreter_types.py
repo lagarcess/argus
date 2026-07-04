@@ -36,6 +36,20 @@ class LLMAssetMentionCandidate(BaseModel):
             "or reference baseline."
         ),
     )
+    mention_kind: Literal[
+        "company_name",
+        "ticker",
+        "crypto",
+        "currency_pair",
+        "unknown",
+    ] = Field(
+        default="unknown",
+        description=(
+            "Classify the raw span itself. Use company_name for public company "
+            "names like Target or Costco, ticker for stock symbols like TGT or "
+            "AAPL, crypto for assets like Bitcoin, and currency_pair for FX pairs."
+        ),
+    )
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
 

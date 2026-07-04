@@ -95,6 +95,137 @@ def test_provider_asset_context_resolves_only_llm_identified_mentions(
     assert not {"buy", "with", "every", "month", "February"} & set(queries)
 
 
+def test_provider_asset_context_uses_name_search_for_company_mentions() -> None:
+    import json
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.resolution import AssetResolution
+
+    calls: list[tuple[str, str]] = []
+    target = ResolvedAssetStub("TGT", "equity", name="Target Corporation")
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        resolution_mode: str = "auto",
+    ) -> AssetResolution:
+        del field, source
+        calls.append((query, resolution_mode))
+        return AssetResolution(
+            status="resolved",
+            raw_text=query,
+            asset=target,
+            candidates=(target,),
+            provenance=ResolutionProvenance(
+                field="asset_universe[0]",
+                raw_text=query,
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol="TGT",
+                asset_class="equity",
+                validated_by="provider_catalog",
+                confidence="medium",
+            ),
+        )
+
+    context = interpreter_module.provider_asset_resolution_context_from_extraction(
+        interpreter_module.LLMAssetMentionExtraction(
+            asset_mentions=[
+                {
+                    "raw_text": "target",
+                    "role": "traded_asset",
+                    "mention_kind": "company_name",
+                    "confidence": 0.9,
+                },
+            ]
+        ),
+        resolve_asset_candidate=resolve_candidate,
+    )
+
+    assert calls == [("target", "company_name")]
+    assert context is not None
+    rows = json.loads(context)["asset_resolution_candidates"]
+    assert [row["symbol"] for row in rows] == ["TGT"]
+
+
+def test_provider_context_prevents_wrong_exact_symbol_for_company_name() -> None:
+    import json
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "target",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "TGT",
+                    "asset_class": "equity",
+                    "name": "Target Corporation",
+                    "confidence": 0.94,
+                },
+                {
+                    "raw_text": "Walmart",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "WMT",
+                    "asset_class": "equity",
+                    "name": "Walmart Inc.",
+                    "confidence": 0.94,
+                },
+                {
+                    "raw_text": "costco",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "COST",
+                    "asset_class": "equity",
+                    "name": "Costco Wholesale Corporation",
+                    "confidence": 0.94,
+                },
+            ]
+        }
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="User wants monthly recurring buys in Target, Walmart, and Costco.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="dca_accumulation",
+            asset_universe=["TGAAF", "WMT", "COST"],
+            asset_class="equity",
+            date_range={"start": "2020-02-01", "end": "today"},
+            recurring_contribution=500,
+            cadence="monthly",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    normalized = interpreter_module._normalize_response_for_runtime_context(
+        response,
+        request=InterpretationRequest(
+            current_user_message=(
+                "Id like to buy target Walmart and costco evenly with 500 dollars "
+                "every month from February 2020 till today"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+        asset_resolution_context=context,
+    )
+
+    assert normalized.candidate_strategy_draft.asset_universe == [
+        "TGT",
+        "WMT",
+        "COST",
+    ]
+    assert normalized.candidate_strategy_draft.asset_class == "equity"
+
+
 def test_llm_interpreter_removes_stale_indicator_limit_when_user_only_said_drops(
     monkeypatch,
 ) -> None:

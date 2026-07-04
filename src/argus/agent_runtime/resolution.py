@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from argus.agent_runtime.state.models import (
     ResolutionProvenance,
@@ -37,11 +37,34 @@ class IndicatorResolution:
     provenance: ResolutionProvenance
 
 
+AssetResolutionMode = Literal["auto", "company_name", "symbol"]
+_PRIMARY_EXCHANGES = {"NYSE", "NASDAQ", "NYSEARCA", "NYSEAMERICAN", "AMEX"}
+_SECONDARY_EXCHANGES = {"OTC", "OTCMKTS", "PINK"}
+_COMPANY_NAME_TRAILING_WORDS = {
+    "corp",
+    "corporation",
+    "co",
+    "company",
+    "inc",
+    "incorporated",
+    "limited",
+    "ltd",
+    "plc",
+}
+_SECURITY_NAME_TRAILING_PHRASES = (
+    ("class", "a", "common", "stock"),
+    ("class", "b", "common", "stock"),
+    ("common", "stock"),
+    ("ordinary", "shares"),
+)
+
+
 def resolve_asset_candidate(
     query: str,
     *,
     field: str,
     source: ResolutionSource,
+    resolution_mode: AssetResolutionMode = "auto",
 ) -> AssetResolution:
     raw_text = str(query or "").strip()
     if not raw_text:
@@ -54,6 +77,8 @@ def resolve_asset_candidate(
             candidates=(),
             confidence="low",
         )
+    if resolution_mode == "company_name":
+        return _resolve_company_name_asset(raw_text, field=field, source=source)
     try:
         asset = resolve_market_asset(raw_text)
         return _asset_resolution(
@@ -135,6 +160,51 @@ def resolve_asset_candidate(
     )
 
 
+def _resolve_company_name_asset(
+    raw_text: str,
+    *,
+    field: str,
+    source: ResolutionSource,
+) -> AssetResolution:
+    candidates = _unique_assets(_search_assets_safely(raw_text, limit=12))
+    ranked = _rank_company_name_candidates(raw_text, candidates)
+    if not ranked:
+        return _asset_resolution(
+            status="unsupported",
+            raw_text=raw_text,
+            field=field,
+            source=source,
+            asset=None,
+            candidates=(),
+            confidence="low",
+        )
+    best_key, best_asset = ranked[0]
+    tied = [
+        asset
+        for key, asset in ranked
+        if key[:3] == best_key[:3]
+    ]
+    if len(tied) > 1:
+        return _asset_resolution(
+            status="ambiguous",
+            raw_text=raw_text,
+            field=field,
+            source=source,
+            asset=None,
+            candidates=tuple(tied[:5]),
+            confidence="medium",
+        )
+    return _asset_resolution(
+        status="resolved",
+        raw_text=raw_text,
+        field=field,
+        source=source,
+        asset=best_asset,
+        candidates=(best_asset,),
+        confidence="medium",
+    )
+
+
 def search_assets(query: str, *, limit: int = 12) -> list[ResolvedAsset]:
     return search_market_assets(query, limit=limit)
 
@@ -156,6 +226,103 @@ def _provider_name_prefix_match(raw_text: str, asset: ResolvedAsset) -> bool:
     lowered = " ".join(str(raw_text or "").casefold().split())
     top_name = " ".join(str(asset.name or "").casefold().split())
     return bool(lowered and top_name.startswith(lowered))
+
+
+def _rank_company_name_candidates(
+    raw_text: str,
+    candidates: list[ResolvedAsset],
+) -> list[tuple[tuple[int, int, int, int, str], ResolvedAsset]]:
+    lowered = " ".join(str(raw_text or "").casefold().split())
+    ranked: list[tuple[tuple[int, int, int, int, str], ResolvedAsset]] = []
+    for asset in candidates:
+        name_score = _company_name_match_score(lowered, asset)
+        if name_score > 2:
+            continue
+        ranked.append(
+            (
+                (
+                    name_score,
+                    _asset_class_rank(asset),
+                    _exchange_rank(asset),
+                    len(str(asset.canonical_symbol or "")),
+                    str(asset.canonical_symbol or ""),
+                ),
+                asset,
+            )
+        )
+    ranked.sort(key=lambda item: item[0])
+    return ranked
+
+
+def _company_name_match_score(raw_text: str, asset: ResolvedAsset) -> int:
+    name = " ".join(str(asset.name or "").casefold().split())
+    core_name = _provider_company_name_core(asset.name)
+    if raw_text in {name, core_name}:
+        return 0
+    if core_name.startswith(raw_text):
+        return 1
+    if name.startswith(raw_text):
+        return 2
+    if raw_text and raw_text in core_name:
+        return 3
+    if raw_text and raw_text in name:
+        return 4
+    return 5
+
+
+def _provider_company_name_core(name: str) -> str:
+    words = _normalized_name_words(name)
+    words = _without_trailing_security_phrases(words)
+    while words and words[-1] in _COMPANY_NAME_TRAILING_WORDS:
+        words = words[:-1]
+    return " ".join(words)
+
+
+def _normalized_name_words(value: str) -> list[str]:
+    normalized = str(value or "").casefold()
+    for character in ".,()[]{}":
+        normalized = normalized.replace(character, " ")
+    return [word for word in normalized.split() if word]
+
+
+def _without_trailing_security_phrases(words: list[str]) -> list[str]:
+    trimmed = list(words)
+    changed = True
+    while changed and trimmed:
+        changed = False
+        for phrase in _SECURITY_NAME_TRAILING_PHRASES:
+            length = len(phrase)
+            if len(trimmed) >= length and tuple(trimmed[-length:]) == phrase:
+                trimmed = trimmed[:-length]
+                changed = True
+                break
+    return trimmed
+
+
+def _asset_class_rank(asset: ResolvedAsset) -> int:
+    if asset.asset_class == "equity":
+        return 0
+    if asset.asset_class == "crypto":
+        return 1
+    return 2
+
+
+def _exchange_rank(asset: ResolvedAsset) -> int:
+    exchange = _exchange_code(asset)
+    if exchange in _PRIMARY_EXCHANGES:
+        return 0
+    if not exchange:
+        return 1
+    if exchange in _SECONDARY_EXCHANGES or "OTC" in exchange:
+        return 2
+    return 1
+
+
+def _exchange_code(asset: ResolvedAsset) -> str:
+    raw_exchange = str(getattr(asset, "exchange", "") or "").strip().upper()
+    if "." in raw_exchange:
+        raw_exchange = raw_exchange.rsplit(".", 1)[-1]
+    return raw_exchange
 
 
 def resolve_indicator_candidate(

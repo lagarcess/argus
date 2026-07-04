@@ -31,6 +31,7 @@ class ResolvedAsset:
     name: str
     raw_symbol: str
     provider: str = "unknown"
+    exchange: str | None = None
 
 
 @dataclass(frozen=True)
@@ -288,6 +289,7 @@ def _resolved_asset_from_alpaca_asset(
         name=raw_name,
         raw_symbol=raw_symbol,
         provider="alpaca",
+        exchange=str(getattr(asset, "exchange", "") or "") or None,
     )
     return canonical, resolved
 
@@ -409,6 +411,7 @@ def _load_alpaca_asset_rows(rows: list[object]) -> dict[str, ResolvedAsset]:
             name=raw_name,
             raw_symbol=raw_symbol,
             provider=str(row.get("provider") or "recorded_provider_fixture"),
+            exchange=str(row.get("exchange") or "") or None,
         )
         _add_aliases(aliases, resolved, canonical=canonical)
         name_alias = raw_name.lower().strip()

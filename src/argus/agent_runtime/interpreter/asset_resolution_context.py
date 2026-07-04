@@ -83,12 +83,14 @@ def provider_asset_resolution_context_from_extraction(
                 raw_text,
                 field=field,
                 source="llm_extraction",
+                resolution_mode=_resolution_mode_for_mention(mention),
             )
         except ValueError:
             continue
         row = _provider_asset_resolution_context_row(
             resolution=resolution,
             role=role,
+            mention_kind=str(getattr(mention, "mention_kind", "") or "unknown"),
             confidence=mention.confidence,
         )
         if row is not None:
@@ -137,18 +139,36 @@ def _asset_mention_extraction_messages(
                 "basket. Do not infer assets from ordinary grammar, months, amounts, "
                 "or strategy words. Do not canonicalize yourself; return only the "
                 "short raw text span and whether the user framed it as a traded asset, "
-                "a benchmark/comparison, or unknown. Return at most five distinct "
-                "mentions. If none are visible, return an empty list."
+                "a benchmark/comparison, or unknown. Also classify whether the span "
+                "is a company_name, ticker, crypto asset, currency_pair, or unknown. "
+                "Return at most five distinct mentions. If none are visible, return "
+                "an empty list."
             ),
         },
         {"role": "user", "content": request.current_user_message},
     ]
 
 
+def _resolution_mode_for_mention(mention: Any) -> str:
+    kind = str(getattr(mention, "mention_kind", "") or "unknown")
+    if kind == "company_name":
+        return "company_name"
+    if kind in {"ticker", "crypto", "currency_pair"}:
+        return "symbol"
+    raw_text = str(getattr(mention, "raw_text", "") or "").strip()
+    compact = raw_text.replace("/", "").replace("-", "").lstrip("$")
+    if raw_text.startswith("$") or "/" in raw_text or "-" in raw_text:
+        return "symbol"
+    if compact.isalpha() and compact == compact.upper():
+        return "symbol"
+    return "company_name"
+
+
 def _provider_asset_resolution_context_row(
     *,
     resolution: AssetResolution,
     role: str,
+    mention_kind: str,
     confidence: float,
 ) -> dict[str, object] | None:
     raw_text = str(resolution.raw_text or "").strip()
@@ -160,6 +180,7 @@ def _provider_asset_resolution_context_row(
             "symbol": str(resolution.asset.canonical_symbol or "").strip().upper(),
             "asset_class": str(resolution.asset.asset_class or "").strip(),
             "name": str(resolution.asset.name or "").strip(),
+            "mention_kind": mention_kind,
             "confidence": confidence,
         }
     if resolution.status == "ambiguous" and resolution.candidates:
@@ -178,6 +199,7 @@ def _provider_asset_resolution_context_row(
             "role": role,
             "status": "ambiguous",
             "candidates": candidates,
+            "mention_kind": mention_kind,
             "confidence": confidence,
         }
     return None

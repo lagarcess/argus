@@ -12,6 +12,7 @@ class AssetStub:
     asset_class: str
     name: str = ""
     raw_symbol: str = ""
+    exchange: str | None = None
 
 
 def test_asset_resolution_records_bitcoin_provenance(monkeypatch) -> None:
@@ -246,6 +247,53 @@ def test_llm_extraction_asset_resolution_keeps_ranked_name_ambiguity(
         "GOOGL",
         "GOOP",
     ]
+
+
+def test_company_name_resolution_rejects_wrong_exact_symbol_when_name_search_is_better(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution
+
+    wrong_symbol = AssetStub(
+        "TGAAF",
+        "equity",
+        "Target Group Inc.",
+        "TARGET",
+        exchange="OTC",
+    )
+    target = AssetStub(
+        "TGT",
+        "equity",
+        "Target Corporation",
+        "TGT",
+        exchange="NYSE",
+    )
+    partial_name_peer = AssetStub(
+        "TH",
+        "equity",
+        "Target Hospitality Corp. Common Stock",
+        "TH",
+        exchange="NASDAQ",
+    )
+
+    monkeypatch.setattr(resolution, "resolve_market_asset", lambda _: wrong_symbol)
+    monkeypatch.setattr(
+        resolution,
+        "search_market_assets",
+        lambda query, limit=5: [wrong_symbol, target, partial_name_peer][:limit],
+    )
+
+    result = resolution.resolve_asset_candidate(
+        "target",
+        field="asset_universe[0]",
+        source="llm_extraction",
+        resolution_mode="company_name",
+    )
+
+    assert result.status == "resolved"
+    assert result.asset is not None
+    assert result.asset.canonical_symbol == "TGT"
+    assert result.candidates == (target,)
 
 
 def test_currency_pair_resolution_preserves_direction(monkeypatch) -> None:

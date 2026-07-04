@@ -154,6 +154,7 @@ from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _response_from_pending_response_option_selection_audit,
     _response_needs_pending_response_option_selection_audit,
 )
+from argus.agent_runtime.interpreter import provider_context_assets
 from argus.agent_runtime.interpreter import requested_asset_answer as _requested_asset_answer
 from argus.agent_runtime.interpreter.readiness_helpers import (  # noqa: F401
     _active_artifact_asset_universe_operation_needs_planner,
@@ -412,9 +413,11 @@ class OpenRouterStructuredInterpreter:
             context_model_name = candidate_models[0] if candidate_models else ""
         else:
             context_model_name = self.model_name
-        asset_resolution_context = await _provider_asset_resolution_context_for_request(
+        asset_resolution_context = await provider_asset_resolution_context_for_request(
             request=request,
             preferred_model=context_model_name,
+            invoke_schema=invoke_openrouter_json_schema,
+            resolve_asset_candidate=_resolve_asset_candidate,
         )
         messages = self._messages(
             request,
@@ -437,6 +440,7 @@ class OpenRouterStructuredInterpreter:
                         response=response,
                         preferred_model=candidate_model,
                         request=request,
+                        asset_resolution_context=asset_resolution_context,
                     )
                     self.last_status = "used" if index == 0 else "fallback_used"
                     return self._to_runtime_interpretation(response, request=request)
@@ -502,6 +506,7 @@ class OpenRouterStructuredInterpreter:
                         response=response,
                         preferred_model=self.model_name,
                         request=request,
+                        asset_resolution_context=asset_resolution_context,
                     )
                     self.last_status = "used"
                     return self._to_runtime_interpretation(response, request=request)
@@ -565,6 +570,7 @@ class OpenRouterStructuredInterpreter:
                         response=response,
                         preferred_model=fallback_model_name,
                         request=request,
+                        asset_resolution_context=asset_resolution_context,
                     )
                     self.last_status = "fallback_used"
                     return self._to_runtime_interpretation(response, request=request)
@@ -1053,20 +1059,8 @@ class OpenRouterStructuredInterpreter:
         )
 
 
-async def _provider_asset_resolution_context_for_request(*, request, preferred_model):
-    return await provider_asset_resolution_context_for_request(
-        request=request,
-        preferred_model=preferred_model,
-        invoke_schema=invoke_openrouter_json_schema,
-        resolve_asset_candidate=_resolve_asset_candidate,
-    )
-
-
 def _provider_asset_resolution_context_from_extraction(extraction):
-    return provider_asset_resolution_context_from_extraction(
-        extraction,
-        resolve_asset_candidate=_resolve_asset_candidate,
-    )
+    return provider_asset_resolution_context_from_extraction(extraction, resolve_asset_candidate=_resolve_asset_candidate)  # noqa: E501
 
 
 async def _asset_grounding_audited_response(
@@ -2161,9 +2155,9 @@ async def _response_ready_for_runtime(
     *,
     response: LLMInterpretationResponse,
     preferred_model: str,
-    request: InterpretationRequest,
+    request: InterpretationRequest, asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse:
-    response = _normalize_response_for_runtime_context(response, request=request)
+    response = _normalize_response_for_runtime_context(response, request=request, asset_resolution_context=asset_resolution_context)  # noqa: E501
     _log_runtime_readiness_step("started", response=response)
     planned_artifact_edit = await _ready_active_artifact_edit_planned_response(
         response=response,
@@ -5011,11 +5005,16 @@ def _normalize_response_for_runtime_context(
     response: LLMInterpretationResponse,
     *,
     request: InterpretationRequest,
+    asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse:
     response = _response_with_latest_result_window_bound(response, request=request)
     response = _response_with_post_result_window_inherited(
         response,
         request=request,
+    )
+    response = provider_context_assets.response_with_provider_context_assets(
+        response,
+        asset_resolution_context=asset_resolution_context,
     )
     response = _response_with_canonical_interpreter_assets(response)
     if _request_has_latest_result(request):
@@ -5329,10 +5328,10 @@ def _resolve_asset_candidate(
     query: str,
     *,
     field: str,
-    source: ResolutionSource,
+    source: ResolutionSource, resolution_mode: str = "auto",
 ) -> AssetResolution:
     if resolve_asset is _DEFAULT_RESOLVE_ASSET:
-        return runtime_resolve_asset_candidate(query, field=field, source=source)
+        return runtime_resolve_asset_candidate(query, field=field, source=source, resolution_mode=resolution_mode)  # noqa: E501
     resolved = resolve_asset(query)
     provenance = ResolutionProvenance(
         field=field,
