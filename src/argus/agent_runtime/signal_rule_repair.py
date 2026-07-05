@@ -15,6 +15,8 @@ class SignalRulePlan(BaseModel):
     outcome: Literal["ready_to_confirm", "needs_clarification", "draft_only"]
     user_goal_summary: str | None = None
     strategy_thesis: str | None = None
+    asset_universe: list[str] = Field(default_factory=list)
+    asset_class: str | None = None
     entry_logic: str | None = None
     exit_logic: str | None = None
     rule_spec: dict[str, Any] | None = None
@@ -120,6 +122,14 @@ def _signal_rule_plan_messages(
                 "user supplied enough meaning. Do not execute and do not invent "
                 "unsupported conditions. Use the candidate strategy and prior "
                 "strategy as context; the current user message is authoritative.\n\n"
+                "Asset grounding: carry every traded asset the user clearly named "
+                "for the strategy in asset_universe, across signal-rule, buy/hold, "
+                "or recurring-buy ideas. Use candidate/prior asset_universe when it "
+                "already matches the user's current intent. Use names or tickers "
+                "from the user text; deterministic provider validation will resolve "
+                "them after this plan. Set asset_class only when it is clear. If an "
+                "asset mention is genuinely ambiguous, leave it for clarification "
+                "instead of picking silently.\n\n"
                 "Rule grammar: rule_spec has entry and exit groups. Each group has "
                 "conditions with left/operator/right. Operators are lt, lte, gt, "
                 "gte, cross_above, cross_below. Operands may be numbers or series "

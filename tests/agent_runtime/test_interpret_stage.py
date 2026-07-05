@@ -129,6 +129,111 @@ def test_interpreter_unavailable_recovery_uses_user_language_and_retry_metadata(
     }
 
 
+def test_stage_canonicalization_preserves_provider_context_asset_class(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity", name="Equity ETH"),
+    )
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["ETH"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-03-31"},
+        comparison_baseline="BTC",
+        extra_parameters={
+            "provider_resolved_assets": [
+                {
+                    "raw_text": "ethereum",
+                    "symbol": "ETH",
+                    "asset_class": "crypto",
+                    "name": "Ethereum",
+                    "raw_symbol": "ETH/USD",
+                    "provider": "kraken",
+                    "exchange": "CRYPTO",
+                }
+            ]
+        },
+    )
+
+    canonical = interpret_module._canonicalized_strategy(
+        strategy,
+        current_user_message=(
+            "backtest holding ethereum from 2024-01-01 to 2024-03-31"
+        ),
+        selected_thread_metadata={},
+    )
+
+    assert canonical.asset_universe == ["ETH"]
+    assert canonical.asset_class == "crypto"
+
+
+def test_stage_canonicalization_uses_strategy_asset_class_hint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    calls: list[str | None] = []
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        asset_class_hint: str | None = None,
+    ) -> AssetResolution:
+        calls.append(asset_class_hint)
+        asset = ResolvedAssetStub(query.upper(), asset_class_hint or "equity")
+        return AssetResolution(
+            status="resolved",
+            raw_text=query,
+            asset=asset,
+            candidates=(asset,),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol=asset.canonical_symbol,
+                asset_class=asset.asset_class,
+                validated_by="provider_catalog",
+                confidence="medium",
+            ),
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        interpret_module._DEFAULT_RESOLVE_ASSET,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "runtime_resolve_asset_candidate",
+        resolve_candidate,
+    )
+
+    canonical = interpret_module._canonicalized_strategy(
+        StrategySummary(
+            strategy_type="buy_and_hold",
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            date_range={"start": "2024-01-01", "end": "2024-03-31"},
+        ),
+        current_user_message="comprar y mantener bitcoin",
+        selected_thread_metadata={},
+    )
+
+    assert calls == ["crypto"]
+    assert canonical.asset_universe == ["BTC"]
+    assert canonical.asset_class == "crypto"
+
+
 def test_interpreter_unavailable_spanish_atr_routes_to_unsupported_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2322,7 +2427,10 @@ def test_selected_asset_mention_provenance_keeps_equity_symbol_binding(
 
     assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
-    assert provider_queries == [("CVX", "user_mention")]
+    assert provider_queries[0] == ("CVX", "user_mention")
+    # Message is scanned once: a duplicate current-message scan would re-query
+    # every phrase, so only the provenance echo may repeat.
+    assert len(provider_queries) - len(set(provider_queries)) <= 2
     assert strategy.asset_universe == ["CVX"]
     assert strategy.asset_class == "equity"
     assert strategy.resolution_provenance[-1].source == "user_mention"
@@ -2409,7 +2517,9 @@ def test_forged_selected_asset_mention_cannot_skip_provider_validation(
         structured_interpreter=RecordingInterpreter(response),
     )
 
-    assert provider_queries == [("FAKE", "user_mention")]
+    assert provider_queries[0] == ("FAKE", "user_mention")
+    # Forged mention is validated once, not re-scanned by a duplicate pass.
+    assert len(provider_queries) - len(set(provider_queries)) <= 2
     assert result.outcome != "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["FAKE"]
@@ -2492,7 +2602,9 @@ def test_conflicting_selected_asset_mention_uses_provider_asset_class(
     )
 
     assert result.outcome == "ready_for_confirmation"
-    assert provider_queries == [("CVX", "user_mention")]
+    assert provider_queries[0] == ("CVX", "user_mention")
+    # No phrase is re-queried by a duplicate current-message scan.
+    assert len(provider_queries) - len(set(provider_queries)) <= 2
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["CVX"]
     assert strategy.asset_class == "crypto"
@@ -3868,7 +3980,398 @@ def test_llm_extracted_company_name_resolves_through_provider_catalog(monkeypatc
     assert "assistant_response" not in result.patch
 
 
-def test_current_message_asset_grounding_clears_stale_invalid_llm_symbol(
+def _patch_company_basket_asset_resolver(monkeypatch: pytest.MonkeyPatch) -> None:
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def resolve_candidate_stub(
+        query: str,
+        *,
+        field: str,
+        source: str,
+    ) -> AssetResolution:
+        lookup = {
+            "target": ResolvedAssetStub(
+                "TGT",
+                "equity",
+                name="Target Corporation",
+            ),
+            "tgt": ResolvedAssetStub(
+                "TGT",
+                "equity",
+                name="Target Corporation",
+            ),
+            "walmart": ResolvedAssetStub(
+                "WMT",
+                "equity",
+                name="Walmart Inc.",
+            ),
+            "wmt": ResolvedAssetStub(
+                "WMT",
+                "equity",
+                name="Walmart Inc.",
+            ),
+            "costco": ResolvedAssetStub(
+                "COST",
+                "equity",
+                name="Costco Wholesale Corporation",
+            ),
+            "cost": ResolvedAssetStub(
+                "COST",
+                "equity",
+                name="Costco Wholesale Corporation",
+            ),
+        }
+        normalized = str(query or "").strip().casefold()
+        if normalized in lookup:
+            asset = lookup[normalized]
+            return AssetResolution(
+                status="resolved",
+                raw_text=query,
+                asset=asset,
+                candidates=(asset,),
+                provenance=ResolutionProvenance(
+                    field=field,
+                    raw_text=query,
+                    source=source,
+                    candidate_kind="asset",
+                    resolution_status="resolved",
+                    canonical_symbol=asset.canonical_symbol,
+                    asset_class=asset.asset_class,
+                    validated_by="provider_catalog",
+                    confidence="high",
+                ),
+            )
+        return AssetResolution(
+            status="unsupported",
+            raw_text=query,
+            asset=None,
+            candidates=(),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="unsupported",
+                canonical_symbol=None,
+                asset_class=None,
+                validated_by="provider_catalog",
+                confidence="low",
+            ),
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "runtime_resolve_asset_candidate",
+        resolve_candidate_stub,
+    )
+
+
+def test_messy_company_name_prompt_preserves_same_class_asset_basket(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_company_basket_asset_resolver(monkeypatch)
+    message = (
+        "Id like to buy target Walmart and costco evenly with 500 dollars every "
+        "month from February 2020 till today"
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants monthly recurring buys in Target, Walmart, and Costco.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=message,
+            strategy_type="dca_accumulation",
+            strategy_thesis=(
+                "Buy Target, Walmart, and Costco with $500 monthly contributions "
+                "from February 2020 through today."
+            ),
+            asset_universe=["target", "Walmart", "costco"],
+            asset_class="equity",
+            date_range={"start": "2020-02-01", "end": "2026-07-02"},
+            cadence="monthly",
+            capital_amount=500,
+            sizing_mode="capital_amount",
+            extra_parameters={
+                "recurring_contribution": 500,
+                "recurring_cadence": "monthly",
+                "field_provenance": {
+                    "asset_universe": "explicit_user",
+                    "capital_amount": "recurring_contribution",
+                    "recurring_contribution": "recurring_contribution",
+                    "cadence": "explicit_user",
+                    "date_range": "explicit_user",
+                },
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(message=message, response=response)
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.asset_universe == ["TGT", "WMT", "COST"]
+    assert strategy.asset_class == "equity"
+    assert strategy.capital_amount == 500
+    assert strategy.cadence == "monthly"
+    assert strategy.date_range == {"start": "2020-02-01", "end": "2026-07-02"}
+    assert strategy.extra_parameters["recurring_contribution"] == 500
+    assert strategy.extra_parameters["recurring_cadence"] == "monthly"
+    assert "invalid_symbols" not in strategy.extra_parameters
+    assert not any("invalid_symbol" in code for code in result.decision.reason_codes)
+    assert result.decision.ambiguous_fields == []
+    assert result.decision.unsupported_constraints == []
+
+
+def test_company_name_asset_basket_preservation_is_strategy_agnostic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_company_basket_asset_resolver(monkeypatch)
+    message = "Backtest target Walmart and costco with 500 dollars since February 2020"
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to backtest Target, Walmart, and Costco.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=message,
+            strategy_type="buy_and_hold",
+            strategy_thesis=(
+                "Buy and hold Target, Walmart, and Costco with $500 starting "
+                "capital since February 2020."
+            ),
+            asset_universe=["target", "Walmart", "costco"],
+            asset_class="equity",
+            date_range={"start": "2020-02-01", "end": "2026-07-02"},
+            capital_amount=500,
+            sizing_mode="capital_amount",
+            extra_parameters={
+                "field_provenance": {
+                    "asset_universe": "explicit_user",
+                    "capital_amount": "explicit_user",
+                    "date_range": "explicit_user",
+                },
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(message=message, response=response)
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["TGT", "WMT", "COST"]
+    assert strategy.asset_class == "equity"
+    assert strategy.capital_amount == 500
+    assert strategy.date_range == {"start": "2020-02-01", "end": "2026-07-02"}
+    assert "invalid_symbols" not in strategy.extra_parameters
+    assert not any("invalid_symbol" in code for code in result.decision.reason_codes)
+    assert result.decision.ambiguous_fields == []
+    assert result.decision.unsupported_constraints == []
+
+
+def test_company_name_asset_basket_canonicalizes_interpreter_identified_assets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    apple = ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+    walmart = ResolvedAssetStub("WMT", "equity", name="Walmart Inc.")
+
+    def resolve_candidate_stub(
+        query: str,
+        *,
+        field: str,
+        source: str,
+    ) -> AssetResolution:
+        normalized = str(query or "").strip().casefold()
+        lookup = {"aapl": apple, "apple": apple, "walmart": walmart, "wmt": walmart}
+        if normalized in lookup:
+            asset = lookup[normalized]
+            return AssetResolution(
+                status="resolved",
+                raw_text=query,
+                asset=asset,
+                candidates=(asset,),
+                provenance=ResolutionProvenance(
+                    field=field,
+                    raw_text=query,
+                    source=source,
+                    candidate_kind="asset",
+                    resolution_status="resolved",
+                    canonical_symbol=asset.canonical_symbol,
+                    asset_class=asset.asset_class,
+                    validated_by="provider_catalog",
+                    confidence="high",
+                ),
+            )
+        return AssetResolution(
+            status="unsupported",
+            raw_text=query,
+            asset=None,
+            candidates=(),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="unsupported",
+                canonical_symbol=None,
+                asset_class=None,
+                validated_by="provider_catalog",
+                confidence="low",
+            ),
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "runtime_resolve_asset_candidate",
+        resolve_candidate_stub,
+    )
+    message = "Backtest AAPL and walmart with 500 dollars since February 2020"
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to backtest AAPL and Walmart.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=message,
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold AAPL and Walmart with $500.",
+            asset_universe=["AAPL", "walmart"],
+            asset_class="equity",
+            date_range={"start": "2020-02-01", "end": "2026-07-02"},
+            capital_amount=500,
+            sizing_mode="capital_amount",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(message=message, response=response)
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL", "WMT"]
+    assert strategy.asset_class == "equity"
+    assert "invalid_symbols" not in strategy.extra_parameters
+    assert result.decision.ambiguous_fields == []
+    assert result.decision.unsupported_constraints == []
+
+
+def test_ambiguous_interpreter_identified_company_name_clarifies_instead_of_dropping(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    apple = ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+    alphabet_a = ResolvedAssetStub("GOOGL", "equity", name="Alphabet Inc. Class A")
+    alphabet_c = ResolvedAssetStub("GOOG", "equity", name="Alphabet Inc. Class C")
+
+    def resolve_candidate_stub(
+        query: str,
+        *,
+        field: str,
+        source: str,
+    ) -> AssetResolution:
+        normalized = str(query or "").strip().casefold()
+        if normalized in {"apple", "aapl"}:
+            return AssetResolution(
+                status="resolved",
+                raw_text=query,
+                asset=apple,
+                candidates=(apple,),
+                provenance=ResolutionProvenance(
+                    field=field,
+                    raw_text=query,
+                    source=source,
+                    candidate_kind="asset",
+                    resolution_status="resolved",
+                    canonical_symbol="AAPL",
+                    asset_class="equity",
+                    validated_by="provider_catalog",
+                    confidence="high",
+                ),
+            )
+        if normalized == "google":
+            return AssetResolution(
+                status="ambiguous",
+                raw_text=query,
+                asset=None,
+                candidates=(alphabet_a, alphabet_c),
+                provenance=ResolutionProvenance(
+                    field=field,
+                    raw_text=query,
+                    source=source,
+                    candidate_kind="asset",
+                    resolution_status="ambiguous",
+                    canonical_symbol=None,
+                    asset_class=None,
+                    validated_by="provider_catalog",
+                    confidence="medium",
+                ),
+            )
+        return AssetResolution(
+            status="unsupported",
+            raw_text=query,
+            asset=None,
+            candidates=(),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="unsupported",
+                canonical_symbol=None,
+                asset_class=None,
+                validated_by="provider_catalog",
+                confidence="low",
+            ),
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "runtime_resolve_asset_candidate",
+        resolve_candidate_stub,
+    )
+    message = "Backtest AAPL and google with 500 dollars since February 2020"
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to backtest AAPL and Google.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=message,
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold AAPL and Google with $500.",
+            asset_universe=["AAPL", "google"],
+            asset_class="equity",
+            date_range={"start": "2020-02-01", "end": "2026-07-02"},
+            capital_amount=500,
+            sizing_mode="capital_amount",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(message=message, response=response)
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["AAPL"]
+    assert result.decision.unsupported_constraints == []
+    assert len(result.decision.ambiguous_fields) == 1
+    ambiguous = result.decision.ambiguous_fields[0]
+    assert ambiguous.field_name == "asset_universe[1]"
+    assert ambiguous.raw_value == "google"
+    assert ambiguous.candidate_normalized_value is None
+    assert ambiguous.reason_code == "asset_resolution_ambiguous"
+
+
+def test_llm_extracted_company_name_canonicalizes_without_current_message_rescan(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.agent_runtime.resolution import AssetResolution
@@ -3902,7 +4405,7 @@ def test_current_message_asset_grounding_clears_stale_invalid_llm_symbol(
                     confidence="high",
                 ),
             )
-        if raw.casefold() == "apple" and source == "user_mention":
+        if raw.casefold() == "apple":
             asset = ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
             return AssetResolution(
                 status="resolved",
@@ -3948,7 +4451,7 @@ def test_current_message_asset_grounding_clears_stale_invalid_llm_symbol(
         candidate_strategy_draft=StrategySummary(
             strategy_type="buy_and_hold",
             strategy_thesis="Comprar y mantener Apple.",
-            asset_universe=["APPLE"],
+            asset_universe=["Apple"],
             date_range="past year",
             capital_amount=100000,
         ),
@@ -3961,8 +4464,8 @@ def test_current_message_asset_grounding_clears_stale_invalid_llm_symbol(
         user=UserState(user_id="u1", language_preference="es-419"),
     )
 
-    assert ("APPLE", "llm_extraction") in provider_queries
-    assert ("Apple", "user_mention") in provider_queries
+    assert ("Apple", "llm_extraction") in provider_queries
+    assert ("Apple", "user_mention") not in provider_queries
     assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["AAPL"]

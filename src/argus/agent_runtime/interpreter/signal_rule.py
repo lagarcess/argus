@@ -318,6 +318,14 @@ def _response_from_signal_rule_plan(
         repaired.user_goal_summary = plan.user_goal_summary
     if plan.strategy_thesis:
         draft.strategy_thesis = plan.strategy_thesis
+    if plan.asset_universe:
+        draft.asset_universe = [
+            str(value).strip()
+            for value in plan.asset_universe[:5]
+            if str(value or "").strip()
+        ]
+    if plan.asset_class:
+        draft.asset_class = str(plan.asset_class).strip().lower() or None
     if plan.entry_logic:
         draft.entry_logic = plan.entry_logic
     if plan.exit_logic:

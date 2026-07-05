@@ -15,7 +15,6 @@ from argus.agent_runtime.artifacts.strategy_edits import (
     apply_artifact_patch,
 )
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
-    _active_strategy_from_snapshot,
     _clear_incompatible_strategy_rule_state,
     _indicator_key_from_strategy,
     _provenance_field,
@@ -438,25 +437,6 @@ def _extra_parameters_without_unrequested_date_context(
             continue
         cleaned[key] = value
     return cleaned
-
-
-def _should_apply_current_message_asset_grounding(
-    *,
-    semantic_turn_act: str | None,
-    selected_thread_metadata: dict[str, Any],
-    snapshot: TaskSnapshot | None,
-) -> bool:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field == "asset_universe":
-        return True
-    if semantic_turn_act != "answer_pending_need":
-        return True
-    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
-        return True
-    prior = _active_strategy_from_snapshot(snapshot)
-    return not bool(prior and prior.asset_universe)
 
 
 def _contextual_date_range_value(

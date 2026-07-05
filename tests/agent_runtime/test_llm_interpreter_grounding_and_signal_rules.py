@@ -3804,7 +3804,7 @@ async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
     assert draft.exit_logic
 
 @pytest.mark.asyncio
-async def test_structured_signal_draft_recovers_missing_asset_from_context(
+async def test_structured_signal_draft_canonicalizes_interpreter_asset(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -3812,7 +3812,7 @@ async def test_structured_signal_draft_recovers_missing_asset_from_context(
 
     async def fail_if_model_called(**kwargs):
         del kwargs
-        raise AssertionError("catalog-backed asset recovery should not need a model")
+        raise AssertionError("asset canonicalization should not need a model")
 
     def resolve_stub(symbol: str) -> ResolvedAssetStub:
         if symbol.lower() in {"tesla", "tsla"}:
@@ -3834,7 +3834,7 @@ async def test_structured_signal_draft_recovers_missing_asset_from_context(
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
-        requires_clarification=True,
+        requires_clarification=False,
         user_goal_summary=(
             "Backtest a 50/200 moving-average crossover for Tesla."
         ),
@@ -3850,6 +3850,7 @@ async def test_structured_signal_draft_recovers_missing_asset_from_context(
                 "200-day SMA between January 2022 and today, starting with "
                 "$10,000 capital."
             ),
+            asset_universe=["TSLA"],
             date_range={"start": "2022-01-01", "end": "today"},
             capital_amount=10000,
             entry_rule={
@@ -3869,10 +3870,7 @@ async def test_structured_signal_draft_recovers_missing_asset_from_context(
                 "slow_indicator": "sma",
             },
         ),
-        missing_required_fields=["asset_universe"],
-        assistant_response=(
-            "Just to confirm, are you testing this on TSLA stock?"
-        ),
+        assistant_response=None,
     )
 
     repaired = await interpreter_module._response_ready_for_runtime(
@@ -3894,7 +3892,7 @@ async def test_structured_signal_draft_recovers_missing_asset_from_context(
     assert repaired.requires_clarification is False
     assert repaired.assistant_response is None
     assert repaired.missing_required_fields == []
-    assert "provider_catalog_asset_recovery" in repaired.reason_codes
+    assert "provider_catalog_asset_recovery" not in repaired.reason_codes
     assert draft.asset_universe == ["TSLA"]
     assert draft.asset_class == "equity"
     assert draft.entry_rule and draft.exit_rule
@@ -4003,9 +4001,10 @@ async def test_unsupported_supported_rule_classification_gets_signal_rule_repair
     async def plan_stub(**kwargs):
         del kwargs
         calls.append("signal_rule_plan")
-        return _sma_50_200_crossover_plan(
+        plan = _sma_50_200_crossover_plan(
             strategy_thesis="Test Tesla with a 50/200 moving-average crossover."
         )
+        return plan.model_copy(update={"asset_universe": ["Tesla"]})
 
     async def field_fidelity_audit_stub(*, response, request, **kwargs):
         del kwargs
@@ -4104,7 +4103,7 @@ async def test_supported_rule_repair_audits_dropped_user_stated_capital(
                 "Test Tesla with a 50/200 moving-average crossover using $10,000."
             ),
         )
-        return plan
+        return plan.model_copy(update={"asset_universe": ["Tesla"]})
 
     async def field_fidelity_audit_stub(*, response, request, **kwargs):
         del kwargs

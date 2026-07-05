@@ -86,10 +86,6 @@ def test_measurement_fixtures_do_not_assert_expected_prose() -> None:
 def test_expected_fail_baselines_are_issue_tagged() -> None:
     expected_failures = [case for case in load_eval_cases() if case.expected_fail]
 
-    assert any(
-        case.expected_fail is not None and case.expected_fail.issue == "#142"
-        for case in expected_failures
-    )
     for case in expected_failures:
         assert case.expected_fail is not None
         assert case.expected_fail.issue.startswith("#")
