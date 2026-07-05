@@ -5,6 +5,7 @@ type MergeFinalTextOptions = {
   finalText: string;
   finalActions: ChatActionOption[];
   contentPresentation?: Message["contentPresentation"];
+  resultFactHeadingKey?: string | null;
 };
 
 export function mergeFinalTextMessage(
@@ -14,6 +15,7 @@ export function mergeFinalTextMessage(
     finalText,
     finalActions,
     contentPresentation,
+    resultFactHeadingKey,
   }: MergeFinalTextOptions,
 ): Message {
   if (message.id !== assistantId) {
@@ -25,5 +27,6 @@ export function mergeFinalTextMessage(
     content: finalText || message.content || undefined,
     actions: finalActions.length > 0 ? finalActions : message.actions,
     contentPresentation: contentPresentation ?? message.contentPresentation,
+    resultFactHeadingKey: resultFactHeadingKey ?? message.resultFactHeadingKey,
   };
 }

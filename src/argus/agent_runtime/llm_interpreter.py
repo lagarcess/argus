@@ -685,8 +685,8 @@ class OpenRouterStructuredInterpreter:
             "such as strategy_type, asset_class, cadence, timeframe, indicator, "
             "semantic_turn_act, artifact_target, and result_followup_focus; do not "
             "translate those machine fields. Put the detected user language in "
-            "candidate_strategy_draft.language. Put the exact bounded date/window "
-            "phrase in candidate_strategy_draft.date_range_raw_text. For relative "
+            "detected_user_language for every turn and in candidate_strategy_draft.language when "
+            "a strategy draft is present. Put the exact bounded date/window phrase in candidate_strategy_draft.date_range_raw_text. For relative "
             "or semantic time windows, also fill candidate_strategy_draft."
             "date_range_intent with canonical fields: kind=rolling_window with "
             "count/unit, kind=year_to_date with optional year, kind=calendar_year "
@@ -889,8 +889,16 @@ class OpenRouterStructuredInterpreter:
             "one, or otherwise repeat the latest failed run without changing the idea, "
             "and unsupported_request when the user asks for unsupported capabilities. "
             "When semantic_turn_act is result_followup, set result_followup_focus to "
-            "the closest value: why_underperformed, max_drawdown, what_tested, "
-            "next_experiment, assumptions, or general. Result follow-ups must be "
+            "the closest value: why_underperformed, max_drawdown, drawdown_date, "
+            "peak_date, peak_value, result_card_fact, what_tested, "
+            "next_experiment, assumptions, or general. Use peak_date when the user "
+            "asks when the latest result reached its highest value, peak_value when "
+            "they ask what that highest value was, drawdown_date when they ask when "
+            "the largest drawdown bottomed, and result_card_fact when they ask for "
+            "another factual value shown on the latest result card. For any factual "
+            "result question, set result_followup_fact_key to the canonical "
+            "snake_case key of that value (schema list, or the metric's plain "
+            "snake_case name); leave it unset otherwise. Result follow-ups must be "
             "answered from the latest result facts supplied to the runtime; do not "
             "invent metrics. Use why_underperformed for any why/how the result happened "
             "or other performance "
@@ -988,6 +996,7 @@ class OpenRouterStructuredInterpreter:
             task_relation=response.task_relation,
             requires_clarification=response.requires_clarification,
             user_goal_summary=response.user_goal_summary,
+            detected_user_language=response.detected_user_language,
             candidate_strategy_draft=strategy,
             missing_required_fields=list(response.missing_required_fields),
             assistant_response=response.assistant_response,
@@ -998,6 +1007,7 @@ class OpenRouterStructuredInterpreter:
             response_profile_overrides=response.response_profile_overrides,
             semantic_turn_act=response.semantic_turn_act,
             result_followup_focus=response.result_followup_focus,
+            result_followup_fact_key=response.result_followup_fact_key,
             capability_question_focus=response.capability_question_focus,
             context_question_focus=response.context_question_focus,
             artifact_target=_artifact_target_from_response(response),
@@ -4539,6 +4549,7 @@ async def _latest_result_routing_audited_response(
             "assistant_response": None,
             "semantic_turn_act": "result_followup",
             "result_followup_focus": audit.focus or "general",
+            "result_followup_fact_key": audit.fact_key,
             "capability_question_focus": None,
             "context_question_focus": None,
             "uses_latest_result_context": True,

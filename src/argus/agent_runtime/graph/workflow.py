@@ -81,6 +81,11 @@ class WorkflowState(TypedDict, total=False):
     final_response_payload: dict[str, Any]
     latest_failed_action_reference: ArtifactReference | dict[str, Any]
     next_actions: list[str]
+    latest_run_id: str | None
+    result_run_id: str | None
+    result_strategy_id: str | None
+    result_conversation_id: str | None
+    result_fact_bank: dict[str, Any]
     result_action_request: dict[str, Any]
 
 
@@ -96,6 +101,10 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
         "final_response_payload",
         "latest_failed_action_reference",
         "next_actions",
+        "latest_run_id",
+        "result_run_id",
+        "result_strategy_id",
+        "result_conversation_id",
         "result_fact_bank",
         "result_action_request",
     }
@@ -525,7 +534,13 @@ def _should_preserve_pending_strategy(
         or prior_task_snapshot.pending_strategy_summary is None
     ):
         return False
-    if latest_backtest_reference is not None or latest_collection_reference is not None:
+    if _has_new_artifact_reference(
+        latest_backtest_reference,
+        prior_task_snapshot.latest_backtest_result_reference,
+    ) or _has_new_artifact_reference(
+        latest_collection_reference,
+        prior_task_snapshot.latest_collection_action_reference,
+    ):
         return False
     action = run_state.structured_action
     return action is None or action.type != "cancel_confirmation"
@@ -544,6 +559,23 @@ def _should_capture_current_pending_strategy(
     if response_intent is None:
         return False
     return bool(response_intent.semantic_needs or response_intent.requested_fields)
+
+
+def _has_new_artifact_reference(
+    current: ArtifactReference | None,
+    prior: ArtifactReference | None,
+) -> bool:
+    if current is None:
+        return False
+    if prior is None:
+        return True
+    return (
+        current.artifact_kind,
+        current.artifact_id,
+    ) != (
+        prior.artifact_kind,
+        prior.artifact_id,
+    )
 
 
 def _current_failed_action_reference(
@@ -629,6 +661,16 @@ def _build_thread_metadata(
         and run_state.response_intent.requested_fields
     ):
         requested_field = run_state.response_intent.requested_fields[0]
+    if requested_field in (None, ""):
+        prior_metadata = workflow_state.get("selected_thread_metadata")
+        snapshot = workflow_state.get("latest_task_snapshot")
+        if (
+            stage_outcome_value == "ready_to_respond"
+            and isinstance(prior_metadata, dict)
+            and isinstance(snapshot, TaskSnapshot)
+            and snapshot.pending_strategy_summary is not None
+        ):
+            requested_field = prior_metadata.get("requested_field")
     if isinstance(requested_field, str) and requested_field:
         metadata["requested_field"] = requested_field
     if run_state.response_intent is not None:

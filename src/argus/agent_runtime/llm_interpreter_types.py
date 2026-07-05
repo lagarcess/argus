@@ -178,6 +178,14 @@ class LLMInterpretationResponse(BaseModel):
     task_relation: Literal["new_task", "continue", "refine", "ambiguous"]
     requires_clarification: bool = False
     user_goal_summary: str
+    detected_user_language: str | None = Field(
+        default=None,
+        description=(
+            "Detected language of the current user message as a BCP-47-style code "
+            "such as en, es, or es-419. Populate this for every turn; it is typed "
+            "turn metadata, not an executable strategy field."
+        ),
+    )
     candidate_strategy_draft: LLMStrategyDraft = Field(default_factory=LLMStrategyDraft)
     missing_required_fields: list[str] = Field(default_factory=list)
     assistant_response: str | None = None
@@ -203,6 +211,22 @@ class LLMInterpretationResponse(BaseModel):
         | None
     ) = None
     result_followup_focus: ResultFollowupFocus | None = None
+    result_followup_fact_key: str | None = Field(
+        default=None,
+        description=(
+            "Canonical snake_case key for the single factual latest-result value "
+            "the user asked about. Known keys: total_return, benchmark_return, "
+            "benchmark_delta, benchmark_symbol, max_drawdown, drawdown_date, "
+            "peak_date, peak_value, lowest_date, lowest_value, final_value, "
+            "annualized_return, profit, volatility, win_rate, profit_factor, "
+            "sharpe_ratio, trade_count, starting_capital, date_range, symbols, "
+            "strategy. For another single result metric, emit its plain "
+            "snake_case name (for example sortino_ratio) — never a sentence or "
+            "synonym phrase. Leave unset when the question is not about one "
+            "specific result value. Use this only with "
+            "semantic_turn_act=result_followup."
+        ),
+    )
     capability_question_focus: CapabilityQuestionFocus | None = None
     context_question_focus: ContextQuestionFocus | None = None
     artifact_target: ArtifactTarget | None = None

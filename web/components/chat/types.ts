@@ -211,4 +211,6 @@ export type Message = {
   artifactStatus?: string;
   savedStrategyId?: string | null;
   copyText?: string;
+  /** Canonical fact key for a latest-result fact answer; localized heading chrome. */
+  resultFactHeadingKey?: string | null;
 };

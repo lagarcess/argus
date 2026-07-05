@@ -9,6 +9,12 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from argus.agent_runtime.recovery_messages import recovery_message
 from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
+from argus.agent_runtime.result_fact_enrichment import (
+    as_float,
+    enriched_result_fact_entries,
+    format_percent,
+    metric_number,
+)
 from argus.agent_runtime.stages.interpret_types import ResultFollowupFocus
 from argus.context.rendering import context_packet_fact_summary
 from argus.domain.benchmark_comparison import benchmark_comparison_from_delta
@@ -137,12 +143,18 @@ async def compose_result_followup_response(
     focus: ResultFollowupFocus,
     user_message: str,
     language: str = "en",
+    fact_key: str | None = None,
+    extra_facts: dict[str, str] | None = None,
+    extra_required_fact_ids: set[str] | None = None,
+    extra_appendable_fact_ids: set[str] | None = None,
     invoke_json_schema_func=invoke_openrouter_json_schema,
     log_openrouter_failure_func=log_openrouter_failure,
 ) -> str | None:
     fact_bank = result_followup_fact_bank(metadata)
     if not fact_bank:
         return None
+    if extra_facts:
+        fact_bank.update(extra_facts)
     use_context_route = result_followup_uses_context_route(
         fact_bank=fact_bank,
         focus=focus,
@@ -151,7 +163,12 @@ async def compose_result_followup_response(
         fact_bank=fact_bank,
         focus=focus,
         include_context=use_context_route,
+        fact_key=fact_key,
     )
+    if extra_required_fact_ids:
+        required_fact_ids |= {
+            fact_id for fact_id in extra_required_fact_ids if fact_id in fact_bank
+        }
     context_packet_ids = context_packet_ids_from_fact_bank(fact_bank)
     llm_task = result_followup_llm_task(
         fact_bank=fact_bank,
@@ -202,6 +219,7 @@ async def compose_result_followup_response(
         fact_bank=fact_bank,
         required_fact_ids=required_fact_ids,
         focus=focus,
+        extra_appendable_fact_ids=extra_appendable_fact_ids,
     )
     if rendered is None:
         record_result_followup_recovery_receipt(
@@ -486,6 +504,10 @@ def result_followup_focus_question(focus: ResultFollowupFocus) -> str:
             "strategy did not underperform."
         ),
         "max_drawdown": "Explain the max drawdown for the latest run.",
+        "drawdown_date": "Explain when the largest drawdown bottomed for the latest run.",
+        "peak_date": "Explain when the latest run reached peak portfolio value.",
+        "peak_value": "Explain the peak portfolio value for the latest run.",
+        "result_card_fact": "Answer the requested factual result-card value.",
         "what_tested": "Explain what was tested in the latest run.",
         "next_experiment": "Suggest useful supported next experiments for this run.",
         "assumptions": "Explain the assumptions used by the latest run.",
@@ -562,6 +584,7 @@ def render_result_followup_draft(
     fact_bank: dict[str, str],
     required_fact_ids: set[str],
     focus: ResultFollowupFocus,
+    extra_appendable_fact_ids: set[str] | None = None,
 ) -> str | None:
     body = render_result_followup_answer_body(draft)
     if not body:
@@ -586,6 +609,7 @@ def render_result_followup_draft(
         missing_fact_ids=required_fact_ids - used_fact_ids,
         fact_bank=fact_bank,
         focus=focus,
+        extra_appendable_fact_ids=extra_appendable_fact_ids,
     )
     ordered_fact_ids.extend(appendable_missing_fact_ids)
     used_fact_ids.update(appendable_missing_fact_ids)
@@ -666,6 +690,7 @@ def appendable_missing_required_fact_ids(
     missing_fact_ids: set[str],
     fact_bank: dict[str, str],
     focus: ResultFollowupFocus,
+    extra_appendable_fact_ids: set[str] | None = None,
 ) -> list[str]:
     appendable_fact_ids = {
         "context_packet_facts",
@@ -673,6 +698,8 @@ def appendable_missing_required_fact_ids(
         "caveat",
         "relative_performance",
     }
+    if extra_appendable_fact_ids:
+        appendable_fact_ids.update(extra_appendable_fact_ids)
     if result_followup_uses_context_route(fact_bank=fact_bank, focus=focus):
         appendable_fact_ids.update(
             {
@@ -818,6 +845,10 @@ def result_followup_fact_bank(metadata: dict[str, Any]) -> dict[str, str]:
     )
     if trade_count is not None:
         fact_bank["trade_count"] = f"{int(trade_count)} trades"
+    # Deterministic enrichment (equity-curve extrema, supplemental metrics,
+    # result-card rows). Canonical entries above win on key collisions.
+    for fact_id, value in enriched_result_fact_entries(metadata).items():
+        fact_bank.setdefault(fact_id, value)
     rule_summary = str(resolved_rule_summary(metadata) or "").strip()
     if rule_summary:
         fact_bank["rule_summary"] = rule_summary
@@ -851,6 +882,7 @@ def required_result_followup_fact_ids(
     fact_bank: dict[str, str],
     focus: ResultFollowupFocus,
     include_context: bool = False,
+    fact_key: str | None = None,
 ) -> set[str]:
     required: set[str] = {"caveat"}
     has_context_facts = "context_packet_facts" in fact_bank
@@ -861,6 +893,20 @@ def required_result_followup_fact_ids(
         required.add("symbols")
     if focus == "max_drawdown":
         required.update(fact_id for fact_id in ("max_drawdown",) if fact_id in fact_bank)
+    elif focus in {"peak_date", "peak_value"}:
+        # Pin the facts the question is about; the pair keeps date and value
+        # answers grounded on the same curve point.
+        for fact_id in ("peak_date", "peak_value"):
+            if fact_id in fact_bank:
+                required.add(fact_id)
+    elif focus == "drawdown_date":
+        # drawdown_depth is computed at the same trough as drawdown_date, so
+        # the stated magnitude always matches the stated date.
+        for fact_id in ("drawdown_date", "drawdown_depth"):
+            if fact_id in fact_bank:
+                required.add(fact_id)
+        if "drawdown_depth" not in fact_bank and "max_drawdown" in fact_bank:
+            required.add("max_drawdown")
     elif focus == "what_tested":
         for fact_id in (
             "strategy",
@@ -893,6 +939,8 @@ def required_result_followup_fact_ids(
         for fact_id in ("assumptions", "starting_capital", "benchmark_symbol"):
             if fact_id in fact_bank:
                 required.add(fact_id)
+    if fact_key and fact_key in fact_bank:
+        required.add(fact_key)
     return required
 
 
@@ -1033,43 +1081,6 @@ def relative_performance_label(
 def config_snapshot(metadata: dict[str, Any]) -> dict[str, Any]:
     config = metadata.get("config_snapshot")
     return dict(config) if isinstance(config, dict) else {}
-
-
-def metric_number(
-    metadata: dict[str, Any],
-    *,
-    paths: tuple[tuple[str, ...], ...],
-) -> float | None:
-    for path in paths:
-        value: Any = metadata
-        for key in path:
-            if not isinstance(value, dict):
-                value = None
-                break
-            value = value.get(key)
-        number = as_float(value)
-        if number is not None:
-            return number
-    return None
-
-
-def as_float(value: Any) -> float | None:
-    if isinstance(value, bool) or value is None:
-        return None
-    if isinstance(value, int | float):
-        return float(value)
-    if isinstance(value, str):
-        cleaned = value.strip().replace("%", "").replace("+", "").replace(",", "")
-        try:
-            return float(cleaned)
-        except ValueError:
-            return None
-    return None
-
-
-def format_percent(value: float, *, signed: bool = True) -> str:
-    sign = "+" if signed and value > 0 else ""
-    return f"{sign}{value:.1f}%"
 
 
 def symbols_label(metadata: dict[str, Any]) -> str:

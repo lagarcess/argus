@@ -77,6 +77,7 @@ import {
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
+import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
 import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
 import {
@@ -1523,6 +1524,7 @@ export default function ChatInterface() {
             ),
           );
         } else if (finalText) {
+          const finalFactHeadingKey = resultFactHeadingKeyFromMetadata(finalPayload);
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
@@ -1535,6 +1537,7 @@ export default function ChatInterface() {
                     action?.type === "show_breakdown"
                       ? "result_breakdown"
                       : undefined,
+                  resultFactHeadingKey: finalFactHeadingKey,
                 }),
               ),
               assistantId,
@@ -1548,6 +1551,7 @@ export default function ChatInterface() {
                   action?.type === "show_breakdown"
                     ? "result_breakdown"
                     : undefined,
+                resultFactHeadingKey: finalFactHeadingKey,
               },
             );
             if (

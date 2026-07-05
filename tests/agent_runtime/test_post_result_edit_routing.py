@@ -388,13 +388,16 @@ class _RecordingInterpreter:
         return self.response
 
 
-def test_post_result_planned_edit_materializes_full_confirmation() -> None:
+def test_post_result_planned_edit_materializes_full_confirmation(monkeypatch) -> None:
     """The confirmation from a post-result planned edit must carry the
     completed run's contribution, cadence, and window — there is no pending
     strategy to merge from on this surface."""
 
+    from argus.agent_runtime.stages import interpret as interpret_module
     from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.setattr(interpret_module, "resolve_asset", _resolve_stub)
     planned = StructuredInterpretation(
         intent="backtest_execution",
         task_relation="continue",

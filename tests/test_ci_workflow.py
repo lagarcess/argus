@@ -61,8 +61,10 @@ def test_ci_has_active_backend_and_frontend_quality_jobs() -> None:
     assert "tests/test_render_canary_script.py" in backend_steps
     assert "tests/test_legacy_orchestrator_retirement.py" in backend_steps
     assert "tests/test_chat_backtest_state_machine.py" in backend_steps
+    assert "tests/test_chat_runtime_reload_guardrails.py" in backend_steps
     assert "tests/test_openrouter_policy.py" in backend_steps
     assert "tests/agent_runtime/test_execute_recovery.py" in backend_steps
+    assert "tests/agent_runtime/test_latest_result_fact_answers.py" in backend_steps
     assert "tests/section3/test_market_data_provider.py" in backend_steps
     assert "--no-cov" in backend_steps
 

@@ -186,6 +186,11 @@ export default function ChatMessage({
       ? "opacity-100"
       : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100";
   const displayContent = getDisplayContent();
+  // Localized heading chrome for latest-result fact answers, driven by the
+  // typed fact key. Unknown keys render no heading.
+  const factHeadingLabel = message.resultFactHeadingKey
+    ? t(`chat.result_followup.headings.${message.resultFactHeadingKey}`, "")
+    : "";
 
   if (isUser && message.kind === "action") {
     return (
@@ -250,6 +255,9 @@ export default function ChatMessage({
             />
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
+              {factHeadingLabel && (
+                <div className="argus-result-section-label">{factHeadingLabel}</div>
+              )}
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {displayContent}
               </ReactMarkdown>

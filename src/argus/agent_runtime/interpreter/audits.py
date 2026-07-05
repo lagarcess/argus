@@ -337,6 +337,15 @@ class LatestResultRoutingAudit(BaseModel):
             "Closest result follow-up focus when targets_latest_result is true."
         ),
     )
+    fact_key: str | None = Field(
+        default=None,
+        description=(
+            "Optional canonical result fact key the user asked about, such as "
+            "peak_date, peak_value, max_drawdown, drawdown_date, total_return, "
+            "benchmark_delta, date_range, symbols, benchmark_symbol, or an "
+            "unsupported metric key like sortino_ratio."
+        ),
+    )
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
 

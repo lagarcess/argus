@@ -870,7 +870,7 @@ def _response_needs_latest_result_routing_audit(
     if response.intent == "results_explanation":
         return True
     if _llm_strategy_draft_has_executable_shape(response.candidate_strategy_draft):
-        return response.task_relation == "continue"
+        return True
     if _llm_strategy_draft_has_extractable_fields(response.candidate_strategy_draft):
         return True
     return bool(
@@ -913,12 +913,26 @@ def _latest_result_routing_audit_messages(
                 "not depend on the latest result. If the primary interpreter copied "
                 "symbols, dates, timeframe, or strategy labels out of the latest "
                 "result but did not produce a new executable rule, treat that as "
-                "latest-result context rather than a new strategy. Set "
+                "latest-result context rather than a new strategy. Short anaphoric "
+                "questions such as 'what date did this peak?', 'when did this peak?', "
+                "'what was the peak value?', 'when was the worst drawdown?', "
+                "'cuándo alcanzó el máximo?', or 'cuál fue la caída máxima?' target "
+                "the latest result when a latest result exists, even if the primary "
+                "interpreter filled strategy fields from prior context. Set "
                 "save_requested=true when the user is asking to save, keep, "
                 "bookmark, or promote the latest completed result artifact. "
                 "Examples that must set save_requested=true when a latest result "
                 "exists: 'save this', 'save this result', 'keep this', "
                 "'bookmark this run', 'save that strategy from the result'. Use "
+                "focus=peak_date and fact_key=peak_date for questions asking when "
+                "the portfolio value peaked. Use focus=peak_value and "
+                "fact_key=peak_value for questions asking what the highest portfolio "
+                "value was. Use focus=drawdown_date and fact_key=drawdown_date for "
+                "questions asking when the largest drawdown bottomed. Use "
+                "focus=max_drawdown and fact_key=max_drawdown for questions asking "
+                "how large the drawdown was. Use focus=result_card_fact and set "
+                "fact_key to the canonical metric name for other factual values, "
+                "including unsupported metrics like sortino_ratio. "
                 "why_underperformed for questions that ask why a result matched, "
                 "beat, lagged, or compared with its benchmark; use what_tested only "
                 "when the user is asking for the run setup itself."

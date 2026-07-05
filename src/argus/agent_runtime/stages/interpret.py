@@ -214,6 +214,9 @@ from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_conti
     structured_interpretation_has_complete_typed_asset_patch as _structured_interpretation_has_complete_typed_asset_patch,
     structured_interpretation_has_supported_artifact_assumption_edit as _structured_interpretation_has_supported_artifact_assumption_edit,
 )
+from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+    latest_result_answer_stage_result_if_applicable as _latest_result_answer_stage_result_if_applicable,
+)
 from argus.agent_runtime.stages.interpret_internal.pending_date_answer import (
     pending_date_answer_interpretation as _pending_date_answer_interpretation,
 )
@@ -922,6 +925,7 @@ async def _stage_result_from_interpretation(
         task_relation=interpretation.task_relation,
         requires_clarification=requires_clarification,
         user_goal_summary=interpretation.user_goal_summary,
+        detected_user_language=interpretation.detected_user_language,
         candidate_strategy_draft=strategy,
         missing_required_fields=missing_required_fields,
         optional_parameter_opportunity=list(capability_contract.optional_defaults),
@@ -960,6 +964,7 @@ async def _stage_result_from_interpretation(
         resolution_provenance=list(strategy.resolution_provenance),
         semantic_turn_act=interpretation.semantic_turn_act,
         result_followup_focus=interpretation.result_followup_focus,
+        result_followup_fact_key=interpretation.result_followup_fact_key,
         capability_question_focus=interpretation.capability_question_focus,
         context_question_focus=interpretation.context_question_focus,
         artifact_target=artifact_target,
@@ -1000,6 +1005,14 @@ async def _stage_result_from_interpretation(
     )
     if pending_artifact_followup_result is not None:
         return pending_artifact_followup_result
+    latest_result_fact_answer = await _latest_result_answer_stage_result_if_applicable(
+        decision=decision,
+        snapshot=snapshot,
+        current_user_message=state.current_user_message,
+        language=user.language_preference,
+    )
+    if latest_result_fact_answer is not None:
+        return latest_result_fact_answer
     pending_refinement_result = _pending_refinement_misroute_result_if_applicable(
         decision=decision,
         snapshot=snapshot,

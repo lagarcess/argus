@@ -246,6 +246,35 @@
       "aria_label": "Desglose del resultado",
       "label": "Desglose"
     },
+    "result_followup": {
+      "headings": {
+        "peak_date": "Fecha del máximo",
+        "peak_value": "Valor máximo",
+        "drawdown_date": "Fecha de la caída",
+        "max_drawdown": "Caída máxima",
+        "lowest_date": "Fecha del mínimo",
+        "lowest_value": "Valor más bajo",
+        "final_value": "Valor final",
+        "total_return": "Retorno total",
+        "benchmark_return": "Retorno de referencia",
+        "benchmark_delta": "Frente a la referencia",
+        "benchmark_symbol": "Referencia",
+        "annualized_return": "Retorno anualizado",
+        "profit": "Ganancia",
+        "volatility": "Volatilidad",
+        "win_rate": "Tasa de aciertos",
+        "profit_factor": "Factor de beneficio",
+        "sharpe_ratio": "Ratio de Sharpe",
+        "trade_count": "Operaciones",
+        "starting_capital": "Capital inicial",
+        "date_range": "Periodo",
+        "symbols": "Activos",
+        "strategy": "Estrategia"
+      },
+      "options": {
+        "ask_supported": "Pregunta por un dato disponible del resultado"
+      }
+    },
     "result_trust_strip": "Simulación histórica · Sin comisiones/deslizamiento · No es asesoría",
     "result_trust_strip_label": "Contexto de confianza del resultado",
     "asset_class": {
