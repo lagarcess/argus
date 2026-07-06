@@ -131,6 +131,10 @@ Integration guardrails:
   pass focused backend/frontend tests and live browser QA before promotion to
   `codex/private-alpha-next`; use Render canary evidence when preparing a
   tester-facing or deploy-facing checkpoint.
+- For eval work, read `tests/evals/README.md` "Test Tiers" before running
+  checks. Use the mocked harness for every change, reserve live eval for the
+  three documented gates, and treat Browser QA as real-API work because every
+  turn spends tokens.
 - For release checkpoints, CI/CD SOTA warmup and canary evidence must be
   gathered against the branch-deployed staging/private-alpha Render validation surface
   for the exact candidate SHA. Do not treat merge to `main` as a prerequisite for canary evidence; `main` is the later promotion target after founder approval.

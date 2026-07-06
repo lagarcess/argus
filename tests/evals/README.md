@@ -4,6 +4,19 @@ This folder contains the private-alpha measurement eval harness. Cases live as
 data fixtures, and the harness asserts typed runtime outcomes instead of exact
 assistant phrasing.
 
+## Test Tiers
+
+- **Mocked harness - every change (free, no API calls):**
+  `poetry run pytest tests/evals/test_measurement_eval_harness.py`
+  Validates routing, state, and contract logic. This is the everyday inner-loop
+  check.
+- **Live eval - only the 3 sanctioned moments:**
+  1. Pre-merge on a PR that changes runtime behavior.
+  2. Main promotion candidate.
+  3. After any model/provider change.
+- **Browser QA is also real-API:** every turn spends tokens. Use it at gates, not
+  per hypothesis.
+
 ## Mocked Run
 
 Run the mocked harness checks with:
