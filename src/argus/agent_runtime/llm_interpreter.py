@@ -156,7 +156,6 @@ from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
 )
 from argus.agent_runtime.interpreter import provider_context_assets
 from argus.agent_runtime.interpreter import requested_asset_answer as _requested_asset_answer
-from argus.agent_runtime.interpreter import unsupported_request_context
 from argus.agent_runtime.interpreter.readiness_helpers import (  # noqa: F401
     _active_artifact_asset_universe_operation_needs_planner,
     _asset_universe_operation_clarification_response,
@@ -5054,16 +5053,10 @@ def _normalize_response_for_runtime_context(
         response,
         request=request,
     )
-    response = provider_context_assets.response_with_provider_context_assets(
+    response = provider_context_assets.response_with_runtime_context_assets(
         response,
+        request=request,
         asset_resolution_context=asset_resolution_context,
-        include_unsupported_request=True,
-    )
-    response = (
-        unsupported_request_context.response_with_unsupported_request_runtime_facts(
-            response,
-            request=request,
-        )
     )
     response = _response_with_canonical_interpreter_assets(response)
     if _request_has_latest_result(request):

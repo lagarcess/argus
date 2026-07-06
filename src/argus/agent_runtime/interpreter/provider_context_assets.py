@@ -4,15 +4,34 @@ import json
 from collections.abc import Callable
 from typing import Any
 
+from argus.agent_runtime.interpreter import unsupported_request_context
 from argus.agent_runtime.llm_interpreter_types import (
     LLMAmbiguousField,
     LLMInterpretationResponse,
 )
 from argus.agent_runtime.resolution import AssetResolution
+from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import ResolutionProvenance
 from argus.domain.market_data.assets import ResolvedAsset
 
 _PROVIDER_RESOLVED_ASSETS_KEY = "provider_resolved_assets"
+
+
+def response_with_runtime_context_assets(
+    response: LLMInterpretationResponse,
+    *,
+    request: InterpretationRequest,
+    asset_resolution_context: str | None,
+) -> LLMInterpretationResponse:
+    response = response_with_provider_context_assets(
+        response,
+        asset_resolution_context=asset_resolution_context,
+        include_unsupported_request=True,
+    )
+    return unsupported_request_context.response_with_unsupported_request_runtime_facts(
+        response,
+        request=request,
+    )
 
 
 def response_with_provider_context_assets(
