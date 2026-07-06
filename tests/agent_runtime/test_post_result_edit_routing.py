@@ -777,3 +777,60 @@ def test_post_result_starting_capital_edit_defers_unexecutable_principal(
         constraint.category
         for constraint in result.decision.unsupported_constraints
     }
+
+
+def test_result_followup_asset_swap_with_inferred_target_confirms(
+    monkeypatch,
+) -> None:
+    """An inferred-target result edit ("try NVDA instead") reaches the patch
+    path even when the echoed draft carries executable fields beyond dates.
+    """
+
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.setattr(interpret_module, "resolve_asset", _resolve_stub)
+    planned = StructuredInterpretation(
+        intent="results_explanation",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User wants the same run with NVDA instead.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="try NVDA instead",
+            strategy_type="dca_accumulation",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            cadence="monthly",
+            capital_amount=500,
+            date_range={"start": "2020-02-01", "end": "2026-07-02"},
+            extra_parameters={"asset_universe_operation": "replace"},
+        ),
+        semantic_turn_act="result_followup",
+        result_followup_focus="general",
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="try NVDA instead",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="results_explanation",
+            completed=True,
+            latest_backtest_result_reference=_completed_result_reference(),
+        ),
+        selected_thread_metadata={
+            "latest_task_type": "results_explanation",
+            "last_stage_outcome": "ready_to_respond",
+        },
+        structured_interpreter=_RecordingInterpreter(planned),
+    )
+
+    strategy = result.decision.candidate_strategy_draft
+    assert result.outcome == "ready_for_confirmation"
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.cadence == "monthly"
+    assert strategy.capital_amount == 500
+    assert "result_followup_target_inferred" in result.decision.reason_codes
