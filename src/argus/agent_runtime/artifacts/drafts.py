@@ -40,7 +40,13 @@ def draft_from_result_metadata(metadata: dict[str, Any]) -> StrategySummary:
         "capital_amount",
         resolved_parameters.get("recurring_contribution"),
     )
+    _fill_if_blank(values, "capital_amount", config.get("recurring_contribution"))
     _fill_if_blank(values, "cadence", resolved_parameters.get("cadence"))
+    _fill_if_blank(
+        values,
+        "cadence",
+        _dict(config.get("parameters")).get("dca_cadence"),
+    )
     _fill_if_blank(
         values,
         "comparison_baseline",

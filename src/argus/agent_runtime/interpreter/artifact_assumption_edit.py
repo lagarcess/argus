@@ -99,7 +99,7 @@ def _request_targets_post_result_artifact_edit(
     requested_field = _field_path_base(
         request.selected_thread_metadata.get("requested_field")
     )
-    if requested_field:
+    if requested_field and requested_field != "refinement":
         return False
     snapshot = request.latest_task_snapshot
     if snapshot is None or snapshot.latest_backtest_result_reference is None:
@@ -201,8 +201,8 @@ def _apply_resolved_edit_to_draft(
             draft.date_range = intent_resolution.payload
             field_provenance["date_range"] = "explicit_user"
     if resolved.initial_capital is not None:
-        draft.capital_amount = resolved.initial_capital
-        field_provenance["capital_amount"] = "starting_capital"
+        draft.initial_capital = resolved.initial_capital
+        field_provenance["initial_capital"] = "starting_capital"
     if resolved.recurring_contribution_amount is not None:
         recurring_amount = float(resolved.recurring_contribution_amount)
         draft.capital_amount = recurring_amount
@@ -268,8 +268,8 @@ def _apply_legacy_flat_edit_fields(
             draft.comparison_baseline = benchmark
             field_provenance["comparison_baseline"] = "explicit_user"
     if plan.initial_capital is not None:
-        draft.capital_amount = plan.initial_capital
-        field_provenance["capital_amount"] = "starting_capital"
+        draft.initial_capital = plan.initial_capital
+        field_provenance["initial_capital"] = "starting_capital"
     if plan.recurring_contribution_amount is not None:
         recurring_amount = float(plan.recurring_contribution_amount)
         draft.capital_amount = recurring_amount
@@ -340,6 +340,9 @@ def _response_from_artifact_assumption_edit_plan(
     asset_symbol_resolver: Callable[[str], str | None] | None = None,
 ) -> LLMInterpretationResponse:
     draft = LLMStrategyDraft(raw_user_phrasing=request.current_user_message)
+    artifact_target = (
+        "latest_result" if _request_targets_post_result_artifact_edit(request) else None
+    )
     current_strategy = _current_artifact_strategy(request)
     if current_strategy is not None and current_strategy.strategy_type:
         draft.strategy_type = current_strategy.strategy_type
@@ -390,6 +393,7 @@ def _response_from_artifact_assumption_edit_plan(
                 confidence=plan.confidence,
                 reason_codes=["artifact_assumption_edit_planned"],
                 semantic_turn_act="unsupported_request",
+                artifact_target=artifact_target,
             )
         return LLMInterpretationResponse(
             intent="backtest_execution",
@@ -406,6 +410,7 @@ def _response_from_artifact_assumption_edit_plan(
             confidence=plan.confidence,
             reason_codes=["artifact_assumption_edit_planned"],
             semantic_turn_act="answer_pending_need",
+            artifact_target=artifact_target,
         )
 
     return LLMInterpretationResponse(
@@ -430,4 +435,5 @@ def _response_from_artifact_assumption_edit_plan(
             if plan.outcome == "unsupported"
             else "answer_pending_need"
         ),
+        artifact_target=artifact_target,
     )

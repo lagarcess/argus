@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from argus.agent_runtime.artifacts.drafts import draft_from_confirmation_payload
+from argus.agent_runtime.artifacts.drafts import (
+    draft_from_confirmation_payload,
+    draft_from_result_metadata,
+)
 from argus.agent_runtime.confirmation_artifacts import (
     validate_confirmation_execution_payload,
 )
@@ -356,6 +359,10 @@ def latest_run_id_for_action(
 
 def strategy_from_result_reference(reference: ArtifactReference) -> StrategySummary:
     metadata = dict(reference.metadata)
+    reconstructed = draft_from_result_metadata(metadata)
+    if reconstructed.asset_universe:
+        return reconstructed
+
     config = metadata.get("config_snapshot")
     config_snapshot = dict(config) if isinstance(config, dict) else {}
     resolved_strategy = config_snapshot.get("resolved_strategy")

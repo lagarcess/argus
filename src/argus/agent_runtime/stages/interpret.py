@@ -467,8 +467,11 @@ async def _stage_result_from_interpretation(
     expects_strategy_route = _strategy_route_expected(
         intent=interpretation.intent,
         semantic_turn_act=interpretation.semantic_turn_act,
-    ) or _candidate_strategy_has_backtest_shape(
-        interpretation.candidate_strategy_draft
+    ) or (
+        interpretation.semantic_turn_act != "result_followup"
+        and _candidate_strategy_has_backtest_shape(
+            interpretation.candidate_strategy_draft
+        )
     )
     educational_turn_has_strategy_baggage = _educational_turn_has_strategy_baggage(
         interpretation=interpretation,

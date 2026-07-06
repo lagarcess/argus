@@ -218,6 +218,13 @@ def _refinement_reply_evidences_planner_edit(draft: LLMStrategyDraft) -> bool:
 
     if _llm_strategy_draft_has_supported_artifact_assumption_edit(draft):
         return True
+    if (
+        draft.initial_capital is not None
+        or draft.total_capital is not None
+        or draft.capital_amount is not None
+        or draft.recurring_contribution is not None
+    ):
+        return True
     if str(draft.cadence or "").strip():
         return True
     return bool(

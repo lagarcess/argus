@@ -327,7 +327,8 @@ def pending_strategy_metadata_fallback_context(
         conversation_id=conversation_id,
         limit=20,
     )
-    for message in reversed(messages):
+    for message_index in range(len(messages) - 1, -1, -1):
+        message = messages[message_index]
         if message.role != "assistant":
             continue
         if not isinstance(message.metadata, dict):
@@ -408,6 +409,38 @@ def pending_strategy_metadata_fallback_context(
                 if run.strategy_id is not None:
                     selected_thread_metadata["source_result_strategy_id"] = (
                         run.strategy_id
+                    )
+        if (
+            source_reference is None
+            and str(requested_field or "").strip() == "refinement"
+        ):
+            # A typed fact answer can sit between the Refine idea prompt and the
+            # user's edit. Older metadata did not always persist source_result,
+            # so recover the completed result from the conversation rather than
+            # dropping the post-result artifact context. Provenance: accept only
+            # a result evidenced by a message at or before the refinement prompt
+            # itself — never a newer run or a run-store guess.
+            result_lookup = _latest_completed_result_reference(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                messages=messages[: message_index + 1],
+                allow_run_store_fallback=False,
+            )
+            if result_lookup is not None:
+                source_reference = result_lookup[0]
+                source_run_id = str(
+                    source_reference.metadata.get("result_run_id")
+                    or source_reference.metadata.get("run_id")
+                    or source_reference.artifact_id
+                )
+                if source_run_id:
+                    selected_thread_metadata["source_result_run_id"] = source_run_id
+                source_strategy_id = source_reference.metadata.get(
+                    "result_strategy_id"
+                )
+                if isinstance(source_strategy_id, str) and source_strategy_id:
+                    selected_thread_metadata["source_result_strategy_id"] = (
+                        source_strategy_id
                     )
         return RuntimeFallbackContext(
             latest_task_snapshot=TaskSnapshot(
@@ -523,6 +556,7 @@ def _latest_completed_result_reference(
     user_id: str,
     conversation_id: str,
     messages: list[Message] | None = None,
+    allow_run_store_fallback: bool = True,
 ) -> tuple[ArtifactReference, str] | None:
     scanned = (
         messages
@@ -550,6 +584,8 @@ def _latest_completed_result_reference(
             message_metadata=metadata,
         )
         return reference, "message_metadata"
+    if not allow_run_store_fallback:
+        return None
     run = latest_completed_run_for_conversation(
         user_id=user_id,
         conversation_id=conversation_id,

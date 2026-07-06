@@ -255,6 +255,30 @@ async def test_latest_result_peak_date_answer_composes_from_typed_facts() -> Non
 
 
 @pytest.mark.asyncio
+async def test_stage_declines_untyped_focus_without_fact_key() -> None:
+    # No language matching here: an untyped focus with a missing fact key
+    # stays out of the fact stage and falls through to the composer chain.
+    composer = _RecordingComposer()
+    decision = _decision("general").model_copy(
+        update={
+            "result_followup_focus": "general",
+            "result_followup_fact_key": None,
+        }
+    )
+
+    result = await latest_result_answer_stage_result_if_applicable(
+        decision=decision,
+        snapshot=_snapshot(),
+        current_user_message="what date did this peak?",
+        language="en",
+        compose_response_func=composer,
+    )
+
+    assert result is None
+    assert composer.calls == []
+
+
+@pytest.mark.asyncio
 async def test_latest_result_drawdown_date_pairs_depth_with_trough_date() -> None:
     composer = _RecordingComposer()
 
@@ -578,6 +602,65 @@ async def test_workflow_refine_then_result_fact_answer_keeps_pending_state(
     assert snapshot.pending_strategy_summary is not None
     assert snapshot.pending_strategy_summary.asset_universe == ["COST", "TGT"]
     assert state.values["selected_thread_metadata"]["requested_field"] == "refinement"
+
+
+@pytest.mark.asyncio
+async def test_workflow_refine_result_question_with_strategy_baggage_does_not_confirm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    composer = _RecordingComposer(
+        response="The peak portfolio value was $14,500.25 on 2021-11-09."
+    )
+    monkeypatch.setattr(
+        latest_result_answer_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    interpreter = _StaticInterpreter(
+        StructuredInterpretation(
+            intent="results_explanation",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User asked about the latest result peak.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["COST", "TGT"],
+                asset_class="equity",
+                date_range={"start": "2020-02-01", "end": "2026-07-02"},
+                cadence="monthly",
+                extra_parameters={"recurring_contribution": 500},
+            ),
+            semantic_turn_act="result_followup",
+            result_followup_focus="peak_date",
+            artifact_target="latest_result",
+            confidence=0.9,
+        )
+    )
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id="thread-refine-result-question-strategy-baggage",
+        message="what date did this peak?",
+        fallback_latest_task_snapshot=_snapshot(),
+        fallback_selected_thread_metadata={
+            "latest_task_type": "backtest_execution",
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "refinement",
+            "source_result_run_id": "run-140",
+        },
+    )
+
+    assert result["stage_outcome"] == "ready_to_respond"
+    assert "The peak portfolio value was $14,500.25 on 2021-11-09." in result[
+        "assistant_response"
+    ]
+    assert composer.calls[0]["focus"] == "peak_date"
+    assert composer.calls[0]["fact_key"] == "peak_date"
 
 
 @pytest.mark.asyncio

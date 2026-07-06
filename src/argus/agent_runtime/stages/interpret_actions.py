@@ -9,6 +9,7 @@ from argus.agent_runtime.artifacts.continuity import (
     resolve_artifact_anchor,
 )
 from argus.agent_runtime.artifacts.patch_policy import (
+    artifact_patch_changed_fields,
     executable_artifact_patch_missing_fields,
     relevant_unsupported_constraints_for_artifact_patch,
 )
@@ -840,7 +841,9 @@ def _result_artifact_patch_stage_result_if_applicable(
 ) -> StageResult | None:
     if _result_followup_target_was_inferred_non_patch(decision):
         return None
-    if not decision_allows_result_artifact_patch(decision=decision):
+    if not decision_allows_result_artifact_patch(
+        decision=decision
+    ) and not _allows_inferred_result_followup_patch(decision):
         return None
     reference = (
         snapshot.latest_backtest_result_reference if snapshot is not None else None
@@ -856,6 +859,11 @@ def _result_artifact_patch_stage_result_if_applicable(
         candidate=decision.candidate_strategy_draft,
     )
     if patched is None:
+        return None
+    if (
+        decision.semantic_turn_act == "result_followup"
+        and not _result_followup_patch_changes_executable_result_fields(patched)
+    ):
         return None
     return _stage_result_from_result_artifact_patch(
         decision=decision,
@@ -949,6 +957,24 @@ def _planned_asset_universe_for_result_patch(
     return list(draft_assets)
 
 
+def _result_followup_patch_changes_executable_result_fields(
+    patched: StrategySummary,
+) -> bool:
+    changed_fields = artifact_patch_changed_fields(patched)
+    return bool(
+        changed_fields
+        & {
+            "asset_universe",
+            "asset_class",
+            "cadence",
+            "capital_amount",
+            "date_range",
+            "timeframe",
+            "comparison_baseline",
+        }
+    )
+
+
 def _result_followup_target_was_inferred_non_patch(
     decision: InterpretDecision,
 ) -> bool:
@@ -957,6 +983,14 @@ def _result_followup_target_was_inferred_non_patch(
     return _strategy_has_structured_non_patch_evidence(
         strategy=decision.candidate_strategy_draft,
         patch_fields=frozenset({"date_range", "strategy_type"}),
+    )
+
+
+def _allows_inferred_result_followup_patch(decision: InterpretDecision) -> bool:
+    return (
+        decision.semantic_turn_act == "result_followup"
+        and decision.artifact_target == "latest_result"
+        and RESULT_FOLLOWUP_TARGET_INFERRED in decision.reason_codes
     )
 
 
@@ -983,6 +1017,7 @@ def _decision_allows_deterministic_result_patch(
     if decision.semantic_turn_act in {
         "approval",
         "educational_question",
+        "result_followup",
         "retry_failed_action",
     }:
         return False

@@ -41,7 +41,7 @@ def relevant_unsupported_constraints_for_artifact_patch(
 ) -> list[UnsupportedConstraint]:
     if not constraints or not strategy_can_be_approved(strategy):
         return list(constraints)
-    changed_fields = _artifact_patch_changed_fields(strategy)
+    changed_fields = artifact_patch_changed_fields(strategy)
     if not changed_fields:
         return list(constraints)
     return [
@@ -69,7 +69,7 @@ def _constraint_still_applies_to_patch(
     return True
 
 
-def _artifact_patch_changed_fields(strategy: StrategySummary) -> set[str]:
+def artifact_patch_changed_fields(strategy: StrategySummary) -> set[str]:
     artifact_patch = dict(strategy.extra_parameters or {}).get("artifact_patch")
     if not isinstance(artifact_patch, dict):
         return set()

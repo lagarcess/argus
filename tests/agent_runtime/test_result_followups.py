@@ -550,6 +550,57 @@ async def test_result_followup_accepts_semantic_language_with_required_fact_cont
 
 
 @pytest.mark.asyncio
+async def test_result_followup_general_focus_appends_required_symbol_fact() -> None:
+    async def fake_schema_client(**kwargs: Any) -> object:
+        schema = kwargs["schema_model"]
+        return schema(
+            relative_performance_claim="unknown",
+            answer="The latest run peaked at $14,500.25 on 2021-11-09.",
+            answer_blocks=["The latest run peaked at $14,500.25 on 2021-11-09."],
+            fact_ids=["peak_date", "peak_value", "caveat"],
+        )
+
+    response = await compose_result_followup_response(
+        metadata={
+            "symbols": ["COST", "TGT"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 28.4,
+                        "portfolio_value_range": {
+                            "peak_value": 14500.25,
+                            "currency": "USD",
+                            "source": "strategy_portfolio_equity_close",
+                        },
+                    }
+                }
+            },
+            "chart": {
+                "kind": "portfolio_equity",
+                "currency": "USD",
+                "series": [
+                    {"time": "2020-02-03", "value": 10000.0},
+                    {"time": "2021-11-09", "value": 14500.25},
+                    {"time": "2026-07-02", "value": 13900.0},
+                ],
+            },
+            "config_snapshot": {
+                "template": "dca_accumulation",
+                "date_range": {"start": "2020-02-01", "end": "2026-07-02"},
+            },
+        },
+        focus="general",
+        user_message="what date did this peak?",
+        invoke_json_schema_func=fake_schema_client,
+    )
+
+    assert response is not None
+    assert "2021-11-09" in response
+    assert "COST, TGT" in response
+
+
+@pytest.mark.asyncio
 async def test_result_followup_rejects_unknown_fact_ids() -> None:
     async def fake_schema_client(**kwargs: Any) -> object:
         schema = kwargs["schema_model"]

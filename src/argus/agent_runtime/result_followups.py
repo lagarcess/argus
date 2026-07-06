@@ -697,6 +697,7 @@ def appendable_missing_required_fact_ids(
         "context_packet_limitations",
         "caveat",
         "relative_performance",
+        "symbols",
     }
     if extra_appendable_fact_ids:
         appendable_fact_ids.update(extra_appendable_fact_ids)

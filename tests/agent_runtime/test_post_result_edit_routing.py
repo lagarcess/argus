@@ -55,6 +55,19 @@ def _post_result_request(message: str) -> InterpretationRequest:
     )
 
 
+def _post_result_refinement_request(message: str) -> InterpretationRequest:
+    request = _post_result_request(message)
+    return request.model_copy(
+        update={
+            "selected_thread_metadata": {
+                "latest_task_type": "results_explanation",
+                "last_stage_outcome": "ready_to_respond",
+                "requested_field": "refinement",
+            }
+        }
+    )
+
+
 def _resolve_stub(symbol: str, **kwargs):
     del kwargs
     aliases = {
@@ -174,6 +187,256 @@ async def test_post_result_refine_reply_routes_to_edit_planner(
     draft = result.candidate_strategy_draft
     assert draft.asset_universe == ["NVDA"]
     assert draft.date_range == {"start": "2020-02-01", "end": "2026-07-02"}
+
+
+@pytest.mark.asyncio
+async def test_result_refine_prompt_after_fact_answer_routes_capital_edit_to_planner(
+    monkeypatch,
+) -> None:
+    """The result-card Refine idea prompt can survive an intervening result
+    question. A later capital edit still belongs to the typed edit planner, not
+    the broad DCA clarification path.
+    """
+
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(interpreter_module, "resolve_asset", _resolve_stub)
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="strategy_drafting",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User wants to change starting capital.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing="change starting capital to $2,000",
+                    strategy_type="dca_accumulation",
+                    date_range={"start": "2020-02-01", "end": "2026-07-02"},
+                ),
+                semantic_turn_act="refine_current_idea",
+            )
+        if schema_model.__name__ != "ArtifactAssumptionEditPlan":
+            raise ValueError(f"unexpected schema request: {schema_model.__name__}")
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User set starting capital to $2,000.",
+            operations=[
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="capital",
+                    number=2000,
+                )
+            ],
+            confidence=0.95,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        _post_result_refinement_request("change starting capital to $2,000")
+    )
+
+    assert result is not None
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+    assert result.artifact_target == "latest_result"
+    draft = result.candidate_strategy_draft
+    assert result.semantic_turn_act == "answer_pending_need"
+    assert draft.extra_parameters["initial_capital"] == 2000
+    assert draft.extra_parameters["field_provenance"]["initial_capital"] == (
+        "starting_capital"
+    )
+
+
+@pytest.mark.asyncio
+async def test_post_result_capital_edit_with_unprovenanced_amount_uses_planner(
+    monkeypatch,
+) -> None:
+    """Live models can return a typed initial_capital value without
+    field_provenance. On a post-result refine surface, that is still typed edit
+    evidence and must not become a standalone incomplete DCA draft.
+    """
+
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(interpreter_module, "resolve_asset", _resolve_stub)
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="strategy_drafting",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User wants to change starting capital.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing="change starting capital to $2,000",
+                    strategy_type="dca_accumulation",
+                    initial_capital=2000,
+                ),
+                semantic_turn_act="refine_current_idea",
+            )
+        if schema_model.__name__ != "ArtifactAssumptionEditPlan":
+            raise ValueError(f"unexpected schema request: {schema_model.__name__}")
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User set starting capital to $2,000.",
+            operations=[
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="capital",
+                    number=2000,
+                )
+            ],
+            confidence=0.95,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        _post_result_refinement_request("change starting capital to $2,000")
+    )
+
+    assert result is not None
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert result.artifact_target == "latest_result"
+    assert result.candidate_strategy_draft.extra_parameters["initial_capital"] == 2000
+
+
+@pytest.mark.asyncio
+async def test_post_result_capital_edit_with_unprovenanced_capital_amount_uses_planner(
+    monkeypatch,
+) -> None:
+    """Fallback models can put the edited money value in capital_amount.
+
+    On a post-result refine surface, the edit planner owns the target
+    disambiguation instead of the broad DCA missing-contribution path.
+    """
+
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(interpreter_module, "resolve_asset", _resolve_stub)
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="strategy_drafting",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User wants to change starting capital.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing="change starting capital to $2,000",
+                    strategy_type="dca_accumulation",
+                    capital_amount=2000,
+                ),
+                semantic_turn_act="refine_current_idea",
+            )
+        if schema_model.__name__ != "ArtifactAssumptionEditPlan":
+            raise ValueError(f"unexpected schema request: {schema_model.__name__}")
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User set starting capital to $2,000.",
+            operations=[
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="capital",
+                    number=2000,
+                )
+            ],
+            confidence=0.95,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        _post_result_refinement_request("change starting capital to $2,000")
+    )
+
+    assert result is not None
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert result.artifact_target == "latest_result"
+    assert result.candidate_strategy_draft.extra_parameters["initial_capital"] == 2000
 
 
 @pytest.mark.asyncio
@@ -450,3 +713,71 @@ def test_post_result_planned_edit_materializes_full_confirmation(monkeypatch) ->
     # CONTRIBUTION.
     assert strategy.capital_amount == 500
     assert result.outcome == "ready_for_confirmation"
+
+
+def test_post_result_starting_capital_edit_defers_unexecutable_principal(
+    monkeypatch,
+) -> None:
+    """A latest-result starting-capital edit keeps the completed DCA anchor
+    (no re-ask for the known recurring contribution) but stays blocked behind
+    the unsupported_dca_starting_principal guard: the engine cannot execute a
+    separate starting principal yet (docs/API_CONTRACT.md), so the edit must
+    not be presented as ready to run.
+    """
+
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.setattr(interpret_module, "resolve_asset", _resolve_stub)
+    planned = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User set starting capital to $2,000.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="change starting capital to $2,000",
+            strategy_type="dca_accumulation",
+            extra_parameters={
+                "initial_capital": 2000,
+                "field_provenance": {"initial_capital": "starting_capital"},
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+        reason_codes=["artifact_assumption_edit_planned"],
+        artifact_target="latest_result",
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="change starting capital to $2,000",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="results_explanation",
+            completed=True,
+            latest_backtest_result_reference=_completed_result_reference(),
+        ),
+        selected_thread_metadata={
+            "latest_task_type": "results_explanation",
+            "last_stage_outcome": "ready_to_respond",
+            "requested_field": "refinement",
+        },
+        structured_interpreter=_RecordingInterpreter(planned),
+    )
+
+    strategy = result.decision.candidate_strategy_draft
+    assert result.outcome == "needs_clarification"
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.asset_universe == ["AAPL", "MSFT"]
+    assert strategy.cadence == "monthly"
+    # The known recurring contribution is preserved from the result anchor —
+    # the runtime must not ask for it again.
+    assert strategy.capital_amount == 500
+    assert "capital_amount" not in result.decision.missing_required_fields
+    assert strategy.extra_parameters["initial_capital"] == 2000
+    assert "unsupported_dca_starting_principal" in {
+        constraint.category
+        for constraint in result.decision.unsupported_constraints
+    }
