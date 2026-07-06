@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci.yml"
 CANARY_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-canary.yml"
 SMOKE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-smoke.yml"
+AGENT_RUNTIME_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "agent-runtime-regression.yml"
 
 
 def _workflow() -> dict:
@@ -20,6 +21,10 @@ def _canary_workflow() -> dict:
 
 def _smoke_workflow() -> dict:
     return yaml.safe_load(SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8"))
+
+
+def _agent_runtime_workflow() -> dict:
+    return yaml.safe_load(AGENT_RUNTIME_WORKFLOW_PATH.read_text(encoding="utf-8"))
 
 
 def test_ci_runs_on_main_codex_and_jules_without_deploying() -> None:
@@ -243,3 +248,34 @@ def test_private_alpha_smoke_workflow_runs_local_predeploy_gate() -> None:
     assert "cd web && bun install --frozen-lockfile" in joined_steps
     assert ".github/local-smoke.sh --expected-sha \"$GITHUB_SHA\"" in joined_steps
     assert "RENDER_API_KEY" not in SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+
+def test_agent_runtime_regression_workflow_runs_full_runtime_sweep() -> None:
+    workflow = _agent_runtime_workflow()
+
+    assert workflow["name"] == "Agent Runtime Regression"
+    assert set(workflow["on"]) == {
+        "workflow_dispatch",
+        "schedule",
+        "push",
+        "pull_request",
+    }
+    assert workflow["on"]["schedule"] == [{"cron": "15 9 * * *"}]
+    assert workflow["on"]["push"]["branches"] == ["codex/private-alpha-next"]
+    assert workflow["on"]["pull_request"]["branches"] == [
+        "codex/private-alpha-next"
+    ]
+    assert "src/argus/agent_runtime/**" in workflow["on"]["pull_request"]["paths"]
+    assert "tests/agent_runtime/**" in workflow["on"]["pull_request"]["paths"]
+    assert workflow["permissions"] == {"contents": "read"}
+    assert "deploy" not in workflow["jobs"]
+
+    job = workflow["jobs"]["agent-runtime"]
+    assert job["timeout-minutes"] == 25
+    assert job["if"] == (
+        "github.event.pull_request.draft == false || "
+        "github.event_name != 'pull_request'"
+    )
+    joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
+    assert "poetry install --with dev --no-interaction" in joined_steps
+    assert "poetry run pytest tests/agent_runtime -q --no-cov" in joined_steps
