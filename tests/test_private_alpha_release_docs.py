@@ -94,3 +94,23 @@ def test_agents_guardrail_keeps_canary_evidence_before_main_promotion() -> None:
     assert "branch-deployed staging/private-alpha Render validation surface" in agents
     assert "Do not treat merge to `main` as a prerequisite for canary" in agents
     assert "`main` is the later promotion target" in agents
+
+
+def test_eval_docs_document_mocked_first_test_tiers_and_agent_pointer() -> None:
+    readme = _source("tests/evals/README.md")
+    agents = _source("AGENTS.md")
+
+    assert "## Test Tiers" in readme
+    assert "**Mocked harness - every change (free, no API calls):**" in readme
+    assert "poetry run pytest tests/evals/test_measurement_eval_harness.py" in readme
+    assert "Validates routing, state, and contract logic" in readme
+    assert "**Live eval - only the 3 sanctioned moments:**" in readme
+    assert "Pre-merge on a PR that changes runtime behavior" in readme
+    assert "Main promotion candidate" in readme
+    assert "After any model/provider change" in readme
+    assert "**Browser QA is also real-API:**" in readme
+
+    assert "tests/evals/README.md" in agents
+    assert "mocked harness" in agents
+    assert "live eval" in agents
+    assert "Browser QA" in agents
