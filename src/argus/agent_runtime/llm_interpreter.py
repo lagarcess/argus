@@ -3275,13 +3275,20 @@ def _response_needs_focused_date_window_intent_repair(
         and not _supported_partial_draft_has_repairable_shape(draft)
     ):
         return False
-    if (
-        resolve_date_range_intent(draft.date_range_intent) is not None
-        and has_semantic_date_evidence
-    ):
-        if _complete_date_range_matches_resolved_intent(draft):
-            return False
-        return True
+    if resolve_date_range_intent(draft.date_range_intent) is not None:
+        # A calendar-year intent whose evidence is not the bare year the user
+        # stated (or that carries no evidence at all) cannot vouch for the
+        # drafted window — the draft matching its own intent proves nothing.
+        if (
+            draft.date_range_intent is not None
+            and draft.date_range_intent.kind == "calendar_year"
+            and not _date_range_intent_can_safely_suppress_focused_repair(draft)
+        ):
+            return True
+        if has_semantic_date_evidence:
+            if _complete_date_range_matches_resolved_intent(draft):
+                return False
+            return True
     has_complete_date_range = _has_complete_date_range_payload(
         normalize_date_range_candidate(draft.date_range)
     )

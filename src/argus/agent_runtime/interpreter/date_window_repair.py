@@ -103,6 +103,17 @@ def _response_needs_temporal_runtime_repair(
         != _normalized_stated_field(resolved_from_draft)
     ):
         return True
+    # A calendar-year intent is only trustworthy when its evidence is the bare
+    # year the user actually stated; anything else (or no evidence) means the
+    # window needs the focused re-extraction.
+    if (
+        isinstance(draft.date_range, dict)
+        and not has_partial_explicit_date_range(draft.date_range)
+        and draft.date_range_intent is not None
+        and draft.date_range_intent.kind == "calendar_year"
+        and not _date_range_intent_can_safely_suppress_focused_repair(draft)
+    ):
+        return True
     return False
 
 
