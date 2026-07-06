@@ -19,8 +19,12 @@ def response_with_provider_context_assets(
     response: LLMInterpretationResponse,
     *,
     asset_resolution_context: str | None,
+    include_unsupported_request: bool = False,
 ) -> LLMInterpretationResponse:
-    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+    supported_intents = {"strategy_drafting", "backtest_execution"}
+    if include_unsupported_request:
+        supported_intents.add("unsupported_or_out_of_scope")
+    if response.intent not in supported_intents:
         return response
     rows = _asset_context_rows(asset_resolution_context)
     candidate_rows = [
@@ -59,6 +63,11 @@ def response_with_provider_context_assets(
         extra_parameters[_PROVIDER_RESOLVED_ASSETS_KEY] = resolved_records
         draft.extra_parameters = extra_parameters
 
+    # Unsupported turns borrow resolved assets only; never escalate a refusal.
+    if response.intent == "unsupported_or_out_of_scope":
+        if not resolved_symbols:
+            return response
+        ambiguous_fields = []
     if not ambiguous_fields and draft == response.candidate_strategy_draft:
         return response
     update: dict[str, Any] = {"candidate_strategy_draft": draft}

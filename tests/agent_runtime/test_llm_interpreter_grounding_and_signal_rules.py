@@ -1544,7 +1544,8 @@ async def test_llm_interpreter_plans_active_artifact_assumption_edit_after_model
     assert result.semantic_turn_act == "answer_pending_need"
     assert result.candidate_strategy_draft.capital_amount == 5000
     assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
-        "capital_amount": "starting_capital"
+        "capital_amount": "starting_capital",
+        "initial_capital": "starting_capital",
     }
     assert "artifact_assumption_edit_planned" in result.reason_codes
 
@@ -1737,7 +1738,8 @@ async def test_llm_interpreter_plans_underfilled_active_artifact_assumption_edit
     assert result.intent == "backtest_execution"
     assert result.candidate_strategy_draft.capital_amount == 5000
     assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
-        "capital_amount": "starting_capital"
+        "capital_amount": "starting_capital",
+        "initial_capital": "starting_capital",
     }
     assert "artifact_assumption_edit_planned" in result.reason_codes
 

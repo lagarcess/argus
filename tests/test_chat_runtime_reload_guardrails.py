@@ -4064,3 +4064,55 @@ def test_fact_answer_message_does_not_block_pending_strategy_fallback() -> None:
     assert reference.artifact_id == run_id
     assert fallback.selected_thread_metadata is not None
     assert fallback.selected_thread_metadata["source_result_run_id"] == run_id
+
+
+def test_pending_refinement_after_fact_answer_recovers_latest_result_reference() -> None:
+    from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Simulation complete.",
+        metadata={
+            "agent_runtime_stage_outcome": "execution_succeeded",
+            "result_run_id": run_id,
+            "latest_run_id": run_id,
+            "result_card": {"title": "AAPL buy and hold"},
+        },
+    )
+    pending_metadata = _pending_strategy_metadata()
+    pending_metadata["pending_strategy"]["requested_field"] = "refinement"
+    pending_metadata["pending_strategy"]["missing_required_fields"] = ["refinement"]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="What would you like to change?",
+        metadata=pending_metadata,
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The peak date was June 2, 2026.",
+        metadata=_fact_answer_metadata(run_id),
+    )
+
+    fallback = pending_strategy_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    assert fallback.latest_task_snapshot is not None
+    reference = fallback.latest_task_snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.artifact_id == run_id
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["requested_field"] == "refinement"
+    assert fallback.selected_thread_metadata["source_result_run_id"] == run_id

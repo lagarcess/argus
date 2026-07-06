@@ -330,6 +330,79 @@ def test_provider_context_prevents_wrong_exact_symbol_for_company_name() -> None
     assert normalized.candidate_strategy_draft.asset_class == "equity"
 
 
+@pytest.mark.parametrize("with_unsupported_constraint", [True, False])
+def test_unsupported_request_preserves_provider_asset_and_explicit_window(
+    with_unsupported_constraint: bool,
+) -> None:
+    import json
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "TSLA",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "TSLA",
+                    "asset_class": "equity",
+                    "name": "Tesla, Inc.",
+                    "confidence": 0.94,
+                }
+            ]
+        }
+    )
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants to run an options straddle on TSLA.",
+        candidate_strategy_draft=LLMStrategyDraft(),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="options straddle",
+                explanation="Options straddles are not executable yet.",
+            )
+        ]
+        if with_unsupported_constraint
+        else [],
+        semantic_turn_act="unsupported_request",
+    )
+
+    normalized = interpreter_module._normalize_response_for_runtime_context(
+        response,
+        request=InterpretationRequest(
+            current_user_message=(
+                "can you run an options straddle on TSLA from 2024-01-01 "
+                "through 2024-12-31?"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+        asset_resolution_context=context,
+    )
+
+    draft = normalized.candidate_strategy_draft
+    assert normalized.intent == "unsupported_or_out_of_scope"
+    assert normalized.semantic_turn_act == "unsupported_request"
+    if with_unsupported_constraint:
+        assert normalized.unsupported_constraints[0].category == (
+            "unsupported_strategy_logic"
+        )
+    else:
+        # The runtime never invents constraints or displaces the refusal.
+        assert normalized.unsupported_constraints == []
+    assert draft.asset_universe == ["TSLA"]
+    assert draft.asset_class == "equity"
+    # date_range is not backfilled: filled run fields would suppress the
+    # focused repair of wrongly-refused supported ideas.
+    assert not draft.date_range
+    assert draft.comparison_baseline == "SPY"
+
+
 def test_provider_context_asset_class_survives_runtime_validation(monkeypatch) -> None:
     import json
 

@@ -9,8 +9,11 @@ from argus.agent_runtime.artifacts.continuity import (
     resolve_artifact_anchor,
 )
 from argus.agent_runtime.artifacts.patch_policy import (
+    RESULT_FOLLOWUP_EXECUTABLE_PATCH_FIELDS,
+    artifact_patch_changed_fields,
     executable_artifact_patch_missing_fields,
     relevant_unsupported_constraints_for_artifact_patch,
+    strategy_has_structured_non_patch_evidence,
 )
 from argus.agent_runtime.artifacts.strategy_edits import ArtifactPatch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
@@ -840,7 +843,9 @@ def _result_artifact_patch_stage_result_if_applicable(
 ) -> StageResult | None:
     if _result_followup_target_was_inferred_non_patch(decision):
         return None
-    if not decision_allows_result_artifact_patch(decision=decision):
+    if not decision_allows_result_artifact_patch(
+        decision=decision
+    ) and not _allows_inferred_result_followup_patch(decision):
         return None
     reference = (
         snapshot.latest_backtest_result_reference if snapshot is not None else None
@@ -856,6 +861,11 @@ def _result_artifact_patch_stage_result_if_applicable(
         candidate=decision.candidate_strategy_draft,
     )
     if patched is None:
+        return None
+    if (
+        decision.semantic_turn_act == "result_followup"
+        and not _result_followup_patch_changes_executable_result_fields(patched)
+    ):
         return None
     return _stage_result_from_result_artifact_patch(
         decision=decision,
@@ -949,14 +959,42 @@ def _planned_asset_universe_for_result_patch(
     return list(draft_assets)
 
 
+def _result_followup_patch_changes_executable_result_fields(
+    patched: StrategySummary,
+) -> bool:
+    return bool(
+        artifact_patch_changed_fields(patched)
+        & RESULT_FOLLOWUP_EXECUTABLE_PATCH_FIELDS
+    )
+
+
 def _result_followup_target_was_inferred_non_patch(
     decision: InterpretDecision,
 ) -> bool:
     if RESULT_FOLLOWUP_TARGET_INFERRED not in decision.reason_codes:
         return False
-    return _strategy_has_structured_non_patch_evidence(
+    # A draft gap the result patch cannot fill from the anchor marks a
+    # question or a new idea, not an executable edit of the completed run.
+    draft_gaps = set(
+        missing_required_fields_for_strategy(
+            decision.candidate_strategy_draft,
+            contract=build_default_capability_contract(),
+        )
+    )
+    if draft_gaps - (RESULT_FOLLOWUP_EXECUTABLE_PATCH_FIELDS | {"strategy_thesis"}):
+        return True
+    return strategy_has_structured_non_patch_evidence(
         strategy=decision.candidate_strategy_draft,
-        patch_fields=frozenset({"date_range", "strategy_type"}),
+        patch_fields=frozenset({"strategy_type"})
+        | RESULT_FOLLOWUP_EXECUTABLE_PATCH_FIELDS,
+    )
+
+
+def _allows_inferred_result_followup_patch(decision: InterpretDecision) -> bool:
+    return (
+        decision.semantic_turn_act == "result_followup"
+        and decision.artifact_target == "latest_result"
+        and RESULT_FOLLOWUP_TARGET_INFERRED in decision.reason_codes
     )
 
 
@@ -974,7 +1012,7 @@ def _decision_allows_deterministic_result_patch(
     if decision.intent == "unsupported_or_out_of_scope" or (
         decision.semantic_turn_act == "unsupported_request"
     ):
-        return not _strategy_has_structured_non_patch_evidence(
+        return not strategy_has_structured_non_patch_evidence(
             strategy=decision.candidate_strategy_draft,
             patch_fields=patch_fields,
         )
@@ -983,6 +1021,7 @@ def _decision_allows_deterministic_result_patch(
     if decision.semantic_turn_act in {
         "approval",
         "educational_question",
+        "result_followup",
         "retry_failed_action",
     }:
         return False
@@ -994,25 +1033,6 @@ def _decision_allows_deterministic_result_patch(
         or decision.semantic_turn_act
         in {"answer_pending_need", "refine_current_idea", "result_followup"}
     )
-
-
-def _strategy_has_structured_non_patch_evidence(
-    *,
-    strategy: StrategySummary,
-    patch_fields: frozenset[str],
-) -> bool:
-    ignored_fields = {
-        "raw_user_phrasing",
-        "strategy_thesis",
-        "resolution_provenance",
-        "extra_parameters",
-    }
-    for field_name in StrategySummary.model_fields:
-        if field_name in patch_fields or field_name in ignored_fields:
-            continue
-        if getattr(strategy, field_name) not in (None, "", [], {}):
-            return True
-    return False
 
 
 def _stage_result_from_result_artifact_patch(

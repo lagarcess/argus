@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from argus.agent_runtime.artifacts.drafts import draft_from_confirmation_payload
+from argus.agent_runtime.artifacts.drafts import (
+    draft_from_confirmation_payload,
+    draft_from_result_metadata,
+)
 from argus.agent_runtime.confirmation_artifacts import (
     validate_confirmation_execution_payload,
 )
@@ -355,37 +358,9 @@ def latest_run_id_for_action(
 
 
 def strategy_from_result_reference(reference: ArtifactReference) -> StrategySummary:
-    metadata = dict(reference.metadata)
-    config = metadata.get("config_snapshot")
-    config_snapshot = dict(config) if isinstance(config, dict) else {}
-    resolved_strategy = config_snapshot.get("resolved_strategy")
-    payload = dict(resolved_strategy) if isinstance(resolved_strategy, dict) else {}
-    resolved_parameters = config_snapshot.get("resolved_parameters")
-    parameters = (
-        dict(resolved_parameters) if isinstance(resolved_parameters, dict) else {}
-    )
-
-    if not payload.get("strategy_type") and config_snapshot.get("template"):
-        payload["strategy_type"] = config_snapshot["template"]
-    if not payload.get("asset_class") and metadata.get("asset_class"):
-        payload["asset_class"] = metadata["asset_class"]
-    if not payload.get("asset_universe"):
-        symbols = payload.get("symbols") or config_snapshot.get("symbols")
-        if isinstance(symbols, list):
-            payload["asset_universe"] = [str(symbol) for symbol in symbols if symbol]
-    if not payload.get("date_range"):
-        payload["date_range"] = parameters.get("date_range") or config_snapshot.get(
-            "date_range"
-        )
-
-    allowed_fields = set(StrategySummary.model_fields)
-    strategy_payload = {
-        key: value
-        for key, value in payload.items()
-        if key in allowed_fields and value not in (None, "", [], {})
-    }
+    # A malformed reference must never break the anchor path.
     try:
-        return StrategySummary.model_validate(strategy_payload)
+        return draft_from_result_metadata(dict(reference.metadata))
     except Exception:
         return StrategySummary()
 
