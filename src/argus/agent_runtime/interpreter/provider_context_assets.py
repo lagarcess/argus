@@ -63,8 +63,7 @@ def response_with_provider_context_assets(
         extra_parameters[_PROVIDER_RESOLVED_ASSETS_KEY] = resolved_records
         draft.extra_parameters = extra_parameters
 
-    # Unsupported turns only borrow resolved assets so continuation keeps the
-    # basket; they never escalate ambiguity or displace the model's refusal.
+    # Unsupported turns borrow resolved assets only; never escalate a refusal.
     if response.intent == "unsupported_or_out_of_scope":
         if not resolved_symbols:
             return response

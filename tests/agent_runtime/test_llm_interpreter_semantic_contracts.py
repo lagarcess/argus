@@ -393,14 +393,12 @@ def test_unsupported_request_preserves_provider_asset_and_explicit_window(
             "unsupported_strategy_logic"
         )
     else:
-        # LLM interpretation stays canonical: the runtime never invents an
-        # unsupported constraint or displaces the model's refusal reply.
+        # The runtime never invents constraints or displaces the refusal.
         assert normalized.unsupported_constraints == []
     assert draft.asset_universe == ["TSLA"]
     assert draft.asset_class == "equity"
-    # date_range is deliberately NOT backfilled on unsupported turns: filled
-    # run fields read as extraction evidence and would suppress the focused
-    # repair of wrongly-refused supported ideas.
+    # date_range is not backfilled: filled run fields would suppress the
+    # focused repair of wrongly-refused supported ideas.
     assert not draft.date_range
     assert draft.comparison_baseline == "SPY"
 

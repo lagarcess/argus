@@ -718,11 +718,9 @@ def test_post_result_planned_edit_materializes_full_confirmation(monkeypatch) ->
 def test_post_result_starting_capital_edit_defers_unexecutable_principal(
     monkeypatch,
 ) -> None:
-    """A latest-result starting-capital edit keeps the completed DCA anchor
-    (no re-ask for the known recurring contribution) but stays blocked behind
-    the unsupported_dca_starting_principal guard: the engine cannot execute a
-    separate starting principal yet (docs/API_CONTRACT.md), so the edit must
-    not be presented as ready to run.
+    """Starting-capital edits keep the DCA anchor (no re-ask for the known
+    contribution) but stay blocked: the engine cannot execute a separate
+    starting principal (docs/API_CONTRACT.md).
     """
 
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -772,8 +770,6 @@ def test_post_result_starting_capital_edit_defers_unexecutable_principal(
     assert strategy.strategy_type == "dca_accumulation"
     assert strategy.asset_universe == ["AAPL", "MSFT"]
     assert strategy.cadence == "monthly"
-    # The known recurring contribution is preserved from the result anchor —
-    # the runtime must not ask for it again.
     assert strategy.capital_amount == 500
     assert "capital_amount" not in result.decision.missing_required_fields
     assert strategy.extra_parameters["initial_capital"] == 2000

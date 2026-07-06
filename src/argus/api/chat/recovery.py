@@ -414,12 +414,10 @@ def pending_strategy_metadata_fallback_context(
             source_reference is None
             and str(requested_field or "").strip() == "refinement"
         ):
-            # A typed fact answer can sit between the Refine idea prompt and the
-            # user's edit. Older metadata did not always persist source_result,
-            # so recover the completed result from the conversation rather than
-            # dropping the post-result artifact context. Provenance: accept only
-            # a result evidenced by a message at or before the refinement prompt
-            # itself — never a newer run or a run-store guess.
+            # Older metadata may lack source_result (e.g. a fact answer sits
+            # between the Refine prompt and the edit). Recover the result from
+            # messages at or before this prompt — never a newer run or a
+            # run-store guess.
             result_lookup = _latest_completed_result_reference(
                 user_id=user_id,
                 conversation_id=conversation_id,

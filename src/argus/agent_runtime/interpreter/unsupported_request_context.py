@@ -1,12 +1,8 @@
-"""Context preservation for unsupported/out-of-scope interpreter replies.
+"""Draft-only context enrichment for unsupported/out-of-scope replies.
 
-Unsupported turns can still carry reusable typed context (a default benchmark
-for the resolved asset class) that later continuation turns borrow. This
-module only enriches the candidate draft — the LLM reply stays canonical: no
-constraints are invented and the model's refusal prose is never displaced.
-It must not backfill run fields the repair chain reads as extraction
-evidence (e.g. date_range), or wrongly-refused supported ideas lose their
-focused re-extraction.
+Never invent constraints, displace the model's refusal, or backfill run
+fields like date_range — filled run fields suppress the focused repair of
+wrongly-refused supported ideas.
 """
 
 from __future__ import annotations

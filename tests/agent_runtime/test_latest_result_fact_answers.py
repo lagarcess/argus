@@ -256,8 +256,7 @@ async def test_latest_result_peak_date_answer_composes_from_typed_facts() -> Non
 
 @pytest.mark.asyncio
 async def test_stage_declines_untyped_focus_without_fact_key() -> None:
-    # No language matching here: an untyped focus with a missing fact key
-    # stays out of the fact stage and falls through to the composer chain.
+    # Untyped focus stays out of the fact stage; the composer chain owns it.
     composer = _RecordingComposer()
     decision = _decision("general").model_copy(
         update={

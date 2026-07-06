@@ -358,11 +358,7 @@ def latest_run_id_for_action(
 
 
 def strategy_from_result_reference(reference: ArtifactReference) -> StrategySummary:
-    # draft_from_result_metadata is resolved_strategy-primary and gap-fills
-    # every field the old inline rebuild covered (template, asset_class,
-    # symbols, date_range) plus the run parameters, from the same persisted
-    # config snapshot. Keep the exception fallback so a malformed reference
-    # can never break the anchor path.
+    # A malformed reference must never break the anchor path.
     try:
         return draft_from_result_metadata(dict(reference.metadata))
     except Exception:

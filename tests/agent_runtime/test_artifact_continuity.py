@@ -72,10 +72,8 @@ def test_result_draft_preserves_dca_money_cadence_timeframe_and_benchmark() -> N
 
 
 def test_result_draft_recovers_dca_contribution_from_config_snapshot() -> None:
-    # Older result metadata can lack resolved_parameters.recurring_contribution,
-    # but the persisted config snapshot is the flat engine config and always
-    # carries the canonical, language-neutral keys the result card is built
-    # from (recurring_contribution + parameters.dca_cadence).
+    # Older metadata can lack resolved_parameters; the flat config snapshot
+    # still carries canonical recurring_contribution + parameters.dca_cadence.
     draft = draft_from_result_metadata(
         {
             "asset_class": "equity",
