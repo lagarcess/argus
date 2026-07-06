@@ -123,6 +123,39 @@ def test_expected_fail_only_masks_allowed_failure_prefixes() -> None:
     assert harness._result_status([], expected_fail=expected_fail) == "passed"
 
 
+def test_date_range_expectations_compare_iso_interval_and_dict_equivalently() -> None:
+    dict_window = {"start": "2024-01-01", "end": "2024-12-31"}
+    interval_window = "2024-01-01T00:00:00Z/2024-12-31T00:00:00Z"
+
+    for expected_date_range, actual_date_range in (
+        (dict_window, interval_window),
+        (interval_window, dict_window),
+    ):
+        case = harness.EvalCase(
+            id="date-range-normalization",
+            category="messy_english",
+            prompt="test Target, Walmart, and Costco in 2024",
+            user_language="en",
+            ui_language="en",
+            expected=harness.TypedExpectations(
+                intent="backtest_execution",
+                capability_verdict="executable",
+                date_range=expected_date_range,
+            ),
+        )
+
+        failures = harness.typed_expectation_failures(
+            case=case,
+            outcome={
+                "intent": "backtest_execution",
+                "capability_verdict": "executable",
+                "date_range": actual_date_range,
+            },
+        )
+
+        assert failures == []
+
+
 def test_prose_judge_cases_fail_when_assistant_text_is_missing(monkeypatch: Any) -> None:
     case = harness.EvalCase(
         id="missing-prose",
