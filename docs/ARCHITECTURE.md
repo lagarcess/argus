@@ -304,7 +304,10 @@ of the job.
 
 The simulation logic (Numba/Python) that calculates metrics and returns results.
 It remains domain code in the monorepo, but the production runtime boundary is
-the workflow execution plane.
+the workflow execution plane. Execution realism (trading fees + slippage) is
+modeled in the engine behind `ARGUS_ENABLE_EXECUTION_REALISM` (default OFF); when
+the flag is inert the legacy cost path is preserved byte-identical, so evidence
+artifacts stay reproducible across the flag boundary.
 
 *Stateless systems should scale horizontally later.*
 
@@ -463,6 +466,13 @@ Structured action chips are not natural-language NLU shortcuts. They enter LangG
 | Deterministic (post-LLM) | Symbol resolution via `domain/market_data.resolve_asset()`, asset class parity check, date range limit check, missing required fields check |
 
 No regex gate intercepts a user message before the LLM sees it. No hardcoded natural language string competes with the LLM's response in any stage file.
+
+User-facing prose is language-agnostic by construction. The runtime keeps no
+per-language copy tables: LLM-authored prose is written in the detected turn
+language, degraded/recovery copy renders from typed codes, and result chrome
+renders from typed keys the frontend localizes (B4, #154). English/Spanish parity
+is proven by the eval harness, not hardcoded. See `docs/CONVERSATIONAL_RUNTIME.md`
+— "Language-Agnostic Prose Composition".
 
 ### Session State Rule
 

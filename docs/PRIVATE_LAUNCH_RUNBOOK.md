@@ -262,6 +262,28 @@ profiles.
 Set `ARGUS_OPS_TOKEN` manually in Render for `argus-api`; it is intentionally
 `sync: false`. Keep `ARGUS_OPS_TOKEN` out of frontend environment variables.
 
+## Runtime Tuning Flags
+
+These are optional runtime knobs (not secrets). Defaults are safe for
+private-alpha launch; record any override in the release manifest.
+
+- `ARGUS_ENABLE_EXECUTION_REALISM` — models trading fees + slippage end to end.
+  Default OFF. Keep off for alpha: the founder deliberately disclaims cost
+  assumptions for the current PMF stage. When off, results carry the "No
+  fees/slippage" assumptions footer and the legacy cost path is byte-identical.
+- `ARGUS_STRUCTURED_REASONING_EFFORT` / `ARGUS_CAPABILITY_REASONING_EFFORT` —
+  per-tier OpenRouter reasoning-effort overrides for the structured
+  interpretation and capability-conflict calls
+  (`xhigh|high|medium|low|minimal|none`). Unset uses the profile default. Lower
+  effort saves cost in dev; run production at full effort. Invalid values are
+  ignored with a warning.
+- Prompt caching is automatic: structured-artifact calls
+  (interpretation/repair/field-fidelity/capability-conflict) send a stable
+  prefix so OpenRouter can cache it. No env toggle; it activates for those tasks.
+- `ARGUS_RUN_LIVE_EVALS=1` — runs the live eval suite under `tests/evals/` (real
+  model spend). Unset/`0` keeps evals mocked. Set it for the pre-merge
+  landing-gate run and every `main` promotion candidate.
+
 ## Smoke Test
 
 Use an allowlisted account and verify:

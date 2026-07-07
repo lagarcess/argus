@@ -1,5 +1,10 @@
 # P2.1 Capability Audit (Slice D)
 
+> [!NOTE]
+> Archived 2026-07-07. Completed P2.1 milestone spec; the capability registry it
+> designed shipped (#129). Retained for design archaeology. Current execution
+> board: `docs/specs/private-alpha-next-roadmap.md`.
+
 Status: Complete — read-only audit; grounds the P2.1 Capability Registry design
 Date: 2026-06-27
 Branch: `codex/private-alpha-next` (audited against the clean, promoted P0/P1 state)

@@ -9,7 +9,7 @@ Context and rationale:
 
 - See ``docs/specs/private-alpha-next-roadmap.md`` (P2 board, "P2.0 Spine guardrail gate"
   and the six cross-cutting invariants) and
-  ``docs/specs/private-alpha-next-p2.1-capability-audit.md``.
+  ``docs/archive/private-alpha-next-p2.1-capability-audit.md``.
 - Both quarantines broke the spine with "tasteful" heuristics, NOT ``import re`` or
   ``if "buy" in message``. So these tripwires name banned MECHANISMS / SIGNATURES.
 - They are source-level scans on purpose: the realistic regression is cherry-picking

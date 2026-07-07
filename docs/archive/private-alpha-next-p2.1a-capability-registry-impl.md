@@ -1,9 +1,14 @@
 # P2.1.a — Capability Registry Consolidation (Implementation Spec)
 
+> [!NOTE]
+> Archived 2026-07-07. Implemented and merged (#129); the slice branch is
+> superseded. Retained for implementation archaeology. Current execution board:
+> `docs/specs/private-alpha-next-roadmap.md`.
+
 Status: Spec → implementation on slice branch `codex/p2.1a-capability-registry`
 Date: 2026-06-27
 Parent: `codex/private-alpha-next` (integration trunk — do not merge/promote here)
-Grounding: `docs/specs/private-alpha-next-p2.1-capability-audit.md` (inventory + design
+Grounding: `docs/archive/private-alpha-next-p2.1-capability-audit.md` (inventory + design
 direction), `docs/specs/private-alpha-next-roadmap.md` (P2.1 milestone, P2.0 guardrails),
 `tests/test_spine_guardrails.py` (tripwires that must stay green), `AGENTS.md` runtime
 principles.

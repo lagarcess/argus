@@ -2,7 +2,7 @@
 
 Covers P2.1.a — every derived allow-list reads from the single registry, draft
 strategies have no path, and the indicator computes-vs-reachable axes are explicit.
-See docs/specs/private-alpha-next-p2.1a-capability-registry-impl.md.
+See docs/archive/private-alpha-next-p2.1a-capability-registry-impl.md.
 """
 
 from __future__ import annotations

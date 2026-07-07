@@ -24,3 +24,14 @@ Archived private-alpha spec/checkpoint files:
 - `private-alpha-readiness-orchestration.md`
 - `private-alpha-status-action-parity-audit.md`
 - `research-lab-thesis.md`
+
+Added in the 2026-07-07 pass (after the Gate A/B loop, B4 language-gate
+retirement, and execution realism shipped):
+
+- `PRODUCTION_READINESS_AUDIT.md` — May 2026 readiness audit; self-declared
+  historical, moved out of top-level `docs/`.
+- `ARGUS_SYSTEM_STEERING.md` — May 2026 pre-launch steering reference; moved out
+  of top-level `docs/`.
+- `private-alpha-next-p2.1-capability-audit.md` — completed P2.1 audit (Slice D).
+- `private-alpha-next-p2.1a-capability-registry-impl.md` — completed P2.1.a
+  capability registry consolidation spec (shipped in #129).

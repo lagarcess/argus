@@ -70,6 +70,28 @@ structured LLM clarifier with bounded facts and requested fields. Deterministic
 user-facing copy is reserved for explicit artifact-action recovery, such as a
 stale or non-retryable failed-run action, where code owns the safety boundary.
 
+## Language-Agnostic Prose Composition
+
+Runtime copy is composed, not templated per language. Since the B4 language-gate
+retirement (#154, PRs #174-177), Argus keeps no parallel English/Spanish copy
+tables in the runtime:
+
+- LLM-authored prose (result summaries, clarifications, explanations) is written
+  in the detected turn language from a typed fact bank. The backend supplies
+  typed facts; the model supplies the words.
+- Degraded and recovery copy renders from typed codes, not per-language strings.
+  When the LLM path is unavailable, the runtime maps a typed recovery/degraded
+  code to localized surface text at the presentation boundary, never a runtime
+  `if locale == "es-419"` branch or an `_english_*` helper.
+- Result-card chrome (labels, headings, chips) renders from typed keys the
+  frontend localizes, not from backend-baked language strings.
+
+The invariant: prose follows the detected turn language everywhere, English and
+Spanish parity is proven by the eval harness (not hardcoded copy), and no runtime
+module carries per-language copy tables, localized stop-word lists, or
+display-label token matching for semantic choice selection. This is the runtime
+expression of the P2.0 guardrail against per-language copy.
+
 ## Active Layers
 
 1. Conversational intelligence

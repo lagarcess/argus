@@ -1,5 +1,11 @@
 # P1 Evidence Decision Spine Implementation Plan
 
+> [!NOTE]
+> Historical plan (banner added 2026-07-07). The P1 Idea/IdeaVersion/
+> EvidenceArtifact/DecisionNote spine shipped and was promoted to `main`.
+> Retained for implementation archaeology; current execution board is
+> `docs/specs/private-alpha-next-roadmap.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the P1 Idea, IdeaVersion, EvidenceArtifact, and DecisionNote spine so completed backtests auto-capture durable evidence, decisions remain explicit, and Omnisearch recalls typed artifacts without regressing P0 continuity.

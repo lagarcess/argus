@@ -4,7 +4,9 @@
 
 Snapshot note: refreshed for `codex/private-alpha-next` after P2.0/P2.1 landed
 and after the evidence-aware loop was reclassified as source thesis for the
-decision memo.
+decision memo. Refreshed again 2026-07-07 after the Gate A/B loop, the B4
+language-gate retirement, and execution realism landed — see the 2026-07-07 pass
+below and the updated rows for the moved/resolved docs.
 
 Current source stack after the canon docs:
 
@@ -27,6 +29,18 @@ release-gate reference. It does not own Private Alpha Next product sequencing.
 Archive pass: high-confidence stale private-alpha specs and completed checkpoint
 docs were moved from `docs/specs/` to `docs/archive/` so active agents do not
 mistake them for current command sources.
+
+2026-07-07 pass: after the Gate A/B loop (#140/#142/#153/#146), the B4
+language-gate retirement (#154, #174-177), and execution realism (#130/#178)
+landed, four more docs moved to `docs/archive/`: the two completed P2.1 specs
+(`private-alpha-next-p2.1-capability-audit.md`,
+`private-alpha-next-p2.1a-capability-registry-impl.md`) and the two
+self-declared-historical top-level docs (`PRODUCTION_READINESS_AUDIT.md`,
+`ARGUS_SYSTEM_STEERING.md`). The two completed P1 superpowers plans
+(`2026-06-19-p1-evidence-decision-spine.md`,
+`2026-06-20-p1-red-audit-recovery.md`) received historical banners in place.
+`docs/CONVERSATIONAL_RUNTIME.md` is resolved as an active runtime-contract doc,
+not a stale one.
 
 ## Inventory
 
@@ -53,11 +67,11 @@ mistake them for current command sources.
 | `docs/archive/research-lab-thesis.md` | archived historical evidence | Earlier Research Lab thesis draft. It is retained for context and refined by `docs/specs/evidence-aware-idea-loop.md`, which then informed the decision memo. | Keep archived for product archaeology. | Superseded by evidence-aware source thesis and current decision memo |
 | `docs/archive/private-alpha-backtest-execution-capacity.md` | archived historical evidence | Draft from 2026-06-05; later release/runtime docs own active deployment discipline and architecture truth. | Keep archived for runtime-capacity archaeology. | Historical capacity draft |
 | `docs/archive/agent-architecture.md` | archived historical evidence | Proposed architecture from 2026-04-29. Predates the conversation trust milestone. | Keep archived for architecture archaeology. | Stale date |
-| `docs/CONVERSATIONAL_RUNTIME.md` | unclear/needs owner decision | Status is "Active Alpha implementation", but unclear if it's canon, active spec, or superseded by `docs/ARCHITECTURE.md`. | Decide if canon or stale/superseded. |  |
+| `docs/CONVERSATIONAL_RUNTIME.md` | active runtime-contract doc | Owns the conversational runtime contract (artifact spine, action events, typed-prose composition). Kept current through #178; complements, not superseded by, `docs/ARCHITECTURE.md`. | Keep active. Resolved 2026-07-07. |  |
 | `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` | archived/superseded | Explicitly marked "> Historical plan. This document records an earlier launch-closure checklist and should not be treated as the current milestone source of truth." | Archived under `docs/archive/`; use `docs/archive/private-alpha-conversation-trust.md` for the completed trust checkpoint and `docs/specs/private-alpha-ci-cd-sota.md` for release-gate discipline. | Explicitly stale. |
-| `docs/ARGUS_SYSTEM_STEERING.md` | historical evidence | "Pre-private-launch steering reference... planning reference, not an implementation ticket" from 2026-05-19. | Add historical banner. |  |
+| `docs/archive/ARGUS_SYSTEM_STEERING.md` | historical evidence | "Pre-private-launch steering reference... planning reference, not an implementation ticket" from 2026-05-19. | Moved to `docs/archive/` (2026-07-07); carries its historical banner. |  |
 | `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md` | unclear/needs owner decision | QA script. Could be canon process, or an active spec, or archive if out of date. | Clarify if this QA process is still active. | Uses legacy orchestrator path? |
-| `docs/PRODUCTION_READINESS_AUDIT.md` | historical evidence | Audit for `codex/production-readiness-gap-implementation` from 2026-05-05. | Add historical banner. |  |
+| `docs/archive/PRODUCTION_READINESS_AUDIT.md` | historical evidence | Audit for `codex/production-readiness-gap-implementation` from 2026-05-05. | Moved to `docs/archive/` (2026-07-07); carries its historical banner. |  |
 | `docs/superpowers/plans/2026-05-06-streaming-persistence-ui-orchestration.md` | historical evidence | Implementation plan for Phase 5 from 2026-05-06. | Add historical banner. |  |
 | `docs/superpowers/plans/2026-05-12-conversational-contract-hardening.md` | historical evidence | Implementation plan from 2026-05-12. | Add historical banner. |  |
 | `docs/superpowers/plans/2026-05-06-agent-runtime-phase-6-structural-hygiene.md` | historical evidence | Implementation plan from 2026-05-06. | Add historical banner. |  |

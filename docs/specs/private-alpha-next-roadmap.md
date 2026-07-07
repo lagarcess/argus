@@ -1,20 +1,27 @@
 # Private Alpha Next Roadmap
 
 Status: P2.0 + P2.1 DONE (spine gate, capability registry, conversational edit
-contract). Idea Ledger lightweight recall (#132) and spine modularization (#133)
-merged into `codex/private-alpha-next`; recent follow-ups include modularity
-budget guardrails (#136), the clean-checkout suite gate repair (#135), alpha
-legal/Data Controls surfaces (#137), and date-window helper cleanup (#138).
-Remaining P2 is reframed end-to-end around decision-memo execution gates, with
-the compounding loop as the highest-leverage PMF gate. Fees/slippage realism is
-an async isolated workstream (issue #130).
-Current pointer: #141 refine routing is MERGED (PR #148 at `5fc7a9a`).
-Promotion to `main` is PAUSED pending #140 (not started) and #142 (PR #146 in
-review; must rebase onto `5fc7a9a` and rerun the interpret suite before merge).
+contract). The Gate A/B loop landed through 2026-07-07: refine routing
+(#141/PR #148), Idea Ledger portfolio browse (#147), latest-result fact answers
+(#140/PR #153), messy company-name asset preservation (#142/PR #146), and the
+B3 measurement trio (eval harness #143, PostHog product events #144, append-only
+cost ledger #145). B4 retired the per-language copy tables — runtime prose and
+recovery copy now compose from typed facts/codes (#154, PRs #174-177). Execution
+realism (fees/slippage, #130/PR #178) merged flag-off, and a new interpreter
+cost/perf lane added prompt caching + per-tier reasoning controls (#156/#157,
+PR #172). Remaining P2 is the compounding loop's back half: linked versions
+(A1b) and comparison (A2), the highest-leverage PMF gate.
+Current pointer: the interpret/edit spine is between owners; A1b (linked
+IdeaVersion emission) is the next spine-chain slice and is unblocked.
+Promotion to `main` is PAUSED. The old #140/#142 blockers are both merged; the
+live blockers are now #171 (live eval red — calendar-year windows nulled on
+recovery drafts and a regressed #142 company-name case), #150 (three
+agent_runtime tests CI never runs), and #151 (readiness prose vs confirmation
+card).
 Execution runs off the P2 execution board below: point an agent at any READY
 lane. The interpret/edit spine has exactly one owner lane at a time (currently
 unowned; A1b is next in the spine chain).
-Date: 2026-07-01
+Date: 2026-07-07
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
 
@@ -316,7 +323,7 @@ disease cannot recur silently.
 Each slice owns a PMF gate, is demoable in a founder-guided session, and is one
 revertable slice family.
 
-##### P2 execution board: decision memo gates + unlock status (AUTHORITATIVE, 2026-07-01)
+##### P2 execution board: decision memo gates + unlock status (AUTHORITATIVE, 2026-07-07)
 
 Evidence-grounded after a live walkthrough + code grounding pass. The decision memo's
 moat is the loop where ideas are tested, remembered, compared, and trusted (memo §4.1,
@@ -342,9 +349,11 @@ authorization. Status legend:
 
 Spine ownership rule: exactly one lane at a time may edit the interpret/edit
 spine (`agent_runtime/stages/*`, `agent_runtime/interpreter/*`,
-`llm_interpreter*.py`, `artifact_edit_planner.py`). The current owner is lane
-A1 (#141). Parallel runtime lanes keep new logic in their own modules, touch
-shared dispatch minimally, and take rebase duty; the spine owner merges first.
+`llm_interpreter*.py`, `artifact_edit_planner.py`). The spine is currently
+between owners — A1 (#141), B1 (#140), and the B4 typed-prose series all landed;
+A1b is next in the chain. Parallel runtime lanes keep new logic in their own
+modules, touch shared dispatch minimally, and take rebase duty; the spine owner
+merges first.
 
 **Gate A: memory-backed compounding loop (highest leverage).**
 
@@ -414,6 +423,26 @@ DONE + landed on `codex/private-alpha-next`:
   answers, RSI threshold edits, Recents attention, Omnisearch default-on QA;
   degraded fallbacks now consume typed ids/payloads instead of display-label
   text.
+- A1 refine routing + loop repair (#141, PR #148): refine chip + NL edits route
+  through the typed edit contract; same-period references bind to the latest run.
+- A3 Idea Ledger portfolio browse (#147): saved ideas grouped by decision state
+  in Omnisearch; backend-owned `ledger_groups` are the source of truth.
+- B1 latest-result fact answers (#140, PR #153): peak-date/drawdown follow-ups
+  answered from canonical `backtest_runs` facts, pending edit state preserved.
+- B2 company-name asset preservation (#142, PR #146): messy multi-symbol
+  company-name baskets survive to confirmation. CAVEAT: #171 reports this case
+  regressed on the live eval at `4eae18e` — verify before `main`.
+- B3 measurement trio: eval harness (#143), server-side PostHog product events
+  (#144), append-only CostLedger (#145). The eval harness is a live landing gate.
+- B4 language-gate retirement (#154, PRs #174-177): runtime prose composes from
+  typed facts; degraded recovery copy and result chrome render from typed
+  codes/keys; per-language copy tables retired, parity proven by eval.
+- C1 execution realism — fees/slippage (#130, PR #178): merged flag-off behind
+  `ARGUS_ENABLE_EXECUTION_REALISM`; legacy float path preserved when inert.
+- Interpreter cost/perf (#156/#157, PR #172): automatic stable-prefix prompt
+  caching on structured-artifact calls + per-tier reasoning-effort env overrides
+  (`ARGUS_STRUCTURED_REASONING_EFFORT`, `ARGUS_CAPABILITY_REASONING_EFFORT`).
+- #149 result-followup timeout recovery fixed for Python 3.10 (#168).
 - `codex/p2.1a-capability-registry` is SUPERSEDED — its deploy work (onboarding-flag
   gate, grok-4.3/claude-haiku model swap, deploy contract, widened LLM timeouts) is
   already in integration; the branch carries no unique runtime. Retire it, no rescue.
@@ -461,33 +490,23 @@ LANES BY GATE (the board agents execute from):
 
 **Gate B — trust, recovery, measurement:**
 
-- **B1 Latest-result answers from run facts (#140).** READY-BUILD — dispatch
-  now; it was founder-serialized behind #141, which is merged. Build on top of
-  the landed refine routing. New logic lives in its own
-  `stages/interpret_internal/` module (pattern: `requested_asset_answer.py`),
-  thin dispatch hook only. Coexistence contract: consume the interpreter's
-  typed intent only; if pending edit state is active and a turn classifies as
-  a result question, answer it and leave the pending state intact — the #148
-  regression suites must stay green. Scope fence: answer from canonical
-  `backtest_runs`/result facts (peak date/value, drawdown date) or state the
-  limitation via typed payloads; preserve `result_run_id` in response
-  metadata. Do NOT rework recovery copy here (that is B4).
+- **B1 Latest-result answers from run facts (#140).** DONE — merged as PR #153.
+  Peak-date/value and drawdown follow-ups answer from canonical
+  `backtest_runs`/result facts; when pending edit state is active and a turn
+  classifies as a result question, it answers and leaves the pending state
+  intact (the #148 regression suites stayed green); `result_run_id` is preserved
+  in response metadata. FOLLOW-UP: #164 (OPEN) tracks the residual refine wall
+  for untyped fact questions — emit a typed result-followup fact focus/key.
 
-- **B2 Asset preservation in messy company-name prompts (#142).** ACTIVE (in
-  flight). Scout verdict 2026-07-01: runs FREE of A1 — #142 lives on the
-  first-pass `interpret -> asset resolution -> canonicalize -> confirmation`
-  path, A1 in post-result refine/typed-edit routing. Likely drop zone:
-  `asset_text_grounding.py`, `resolution.py`, `stages/interpret.py`
-  (confirmation just renders `asset_universe`; the loss is upstream). Repro
-  target: `tests/agent_runtime/test_interpret_stage.py` asserting TGT + WMT +
-  COST all survive to confirmation. Discipline: keep the fix in
-  grounding/resolution modules and touch `stages/interpret.py` minimally.
-  A1 landed first (PR #148, heavy overlap on `stages/interpret.py`,
-  `llm_interpreter.py`, `strategy_builder.py`): PR #146 MUST rebase onto
-  `5fc7a9a` and rerun the interpret suite plus the new #148 regression suites
-  before merge, even if GitHub reports a clean merge. Spine rules apply:
-  provider-backed name resolution feeds INTO interpretation as context/tools,
-  never a post-LLM text rescan.
+- **B2 Asset preservation in messy company-name prompts (#142).** DONE — merged
+  as PR #146. Messy multi-symbol company-name baskets (TGT + WMT + COST) survive
+  through `interpret -> asset resolution -> canonicalize -> confirmation`;
+  provider-backed name resolution feeds INTO interpretation as context, never a
+  post-LLM text rescan. REGRESSION WATCH: #171 (OPEN) reports the company-name
+  case regressed on the live eval at `4eae18e` (alongside calendar-year windows
+  nulled on recovery drafts). Re-verify the `test_interpret_stage.py` basket
+  assertions before any `main` promotion; likely fallout from the recovery-draft
+  work in #166 / the B4 typed-prose series.
 
 - **B3 Measurement wiring** (= P2.5 below). READY-BUILD, off-spine. One lane,
   THREE atomic slices in this ORDER, each its own PR — never combined into one
@@ -511,19 +530,34 @@ LANES BY GATE (the board agents execute from):
   budget. Apply the migration to dev/prod Supabase at next deploy.
   B3 lane COMPLETE — harness gates merges, events flow, spend is metered.
 
-- **B4 Recovery-copy retirement** (= P2.4 remainder). READY-SPEC; BUILD is
-  BLOCKED(B3 eval harness) so English/Spanish parity is proven by eval, not
-  hardcoded. Retire per-language recovery copy
-  (`api/chat/streaming.py` `assistant_copy_for_result`,
-  `recovery_messages.py`) toward model-voiced parity.
+- **B4 Recovery-copy / language-gate retirement (#154).** DONE — merged as PRs
+  #174-177. Runtime prose composes from typed facts (#174); degraded recovery
+  copy renders from typed codes (#175); result chrome renders from typed keys
+  (#177); migrated language surfaces are test-guarded (#176). Per-language copy
+  tables (`assistant_copy_for_result`, `recovery_messages.py`) are retired;
+  prose follows the detected turn language everywhere and EN/ES parity is proven
+  by the B3 eval harness, not hardcoded. WATCH: #171 flags calendar-year windows
+  nulled on recovery drafts — re-verify the recovery path before `main`.
+
+- **B5 Interpreter cost/perf (#156, #157).** DONE — merged as PR #172. Automatic
+  stable-prefix prompt caching on structured-artifact calls
+  (interpretation/repair/field-fidelity/capability-conflict) and per-tier
+  reasoning-effort env overrides (`ARGUS_STRUCTURED_REASONING_EFFORT`,
+  `ARGUS_CAPABILITY_REASONING_EFFORT`) so dev runs cheap and production runs at
+  full effort. OPEN follow-ups on this lane: #159 (quality-gated model cascade —
+  cheap primary, capable escalation) and #160 (close interpreter dead-ends:
+  composer-None fall-through, no silent date default). Both READY-BUILD, off the
+  A1b spine slice; keep new logic in their own modules.
 
 **Gate C — evidence credibility:**
 
-- **C1 Execution realism — fees/slippage** (= P2.2 below). ASYNC: GitHub issue
-  `lagarcess/argus#130` + worktree `codex/engine-realism`, flag-gated
-  `ARGUS_ENABLE_EXECUTION_REALISM` (default off), cherry-pick per phase. Off
-  the critical path; the founder deliberately disclaims assumptions for the PMF
-  stage.
+- **C1 Execution realism — fees/slippage (#130).** DONE — merged as PR #178 into
+  `codex/private-alpha-next` (9 atomic commits). Fees + slippage model end to
+  end behind `ARGUS_ENABLE_EXECUTION_REALISM` (default OFF); the legacy float
+  cost path is preserved byte-identical when the flag is inert; cost-surface
+  fields recorded in API_CONTRACT and DATA_MODEL. Still OFF the critical path —
+  the founder deliberately disclaims assumptions for the PMF stage — but it is
+  now integration truth, not an async cherry-pick lane.
 
 **Gate D — memory controls and privacy:**
 
@@ -539,34 +573,41 @@ iOS shell proof, broker/export packet design, security/privacy review,
 monetization/entitlement architecture.
 
 **Integration health (filed during #148 review verification; triaged
-2026-07-03):**
+2026-07-03, refreshed 2026-07-07):**
 
-- **#149** — result-followup timeout recovery is dead code on Python 3.10,
-  the version CI and deploy pin (`asyncio.TimeoutError` vs builtin mismatch;
-  aliases only on 3.11+). One-line fix; the failing test already exists.
-  Quick standalone PR; verify on a 3.10 venv.
+- **#149** — FIXED (PR #168). Result-followup timeout recovery no longer dead on
+  Python 3.10 (`asyncio.TimeoutError` vs builtin mismatch resolved); the failing
+  test now passes on a 3.10 venv.
 - **#150** — three agent_runtime tests fail at the integration fork point on
-  every Python (date-window audit drift x2, stale provenance x1) and the
-  curated CI file list never runs them. Two parts: the behavior bisect+fix is
-  spine-adjacent (queue behind #153); the systemic fix — a full-suite or
-  nightly CI job so the fixed file list stops hiding drift — is parallel-safe
-  infra, start anytime.
-- **#151** — the last surviving #141 corner: an executable-complete draft
-  plus model readiness prose never materializes the confirmation card, so
-  bare affirmations re-confirm verbally (violates "canonical payload and UI
-  prose disagree"). Spine story: queue immediately after #153 lands, before
-  or alongside A1b. RECOMMENDED addition to the `main` promotion blockers.
+  every Python (date-window audit drift x2, stale provenance x1) and the curated
+  CI file list never runs them. The behavior bisect+fix is spine-adjacent; the
+  systemic fix — a regression-sweep CI job so the fixed file list stops hiding
+  drift — is in flight as OPEN PR #169. Still a `main` promotion blocker until
+  both parts land.
+- **#151** — the last surviving #141 corner: an executable-complete draft plus
+  model readiness prose never materializes the confirmation card, so bare
+  affirmations re-confirm verbally (violates "canonical payload and UI prose
+  disagree"). Still OPEN; queue before or alongside A1b. A `main` promotion
+  blocker.
+- **#171** — NEW (filed 2026-07-07). Live eval RED at `4eae18e`: calendar-year
+  windows nulled on recovery drafts and the #142 company-name case regressed.
+  Likely fallout from the recovery-draft work (#166) and/or the B4 typed-prose
+  series (#174-177). The top `main` promotion blocker — the live eval gate is
+  red. SCOUT/bisect first against the B4 + #166 merges.
 
 **Standing release discipline** (blocks `main`, not a lane): rerun the exact
 clean-checkout suite gate (issue #134 / PR #135) before any branch or `main`
 promotion instead of treating the repair as permanent proof for future SHAs.
-Promotion to `main` stays PAUSED pending #140-#142.
-Once the eval harness (B3 slice 1, PR #143) merges, it is a landing gate:
+Promotion to `main` stays PAUSED — #140-#142 are merged, but the live blockers
+are now #171 (live eval red), #150 (hidden test drift + CI gap, PR #169), and
+#151 (readiness prose vs confirmation card).
+The eval harness (B3 slice 1, PR #143) is now a live landing gate:
 runtime-behavior PRs run the live eval suite once pre-merge; every `main`
 promotion candidate runs the full live suite on its exact SHA with no
 unexpected failures (expected-fails only for open issue-tagged bugs); rerun
-the suite after any interpreter model or provider change. Integration stays a
-fast checkpoint; `main` is the heavyweight gate.
+the suite after any interpreter model or provider change. #171 means that gate
+is currently RED. Integration stays a fast checkpoint; `main` is the heavyweight
+gate.
 
 "P2 done" = Argus **remembers, compares, and stays honest about staleness** — the memo's
 moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
@@ -614,7 +655,7 @@ moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
   `draft_only` token plumbing (`web/components/chat/ChatInput.tsx`,
   `web/components/chat/types.ts`); and retire or guard the orphaned `signals.py`
   handlers for the two drafts. Stay narrow: do not widen the supported set in this
-  slice. See `docs/specs/private-alpha-next-p2.1-capability-audit.md`.
+  slice. See `docs/archive/private-alpha-next-p2.1-capability-audit.md`.
 - Allowed surfaces: capability registry domain module, interpreter
   context/tools wiring, typed post-LLM capability validation, registry-backed
   result/clarification copy that is model-voiced, docs (`API_CONTRACT.md`,
@@ -639,8 +680,12 @@ moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
 - PMF gate: users describe a decision Argus clarified; trust foundation for all
   later slices.
 
-##### P2.2 Backtest credibility — fees/slippage realism (ASYNC: Codex issue #130, worktree codex/engine-realism)
+##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, flag-off)
 
+- Status: DONE (PR #178, 9 atomic commits). Fees + slippage model end to end
+  behind `ARGUS_ENABLE_EXECUTION_REALISM` (default OFF); legacy float cost path
+  preserved byte-identical when inert; cost-surface fields recorded in
+  API_CONTRACT and DATA_MODEL. The scope below is delivered, not pending.
 - Outcome: results carry assumptions a user can explain without founder help.
 - Scope: a `BacktestEngine` interface with the current engine as an adapter (no
   VectorBT/engine internals leaking into product objects); audit and surface
@@ -662,8 +707,14 @@ moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
 - PMF gate: at least two of five users voluntarily revisit or compare. This is
   the retention loop. Full verification/QA/rollback spec authored at activation.
 
-##### P2.4 Failure and recovery trust
+##### P2.4 Failure and recovery trust (recovery pattern DONE via B4; live parity gate open)
 
+- Status: the model-voiced, language-agnostic recovery pattern is DELIVERED — B4
+  (#154, PRs #174-177) retired per-language copy so recovery/degraded prose
+  renders from typed codes/keys in the detected turn language. The PMF gate below
+  (Spanish-preferring users complete the loop unaided) is validated by the live
+  eval harness, which is currently RED on #171 — close that before claiming the
+  gate.
 - Outcome: when Argus fails or hits an unsupported request, recovery preserves
   the user's idea, clarifies without making the user feel wrong, explains
   unsupported capability in product language, and never leaks raw provider/runtime
