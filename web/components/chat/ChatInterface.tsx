@@ -77,6 +77,7 @@ import {
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
+import { recoveryDisplayFromMetadata } from "@/lib/chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
 import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
@@ -1376,6 +1377,7 @@ export default function ChatInterface() {
         }
         const errorPayload = event.data as typeof event.data & Record<string, unknown>;
         const persistedErrorMessageId = event.data.message_id?.trim();
+        const errorRecoveryDisplay = recoveryDisplayFromMetadata(errorPayload);
         const metadataRetryAction = retryLastTurnActionFromMetadata(errorPayload, {
           assistantMessageId: persistedErrorMessageId,
         });
@@ -1402,6 +1404,7 @@ export default function ChatInterface() {
                         event.data.detail,
                         t('chat.error_backtest'),
                       ),
+                      recoveryDisplay: errorRecoveryDisplay,
                       actions: visibleRetryAction ? [visibleRetryAction] : m.actions,
                     }
                   : m,
@@ -1426,6 +1429,7 @@ export default function ChatInterface() {
           typeof finalPayload.message_id === "string"
             ? finalPayload.message_id
             : undefined;
+        const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
         const finalRetryActions = [
           failedActionRetryActionFromMetadata(finalPayload),
           retryLastTurnActionFromMetadata(finalPayload, {
@@ -1533,6 +1537,7 @@ export default function ChatInterface() {
                   assistantId,
                   finalText,
                   finalActions: finalRetryActions,
+                  recoveryDisplay: finalRecoveryDisplay,
                   contentPresentation:
                     action?.type === "show_breakdown"
                       ? "result_breakdown"
@@ -1547,6 +1552,7 @@ export default function ChatInterface() {
                 kind: "text",
                 content: finalText,
                 actions: finalRetryActions.length > 0 ? finalRetryActions : undefined,
+                recoveryDisplay: finalRecoveryDisplay,
                 contentPresentation:
                   action?.type === "show_breakdown"
                     ? "result_breakdown"

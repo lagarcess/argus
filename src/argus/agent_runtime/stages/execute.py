@@ -7,7 +7,7 @@ from copy import deepcopy
 from typing import Any
 
 from argus.agent_runtime.recovery.policy import should_retry
-from argus.agent_runtime.recovery_messages import resolve_recovery_language
+from argus.agent_runtime.recovery_messages import recovery_state
 from argus.agent_runtime.rule_specs import (
     executable_rule_spec_from_strategy,
     indicator_threshold_rule,
@@ -154,6 +154,10 @@ def execute_stage(
                 language=language,
             )
             if recovery_prompt is not None:
+                recovery = _recoverable_execution_recovery_state(
+                    error_message=_as_optional_str(envelope.get("error_message")),
+                    records=records,
+                )
                 return StageResult(
                     outcome="execution_failed_recoverably",
                     stage_patch={
@@ -163,6 +167,7 @@ def execute_stage(
                         "final_response_payload": {
                             "error": recovery_prompt,
                         },
+                        **({"recovery": recovery} if recovery is not None else {}),
                         **_failed_action_reference_patch(
                             payload=payload,
                             failure_classification=failure_classification,
@@ -205,6 +210,10 @@ def execute_stage(
         language=language,
     )
     if recovery_prompt is not None:
+        recovery = _recoverable_execution_recovery_state(
+            error_message=retry_exhausted,
+            records=records,
+        )
         return StageResult(
             outcome="execution_failed_recoverably",
             stage_patch={
@@ -212,6 +221,7 @@ def execute_stage(
                 "failure_classification": last_error_type,
                 "assistant_prompt": recovery_prompt,
                 "final_response_payload": {"error": recovery_prompt},
+                **({"recovery": recovery} if recovery is not None else {}),
                 **_failed_action_reference_patch(
                     payload=payload,
                     failure_classification=last_error_type,
@@ -568,6 +578,7 @@ def _recoverable_execution_prompt(
     records: list[dict[str, Any]],
     language: str = "en",
 ) -> str | None:
+    _ = language
     if error_type != "upstream_dependency_error":
         return None
     unavailable_data_kind = _unavailable_data_kind(
@@ -577,21 +588,32 @@ def _recoverable_execution_prompt(
     if unavailable_data_kind is None:
         return None
 
-    draft_label = _draft_label_from_payload(payload, language=language)
+    draft_label = _draft_label_from_payload(payload)
     data_label = _unavailable_data_label(
         data_kind=unavailable_data_kind,
-        language=language,
     )
-    if resolve_recovery_language(language) == "es-419":
-        return (
-            f"La configuracion de {draft_label} sigue aqui, pero no pude obtener "
-            f"{data_label} para esa simulacion en este momento. Intentalo de nuevo, "
-            "cambia las fechas o elige otro activo compatible."
-        )
     return (
         f"The {draft_label} setup is still here, but I could not get {data_label} "
         "for that run right now. Try again, change the dates, or choose a different "
         "supported asset."
+    )
+
+
+def _recoverable_execution_recovery_state(
+    *,
+    error_message: str | None,
+    records: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    unavailable_data_kind = _unavailable_data_kind(
+        error_message=error_message,
+        records=records,
+    )
+    if unavailable_data_kind is None:
+        return None
+    return recovery_state(
+        "execution_data_unavailable",
+        retryable=True,
+        data_kind=unavailable_data_kind,
     )
 
 
@@ -627,29 +649,17 @@ def _normalized_failure_value(value: Any) -> str:
     return str(value or "").strip().lower().replace("-", "_")
 
 
-def _unavailable_data_label(*, data_kind: str, language: str) -> str:
-    if resolve_recovery_language(language) == "es-419":
-        return "datos de referencia" if data_kind == "benchmark" else "datos de mercado"
+def _unavailable_data_label(*, data_kind: str) -> str:
     return "benchmark data" if data_kind == "benchmark" else "market data"
 
 
-def _draft_label_from_payload(payload: dict[str, Any], *, language: str = "en") -> str:
+def _draft_label_from_payload(payload: dict[str, Any]) -> str:
     symbols = _resolve_symbols(_strategy_fields(payload))
     symbol = symbols[0] if symbols else str(payload.get("symbol") or "").strip().upper()
     symbol_prefix = f"{symbol} " if symbol else ""
     strategy_type = _normalize_strategy_type(
         str(payload.get("strategy_type") or "strategy")
     )
-    if resolve_recovery_language(language) == "es-419":
-        if strategy_type == "dca_accumulation":
-            return f"{symbol_prefix}compras recurrentes".strip()
-        if strategy_type == "buy_and_hold":
-            return f"{symbol_prefix}comprar y mantener".strip()
-        if strategy_type == "indicator_threshold":
-            return f"{symbol_prefix}regla de indicador".strip()
-        if strategy_type == "signal_strategy":
-            return f"{symbol_prefix}estrategia de senales".strip()
-        return f"{symbol_prefix}estrategia".strip()
     if strategy_type == "dca_accumulation":
         return f"{symbol_prefix}recurring-buys draft".strip()
     if strategy_type == "buy_and_hold":

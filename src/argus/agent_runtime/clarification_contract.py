@@ -2,11 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from argus.agent_runtime.presentation_i18n import runtime_locale
 from argus.agent_runtime.recovery_messages import recovery_message
-from argus.agent_runtime.simplification_option_contract import (
-    localized_simplification_option_label,
-)
+from argus.agent_runtime.simplification_option_contract import simplification_option_kind
 from argus.agent_runtime.state.models import StrategySummary
 
 OFFLINE_CLARIFICATION_FALLBACK = recovery_message(
@@ -54,38 +51,22 @@ def intent_clarification_fallback(
     if not isinstance(needs, list) or not needs:
         return None
     symbol = _primary_symbol(strategy)
-    locale = runtime_locale(language)
+    _ = language
     if "period" in needs:
-        if locale == "es-419":
-            return f"¿Qué periodo quieres usar{_es_asset_suffix(symbol)}?"
         return f"What date window should I use{_en_asset_suffix(symbol)}?"
     if "asset_target" in needs:
-        if locale == "es-419":
-            return "¿Qué activo quieres probar?"
         return "Which asset should I test?"
     if "assumption" in needs:
-        if locale == "es-419":
-            return f"¿Qué supuesto quieres ajustar{_es_asset_suffix(symbol)}?"
         return f"What assumption should I adjust{_en_asset_suffix(symbol)}?"
     if "sizing_amount" in needs and "schedule" in needs:
-        if locale == "es-419":
-            return "¿Cuánto quieres invertir en cada compra y con qué frecuencia?"
         return "How much should each purchase be, and how often should it happen?"
     if "sizing_amount" in needs:
-        if locale == "es-419":
-            return "¿Cuánto quieres invertir?"
         return "How much should I use?"
     if "schedule" in needs:
-        if locale == "es-419":
-            return "¿Con qué frecuencia quieres hacer las compras?"
         return "How often should the purchases happen?"
     if "rule_definition" in needs:
-        if locale == "es-419":
-            return "¿Qué regla de entrada o salida quieres probar?"
         return "What entry or exit rule should I test?"
     if "refinement" in needs:
-        if locale == "es-419":
-            return "¿Qué quieres ajustar de esta idea?"
         return "What would you like to change?"
     return None
 
@@ -96,20 +77,13 @@ def _unsupported_recovery_fallback(
     response_intent: dict[str, Any],
     strategy: StrategySummary | dict[str, Any] | None,
 ) -> str | None:
-    locale = runtime_locale(language)
-    options = _option_labels(response_intent, locale=locale)
+    _ = language
+    options = _option_labels(response_intent)
     if not options:
         return None
     raw_value = _unsupported_raw_value(response_intent)
     symbol = _primary_symbol(strategy)
-    joined_options = _join_options(options, locale=locale)
-    if locale == "es-419":
-        subject = raw_value or "Esa regla"
-        symbol_suffix = f" para {symbol}" if symbol else ""
-        return (
-            f"{subject} no define por sí solo cuándo comprar o vender"
-            f"{symbol_suffix}. ¿Qué camino quieres usar: {joined_options}?"
-        )
+    joined_options = _join_options(options)
     subject = raw_value or "That rule"
     symbol_suffix = f" for {symbol}" if symbol else ""
     return (
@@ -118,7 +92,7 @@ def _unsupported_recovery_fallback(
     )
 
 
-def _option_labels(response_intent: dict[str, Any], *, locale: str) -> list[str]:
+def _option_labels(response_intent: dict[str, Any]) -> list[str]:
     raw_options = response_intent.get("options")
     if not isinstance(raw_options, list):
         return []
@@ -126,11 +100,7 @@ def _option_labels(response_intent: dict[str, Any], *, locale: str) -> list[str]
     for option in raw_options:
         if not isinstance(option, dict):
             continue
-        label = localized_simplification_option_label(
-            label=option.get("label"),
-            replacement_values=option.get("replacement_values"),
-            locale=locale,
-        )
+        label = _fallback_option_label(option)
         if label is None:
             continue
         if label not in labels:
@@ -169,14 +139,26 @@ def _looks_like_internal_code(value: str) -> bool:
     )
 
 
-def _join_options(options: list[str], *, locale: str) -> str:
+def _fallback_option_label(option: dict[str, Any]) -> str | None:
+    kind = simplification_option_kind(option.get("replacement_values"))
+    if kind == "rsi_threshold":
+        return "Use a supported RSI threshold rule"
+    if kind == "buy_and_hold":
+        return "Compare with buy and hold"
+    if kind == "moving_average_crossover":
+        return "Use a supported moving-average crossover"
+    label = option.get("label")
+    if isinstance(label, str) and label.strip():
+        return label.strip()
+    return None
+
+
+def _join_options(options: list[str]) -> str:
     if len(options) <= 1:
         return options[0] if options else ""
     if len(options) == 2:
-        conjunction = " o " if locale == "es-419" else " or "
-        return conjunction.join(options)
-    conjunction = "o" if locale == "es-419" else "or"
-    return f"{', '.join(options[:-1])}, {conjunction} {options[-1]}"
+        return " or ".join(options)
+    return f"{', '.join(options[:-1])}, or {options[-1]}"
 
 
 def _primary_symbol(strategy: StrategySummary | dict[str, Any] | None) -> str | None:
@@ -196,7 +178,3 @@ def _primary_symbol(strategy: StrategySummary | dict[str, Any] | None) -> str | 
 
 def _en_asset_suffix(symbol: str | None) -> str:
     return f" for {symbol}" if symbol else ""
-
-
-def _es_asset_suffix(symbol: str | None) -> str:
-    return f" para {symbol}" if symbol else ""
