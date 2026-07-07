@@ -1112,7 +1112,7 @@ async def _compose_result_followup_with_timeout(
             ),
             timeout=RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS,
         )
-    except TimeoutError:
+    except (TimeoutError, asyncio.TimeoutError):
         fact_bank = result_followup_fact_bank(metadata)
         record_result_followup_recovery_receipt(
             task=result_followup_llm_task(fact_bank=fact_bank, focus=focus),
