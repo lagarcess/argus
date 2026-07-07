@@ -1,11 +1,11 @@
-# Issue 151 Repro Notes
+# Issue 151 Card Materialization Repro
 
 Base: `origin/codex/private-alpha-next` at `eca0b7eb0bc10c27e02559850a855fb6cba48e86`.
 
 Scope: read-only repro scout. Runtime source was not edited. The only repo writes are:
 
 - `tests/agent_runtime/test_post_result_edit_routing.py`
-- `NOTES-151.md`
+- `docs/archive/issue-151-card-materialization-repro.md`
 
 ## Baseline
 
