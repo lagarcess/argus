@@ -480,6 +480,13 @@ def _render_result_breakdown_draft(
     if not required_fact_ids.issubset(used_fact_ids):
         return None
 
+    if not _rendered_breakdown_mentions_required_facts(
+        rendered_text=rendered_text,
+        fact_bank=fact_bank,
+        required_fact_ids=required_fact_ids,
+    ):
+        return None
+
     if len(rendered_text.split()) > 520:
         return None
     if _contains_disallowed_breakdown_heading(rendered_text):
@@ -508,6 +515,81 @@ def _render_result_breakdown_answer_body(draft: ResultBreakdownDraft) -> str | N
     return "\n\n".join(blocks).strip()
 
 
+def _rendered_breakdown_mentions_required_facts(
+    *,
+    rendered_text: str,
+    fact_bank: dict[str, str],
+    required_fact_ids: set[str],
+) -> bool:
+    if "symbols" in required_fact_ids and not _mentions_all_breakdown_symbols(
+        rendered_text,
+        fact_bank.get("symbols"),
+    ):
+        return False
+    if "benchmark_symbol" in required_fact_ids and not _contains_breakdown_text(
+        rendered_text,
+        fact_bank.get("benchmark_symbol"),
+    ):
+        return False
+    if "date_range" in required_fact_ids and not _contains_breakdown_fact_value(
+        rendered_text,
+        fact_bank.get("date_range"),
+    ):
+        return False
+    return not _contains_unknown_breakdown_metric_number(
+        rendered_text=rendered_text,
+        fact_bank=fact_bank,
+    )
+
+
+def _mentions_all_breakdown_symbols(text: str, value: str | None) -> bool:
+    symbols = [
+        symbol.strip()
+        for symbol in str(value or "").replace(" and ", ",").split(",")
+        if symbol.strip()
+    ]
+    return all(_contains_breakdown_text(text, symbol) for symbol in symbols)
+
+
+def _contains_breakdown_fact_value(text: str, value: str | None) -> bool:
+    cleaned = str(value or "").strip()
+    if not cleaned:
+        return True
+    if _contains_breakdown_text(text, cleaned):
+        return True
+    numeric_tokens = _breakdown_numeric_tokens(cleaned)
+    if not numeric_tokens:
+        return False
+    text_tokens = set(_breakdown_numeric_tokens(text))
+    return all(token in text_tokens for token in numeric_tokens)
+
+
+def _contains_breakdown_text(text: str, value: str | None) -> bool:
+    cleaned = str(value or "").strip()
+    return not cleaned or cleaned.casefold() in str(text or "").casefold()
+
+
+def _contains_unknown_breakdown_metric_number(
+    *,
+    rendered_text: str,
+    fact_bank: dict[str, str],
+) -> bool:
+    allowed: set[str] = set()
+    for fact_id in (
+        "total_return",
+        "benchmark_return",
+        "benchmark_delta_magnitude",
+        "benchmark_comparison",
+        "max_drawdown",
+    ):
+        allowed.update(_breakdown_metric_numeric_tokens(fact_bank.get(fact_id)))
+    if not allowed:
+        return False
+    return any(
+        token not in allowed for token in _breakdown_metric_numeric_tokens(rendered_text)
+    )
+
+
 INTERNAL_BREAKDOWN_TERMS = (
     "alpaca",
     "context packet",
@@ -532,6 +614,123 @@ def _contains_user_visible_internal_breakdown_term(answer: str) -> bool:
 
 def _normalize_result_breakdown_body(value: str) -> str:
     return " ".join(str(value or "").split()).strip()
+
+
+def _breakdown_metric_numeric_tokens(value: str | None) -> list[str]:
+    text = str(value or "")
+    tokens: list[str] = []
+    for index, character in enumerate(text):
+        if not (character.isdigit() or character in "+-"):
+            continue
+        token = _breakdown_numeric_token_starting_at(text, index)
+        if token is None:
+            continue
+        raw_token, end = token
+        suffix = text[end : end + 24].casefold()
+        stripped_suffix = suffix.lstrip()
+        if not (
+            stripped_suffix.startswith("%")
+            or stripped_suffix.startswith("percentage point")
+            or stripped_suffix.startswith("pts")
+            or stripped_suffix.startswith("puntos porcentual")
+        ):
+            continue
+        normalized = _normalize_result_breakdown_number_token(raw_token)
+        if normalized is None:
+            continue
+        try:
+            metric_token = f"{abs(float(normalized)):.1f}"
+        except ValueError:
+            continue
+        if metric_token not in tokens:
+            tokens.append(metric_token)
+    return tokens
+
+
+def _breakdown_numeric_tokens(value: str | None) -> list[str]:
+    text = str(value or "")
+    tokens: list[str] = []
+    for index, character in enumerate(text):
+        if not (character.isdigit() or character in "+-"):
+            continue
+        token = _breakdown_numeric_token_starting_at(text, index)
+        if token is None:
+            continue
+        raw_token, _ = token
+        normalized = _normalize_result_breakdown_number_token(raw_token)
+        if normalized is None:
+            continue
+        try:
+            numeric_token = f"{float(normalized):.1f}"
+        except ValueError:
+            continue
+        if numeric_token not in tokens:
+            tokens.append(numeric_token)
+    return tokens
+
+
+def _breakdown_numeric_token_starting_at(
+    text: str,
+    index: int,
+) -> tuple[str, int] | None:
+    candidate = ""
+    cursor = index
+    if text[cursor] in "+-":
+        candidate += text[cursor]
+        cursor += 1
+    seen_digit = False
+    while cursor < len(text):
+        character = text[cursor]
+        if character.isdigit():
+            seen_digit = True
+            candidate += character
+            cursor += 1
+            continue
+        if character in ".,":
+            candidate += character
+            cursor += 1
+            continue
+        break
+    if not seen_digit:
+        return None
+    return candidate, cursor
+
+
+def _normalize_result_breakdown_number_token(value: str) -> str | None:
+    token = value.strip().strip(".,")
+    if not token or not any(character.isdigit() for character in token):
+        return None
+    if "." in token and "," in token:
+        decimal_separator = "." if token.rfind(".") > token.rfind(",") else ","
+        thousands_separator = "," if decimal_separator == "." else "."
+        token = token.replace(thousands_separator, "")
+        if decimal_separator == ",":
+            token = token.replace(",", ".")
+        return token
+    if "," in token:
+        return _normalize_single_result_breakdown_separator_number(
+            token,
+            separator=",",
+        )
+    if "." in token:
+        return _normalize_single_result_breakdown_separator_number(
+            token,
+            separator=".",
+        )
+    return token
+
+
+def _normalize_single_result_breakdown_separator_number(
+    value: str,
+    *,
+    separator: str,
+) -> str:
+    pieces = value.split(separator)
+    if len(pieces) > 1 and all(len(piece) == 3 for piece in pieces[1:]):
+        return "".join(pieces)
+    if separator == ",":
+        return value.replace(",", ".")
+    return value
 
 
 def _strip_result_breakdown_fact_id_comments(

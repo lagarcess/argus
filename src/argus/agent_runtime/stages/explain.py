@@ -323,7 +323,6 @@ async def _llm_explanation(
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
-    canonical_takeaway: str | None = None
     fact_context = {
         "tested_summary": tested_summary,
         "execution_note": execution_note,
@@ -425,7 +424,6 @@ async def _llm_explanation(
                 rule_summary,
                 language=language,
             ),
-            canonical_takeaway=canonical_takeaway,
             language=language,
         )
         if rendered is None:
@@ -558,7 +556,6 @@ def _render_quick_take_draft(
     allowed_next_experiments: Any,
     relative_performance_truth: QuickTakeRelativeClaim,
     tested_line: str,
-    canonical_takeaway: str | None,
     language: str,
 ) -> str | None:
     response = _coerce_quick_take_draft(draft)
@@ -578,7 +575,6 @@ def _render_quick_take_draft(
     # the authoritative guard for user-facing benchmark truth.
     visible_response = response.model_copy(
         update={
-            "takeaway": canonical_takeaway or response.takeaway,
             "tested_bullet": tested,
         }
     )
@@ -593,8 +589,7 @@ def _render_quick_take_draft(
     ):
         return None
 
-    takeaway = canonical_takeaway or response.takeaway
-    lines = [_clean_quick_take_line(takeaway), ""]
+    lines = [_clean_quick_take_line(response.takeaway), ""]
     if tested:
         lines.append(f"- {tested}")
     optional_bullets = (
@@ -641,6 +636,8 @@ def _quick_take_mentions_required_visible_facts(
     if benchmark_symbol and not _contains_text(text, benchmark_symbol):
         return False
     if not _mentions_benchmark_comparison(text=text, fact_bank=fact_bank):
+        return False
+    if _quick_take_mentions_unknown_metric_number(text=text, fact_bank=fact_bank):
         return False
     return True
 
@@ -694,6 +691,23 @@ def _mentions_benchmark_comparison(
     return bool(magnitude_number and magnitude_number in _numeric_tokens(text))
 
 
+def _quick_take_mentions_unknown_metric_number(
+    *,
+    text: str,
+    fact_bank: dict[str, str],
+) -> bool:
+    allowed = set()
+    for fact_id in (
+        "total_return",
+        "benchmark_return",
+        "benchmark_delta_magnitude",
+    ):
+        allowed.update(_metric_numeric_tokens(fact_bank.get(fact_id)))
+    if not allowed:
+        return False
+    return any(token not in allowed for token in _metric_numeric_tokens(text))
+
+
 def _contains_text(text: str, needle: str) -> bool:
     return needle.casefold() in text.casefold()
 
@@ -734,6 +748,57 @@ def _numeric_tokens(value: str | None) -> list[str]:
     if candidate:
         flush(candidate)
     return tokens
+
+
+def _metric_numeric_tokens(value: str | None) -> list[str]:
+    text = str(value or "")
+    tokens: list[str] = []
+    for index, character in enumerate(text):
+        if not (character.isdigit() or character in "+-"):
+            continue
+        token = _numeric_token_starting_at(text, index)
+        if token is None:
+            continue
+        raw_token, end = token
+        suffix = text[end : end + 24].casefold()
+        if not suffix.lstrip().startswith("%") and not suffix.lstrip().startswith(
+            "percentage point"
+        ) and not suffix.lstrip().startswith("puntos porcentual"):
+            continue
+        normalized = _normalize_numeric_token(raw_token)
+        if normalized is None:
+            continue
+        try:
+            metric_token = f"{abs(float(normalized)):.1f}"
+        except ValueError:
+            continue
+        if metric_token not in tokens:
+            tokens.append(metric_token)
+    return tokens
+
+
+def _numeric_token_starting_at(text: str, index: int) -> tuple[str, int] | None:
+    candidate = ""
+    cursor = index
+    if text[cursor] in "+-":
+        candidate += text[cursor]
+        cursor += 1
+    seen_digit = False
+    while cursor < len(text):
+        character = text[cursor]
+        if character.isdigit():
+            seen_digit = True
+            candidate += character
+            cursor += 1
+            continue
+        if character in ".,":
+            candidate += character
+            cursor += 1
+            continue
+        break
+    if not seen_digit:
+        return None
+    return candidate, cursor
 
 
 def _normalize_numeric_token(value: str) -> str | None:

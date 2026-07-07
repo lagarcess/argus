@@ -2688,6 +2688,63 @@ def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> N
     assert text is None
 
 
+def test_result_breakdown_rejects_mismatched_visible_fact_values(monkeypatch) -> None:
+    from argus.api.chat import breakdown as chat_service
+
+    del monkeypatch
+    fake_schema = FakeBreakdownSchemaClient(
+        {
+            "answer_blocks": [
+                (
+                    "AAPL Buy and Hold tested AAPL across past year using the "
+                    "stored backtest setup."
+                ),
+                (
+                    "AAPL finished at +46.7% while SPY returned +20.0%, a 13.9 "
+                    "percentage point lead."
+                ),
+                (
+                    "Benchmark: SPY. This is historical simulation evidence, not a "
+                    "prediction."
+                ),
+            ],
+            "fact_ids": [
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_comparison",
+                "caveat",
+            ],
+        }
+    )
+
+    text = chat_service.llm_result_breakdown_message(
+        {
+            "title": "AAPL Buy and Hold",
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "date_range": "past year",
+            "raw_metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 39.5,
+                        "benchmark_return_pct": 25.6,
+                        "delta_vs_benchmark_pct": 13.9,
+                        "max_drawdown_pct": -13.8,
+                    }
+                }
+            },
+            "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
+        },
+        invoke_json_schema_func=fake_schema,
+    )
+
+    assert text is None
+
+
 def test_result_breakdown_rejects_user_visible_internal_context_terms(
     monkeypatch,
 ) -> None:
