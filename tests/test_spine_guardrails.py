@@ -168,6 +168,8 @@ ISSUE_154_LANGUAGE_GATES = {
     'Literal["en", "es-419"]': "two-language runtime literal clone",
     "Literal['en', 'es-419']": "two-language runtime literal clone",
     "es-419": "inline locale-specific runtime copy or branch",
+    'startswith("es")': "Spanish-prefix runtime branch",
+    "startswith('es')": "Spanish-prefix runtime branch",
 }
 
 
