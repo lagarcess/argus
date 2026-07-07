@@ -359,7 +359,7 @@ def test_runtime_confirmation_card_shows_execution_realism_values(
     assert "No slippage" not in card["assumptions"]
 
 
-def test_runtime_confirmation_card_localizes_spanish_confirmation_artifact() -> None:
+def test_runtime_confirmation_card_emits_typed_spanish_confirmation_artifact() -> None:
     card = runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",
@@ -405,28 +405,45 @@ def test_runtime_confirmation_card_localizes_spanish_confirmation_artifact() -> 
     )
 
     assert card is not None
-    assert card["title"] == "ETH: Comprar y mantener"
-    assert card["statusLabel"] == "Listo para ejecutar"
-    assert (
-        card["summary"]
-        == "Listo para probar comprar y mantener ETH del 1 de enero de 2024 al 31 de marzo de 2024."
-    )
+    assert card["status"] == "ready_to_run"
+    assert card["strategy_type"] == "buy_and_hold"
+    assert card["asset_class"] == "crypto"
+    assert card["display_facts"] == {
+        "benchmark_symbol": "BTC",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "timeframe": "1D",
+    }
     assert any(
-        row["key"] == "strategy" and row["value"] == "Comprar y mantener"
+        row["key"] == "strategy"
+        and row["labelKey"] == "chat.confirmation.rows.strategy"
+        and row["value"] == "Buy and Hold"
         for row in card["rows"]
     )
     assert any(
         row["key"] == "period"
+        and row["labelKey"] == "chat.confirmation.rows.period"
         and row["value"] == "1 de enero de 2024 al 31 de marzo de 2024"
         for row in card["rows"]
     )
-    assert "$100,000 capital inicial" in card["assumptions"]
+    assert any(
+        row["key"] == "starting_capital"
+        and row["labelKey"] == "chat.confirmation.rows.starting_capital"
+        and row["value"] == "$100,000"
+        for row in card["rows"]
+    )
+    assert {action["labelKey"] for action in card["actions"]} == {
+        "chat.confirmation.actions.adjust_assumptions",
+        "chat.confirmation.actions.cancel",
+        "chat.confirmation.actions.change_asset",
+        "chat.confirmation.actions.change_dates",
+        "chat.confirmation.actions.run_backtest",
+    }
+    assert "$100,000 starting capital" in card["assumptions"]
     assert "Datos diarios" in card["assumptions"]
-    assert "Sin comisiones" in card["assumptions"]
-    assert "Sin deslizamiento" in card["assumptions"]
-    assert "Referencia: BTC" in card["assumptions"]
-    assert all("starting capital" not in value for value in card["assumptions"])
-    assert all("Benchmark:" not in value for value in card["assumptions"])
+    assert "No fees" in card["assumptions"]
+    assert "No slippage" in card["assumptions"]
+    assert "Benchmark: BTC" in card["assumptions"]
 
 
 def test_runtime_confirmation_card_localizes_spanish_indicator_rules() -> None:

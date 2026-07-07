@@ -365,12 +365,10 @@ def _confirmation_assumptions(
     else:
         fees = _optional_parameter_value(optional_parameters, "fees")
         if fees in (0, 0.0, "0", "0.0"):
-            assumptions.append("Sin comisiones" if _is_spanish(language) else "No fees")
+            assumptions.append("No fees")
         slippage = _optional_parameter_value(optional_parameters, "slippage")
         if slippage in (0, 0.0, "0", "0.0"):
-            assumptions.append(
-                "Sin deslizamiento" if _is_spanish(language) else "No slippage"
-            )
+            assumptions.append("No slippage")
     benchmark_assumption = _confirmation_benchmark_assumption(
         strategy=strategy,
         optional_parameters=optional_parameters,
@@ -552,8 +550,6 @@ def _confirmation_execution_costs(
 def _execution_cost_assumption(costs: dict[str, float], *, language: str) -> str:
     fee_bps = _format_bps(float(costs["fees"]) * 10000.0)
     slippage_bps = _format_bps(float(costs["slippage"]) * 10000.0)
-    if _is_spanish(language):
-        return f"Costos modelados: comisión de {fee_bps} bps + deslizamiento de {slippage_bps} bps"
     return f"Modeled costs: {fee_bps} bps fee + {slippage_bps} bps slippage"
 
 
@@ -582,15 +578,6 @@ def _confirmation_summary(
     language: str = "en",
 ) -> str:
     strategy_type = executable_strategy_type(strategy)
-    if _is_spanish(language):
-        if strategy_type == "buy_and_hold":
-            return f"Listo para probar comprar y mantener {assets} del {period}."
-        if _strategy_type_uses_cadence(strategy_type):
-            return f"Listo para probar compras recurrentes de {assets} del {period}."
-        return (
-            f"Listo para probar {assets} con "
-            f"{_summary_strategy_phrase(strategy_label, language=language)} del {period}."
-        )
     if strategy_type == "buy_and_hold":
         return f"Ready to test buy-and-hold for {assets} over {period}."
     if _strategy_type_uses_cadence(strategy_type):
@@ -602,15 +589,6 @@ def _confirmation_summary(
 
 
 def _summary_strategy_phrase(strategy_label: str, *, language: str = "en") -> str:
-    if _is_spanish(language):
-        phrases = {
-            "Umbral RSI": "un umbral RSI",
-            "Compra en caidas": "una regla de compra en caidas",
-            "Umbral de indicador": "un umbral de indicador",
-            "Estrategia de senales": "una estrategia de senales",
-            "Cruce de medias moviles": "un cruce de medias moviles",
-        }
-        return phrases.get(strategy_label, strategy_label.strip().lower())
     phrases = {
         "RSI Threshold": "an RSI threshold",
         "Dip Buying": "a dip-buying rule",
@@ -658,9 +636,7 @@ def _format_confirmation_rule_value(
 
 def _format_confirmation_period(value: Any, *, language: str = "en") -> str:
     resolved = resolve_date_range(value, today=_confirmation_today())
-    if _is_spanish(language):
-        return format_date_range_label(resolved.start, resolved.end, language=language)
-    return resolved.display
+    return format_date_range_label(resolved.start, resolved.end, language=language)
 
 
 def _confirmation_period_without_parentheses(value: str) -> str:
@@ -689,15 +665,7 @@ def _localized_strategy_label(
     *,
     language: str,
 ) -> str:
-    if not _is_spanish(language):
-        return display_strategy_type(strategy)
-    labels = {
-        "buy_and_hold": "Comprar y mantener",
-        "dca_accumulation": "Compras recurrentes",
-        "indicator_threshold": "Umbral de indicador",
-        "signal_strategy": "Estrategia de senales",
-    }
-    return labels.get(executable_strategy_type(strategy), display_strategy_type(strategy))
+    return display_strategy_type(strategy)
 
 
 def _localized_strategy_slug(
@@ -705,32 +673,18 @@ def _localized_strategy_slug(
     *,
     language: str,
 ) -> str:
-    if not _is_spanish(language):
-        return display_strategy_slug(strategy)
-    label = _localized_strategy_label(strategy, language=language)
-    return label[:1].lower() + label[1:]
+    return display_strategy_slug(strategy)
 
 
 def _confirmation_title(*, assets: str, strategy_type: str, language: str) -> str:
-    if _is_spanish(language):
-        return f"{assets}: {strategy_type[:1].upper()}{strategy_type[1:]}".strip()
     return f"{assets} {strategy_type}".strip()
 
 
 def _confirmation_status_label(*, is_ready_to_run: bool, language: str) -> str:
-    if _is_spanish(language):
-        return "Listo para ejecutar" if is_ready_to_run else "Necesita cambios"
     return "Ready to run" if is_ready_to_run else "Needs change"
 
 
 def _money_assumption(value: float, *, role: str, language: str) -> str:
-    if _is_spanish(language):
-        label = (
-            "aporte recurrente"
-            if role == "recurring_contribution"
-            else "capital inicial"
-        )
-        return f"${value:,.0f} {label}"
     label = (
         "recurring contribution"
         if role == "recurring_contribution"
@@ -740,12 +694,7 @@ def _money_assumption(value: float, *, role: str, language: str) -> str:
 
 
 def _benchmark_assumption(symbol: str, *, language: str) -> str:
-    prefix = "Referencia" if _is_spanish(language) else "Benchmark"
-    return f"{prefix}: {symbol}"
-
-
-def _is_spanish(language: str) -> bool:
-    return (language or "en").lower().startswith("es")
+    return f"Benchmark: {symbol}"
 
 
 def _confirmation_today() -> date:

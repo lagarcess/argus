@@ -122,33 +122,11 @@ class FakeStructuredModel:
         schema_name = getattr(self.schema, "__name__", "")
         if schema_name == "ResultBreakdownDraft":
             return self.schema(  # type: ignore[misc, operator]
-                language_quality="matches_prompt_language",
-                sections=[
-                    {
-                        "heading": "Reading the run",
-                        "parts": [
-                            {
-                                "kind": "text",
-                                "text": "The tested result is ",
-                            },
-                            {"kind": "fact", "fact_id": "title"},
-                            {
-                                "kind": "text",
-                                "text": ". The context to keep in view is ",
-                            },
-                            {"kind": "fact", "fact_id": "caveat"},
-                        ],
-                    },
-                    {
-                        "heading": "Benchmark and risk context",
-                        "parts": [
-                            {
-                                "kind": "text",
-                                "text": "Use the card metrics as the source of truth.",
-                            },
-                        ],
-                    },
-                ]
+                answer_blocks=[
+                    "The tested result is grounded in the stored result and its caveat.",
+                    "Use the card metrics as the source of truth.",
+                ],
+                fact_ids=["title", "caveat"],
             )
         return LLMInterpretationResponse(
             intent="conversation_followup",
@@ -187,30 +165,14 @@ class FakeBreakdownSchemaClient:
             return self.response
         schema = kwargs["schema_model"]
         return schema(
-            language_quality="matches_prompt_language",
-            sections=[
-                {
-                    "heading": "Reading the run",
-                    "parts": [
-                        {"kind": "text", "text": "The tested result is "},
-                        {"kind": "fact", "fact_id": "title"},
-                        {
-                            "kind": "text",
-                            "text": ". The context to keep in view is ",
-                        },
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                },
-                {
-                    "heading": "Benchmark and risk context",
-                    "parts": [
-                        {
-                            "kind": "text",
-                            "text": "Use the card metrics as the source of truth.",
-                        },
-                    ],
-                },
-            ]
+            answer_blocks=[
+                (
+                    "The stored result is grounded in the completed backtest and "
+                    "its historical-simulation caveat."
+                ),
+                "Use the card metrics as the source of truth.",
+            ],
+            fact_ids=["title", "caveat"],
         )
 
 
@@ -529,8 +491,22 @@ def test_result_breakdown_prompt_carries_product_language_contract() -> None:
     )
 
     assert "product_language" in messages[0]["content"]
-    assert "language_quality" in messages[0]["content"]
+    assert "fact_ids" in messages[0]["content"]
+    assert "Answer in Spanish" in messages[0]["content"]
     assert "es-419" in messages[1]["content"]
+
+
+def test_result_breakdown_schema_requires_visible_blocks_and_fact_ids() -> None:
+    from argus.api.chat.breakdown import ResultBreakdownDraft
+    from pydantic import ValidationError
+
+    schema = ResultBreakdownDraft.model_json_schema()
+
+    assert {"answer_blocks", "fact_ids"}.issubset(set(schema["required"]))
+    with pytest.raises(ValidationError):
+        ResultBreakdownDraft.model_validate({})
+    with pytest.raises(ValidationError):
+        ResultBreakdownDraft.model_validate({"answer_blocks": [], "fact_ids": []})
 
 
 def test_spanish_result_breakdown_rejects_mixed_language_llm_output() -> None:
@@ -538,24 +514,20 @@ def test_spanish_result_breakdown_rejects_mixed_language_llm_output() -> None:
 
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "language_quality": "mixed_or_wrong_language",
-            "sections": [
-                {
-                    "heading": "Setup",
-                    "parts": [
-                        {"kind": "text", "text": "Here's the deeper read."},
-                        {"kind": "fact", "fact_id": "title"},
-                        {"kind": "fact", "fact_id": "symbols"},
-                        {"kind": "fact", "fact_id": "date_range"},
-                        {"kind": "fact", "fact_id": "total_return"},
-                        {"kind": "fact", "fact_id": "benchmark_symbol"},
-                        {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "fact", "fact_id": "benchmark_comparison"},
-                        {"kind": "fact", "fact_id": "max_drawdown"},
-                        {"kind": "fact", "fact_id": "assumptions"},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                }
+            "answer_blocks": [
+                "The fact_bank says here's the deeper read.",
+            ],
+            "fact_ids": [
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_comparison",
+                "max_drawdown",
+                "assumptions",
+                "caveat",
             ],
         }
     )
@@ -585,7 +557,7 @@ def test_spanish_result_breakdown_rejects_mixed_language_llm_output() -> None:
     assert text is None
 
 
-def test_spanish_result_breakdown_fallback_is_localized_and_grounded() -> None:
+def test_spanish_result_breakdown_fallback_is_grounded_without_language_branch() -> None:
     from argus.api.chat import breakdown as chat_service
 
     text = chat_service.fallback_result_breakdown_message(
@@ -613,21 +585,16 @@ def test_spanish_result_breakdown_fallback_is_localized_and_grounded() -> None:
         language="es-419",
     )
 
-    assert "lectura más detallada" in text
-    assert "**Configuración.**" in text
-    assert "**Cómo leerlo.**" in text
-    assert "**Riesgo y supuestos.**" in text
-    assert "**Siguiente prueba útil.**" in text
-    assert "Regla: compra al inicio del periodo y mantén hasta el final." in text
-    assert "Superó por 23.6 puntos porcentuales" in text
-    assert "Entry rule" not in text
-    assert "exit rule" not in text
-    assert "Beat by" not in text
-    assert "percentage points" not in text
+    assert "Here's the deeper read" in text
+    assert "**Setup.**" in text
+    assert "**How to read it.**" in text
+    assert "**Risk and assumptions.**" in text
+    assert "**Useful next check.**" in text
+    assert "Entry rule: buy at the start of the period" in text
+    assert "Beat by 23.6 percentage points" in text
     assert "Prueba siguiente: Prueba siguiente" not in text
-    assert "Here's the deeper read" not in text
-    assert "Setup" not in text
-    assert "How to read it" not in text
+    assert "lectura más detallada" not in text
+    assert "Superó por" not in text
 
 
 def test_result_breakdown_llm_has_hard_action_budget() -> None:
@@ -2386,8 +2353,9 @@ def test_result_breakdown_prompt_asks_for_fact_bank_references(
     system_prompt = messages[0]["content"]
     user_payload = messages[1]["content"]
     assert "non-template" in system_prompt.lower()
-    assert "vary the section headings" in system_prompt.lower()
-    assert "fact reference" in system_prompt.lower()
+    assert "answer_blocks" in system_prompt
+    assert "fact_ids" in system_prompt
+    assert "grounding metadata" in system_prompt.lower()
     assert "plain language" in system_prompt.lower()
     assert "curiosity-forward" in system_prompt.lower()
     assert "dense financial pdf" in system_prompt.lower()
@@ -2411,44 +2379,33 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Reading this run",
-                    "parts": [
-                        {"kind": "text", "text": "The tested idea was "},
-                        {"kind": "fact", "fact_id": "title"},
-                        {"kind": "text", "text": " across "},
-                        {"kind": "fact", "fact_id": "date_range"},
-                        {"kind": "text", "text": "."},
-                    ],
-                },
-                {
-                    "heading": "Return and benchmark",
-                    "parts": [
-                        {"kind": "fact", "fact_id": "symbols"},
-                        {"kind": "text", "text": " finished at "},
-                        {"kind": "fact", "fact_id": "total_return"},
-                        {"kind": "text", "text": " while "},
-                        {"kind": "fact", "fact_id": "benchmark_symbol"},
-                        {"kind": "text", "text": " returned "},
-                        {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "text", "text": ", leaving "},
-                        {"kind": "fact", "fact_id": "benchmark_comparison"},
-                        {"kind": "text", "text": " of relative performance."},
-                    ],
-                },
-                {
-                    "heading": "Risk and caveat",
-                    "parts": [
-                        {"kind": "text", "text": "The largest drawdown was "},
-                        {"kind": "fact", "fact_id": "max_drawdown"},
-                        {"kind": "text", "text": ". Assumptions: "},
-                        {"kind": "fact", "fact_id": "assumptions"},
-                        {"kind": "text", "text": " "},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                },
-            ]
+            "answer_blocks": [
+                (
+                    "AAPL Buy and Hold tested AAPL across past year using the "
+                    "stored backtest setup."
+                ),
+                (
+                    "AAPL finished at +39.5% while SPY returned +25.6%, a 13.9 "
+                    "percentage point lead."
+                ),
+                (
+                    "The largest drawdown was -13.8%. Assumptions: Universe: AAPL. "
+                    "Benchmark: SPY. This is historical simulation evidence, not a "
+                    "prediction."
+                ),
+            ],
+            "fact_ids": [
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_comparison",
+                "max_drawdown",
+                "assumptions",
+                "caveat",
+            ],
         }
     )
 
@@ -2487,14 +2444,13 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
     )
 
     assert text is not None
-    assert "### Reading this run" in text
     assert "AAPL Buy and Hold" in text
     assert "past year" in text
     assert "AAPL" in text
     assert "+39.5%" in text
     assert "SPY" in text
     assert "+25.6%" in text
-    assert "Beat by 13.9 percentage points" in text
+    assert "13.9 percentage point lead" in text
     assert "-13.8%" in text
     assert "Universe: AAPL." in text
     assert "not a prediction" in text.lower()
@@ -2535,46 +2491,32 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Reading this run",
-                    "parts": [
-                        {"kind": "text", "text": "The tested idea was"},
-                        {"kind": "fact", "fact_id": "title"},
-                        {"kind": "text", "text": "over"},
-                        {"kind": "fact", "fact_id": "date_range"},
-                        {"kind": "text", "text": "and returned"},
-                        {"kind": "fact", "fact_id": "total_return"},
-                        {"kind": "text", "text": "."},
-                    ],
-                },
-                {
-                    "heading": "Benchmark context",
-                    "parts": [
-                        {"kind": "fact", "fact_id": "symbols"},
-                        {"kind": "text", "text": "was compared with"},
-                        {"kind": "fact", "fact_id": "benchmark_symbol"},
-                        {"kind": "text", "text": "at"},
-                        {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "text", "text": "for a relative spread of"},
-                        {"kind": "fact", "fact_id": "benchmark_comparison"},
-                        {"kind": "text", "text": "."},
-                    ],
-                },
-                {
-                    "heading": "Risk, assumptions, and next step",
-                    "parts": [
-                        {"kind": "text", "text": "The max drawdown was"},
-                        {"kind": "fact", "fact_id": "max_drawdown"},
-                        {"kind": "text", "text": ". Assumptions:"},
-                        {"kind": "fact", "fact_id": "assumptions"},
-                        {"kind": "text", "text": "Next runnable checks:"},
-                        {"kind": "fact", "fact_id": "runnable_next_tests"},
-                        {"kind": "text", "text": "."},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                },
-            ]
+            "answer_blocks": [
+                "BABA Buy and Hold tested BABA over last month and returned +1.7%.",
+                (
+                    "SPY returned +26.6%, so BABA lagged by 24.9 percentage points "
+                    "versus that benchmark."
+                ),
+                (
+                    "The max drawdown was -36.8%. Assumptions: Universe: BABA. "
+                    "Benchmark: SPY. A useful next check is one of the supported "
+                    "same-asset-class variations. This is historical simulation "
+                    "evidence, not a prediction."
+                ),
+            ],
+            "fact_ids": [
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_comparison",
+                "max_drawdown",
+                "assumptions",
+                "runnable_next_tests",
+                "caveat",
+            ],
         }
     )
 
@@ -2600,13 +2542,13 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
     )
 
     assert text is not None
-    assert "**Test:** BABA Buy and Hold, last month." in text
-    assert "**Performance:** total return +1.7%." in text
-    assert (
-        "**Performance:** SPY benchmark return +26.6%; Lagged by 24.9 percentage points."
-        in text
-    )
-    assert "**Risk marker:** max drawdown -36.8%." in text
+    assert "BABA Buy and Hold tested BABA over last month and returned +1.7%." in text
+    assert "SPY returned +26.6%" in text
+    assert "lagged by 24.9 percentage points" in text
+    assert "The max drawdown was -36.8%." in text
+    assert "**Test:**" not in text
+    assert "**Performance:**" not in text
+    assert "**Risk marker:**" not in text
     assert "The tested idea was over and returned." not in text
     assert "wasBABA" not in text
     assert "Holdover" not in text
@@ -2614,7 +2556,7 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
     assert "BABA Buy and Hold BABA last month" not in text
 
 
-def test_result_breakdown_rejects_malformed_generated_connective_text(
+def test_result_breakdown_rejects_empty_generated_body(
     monkeypatch,
 ) -> None:
     from argus.api.chat import breakdown as chat_service
@@ -2622,31 +2564,19 @@ def test_result_breakdown_rejects_malformed_generated_connective_text(
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Reading the run",
-                    "parts": [
-                        {
-                            "kind": "text",
-                            "text": (
-                                "The benchmark return for the same window was "
-                            ),
-                        },
-                        {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "text", "text": " — a spread of "},
-                        {"kind": "fact", "fact_id": "benchmark_comparison"},
-                        {"kind": "text", "text": "."},
-                        {"kind": "fact", "fact_id": "title"},
-                        {"kind": "fact", "fact_id": "symbols"},
-                        {"kind": "fact", "fact_id": "date_range"},
-                        {"kind": "fact", "fact_id": "total_return"},
-                        {"kind": "fact", "fact_id": "benchmark_symbol"},
-                        {"kind": "fact", "fact_id": "max_drawdown"},
-                        {"kind": "fact", "fact_id": "assumptions"},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                }
-            ]
+            "answer_blocks": [],
+            "fact_ids": [
+                "benchmark_return",
+                "benchmark_comparison",
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "max_drawdown",
+                "assumptions",
+                "caveat",
+            ],
         }
     )
 
@@ -2675,11 +2605,7 @@ def test_result_breakdown_rejects_malformed_generated_connective_text(
         invoke_json_schema_func=fake_schema,
     )
 
-    assert text is not None
-    assert "was — a spread of" not in text
-    assert "**Test:** AAPL DCA Accumulation, March 1, 2024 to October 31, 2024." in text
-    assert "SPY benchmark return +5.5%" in text
-    assert "Beat by 7.0 percentage points" in text
+    assert text is None
 
 
 def test_result_breakdown_rejects_quick_take_headings(monkeypatch) -> None:
@@ -2688,23 +2614,19 @@ def test_result_breakdown_rejects_quick_take_headings(monkeypatch) -> None:
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Quick Take",
-                    "parts": [
-                        {"kind": "fact", "fact_id": "title"},
-                        {"kind": "fact", "fact_id": "symbols"},
-                        {"kind": "fact", "fact_id": "date_range"},
-                        {"kind": "fact", "fact_id": "total_return"},
-                        {"kind": "fact", "fact_id": "benchmark_symbol"},
-                        {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "fact", "fact_id": "benchmark_comparison"},
-                        {"kind": "fact", "fact_id": "max_drawdown"},
-                        {"kind": "fact", "fact_id": "assumptions"},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                }
-            ]
+            "answer_blocks": ["### Quick Take\nThis should not render."],
+            "fact_ids": [
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_comparison",
+                "max_drawdown",
+                "assumptions",
+                "caveat",
+            ],
         }
     )
 
@@ -2738,15 +2660,8 @@ def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> N
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Invented future",
-                    "parts": [
-                        {"kind": "text", "text": "The future expectation is "},
-                        {"kind": "fact", "fact_id": "future_return"},
-                    ],
-                }
-            ]
+            "answer_blocks": ["The future expectation is higher than the saved run."],
+            "fact_ids": ["future_return"],
         }
     )
 
@@ -2781,30 +2696,24 @@ def test_result_breakdown_rejects_user_visible_internal_context_terms(
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Context and caveats",
-                    "parts": [
-                        {
-                            "kind": "text",
-                            "text": (
-                                "Macro snapshots from the FRED data packet provide "
-                                "background market conditions but do not influence trades."
-                            ),
-                        },
-                        {"kind": "fact", "fact_id": "title"},
-                        {"kind": "fact", "fact_id": "symbols"},
-                        {"kind": "fact", "fact_id": "date_range"},
-                        {"kind": "fact", "fact_id": "total_return"},
-                        {"kind": "fact", "fact_id": "benchmark_symbol"},
-                        {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "fact", "fact_id": "benchmark_comparison"},
-                        {"kind": "fact", "fact_id": "max_drawdown"},
-                        {"kind": "fact", "fact_id": "assumptions"},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                }
-            ]
+            "answer_blocks": [
+                (
+                    "Macro snapshots from the FRED data packet provide background "
+                    "market conditions but do not influence trades."
+                )
+            ],
+            "fact_ids": [
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_comparison",
+                "max_drawdown",
+                "assumptions",
+                "caveat",
+            ],
         }
     )
 
@@ -2838,15 +2747,8 @@ def test_result_breakdown_requires_core_fact_coverage(monkeypatch) -> None:
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Too thin",
-                    "parts": [
-                        {"kind": "text", "text": "The run needs more context. "},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                }
-            ]
+            "answer_blocks": ["The run needs more context."],
+            "fact_ids": ["caveat"],
         }
     )
 
