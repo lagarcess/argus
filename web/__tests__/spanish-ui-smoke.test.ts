@@ -52,6 +52,8 @@ describe("Spanish UI Smoke Harness", () => {
     "command_palette.ledger.no_saved_ideas",
     "onboarding.language.title",
     "onboarding.language.continue_in",
+    "chat.result_followup.headings.general",
+    "chat.result_followup.headings.next_experiment",
   ];
 
   function readLocale(localePath: string) {

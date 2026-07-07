@@ -6,10 +6,7 @@ from typing import Any, Literal
 
 from argus.agent_runtime.presentation_i18n import optional_parameter_display_label
 from argus.agent_runtime.response_language import response_language_instruction
-from argus.agent_runtime.response_style import (
-    ARGUS_RESPONSE_STYLE_CONTRACT,
-    with_response_heading,
-)
+from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
     ConfirmationPayload,
@@ -57,10 +54,6 @@ RESULT_READOUT_SOURCE_LLM = "llm_explain_stage"
 RESULT_READOUT_SOURCE_DETERMINISTIC_FALLBACK = "deterministic_fallback"
 RESULT_READOUT_FAILURE_LLM_UNAVAILABLE = "llm_unavailable_or_rejected"
 RESULT_READOUT_FAILURE_QUICK_TAKE_DRAFT_REJECTED = "quick_take_draft_rejected"
-
-
-def _quick_take_heading(language: str | None) -> str:
-    return ""
 
 
 @dataclass(frozen=True)
@@ -183,12 +176,7 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         )
         return StageResult(
             outcome="ready_to_respond",
-            stage_patch={
-                "assistant_response": with_response_heading(
-                    heading=_quick_take_heading(language),
-                    body=response,
-                )
-            },
+            stage_patch={"assistant_response": response},
         )
     benchmark_symbol = _benchmark_contract(
         strategy=strategy,
@@ -211,12 +199,7 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
 
     return StageResult(
         outcome="ready_to_respond",
-        stage_patch={
-            "assistant_response": with_response_heading(
-                heading=_quick_take_heading(language),
-                body=response,
-            )
-        },
+        stage_patch={"assistant_response": response},
     )
 
 
@@ -248,10 +231,7 @@ async def explain_stage_async(*, state: RunState, language: str = "en") -> Stage
         outcome=fallback.outcome,
         stage_patch={
             **fallback.stage_patch,
-            "assistant_response": with_response_heading(
-                heading=_quick_take_heading(language),
-                body=llm_result.text,
-            ),
+            "assistant_response": llm_result.text,
             "assistant_response_source": RESULT_READOUT_SOURCE_LLM,
             "assistant_response_fallback_used": False,
         },

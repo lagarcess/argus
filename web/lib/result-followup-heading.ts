@@ -10,6 +10,7 @@ const FACT_HEADING_INTENT_KINDS = new Set([
   "beginner_guidance",
   "unsupported_recovery",
 ]);
+const CHROME_HEADING_INTENT_KIND = "result_followup_chrome";
 
 function recordOrNull(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -32,8 +33,12 @@ export function resultFactHeadingKeyFromMetadata(
   const responseIntent = recordOrNull(metadata.response_intent);
   if (!responseIntent) return null;
   const kind = stringOrNull(responseIntent.kind);
-  if (!kind || !FACT_HEADING_INTENT_KINDS.has(kind)) return null;
+  if (!kind) return null;
   const facts = recordOrNull(responseIntent.facts);
   if (!facts) return null;
+  if (kind === CHROME_HEADING_INTENT_KIND) {
+    return stringOrNull(facts.heading_key);
+  }
+  if (!FACT_HEADING_INTENT_KINDS.has(kind)) return null;
   return stringOrNull(facts.fact_key) ?? stringOrNull(facts.requested_metric);
 }

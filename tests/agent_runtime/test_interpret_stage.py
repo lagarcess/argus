@@ -3049,7 +3049,11 @@ def test_result_followup_uses_latest_result_when_interpreter_unavailable(
     )
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"].startswith("**What happened**")
+    assert not result.patch["assistant_response"].startswith("**")
+    assert result.patch["response_intent"] == {
+        "kind": "result_followup_chrome",
+        "facts": {"focus": "general", "heading_key": "general"},
+    }
     assert "Grounded answer from the latest result facts." in result.patch[
         "assistant_response"
     ]
@@ -3061,7 +3065,7 @@ def test_result_followup_uses_latest_result_when_interpreter_unavailable(
     assert captured["user_message"] == "Why did this happen?"
 
 
-def test_result_followup_heading_uses_user_language_when_interpreter_unavailable(
+def test_result_followup_heading_uses_typed_chrome_when_interpreter_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_compose_result_followup_response(**kwargs: Any) -> str:
@@ -3113,7 +3117,11 @@ def test_result_followup_heading_uses_user_language_when_interpreter_unavailable
     )
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"].startswith("**Qué pasó**")
+    assert not result.patch["assistant_response"].startswith("**")
+    assert result.patch["response_intent"] == {
+        "kind": "result_followup_chrome",
+        "facts": {"focus": "general", "heading_key": "general"},
+    }
     assert "Respuesta fundamentada" in result.patch["assistant_response"]
 
 
@@ -3164,7 +3172,10 @@ def test_result_followup_uses_llm_composer_before_recovery(monkeypatch: pytest.M
     )
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"].startswith("**What happened**")
+    assert result.patch["response_intent"] == {
+        "kind": "result_followup_chrome",
+        "facts": {"focus": "why_underperformed", "heading_key": "general"},
+    }
     assert (
         "LLM-composed answer grounded in the result fact bank."
         in result.patch["assistant_response"]
@@ -3292,7 +3303,14 @@ def test_latest_result_recovery_preserves_next_experiment_focus(
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
     answer_lower = answer.lower()
-    assert answer.startswith("**Try next**")
+    assert not answer.startswith("**")
+    assert result.patch["response_intent"] == {
+        "kind": "result_followup_chrome",
+        "facts": {
+            "focus": "next_experiment",
+            "heading_key": "next_experiment",
+        },
+    }
     assert "could not safely answer that follow-up" in answer_lower
     assert result.patch["recovery"] == {
         "code": "latest_result_followup_unavailable",
@@ -3503,7 +3521,11 @@ def test_result_followup_timeout_uses_localized_recovery(
 
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
-    assert answer.startswith("**What happened**")
+    assert not answer.startswith("**")
+    assert result.patch["response_intent"] == {
+        "kind": "result_followup_chrome",
+        "facts": {"focus": "general", "heading_key": "general"},
+    }
     assert "could not safely answer that follow-up" in answer
     receipts = openrouter.get_openrouter_route_receipts()
     assert receipts[-1].task == "result_summary"
@@ -3558,8 +3580,7 @@ def test_results_explanation_intent_uses_result_artifact_even_if_turn_act_drifts
         requires_clarification=False,
         user_goal_summary="User asks what was tested.",
         assistant_response=(
-            "**What happened**\n\nThe strategy returned 40.4% while the benchmark "
-            "returned 27.3%."
+            "The strategy returned 40.4% while the benchmark returned 27.3%."
         ),
         semantic_turn_act="educational_question",
     )
@@ -3571,7 +3592,11 @@ def test_results_explanation_intent_uses_result_artifact_even_if_turn_act_drifts
     )
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"].startswith("**What happened**")
+    assert not result.patch["assistant_response"].startswith("**")
+    assert result.patch["response_intent"] == {
+        "kind": "result_followup_chrome",
+        "facts": {"focus": "general", "heading_key": "general"},
+    }
     assert "I tested AAPL" in result.patch["assistant_response"]
     assert result.decision.semantic_turn_act == "result_followup"
 
@@ -3699,7 +3724,11 @@ def test_zero_return_followup_uses_result_reason_without_repeating_readout(
 
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
-    assert answer.startswith("**What happened**")
+    assert not answer.startswith("**")
+    assert result.patch["response_intent"] == {
+        "kind": "result_followup_chrome",
+        "facts": {"focus": "general", "heading_key": "general"},
+    }
     assert "strategy returned 0.0%" in answer
     assert "SPY returned +8.9%" in answer
     assert "No entry trades were executed" in answer

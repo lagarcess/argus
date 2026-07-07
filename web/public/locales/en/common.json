@@ -306,6 +306,10 @@
     },
     "result_followup": {
       "headings": {
+        "general": "What happened",
+        "what_tested": "What was tested",
+        "next_experiment": "Try next",
+        "assumptions": "Assumptions",
         "peak_date": "Peak date",
         "peak_value": "Peak value",
         "drawdown_date": "Drawdown date",

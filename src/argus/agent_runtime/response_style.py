@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from argus.agent_runtime.presentation_i18n import runtime_locale
-
 ARGUS_RESPONSE_STYLE_CONTRACT = (
     "Argus response style: sound warm, plain language, concise, and "
     "curiosity-forward. Avoid dense financial PDF tone, long report blocks, "
@@ -18,36 +16,25 @@ def argus_response_style_contract() -> str:
     return ARGUS_RESPONSE_STYLE_CONTRACT
 
 
-def with_response_heading(*, heading: str, body: str | None) -> str:
-    """Add lightweight presentation chrome without owning the assistant language."""
-
-    cleaned_heading = " ".join(str(heading or "").split()).strip()
-    cleaned_body = str(body or "").strip()
-    if not cleaned_heading or not cleaned_body:
-        return cleaned_body
-    markdown_heading = f"**{cleaned_heading}**"
-    if cleaned_body.startswith(markdown_heading) or cleaned_body.startswith("#"):
-        return cleaned_body
-    return f"{markdown_heading}\n\n{cleaned_body}"
+_RESULT_FOLLOWUP_HEADING_KEYS = {
+    "next_experiment": "next_experiment",
+    "max_drawdown": "max_drawdown",
+    "what_tested": "what_tested",
+    "assumptions": "assumptions",
+}
 
 
-def result_followup_heading(focus: str | None, *, language: str = "en") -> str:
-    if runtime_locale(language) == "es-419":
-        if focus == "next_experiment":
-            return "Qué probar después"
-        if focus == "max_drawdown":
-            return "Caída máxima"
-        if focus == "what_tested":
-            return "Qué se probó"
-        if focus == "assumptions":
-            return "Supuestos"
-        return "Qué pasó"
-    if focus == "next_experiment":
-        return "Try next"
-    if focus == "max_drawdown":
-        return "Drawdown"
-    if focus == "what_tested":
-        return "What was tested"
-    if focus == "assumptions":
-        return "Assumptions"
-    return "What happened"
+def result_followup_heading_key(focus: str | None) -> str:
+    normalized = str(focus or "").strip()
+    return _RESULT_FOLLOWUP_HEADING_KEYS.get(normalized, "general")
+
+
+def result_followup_response_intent(focus: str | None) -> dict[str, object]:
+    normalized = str(focus or "").strip() or "general"
+    return {
+        "kind": "result_followup_chrome",
+        "facts": {
+            "focus": normalized,
+            "heading_key": result_followup_heading_key(normalized),
+        },
+    }

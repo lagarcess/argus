@@ -41,10 +41,7 @@ from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
 from argus.agent_runtime.response_language import response_language_instruction
-from argus.agent_runtime.response_style import (
-    result_followup_heading,
-    with_response_heading,
-)
+from argus.agent_runtime.response_style import result_followup_response_intent
 from argus.agent_runtime.result_followups import (
     compose_private_alpha_save_response,
     compose_result_followup_response,
@@ -2453,13 +2450,8 @@ async def _latest_result_followup_when_interpreter_unavailable(
         outcome="ready_to_respond",
         decision=decision,
         stage_patch={
-            "assistant_response": with_response_heading(
-                heading=result_followup_heading(
-                    "general",
-                    language=user.language_preference,
-                ),
-                body=response,
-            ),
+            "assistant_response": response,
+            "response_intent": result_followup_response_intent("general"),
             **(
                 recovery_state_stage_patch(
                     "latest_result_followup_unavailable",
@@ -2523,6 +2515,19 @@ async def _latest_result_followup_recovery_if_applicable(
             )
     if save_requested and not _strategies_enabled():
         used_recovery = False
+    stage_patch: dict[str, Any] = {
+        "assistant_response": response,
+    }
+    if not (save_requested and not _strategies_enabled()):
+        stage_patch["response_intent"] = result_followup_response_intent(focus)
+    if used_recovery:
+        stage_patch.update(
+            recovery_state_stage_patch(
+                "latest_result_followup_unavailable",
+                language=user.language_preference,
+                retryable=True,
+            )
+        )
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -2547,28 +2552,7 @@ async def _latest_result_followup_recovery_if_applicable(
                 ],
             }
         ),
-        stage_patch={
-            "assistant_response": (
-                response
-                if save_requested and not _strategies_enabled()
-                else with_response_heading(
-                    heading=result_followup_heading(
-                        focus,
-                        language=user.language_preference,
-                    ),
-                    body=response,
-                )
-            ),
-            **(
-                recovery_state_stage_patch(
-                    "latest_result_followup_unavailable",
-                    language=user.language_preference,
-                    retryable=True,
-                )
-                if used_recovery
-                else {}
-            ),
-        },
+        stage_patch=stage_patch,
     )
 
 

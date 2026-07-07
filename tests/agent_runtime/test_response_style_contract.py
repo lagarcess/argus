@@ -3,7 +3,8 @@ from __future__ import annotations
 from argus.agent_runtime.response_style import (
     ARGUS_RESPONSE_STYLE_CONTRACT,
     argus_response_style_contract,
-    result_followup_heading,
+    result_followup_heading_key,
+    result_followup_response_intent,
 )
 from argus.agent_runtime.result_followups import result_followup_llm_messages
 from argus.api.chat.breakdown import _result_breakdown_llm_messages
@@ -45,10 +46,15 @@ def test_result_followup_prompt_includes_argus_response_style_contract() -> None
     assert "two short paragraphs" in messages[0]["content"]
 
 
-def test_result_followup_headings_are_enabled_language_aware() -> None:
-    assert result_followup_heading("general", language="es-419") == "Qué pasó"
-    assert result_followup_heading("assumptions", language="es-419") == "Supuestos"
-    assert result_followup_heading("general", language="en") == "What happened"
+def test_result_followup_headings_are_typed_chrome_keys() -> None:
+    assert result_followup_heading_key("general") == "general"
+    assert result_followup_heading_key("assumptions") == "assumptions"
+    assert result_followup_heading_key("next_experiment") == "next_experiment"
+    assert result_followup_heading_key("unknown_focus") == "general"
+    assert result_followup_response_intent("what_tested") == {
+        "kind": "result_followup_chrome",
+        "facts": {"focus": "what_tested", "heading_key": "what_tested"},
+    }
 
 
 def test_result_breakdown_prompt_includes_argus_response_style_contract() -> None:
