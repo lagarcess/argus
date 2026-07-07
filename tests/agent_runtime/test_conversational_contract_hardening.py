@@ -1047,15 +1047,6 @@ def test_dca_recurring_amount_semantic_provenance_handles_variation(
         ),
     ],
 )
-@pytest.mark.xfail(
-    reason=(
-        "#146 regression: cadence words ('week'/'month') are promoted into "
-        "asset_universe instead of being de-promoted; tracked under #150 "
-        "integration-health behavior-fix. Remove when the interpreter stops "
-        "treating cadence terms as assets."
-    ),
-    strict=True,
-)
 def test_dca_cadence_terms_are_not_promoted_to_assets(
     monkeypatch,
     message: str,
@@ -5700,16 +5691,6 @@ def test_interpret_stage_preserves_interpreter_asset_and_repairs_explicit_date(
     )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "#146 regression: an unambiguous missing asset is no longer repaired "
-        "from the message when the benchmark owner is known, so the turn ends "
-        "in needs_clarification instead of ready_for_confirmation; tracked "
-        "under #150 integration-health behavior-fix. Remove when repair is "
-        "restored."
-    ),
-    strict=True,
-)
 def test_interpret_stage_repairs_missing_asset_when_benchmark_owner_is_known(
     monkeypatch,
 ) -> None:
@@ -6408,14 +6389,6 @@ def test_unsupported_strategy_logic_localized_labels_are_display_only() -> None:
     assert option.replacement_values == {}
 
 
-@pytest.mark.xfail(
-    reason=(
-        "#150 (item 3): simplifying a pending buy-hold draft leaves a stale "
-        "field_provenance entry in extra_parameters. Remove when the "
-        "simplification clears stale provenance."
-    ),
-    strict=True,
-)
 def test_pending_buy_hold_simplification_clears_stale_indicator_rule() -> None:
     from argus.agent_runtime.interpreter.pending_option import (
         _apply_pending_response_option_replacement,

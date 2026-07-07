@@ -34,6 +34,7 @@ from argus.agent_runtime.state.models import (
     StrategySummary,
     TaskSnapshot,
 )
+from argus.domain.cadences import SUPPORTED_DCA_CADENCES
 from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
     canonical_strategy_type,
@@ -561,6 +562,35 @@ def _is_field_owned_indicator_asset_candidate(
     if executable_indicator_spec(str(symbol or "")) is None:
         return False
     if not _strategy_uses_rule_or_indicator_context(strategy):
+        return False
+    return not _strategy_has_explicit_asset_evidence(
+        strategy,
+        symbol=str(symbol or ""),
+        current_user_message=current_user_message,
+    )
+
+
+# Bare root tokens of the canonical DCA cadence enum. Derived from the typed enum,
+# not a per-language copy table: in a recurring-buy draft the LLM sometimes mis-promotes
+# the cadence word itself into asset_universe (e.g. "every week"/"each month" -> asset
+# "WEEK"/"MONTH"). Drop those cadence roots unless the user gave explicit asset evidence.
+_CADENCE_ROOT_TOKENS: frozenset[str] = frozenset(
+    {"day", "week", "biweek", "month", "quarter"}
+)
+
+
+def _is_cadence_word_asset_candidate(
+    symbol: str,
+    *,
+    strategy: StrategySummary,
+    current_user_message: str | None,
+    asset_field_requested: bool,
+) -> bool:
+    if asset_field_requested:
+        return False
+    if str(strategy.cadence or "").strip().casefold() not in SUPPORTED_DCA_CADENCES:
+        return False
+    if str(symbol or "").strip().casefold() not in _CADENCE_ROOT_TOKENS:
         return False
     return not _strategy_has_explicit_asset_evidence(
         strategy,

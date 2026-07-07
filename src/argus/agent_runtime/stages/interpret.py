@@ -175,6 +175,7 @@ from argus.agent_runtime.stages.interpret_internal.contextual_merge import (  # 
     _declared_strategy_family,
     _extra_parameters_without_unrequested_money_context,
     _has_complete_date_range,
+    _is_cadence_word_asset_candidate,
     _is_field_owned_indicator_asset_candidate,
     _merge_contextual_extra_parameters,
     _merged_contextual_date_range,
@@ -650,6 +651,7 @@ async def _stage_result_from_interpretation(
         else incoming_strategy
     )
     benchmark_reason_codes: list[str] = []
+    asset_repair_reason_codes: list[str] = []
     if expects_strategy_route:
         prior_strategy = _active_strategy_from_snapshot(snapshot)
         strategy, unstated_benchmark_reason_codes = (
@@ -659,6 +661,12 @@ async def _stage_result_from_interpretation(
             )
         )
         benchmark_reason_codes.extend(unstated_benchmark_reason_codes)
+        strategy, asset_repair_reason_codes = (
+            _strategy_with_benchmark_owner_asset_repair(
+                strategy,
+                current_user_message=state.current_user_message,
+            )
+        )
     if expects_strategy_route:
         prior_strategy = _active_strategy_from_snapshot(snapshot)
         strategy, interpretation = _strategy_with_current_message_run_field_contract(
@@ -913,6 +921,7 @@ async def _stage_result_from_interpretation(
                 else []
             ),
             *shape_default_reason_codes,
+            *asset_repair_reason_codes,
             *integrity_report.reason_codes,
             *constraint_filter_reason_codes,
             *ambiguity_filter_reason_codes,
@@ -2606,6 +2615,7 @@ def _canonicalized_strategy(
     asset_classes: set[str] = set()
     invalid_symbols: list[str] = []
     field_owned_indicator_symbols: list[str] = []
+    cadence_word_symbols: list[str] = []
     provenance: list[ResolutionProvenance] = []
     asset_field_requested = (
         _field_base(str(selected_thread_metadata.get("requested_field") or ""))
@@ -2620,6 +2630,14 @@ def _canonicalized_strategy(
             asset_field_requested=asset_field_requested,
         ):
             field_owned_indicator_symbols.append(symbol)
+            continue
+        if _is_cadence_word_asset_candidate(
+            symbol,
+            strategy=updated,
+            current_user_message=current_user_message,
+            asset_field_requested=asset_field_requested,
+        ):
+            cadence_word_symbols.append(symbol)
             continue
         field = f"asset_universe[{index}]"
         resolution = (
@@ -2649,7 +2667,7 @@ def _canonicalized_strategy(
 
     if canonical_symbols:
         updated.asset_universe = list(dict.fromkeys(canonical_symbols))
-    elif field_owned_indicator_symbols:
+    elif field_owned_indicator_symbols or cadence_word_symbols:
         updated.asset_universe = []
     if len(asset_classes) == 1:
         updated.asset_class = next(iter(asset_classes))
@@ -2664,6 +2682,64 @@ def _canonicalized_strategy(
         [*updated.resolution_provenance, *provenance]
     )
     return updated
+
+
+def _strategy_with_benchmark_owner_asset_repair(
+    strategy: StrategySummary,
+    *,
+    current_user_message: str,
+) -> tuple[StrategySummary, list[str]]:
+    """Ground the single missing traded asset when the benchmark owner is stated.
+
+    Provider-backed only: a user-stated benchmark disambiguates which current-turn
+    mention is the comparison, so exactly one other provider-resolved ticker of a
+    single asset class is the traded asset. Never guesses when the benchmark is
+    unstated or when more than one candidate remains.
+    """
+
+    if strategy.asset_universe:
+        return strategy, []
+    benchmark = _normalized_symbol(strategy.comparison_baseline)
+    if benchmark is None:
+        return strategy, []
+    provenance = strategy.extra_parameters.get("field_provenance")
+    if not (
+        isinstance(provenance, dict)
+        and provenance.get("comparison_baseline") == "explicit_user"
+    ):
+        return strategy, []
+    try:
+        mentions = provider_ticker_mentions_from_text(
+            current_user_message,
+            resolve_candidate=lambda query: _resolve_asset_candidate_safely(
+                query,
+                field="asset_universe",
+                source="user_mention",
+            ),
+            excluded_tokens={benchmark},
+        )
+    except Exception:
+        return strategy, []
+    resolved_symbols: list[str] = []
+    asset_classes: set[str] = set()
+    for mention in mentions:
+        symbol = str(
+            getattr(mention.asset, "canonical_symbol", "") or ""
+        ).strip().upper()
+        if not symbol or symbol == benchmark or symbol in resolved_symbols:
+            continue
+        resolved_symbols.append(symbol)
+        asset_class = str(
+            getattr(mention.asset, "asset_class", "") or ""
+        ).strip().lower()
+        if asset_class:
+            asset_classes.add(asset_class)
+    if len(resolved_symbols) != 1 or len(asset_classes) != 1:
+        return strategy, []
+    updated = strategy.model_copy(deep=True)
+    updated.asset_universe = resolved_symbols
+    updated.asset_class = next(iter(asset_classes))
+    return updated, ["current_message_asset_grounding_repaired"]
 
 
 def _default_benchmark_for_asset_class(
