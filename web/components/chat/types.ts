@@ -5,6 +5,7 @@ import type {
   DecisionState,
 } from "@/lib/argus-api";
 import type { ConfirmationDisplayFacts } from "@/lib/confirmation-assumptions-display";
+import type { RecoveryDisplay } from "@/lib/chat-recovery-display";
 
 export type StrategyResultMetric = {
   label: string;
@@ -228,4 +229,6 @@ export type Message = {
   copyText?: string;
   /** Canonical fact key for a latest-result fact answer; localized heading chrome. */
   resultFactHeadingKey?: string | null;
+  /** Typed degraded/offline recovery display rendered through web i18n. */
+  recoveryDisplay?: RecoveryDisplay | null;
 };

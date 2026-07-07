@@ -295,6 +295,11 @@ def test_execute_recovers_visible_dca_confirmation_when_market_data_is_unavailab
     assert "market data" in prompt
     assert "try again" in prompt.lower()
     assert "market_data_unavailable" not in prompt
+    assert result.patch["recovery"] == {
+        "code": "execution_data_unavailable",
+        "retryable": True,
+        "params": {"data_kind": "market"},
+    }
     assert result.patch["final_response_payload"]["error"] == prompt
     failed_reference = result.patch["latest_failed_action_reference"]
     assert failed_reference["artifact_kind"] == "failed_action"
@@ -358,6 +363,11 @@ def test_execute_recovers_visible_confirmation_when_benchmark_data_is_unavailabl
     assert "benchmark data" in prompt
     assert "try again" in prompt.lower()
     assert "benchmark_data_unavailable" not in prompt
+    assert result.patch["recovery"] == {
+        "code": "execution_data_unavailable",
+        "retryable": True,
+        "params": {"data_kind": "benchmark"},
+    }
     assert result.patch["final_response_payload"]["error"] == prompt
     failed_reference = result.patch["latest_failed_action_reference"]
     assert failed_reference["metadata"]["action_type"] == "run_backtest"
@@ -367,7 +377,7 @@ def test_execute_recovers_visible_confirmation_when_benchmark_data_is_unavailabl
     assert failed_reference["metadata"]["launch_payload"]["symbol"] == "TSLA"
 
 
-def test_execute_localizes_market_data_recovery_for_spanish_confirmation() -> None:
+def test_execute_emits_market_data_recovery_code_for_spanish_confirmation() -> None:
     tool = StubBacktestTool(
         responses=[
             {
@@ -409,13 +419,17 @@ def test_execute_localizes_market_data_recovery_for_spanish_confirmation() -> No
 
     assert result.outcome == "execution_failed_recoverably"
     prompt = result.patch["assistant_prompt"]
-    assert "La configuracion de AAPL comprar y mantener sigue aqui" in prompt
-    assert "datos de mercado" in prompt
-    assert "Intentalo de nuevo" in prompt
+    assert "AAPL buy-and-hold draft" in prompt
+    assert "market data" in prompt
     assert "market_data_unavailable" not in prompt
+    assert result.patch["recovery"] == {
+        "code": "execution_data_unavailable",
+        "retryable": True,
+        "params": {"data_kind": "market"},
+    }
 
 
-def test_execute_localizes_benchmark_data_recovery_for_spanish_confirmation() -> None:
+def test_execute_emits_benchmark_data_recovery_code_for_spanish_confirmation() -> None:
     tool = StubBacktestTool(
         responses=[
             {
@@ -457,10 +471,14 @@ def test_execute_localizes_benchmark_data_recovery_for_spanish_confirmation() ->
 
     assert result.outcome == "execution_failed_recoverably"
     prompt = result.patch["assistant_prompt"]
-    assert "La configuracion de TSLA comprar y mantener sigue aqui" in prompt
-    assert "datos de referencia" in prompt
-    assert "Intentalo de nuevo" in prompt
+    assert "TSLA buy-and-hold draft" in prompt
+    assert "benchmark data" in prompt
     assert "benchmark_data_unavailable" not in prompt
+    assert result.patch["recovery"] == {
+        "code": "execution_data_unavailable",
+        "retryable": True,
+        "params": {"data_kind": "benchmark"},
+    }
 
 
 def test_execute_does_not_classify_unavailable_data_from_prose_only() -> None:

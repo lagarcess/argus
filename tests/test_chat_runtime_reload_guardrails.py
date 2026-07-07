@@ -951,7 +951,13 @@ def test_stale_confirmation_card_without_structured_payload_returns_recovery(
 
     assert response.status_code == 200
     assert runtime_calls == 0
-    text = _stream_payloads(response.text, "token")[0]["content"]
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    text = final["assistant_response"]
+    assert final["recovery"] == {
+        "code": "confirmation_state_lost",
+        "retryable": False,
+    }
     assert "lost the active confirmation state" in text
     assert "confirm it again" in text
 
@@ -998,11 +1004,13 @@ def test_stale_confirmation_card_without_structured_payload_returns_spanish_reco
 
     assert response.status_code == 200
     assert runtime_calls == 0
-    text = _stream_payloads(response.text, "token")[0]["content"]
-    lowered = text.lower()
-    assert "confirmación" in lowered
-    assert "guardada" in lowered
-    assert "lost the active confirmation state" not in lowered
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["recovery"] == {
+        "code": "confirmation_state_lost",
+        "retryable": False,
+    }
+    assert "lost the active confirmation state" in final["assistant_response"].lower()
 
 
 def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
@@ -1064,7 +1072,13 @@ def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert runtime_calls == 0
-    text = _stream_payloads(response.text, "token")[0]["content"]
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    text = final["assistant_response"]
+    assert final["recovery"] == {
+        "code": "confirmation_action_stale_card",
+        "retryable": False,
+    }
     assert "confirmation was updated" in text.lower()
     assert "latest" in text.lower()
 
@@ -1128,11 +1142,13 @@ def test_stale_confirmation_action_id_returns_spanish_recovery(monkeypatch) -> N
 
     assert response.status_code == 200
     assert runtime_calls == 0
-    text = _stream_payloads(response.text, "token")[0]["content"]
-    lowered = text.lower()
-    assert "confirmación" in lowered
-    assert "tarjeta" in lowered
-    assert "confirmation was updated" not in lowered
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["recovery"] == {
+        "code": "confirmation_action_stale_card",
+        "retryable": False,
+    }
+    assert "confirmation was updated" in final["assistant_response"].lower()
 
 
 def test_run_confirmation_action_without_confirmation_id_does_not_execute(
@@ -1175,7 +1191,13 @@ def test_run_confirmation_action_without_confirmation_id_does_not_execute(
 
     assert response.status_code == 200
     assert runtime_calls == 0
-    text = _stream_payloads(response.text, "token")[0]["content"]
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    text = final["assistant_response"]
+    assert final["recovery"] == {
+        "code": "confirmation_action_missing_identity",
+        "retryable": False,
+    }
     lowered = text.lower()
     assert "confirmation action" in lowered
     assert "latest card action" in lowered
@@ -1221,11 +1243,13 @@ def test_run_confirmation_action_without_confirmation_id_returns_spanish_recover
 
     assert response.status_code == 200
     assert runtime_calls == 0
-    text = _stream_payloads(response.text, "token")[0]["content"]
-    lowered = text.lower()
-    assert "identidad" in lowered
-    assert "tarjeta" in lowered
-    assert "confirmation action" not in lowered
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["recovery"] == {
+        "code": "confirmation_action_missing_identity",
+        "retryable": False,
+    }
+    assert "confirmation action" in final["assistant_response"].lower()
 
 
 def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:

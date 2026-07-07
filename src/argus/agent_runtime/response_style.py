@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from argus.agent_runtime.recovery_messages import resolve_recovery_language
+from argus.agent_runtime.presentation_i18n import runtime_locale
 
 ARGUS_RESPONSE_STYLE_CONTRACT = (
     "Argus response style: sound warm, plain language, concise, and "
@@ -32,7 +32,7 @@ def with_response_heading(*, heading: str, body: str | None) -> str:
 
 
 def result_followup_heading(focus: str | None, *, language: str = "en") -> str:
-    if resolve_recovery_language(language) == "es-419":
+    if runtime_locale(language) == "es-419":
         if focus == "next_experiment":
             return "Qué probar después"
         if focus == "max_drawdown":

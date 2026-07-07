@@ -13,6 +13,7 @@ import { postFeedback } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
+import { recoveryDisplayText } from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
@@ -170,6 +171,12 @@ export default function ChatMessage({
     if (content.startsWith("__ONBOARDING_GOAL__:")) {
       const goal = content.split(":")[1];
       return t(`onboarding.goals.${goal}.title`, goal);
+    }
+    if (!isUser && message.recoveryDisplay) {
+      const recovered = recoveryDisplayText(message.recoveryDisplay, t);
+      if (recovered.trim()) {
+        return recovered;
+      }
     }
     return isUser ? content : normalizeAssistantDisplayText(content);
   };

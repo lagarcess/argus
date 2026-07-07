@@ -107,7 +107,7 @@ def test_interpret_stage_does_not_hide_unexpected_interpreter_exceptions() -> No
         )
 
 
-def test_interpreter_unavailable_recovery_uses_user_language_and_retry_metadata() -> None:
+def test_interpreter_unavailable_recovery_emits_typed_code_and_retry_metadata() -> None:
     message = "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
 
     result = interpret_stage(
@@ -119,13 +119,11 @@ def test_interpreter_unavailable_recovery_uses_user_language_and_retry_metadata(
 
     assert result.outcome == "ready_to_respond"
     response = result.stage_patch["assistant_response"]
-    assert "Guardé tu mensaje" in response
-    assert "I saved your message" not in response
+    assert "I saved your message" in response
     assert result.stage_patch["retry_last_turn"] == {"message": message}
     assert result.stage_patch["recovery"] == {
         "code": "interpreter_unavailable",
         "retryable": True,
-        "language": "es-419",
     }
 
 
@@ -3299,7 +3297,6 @@ def test_latest_result_recovery_preserves_next_experiment_focus(
     assert result.patch["recovery"] == {
         "code": "latest_result_followup_unavailable",
         "retryable": True,
-        "language": "en",
     }
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "next_experiment"
@@ -6317,7 +6314,6 @@ def test_interpreter_unavailable_date_answer_preserves_active_confirmation(
     assert result.stage_patch["recovery"] == {
         "code": "interpreter_unavailable",
         "retryable": True,
-        "language": "en",
     }
     assert "visible confirmation" in result.stage_patch["assistant_response"]
 

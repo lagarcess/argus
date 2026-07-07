@@ -5,7 +5,11 @@ from typing import Any
 
 from loguru import logger
 
-from argus.agent_runtime.recovery_messages import recovery_message
+from argus.agent_runtime.recovery_messages import (
+    RecoveryMessageCode,
+    recovery_message,
+    recovery_state,
+)
 from argus.agent_runtime.runtime import build_workflow_input
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -33,6 +37,7 @@ class RuntimeFallbackContext:
     confirmation_payload: dict[str, Any] | None = None
     confirmation_message_id: str | None = None
     recovery_message: str | None = None
+    recovery: dict[str, Any] | None = None
 
 
 def _recent_messages_for_conversation(
@@ -203,35 +208,27 @@ def confirmation_metadata_fallback_context(
             continue
         payload = metadata.get("confirmation_payload")
         if not isinstance(payload, dict):
-            return RuntimeFallbackContext(
-                recovery_message=recovery_message(
-                    "confirmation_state_lost",
-                    language=language,
-                )
+            return _confirmation_recovery_context(
+                "confirmation_state_lost",
+                language=language,
             )
         strategy = payload.get("strategy")
         if not isinstance(strategy, dict):
-            return RuntimeFallbackContext(
-                recovery_message=recovery_message(
-                    "confirmation_state_lost",
-                    language=language,
-                )
+            return _confirmation_recovery_context(
+                "confirmation_state_lost",
+                language=language,
             )
         try:
             pending_strategy = StrategySummary.model_validate(strategy)
         except Exception:
-            return RuntimeFallbackContext(
-                recovery_message=recovery_message(
-                    "confirmation_state_lost",
-                    language=language,
-                )
+            return _confirmation_recovery_context(
+                "confirmation_state_lost",
+                language=language,
             )
         if not strategy_can_be_approved(pending_strategy):
-            return RuntimeFallbackContext(
-                recovery_message=recovery_message(
-                    "confirmation_state_lost",
-                    language=language,
-                )
+            return _confirmation_recovery_context(
+                "confirmation_state_lost",
+                language=language,
             )
         card = metadata.get("confirmation_card")
         confirmation_id = confirmation_id_from_payload(
@@ -293,6 +290,17 @@ def confirmation_metadata_fallback_context(
             confirmation_message_id=message.id,
         )
     return None
+
+
+def _confirmation_recovery_context(
+    code: RecoveryMessageCode,
+    *,
+    language: str | None,
+) -> RuntimeFallbackContext:
+    return RuntimeFallbackContext(
+        recovery_message=recovery_message(code, language=language),
+        recovery=recovery_state(code, language=language, retryable=False),
+    )
 
 
 def _metadata_invalidates_confirmation(metadata: dict[str, Any]) -> bool:

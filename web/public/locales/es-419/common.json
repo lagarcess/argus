@@ -37,6 +37,7 @@
     "expand": "Expandir",
     "learn_more": "Más información",
     "and": "y",
+    "or": "o",
     "tap_to_cancel": "Toca en cualquier otro lugar para cancelar"
   },
   "legal": {
@@ -242,6 +243,63 @@
     "error_load": "No se pudo cargar esa conversación. Inténtalo de nuevo.",
     "error_backtest": "No pude terminar ese turno. Inténtalo otra vez o inicia un chat nuevo si esta conversación venía de una sesión local anterior.",
     "error_generic": "Algo salió mal. Inténtalo de nuevo.",
+    "recovery": {
+      "interpreter_unavailable": "Guardé tu mensaje, pero no pude convertirlo en una configuración de prueba confiable. Intenta de nuevo en un momento.",
+      "assumption_edit_unapplied": "Guardé tu respuesta, pero no pude aplicar ese cambio de supuesto con confianza, así que dejé la idea actual sin cambios. Intenta el cambio de nuevo en un momento.",
+      "setup_change_unapplied": "Todavía tengo {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. Intenta de nuevo en un momento.",
+      "confirmation_change_unapplied": "Todavía tengo la confirmación de {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. {{action_guidance}}",
+      "latest_result_followup_unavailable": "Todavía tengo el resultado más reciente en este chat, pero no pude responder ese seguimiento con confianza. Intenta de nuevo en un momento.",
+      "private_alpha_save_unavailable": "No puedo mover esto a Estrategias mientras esa superficie está desactivada para la alfa privada, pero la ejecución completa sigue en este chat y puedes volver a abrirla desde la conversación o Recientes.",
+      "confirmation_action_guidance": "La confirmación visible sigue lista. Usa la tarjeta para iniciar la simulación, o usa sus controles para cambiarla.",
+      "confirmation_action_missing_context": "No tengo una confirmación activa para cambiar. Describe la idea de inversión otra vez y prepararé un borrador nuevo.",
+      "confirmation_action_missing_identity": "A esa acción de confirmación le falta la identidad de la tarjeta. Usa la acción de la tarjeta más reciente antes de continuar.",
+      "confirmation_action_stale_card": "Esa confirmación ya se actualizó. Usa la tarjeta visible más reciente y mantendré intacta la confirmación actual.",
+      "confirmation_action_stale_payload": "Ese contenido de confirmación ya quedó desactualizado. Usa la tarjeta visible más reciente y mantendré intacta la confirmación actual.",
+      "confirmation_state_lost": "Perdí el estado activo de confirmación, pero tu conversación está guardada. Puedo volver a plantear la estrategia para que la confirmes otra vez.",
+      "confirmation_cancelled": "Sin problema. Dejaré ese borrador sin ejecutar.",
+      "clarification_generation_unavailable": "No pude formular bien el seguimiento en este momento. Tu borrador sigue aquí; dime el detalle que quieres cambiar, o intenta de nuevo en un momento.",
+      "result_refine_missing": "No tengo un resultado completo para ajustar. Ejecuta una estrategia primero y luego usa Ajustar idea desde la tarjeta de resultado.",
+      "context_macro_recovery": "Las condiciones macro pueden ser contexto útil para una prueba histórica. Elige un símbolo, una estrategia o una ventana de comparación y puedo ayudarte a plantear un experimento compatible.",
+      "context_corporate_events_recovery": "Los eventos corporativos son más útiles cuando están ligados a un símbolo y un periodo. Elige un ticker de acciones y puedo usar eventos como splits o dividendos como contexto de una prueba histórica compatible.",
+      "context_market_movers_recovery": "Un movimiento del mercado puede ser un buen punto de partida para un experimento. Elige un símbolo o una idea y puedo convertirlo en una prueba histórica compatible, no en un feed en vivo.",
+      "context_market_movers_seed_recovery": "Una foto momentánea de movimientos puede ayudar a elegir semillas para un experimento: {{seeds}}. Trátalas como símbolos por validar, no como recomendaciones ni como un ranking en vivo. Elige uno y puedo plantear una prueba histórica compatible.",
+      "capability_answer_unavailable": "No pude formular esa respuesta de capacidades con claridad en este momento. Dime el activo, periodo o regla compatible que quieres probar, o intenta de nuevo en un momento.",
+      "runtime_failure": "Algo salió mal. Tu conversación está guardada. Intenta de nuevo.",
+      "artifact_action_invalid_state": "Esa acción ya no está conectada al estado actual de la conversación. Usa la acción visible más reciente o dime qué quieres hacer ahora.",
+      "artifact_action_retry_stale": "Ese reintento pertenece a una ejecución fallida anterior. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",
+      "artifact_action_retry_missing_artifact_id": "A ese reintento le falta la referencia de la ejecución fallida. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",
+      "artifact_action_retry_missing_payload": "No tengo una carga de ejecución fallida para reintentar. Usa de nuevo la acción visible de ejecutar backtest, o confirma la estrategia que quieres ejecutar.",
+      "artifact_action_retry_non_retryable": "Todavía tengo la configuración fallida, pero volver a ejecutar la misma carga encontrará el mismo bloqueo{{blockerSuffix}}. Ajusta la regla, el activo o el rango de fechas y mantendré la idea intacta.",
+      "artifact_action_retry_rebuilt_confirmation": "Todavía tengo esa configuración fallida. Reconstruí el borrador para que puedas revisar la tarjeta y reintentar cuando estés listo.",
+      "artifact_action_retry_inactive": "Ese reintento ya no está conectado a una ejecución fallida activa. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",
+      "execution_data_unavailable": "La configuración sigue aquí, pero no pude obtener {{dataLabel}} para esa simulación en este momento. Inténtalo de nuevo, cambia las fechas o elige otro activo compatible.",
+      "data_kind": {
+        "benchmark": "datos de referencia",
+        "market": "datos de mercado"
+      }
+    },
+    "clarification": {
+      "period": "¿Qué periodo quieres usar?",
+      "period_for_asset": "¿Qué periodo quieres usar para {{symbol}}?",
+      "asset_target": "¿Qué activo quieres probar?",
+      "assumption": "¿Qué supuesto quieres ajustar?",
+      "assumption_for_asset": "¿Qué supuesto quieres ajustar para {{symbol}}?",
+      "sizing_amount_schedule": "¿Cuánto quieres invertir en cada compra y con qué frecuencia?",
+      "sizing_amount": "¿Cuánto quieres invertir?",
+      "schedule": "¿Con qué frecuencia quieres hacer las compras?",
+      "rule_definition": "¿Qué regla de entrada o salida quieres probar?",
+      "refinement": "¿Qué quieres ajustar de esta idea?",
+      "refinement_for_asset": "¿Qué quieres cambiar, comparar o poner a prueba ahora para {{assetText}}?",
+      "unsupported_recovery": "Esa regla no define por sí sola cuándo comprar o vender. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_recovery_for_asset": "Esa regla no define por sí sola cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_recovery_with_raw_value": "{{rawValue}} no define por sí solo cuándo comprar o vender. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} no define por sí solo cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?"
+    },
+    "simplification_options": {
+      "rsi_threshold": "Usar una regla RSI compatible",
+      "buy_and_hold": "Comparar con comprar y mantener",
+      "moving_average_crossover": "Usar un cruce de medias móviles compatible"
+    },
     "result_breakdown": {
       "aria_label": "Desglose del resultado",
       "label": "Desglose"

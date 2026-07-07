@@ -20,6 +20,10 @@ describe("chat message hydration", () => {
     const message = hydrateTextMessageFromApi(
       apiMessage({
         metadata: {
+          recovery: {
+            code: "runtime_failure",
+            retryable: true,
+          },
           retry_last_turn: {
             message: "what if I bought $125 of BTC every two weeks in 2022?",
           },
@@ -29,6 +33,11 @@ describe("chat message hydration", () => {
 
     expect(message.role).toBe("ai");
     expect(message.kind).toBe("text");
+    expect(message.recoveryDisplay).toEqual({
+      kind: "recovery_code",
+      code: "runtime_failure",
+      values: undefined,
+    });
     expect(message.actions).toEqual([
       {
         id: "retry-last-turn",
