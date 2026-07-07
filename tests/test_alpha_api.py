@@ -1273,6 +1273,24 @@ def test_search_supports_cursor_and_mixed_types() -> None:
     assert first_ids.isdisjoint(second_ids)
 
 
+def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
+    # Memory mode must share the Supabase path's search_text_matches_query
+    # semantics: a multi-word query matches when every token appears, not only
+    # when the whole phrase is one contiguous substring.
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post(
+        "/api/v1/conversations", json={"title": "Tesla alpha chat"}
+    ).json()["conversation"]
+
+    response = client.get("/api/v1/search", params={"q": "tesla chat"})
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [
+        item["id"] for item in items if item["type"] == "chat"
+    ] == [conversation["id"]]
+
+
 def test_search_emits_recall_usage_product_event(monkeypatch) -> None:
     observed: list[dict[str, object]] = []
 

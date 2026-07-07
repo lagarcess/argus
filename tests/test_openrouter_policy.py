@@ -3729,3 +3729,20 @@ def test_json_content_code_fence_stripping_handles_provider_variants() -> None:
         openrouter._json_content_without_code_fences(bare_json_with_fence)
         == bare_json_with_fence
     )
+
+
+def test_json_content_brace_before_fence_is_bare_json_not_a_fence() -> None:
+    """A ``` inside a JSON string value is content, not a fence: when a JSON
+    brace opens before the first ```, the content passes through untouched
+    instead of being truncated at the embedded fence."""
+
+    prose_then_json = 'Note: {"note": "wrap code in ``` blocks", "ok": true}'
+    assert (
+        openrouter._json_content_without_code_fences(prose_then_json)
+        == prose_then_json
+    )
+    prose_then_array = 'Result: ["keep ``` intact", "ok"]'
+    assert (
+        openrouter._json_content_without_code_fences(prose_then_array)
+        == prose_then_array
+    )

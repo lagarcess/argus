@@ -149,6 +149,33 @@ def test_unresolved_remove_asset_name_is_unsupported_not_silent_noop():
     assert resolved.unsupported == ["remove.asset"]
 
 
+def test_slash_pair_resolving_as_one_asset_is_not_split_into_legs():
+    # "trade BTC/USD instead": a pair the provider resolves as a single asset
+    # must not also append its legs as separate assets.
+    resolved = apply_edit_operations(
+        [EditOperation(op="replace", target="asset", symbols=["BTC/USD"])],
+        current_asset_universe=["AAPL"],
+        asset_symbol_resolver=lambda raw: raw.strip().upper(),
+    )
+
+    assert resolved.asset_universe == ["BTC/USD"]
+    assert resolved.asset_universe_operation == "replace"
+    assert resolved.applied == ["replace.asset"]
+
+
+def test_unresolvable_slash_pair_still_splits_into_resolved_legs():
+    resolved = apply_edit_operations(
+        [EditOperation(op="replace", target="asset", symbols=["AAPL/MSFT"])],
+        current_asset_universe=["TSLA"],
+        asset_symbol_resolver=lambda raw: (
+            None if "/" in raw else raw.strip().upper()
+        ),
+    )
+
+    assert resolved.asset_universe == ["AAPL", "MSFT"]
+    assert resolved.asset_universe_operation == "replace"
+
+
 @pytest.mark.asyncio
 async def test_planner_keeps_company_name_asset_remove_for_later_resolution(
     monkeypatch,
