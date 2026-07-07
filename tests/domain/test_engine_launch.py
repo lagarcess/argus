@@ -1818,3 +1818,45 @@ def test_build_signals_preserves_rule_template_branches_after_rsi() -> None:
 
     assert len(entries) == len(index)
     assert len(exits) == len(index)
+
+
+def test_launch_classifies_malformed_execution_realism_as_invalid_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    request = LaunchBacktestRequest.model_validate(
+        {
+            "strategy_type": "buy_and_hold",
+            "symbol": "AAPL",
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            "entry_rule": None,
+            "exit_rule": None,
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1000.0,
+            "position_size": None,
+            "cadence": None,
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+            "_execution_realism": {
+                "enabled": True,
+                "fee_bps": -10.0,
+                "slippage_bps": 5.0,
+            },
+        }
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "blocked_invalid_input"
+    assert result.envelope.failure_category == "parameter_validation_error"
+    assert result.envelope.failure_reason == "invalid_execution_realism_fee_bps"

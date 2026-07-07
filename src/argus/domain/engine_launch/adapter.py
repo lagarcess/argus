@@ -834,7 +834,9 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
     }
     if error_code in {"market_data_unavailable", "benchmark_data_unavailable"}:
         return "upstream_dependency_error", "failed_upstream"
-    if error_code in invalid_inputs:
+    if error_code in invalid_inputs or error_code.startswith(
+        "invalid_execution_realism_"
+    ):
         return "parameter_validation_error", "blocked_invalid_input"
     if error_code in unsupported:
         return "unsupported_capability", "blocked_unsupported"
