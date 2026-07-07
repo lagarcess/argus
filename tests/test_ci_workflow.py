@@ -267,6 +267,7 @@ def test_agent_runtime_regression_workflow_runs_full_runtime_sweep() -> None:
     ]
     assert "src/argus/agent_runtime/**" in workflow["on"]["pull_request"]["paths"]
     assert "tests/agent_runtime/**" in workflow["on"]["pull_request"]["paths"]
+    assert "tests/test_spine_guardrails.py" in workflow["on"]["pull_request"]["paths"]
     assert workflow["permissions"] == {"contents": "read"}
     assert "deploy" not in workflow["jobs"]
 
@@ -276,6 +277,19 @@ def test_agent_runtime_regression_workflow_runs_full_runtime_sweep() -> None:
         "github.event.pull_request.draft == false || "
         "github.event_name != 'pull_request'"
     )
+    setup_python_step = next(
+        step for step in job["steps"] if step.get("uses") == "actions/setup-python@v5"
+    )
+    assert setup_python_step["with"]["python-version"] == "3.10"
+
     joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert "poetry install --with dev --no-interaction" in joined_steps
-    assert "poetry run pytest tests/agent_runtime -q --no-cov" in joined_steps
+    assert "poetry run pytest tests/agent_runtime tests/test_spine_guardrails.py -q --no-cov" in joined_steps
+
+    runtime_target = ROOT / "tests" / "agent_runtime"
+    hidden_regression_file = (
+        ROOT / "tests" / "agent_runtime" / "test_conversational_contract_hardening.py"
+    )
+    assert hidden_regression_file.exists()
+    assert hidden_regression_file.is_relative_to(runtime_target)
+    assert str(hidden_regression_file.relative_to(ROOT)) not in joined_steps

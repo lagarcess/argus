@@ -10,6 +10,7 @@ name: Agent Runtime Regression
     paths:
       - "src/argus/agent_runtime/**"
       - "tests/agent_runtime/**"
+      - "tests/test_spine_guardrails.py"
       - ".github/workflows/agent-runtime-regression.yml"
   pull_request:
     branches: ["codex/private-alpha-next"]
@@ -17,6 +18,7 @@ name: Agent Runtime Regression
     paths:
       - "src/argus/agent_runtime/**"
       - "tests/agent_runtime/**"
+      - "tests/test_spine_guardrails.py"
       - ".github/workflows/agent-runtime-regression.yml"
 
 permissions:
@@ -48,4 +50,4 @@ jobs:
         run: poetry install --with dev --no-interaction
 
       - name: Run agent_runtime regression sweep
-        run: poetry run pytest tests/agent_runtime -q --no-cov
+        run: poetry run pytest tests/agent_runtime tests/test_spine_guardrails.py -q --no-cov
