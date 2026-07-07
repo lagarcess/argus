@@ -579,7 +579,12 @@ async def chat_stream(
     )
     if stale_confirmation_message is not None:
         runtime_fallback = RuntimeFallbackContext(
-            recovery_message=stale_confirmation_message
+            recovery_message=stale_confirmation_message,
+            recovery=recovery_state(
+                "confirmation_action_stale_card",
+                language=language,
+                retryable=False,
+            ),
         )
     elif is_confirmation_action(payload):
         metadata_fallback = confirmation_metadata_fallback_context(
@@ -623,7 +628,12 @@ async def chat_stream(
             )
         elif missing_run_confirmation_action_id:
             runtime_fallback = RuntimeFallbackContext(
-                recovery_message=missing_run_confirmation_action_id_message(language)
+                recovery_message=missing_run_confirmation_action_id_message(language),
+                recovery=recovery_state(
+                    "confirmation_action_missing_identity",
+                    language=language,
+                    retryable=False,
+                ),
             )
         elif metadata_fallback is not None:
             runtime_fallback = metadata_fallback
@@ -843,6 +853,8 @@ async def chat_stream(
             }
             if payload.action is not None:
                 metadata["chat_action"] = payload.action.model_dump(mode="python")
+            if runtime_fallback.recovery is not None:
+                metadata["recovery"] = dict(runtime_fallback.recovery)
             assistant_message = create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -851,7 +863,8 @@ async def chat_stream(
                 metadata=metadata,
             )
             yield sse_data({"type": "stage_start", "stage": "clarify"})
-            yield sse_data({"type": "token", "content": assistant_text})
+            if runtime_fallback.recovery is None:
+                yield sse_data({"type": "token", "content": assistant_text})
             yield sse_data(
                 {
                     "type": "final",
@@ -859,6 +872,11 @@ async def chat_stream(
                         "stage_outcome": "await_user_reply",
                         "assistant_response": assistant_text,
                         "message_id": assistant_message.id,
+                        **(
+                            {"recovery": runtime_fallback.recovery}
+                            if runtime_fallback.recovery is not None
+                            else {}
+                        ),
                     },
                 }
             )

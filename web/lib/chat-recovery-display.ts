@@ -1,17 +1,9 @@
-type TFunction = (
-  key: string,
-  options?: Record<string, unknown> | string,
-) => string;
+import type { TFunction } from "i18next";
 
 export type RecoveryDisplay =
   | {
       kind: "recovery_code";
       code: string;
-      values?: Record<string, string>;
-    }
-  | {
-      kind: "clarification";
-      need: string;
       values?: Record<string, string>;
     }
   | {
@@ -82,20 +74,8 @@ export function recoveryDisplayFromResponseIntent(
 ): RecoveryDisplay | null {
   const intent = recordOrNull(value);
   const kind = stringOrNull(intent?.kind);
-  if (!kind) {
+  if (!intent || !kind) {
     return null;
-  }
-  if (kind === "clarification") {
-    const needs = stringArrayOrNull(intent.semantic_needs);
-    const need = firstSupportedClarificationNeed(needs);
-    if (!need) {
-      return null;
-    }
-    return {
-      kind: "clarification",
-      need,
-      values: strategyValues(recordOrNull(intent.facts)?.strategy),
-    };
   }
   if (kind === "unsupported_recovery") {
     return unsupportedRecoveryDisplay(intent);
@@ -122,12 +102,6 @@ export function recoveryDisplayText(
   }
   if (display.kind === "recovery_code") {
     return t(`chat.recovery.${display.code}`, recoveryCodeValues(display, t));
-  }
-  if (display.kind === "clarification") {
-    const values = display.values ?? {};
-    const symbol = values.symbol;
-    const keySuffix = symbol ? `${display.need}_for_asset` : display.need;
-    return t(`chat.clarification.${keySuffix}`, values);
   }
   if (display.kind === "unsupported_recovery") {
     const optionsText = joinLocalizedOptions(
@@ -197,25 +171,6 @@ function unsupportedRecoveryDisplay(
       options,
     },
   };
-}
-
-function firstSupportedClarificationNeed(needs: string[] | null): string | null {
-  if (!needs) {
-    return null;
-  }
-  if (needs.includes("sizing_amount") && needs.includes("schedule")) {
-    return "sizing_amount_schedule";
-  }
-  const supported = [
-    "period",
-    "asset_target",
-    "assumption",
-    "sizing_amount",
-    "schedule",
-    "rule_definition",
-    "refinement",
-  ];
-  return supported.find((need) => needs.includes(need)) ?? null;
 }
 
 function strategyValues(value: unknown): Record<string, string> | undefined {

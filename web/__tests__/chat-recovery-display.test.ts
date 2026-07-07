@@ -65,7 +65,7 @@ describe("chat recovery display", () => {
     );
   });
 
-  test("renders clarification intents from typed semantic needs", () => {
+  test("does not replace live clarification prompts with generic recovery text", () => {
     const display = recoveryDisplayFromMetadata({
       response_intent: {
         kind: "clarification",
@@ -78,9 +78,7 @@ describe("chat recovery display", () => {
       },
     });
 
-    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
-      "¿Qué periodo quieres usar para AAPL?",
-    );
+    expect(display).toBeNull();
   });
 
   test("renders unsupported recovery options from typed replacement values", () => {
