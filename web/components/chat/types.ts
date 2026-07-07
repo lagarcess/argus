@@ -127,6 +127,16 @@ export type StrategyResultPayload = {
   copyText?: string;
   actions?: ChatActionOption[];
   chart?: ResultChartPayload | null;
+  executionCosts?: ExecutionCostEvidence | null;
+};
+
+export type ExecutionCostEvidence = {
+  fee_bps?: number | null;
+  slippage_bps?: number | null;
+  gross_total_return_pct?: number | null;
+  net_total_return_pct?: number | null;
+  return_drag_pct?: number | null;
+  benchmark_treatment?: string | null;
 };
 
 export type StrategyConfirmationRowKey =
@@ -179,10 +189,15 @@ export type StrategyConfirmationPayload = {
   summary: string;
   strategy_type?: string;
   display_facts?: ConfirmationDisplayFacts;
+  capabilities?: StrategyConfirmationCapabilities;
   date_range?: StrategyConfirmationDateRange;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];
+};
+
+export type StrategyConfirmationCapabilities = {
+  execution_costs_editable?: boolean;
 };
 
 export type Message = {

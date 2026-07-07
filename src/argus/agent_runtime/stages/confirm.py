@@ -20,6 +20,7 @@ from argus.agent_runtime.strategy_contract import (
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
 )
+from argus.domain.backtesting.config import _execution_realism_feature_enabled
 from argus.domain.engine_launch.display import format_data_through_label
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.engine_launch.strategies import validate_launch_supported
@@ -669,8 +670,12 @@ def _unsupported_execution_assumption(
     *,
     optional_parameter_status: dict[str, Any],
 ) -> dict[str, Any] | None:
+    # With execution realism enabled the engine applies fee and slippage
+    # assumptions, so nonzero values are supported inputs rather than
+    # unsupported constraints.
+    execution_costs_supported = _execution_realism_feature_enabled()
     fees = _parameter_value(optional_parameters, "fees")
-    if not _is_zero_assumption(fees):
+    if not execution_costs_supported and not _is_zero_assumption(fees):
         return _recoverable_constraint_patch(
             optional_parameter_status=optional_parameter_status,
             requested_field="fees",
@@ -690,7 +695,7 @@ def _unsupported_execution_assumption(
         )
 
     slippage = _parameter_value(optional_parameters, "slippage")
-    if not _is_zero_assumption(slippage):
+    if not execution_costs_supported and not _is_zero_assumption(slippage):
         return _recoverable_constraint_patch(
             optional_parameter_status=optional_parameter_status,
             requested_field="slippage",

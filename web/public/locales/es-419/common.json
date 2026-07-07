@@ -383,8 +383,6 @@
         "peak_value": "Valor máximo",
         "lowest_value": "Valor mínimo",
         "date_range": "Rango de fechas",
-        "peak_value": "Valor máximo",
-        "lowest_value": "Valor mínimo",
         "timeframe": "Temporalidad",
         "side": "Dirección",
         "allocation": "Asignación",
@@ -392,7 +390,12 @@
         "cadence": "Cadencia",
         "contribution": "Contribución",
         "entry_rule": "Regla de entrada",
-        "exit_rule": "Regla de salida"
+        "exit_rule": "Regla de salida",
+        "gross_return": "Retorno bruto",
+        "net_return": "Neto de costos",
+        "modeled_costs": "Costos modelados",
+        "modeled_costs_value": "comisión de {{fee}} bps + deslizamiento de {{slippage}} bps",
+        "benchmark_same_costs": "{{benchmark}} (mismos costos modelados)"
       },
       "timeframe": {
         "daily": "Datos diarios",
@@ -500,7 +503,17 @@
         "through": "Hasta {{date}}",
         "no_fees": "Sin comisiones",
         "no_slippage": "Sin deslizamiento",
-        "benchmark": "Referencia: {{symbol}}"
+        "benchmark": "Referencia: {{symbol}}",
+        "modeled_costs": "Costos modelados: comisión de {{fee}} bps + deslizamiento de {{slippage}} bps"
+      },
+      "cost_editor": {
+        "edit_chip": "Editar costos",
+        "fee_label": "Comisión % por operación",
+        "slippage_label": "Deslizamiento % por operación",
+        "apply": "Aplicar",
+        "cancel": "Cancelar",
+        "invalid": "Ingresa porcentajes de 0 o más (deslizamiento hasta {{max}}%).",
+        "message": "Ajusta las comisiones a {{fee}}% y el deslizamiento a {{slippage}}% por operación."
       }
     }
   },

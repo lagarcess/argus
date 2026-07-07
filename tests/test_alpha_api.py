@@ -446,7 +446,10 @@ def test_backtest_rejects_explicit_asset_class_conflict() -> None:
     }
 
 
-def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None:
+def test_backtest_run_normalizes_defaults_persists_metrics_and_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
@@ -763,7 +766,7 @@ def test_execution_realism_payload_is_ignored_when_feature_flag_off(
 ) -> None:
     from argus.domain.engine import normalize_backtest_config
 
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     config = normalize_backtest_config(
         {
             "template": "rsi_mean_reversion",

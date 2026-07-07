@@ -321,6 +321,95 @@ def test_refine_edit_plans_offline_when_interpreter_unavailable(
     assert "artifact_assumption_edit_planned" in result.decision.reason_codes
 
 
+def test_refine_execution_cost_edit_preserves_pending_run_fields(
+    monkeypatch,
+) -> None:
+    """A typed execution-cost edit after Refine idea must patch the pending
+    draft without dropping the completed run's existing setup."""
+
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    async def plan_stub(**kwargs):
+        assert kwargs["current_user_message"] == (
+            "set fees to 0.1% and slippage to 0.05%"
+        )
+        assert kwargs["prior_strategy"]["asset_universe"] == ["AAPL", "MSFT"]
+        assert kwargs["active_confirmation"] is None
+        return artifact_edit_planner.ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed execution costs on the refine draft.",
+            operations=[
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="fees",
+                    number=0.001,
+                ),
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="slippage",
+                    number=0.0005,
+                ),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "plan_artifact_assumption_edit",
+        plan_stub,
+    )
+
+    pending = _refine_pending_strategy().model_copy(
+        update={
+            "capital_amount": 500,
+            "comparison_baseline": "SPY",
+            "timeframe": "1D",
+        }
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="set fees to 0.1% and slippage to 0.05%",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="backtest_execution",
+            completed=False,
+            pending_strategy_summary=pending,
+            latest_backtest_result_reference=ArtifactReference(
+                artifact_kind="backtest_result",
+                artifact_id="run-141",
+                artifact_status="completed",
+            ),
+        ),
+        selected_thread_metadata={
+            "latest_task_type": "backtest_execution",
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "refinement",
+            "source_result_run_id": "run-141",
+        },
+        structured_interpreter=_RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL", "MSFT"]
+    assert strategy.date_range == {"start": "2020-02-01", "end": "2026-07-02"}
+    assert strategy.cadence == "monthly"
+    assert strategy.capital_amount == 500
+    assert strategy.comparison_baseline == "SPY"
+    assert strategy.timeframe == "1D"
+    assert strategy.extra_parameters["recurring_contribution"] == 500
+    assert strategy.extra_parameters["fee_rate"] == 0.001
+    assert strategy.extra_parameters["slippage"] == 0.0005
+    assert (
+        strategy.extra_parameters["field_provenance"]["fee_rate"]
+        == "explicit_user"
+    )
+    assert "artifact_assumption_edit_planned" in result.decision.reason_codes
+
+
 def test_refine_planned_edit_merges_full_confirmation_from_pending_draft(
     monkeypatch,
 ) -> None:
@@ -882,4 +971,56 @@ def test_refine_rule_tweak_reply_is_not_underfilled_assumption_edit() -> None:
     assert not interpreter_module._response_underfills_active_artifact_assumption_edit(
         response=response,
         request=_refine_state_request("use a 20-day moving average instead of 50"),
+    )
+
+
+def test_cost_edit_shape_predicate_accepts_explicit_fee_and_slippage() -> None:
+    # Deterministic pin of the reroute guard: no LLM, no key required.
+    from argus.agent_runtime.stages.interpret import StructuredInterpretation
+    from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
+        structured_interpretation_has_supported_artifact_assumption_edit,
+    )
+    from argus.agent_runtime.state.models import StrategySummary
+
+    interpretation = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User changed execution cost assumptions.",
+        candidate_strategy_draft=StrategySummary(
+            extra_parameters={
+                "fee_rate": 0.001,
+                "slippage": 0.0005,
+                "field_provenance": {
+                    "fee_rate": "explicit_user",
+                    "slippage": "explicit_user",
+                },
+            },
+        ),
+        semantic_turn_act="refine_current_idea",
+    )
+
+    assert structured_interpretation_has_supported_artifact_assumption_edit(
+        interpretation
+    )
+
+
+def test_cost_edit_shape_predicate_rejects_draft_without_costs_or_assets() -> None:
+    from argus.agent_runtime.stages.interpret import StructuredInterpretation
+    from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
+        structured_interpretation_has_supported_artifact_assumption_edit,
+    )
+    from argus.agent_runtime.state.models import StrategySummary
+
+    interpretation = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User said something vague.",
+        candidate_strategy_draft=StrategySummary(extra_parameters={}),
+        semantic_turn_act="refine_current_idea",
+    )
+
+    assert not structured_interpretation_has_supported_artifact_assumption_edit(
+        interpretation
     )

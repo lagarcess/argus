@@ -14,6 +14,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import type { TFunction } from "i18next";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   artifactLifecycleTone,
@@ -22,6 +23,13 @@ import {
 } from "@/lib/artifact-status-tones";
 import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { confirmationAssumptionDisplay } from "@/lib/confirmation-assumptions-display";
+import {
+  costEditDraftFromDisplayFacts,
+  executionCostEditMessage,
+  isValidCostEditDraft,
+  MAX_SLIPPAGE_PERCENT,
+  type ExecutionCostEditDraft,
+} from "@/lib/confirmation-cost-edit";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import {
   strategyDisplayLabel,
@@ -89,6 +97,9 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
     (confirmation.confirmation_state === "active" || !confirmation.confirmation_state) &&
     confirmationStatusAllowsActions(displayState.status);
   const activeActions = canShowActions ? confirmation.actions ?? [] : [];
+  const canEditCosts =
+    canShowActions &&
+    confirmation.capabilities?.execution_costs_editable === true;
   const StatusIcon = displayState.icon;
 
   return (
@@ -146,14 +157,29 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
         </div>
       )}
 
-      {viewModel.assumptions.length > 0 && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-[#c9c9cd]/22 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/[0.04] sm:px-5">
-          {viewModel.assumptions.map((text) => (
-            <span key={text} className="flex min-w-0 items-start gap-1.5 whitespace-normal break-words">
-              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[#8d969e]/45" />
-              {text}
-            </span>
-          ))}
+      {(viewModel.assumptions.length > 0 || canEditCosts) && (
+        <div className="border-t border-[#c9c9cd]/22 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/[0.04] sm:px-5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {viewModel.assumptions.map((text) => (
+              <span key={text} className="flex min-w-0 items-start gap-1.5 whitespace-normal break-words">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[#8d969e]/45" />
+                {text}
+              </span>
+            ))}
+            {canEditCosts && (
+              <ExecutionCostEditor
+                displayFacts={confirmation.display_facts}
+                onSubmit={(message) =>
+                  // A plain labeled action (no type) sends the composed edit as
+                  // a normal chat message, so it flows through the existing
+                  // natural-language edit planner rather than the generic
+                  // adjust-assumptions clarify route.
+                  onAction?.({ label: message })
+                }
+                t={t}
+              />
+            )}
+          </div>
         </div>
       )}
 
@@ -403,4 +429,99 @@ function ConfirmationActionIcon({ action }: { action: ChatActionOption }) {
     return <CircleSlash2 className="h-3.5 w-3.5" />;
   }
   return <PencilLine className="h-3.5 w-3.5" />;
+}
+
+function ExecutionCostEditor({
+  displayFacts,
+  onSubmit,
+  t,
+}: {
+  displayFacts: StrategyConfirmationPayload["display_facts"];
+  onSubmit: (message: string) => void;
+  t: TFunction;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [draft, setDraft] = useState<ExecutionCostEditDraft>(() =>
+    costEditDraftFromDisplayFacts(displayFacts),
+  );
+  const isValid = isValidCostEditDraft(draft);
+
+  if (!isOpen) {
+    return (
+      <button
+        type="button"
+        data-testid="edit-execution-costs"
+        onClick={() => {
+          setDraft(costEditDraftFromDisplayFacts(displayFacts));
+          setIsOpen(true);
+        }}
+        className="inline-flex min-h-6 cursor-pointer items-center gap-1 rounded-full border border-black/10 bg-black/[0.02] px-2 py-0.5 text-[11px] font-medium text-black/60 transition-colors hover:border-black/18 hover:text-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/60 dark:hover:border-white/18 dark:hover:text-white/80"
+      >
+        <PencilLine aria-hidden="true" className="h-3 w-3" />
+        {t("chat.confirmation.cost_editor.edit_chip", "Edit costs")}
+      </button>
+    );
+  }
+
+  const submit = () => {
+    const message = executionCostEditMessage(draft, t);
+    if (!message) {
+      return;
+    }
+    setIsOpen(false);
+    onSubmit(message);
+  };
+
+  return (
+    <div className="mt-1 flex w-full flex-wrap items-end gap-2" data-testid="execution-cost-editor">
+      <label className="flex flex-col gap-0.5 text-[11px] text-[#8d969e]">
+        {t("chat.confirmation.cost_editor.fee_label", "Fee % per trade")}
+        <input
+          type="text"
+          inputMode="decimal"
+          value={draft.feePercent}
+          onChange={(event) =>
+            setDraft((prev) => ({ ...prev, feePercent: event.target.value }))
+          }
+          className="h-8 w-24 rounded-md border border-black/12 bg-white px-2 text-[13px] text-[#191c1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/14 dark:bg-[#24282c] dark:text-white"
+        />
+      </label>
+      <label className="flex flex-col gap-0.5 text-[11px] text-[#8d969e]">
+        {t("chat.confirmation.cost_editor.slippage_label", "Slippage % per trade")}
+        <input
+          type="text"
+          inputMode="decimal"
+          value={draft.slippagePercent}
+          onChange={(event) =>
+            setDraft((prev) => ({ ...prev, slippagePercent: event.target.value }))
+          }
+          className="h-8 w-24 rounded-md border border-black/12 bg-white px-2 text-[13px] text-[#191c1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/14 dark:bg-[#24282c] dark:text-white"
+        />
+      </label>
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!isValid}
+        className={`${actionClassName} disabled:cursor-not-allowed disabled:opacity-45`}
+      >
+        {t("chat.confirmation.cost_editor.apply", "Apply")}
+      </button>
+      <button
+        type="button"
+        onClick={() => setIsOpen(false)}
+        className={actionClassName}
+      >
+        {t("chat.confirmation.cost_editor.cancel", "Cancel")}
+      </button>
+      {!isValid && (
+        <p className="w-full text-[11px] text-[#b3593f] dark:text-[#e08d70]">
+          {t("chat.confirmation.cost_editor.invalid", {
+            defaultValue:
+              "Enter percentages of 0 or more (slippage up to {{max}}%).",
+            max: MAX_SLIPPAGE_PERCENT,
+          })}
+        </p>
+      )}
+    </div>
+  );
 }

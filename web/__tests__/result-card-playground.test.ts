@@ -38,6 +38,7 @@ describe("result card playground", () => {
   test("covers the required static card states without persistence or network code", () => {
     expect(resultCardPlaygroundFixtures.map((fixture) => fixture.id)).toEqual([
       "positive-single-symbol",
+      "modeled-execution-costs",
       "negative-single-symbol",
       "benchmark-underperformance-positive",
       "dca-result",
@@ -124,7 +125,11 @@ describe("result card playground", () => {
       },
     ]);
 
-    const negative = heroDeltaEvidenceView(resultCardPlaygroundFixtures[1].result);
+    const negative = heroDeltaEvidenceView(
+      resultCardPlaygroundFixtures.find(
+        (fixture) => fixture.id === "negative-single-symbol",
+      )!.result,
+    );
     expect(negative.hero.value).toBe("$820");
     expect(negative.hero.detail).toBe("-$180 loss · -18.0% total return");
     expect(negative.hero.tone).toBe("negative");
@@ -448,6 +453,58 @@ describe("result card playground", () => {
       label: "Timeframe",
       value: "1D",
     });
+  });
+
+  test("surfaces modeled execution costs in the visible trust strip", () => {
+    const modeledCosts = resultCardPlaygroundFixtures.find(
+      (fixture) => fixture.id === "modeled-execution-costs",
+    )!.result;
+    const view = heroDeltaEvidenceView(modeledCosts);
+
+    expect(view.trustGroups).toEqual([
+      "Stocks · Historical simulation · Net of 10 bps fee + 5 bps slippage · Not advice",
+    ]);
+    expect(view.details).toContainEqual({
+      label: "Benchmark",
+      value: "SPY (same modeled costs)",
+    });
+  });
+
+  test("renders a cost evidence section in details from the structured payload", () => {
+    const modeledCosts = resultCardPlaygroundFixtures.find(
+      (fixture) => fixture.id === "modeled-execution-costs",
+    )!.result;
+    const view = heroDeltaEvidenceView(modeledCosts);
+
+    expect(view.details).toContainEqual({
+      label: "Gross return",
+      value: "+12.0%",
+    });
+    expect(view.details).toContainEqual({
+      label: "Net of costs",
+      value: "+11.8%",
+    });
+    expect(view.details).toContainEqual({
+      label: "Costs modeled",
+      value: "10 bps fee + 5 bps slippage",
+    });
+    expect(view.details).toContainEqual({
+      label: "Benchmark",
+      value: "SPY (same modeled costs)",
+    });
+  });
+
+  test("omits the cost evidence section when the payload has no modeled costs", () => {
+    const idealized = resultCardPlaygroundFixtures.find(
+      (fixture) => fixture.id === "positive-single-symbol",
+    )!.result;
+    const view = heroDeltaEvidenceView(idealized);
+
+    const labels = view.details.map((detail) => detail.label);
+    expect(labels).not.toContain("Gross return");
+    expect(labels).not.toContain("Net of costs");
+    expect(labels).not.toContain("Costs modeled");
+    expect(labels).not.toContain("Benchmark costs");
   });
 
   test("exposes trade parameters in lightweight details when fixture facts exist", () => {

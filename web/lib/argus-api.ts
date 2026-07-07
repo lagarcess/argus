@@ -3,6 +3,7 @@ import type { AssetClass } from "./argus-types";
 import type {
   ChatActionOption,
   ChatMention,
+  ExecutionCostEvidence,
   StrategyConfirmationPayload,
 } from "@/components/chat/types";
 import {
@@ -96,6 +97,7 @@ export type ConversationResultCard = {
   assumptions: string[];
   actions: ChatActionOption[];
   chart?: ResultChartPayload | null;
+  execution_costs?: ExecutionCostEvidence | null;
 };
 
 // ─── Domain objects ──────────────────────────────────────────────────────────
@@ -501,6 +503,7 @@ export function resultCardFromConversationCard(
       label: displayResultActionLabel(action),
     })),
     chart: card.chart ?? null,
+    executionCosts: card.execution_costs ?? null,
   };
 }
 

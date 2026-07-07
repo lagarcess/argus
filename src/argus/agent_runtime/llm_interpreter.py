@@ -142,6 +142,7 @@ from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
     _merge_focused_repair_with_base,
     _openrouter_wire_messages,
 )
+from argus.agent_runtime.interpreter.execution_cost_capability import execution_cost_capability_clause
 from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _apply_pending_response_option_replacement,
     _clear_dca_recurring_fields,
@@ -776,12 +777,11 @@ class OpenRouterStructuredInterpreter:
             "complete rule_spec. Incomplete indicator ideas and indicators without an "
             "executable registry spec can be understood and drafted, but are not "
             "runnable until the missing entry and exit semantics are supplied. "
-            "Same asset class only; max 5 symbols; "
-            "equity benchmark is SPY; crypto benchmark is BTC; currency pairs "
-            "are supported through Kraken; currency pair benchmark is the tested "
-            "pair itself. No brokerage trading, shorting, mixed asset-class runs, "
-            "custom scripting, or real slippage/fee realism.\n\n"
-            "Benchmark language matters in any user language: when a symbol is "
+            "Same asset class only; max 5 symbols; equity benchmark is SPY; crypto benchmark is BTC; "
+            "currency pairs are supported through Kraken; currency pair benchmark is the tested "
+            "pair itself. "
+            + execution_cost_capability_clause()
+            + "Benchmark language matters in any user language: when a symbol is "
             "framed as a benchmark, reference, comparison target, or market "
             "baseline, put it in comparison_baseline instead of asset_universe. "
             "A one-asset buy/hold request with a separate benchmark is executable "
@@ -955,8 +955,9 @@ class OpenRouterStructuredInterpreter:
             "another factual value shown on the latest result card. For any factual "
             "result question, set result_followup_fact_key to the canonical "
             "snake_case key of that value (schema list, or the metric's plain "
-            "snake_case name); leave it unset otherwise. Result follow-ups must be "
-            "answered from the latest result facts supplied to the runtime; do not "
+            "snake_case name); cost questions use fee_bps, slippage_bps, gross_total_return, "
+            "net_total_return, return_drag, or benchmark_cost_treatment. Leave it unset otherwise. "
+            "Result follow-ups must be answered from the latest result facts supplied to the runtime; do not "
             "invent metrics. Use why_underperformed for any why/how the result happened "
             "or other performance "
             "question, including phrases like 'why did this result happen', even "

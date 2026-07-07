@@ -71,11 +71,16 @@ function confirmationDisplayFacts(
       }),
     );
   }
-  if (isZeroLike(facts.fees)) {
-    display.push(t("chat.confirmation.assumptions.no_fees", "No fees"));
-  }
-  if (isZeroLike(facts.slippage)) {
-    display.push(t("chat.confirmation.assumptions.no_slippage", "No slippage"));
+  const modeledCosts = modeledCostDisplay(facts, t);
+  if (modeledCosts) {
+    display.push(modeledCosts);
+  } else {
+    if (isZeroLike(facts.fees)) {
+      display.push(t("chat.confirmation.assumptions.no_fees", "No fees"));
+    }
+    if (isZeroLike(facts.slippage)) {
+      display.push(t("chat.confirmation.assumptions.no_slippage", "No slippage"));
+    }
   }
   const benchmarkSymbol = facts.benchmark_symbol?.trim();
   if (benchmarkSymbol) {
@@ -116,6 +121,37 @@ function isZeroLike(value: number | string | null | undefined) {
     return false;
   }
   return Number(value) === 0;
+}
+
+function modeledCostDisplay(facts: ConfirmationDisplayFacts, t: Translate) {
+  const fees = numericValue(facts.fees);
+  const slippage = numericValue(facts.slippage);
+  if ((fees ?? 0) <= 0 && (slippage ?? 0) <= 0) {
+    return null;
+  }
+  const feeBps = formatBps((fees ?? 0) * 10000);
+  const slippageBps = formatBps((slippage ?? 0) * 10000);
+  return t("chat.confirmation.assumptions.modeled_costs", {
+    defaultValue: "Modeled costs: {{fee}} bps fee + {{slippage}} bps slippage",
+    fee: feeBps,
+    slippage: slippageBps,
+  });
+}
+
+function numericValue(value: number | string | null | undefined) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function formatBps(value: number) {
+  const rounded = Math.round(value * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
 
 function prependAssetClass(items: string[], assetClassLabel: string | undefined) {

@@ -5321,3 +5321,34 @@ async def test_supported_strategy_capability_conflict_audit_keeps_extra_rule_blo
     )
 
     assert audited is None
+
+
+def test_llm_system_prompt_keeps_legacy_cost_capability_when_flag_off(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    prompt = interpreter._system_prompt()
+
+    assert "custom scripting, or real slippage/fee realism." in prompt
+    assert "extra_parameters.fee_rate" not in prompt
+
+
+def test_llm_system_prompt_instructs_cost_capture_when_flag_on(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    prompt = interpreter._system_prompt()
+
+    assert "or real slippage/fee realism" not in prompt
+    assert "extra_parameters.fee_rate" in prompt
+    assert "extra_parameters.slippage" in prompt
+    assert "0.1% fees means 0.001" in prompt
+    assert "explicit_user" in prompt

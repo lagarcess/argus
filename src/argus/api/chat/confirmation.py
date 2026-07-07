@@ -16,6 +16,10 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     resolve_date_range,
 )
+from argus.domain.backtesting.config import (
+    _execution_realism_feature_enabled,
+    _normalize_execution_realism,
+)
 from argus.domain.engine_launch.display import (
     format_data_through_label,
     format_date_range_label,
@@ -225,6 +229,10 @@ def runtime_confirmation_card(
     }
     if display_facts:
         card["display_facts"] = display_facts
+    if _execution_realism_feature_enabled():
+        # Backend capability truth: the engine can apply fee/slippage
+        # assumptions, so the confirmation surface may offer editing them.
+        card["capabilities"] = {"execution_costs_editable": True}
     asset_class = _confirmation_asset_class(strategy)
     if asset_class is not None:
         card["asset_class"] = asset_class
@@ -345,14 +353,24 @@ def _confirmation_assumptions(
     data_through_assumption = _data_through_assumption(strategy, language=language)
     if data_through_assumption:
         assumptions.append(data_through_assumption)
-    fees = _optional_parameter_value(optional_parameters, "fees")
-    if fees in (0, 0.0, "0", "0.0"):
-        assumptions.append("Sin comisiones" if _is_spanish(language) else "No fees")
-    slippage = _optional_parameter_value(optional_parameters, "slippage")
-    if slippage in (0, 0.0, "0", "0.0"):
+    execution_costs = _confirmation_execution_costs(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload or {},
+    )
+    if execution_costs is not None:
         assumptions.append(
-            "Sin deslizamiento" if _is_spanish(language) else "No slippage"
+            _execution_cost_assumption(execution_costs, language=language)
         )
+    else:
+        fees = _optional_parameter_value(optional_parameters, "fees")
+        if fees in (0, 0.0, "0", "0.0"):
+            assumptions.append("Sin comisiones" if _is_spanish(language) else "No fees")
+        slippage = _optional_parameter_value(optional_parameters, "slippage")
+        if slippage in (0, 0.0, "0", "0.0"):
+            assumptions.append(
+                "Sin deslizamiento" if _is_spanish(language) else "No slippage"
+            )
     benchmark_assumption = _confirmation_benchmark_assumption(
         strategy=strategy,
         optional_parameters=optional_parameters,
@@ -388,12 +406,21 @@ def _confirmation_display_facts(
     data_adjustment = _data_availability_adjustment(strategy)
     if data_adjustment is not None:
         facts["data_through"] = data_adjustment.get("through")
-    fees = _optional_parameter_value(optional_parameters, "fees")
-    if fees is not None:
-        facts["fees"] = fees
-    slippage = _optional_parameter_value(optional_parameters, "slippage")
-    if slippage is not None:
-        facts["slippage"] = slippage
+    execution_costs = _confirmation_execution_costs(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload,
+    )
+    if execution_costs is not None:
+        facts["fees"] = execution_costs["fees"]
+        facts["slippage"] = execution_costs["slippage"]
+    else:
+        fees = _optional_parameter_value(optional_parameters, "fees")
+        if fees is not None:
+            facts["fees"] = fees
+        slippage = _optional_parameter_value(optional_parameters, "slippage")
+        if slippage is not None:
+            facts["slippage"] = slippage
     benchmark_symbol = _confirmation_benchmark_symbol(
         strategy=strategy,
         optional_parameters=optional_parameters,
@@ -471,6 +498,79 @@ def _confirmation_benchmark_symbol(
     if asset_class == "equity":
         return "SPY"
     return None
+
+
+def _confirmation_execution_costs(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, Any],
+    launch_payload: dict[str, Any],
+) -> dict[str, float] | None:
+    if not _execution_realism_feature_enabled():
+        # With the engine flag off the run is idealized no matter what values a
+        # draft carries, so never advertise modeled costs.
+        return None
+
+    launch_realism = launch_payload.get("_execution_realism")
+    if isinstance(launch_realism, dict):
+        try:
+            realism = _normalize_execution_realism(launch_realism)
+        except ValueError:
+            realism = {"enabled": False, "fee_bps": 0.0, "slippage_bps": 0.0}
+    else:
+        realism = {"enabled": False, "fee_bps": 0.0, "slippage_bps": 0.0}
+    if bool(realism["enabled"]):
+        costs = {
+            "fees": float(realism["fee_bps"]) / 10000.0,
+            "slippage": float(realism["slippage_bps"]) / 10000.0,
+        }
+        if costs["fees"] > 0.0 or costs["slippage"] > 0.0:
+            return costs
+
+    extra_parameters = strategy.get("extra_parameters")
+    if isinstance(extra_parameters, dict):
+        costs = {
+            "fees": _optional_float(extra_parameters.get("fee_rate")) or 0.0,
+            "slippage": _optional_float(extra_parameters.get("slippage")) or 0.0,
+        }
+        if costs["fees"] > 0.0 or costs["slippage"] > 0.0:
+            return costs
+
+    costs = {
+        "fees": _optional_float(_optional_parameter_value(optional_parameters, "fees"))
+        or 0.0,
+        "slippage": _optional_float(
+            _optional_parameter_value(optional_parameters, "slippage")
+        )
+        or 0.0,
+    }
+    if costs["fees"] > 0.0 or costs["slippage"] > 0.0:
+        return costs
+    return None
+
+
+def _execution_cost_assumption(costs: dict[str, float], *, language: str) -> str:
+    fee_bps = _format_bps(float(costs["fees"]) * 10000.0)
+    slippage_bps = _format_bps(float(costs["slippage"]) * 10000.0)
+    if _is_spanish(language):
+        return f"Costos modelados: comisión de {fee_bps} bps + deslizamiento de {slippage_bps} bps"
+    return f"Modeled costs: {fee_bps} bps fee + {slippage_bps} bps slippage"
+
+
+def _optional_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_bps(value: float) -> str:
+    rounded = round(value, 2)
+    if rounded.is_integer():
+        return str(int(rounded))
+    return f"{rounded:g}"
 
 
 def _confirmation_summary(

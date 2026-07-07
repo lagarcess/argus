@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 from datetime import date
 
 import pandas as pd
@@ -24,6 +25,10 @@ def _make_bars(
         },
         index=index,
     )
+
+
+def _stable_json(value: object) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
 @pytest.fixture(autouse=True)
@@ -169,6 +174,78 @@ def test_currency_pair_config_uses_same_pair_as_default_benchmark() -> None:
     assert config["benchmark_symbol"] == "EURUSD"
     metrics = engine.compute_alpha_metrics(config)
     assert metrics["aggregate"]["performance"]["total_return_pct"] > 0
+
+
+@pytest.mark.parametrize(
+    ("execution_realism", "error_code"),
+    [
+        (
+            {"enabled": True, "fee_bps": -10.0, "slippage_bps": 0.0},
+            "invalid_execution_realism_fee_bps",
+        ),
+        (
+            {"enabled": True, "fee_bps": 0.0, "slippage_bps": -5.0},
+            "invalid_execution_realism_slippage_bps",
+        ),
+        (
+            {"enabled": True, "fee_bps": float("inf"), "slippage_bps": 0.0},
+            "invalid_execution_realism_fee_bps",
+        ),
+    ],
+)
+def test_normalize_backtest_config_rejects_invalid_execution_realism_costs(
+    monkeypatch: pytest.MonkeyPatch,
+    execution_realism: dict[str, object],
+    error_code: str,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+
+    with pytest.raises(ValueError, match=error_code):
+        engine.normalize_backtest_config(
+            {
+                "template": "buy_and_hold",
+                "asset_class": "equity",
+                "symbols": ["AAPL"],
+                "timeframe": "1D",
+                "start_date": date(2025, 1, 1),
+                "end_date": date(2025, 1, 7),
+                "side": "long",
+                "starting_capital": 10000,
+                "allocation_method": "equal_weight",
+                "benchmark_symbol": "SPY",
+                "parameters": {},
+                "_execution_realism": execution_realism,
+            }
+        )
+
+
+def test_compute_alpha_metrics_rejects_direct_invalid_execution_realism_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    config = engine.normalize_backtest_config(
+        {
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "timeframe": "1D",
+            "start_date": date(2025, 1, 1),
+            "end_date": date(2025, 1, 7),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "SPY",
+            "parameters": {},
+        }
+    )
+    config["_execution_realism"] = {
+        "enabled": True,
+        "fee_bps": -10.0,
+        "slippage_bps": 0.0,
+    }
+
+    with pytest.raises(ValueError, match="invalid_execution_realism_fee_bps"):
+        engine.compute_alpha_metrics(config)
 
 
 def test_validate_backtest_config_rejects_stablecoins() -> None:
@@ -446,6 +523,261 @@ def test_buy_and_hold_metrics_match_total_return_benchmark_and_profit() -> None:
     assert performance["profit"] == pytest.approx(1200.0, abs=1)
 
 
+def test_buy_and_hold_execution_realism_reduces_net_return_and_profit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": date(2025, 1, 1),
+        "end_date": date(2025, 1, 7),
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {},
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10,
+            "slippage_bps": 5,
+        },
+    }
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+    gross = engine.compute_alpha_metrics(engine.normalize_backtest_config(payload))
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    net = engine.compute_alpha_metrics(engine.normalize_backtest_config(payload))
+
+    gross_performance = gross["aggregate"]["performance"]
+    net_performance = net["aggregate"]["performance"]
+    assert net_performance["total_return_pct"] < gross_performance["total_return_pct"]
+    assert net_performance["profit"] < gross_performance["profit"]
+    assert net_performance["execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+        "gross_total_return_pct": gross_performance["total_return_pct"],
+        "net_total_return_pct": net_performance["total_return_pct"],
+        "return_drag_pct": pytest.approx(
+            gross_performance["total_return_pct"]
+            - net_performance["total_return_pct"],
+            abs=0.01,
+        ),
+    }
+    assert net_performance["benchmark_return_pct"] < gross_performance[
+        "benchmark_return_pct"
+    ]
+    assert net_performance["delta_vs_benchmark_pct"] == pytest.approx(
+        net_performance["total_return_pct"]
+        - net_performance["benchmark_return_pct"],
+        abs=0.01,
+    )
+
+
+def test_flag_off_total_return_keeps_legacy_rounding_at_tie_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # 20-bar triangle 96 -> 114 -> 97.8 puts the exact total return on the
+    # 1.875% rounding tie. The legacy returns-based float path rounds it to
+    # 1.87 while an equity/invested ratio rounds to 1.88, so this pins the
+    # flag-off math to the pre-realism engine bit for bit.
+    prices = [
+        96.0, 97.8, 99.6, 101.4, 103.2, 105.0, 106.8, 108.6, 110.4, 112.2,
+        114.0, 112.2, 110.4, 108.6, 106.8, 105.0, 103.2, 101.4, 99.6, 97.8,
+    ]
+    benchmark_prices = [110.0 + 0.5 * step for step in range(len(prices))]
+    bars = {"TSLA": _make_bars(prices), "NVDA": _make_bars(benchmark_prices)}
+
+    def fake_fetch_ohlcv(
+        symbol: str,
+        asset_class: engine.AssetClass,  # noqa: ARG001
+        start_date: date,  # noqa: ARG001
+        end_date: date,  # noqa: ARG001
+        timeframe: str,  # noqa: ARG001
+    ) -> pd.DataFrame:
+        return bars[symbol].copy()
+
+    def fake_fetch_price_series(
+        symbol: str,
+        asset_class: engine.AssetClass,  # noqa: ARG001
+        start_date: date,  # noqa: ARG001
+        end_date: date,  # noqa: ARG001
+        timeframe: str,  # noqa: ARG001
+    ) -> pd.Series:
+        return bars[symbol]["close"]
+
+    monkeypatch.setattr(engine, "fetch_ohlcv", fake_fetch_ohlcv)
+    monkeypatch.setattr(engine, "fetch_price_series", fake_fetch_price_series)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+
+    metrics = engine.compute_alpha_metrics(
+        engine.normalize_backtest_config(
+            {
+                "template": "buy_and_hold",
+                "asset_class": "equity",
+                "symbols": ["TSLA"],
+                "timeframe": "1D",
+                "start_date": date(2025, 1, 1),
+                "end_date": date(2025, 1, 20),
+                "side": "long",
+                "starting_capital": 10000,
+                "allocation_method": "equal_weight",
+                "benchmark_symbol": "NVDA",
+                "parameters": {},
+            }
+        )
+    )
+
+    assert metrics["aggregate"]["performance"]["total_return_pct"] == 1.87
+    assert metrics["by_symbol"]["TSLA"]["performance"]["total_return_pct"] == 1.87
+
+
+@pytest.mark.parametrize(
+    ("template", "symbols", "parameters"),
+    [
+        ("buy_and_hold", ["AAPL"], {}),
+        ("buy_and_hold", ["AAPL", "MSFT"], {}),
+        ("dca_accumulation", ["AAPL"], {"dca_cadence": "daily"}),
+        ("dca_accumulation", ["AAPL", "MSFT"], {"dca_cadence": "weekly"}),
+        (
+            "signal_strategy",
+            ["AAPL"],
+            {
+                "rule_spec": {
+                    "entry": {
+                        "conditions": [
+                            {
+                                "left": {"kind": "price", "field": "close"},
+                                "operator": "cross_above",
+                                "right": 101.0,
+                            }
+                        ]
+                    },
+                    "exit": {
+                        "conditions": [
+                            {
+                                "left": {"kind": "price", "field": "close"},
+                                "operator": "cross_above",
+                                "right": 109.0,
+                            }
+                        ]
+                    },
+                }
+            },
+        ),
+    ],
+)
+def test_execution_realism_flag_off_is_byte_identical(
+    monkeypatch: pytest.MonkeyPatch,
+    template: str,
+    symbols: list[str],
+    parameters: dict,
+) -> None:
+    base_payload = {
+        "template": template,
+        "asset_class": "equity",
+        "symbols": symbols,
+        "timeframe": "1D",
+        "start_date": date(2025, 1, 1),
+        "end_date": date(2025, 1, 7),
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": parameters,
+    }
+    realism_payload = {
+        **base_payload,
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 25,
+            "slippage_bps": 40,
+        },
+    }
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+
+    base_config = engine.normalize_backtest_config(base_payload)
+    realism_config = engine.normalize_backtest_config(realism_payload)
+
+    assert "_execution_realism" not in realism_config
+    assert _stable_json(realism_config) == _stable_json(base_config)
+    assert _stable_json(engine.compute_alpha_metrics(realism_config)) == _stable_json(
+        engine.compute_alpha_metrics(base_config)
+    )
+    assert _stable_json(engine.build_result_chart(realism_config)) == _stable_json(
+        engine.build_result_chart(base_config)
+    )
+    assert _stable_json(
+        engine.build_result_card(
+            realism_config,
+            engine.compute_alpha_metrics(realism_config),
+            chart=engine.build_result_chart(realism_config),
+        )
+    ) == _stable_json(
+        engine.build_result_card(
+            base_config,
+            engine.compute_alpha_metrics(base_config),
+            chart=engine.build_result_chart(base_config),
+        )
+    )
+
+
+def test_signal_strategy_execution_realism_reduces_net_return_and_profit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "template": "signal_strategy",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": date(2025, 1, 1),
+        "end_date": date(2025, 1, 7),
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {
+            "rule_spec": {
+                "entry": {
+                    "conditions": [
+                        {
+                            "left": {"kind": "price", "field": "close"},
+                            "operator": "cross_above",
+                            "right": 101.0,
+                        }
+                    ]
+                },
+                "exit": {
+                    "conditions": [
+                        {
+                            "left": {"kind": "price", "field": "close"},
+                            "operator": "cross_above",
+                            "right": 109.0,
+                        }
+                    ]
+                },
+            }
+        },
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10,
+            "slippage_bps": 5,
+        },
+    }
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+    gross = engine.compute_alpha_metrics(engine.normalize_backtest_config(payload))
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    net = engine.compute_alpha_metrics(engine.normalize_backtest_config(payload))
+
+    gross_performance = gross["aggregate"]["performance"]
+    net_performance = net["aggregate"]["performance"]
+    assert net_performance["total_return_pct"] < gross_performance["total_return_pct"]
+    assert net_performance["profit"] < gross_performance["profit"]
+
+
 def test_max_drawdown_uses_peak_inside_selected_period() -> None:
     equity = pd.Series([100.0, 150.0, 120.0, 180.0])
 
@@ -475,6 +807,95 @@ def test_dca_metrics_use_actual_invested_cash_flows() -> None:
     assert metrics["aggregate"]["performance"]["profit"] == pytest.approx(40.68, abs=0.1)
 
 
+def test_dca_execution_realism_reduces_net_return_and_profit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "template": "dca_accumulation",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": date(2025, 1, 1),
+        "end_date": date(2025, 1, 7),
+        "side": "long",
+        "starting_capital": 100,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {"dca_cadence": "daily"},
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10,
+            "slippage_bps": 5,
+        },
+    }
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+    gross = engine.compute_alpha_metrics(engine.normalize_backtest_config(payload))
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    net = engine.compute_alpha_metrics(engine.normalize_backtest_config(payload))
+
+    gross_performance = gross["aggregate"]["performance"]
+    net_performance = net["aggregate"]["performance"]
+    assert net_performance["total_return_pct"] < gross_performance["total_return_pct"]
+    assert net_performance["profit"] < gross_performance["profit"]
+    assert net_performance["benchmark_return_pct"] < gross_performance[
+        "benchmark_return_pct"
+    ]
+
+
+def test_dca_execution_realism_drag_increases_with_more_fills(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_payload = {
+        "template": "dca_accumulation",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": date(2025, 1, 1),
+        "end_date": date(2025, 1, 7),
+        "side": "long",
+        "starting_capital": 100,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10,
+            "slippage_bps": 5,
+        },
+    }
+    daily_payload = {**base_payload, "parameters": {"dca_cadence": "daily"}}
+    weekly_payload = {**base_payload, "parameters": {"dca_cadence": "weekly"}}
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+    daily_gross = engine.compute_alpha_metrics(
+        engine.normalize_backtest_config(daily_payload)
+    )
+    weekly_gross = engine.compute_alpha_metrics(
+        engine.normalize_backtest_config(weekly_payload)
+    )
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    daily_net = engine.compute_alpha_metrics(engine.normalize_backtest_config(daily_payload))
+    weekly_net = engine.compute_alpha_metrics(
+        engine.normalize_backtest_config(weekly_payload)
+    )
+
+    assert daily_net["aggregate"]["efficiency"]["total_trades"] > weekly_net[
+        "aggregate"
+    ][
+        "efficiency"
+    ]["total_trades"]
+    daily_profit_drag = (
+        daily_gross["aggregate"]["performance"]["profit"]
+        - daily_net["aggregate"]["performance"]["profit"]
+    )
+    weekly_profit_drag = (
+        weekly_gross["aggregate"]["performance"]["profit"]
+        - weekly_net["aggregate"]["performance"]["profit"]
+    )
+    assert daily_profit_drag > weekly_profit_drag
+
+
 def test_multi_symbol_aggregate_uses_equal_weight_capital() -> None:
     config = engine.normalize_backtest_config(
         {
@@ -499,6 +920,43 @@ def test_multi_symbol_aggregate_uses_equal_weight_capital() -> None:
         abs=0.05,
     )
     assert set(metrics["by_symbol"]) == {"AAPL", "MSFT"}
+
+
+def test_multi_symbol_execution_costs_are_not_double_counted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    config = engine.normalize_backtest_config(
+        {
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL", "MSFT"],
+            "timeframe": "1D",
+            "start_date": date(2025, 1, 1),
+            "end_date": date(2025, 1, 7),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "SPY",
+            "parameters": {},
+            "_execution_realism": {
+                "enabled": True,
+                "fee_bps": 10,
+                "slippage_bps": 5,
+            },
+        }
+    )
+
+    metrics = engine.compute_alpha_metrics(config)
+    per_symbol_profit = sum(
+        symbol_metrics["performance"]["profit"]
+        for symbol_metrics in metrics["by_symbol"].values()
+    )
+
+    assert metrics["aggregate"]["performance"]["profit"] == pytest.approx(
+        per_symbol_profit,
+        abs=0.01,
+    )
 
 
 def test_indicator_signals_use_user_selected_thresholds(
@@ -724,6 +1182,104 @@ def test_build_result_card_dca_assumptions_name_recurring_contribution() -> None
     ]
 
 
+def test_build_result_card_shows_execution_realism_cost_and_effect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    config = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-01-07",
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {},
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+        },
+    }
+    metrics = {
+        "aggregate": {
+            "performance": {
+                "total_return_pct": 11.83,
+                "delta_vs_benchmark_pct": 5.83,
+                "profit": 1183.0,
+                "execution_realism": {
+                    "enabled": True,
+                    "fee_bps": 10.0,
+                    "slippage_bps": 5.0,
+                    "gross_total_return_pct": 12.0,
+                    "net_total_return_pct": 11.83,
+                    "return_drag_pct": 0.17,
+                },
+            },
+            "risk": {"max_drawdown_pct": 0.0},
+            "efficiency": {"win_rate": 0.0, "total_trades": 1},
+        }
+    }
+
+    card = engine.build_result_card(config, metrics)
+
+    assert card["assumptions"] == [
+        "Long-only",
+        "Equal weight",
+        "Net of 10 bps fee + 5 bps slippage",
+        "Benchmark: SPY (same modeled costs)",
+    ]
+    assert "Execution realism enabled" not in card["assumptions"]
+    assert card["execution_costs"] == {
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+        "gross_total_return_pct": 12.0,
+        "net_total_return_pct": 11.83,
+        "return_drag_pct": 0.17,
+        "benchmark_treatment": "same_modeled_costs",
+    }
+
+
+def test_build_result_card_omits_execution_costs_without_modeled_costs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-01-07",
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {},
+    }
+    metrics = {
+        "aggregate": {
+            "performance": {
+                "total_return_pct": 12.0,
+                "delta_vs_benchmark_pct": 6.0,
+                "profit": 1200.0,
+            },
+            "risk": {"max_drawdown_pct": 0.0},
+            "efficiency": {"win_rate": 0.0, "total_trades": 1},
+        }
+    }
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+    flag_off_card = engine.build_result_card(config, metrics)
+    assert "execution_costs" not in flag_off_card
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    flag_on_zero_cost_card = engine.build_result_card(config, metrics)
+    assert "execution_costs" not in flag_on_zero_cost_card
+
+
 def test_build_result_card_hides_win_rate_when_no_meaningful_closed_trades() -> None:
     config = {
         "template": "buy_and_hold",
@@ -812,3 +1368,19 @@ def test_validate_template_parameters_accepts_valid():
     }
     # Should not raise
     engine.validate_backtest_config(config)
+
+
+def test_execution_realism_flag_defaults_on_with_explicit_kill_switch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.backtesting.config import _execution_realism_feature_enabled
+
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    assert _execution_realism_feature_enabled()
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    assert _execution_realism_feature_enabled()
+
+    for kill_value in ("false", "FALSE", " off ", "0", "no"):
+        monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", kill_value)
+        assert not _execution_realism_feature_enabled(), kill_value

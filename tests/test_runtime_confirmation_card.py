@@ -1,7 +1,109 @@
 from __future__ import annotations
 
+import pytest
 from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.domain.engine_launch.display import format_timeframe_data_label
+
+
+def _confirmation_result_with_draft_costs() -> dict[str, object]:
+    return {
+        "stage_outcome": "await_approval",
+        "confirmation_payload": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "Buy and hold Apple with requested costs.",
+                "asset_universe": ["AAPL"],
+                "asset_class": "equity",
+                "date_range": {"start": "2025-01-01", "end": "2025-01-07"},
+                "extra_parameters": {
+                    "fee_rate": 0.001,
+                    "slippage": 0.0005,
+                },
+            },
+            "optional_parameters": {
+                "timeframe": {
+                    "label": "Timeframe",
+                    "source": "default",
+                    "value": "1D",
+                },
+                "fees": {"label": "Fees", "source": "default", "value": 0.0},
+                "slippage": {
+                    "label": "Slippage",
+                    "source": "default",
+                    "value": 0.0,
+                },
+            },
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AAPL",
+                "symbols": ["AAPL"],
+                "timeframe": "1D",
+                "date_range": {"start": "2025-01-01", "end": "2025-01-07"},
+                "sizing_mode": "capital_amount",
+                "capital_amount": 1000,
+                "position_size": None,
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+            },
+            "validation": {"executable": True},
+        },
+    }
+
+
+def test_runtime_confirmation_card_flag_off_never_advertises_modeled_costs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Flag off, the engine ignores draft fee/slippage values, so the card must
+    # keep the idealized truth even when an edit stored costs on the draft.
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+
+    card = runtime_confirmation_card(_confirmation_result_with_draft_costs())
+
+    assert card is not None
+    assert card["display_facts"] == {
+        "benchmark_symbol": "SPY",
+        "fees": 0.0,
+        "slippage": 0.0,
+        "timeframe": "1D",
+    }
+    assert "No fees" in card["assumptions"]
+    assert "No slippage" in card["assumptions"]
+    assert not any("Modeled costs" in item for item in card["assumptions"])
+
+
+def test_runtime_confirmation_card_flag_off_ignores_stale_launch_payload_costs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+    result = _confirmation_result_with_draft_costs()
+    result["confirmation_payload"]["launch_payload"]["_execution_realism"] = {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
+
+    card = runtime_confirmation_card(result)
+
+    assert card is not None
+    assert card["display_facts"]["fees"] == 0.0
+    assert card["display_facts"]["slippage"] == 0.0
+    assert "No fees" in card["assumptions"]
+    assert "No slippage" in card["assumptions"]
+    assert not any("Modeled costs" in item for item in card["assumptions"])
+
+
+def test_runtime_confirmation_card_flag_on_shows_draft_costs_without_launch_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+
+    card = runtime_confirmation_card(_confirmation_result_with_draft_costs())
+
+    assert card is not None
+    assert card["display_facts"]["fees"] == 0.001
+    assert card["display_facts"]["slippage"] == 0.0005
+    assert "Modeled costs: 10 bps fee + 5 bps slippage" in card["assumptions"]
 
 
 def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None:
@@ -187,6 +289,74 @@ def test_runtime_confirmation_card_promotes_default_starting_capital() -> None:
     )
     assert "$1,000 starting capital" not in card["assumptions"]
     assert "Benchmark: SPY" in card["assumptions"]
+
+
+def test_runtime_confirmation_card_shows_execution_realism_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold Apple with modeled costs.",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2025-01-01", "end": "2025-01-07"},
+                    "extra_parameters": {
+                        "fee_rate": 0.001,
+                        "slippage": 0.0005,
+                    },
+                },
+                "optional_parameters": {
+                    "timeframe": {
+                        "label": "Timeframe",
+                        "source": "default",
+                        "value": "1D",
+                    },
+                    "fees": {"label": "Fees", "source": "default", "value": 0.0},
+                    "slippage": {
+                        "label": "Slippage",
+                        "source": "default",
+                        "value": 0.0,
+                    },
+                },
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbol": "AAPL",
+                    "symbols": ["AAPL"],
+                    "timeframe": "1D",
+                    "date_range": {"start": "2025-01-01", "end": "2025-01-07"},
+                    "sizing_mode": "capital_amount",
+                    "capital_amount": 1000,
+                    "position_size": None,
+                    "parameters": {},
+                    "risk_rules": [],
+                    "benchmark_symbol": "SPY",
+                    "_execution_realism": {
+                        "enabled": True,
+                        "fee_bps": 10.0,
+                        "slippage_bps": 5.0,
+                    },
+                },
+                "validation": {"executable": True},
+            },
+        }
+    )
+
+    assert card is not None
+    assert card["display_facts"] == {
+        "benchmark_symbol": "SPY",
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "1D",
+    }
+    assert "Modeled costs: 10 bps fee + 5 bps slippage" in card["assumptions"]
+    assert "No fees" not in card["assumptions"]
+    assert "No slippage" not in card["assumptions"]
 
 
 def test_runtime_confirmation_card_localizes_spanish_confirmation_artifact() -> None:
@@ -674,3 +844,25 @@ def test_runtime_confirmation_card_carries_active_confirmation_identity() -> Non
         action for action in card["actions"] if action["type"] == "run_backtest"
     )
     assert run_action["payload"]["confirmation_id"] == "confirm-1"
+
+
+def test_runtime_confirmation_card_flag_off_omits_capabilities(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+
+    card = runtime_confirmation_card(_confirmation_result_with_draft_costs())
+
+    assert card is not None
+    assert "capabilities" not in card
+
+
+def test_runtime_confirmation_card_flag_on_marks_execution_costs_editable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+
+    card = runtime_confirmation_card(_confirmation_result_with_draft_costs())
+
+    assert card is not None
+    assert card["capabilities"] == {"execution_costs_editable": True}

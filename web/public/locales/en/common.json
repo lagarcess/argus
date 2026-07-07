@@ -383,8 +383,6 @@
         "peak_value": "Peak value",
         "lowest_value": "Lowest value",
         "date_range": "Date range",
-        "peak_value": "Peak value",
-        "lowest_value": "Lowest value",
         "timeframe": "Timeframe",
         "side": "Side",
         "allocation": "Allocation",
@@ -392,7 +390,12 @@
         "cadence": "Cadence",
         "contribution": "Contribution",
         "entry_rule": "Entry rule",
-        "exit_rule": "Exit rule"
+        "exit_rule": "Exit rule",
+        "gross_return": "Gross return",
+        "net_return": "Net of costs",
+        "modeled_costs": "Costs modeled",
+        "modeled_costs_value": "{{fee}} bps fee + {{slippage}} bps slippage",
+        "benchmark_same_costs": "{{benchmark}} (same modeled costs)"
       },
       "timeframe": {
         "daily": "Daily data",
@@ -500,7 +503,17 @@
         "through": "Through {{date}}",
         "no_fees": "No fees",
         "no_slippage": "No slippage",
-        "benchmark": "Benchmark: {{symbol}}"
+        "benchmark": "Benchmark: {{symbol}}",
+        "modeled_costs": "Modeled costs: {{fee}} bps fee + {{slippage}} bps slippage"
+      },
+      "cost_editor": {
+        "edit_chip": "Edit costs",
+        "fee_label": "Fee % per trade",
+        "slippage_label": "Slippage % per trade",
+        "apply": "Apply",
+        "cancel": "Cancel",
+        "invalid": "Enter percentages of 0 or more (slippage up to {{max}}%).",
+        "message": "Set fees to {{fee}}% and slippage to {{slippage}}% per trade."
       }
     }
   },

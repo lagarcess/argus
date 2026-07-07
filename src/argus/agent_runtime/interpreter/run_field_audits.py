@@ -932,8 +932,10 @@ def _latest_result_routing_audit_messages(
                 "focus=max_drawdown and fact_key=max_drawdown for questions asking "
                 "how large the drawdown was. Use focus=result_card_fact and set "
                 "fact_key to the canonical metric name for other factual values, "
-                "including unsupported metrics like sortino_ratio. "
-                "why_underperformed for questions that ask why a result matched, "
+                "including execution-cost facts such as fee_bps, slippage_bps, "
+                "gross_total_return, net_total_return, return_drag, and "
+                "benchmark_cost_treatment. Keep unsupported metrics like "
+                "sortino_ratio unsupported. Use why_underperformed for questions that ask why a result matched, "
                 "beat, lagged, or compared with its benchmark; use what_tested only "
                 "when the user is asking for the run setup itself."
             ),
@@ -974,6 +976,12 @@ def _latest_result_fact_bank_for_routing(
             "benchmark_return",
             "benchmark_delta",
             "max_drawdown",
+            "fee_bps",
+            "slippage_bps",
+            "gross_total_return",
+            "net_total_return",
+            "return_drag",
+            "benchmark_cost_treatment",
             "runnable_next_tests",
         )
         if key in fact_bank
