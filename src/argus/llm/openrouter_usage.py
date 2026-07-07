@@ -65,6 +65,16 @@ def normalize_openrouter_token_usage(
     for key, raw in value.items():
         if not isinstance(key, str) or isinstance(raw, bool):
             continue
+        if key == "prompt_tokens_details" and isinstance(raw, dict):
+            for detail_key in ("cached_tokens", "cache_write_tokens"):
+                detail_value = raw.get(detail_key)
+                if isinstance(detail_value, bool):
+                    continue
+                if isinstance(detail_value, int):
+                    normalized[detail_key] = detail_value
+                elif isinstance(detail_value, float) and detail_value.is_integer():
+                    normalized[detail_key] = int(detail_value)
+            continue
         if isinstance(raw, int):
             normalized[key] = raw
         elif isinstance(raw, float) and raw.is_integer():

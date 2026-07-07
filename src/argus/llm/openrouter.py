@@ -6,10 +6,10 @@ import os
 import time
 from collections.abc import Iterable
 from contextvars import ContextVar, Token
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from threading import Lock
-from typing import Literal, TypeVar
+from typing import Literal, TypeVar, cast
 
 import httpx
 from dotenv import load_dotenv
@@ -193,6 +193,13 @@ _TIER_CANDIDATE_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {
     ),
 }
 
+_VALID_REASONING_EFFORTS = frozenset(("xhigh", "high", "medium", "low", "minimal", "none"))
+_REASONING_EFFORT_ENV_BY_TASK: dict[OpenRouterTask, str] = {
+    "interpretation": "ARGUS_STRUCTURED_REASONING_EFFORT",
+    "capability_conflict": "ARGUS_CAPABILITY_REASONING_EFFORT",
+}
+_PROMPT_CACHE_STRUCTURED_ARTIFACT_TASKS = frozenset(("interpretation", "interpretation_repair", "field_fidelity", "capability_conflict"))
+
 
 def openrouter_model_tier_for_task(task: OpenRouterTask | None) -> OpenRouterModelTier:
     if task is None:
@@ -306,15 +313,13 @@ def openrouter_task_timeout_seconds(task: OpenRouterTask) -> float:
 def openrouter_profile_for_task(task: OpenRouterTask) -> OpenRouterProfile:
     profile = OPENROUTER_PROFILES[task]
     timeout_override = _task_timeout_override_seconds(task)
-    if timeout_override is None:
+    reasoning_effort = _task_reasoning_effort_override(task)
+    if timeout_override is None and reasoning_effort is None:
         return profile
-    return OpenRouterProfile(
-        task=profile.task,
-        temperature=profile.temperature,
-        max_tokens=profile.max_tokens,
-        timeout_seconds=timeout_override,
-        max_retries=profile.max_retries,
-        reasoning_effort=profile.reasoning_effort,
+    return replace(
+        profile,
+        timeout_seconds=timeout_override or profile.timeout_seconds,
+        reasoning_effort=reasoning_effort or profile.reasoning_effort,
     )
 
 
@@ -339,6 +344,18 @@ def _task_timeout_override_seconds(task: OpenRouterTask) -> int | None:
         )
         return None
     return timeout_seconds
+
+
+def _task_reasoning_effort_override(task: OpenRouterTask) -> OpenRouterReasoningEffort | None:
+    env_name = _REASONING_EFFORT_ENV_BY_TASK.get(task)
+    raw_value = os.getenv(env_name, "") if env_name else ""
+    normalized = raw_value.strip().lower()
+    if not normalized:
+        return None
+    if normalized in _VALID_REASONING_EFFORTS:
+        return cast(OpenRouterReasoningEffort, normalized)
+    logger.warning("Ignoring invalid OpenRouter reasoning effort override", llm_task=task, reasoning_effort_env_value=raw_value)
+    return None
 
 
 def record_openrouter_route_receipt(
@@ -831,6 +848,23 @@ def _apply_reasoning_for_structured_artifact(
     payload["reasoning"] = {"effort": profile.reasoning_effort}
 
 
+def _messages_with_stable_prefix_prompt_cache(
+    messages: list[dict[str, str]],
+    *,
+    task: OpenRouterTask,
+) -> list[dict[str, object]]:
+    payload_messages: list[dict[str, object]] = [dict(message) for message in messages]
+    if task not in _PROMPT_CACHE_STRUCTURED_ARTIFACT_TASKS:
+        return payload_messages
+
+    cache_index = 0
+    content = payload_messages[0].get("content") if payload_messages and payload_messages[0].get("role") == "system" else None
+    if not isinstance(content, str) or not content:
+        return payload_messages
+    payload_messages[cache_index]["content"] = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
+    return payload_messages
+
+
 _SCHEMA_IN_PROMPT_INSTRUCTION = (
     "Return a single JSON object that validates against this JSON Schema. "
     "Output only the JSON object, no prose, no code fences.\nJSON Schema:\n"
@@ -860,7 +894,7 @@ def _json_schema_payload(
         }
         payload: dict[str, object] = {
             "model": model,
-            "messages": [schema_message, *messages],
+            "messages": _messages_with_stable_prefix_prompt_cache([schema_message, *messages], task=profile.task),
             "temperature": profile.temperature,
             "max_tokens": profile.max_tokens,
         }
@@ -868,7 +902,7 @@ def _json_schema_payload(
         return payload
     payload = {
         "model": model,
-        "messages": messages,
+        "messages": _messages_with_stable_prefix_prompt_cache(messages, task=profile.task),
         "response_format": {
             "type": "json_schema",
             "json_schema": {
