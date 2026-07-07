@@ -108,6 +108,37 @@ def test_unparsed_spanish_singular_year_does_not_become_day_window() -> None:
     )
 
 
+def test_leap_day_trailing_year_stays_month_aligned_not_366_days() -> None:
+    # "last year" on Feb 29 clamps its start to Feb 28 of the prior non-leap
+    # year; the window must keep its year/month label, not become "366 days".
+    today = date(2028, 2, 29)
+
+    assert resolve_rolling_window_intent_text(
+        "last year",
+        today=today,
+        languages=("en",),
+    ) == {
+        "kind": "rolling_window",
+        "count": 1,
+        "unit": "year",
+        "anchor": "today",
+        "confidence": 0.65,
+        "evidence": "last year",
+    }
+    assert resolve_rolling_window_intent_text(
+        "últimos 12 meses",
+        today=today,
+        languages=("es", "en"),
+    ) == {
+        "kind": "rolling_window",
+        "count": 12,
+        "unit": "month",
+        "anchor": "today",
+        "confidence": 0.65,
+        "evidence": "últimos 12 meses",
+    }
+
+
 def test_resolves_relative_year_windows_before_strategy_semantics() -> None:
     today = date(2026, 6, 16)
 

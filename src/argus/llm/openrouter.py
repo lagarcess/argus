@@ -896,12 +896,22 @@ def _json_content_without_code_fences(content: str) -> str:
 
     text = content.strip()
     if not text.startswith("```"):
-        if text.startswith(("{", "[")) or "```" not in text:
+        fence_at = text.find("```")
+        if text.startswith(("{", "[")) or fence_at == -1:
             return text
-        # Leading prose before a fenced body ("Here is the JSON: ```json ...").
-        # Bare JSON is returned above untouched, so a ``` inside a JSON string
-        # never triggers this.
-        text = text[text.find("```") :]
+        # A JSON value that opens before the first ``` and parses past it owns
+        # that ``` as string content; otherwise the fence is real and the
+        # fenced body wins.
+        brace_candidates = [i for i in (text.find("{"), text.find("[")) if i != -1]
+        brace_at = min(brace_candidates) if brace_candidates else -1
+        if brace_at != -1 and brace_at < fence_at:
+            try:
+                _, span = json.JSONDecoder().raw_decode(text[brace_at:])
+            except ValueError:
+                span = 0
+            if brace_at + span > fence_at:
+                return text[brace_at : brace_at + span]
+        text = text[fence_at:]
     text = text[len("```") :]
     info_end = 0
     while info_end < len(text) and (

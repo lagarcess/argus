@@ -834,3 +834,47 @@ def test_result_followup_asset_swap_with_inferred_target_confirms(
     assert strategy.cadence == "monthly"
     assert strategy.capital_amount == 500
     assert "result_followup_target_inferred" in result.decision.reason_codes
+
+
+def test_result_patch_asset_universe_ignores_dash_slash_spelling_difference():
+    """BRK-B in the turn draft and BRK/B on the anchor are the same asset; a
+    result patch must not carry a spurious asset change for the spelling."""
+
+    from argus.agent_runtime.profile.response_profile import (
+        resolve_effective_response_profile,
+    )
+    from argus.agent_runtime.stages.interpret_actions import (
+        _planned_asset_universe_for_result_patch,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretDecision
+
+    decision = InterpretDecision(
+        intent="results_explanation",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="Refine the completed run.",
+        candidate_strategy_draft=StrategySummary(asset_universe=["BRK-B"]),
+        confidence=0.9,
+        reason_codes=["artifact_assumption_edit_planned"],
+        effective_response_profile=resolve_effective_response_profile(
+            user=UserState(user_id="u1"),
+            explicit_overrides=None,
+        ),
+    )
+
+    assert (
+        _planned_asset_universe_for_result_patch(
+            decision=decision,
+            anchor_draft=StrategySummary(asset_universe=["BRK/B"]),
+        )
+        is None
+    )
+    # A genuinely different universe still carries through as a patch.
+    assert _planned_asset_universe_for_result_patch(
+        decision=decision.model_copy(
+            update={
+                "candidate_strategy_draft": StrategySummary(asset_universe=["NVDA"]),
+            }
+        ),
+        anchor_draft=StrategySummary(asset_universe=["BRK/B"]),
+    ) == ["NVDA"]

@@ -74,6 +74,7 @@ def _response_needs_temporal_runtime_repair(
     )
     if _llm_value_is_empty(draft.date_range):
         return resolved_from_draft is not None
+    has_relative_window = _current_turn_has_relative_window_evidence(request)
     current_message_range = _date_range_from_current_turn_message(request)
     if (
         current_message_range is not None
@@ -83,11 +84,11 @@ def _response_needs_temporal_runtime_repair(
         != _normalized_stated_field(current_message_range)
         and (
             "runtime_date_range_normalization" not in response.reason_codes
-            or _current_turn_has_relative_window_evidence(request)
+            or has_relative_window
         )
     ):
         return True
-    if _current_turn_has_relative_window_evidence(request):
+    if has_relative_window:
         return (
             resolved_from_draft is None
             or not isinstance(draft.date_range, dict)

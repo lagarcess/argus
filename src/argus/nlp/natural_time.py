@@ -315,6 +315,17 @@ def resolve_date_range_intent(
     return None
 
 
+def _is_leap_day_clamp_pair(start: date, end: date) -> bool:
+    """True when a Feb-29 anchor clamped to Feb-28 marks the same month/year day.
+
+    A trailing 1-year window ending on Feb 29 subtracts to Feb 28 of the prior
+    (non-leap) year, so the endpoints share a month-aligned anchor even though
+    their day-of-month differs.
+    """
+
+    return {(start.month, start.day), (end.month, end.day)} == {(2, 28), (2, 29)}
+
+
 def _rolling_window_fields_from_range(
     *,
     start: date,
@@ -324,7 +335,7 @@ def _rolling_window_fields_from_range(
     if end < start or end != today:
         return None
     month_delta = (end.year - start.year) * 12 + (end.month - start.month)
-    if month_delta > 0 and start.day == end.day:
+    if month_delta > 0 and (start.day == end.day or _is_leap_day_clamp_pair(start, end)):
         return {"count": month_delta, "unit": "month"}
     day_delta = end.toordinal() - start.toordinal()
     if day_delta <= 0:

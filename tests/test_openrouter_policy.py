@@ -3729,3 +3729,34 @@ def test_json_content_code_fence_stripping_handles_provider_variants() -> None:
         openrouter._json_content_without_code_fences(bare_json_with_fence)
         == bare_json_with_fence
     )
+
+
+def test_json_content_fence_inside_json_string_value_is_not_a_fence() -> None:
+    """A ``` inside a JSON string value is content, not a fence: when a JSON
+    value opens before the first ``` and parses past it, that value is
+    extracted instead of being truncated at the embedded fence."""
+
+    prose_then_json = 'Note: {"note": "wrap code in ``` blocks", "ok": true}'
+    assert (
+        openrouter._json_content_without_code_fences(prose_then_json)
+        == '{"note": "wrap code in ``` blocks", "ok": true}'
+    )
+    prose_then_array = 'Result: ["keep ``` intact", "ok"]'
+    assert (
+        openrouter._json_content_without_code_fences(prose_then_array)
+        == '["keep ``` intact", "ok"]'
+    )
+
+
+def test_json_content_prose_brace_before_real_fence_still_yields_body() -> None:
+    """A brace inside leading prose does not demote a real fenced body: junk
+    braces and prose JSON that closes before the fence both defer to it."""
+
+    junk_brace = 'Here is the schema {...}: ```json\n{"ok": true}\n```'
+    schema_mention = (
+        'Matching {"type": "object"} as requested: ```json\n{"ok": true}\n```'
+    )
+    for content in (junk_brace, schema_mention):
+        assert (
+            openrouter._json_content_without_code_fences(content) == '{"ok": true}'
+        ), content

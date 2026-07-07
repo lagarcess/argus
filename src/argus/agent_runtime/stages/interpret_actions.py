@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from argus.agent_runtime.artifacts.asset_edits import same_asset_universe
 from argus.agent_runtime.artifacts.continuity import (
     apply_patch_to_anchor,
     patched_draft_from_candidate,
@@ -951,10 +952,7 @@ def _planned_asset_universe_for_result_patch(
     if not draft_assets or anchor_draft is None:
         return None
 
-    def normalized(symbols: list[str]) -> set[str]:
-        return {str(symbol).strip().upper() for symbol in symbols}
-
-    if normalized(draft_assets) == normalized(anchor_draft.asset_universe):
+    if same_asset_universe(draft_assets, anchor_draft.asset_universe):
         return None
     return list(draft_assets)
 
