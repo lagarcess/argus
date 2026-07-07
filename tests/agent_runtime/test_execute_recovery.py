@@ -1617,21 +1617,20 @@ def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
     }
 
     result = explain_stage(state=state)
+    response = result.patch["assistant_response"]
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"].startswith("**Quick take**")
+    assert response.startswith("The strategy returned 14.0%")
     assert (
         "Tested: the confirmed strategy: Test a Tesla pullback idea."
-        in result.patch["assistant_response"]
+        in response
     )
-    assert "Defaults: Initial capital." in result.patch["assistant_response"]
-    assert "User-set options: Timeframe." in result.patch["assistant_response"]
-    assert (
-        "return comparison, not causal attribution" in result.patch["assistant_response"]
-    )
+    assert "Defaults: Initial capital." in response
+    assert "User-set options: Timeframe." in response
+    assert "return comparison, not causal attribution" in response
 
 
-def test_explain_stage_localizes_spanish_quick_take_heading() -> None:
+def test_explain_stage_spanish_fallback_does_not_render_language_heading() -> None:
     state = RunState.new(current_user_message="por que", recent_thread_history=[])
     state.effective_response_profile = ResponseProfile(
         effective_tone="friendly",
@@ -1660,19 +1659,17 @@ def test_explain_stage_localizes_spanish_quick_take_heading() -> None:
 
     result = explain_stage(state=state, language="es-419")
 
-    assert result.patch["assistant_response"].startswith("**Resumen rápido**")
+    assert result.patch["assistant_response"].startswith("The strategy returned")
+    assert not result.patch["assistant_response"].startswith("**Resumen rápido**")
     assert not result.patch["assistant_response"].startswith("**Quick take**")
-    assert "- Probado: ETH: comprar y mantener" in result.patch["assistant_response"]
+    assert "- Tested: ETH buy and hold" in result.patch["assistant_response"]
     assert "1 de enero de 2024 al 31 de marzo de 2024" in result.patch[
         "assistant_response"
     ]
-    assert "Valores predeterminados: capital inicial." in result.patch[
-        "assistant_response"
-    ]
-    assert "Opciones elegidas: temporalidad." in result.patch["assistant_response"]
+    assert "Defaults: capital inicial." in result.patch["assistant_response"]
+    assert "User-set options: temporalidad." in result.patch["assistant_response"]
     assert "Initial capital" not in result.patch["assistant_response"]
     assert "Timeframe" not in result.patch["assistant_response"]
-    assert "- Tested:" not in result.patch["assistant_response"]
 
 
 @pytest.mark.asyncio
@@ -1696,12 +1693,12 @@ async def test_explain_stage_async_validates_next_checks_without_rendering_them(
             "next_experiment_option_kinds": ["adjust_signal_periods"],
             "fact_ids": [
                 "tested_summary",
-                    "total_return",
-                    "benchmark_return",
-                    "benchmark_symbol",
-                    "benchmark_comparison",
-                    "caveat",
-                ],
+                "total_return",
+                "benchmark_return",
+                "benchmark_symbol",
+                "benchmark_comparison",
+                "caveat",
+            ],
         }
 
     monkeypatch.setattr(
@@ -1729,7 +1726,7 @@ async def test_explain_stage_async_validates_next_checks_without_rendering_them(
 
     result = await explain_stage_async(state=state)
 
-    assert result.stage_patch["assistant_response"].startswith("**Quick take**")
+    assert result.stage_patch["assistant_response"].startswith("The TSLA test")
     assert "adjust the signal periods" not in result.stage_patch["assistant_response"]
     assert "Next check" not in result.stage_patch["assistant_response"]
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
@@ -1749,7 +1746,7 @@ async def test_explain_stage_async_validates_next_checks_without_rendering_them(
 
 
 @pytest.mark.asyncio
-async def test_explain_stage_async_localizes_spanish_quick_take_heading(
+async def test_explain_stage_async_composes_spanish_quick_take_without_heading(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import explain as explain_module
@@ -1802,19 +1799,20 @@ async def test_explain_stage_async_localizes_spanish_quick_take_heading(
 
     result = await explain_stage_async(state=state, language="es-419")
 
-    assert result.stage_patch["assistant_response"].startswith("**Resumen rápido**")
+    assert result.stage_patch["assistant_response"].startswith("ETH rindió +55.1%")
+    assert not result.stage_patch["assistant_response"].startswith("**Resumen rápido**")
     assert not result.stage_patch["assistant_response"].startswith("**Quick take**")
-    assert "La estrategia rindió 55.1% mientras BTC rindió 61.4%" in result.stage_patch[
+    assert "Se probó comprar y mantener ETH" in result.stage_patch[
         "assistant_response"
     ]
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
     messages = captured["messages"]
     assert isinstance(messages, list)
-    assert "Write every user-facing field" in messages[0]["content"]
+    assert "Answer in Spanish" in messages[0]["content"]
     context = json.loads(messages[1]["content"])
     assert context["language"] == "es-419"
     assert context["fact_bank"]["tested_summary"].startswith(
-        "ETH: comprar y mantener del 1 de enero de 2024"
+        "ETH buy and hold over 1 de enero de 2024"
     )
     assert "2024-01-01 to 2024-03-31" not in context["fact_bank"]["tested_summary"]
 
@@ -1875,9 +1873,11 @@ async def test_explain_stage_async_drops_mixed_language_optional_spanish_quick_t
     result = await explain_stage_async(state=state, language="es-419")
     response = result.stage_patch["assistant_response"]
 
-    assert response.startswith("**Resumen rápido**")
+    assert response.startswith("Comprar y mantener AAPL")
+    assert not response.startswith("**Resumen rápido**")
+    assert not response.startswith("**Quick take**")
     assert "total return for" not in response
-    assert "Probado:" in response
+    assert "Simulación histórica solamente" not in response
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
     assert result.stage_patch["assistant_response_fallback_used"] is False
 
@@ -1897,10 +1897,7 @@ async def test_explain_stage_async_renders_spanish_setup_from_canonical_facts(
             "takeaway": (
                 "AAPL rindió +46.7%, superando a SPY por 23.6 puntos porcentuales."
             ),
-            "tested_bullet": (
-                "AAPL buy and hold. Entry rule: buy at the start of the period; "
-                "exit rule: hold through the end."
-            ),
+            "tested_bullet": "Se probó comprar y mantener AAPL en la ventana confirmada.",
             "meaning_bullet": "La comparación sirve como evidencia histórica.",
             "next_check_bullet": None,
             "assumption_bullet": None,
@@ -1947,12 +1944,11 @@ async def test_explain_stage_async_renders_spanish_setup_from_canonical_facts(
     assert isinstance(messages, list)
     context = json.loads(messages[1]["content"])
 
-    assert context["fact_bank"]["rule_summary"].startswith("Regla:")
-    assert "Entry rule" not in context["fact_bank"]["rule_summary"]
+    assert context["fact_bank"]["rule_summary"].startswith("Rule:")
     assert "Entry rule" not in response
     assert "benchmark SPY" not in response
-    assert "superó la referencia por 23.6 puntos porcentuales" in response
-    assert "Regla: compra al inicio del periodo" in response
+    assert "superando a SPY por 23.6 puntos porcentuales" in response
+    assert "Se probó comprar y mantener AAPL" in response
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
     assert result.stage_patch["assistant_response_fallback_used"] is False
 
@@ -2011,7 +2007,7 @@ async def test_explain_stage_async_accepts_spanish_decimal_comma_benchmark_gap(
     result = await explain_stage_async(state=state, language="es-419")
     response = result.stage_patch["assistant_response"]
 
-    assert response.startswith("**Resumen rápido**")
+    assert response.startswith("AAPL y MSFT rindieron")
     assert "SPY" in response
     assert "puntos porcentuales" in response
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
@@ -2162,6 +2158,62 @@ async def test_explain_stage_async_renders_quick_take_from_canonical_facts(
 
 
 @pytest.mark.asyncio
+async def test_explain_stage_async_rejects_mismatched_quick_take_return_values(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
+        return {
+            "relative_performance_claim": "beat_benchmark",
+            "takeaway": "AAPL beat QQQ by 8.1 percentage points in this historical test.",
+            "tested_bullet": "Tested AAPL buy and hold over the confirmed 2024 window.",
+            "meaning_bullet": "AAPL returned +46.7%, while QQQ returned +38.6%.",
+            "next_check_bullet": None,
+            "assumption_bullet": None,
+            "caveat_bullet": "Historical simulation only.",
+            "next_experiment_option_kinds": [],
+            "fact_ids": [
+                "tested_summary",
+                "total_return",
+                "benchmark_return",
+                "benchmark_comparison",
+                "benchmark_symbol",
+                "caveat",
+            ],
+        }
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_json_schema",
+        fake_quick_take_plan,
+    )
+    state = RunState.new(current_user_message="why", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "AAPL buy and hold against QQQ.",
+            "asset_universe": ["AAPL"],
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+        },
+        "optional_parameters": {},
+    }
+    state.final_response_payload = {
+        "result": {"total_return": 0.35, "benchmark_return": 0.269},
+        "explanation_context": {"benchmark_symbol": "QQQ"},
+    }
+
+    result = await explain_stage_async(state=state)
+    response = result.stage_patch["assistant_response"]
+
+    assert result.stage_patch["assistant_response_fallback_used"] is True
+    assert "46.7%" not in response
+    assert "38.6%" not in response
+    assert "35.0%" in response
+    assert "26.9%" in response
+
+
+@pytest.mark.asyncio
 async def test_explain_stage_async_ignores_unknown_optional_fact_ids_after_required_facts(
     monkeypatch,
 ) -> None:
@@ -2264,7 +2316,7 @@ async def test_explain_stage_async_accepts_natural_benchmark_gap_wording(
     response = result.stage_patch["assistant_response"]
 
     assert "QQQ" in response
-    assert "lagged by 5.3 percentage points" in response
+    assert "trailed QQQ by 5.3 percentage points" in response
     assert "template wording" in response
 
 
@@ -2321,13 +2373,13 @@ async def test_explain_stage_async_does_not_reject_grounded_copy_for_missing_fac
     response = result.stage_patch["assistant_response"]
 
     assert "SPY" in response
-    assert "lagged by 13.3 percentage points" in response
+    assert "lagged SPY by 13.3 percentage points" in response
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
     assert result.stage_patch["assistant_response_fallback_used"] is False
 
 
 @pytest.mark.asyncio
-async def test_explain_stage_async_uses_canonical_takeaway_for_visible_benchmark_facts(
+async def test_explain_stage_async_falls_back_when_required_fact_metadata_is_missing(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import explain as explain_module
@@ -2377,9 +2429,9 @@ async def test_explain_stage_async_uses_canonical_takeaway_for_visible_benchmark
 
     assert "SPY" in response
     assert "lagged by 3.1 percentage points" in response
-    assert "directional evidence" in response
-    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
-    assert result.stage_patch["assistant_response_fallback_used"] is False
+    assert "directional evidence" not in response
+    assert result.stage_patch["assistant_response_source"] == "deterministic_fallback"
+    assert result.stage_patch["assistant_response_fallback_used"] is True
 
 
 @pytest.mark.asyncio
@@ -2440,7 +2492,7 @@ async def test_explain_stage_async_accepts_clean_copy_with_wrong_language_self_r
     response = result.stage_patch["assistant_response"]
 
     assert "SPY" in response
-    assert "lagged by 13.3 percentage points" in response
+    assert "That lagged SPY by 13.3 percentage points" in response
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
     assert result.stage_patch["assistant_response_fallback_used"] is False
 
@@ -2454,7 +2506,10 @@ async def test_explain_stage_async_drops_optional_mixed_language_prose_without_f
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
         return {
             "relative_performance_claim": "lagged_benchmark",
-            "takeaway": "AAPL y MSFT quedaron por debajo de SPY.",
+            "takeaway": (
+                "AAPL y MSFT rindieron 12.8% mientras SPY rindió 26.1%; "
+                "quedaron por debajo por 13.3 puntos porcentuales."
+            ),
             "tested_bullet": "total return for AAPL and MSFT",
             "meaning_bullet": "Keep in mind this is historical simulation only.",
             "next_check_bullet": None,
@@ -2494,8 +2549,8 @@ async def test_explain_stage_async_drops_optional_mixed_language_prose_without_f
     result = await explain_stage_async(state=state, language="es-419")
     response = result.stage_patch["assistant_response"]
 
-    assert "La estrategia rindió 12.8% mientras SPY rindió 26.1%" in response
-    assert "Probado:" in response
+    assert response.startswith("AAPL y MSFT rindieron 12.8%")
+    assert "Probado:" not in response
     assert "total return for" not in response
     assert "Keep in mind" not in response
     assert "Same period" not in response
@@ -2511,7 +2566,7 @@ def test_explain_stage_quick_take_validation_has_no_language_fragment_blacklist(
 
     assert "english_fragments" not in source
     assert "_quick_take_matches_requested_language" not in source
-    assert "import re" not in source
+    assert "import re" not in {line.strip() for line in source.splitlines()}
 
 
 @pytest.mark.asyncio
@@ -2563,7 +2618,7 @@ async def test_explain_stage_async_accepts_supported_next_experiment_labels(
     response = result.stage_patch["assistant_response"]
 
     assert "SPY" in response
-    assert "lagged by 13.3 percentage points" in response
+    assert "lagged SPY by 13.3 percentage points" in response
     assert "change the date range" not in response
     assert "Next check" not in response
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
@@ -2619,7 +2674,7 @@ async def test_explain_stage_async_ignores_unrendered_next_experiment_kinds(
     response = result.stage_patch["assistant_response"]
 
     assert "SPY" in response
-    assert "lagged by 13.3 percentage points" in response
+    assert "lagged SPY by 13.3 percentage points" in response
     assert "invent a new private metric" not in response
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
     assert result.stage_patch["assistant_response_fallback_used"] is False
@@ -2679,8 +2734,8 @@ async def test_explain_stage_async_replaces_signed_benchmark_delta_takeaway(
 
     assert "-5.3" not in response
     assert "lagged by 5.3 percentage points" in response
-    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
-    assert result.stage_patch["assistant_response_fallback_used"] is False
+    assert result.stage_patch["assistant_response_source"] == "deterministic_fallback"
+    assert result.stage_patch["assistant_response_fallback_used"] is True
 
 
 @pytest.mark.asyncio
@@ -2912,7 +2967,7 @@ def test_explain_stage_varies_with_expertise_mode() -> None:
     beginner_result = explain_stage(state=beginner_state)
     advanced_result = explain_stage(state=advanced_state)
 
-    assert beginner_result.patch["assistant_response"].startswith("**Quick take**")
+    assert beginner_result.patch["assistant_response"].startswith("The strategy returned")
     assert (
         "evidence check"
         in beginner_result.patch["assistant_response"].lower()
@@ -2939,7 +2994,7 @@ def test_explain_stage_deterministic_fallback_avoids_report_tone() -> None:
     result = explain_stage(state=state)
     response = result.patch["assistant_response"]
 
-    assert response.startswith("**Quick take**")
+    assert response.startswith("The strategy returned")
     assert "Result card:" not in response
     assert "Breakdown:" not in response
     assert "1D bars" not in response

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from argus.agent_runtime.presentation_i18n import optional_parameter_display_label
+from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.response_style import (
     ARGUS_RESPONSE_STYLE_CONTRACT,
     with_response_heading,
@@ -59,12 +60,7 @@ RESULT_READOUT_FAILURE_QUICK_TAKE_DRAFT_REJECTED = "quick_take_draft_rejected"
 
 
 def _quick_take_heading(language: str | None) -> str:
-    return "Resumen rápido" if _is_spanish(language) else "Quick take"
-
-
-def _is_spanish(language: str | None) -> bool:
-    normalized = str(language or "").strip().lower()
-    return normalized.startswith("es")
+    return ""
 
 
 @dataclass(frozen=True)
@@ -327,17 +323,6 @@ async def _llm_explanation(
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
-    canonical_takeaway: str | None = None
-    if total_return is not None and benchmark_return is not None:
-        canonical_takeaway = _readout_takeaway(
-            total_return=total_return,
-            benchmark_return=benchmark_return,
-            benchmark_symbol=str(benchmark_contract.get("benchmark_symbol") or ""),
-            same_period=same_period,
-            delta=total_return - benchmark_return,
-            execution_note=execution_note,
-            language=language,
-        )
     fact_context = {
         "tested_summary": tested_summary,
         "execution_note": execution_note,
@@ -376,12 +361,26 @@ async def _llm_explanation(
                 "supplied fact_bank facts for metrics, symbols, dates, assumptions, "
                 "and next-test labels. The result card answers what happened; your "
                 "job is to explain what matters without duplicating every metric. "
+                f"{response_language_instruction(language)} "
+                "Do not leave untranslated English words in user-facing prose except "
+                "tickers, symbols, currency codes, numbers, and standard abbreviations. "
+                "When product_language is not English, translate finance terms instead "
+                "of borrowing English terms like benchmark. "
+                "For non-English product_language, literal English words such as "
+                "benchmark, drawdown, back-test, backtest, setup, total return, risk, "
+                "assumptions, and useful next check are language-quality failures. "
+                "Some source fact values may be stored in English; translate their "
+                "meaning into product_language in your visible output. Judge "
+                "language_quality only from your generated user-facing fields, not "
+                "from source fact values, fact IDs, or schema keys. "
+                "Do not fail the language audit just because source fact values are "
+                "stored in English; translate those source facts in the completed "
+                "Quick Take. "
                 "Do not turn the Quick Take into a Try next section; supported "
                 "next experiments are validated here but presented through follow-up "
                 "actions and deeper explanation surfaces. "
                 "Benchmark returns belong only to benchmark_contract.benchmark_symbol. "
                 "Write every user-facing field in prompt_context.language. "
-                "If language starts with 'es', write user-facing fields in Spanish. "
                 "Symbols, tickers, currency codes, numbers, and percentages can stay "
                 "unchanged, but internal fact IDs and schema field names are never "
                 "user-facing copy. "
@@ -425,7 +424,6 @@ async def _llm_explanation(
                 rule_summary,
                 language=language,
             ),
-            canonical_takeaway=canonical_takeaway,
             language=language,
         )
         if rendered is None:
@@ -558,7 +556,6 @@ def _render_quick_take_draft(
     allowed_next_experiments: Any,
     relative_performance_truth: QuickTakeRelativeClaim,
     tested_line: str,
-    canonical_takeaway: str | None,
     language: str,
 ) -> str | None:
     response = _coerce_quick_take_draft(draft)
@@ -567,12 +564,17 @@ def _render_quick_take_draft(
     truth = relative_performance_truth
     if truth != "unknown" and response.relative_performance_claim != truth:
         return None
-    tested = _clean_quick_take_line(tested_line)
+    language_matches_prompt = response.language_quality == "matches_prompt_language"
+    tested = (
+        _clean_quick_take_line(response.tested_bullet)
+        or _clean_quick_take_line(tested_line)
+        if language_matches_prompt
+        else None
+    )
     # `fact_ids` is model self-report metadata. The visible copy checks below are
     # the authoritative guard for user-facing benchmark truth.
     visible_response = response.model_copy(
         update={
-            "takeaway": canonical_takeaway or response.takeaway,
             "tested_bullet": tested,
         }
     )
@@ -587,15 +589,13 @@ def _render_quick_take_draft(
     ):
         return None
 
-    tested_label = "Probado:" if _is_spanish(language) else "Tested:"
-    takeaway = canonical_takeaway or response.takeaway
-    lines = [_clean_quick_take_line(takeaway), ""]
+    lines = [_clean_quick_take_line(response.takeaway), ""]
     if tested:
-        lines.append(f"{tested_label} {tested}")
+        lines.append(f"- {tested}")
     optional_bullets = (
         (response.meaning_bullet, response.assumption_bullet, response.caveat_bullet)
-        if response.language_quality == "matches_prompt_language"
-        else (fact_bank.get("caveat"),)
+        if language_matches_prompt
+        else ()
     )
     for bullet in optional_bullets:
         line = _clean_quick_take_line(bullet)
@@ -636,6 +636,8 @@ def _quick_take_mentions_required_visible_facts(
     if benchmark_symbol and not _contains_text(text, benchmark_symbol):
         return False
     if not _mentions_benchmark_comparison(text=text, fact_bank=fact_bank):
+        return False
+    if _quick_take_mentions_unknown_metric_number(text=text, fact_bank=fact_bank):
         return False
     return True
 
@@ -689,6 +691,23 @@ def _mentions_benchmark_comparison(
     return bool(magnitude_number and magnitude_number in _numeric_tokens(text))
 
 
+def _quick_take_mentions_unknown_metric_number(
+    *,
+    text: str,
+    fact_bank: dict[str, str],
+) -> bool:
+    allowed = set()
+    for fact_id in (
+        "total_return",
+        "benchmark_return",
+        "benchmark_delta_magnitude",
+    ):
+        allowed.update(_metric_numeric_tokens(fact_bank.get(fact_id)))
+    if not allowed:
+        return False
+    return any(token not in allowed for token in _metric_numeric_tokens(text))
+
+
 def _contains_text(text: str, needle: str) -> bool:
     return needle.casefold() in text.casefold()
 
@@ -729,6 +748,57 @@ def _numeric_tokens(value: str | None) -> list[str]:
     if candidate:
         flush(candidate)
     return tokens
+
+
+def _metric_numeric_tokens(value: str | None) -> list[str]:
+    text = str(value or "")
+    tokens: list[str] = []
+    for index, character in enumerate(text):
+        if not (character.isdigit() or character in "+-"):
+            continue
+        token = _numeric_token_starting_at(text, index)
+        if token is None:
+            continue
+        raw_token, end = token
+        suffix = text[end : end + 24].casefold()
+        if not suffix.lstrip().startswith("%") and not suffix.lstrip().startswith(
+            "percentage point"
+        ) and not suffix.lstrip().startswith("puntos porcentual"):
+            continue
+        normalized = _normalize_numeric_token(raw_token)
+        if normalized is None:
+            continue
+        try:
+            metric_token = f"{abs(float(normalized)):.1f}"
+        except ValueError:
+            continue
+        if metric_token not in tokens:
+            tokens.append(metric_token)
+    return tokens
+
+
+def _numeric_token_starting_at(text: str, index: int) -> tuple[str, int] | None:
+    candidate = ""
+    cursor = index
+    if text[cursor] in "+-":
+        candidate += text[cursor]
+        cursor += 1
+    seen_digit = False
+    while cursor < len(text):
+        character = text[cursor]
+        if character.isdigit():
+            seen_digit = True
+            candidate += character
+            cursor += 1
+            continue
+        if character in ".,":
+            candidate += character
+            cursor += 1
+            continue
+        break
+    if not seen_digit:
+        return None
+    return candidate, cursor
 
 
 def _normalize_numeric_token(value: str) -> str | None:
@@ -935,17 +1005,12 @@ def _display_rule_summary(
         else {}
     )
     if strategy_type == "buy_and_hold":
-        if _is_spanish(language):
-            return "Regla: compra al inicio del periodo y mantén hasta el final."
         return "Rule: buy at the start of the period and hold through the end."
     if strategy_type == "dca_accumulation":
         cadence = _cadence_display_label(
             strategy.get("cadence") or resolved_parameters.get("cadence"),
             language=language,
         )
-        if _is_spanish(language):
-            cadence_phrase = f" con cadencia {cadence}" if cadence else ""
-            return f"Regla: compra de forma recurrente{cadence_phrase} y mantén."
         cadence_phrase = f" on a {cadence} cadence" if cadence else ""
         return f"Rule: buy recurring contributions{cadence_phrase} and hold."
     if strategy_type == "indicator_threshold":
@@ -956,18 +1021,10 @@ def _display_rule_summary(
         exit_threshold = resolved_parameters.get("exit_threshold")
         if indicator and entry_threshold is not None and exit_threshold is not None:
             label = indicator.upper()
-            if _is_spanish(language):
-                return (
-                    f"Regla: compra cuando {label} esté en o por debajo de "
-                    f"{entry_threshold}; vende cuando esté en o por encima de "
-                    f"{exit_threshold}."
-                )
             return (
                 f"Rule: buy when {label} is at or below {entry_threshold}; "
                 f"sell when it is at or above {exit_threshold}."
             )
-    if _is_spanish(language):
-        return None
     return rule_summary
 
 
@@ -981,14 +1038,6 @@ def _cadence_display_label(value: Any, *, language: str) -> str:
     cadence = str(value or "").strip().lower().replace("-", "_")
     if not cadence:
         return ""
-    if _is_spanish(language):
-        return {
-            "daily": "diaria",
-            "weekly": "semanal",
-            "biweekly": "quincenal",
-            "monthly": "mensual",
-            "quarterly": "trimestral",
-        }.get(cadence, cadence.replace("_", " "))
     return cadence.replace("_", " ")
 
 
@@ -1032,22 +1081,14 @@ def _tested_summary(
         language=language,
     )
     if assets and strategy_label and period:
-        if _is_spanish(language):
-            return f"{assets}: {strategy_label} del {period}"
         return f"{assets} {strategy_label} over {period}"
     if assets and strategy_label:
-        if _is_spanish(language):
-            return f"{assets}: {strategy_label}"
         return f"{assets} {strategy_label}"
     if assets and period:
-        if _is_spanish(language):
-            return f"{assets} durante {period}"
         return f"{assets} over {period}"
     thesis = _thesis(strategy)
     if not thesis:
         return None
-    if _is_spanish(language):
-        return f"la estrategia confirmada: {thesis}"
     return f"the confirmed strategy: {thesis}"
 
 
@@ -1072,16 +1113,6 @@ def _asset_summary(strategy: dict[str, Any]) -> str | None:
 def _strategy_label(value: Any, *, language: str) -> str | None:
     if not isinstance(value, str) or not value.strip():
         return None
-    if _is_spanish(language):
-        labels = {
-            "buy_and_hold": "comprar y mantener",
-            "dca_accumulation": "compras recurrentes",
-            "indicator_threshold": "umbral de indicador",
-            "signal_strategy": "estrategia de senales",
-        }
-        normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
-        if normalized in labels:
-            return labels[normalized]
     return display_strategy_type({"strategy_type": value.strip()}).lower()
 
 
@@ -1096,9 +1127,7 @@ def _period_summary(value: Any, *, language: str) -> str | None:
         start = value.get("start")
         end = value.get("end")
         if start and end:
-            if _is_spanish(language):
-                return format_date_range_label(start, end, language=language)
-            return f"{start} to {end}"
+            return format_date_range_label(start, end, language=language)
     return None
 
 
@@ -1130,23 +1159,16 @@ def _assumption_summary(
     if isinstance(assumptions, list) and assumptions:
         assumption_text = _compact_sentence_list(assumptions, limit=3)
         if assumption_text:
-            label = "Supuestos: " if _is_spanish(language) else "Assumptions: "
-            parts.append(label + assumption_text)
+            parts.append("Assumptions: " + assumption_text)
     elif defaulted_labels:
-        label = "Valores predeterminados: " if _is_spanish(language) else "Defaults: "
-        parts.append(label + ", ".join(defaulted_labels) + ".")
+        parts.append("Defaults: " + ", ".join(defaulted_labels) + ".")
     if user_labels:
-        label = "Opciones elegidas: " if _is_spanish(language) else "User-set options: "
-        parts.append(label + ", ".join(user_labels) + ".")
+        parts.append("User-set options: " + ", ".join(user_labels) + ".")
     return " ".join(parts)
 
 
 def _caveat_summary(explanation_context: dict[str, Any], *, language: str) -> str:
-    default = (
-        "Es una comparación de retornos, no una atribución causal."
-        if _is_spanish(language)
-        else "This is a return comparison, not causal attribution."
-    )
+    default = "This is a return comparison, not causal attribution."
     caveats = explanation_context.get("caveats", [])
     if not isinstance(caveats, list) or not caveats:
         return default
@@ -1247,28 +1269,6 @@ def _result_readout_markdown(
         rule_summary,
         language=language,
     )
-    if _is_spanish(language):
-        lines = [
-            takeaway,
-            "",
-            f"- Probado: {tested}.",
-        ]
-        if execution_note:
-            lines.append(
-                f"- Señal: {_compact_execution_note(execution_note, language=language)}"
-            )
-        else:
-            lines.append(f"- Qué significa: {interpretation}")
-        next_check = next_check_override or _next_check_line(
-            execution_note=execution_note,
-            language=language,
-        )
-        if next_check:
-            lines.append(f"- Siguiente prueba: {next_check}")
-        if assumption_summary:
-            lines.append(f"- Supuestos: {_strip_leading_label(assumption_summary)}")
-        lines.append(f"- Ten en cuenta: {caveat}")
-        return "\n".join(lines)
     lines = [
         takeaway,
         "",
@@ -1301,22 +1301,8 @@ def _readout_takeaway(
     language: str,
 ) -> str:
     benchmark_context = _benchmark_context_phrase(same_period, language=language)
-    benchmark_label = benchmark_symbol or (
-        "la referencia" if _is_spanish(language) else "the benchmark"
-    )
+    benchmark_label = benchmark_symbol or "the benchmark"
     relative = _relative_performance_sentence(delta, language=language)
-    if _is_spanish(language):
-        if execution_note and abs(total_return) < 0.05:
-            return (
-                "No se abrió ninguna operación. La estrategia se mantuvo en efectivo "
-                "porque la condición de entrada no se activó; rindió "
-                f"{total_return:.1f}% mientras {benchmark_label} rindió "
-                f"{benchmark_return:.1f}% {benchmark_context}; {relative}"
-            )
-        return (
-            f"La estrategia rindió {total_return:.1f}% mientras {benchmark_label} "
-            f"rindió {benchmark_return:.1f}% {benchmark_context}, así que {relative}"
-        )
     if execution_note and abs(total_return) < 0.05:
         return (
             "No trade opened. The strategy stayed in cash because its entry "
@@ -1332,13 +1318,7 @@ def _readout_takeaway(
 
 def _relative_performance_sentence(delta: float, *, language: str) -> str:
     if abs(delta) < 0.05:
-        if _is_spanish(language):
-            return "estuvo prácticamente en línea con la referencia."
         return "was effectively in line with the benchmark."
-    if _is_spanish(language):
-        if delta > 0:
-            return f"superó la referencia por {abs(delta):.1f} puntos porcentuales."
-        return f"quedó por debajo por {abs(delta):.1f} puntos porcentuales."
     direction = "outperformed" if delta > 0 else "lagged"
     return f"{direction} by {abs(delta):.1f} percentage points."
 
@@ -1349,7 +1329,7 @@ def _tested_readout_line(
     *,
     language: str,
 ) -> str:
-    fallback = "la estrategia confirmada" if _is_spanish(language) else "the confirmed strategy"
+    fallback = "the confirmed strategy"
     tested = (tested_summary or fallback).strip().rstrip(".")
     if not rule_summary:
         return tested
@@ -1364,11 +1344,6 @@ def _compact_execution_note(execution_note: str, *, language: str) -> str:
     if note.startswith("No entry trades were executed") and (
         "entry condition did not trigger" in note
     ):
-        if _is_spanish(language):
-            return (
-                "La condición de entrada no se activó en esta ventana, así que no se "
-                "abrió ninguna posición."
-            )
         return (
             "The entry condition did not trigger in this window, so no position "
             "was opened."
@@ -1378,11 +1353,6 @@ def _compact_execution_note(execution_note: str, *, language: str) -> str:
 
 def _next_check_line(*, execution_note: str | None, language: str) -> str | None:
     if execution_note and execution_note.startswith("No entry trades were executed"):
-        if _is_spanish(language):
-            return (
-                "Afloja el umbral de entrada o amplía la ventana antes de juzgar "
-                "la idea."
-            )
         return (
             "Loosen the entry threshold or widen the window before judging the " "idea."
         )
@@ -1390,10 +1360,6 @@ def _next_check_line(*, execution_note: str | None, language: str) -> str | None
 
 
 def _benchmark_context_phrase(same_period: bool, *, language: str) -> str:
-    if _is_spanish(language):
-        if same_period:
-            return "en el mismo periodo"
-        return "en la ventana de comparación"
     if same_period:
         return "over the same period"
     return "for the comparison window"
@@ -1403,23 +1369,10 @@ def _strip_leading_label(value: str) -> str:
     text = value.strip()
     if text.startswith("Assumptions:"):
         return text[len("Assumptions:") :].strip()
-    if text.startswith("Supuestos:"):
-        return text[len("Supuestos:") :].strip()
     return text
 
 
 def _expertise_sentence(expertise_mode: str, *, language: str) -> str:
-    if _is_spanish(language):
-        if expertise_mode == "advanced":
-            return "Esto es solo una comparación de retornos, sin atribución causal."
-        if expertise_mode == "intermediate":
-            return (
-                "Úsalo como comparación directa contra la referencia antes de decidir "
-                "ajustes."
-            )
-        return (
-            "Úsalo como evidencia para revisar la regla confirmada antes de refinarla."
-        )
     if expertise_mode == "advanced":
         return "This is a return comparison only, without causal attribution."
     if expertise_mode == "intermediate":
@@ -1448,32 +1401,6 @@ def _build_incomplete_result_response(
     expertise_mode = (
         profile.effective_expertise_mode if profile is not None else "beginner"
     )
-    if _is_spanish(language):
-        tested_sentence = (
-            f"Esto aplica a {tested_summary}."
-            if tested_summary is not None
-            else "Esto aplica a la estrategia confirmada."
-        )
-        expertise_sentence = _expertise_sentence(expertise_mode, language=language)
-        base = (
-            "El resultado está incompleto, así que todavía no puedo reportar "
-            f"retornos observados. {tested_sentence} {expertise_sentence}"
-        )
-        execution_sentence = f" {execution_note}" if execution_note else ""
-        if verbosity == "high":
-            if tone == "friendly":
-                return (
-                    "Este es el estado actual. "
-                    f"{base}{execution_sentence} Supuestos y salvedades: "
-                    f"{assumption_summary} {caveat}"
-                )
-            return (
-                f"{base}{execution_sentence} Supuestos y salvedades: "
-                f"{assumption_summary} {caveat}"
-            )
-        return (
-            f"{base}{execution_sentence} Salvedad: {assumption_summary} {caveat}"
-        )
     tested_sentence = (
         f"This applies to {tested_summary}."
         if tested_summary is not None
