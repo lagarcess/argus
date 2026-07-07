@@ -14,10 +14,10 @@ PR #172). Remaining P2 is the compounding loop's back half: linked versions
 Current pointer: the interpret/edit spine is between owners; A1b (linked
 IdeaVersion emission) is the next spine-chain slice and is unblocked.
 Promotion to `main` is PAUSED. The old #140/#142 blockers are both merged; the
-live blockers are now #171 (live eval red — calendar-year windows nulled on
-recovery drafts and a regressed #142 company-name case), #150 (three
-agent_runtime tests CI never runs), and #151 (readiness prose vs confirmation
-card).
+live blockers are one interpret-surface regression cluster — #171 (live eval
+red), #160 (interpreter dead-ends), #151 (card materialization), and #150 (the
+mocked half of #171) — sequenced under one owner in the main-promotion burn-down
+below.
 Execution runs off the P2 execution board below: point an agent at any READY
 lane. The interpret/edit spine has exactly one owner lane at a time (currently
 unowned; A1b is next in the spine chain).
@@ -544,10 +544,11 @@ LANES BY GATE (the board agents execute from):
   (interpretation/repair/field-fidelity/capability-conflict) and per-tier
   reasoning-effort env overrides (`ARGUS_STRUCTURED_REASONING_EFFORT`,
   `ARGUS_CAPABILITY_REASONING_EFFORT`) so dev runs cheap and production runs at
-  full effort. OPEN follow-ups on this lane: #159 (quality-gated model cascade —
-  cheap primary, capable escalation) and #160 (close interpreter dead-ends:
-  composer-None fall-through, no silent date default). Both READY-BUILD, off the
-  A1b spine slice; keep new logic in their own modules.
+  full effort. OPEN follow-up on this lane: #159 (quality-gated model cascade —
+  cheap primary, capable escalation; low-priority/deferred). NOTE: #160
+  (interpreter dead-ends) surfaced from this lane's investigation but is a
+  high-priority `main` blocker, not cost/perf polish — it lives in the
+  main-promotion burn-down below, not here.
 
 **Gate C — evidence credibility:**
 
@@ -578,12 +579,13 @@ monetization/entitlement architecture.
 - **#149** — FIXED (PR #168). Result-followup timeout recovery no longer dead on
   Python 3.10 (`asyncio.TimeoutError` vs builtin mismatch resolved); the failing
   test now passes on a 3.10 venv.
-- **#150** — three agent_runtime tests fail at the integration fork point on
-  every Python (date-window audit drift x2, stale provenance x1) and the curated
-  CI file list never runs them. The behavior bisect+fix is spine-adjacent; the
-  systemic fix — a regression-sweep CI job so the fixed file list stops hiding
-  drift — is in flight as OPEN PR #169. Still a `main` promotion blocker until
-  both parts land.
+- **#150** — RE-TRIAGED to high-priority (2026-07-07): this is the mocked half of
+  #171 Sig2, not a deferrable chore. Three agent_runtime tests fail at the fork
+  point (date-window audit drift x2, stale provenance x1) plus strict xfails
+  tagged #150 (e.g. cadence terms promoted to assets), and the curated CI list
+  never runs the failing set. The behavior fix closes together with #171 Sig2;
+  the systemic CI half is OPEN PR #169 (off-spine). Sequenced in the
+  main-promotion burn-down below.
 - **#151** — the last surviving #141 corner: an executable-complete draft plus
   model readiness prose never materializes the confirmation card, so bare
   affirmations re-confirm verbally (violates "canonical payload and UI prose
@@ -595,12 +597,62 @@ monetization/entitlement architecture.
   series (#174-177). The top `main` promotion blocker — the live eval gate is
   red. SCOUT/bisect first against the B4 + #166 merges.
 
+##### Main-promotion burn-down — the interpret-surface lane (2026-07-07)
+
+The remaining `main`-promotion blockers are not four scattered bugs; they are one
+regression cluster on the interpret/edit spine, most introduced by the
+07-06/07-07 merges. Treat them as a single burn-down lane with one owner.
+
+Shared surface (why they cannot be parallel implementers): `stages/interpret.py`,
+`interpreter/artifact_assumption_edit.py`,
+`interpreter/unsupported_request_context.py`,
+`interpreter/date_window_repair.py`, `llm_interpreter.py`. This is the spine —
+exactly one implementation owner at a time. Parallel SCOUT/repro is fine;
+parallel edits are not.
+
+Members and roots:
+
+- **#171 (high) — live eval red, the gate.** Two regressions: Sig1 (calendar-year
+  windows nulled on recovery drafts) traces to #166 (`a5ac38b`,
+  `date_window_repair.py` + `llm_interpreter.py`); Sig2 (#142 basket dropped,
+  verdict flips to `unsupported`) traces to #165 (`a80d681`,
+  `artifact_assumption_edit.py` + `unsupported_request_context.py`).
+- **#150 (re-triaged high) — the mocked half of #171 Sig2.** The strict xfails
+  tagged #150 (e.g. cadence terms promoted to assets) are the free, deterministic
+  repro; the CI-gap half is OPEN PR #169 (off-spine). Closes with #171 Sig2.
+- **#160 (high) — interpreter dead-ends.** (A) composer-`None` fall-through at
+  `_latest_result_followup_recovery_if_applicable`; (B) silent trailing-year date
+  default. (B) co-designs with #171 Sig1 as one date-provenance-on-recovery
+  policy (trust or clarify — never null, never silent-default). (A)'s blocker
+  status is conditional on the deployed grok/haiku tier.
+- **#151 (high) — card materialization.** An executable-complete post-result draft
+  plus a model `assistant_response` emits prose instead of `ready_for_confirmation`,
+  so a bare "yes" has nothing typed to launch (`_stage_result_from_interpretation`
+  + `artifact_assumption_edit.py`).
+- **#164 (med) — trailing follow-up.** Typed result-followup fact focus/key; the
+  residual refine wall behind #160(A). Not a gate; lands after the cluster.
+
+Landing order (serial on the spine):
+
+1. #171 Sig2 + #150 — repair the #165 drift, un-xfail the #150 strict tests as
+   they flip, restore the TGT/WMT/COST basket. Verify against FREE mocked tests.
+2. #171 Sig1 + #160(B) — one date-provenance-on-recovery policy; repair #166's
+   over-eager distrust.
+3. #160(A) — composer-`None` falls through to the edit path.
+4. #151 — materialize the confirmation card from the executable-complete draft.
+5. Full live eval on the exact SHA → gate green. Then #164.
+
+Off-spine and parallel-safe now: PR #169 (regression-sweep CI) plus writing the
+repro tests. Waiver valve: #171 permits issue-tagged scoped expected-fails to
+unblock promotion if the founder accepts the regression short-term; the roots are
+known data-dropping regressions, so fix is preferred over waive.
+
 **Standing release discipline** (blocks `main`, not a lane): rerun the exact
 clean-checkout suite gate (issue #134 / PR #135) before any branch or `main`
 promotion instead of treating the repair as permanent proof for future SHAs.
-Promotion to `main` stays PAUSED — #140-#142 are merged, but the live blockers
-are now #171 (live eval red), #150 (hidden test drift + CI gap, PR #169), and
-#151 (readiness prose vs confirmation card).
+Promotion to `main` stays PAUSED — #140-#142 are merged; the live blockers are
+the interpret-surface cluster #171/#160/#151/#150, sequenced under one owner in
+the main-promotion burn-down above.
 The eval harness (B3 slice 1, PR #143) is now a live landing gate:
 runtime-behavior PRs run the live eval suite once pre-merge; every `main`
 promotion candidate runs the full live suite on its exact SHA with no
