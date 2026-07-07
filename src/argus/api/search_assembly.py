@@ -10,6 +10,7 @@ from argus.domain.evidence import (
     evidence_preview_from_artifact,
     evidence_preview_from_payload,
 )
+from argus.domain.search_text import search_text_matches_query
 
 ScoredSearchItem = tuple[int, SearchItem]
 
@@ -170,7 +171,7 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
         if conversation.deleted_at:
             continue
         haystack = f"{conversation.title} {conversation.last_message_preview or ''}"
-        if query in haystack.lower():
+        if search_text_matches_query(query=query, text=haystack):
             item = SearchItem(
                 type="chat",
                 id=conversation.id,
@@ -199,7 +200,7 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
         if strategy.deleted_at:
             continue
         haystack = f"{strategy.name} {' '.join(strategy.symbols)} {strategy.template}"
-        if query in haystack.lower():
+        if search_text_matches_query(query=query, text=haystack):
             matched_text = ", ".join(strategy.symbols) or strategy.name
             item = SearchItem(
                 type="strategy",
@@ -231,7 +232,7 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
             continue
         if collection.deleted_at:
             continue
-        if query in collection.name.lower():
+        if search_text_matches_query(query=query, text=collection.name):
             item = SearchItem(
                 type="collection",
                 id=collection.id,
@@ -259,7 +260,7 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
             continue
         title = run.conversation_result_card.get("title", "Backtest run")
         haystack = f"{title} {' '.join(run.symbols)} {run.config_snapshot.get('template', '')}"
-        if query in haystack.lower():
+        if search_text_matches_query(query=query, text=haystack):
             scored_items.append(_scored_memory_run(run=run, query=query))
     decision_state_by_idea = _latest_decision_state_by_idea(
         [
@@ -272,7 +273,9 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
         if api_state.store.idea_owners.get(idea.id) != user.id:
             continue
         haystack = f"{idea.title} {idea.summary}"
-        if query in haystack.lower():
+        # Empty-query browse (q="" + decision_state filter) must still surface
+        # ideas so the router can narrow them by state, matching the Supabase path.
+        if not query or search_text_matches_query(query=query, text=haystack):
             item = SearchItem(
                 type="idea",
                 id=idea.id,
@@ -301,7 +304,7 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
         if api_state.store.evidence_artifact_owners.get(artifact.id) != user.id:
             continue
         haystack = f"{artifact.title} {artifact.digest}"
-        if query in haystack.lower():
+        if search_text_matches_query(query=query, text=haystack):
             preview = evidence_preview_from_artifact(artifact)
             item = SearchItem(
                 type="evidence",
@@ -337,7 +340,7 @@ def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchIt
         artifact_text = f"{artifact.title} {artifact.digest}"
         note = decision.note or ""
         haystack = f"{decision.decision_state} {note} {artifact_text}"
-        if query in haystack.lower():
+        if search_text_matches_query(query=query, text=haystack):
             title = artifact.title
             matched_text = _decision_preview_digest(
                 note=note,

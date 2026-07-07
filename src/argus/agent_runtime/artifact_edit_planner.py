@@ -474,8 +474,6 @@ def _normalized_operation_symbols(
             continue
         matched = False
         for candidate in _operation_symbol_candidates(raw_symbol):
-            if "/" in raw_symbol and candidate == raw_symbol and matched:
-                continue
             try:
                 resolved_symbol = (
                     asset_symbol_resolver(candidate) if asset_symbol_resolver else None
@@ -485,6 +483,10 @@ def _normalized_operation_symbols(
             if resolved_symbol:
                 resolved_symbols.extend(normalized_asset_symbols([resolved_symbol]))
                 matched = True
+                # A slash-delimited pair that resolves as a single asset
+                # (e.g. BTC/USD) must not also be split into its legs.
+                if candidate == raw_symbol:
+                    break
         if not matched:
             resolved_symbols.extend(normalized_asset_symbols([raw_symbol]))
     return resolved_symbols
@@ -493,8 +495,8 @@ def _normalized_operation_symbols(
 def _operation_symbol_candidates(raw_symbol: str) -> list[str]:
     if "/" in raw_symbol:
         candidates = [
-            *(part.strip() for part in raw_symbol.split("/") if part.strip()),
             raw_symbol,
+            *(part.strip() for part in raw_symbol.split("/") if part.strip()),
         ]
     else:
         candidates = [raw_symbol]

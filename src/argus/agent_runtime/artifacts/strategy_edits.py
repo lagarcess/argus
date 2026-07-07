@@ -7,8 +7,10 @@ from pydantic import BaseModel, Field
 from argus.agent_runtime.artifacts.asset_edits import (
     AssetUniverseOperation,
     apply_asset_universe_edit,
+    normalized_asset_symbols,
     normalized_asset_universe_operation,
 )
+from argus.agent_runtime.artifacts.asset_edits import _symbol as _asset_symbol
 from argus.agent_runtime.state.models import StrategySummary
 
 PatchSource = Literal["structured_action", "llm_patch", "user_patch", "retry"]
@@ -118,29 +120,13 @@ def _validated_clear_fields(values: list[str]) -> list[str]:
 
 def _normalize_value(field_name: str, value: Any) -> Any:
     if field_name == "asset_universe" and isinstance(value, list):
-        return _symbols(value)
+        return normalized_asset_symbols(value)
     if field_name == "comparison_baseline":
-        return _symbol(value)
+        return _asset_symbol(value)
     if isinstance(value, str):
         stripped = value.strip()
         return stripped or None
     return value
-
-
-def _symbols(values: list[str]) -> list[str]:
-    symbols: list[str] = []
-    for value in values:
-        symbol = _symbol(value)
-        if symbol is not None:
-            symbols.append(symbol)
-    return list(dict.fromkeys(symbols))
-
-
-def _symbol(value: Any) -> str | None:
-    if not isinstance(value, str):
-        return None
-    symbol = value.strip().upper().replace("-", "/")
-    return symbol or None
 
 
 def _blank(value: Any) -> bool:
