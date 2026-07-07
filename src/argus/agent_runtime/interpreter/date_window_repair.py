@@ -74,8 +74,6 @@ def _response_needs_temporal_runtime_repair(
     )
     if _llm_value_is_empty(draft.date_range):
         return resolved_from_draft is not None
-    # Resolve the relative-window probe once; dateparser is heavyweight and both
-    # branches below consult the same current-message evidence.
     has_relative_window = _current_turn_has_relative_window_evidence(request)
     current_message_range = _date_range_from_current_turn_message(request)
     if (

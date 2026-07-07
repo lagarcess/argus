@@ -1274,9 +1274,8 @@ def test_search_supports_cursor_and_mixed_types() -> None:
 
 
 def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
-    # Memory mode must share the Supabase path's search_text_matches_query
-    # semantics: a multi-word query matches when every token appears, not only
-    # when the whole phrase is one contiguous substring.
+    # Memory mode shares the Supabase matcher semantics: a multi-word query
+    # matches when every token appears, not only as one contiguous substring.
     client = _client()
     _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post(
