@@ -45,6 +45,7 @@ ResponseIntentKind = Literal[
     "ambiguity_check",
     "optional_settings",
     "artifact_action_recovery",
+    "result_followup_chrome",
 ]
 
 ArtifactActionRecoveryAction = Literal["retry_failed_action"]

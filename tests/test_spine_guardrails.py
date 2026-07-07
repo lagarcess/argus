@@ -149,9 +149,9 @@ def test_locale_scan_covers_expected_files() -> None:
 
 
 # --- Tripwire 4: issue #154 migrated surfaces stay language-agnostic ----------
-# These are the S1/S3 surfaces already migrated away from deterministic en/es
-# runtime copy. S2 owns the remaining chrome/label helpers and can expand this
-# boundary after those callers are retired.
+# These are the S1/S3 surfaces plus the S2-cleaned heading surface already
+# migrated away from deterministic en/es runtime copy. Keep presentation helpers
+# and API schema aliases out until their typed frontend/API contracts are explicit.
 ISSUE_154_MIGRATED_LANGUAGE_SURFACES = [
     ARGUS_SRC / "agent_runtime" / "stages" / "explain.py",
     ARGUS_SRC / "api" / "chat" / "breakdown.py",
@@ -161,6 +161,7 @@ ISSUE_154_MIGRATED_LANGUAGE_SURFACES = [
     ARGUS_SRC / "agent_runtime" / "artifact_action_recovery.py",
     ARGUS_SRC / "agent_runtime" / "stages" / "execute.py",
     ARGUS_SRC / "api" / "chat" / "result_actions.py",
+    ARGUS_SRC / "agent_runtime" / "response_style.py",
 ]
 
 ISSUE_154_LANGUAGE_GATES = {

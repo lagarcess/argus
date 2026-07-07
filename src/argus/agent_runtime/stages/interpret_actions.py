@@ -23,10 +23,7 @@ from argus.agent_runtime.recovery_messages import (
     recovery_message,
     recovery_state_stage_patch,
 )
-from argus.agent_runtime.response_style import (
-    result_followup_heading,
-    with_response_heading,
-)
+from argus.agent_runtime.response_style import result_followup_response_intent
 from argus.agent_runtime.result_followups import (
     compose_result_followup_response,
     context_packet_ids_from_fact_bank,
@@ -820,10 +817,8 @@ async def artifact_followup_stage_result_if_applicable(
         outcome="ready_to_respond",
         decision=_result_followup_decision(decision, focus=focus),
         stage_patch={
-            "assistant_response": with_response_heading(
-                heading=result_followup_heading(focus, language=language),
-                body=response,
-            ),
+            "assistant_response": response,
+            "response_intent": result_followup_response_intent(focus),
             **(
                 recovery_state_stage_patch(
                     "latest_result_followup_unavailable",

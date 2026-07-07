@@ -42,6 +42,17 @@ describe("result followup heading key", () => {
     ).toBe("sortino_ratio");
   });
 
+  test("extracts frontend chrome heading keys from result followup intent", () => {
+    expect(
+      resultFactHeadingKeyFromMetadata({
+        response_intent: {
+          kind: "result_followup_chrome",
+          facts: { focus: "next_experiment", heading_key: "next_experiment" },
+        },
+      }),
+    ).toBe("next_experiment");
+  });
+
   test("ignores other intent kinds and malformed payloads", () => {
     expect(
       resultFactHeadingKeyFromMetadata({
