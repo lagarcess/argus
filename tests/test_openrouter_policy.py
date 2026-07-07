@@ -259,6 +259,64 @@ def test_interpretation_profile_has_bounded_reasoning_for_semantic_repair() -> N
     assert profile.reasoning_effort == "medium"
 
 
+def test_structured_reasoning_effort_can_be_overridden_for_dev_eval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_STRUCTURED_REASONING_EFFORT", "low")
+
+    profile = openrouter_profile_for_task("interpretation")
+
+    assert profile.reasoning_effort == "low"
+
+
+def test_capability_reasoning_effort_can_be_overridden_for_dev_eval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_CAPABILITY_REASONING_EFFORT", "none")
+
+    profile = openrouter_profile_for_task("capability_conflict")
+
+    assert profile.reasoning_effort == "none"
+
+
+def test_invalid_reasoning_effort_override_preserves_profile_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_STRUCTURED_REASONING_EFFORT", "cheap")
+
+    profile = openrouter_profile_for_task("interpretation")
+
+    assert profile.reasoning_effort == "medium"
+
+
+@pytest.mark.parametrize(
+    ("task", "env_name", "effort"),
+    [
+        ("interpretation", "ARGUS_STRUCTURED_REASONING_EFFORT", "low"),
+        ("capability_conflict", "ARGUS_CAPABILITY_REASONING_EFFORT", "none"),
+    ],
+)
+def test_reasoning_effort_override_is_sent_in_json_schema_payload(
+    monkeypatch: pytest.MonkeyPatch,
+    task: openrouter.OpenRouterTask,
+    env_name: str,
+    effort: openrouter.OpenRouterReasoningEffort,
+) -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    monkeypatch.setenv(env_name, effort)
+
+    payload = openrouter._json_schema_payload(
+        model="qwen/qwen3.5-9b",
+        messages=[{"role": "user", "content": "hello"}],
+        schema_model=LLMDateRangeIntent,
+        schema_name="LLMDateRangeIntent",
+        profile=openrouter_profile_for_task(task),
+    )
+
+    assert payload["reasoning"] == {"effort": effort}
+
+
 def test_interpretation_repair_uses_structured_tier_without_reasoning() -> None:
     profile = openrouter_profile_for_task("interpretation_repair")
 
@@ -3214,6 +3272,93 @@ def test_capability_conflict_json_schema_uses_context_route_with_reasoning(
     assert receipt.outcome == "succeeded"
 
 
+@pytest.mark.parametrize(
+    "task",
+    [
+        "interpretation",
+        "interpretation_repair",
+        "field_fidelity",
+        "capability_conflict",
+    ],
+)
+def test_structured_artifact_payload_marks_stable_system_prefix_for_prompt_cache(
+    task: openrouter.OpenRouterTask,
+) -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    payload = openrouter._json_schema_payload(
+        model="qwen/qwen3.5-9b",
+        messages=[
+            {"role": "system", "content": "stable Argus interpreter policy"},
+            {"role": "system", "content": "dynamic turn context"},
+            {"role": "user", "content": "dynamic user request"},
+        ],
+        schema_model=LLMDateRangeIntent,
+        schema_name="LLMDateRangeIntent",
+        profile=openrouter_profile_for_task(task),
+    )
+
+    system_message = payload["messages"][0]
+    assert system_message["role"] == "system"
+    assert system_message["content"] == [
+        {
+            "type": "text",
+            "text": "stable Argus interpreter policy",
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+    assert payload["messages"][1] == {"role": "system", "content": "dynamic turn context"}
+    assert payload["messages"][2] == {
+        "role": "user",
+        "content": "dynamic user request",
+    }
+
+
+def test_gemini_payload_skips_prompt_cache_when_later_system_context_is_dynamic() -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    payload = openrouter._json_schema_payload(
+        model="google/gemini-2.5-flash-lite",
+        messages=[
+            {"role": "system", "content": "stable Argus interpreter policy"},
+            {"role": "system", "content": "dynamic turn context"},
+            {"role": "user", "content": "dynamic user request"},
+        ],
+        schema_model=LLMDateRangeIntent,
+        schema_name="LLMDateRangeIntent",
+        profile=openrouter_profile_for_task("interpretation"),
+    )
+
+    assert payload["messages"][0] == {
+        "role": "system",
+        "content": "stable Argus interpreter policy",
+    }
+    assert payload["messages"][1] == {
+        "role": "system",
+        "content": "dynamic turn context",
+    }
+
+
+def test_non_target_json_schema_payload_does_not_add_prompt_cache_marker() -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    payload = openrouter._json_schema_payload(
+        model="qwen/qwen3.5-9b",
+        messages=[
+            {"role": "system", "content": "stable naming policy"},
+            {"role": "user", "content": "dynamic user request"},
+        ],
+        schema_model=LLMDateRangeIntent,
+        schema_name="LLMDateRangeIntent",
+        profile=openrouter_profile_for_task("name_suggestion"),
+    )
+
+    assert payload["messages"][0] == {
+        "role": "system",
+        "content": "stable naming policy",
+    }
+
+
 def test_direct_json_schema_records_missing_key_route_receipt(monkeypatch) -> None:
     openrouter.clear_openrouter_route_receipts()
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
@@ -3414,6 +3559,10 @@ def test_direct_json_schema_records_openrouter_token_usage(monkeypatch) -> None:
                     "prompt_tokens": 44,
                     "completion_tokens": 21,
                     "total_tokens": 65,
+                    "prompt_tokens_details": {
+                        "cached_tokens": 32,
+                        "cache_write_tokens": 12,
+                    },
                 },
             }
 
@@ -3451,6 +3600,8 @@ def test_direct_json_schema_records_openrouter_token_usage(monkeypatch) -> None:
         "prompt_tokens": 44,
         "completion_tokens": 21,
         "total_tokens": 65,
+        "cached_tokens": 32,
+        "cache_write_tokens": 12,
     }
 
 
@@ -3679,7 +3830,9 @@ def test_anthropic_structured_calls_use_schema_in_prompt_not_response_format() -
     assert "provider" not in anthropic_payload
     schema_message = anthropic_payload["messages"][0]
     assert schema_message["role"] == "system"
-    assert '"same_as_latest_result"' in schema_message["content"]
+    schema_content = schema_message["content"]
+    assert schema_content[0]["cache_control"] == {"type": "ephemeral"}
+    assert '"same_as_latest_result"' in schema_content[0]["text"]
     assert anthropic_payload["messages"][-1]["content"] == "probe"
 
     grok_schema = grok_payload["response_format"]["json_schema"]
