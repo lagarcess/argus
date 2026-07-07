@@ -38,9 +38,10 @@ not replace LangGraph runtime memory or Supabase product records.
 Result references are derived from immutable `backtest_runs` records. The
 runtime may expose a result fact bank containing the run id, conversation id,
 strategy id, asset class, symbols, benchmark, metrics, config snapshot, result
-card, chart, and trades so follow-up answers can use actual run facts after
-reload. Engine metrics and `backtest_runs.config_snapshot` remain the canonical
-truth; the fact bank is a transport/context projection.
+card, optional structured execution-cost evidence, chart, and trades so
+follow-up answers can use actual run facts after reload. Engine metrics,
+`backtest_runs.config_snapshot`, and structured result-card evidence remain the
+canonical truth; the fact bank is a transport/context projection.
 
 Failed-action references preserve recoverable action context such as the action
 type, launch payload, failure classification, and user-safe error. They exist so

@@ -279,7 +279,7 @@ components:
           description: Reproducible normalized runtime configuration.
         conversation_result_card:
           type: object
-          description: Beginner-friendly inline chat result card. Completed chat runs may include P1 sidecar ids and decision state.
+          description: Beginner-friendly inline chat result card. Completed chat runs may include P1 sidecar ids, decision state, and optional structured execution_costs evidence when the engine modeled fees/slippage.
     ArtifactLifecycle:
       type: string
       enum: [captured, reviewed, saved, decided, archived, discarded]

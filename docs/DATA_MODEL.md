@@ -346,6 +346,10 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 - Legacy persisted chart payloads may include `value_extrema`; readers may use it
   as a fallback, but new run writers should persist `value_summary`.
 - `trades` may mirror chart event markers for lightweight UI hydration. Detailed execution ledgers can preserve signals, order intents, fills, ignored signals, and position snapshots, but list endpoints must expose only lightweight result metadata.
+- When execution realism is enabled and the engine models nonzero fees/slippage,
+  `conversation_result_card.execution_costs` stores structured result evidence:
+  `fee_bps`, `slippage_bps`, gross/net total return, return drag, and benchmark
+  cost treatment. Idealized runs omit this object.
 - Saved strategies must be created from completed run state or an equivalent canonical result snapshot, not reconstructed from frontend display text.
 - Follow-up refinements from a result card must be seeded from
   `config_snapshot` or equivalent canonical run metadata. A user's partial

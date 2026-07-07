@@ -63,6 +63,23 @@ _PAIRED_FACT_IDS: dict[str, tuple[str, ...]] = {
     "lowest_date": ("lowest_date", "lowest_value"),
     "lowest_value": ("lowest_value", "lowest_date"),
     "final_value": ("final_value", "final_date"),
+    "fee_bps": ("fee_bps", "slippage_bps"),
+    "slippage_bps": ("slippage_bps", "fee_bps"),
+    "gross_total_return": (
+        "gross_total_return",
+        "net_total_return",
+        "return_drag",
+    ),
+    "net_total_return": (
+        "net_total_return",
+        "gross_total_return",
+        "return_drag",
+    ),
+    "return_drag": (
+        "return_drag",
+        "gross_total_return",
+        "net_total_return",
+    ),
 }
 
 

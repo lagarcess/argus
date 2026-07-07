@@ -50,6 +50,16 @@ def _latest_result_reference(*, include_curve: bool = True) -> ArtifactReference
             "symbols": ["COST", "TGT"],
             "date_range": {"start": "2020-02-01", "end": "2026-07-02"},
         },
+        "result_card": {
+            "execution_costs": {
+                "fee_bps": 10.0,
+                "slippage_bps": 5.0,
+                "gross_total_return_pct": 28.9,
+                "net_total_return_pct": 28.4,
+                "return_drag_pct": 0.5,
+                "benchmark_treatment": "same_modeled_costs",
+            }
+        },
     }
     if include_curve:
         metadata["chart"] = {
@@ -251,6 +261,61 @@ async def test_latest_result_peak_date_answer_composes_from_typed_facts() -> Non
     assert result.patch["result_run_id"] == "run-140"
     assert result.patch["latest_run_id"] == "run-140"
     assert result.patch["result_conversation_id"] == "conversation-140"
+    assert "latest_result_fact_answer" in result.decision.reason_codes
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("fact_key", "expected_fact"),
+    [
+        ("fee_bps", {"fee_bps": "10 bps"}),
+        ("slippage_bps", {"slippage_bps": "5 bps"}),
+        (
+            "gross_total_return",
+            {
+                "gross_total_return": "+28.9%",
+                "net_total_return": "+28.4%",
+            },
+        ),
+        (
+            "return_drag",
+            {"return_drag": "0.5 percentage points"},
+        ),
+        (
+            "benchmark_cost_treatment",
+            {
+                "benchmark_cost_treatment": (
+                    "Benchmark used the same modeled costs"
+                )
+            },
+        ),
+    ],
+)
+async def test_latest_result_execution_cost_answer_composes_from_typed_facts(
+    fact_key: str,
+    expected_fact: dict[str, str],
+) -> None:
+    composer = _RecordingComposer()
+    decision = _decision("result_card_fact").model_copy(
+        update={"result_followup_fact_key": fact_key}
+    )
+
+    result = await latest_result_answer_stage_result_if_applicable(
+        decision=decision,
+        snapshot=_snapshot(),
+        current_user_message="what execution costs did this use?",
+        language="en",
+        compose_response_func=composer,
+    )
+
+    assert result is not None
+    assert result.patch["assistant_response"] == "COMPOSED_FACT_ANSWER"
+    assert composer.calls[0]["fact_key"] == fact_key
+    facts = result.patch["response_intent"]["facts"]
+    assert facts["fact_key"] == fact_key
+    for key, value in expected_fact.items():
+        assert facts[key] == value
+    assert facts["source"] == "result_followup_fact_bank"
     assert "latest_result_fact_answer" in result.decision.reason_codes
 
 

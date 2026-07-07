@@ -54,7 +54,7 @@ describe("confirmation assumption display", () => {
       "No fees",
       "No slippage",
       "Benchmark: SPY",
-    ]); 
+    ]);
   });
 
   test("renders non-zero modeled fees and slippage as one cost line", () => {

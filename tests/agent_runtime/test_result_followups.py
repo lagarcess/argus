@@ -153,6 +153,44 @@ def test_result_followup_schema_uses_flat_answer_and_fact_id_contract() -> None:
     assert draft is None
 
 
+def test_result_followup_fact_bank_includes_execution_cost_evidence() -> None:
+    fact_bank = result_followup_fact_bank(
+        {
+            "symbols": ["TSLA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 11.8,
+                        "benchmark_return_pct": 8.4,
+                        "delta_vs_benchmark_pct": 3.4,
+                    }
+                }
+            },
+            "result_card": {
+                "execution_costs": {
+                    "fee_bps": 10.0,
+                    "slippage_bps": 5.0,
+                    "gross_total_return_pct": 12.0,
+                    "net_total_return_pct": 11.8,
+                    "return_drag_pct": 0.2,
+                    "benchmark_treatment": "same_modeled_costs",
+                }
+            },
+        }
+    )
+
+    assert fact_bank["fee_bps"] == "10 bps"
+    assert fact_bank["slippage_bps"] == "5 bps"
+    assert fact_bank["gross_total_return"] == "+12.0%"
+    assert fact_bank["net_total_return"] == "+11.8%"
+    assert fact_bank["return_drag"] == "0.2 percentage points"
+    assert (
+        fact_bank["benchmark_cost_treatment"]
+        == "Benchmark used the same modeled costs"
+    )
+
+
 @pytest.mark.asyncio
 async def test_result_followup_prefers_structured_answer_blocks() -> None:
     async def fake_schema_client(**kwargs: Any) -> object:

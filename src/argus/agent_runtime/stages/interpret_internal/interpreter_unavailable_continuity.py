@@ -396,6 +396,14 @@ def structured_interpretation_has_supported_artifact_assumption_edit(
         return False
     strategy = interpretation.candidate_strategy_draft
     extra_parameters = strategy.extra_parameters or {}
+    field_provenance = extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        field_provenance = {}
+    if any(
+        key in extra_parameters and field_provenance.get(key) == "explicit_user"
+        for key in ("fee_rate", "slippage")
+    ):
+        return True
     return bool(strategy.asset_universe) and (
         normalized_asset_universe_operation(
             extra_parameters.get("asset_universe_operation")

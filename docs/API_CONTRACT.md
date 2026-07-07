@@ -546,6 +546,14 @@ Ownership hardening:
       "No slippage or fees included.",
       "Benchmark: SPY."
     ],
+    "execution_costs": {
+      "fee_bps": 10.0,
+      "slippage_bps": 5.0,
+      "gross_total_return_pct": 23.2,
+      "net_total_return_pct": 23.0,
+      "return_drag_pct": 0.2,
+      "benchmark_treatment": "same_modeled_costs"
+    },
     "actions": [
       {
         "type": "show_breakdown",
@@ -627,6 +635,13 @@ commitment is represented by an explicit `DecisionNote`.
 - Legacy persisted `chart.value_extrema` may be read as a fallback only; new writers must emit `chart.value_summary` as the canonical shape.
 - `chart.markers` contains capped entry/exit events derived from executed fills only. Raw strategy signals, blocked exits while flat, and duplicate blocked entries must not appear as chart markers.
 - The frontend must keep TradingView attribution visible when rendering Lightweight Charts.
+
+**Result execution costs contract:**
+- `execution_costs` is optional and appears only when the engine modeled nonzero execution costs for the completed run.
+- Idealized legacy runs omit `execution_costs` and keep the existing no-fees/slippage assumption.
+- `fee_bps` and `slippage_bps` are modeled per-trade costs in basis points.
+- `gross_total_return_pct`, `net_total_return_pct`, and `return_drag_pct` describe strategy return before costs, after costs, and the gross-minus-net drag in percentage points.
+- `benchmark_treatment` is currently `same_modeled_costs`, meaning the benchmark comparison used the same modeled cost assumptions.
 
 **Reproducibility contract:**
 - Direct `/backtests/run` records store the normalized engine config directly in

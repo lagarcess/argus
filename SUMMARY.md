@@ -44,9 +44,10 @@ card remain byte-identical to the pre-feature path.
 
 ## Phase 3 - User-Facing Trust Surface
 
-- Added non-headline execution realism metadata showing gross vs net return.
-- Result card assumptions now say the modeled costs and their effect, for
-  example: `Modeled 10 bps fee + 5 bps slippage; net +11.8% vs gross +12.0%.`
+- Added structured execution realism metadata showing gross return, net return,
+  return drag, and same-cost benchmark treatment.
+- Result card assumptions now keep one concise cost line, for example:
+  `Net of 10 bps fee + 5 bps slippage.`
 - Confirmation surfaces render nonzero modeled costs from the launch payload or
   drafted strategy, without inventing costs when the feature is off.
 - Proof:
@@ -103,8 +104,8 @@ card remain byte-identical to the pre-feature path.
 ## Phase 6 - Result Card Cost Evidence
 
 - The result card always carries one honest assumption line: idealized runs
-  keep "No fees/slippage" and cost-modeled runs keep the modeled-cost line with
-  net vs gross (both were already in place; unchanged here).
+  keep "No fees/slippage" and cost-modeled runs keep a concise "Net of..."
+  modeled-cost line. Gross/net and drag live in structured details.
 - The backend result card payload now includes a structured
   `execution_costs` block (`fee_bps`, `slippage_bps`, `gross_total_return_pct`,
   `net_total_return_pct`, `return_drag_pct`,

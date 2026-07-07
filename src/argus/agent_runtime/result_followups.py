@@ -765,6 +765,12 @@ def _labeled_fact_fragment(fact_id: str, value: str) -> str:
         "max_drawdown": "Max drawdown",
         "trade_count": "Trades",
         "starting_capital": "Starting capital",
+        "fee_bps": "Modeled fee",
+        "slippage_bps": "Modeled slippage",
+        "gross_total_return": "Gross return",
+        "net_total_return": "Net return",
+        "return_drag": "Cost drag",
+        "benchmark_cost_treatment": "Benchmark cost treatment",
         "assumptions": "Assumptions",
     }
     label = labels.get(fact_id)
@@ -846,6 +852,7 @@ def result_followup_fact_bank(metadata: dict[str, Any]) -> dict[str, str]:
     )
     if trade_count is not None:
         fact_bank["trade_count"] = f"{int(trade_count)} trades"
+    fact_bank.update(_execution_cost_fact_entries(metadata))
     # Deterministic enrichment (equity-curve extrema, supplemental metrics,
     # result-card rows). Canonical entries above win on key collisions.
     for fact_id, value in enriched_result_fact_entries(metadata).items():
@@ -876,6 +883,53 @@ def result_followup_fact_bank(metadata: dict[str, Any]) -> dict[str, str]:
         default=str,
     )
     return fact_bank
+
+
+def _execution_cost_fact_entries(metadata: dict[str, Any]) -> dict[str, str]:
+    result_card = _mapping(
+        metadata.get("result_card") or metadata.get("conversation_result_card")
+    )
+    costs = _mapping(result_card.get("execution_costs"))
+    if not costs:
+        return {}
+
+    entries: dict[str, str] = {}
+    fee_bps = as_float(costs.get("fee_bps"))
+    if fee_bps is not None:
+        entries["fee_bps"] = _format_bps(fee_bps)
+    slippage_bps = as_float(costs.get("slippage_bps"))
+    if slippage_bps is not None:
+        entries["slippage_bps"] = _format_bps(slippage_bps)
+    gross_return = as_float(costs.get("gross_total_return_pct"))
+    if gross_return is not None:
+        entries["gross_total_return"] = format_percent(gross_return)
+    net_return = as_float(costs.get("net_total_return_pct"))
+    if net_return is not None:
+        entries["net_total_return"] = format_percent(net_return)
+    return_drag = as_float(costs.get("return_drag_pct"))
+    if return_drag is not None:
+        entries["return_drag"] = _format_percentage_points(abs(return_drag))
+    benchmark_treatment = str(costs.get("benchmark_treatment") or "").strip()
+    if benchmark_treatment == "same_modeled_costs":
+        entries["benchmark_cost_treatment"] = (
+            "Benchmark used the same modeled costs"
+        )
+    return entries
+
+
+def _mapping(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _format_bps(value: float) -> str:
+    rounded = round(float(value), 4)
+    if abs(rounded - round(rounded)) < 0.0001:
+        return f"{int(round(rounded))} bps"
+    return f"{rounded:.4f}".rstrip("0").rstrip(".") + " bps"
+
+
+def _format_percentage_points(value: float) -> str:
+    return f"{float(value):.1f} percentage points"
 
 
 def required_result_followup_fact_ids(

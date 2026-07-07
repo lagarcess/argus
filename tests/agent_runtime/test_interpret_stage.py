@@ -2220,6 +2220,107 @@ def test_active_confirmation_date_refinement_is_material_even_when_labeled_appro
     assert result.decision.candidate_strategy_draft.asset_universe == ["AAPL"]
 
 
+def test_active_confirmation_cost_refinement_uses_artifact_planner(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.confirm import confirm_stage
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    calls: list[dict[str, Any]] = []
+
+    async def plan_stub(**kwargs):
+        calls.append(kwargs)
+        assert kwargs["current_user_message"] == (
+            "set fees to 0.1% and slippage to 0.05%"
+        )
+        assert kwargs["active_confirmation"] is not None
+        assert kwargs["prior_strategy"]["asset_universe"] == ["AAPL"]
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed execution costs.",
+            operations=[
+                EditOperation(op="set", target="fees", number=0.001),
+                EditOperation(op="set", target="slippage", number=0.0005),
+            ],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "plan_artifact_assumption_edit",
+        plan_stub,
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2025-01-01", "end": "2025-12-31"},
+        capital_amount=10000,
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User changed execution cost assumptions.",
+        candidate_strategy_draft=StrategySummary(
+            extra_parameters={
+                "fee_rate": 0.001,
+                "slippage": 0.0005,
+                "field_provenance": {
+                    "fee_rate": "explicit_user",
+                    "slippage": "explicit_user",
+                },
+            },
+        ),
+        semantic_turn_act="refine_current_idea",
+        artifact_target="active_confirmation",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="set fees to 0.1% and slippage to 0.05%",
+        response=response,
+        snapshot=task_snapshot_with_confirmation(pending),
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        confirmation_payload=validated_confirmation_payload(pending),
+    )
+
+    assert calls
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.date_range == {"start": "2025-01-01", "end": "2025-12-31"}
+    assert strategy.capital_amount == 10000
+    assert strategy.extra_parameters["fee_rate"] == 0.001
+    assert strategy.extra_parameters["slippage"] == 0.0005
+    assert (
+        strategy.extra_parameters["field_provenance"]["fee_rate"]
+        == "explicit_user"
+    )
+    assert "artifact_assumption_edit_planned" in result.decision.reason_codes
+
+    confirm_state = RunState.new(
+        current_user_message="set fees to 0.1% and slippage to 0.05%",
+        recent_thread_history=[],
+    )
+    confirm_state.candidate_strategy_draft = strategy
+    confirmation = confirm_stage(
+        state=confirm_state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert confirmation.outcome == "await_approval"
+    payload = confirmation.patch["confirmation_payload"]
+    assert payload["strategy"]["extra_parameters"]["fee_rate"] == 0.001
+    assert payload["strategy"]["extra_parameters"]["slippage"] == 0.0005
+    assert payload["launch_payload"]["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
+
+
 def test_interpret_approval_does_not_run_when_turn_contains_asset_refinement(
     monkeypatch,
 ) -> None:
