@@ -901,12 +901,19 @@ def _json_content_without_code_fences(content: str) -> str:
             return text
         # Leading prose before a fenced body ("Here is the JSON: ```json ...").
         # But a ``` embedded inside a JSON string value ('...{"k":"```"}') is
-        # not a fence: if a JSON brace opens before the first ```, treat the
-        # whole thing as bare JSON and leave it untouched.
+        # not a fence: when a JSON value opens before the first ``` and parses
+        # past it, the ``` is content — return exactly that value. A prose
+        # brace, or prose JSON that closes before the fence, still defers to
+        # the fenced body.
         brace_candidates = [i for i in (text.find("{"), text.find("[")) if i != -1]
         brace_at = min(brace_candidates) if brace_candidates else -1
         if brace_at != -1 and brace_at < fence_at:
-            return text
+            try:
+                _, span = json.JSONDecoder().raw_decode(text[brace_at:])
+            except ValueError:
+                span = 0
+            if brace_at + span > fence_at:
+                return text[brace_at : brace_at + span]
         text = text[fence_at:]
     text = text[len("```") :]
     info_end = 0
