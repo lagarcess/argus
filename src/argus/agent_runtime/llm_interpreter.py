@@ -142,6 +142,7 @@ from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
     _merge_focused_repair_with_base,
     _openrouter_wire_messages,
 )
+from argus.agent_runtime.interpreter.execution_cost_capability import execution_cost_capability_clause
 from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _apply_pending_response_option_replacement,
     _clear_dca_recurring_fields,
@@ -776,12 +777,11 @@ class OpenRouterStructuredInterpreter:
             "complete rule_spec. Incomplete indicator ideas and indicators without an "
             "executable registry spec can be understood and drafted, but are not "
             "runnable until the missing entry and exit semantics are supplied. "
-            "Same asset class only; max 5 symbols; "
-            "equity benchmark is SPY; crypto benchmark is BTC; currency pairs "
-            "are supported through Kraken; currency pair benchmark is the tested "
-            "pair itself. No brokerage trading, shorting, mixed asset-class runs, "
-            "custom scripting, or real slippage/fee realism.\n\n"
-            "Benchmark language matters in any user language: when a symbol is "
+            "Same asset class only; max 5 symbols; equity benchmark is SPY; crypto benchmark is BTC; "
+            "currency pairs are supported through Kraken; currency pair benchmark is the tested "
+            "pair itself. "
+            + execution_cost_capability_clause()
+            + "Benchmark language matters in any user language: when a symbol is "
             "framed as a benchmark, reference, comparison target, or market "
             "baseline, put it in comparison_baseline instead of asset_universe. "
             "A one-asset buy/hold request with a separate benchmark is executable "

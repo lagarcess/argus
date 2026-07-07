@@ -972,3 +972,55 @@ def test_refine_rule_tweak_reply_is_not_underfilled_assumption_edit() -> None:
         response=response,
         request=_refine_state_request("use a 20-day moving average instead of 50"),
     )
+
+
+def test_cost_edit_shape_predicate_accepts_explicit_fee_and_slippage() -> None:
+    # Deterministic pin of the reroute guard: no LLM, no key required.
+    from argus.agent_runtime.stages.interpret import StructuredInterpretation
+    from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
+        structured_interpretation_has_supported_artifact_assumption_edit,
+    )
+    from argus.agent_runtime.state.models import StrategySummary
+
+    interpretation = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User changed execution cost assumptions.",
+        candidate_strategy_draft=StrategySummary(
+            extra_parameters={
+                "fee_rate": 0.001,
+                "slippage": 0.0005,
+                "field_provenance": {
+                    "fee_rate": "explicit_user",
+                    "slippage": "explicit_user",
+                },
+            },
+        ),
+        semantic_turn_act="refine_current_idea",
+    )
+
+    assert structured_interpretation_has_supported_artifact_assumption_edit(
+        interpretation
+    )
+
+
+def test_cost_edit_shape_predicate_rejects_draft_without_costs_or_assets() -> None:
+    from argus.agent_runtime.stages.interpret import StructuredInterpretation
+    from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
+        structured_interpretation_has_supported_artifact_assumption_edit,
+    )
+    from argus.agent_runtime.state.models import StrategySummary
+
+    interpretation = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User said something vague.",
+        candidate_strategy_draft=StrategySummary(extra_parameters={}),
+        semantic_turn_act="refine_current_idea",
+    )
+
+    assert not structured_interpretation_has_supported_artifact_assumption_edit(
+        interpretation
+    )

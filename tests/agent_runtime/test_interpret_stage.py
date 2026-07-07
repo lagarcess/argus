@@ -9424,3 +9424,108 @@ def test_symbol_alias_dictionaries_are_deleted() -> None:
     source = "\n".join(path.read_text() for path in paths)
     for token in ["SYMBOL_ALIASES", "COMMON_NAMES", "NON_SYMBOLS"]:
         assert token not in source
+
+
+def test_cold_start_explicit_costs_flow_to_launch_payload_when_flag_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.confirm import confirm_stage
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    message = "Test buying and holding AAPL for 2025 with 0.1% fees and 0.05% slippage"
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants a buy-and-hold test with explicit costs.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=message,
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold AAPL with explicit execution costs.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2025-01-01", "end": "2025-12-31"},
+            capital_amount=10000,
+            extra_parameters={"fee_rate": 0.001, "slippage": 0.0005},
+            field_provenance={
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+        ),
+        missing_required_fields=[],
+        semantic_turn_act="new_idea",
+    )
+
+    result, _interpreter = run_interpret_with_llm(message=message, response=response)
+
+    assert result.outcome == "ready_for_confirmation"
+    draft = result.decision.candidate_strategy_draft
+    assert draft.extra_parameters["fee_rate"] == 0.001
+    assert draft.extra_parameters["slippage"] == 0.0005
+
+    state = RunState.new(current_user_message=message, recent_thread_history=[])
+    state.candidate_strategy_draft = draft
+    confirm_result = confirm_stage(
+        state=state, contract=build_default_capability_contract()
+    )
+
+    assert confirm_result.outcome == "await_approval"
+    launch_payload = confirm_result.patch["confirmation_payload"]["launch_payload"]
+    assert launch_payload["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
+
+
+def test_cold_start_explicit_costs_stay_inert_when_flag_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.confirm import confirm_stage
+
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    message = "Test buying and holding AAPL for 2025 with 0.1% fees"
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants a buy-and-hold test with explicit costs.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=message,
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold AAPL with explicit execution costs.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2025-01-01", "end": "2025-12-31"},
+            capital_amount=10000,
+            extra_parameters={"fee_rate": 0.001},
+            field_provenance={"fee_rate": "explicit_user"},
+        ),
+        missing_required_fields=[],
+        semantic_turn_act="new_idea",
+    )
+
+    result, _interpreter = run_interpret_with_llm(message=message, response=response)
+
+    assert result.outcome == "ready_for_confirmation"
+    state = RunState.new(current_user_message=message, recent_thread_history=[])
+    state.candidate_strategy_draft = result.decision.candidate_strategy_draft
+    confirm_result = confirm_stage(
+        state=state, contract=build_default_capability_contract()
+    )
+
+    assert confirm_result.outcome == "await_approval"
+    launch_payload = confirm_result.patch["confirmation_payload"]["launch_payload"]
+    assert "_execution_realism" not in launch_payload

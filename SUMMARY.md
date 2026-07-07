@@ -120,6 +120,32 @@ card remain byte-identical to the pre-feature path.
   `tests/section3/test_engine_simulation.py::test_build_result_card_omits_execution_costs_without_modeled_costs`,
   and the `web/__tests__/result-card-playground.test.ts` cost-evidence tests.
 
+## Cold-Start Cost Capture
+
+- The interpreter system prompt previously declared "no real slippage/fee
+  realism," so explicit costs in a user's first message were dropped from the
+  draft. The capability clause is now flag-aware
+  (`interpreter/execution_cost_capability.py`): with the flag off it keeps the
+  legacy sentence byte-for-byte; with the flag on it states that per-trade fee
+  and slippage assumptions are supported and instructs the interpreter to
+  record explicit values, in any language, as decimal fractions in
+  `extra_parameters.fee_rate` / `extra_parameters.slippage` with
+  `explicit_user` provenance. No regex or language gates; extraction stays
+  LLM-owned with deterministic validation after.
+- Proof:
+  `tests/agent_runtime/test_llm_interpreter_artifact_capability_repairs.py::test_llm_system_prompt_keeps_legacy_cost_capability_when_flag_off`,
+  `tests/agent_runtime/test_llm_interpreter_artifact_capability_repairs.py::test_llm_system_prompt_instructs_cost_capture_when_flag_on`,
+  `tests/agent_runtime/test_interpret_stage.py::test_cold_start_explicit_costs_flow_to_launch_payload_when_flag_on`,
+  `tests/agent_runtime/test_interpret_stage.py::test_cold_start_explicit_costs_stay_inert_when_flag_off`,
+  and the deterministic reroute-predicate tests in
+  `tests/agent_runtime/test_refine_action_edit_routing.py`.
+- Live QA (dev backend, flag on): English and Spanish cold-start messages with
+  "0.1% fees and 0.05% slippage" produced a first confirmation card reading
+  `Modeled costs: 10 bps fee + 5 bps slippage` /
+  `Costos modelados: comisión de 10 bps + deslizamiento de 5 bps`; running it
+  produced the net result card (gross -14.8% vs net -14.9%), and a follow-up
+  "what fees did this include?" was answered from the structured cost facts.
+
 ## Cross-Commit Byte-Identity Audit
 
 Beyond the in-suite tests (which compare HEAD to HEAD), the flag-off prime
