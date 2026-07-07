@@ -851,6 +851,7 @@ def _apply_reasoning_for_structured_artifact(
 def _messages_with_stable_prefix_prompt_cache(
     messages: list[dict[str, str]],
     *,
+    model: str,
     task: OpenRouterTask,
 ) -> list[dict[str, object]]:
     payload_messages: list[dict[str, object]] = [dict(message) for message in messages]
@@ -859,7 +860,8 @@ def _messages_with_stable_prefix_prompt_cache(
 
     cache_index = 0
     content = payload_messages[0].get("content") if payload_messages and payload_messages[0].get("role") == "system" else None
-    if not isinstance(content, str) or not content:
+    has_later_system_context = any(message.get("role") in {"system", "developer"} for message in payload_messages[1:])
+    if not isinstance(content, str) or not content or (model.startswith("google/gemini") and has_later_system_context):
         return payload_messages
     payload_messages[cache_index]["content"] = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
     return payload_messages
@@ -894,7 +896,7 @@ def _json_schema_payload(
         }
         payload: dict[str, object] = {
             "model": model,
-            "messages": _messages_with_stable_prefix_prompt_cache([schema_message, *messages], task=profile.task),
+            "messages": _messages_with_stable_prefix_prompt_cache([schema_message, *messages], model=model, task=profile.task),
             "temperature": profile.temperature,
             "max_tokens": profile.max_tokens,
         }
@@ -902,7 +904,7 @@ def _json_schema_payload(
         return payload
     payload = {
         "model": model,
-        "messages": _messages_with_stable_prefix_prompt_cache(messages, task=profile.task),
+        "messages": _messages_with_stable_prefix_prompt_cache(messages, model=model, task=profile.task),
         "response_format": {
             "type": "json_schema",
             "json_schema": {

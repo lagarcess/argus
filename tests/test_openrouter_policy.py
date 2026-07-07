@@ -3314,6 +3314,31 @@ def test_structured_artifact_payload_marks_stable_system_prefix_for_prompt_cache
     }
 
 
+def test_gemini_payload_skips_prompt_cache_when_later_system_context_is_dynamic() -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    payload = openrouter._json_schema_payload(
+        model="google/gemini-2.5-flash-lite",
+        messages=[
+            {"role": "system", "content": "stable Argus interpreter policy"},
+            {"role": "system", "content": "dynamic turn context"},
+            {"role": "user", "content": "dynamic user request"},
+        ],
+        schema_model=LLMDateRangeIntent,
+        schema_name="LLMDateRangeIntent",
+        profile=openrouter_profile_for_task("interpretation"),
+    )
+
+    assert payload["messages"][0] == {
+        "role": "system",
+        "content": "stable Argus interpreter policy",
+    }
+    assert payload["messages"][1] == {
+        "role": "system",
+        "content": "dynamic turn context",
+    }
+
+
 def test_non_target_json_schema_payload_does_not_add_prompt_cache_marker() -> None:
     from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
 
