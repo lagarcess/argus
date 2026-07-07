@@ -544,7 +544,7 @@ def test_buy_and_hold_execution_realism_reduces_net_return_and_profit(
             "slippage_bps": 5,
         },
     }
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     gross = engine.compute_alpha_metrics(engine.normalize_backtest_config(payload))
 
     monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
@@ -610,7 +610,7 @@ def test_flag_off_total_return_keeps_legacy_rounding_at_tie_boundary(
 
     monkeypatch.setattr(engine, "fetch_ohlcv", fake_fetch_ohlcv)
     monkeypatch.setattr(engine, "fetch_price_series", fake_fetch_price_series)
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
 
     metrics = engine.compute_alpha_metrics(
         engine.normalize_backtest_config(
@@ -696,7 +696,7 @@ def test_execution_realism_flag_off_is_byte_identical(
             "slippage_bps": 40,
         },
     }
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
 
     base_config = engine.normalize_backtest_config(base_payload)
     realism_config = engine.normalize_backtest_config(realism_payload)
@@ -766,7 +766,7 @@ def test_signal_strategy_execution_realism_reduces_net_return_and_profit(
             "slippage_bps": 5,
         },
     }
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     gross = engine.compute_alpha_metrics(engine.normalize_backtest_config(payload))
 
     monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
@@ -828,7 +828,7 @@ def test_dca_execution_realism_reduces_net_return_and_profit(
             "slippage_bps": 5,
         },
     }
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     gross = engine.compute_alpha_metrics(engine.normalize_backtest_config(payload))
 
     monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
@@ -866,7 +866,7 @@ def test_dca_execution_realism_drag_increases_with_more_fills(
     daily_payload = {**base_payload, "parameters": {"dca_cadence": "daily"}}
     weekly_payload = {**base_payload, "parameters": {"dca_cadence": "weekly"}}
 
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     daily_gross = engine.compute_alpha_metrics(
         engine.normalize_backtest_config(daily_payload)
     )
@@ -1271,7 +1271,7 @@ def test_build_result_card_omits_execution_costs_without_modeled_costs(
         }
     }
 
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     flag_off_card = engine.build_result_card(config, metrics)
     assert "execution_costs" not in flag_off_card
 
@@ -1368,3 +1368,19 @@ def test_validate_template_parameters_accepts_valid():
     }
     # Should not raise
     engine.validate_backtest_config(config)
+
+
+def test_execution_realism_flag_defaults_on_with_explicit_kill_switch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.backtesting.config import _execution_realism_feature_enabled
+
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    assert _execution_realism_feature_enabled()
+
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    assert _execution_realism_feature_enabled()
+
+    for kill_value in ("false", "FALSE", " off ", "0", "no"):
+        monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", kill_value)
+        assert not _execution_realism_feature_enabled(), kill_value

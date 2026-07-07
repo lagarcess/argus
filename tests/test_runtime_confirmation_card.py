@@ -56,7 +56,7 @@ def test_runtime_confirmation_card_flag_off_never_advertises_modeled_costs(
 ) -> None:
     # Flag off, the engine ignores draft fee/slippage values, so the card must
     # keep the idealized truth even when an edit stored costs on the draft.
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
 
     card = runtime_confirmation_card(_confirmation_result_with_draft_costs())
 
@@ -75,7 +75,7 @@ def test_runtime_confirmation_card_flag_off_never_advertises_modeled_costs(
 def test_runtime_confirmation_card_flag_off_ignores_stale_launch_payload_costs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     result = _confirmation_result_with_draft_costs()
     result["confirmation_payload"]["launch_payload"]["_execution_realism"] = {
         "enabled": True,
@@ -849,7 +849,7 @@ def test_runtime_confirmation_card_carries_active_confirmation_identity() -> Non
 def test_runtime_confirmation_card_flag_off_omits_capabilities(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
 
     card = runtime_confirmation_card(_confirmation_result_with_draft_costs())
 

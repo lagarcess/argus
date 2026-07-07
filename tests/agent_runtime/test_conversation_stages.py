@@ -2739,7 +2739,7 @@ def test_confirm_stage_preserves_user_indicator_period_in_launch_payload() -> No
 def test_confirm_stage_blocks_unsupported_nonzero_fee_assumption(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     state = RunState.new(
         current_user_message="Backtest Tesla with fees.",
         recent_thread_history=[],

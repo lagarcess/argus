@@ -9490,7 +9490,7 @@ def test_cold_start_explicit_costs_stay_inert_when_flag_off(
     from argus.agent_runtime.stages import interpret as interpret_module
     from argus.agent_runtime.stages.confirm import confirm_stage
 
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     monkeypatch.setattr(
         interpret_module,
         "resolve_asset",

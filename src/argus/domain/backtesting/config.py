@@ -100,7 +100,14 @@ def _vbt_freq(timeframe: str) -> str:
 
 
 def _execution_realism_feature_enabled() -> bool:
-    return os.getenv("ARGUS_ENABLE_EXECUTION_REALISM", "").strip().lower() == "true"
+    # On by default; the env var is a kill switch. Costs stay opt-in per idea,
+    # so runs without stated costs remain idealized either way.
+    return os.getenv("ARGUS_ENABLE_EXECUTION_REALISM", "").strip().lower() not in {
+        "false",
+        "0",
+        "off",
+        "no",
+    }
 
 
 def _coerce_execution_realism_enabled(value: Any) -> bool:

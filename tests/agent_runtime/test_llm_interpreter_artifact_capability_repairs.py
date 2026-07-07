@@ -5326,7 +5326,7 @@ async def test_supported_strategy_capability_conflict_audit_keeps_extra_rule_blo
 def test_llm_system_prompt_keeps_legacy_cost_capability_when_flag_off(
     monkeypatch,
 ) -> None:
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     interpreter = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
     )

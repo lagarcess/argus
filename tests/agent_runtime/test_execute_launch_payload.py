@@ -112,7 +112,7 @@ def test_launch_payload_maps_decimal_execution_realism_to_bps_when_flag_on(
 
 
 def test_launch_payload_omits_execution_realism_when_flag_off(monkeypatch) -> None:
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     state = RunState.new(
         current_user_message="Backtest Tesla with fees.",
         recent_thread_history=[],
