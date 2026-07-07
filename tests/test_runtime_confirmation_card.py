@@ -72,6 +72,27 @@ def test_runtime_confirmation_card_flag_off_never_advertises_modeled_costs(
     assert not any("Modeled costs" in item for item in card["assumptions"])
 
 
+def test_runtime_confirmation_card_flag_off_ignores_stale_launch_payload_costs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    result = _confirmation_result_with_draft_costs()
+    result["confirmation_payload"]["launch_payload"]["_execution_realism"] = {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
+
+    card = runtime_confirmation_card(result)
+
+    assert card is not None
+    assert card["display_facts"]["fees"] == 0.0
+    assert card["display_facts"]["slippage"] == 0.0
+    assert "No fees" in card["assumptions"]
+    assert "No slippage" in card["assumptions"]
+    assert not any("Modeled costs" in item for item in card["assumptions"])
+
+
 def test_runtime_confirmation_card_flag_on_shows_draft_costs_without_launch_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -270,7 +291,11 @@ def test_runtime_confirmation_card_promotes_default_starting_capital() -> None:
     assert "Benchmark: SPY" in card["assumptions"]
 
 
-def test_runtime_confirmation_card_shows_execution_realism_values() -> None:
+def test_runtime_confirmation_card_shows_execution_realism_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+
     card = runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",

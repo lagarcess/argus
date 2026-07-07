@@ -5,7 +5,10 @@ from typing import Any, Literal
 
 import pandas as pd
 
-from argus.domain.backtesting.config import _execution_realism_feature_enabled
+from argus.domain.backtesting.config import (
+    _execution_realism_feature_enabled,
+    _normalize_execution_realism,
+)
 
 
 @dataclass(frozen=True)
@@ -23,17 +26,11 @@ class ExecutionEvent:
 def _execution_realism_settings(config: dict[str, Any]) -> dict[str, float | bool]:
     if not _execution_realism_feature_enabled():
         return {"enabled": False, "fees": 0.0, "slippage": 0.0}
-    raw = config.get("_execution_realism") or {}
-    enabled = bool(raw.get("enabled", False))
-    fee_bps = float(raw.get("fee_bps", 0.0))
-    slippage_bps = float(raw.get("slippage_bps", 0.0))
-    if not enabled:
-        fee_bps = 0.0
-        slippage_bps = 0.0
+    realism = _normalize_execution_realism(config.get("_execution_realism"))
     return {
-        "enabled": enabled,
-        "fees": fee_bps / 10000.0,
-        "slippage": slippage_bps / 10000.0,
+        "enabled": bool(realism["enabled"]),
+        "fees": float(realism["fee_bps"]) / 10000.0,
+        "slippage": float(realism["slippage_bps"]) / 10000.0,
     }
 
 

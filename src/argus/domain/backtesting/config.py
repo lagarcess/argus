@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -102,12 +103,37 @@ def _execution_realism_feature_enabled() -> bool:
     return os.getenv("ARGUS_ENABLE_EXECUTION_REALISM", "").strip().lower() == "true"
 
 
+def _coerce_execution_realism_enabled(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
+def _coerce_execution_realism_bps(source: dict[str, Any], key: str) -> float:
+    try:
+        value = float(source.get(key, 0.0))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"invalid_execution_realism_{key}") from exc
+    if not math.isfinite(value) or value < 0.0:
+        raise ValueError(f"invalid_execution_realism_{key}")
+    return value
+
+
 def _normalize_execution_realism(raw: Any) -> dict[str, Any]:
     source = raw if isinstance(raw, dict) else {}
+    enabled = _coerce_execution_realism_enabled(source.get("enabled", False))
+    if not enabled:
+        return {
+            "enabled": False,
+            "fee_bps": 0.0,
+            "slippage_bps": 0.0,
+        }
     return {
-        "enabled": bool(source.get("enabled", False)),
-        "fee_bps": float(source.get("fee_bps", 0.0)),
-        "slippage_bps": float(source.get("slippage_bps", 0.0)),
+        "enabled": True,
+        "fee_bps": _coerce_execution_realism_bps(source, "fee_bps"),
+        "slippage_bps": _coerce_execution_realism_bps(source, "slippage_bps"),
     }
 
 

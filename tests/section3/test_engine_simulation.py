@@ -176,6 +176,78 @@ def test_currency_pair_config_uses_same_pair_as_default_benchmark() -> None:
     assert metrics["aggregate"]["performance"]["total_return_pct"] > 0
 
 
+@pytest.mark.parametrize(
+    ("execution_realism", "error_code"),
+    [
+        (
+            {"enabled": True, "fee_bps": -10.0, "slippage_bps": 0.0},
+            "invalid_execution_realism_fee_bps",
+        ),
+        (
+            {"enabled": True, "fee_bps": 0.0, "slippage_bps": -5.0},
+            "invalid_execution_realism_slippage_bps",
+        ),
+        (
+            {"enabled": True, "fee_bps": float("inf"), "slippage_bps": 0.0},
+            "invalid_execution_realism_fee_bps",
+        ),
+    ],
+)
+def test_normalize_backtest_config_rejects_invalid_execution_realism_costs(
+    monkeypatch: pytest.MonkeyPatch,
+    execution_realism: dict[str, object],
+    error_code: str,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+
+    with pytest.raises(ValueError, match=error_code):
+        engine.normalize_backtest_config(
+            {
+                "template": "buy_and_hold",
+                "asset_class": "equity",
+                "symbols": ["AAPL"],
+                "timeframe": "1D",
+                "start_date": date(2025, 1, 1),
+                "end_date": date(2025, 1, 7),
+                "side": "long",
+                "starting_capital": 10000,
+                "allocation_method": "equal_weight",
+                "benchmark_symbol": "SPY",
+                "parameters": {},
+                "_execution_realism": execution_realism,
+            }
+        )
+
+
+def test_compute_alpha_metrics_rejects_direct_invalid_execution_realism_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    config = engine.normalize_backtest_config(
+        {
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "timeframe": "1D",
+            "start_date": date(2025, 1, 1),
+            "end_date": date(2025, 1, 7),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "SPY",
+            "parameters": {},
+        }
+    )
+    config["_execution_realism"] = {
+        "enabled": True,
+        "fee_bps": -10.0,
+        "slippage_bps": 0.0,
+    }
+
+    with pytest.raises(ValueError, match="invalid_execution_realism_fee_bps"):
+        engine.compute_alpha_metrics(config)
+
+
 def test_validate_backtest_config_rejects_stablecoins() -> None:
     config = engine.normalize_backtest_config(
         {

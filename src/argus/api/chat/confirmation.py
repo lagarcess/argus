@@ -16,7 +16,10 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     resolve_date_range,
 )
-from argus.domain.backtesting.config import _execution_realism_feature_enabled
+from argus.domain.backtesting.config import (
+    _execution_realism_feature_enabled,
+    _normalize_execution_realism,
+)
 from argus.domain.engine_launch.display import (
     format_data_through_label,
     format_date_range_label,
@@ -503,21 +506,26 @@ def _confirmation_execution_costs(
     optional_parameters: dict[str, Any],
     launch_payload: dict[str, Any],
 ) -> dict[str, float] | None:
-    launch_realism = launch_payload.get("_execution_realism")
-    if isinstance(launch_realism, dict) and bool(launch_realism.get("enabled")):
-        fees = _optional_float(launch_realism.get("fee_bps"))
-        slippage = _optional_float(launch_realism.get("slippage_bps"))
-        costs = {
-            "fees": (fees or 0.0) / 10000.0,
-            "slippage": (slippage or 0.0) / 10000.0,
-        }
-        if costs["fees"] > 0.0 or costs["slippage"] > 0.0:
-            return costs
-
     if not _execution_realism_feature_enabled():
         # With the engine flag off the run is idealized no matter what values a
         # draft carries, so never advertise modeled costs.
         return None
+
+    launch_realism = launch_payload.get("_execution_realism")
+    if isinstance(launch_realism, dict):
+        try:
+            realism = _normalize_execution_realism(launch_realism)
+        except ValueError:
+            realism = {"enabled": False, "fee_bps": 0.0, "slippage_bps": 0.0}
+    else:
+        realism = {"enabled": False, "fee_bps": 0.0, "slippage_bps": 0.0}
+    if bool(realism["enabled"]):
+        costs = {
+            "fees": float(realism["fee_bps"]) / 10000.0,
+            "slippage": float(realism["slippage_bps"]) / 10000.0,
+        }
+        if costs["fees"] > 0.0 or costs["slippage"] > 0.0:
+            return costs
 
     extra_parameters = strategy.get("extra_parameters")
     if isinstance(extra_parameters, dict):
