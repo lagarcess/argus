@@ -403,6 +403,278 @@ def test_unsupported_request_preserves_provider_asset_and_explicit_window(
     assert draft.comparison_baseline == "SPY"
 
 
+@pytest.mark.xfail(
+    reason="#171 Sig1 - recovery drafts must preserve stated calendar-year windows",
+    strict=True,
+)
+def test_unsupported_recovery_calendar_year_intent_survives_without_bare_year_provenance(
+    monkeypatch,
+) -> None:
+    import asyncio
+    import json
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.llm_interpreter_types import (
+        FocusedDateWindowExtraction,
+        LLMUnsupportedConstraint,
+    )
+
+    async def asset_grounding_passthrough(*, response, **kwargs):
+        del kwargs
+        return response
+
+    async def schema_stub(*, schema_name: str, **kwargs):
+        del kwargs
+        if schema_name == "FocusedDateWindowExtraction":
+            return FocusedDateWindowExtraction(
+                has_date_window=True,
+                date_range_intent=LLMDateRangeIntent(
+                    kind="calendar_year",
+                    year=2024,
+                    evidence="2024",
+                ),
+                date_range_raw_text="2024",
+                evidence="2024",
+                confidence=0.9,
+            )
+        return None
+
+    schema_stub.__module__ = "argus.llm.openrouter"
+    monkeypatch.setattr(
+        interpreter_module,
+        "_asset_grounding_audited_response",
+        asset_grounding_passthrough,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        schema_stub,
+    )
+
+    context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "AAPL",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "AAPL",
+                    "asset_class": "equity",
+                    "name": "Apple Inc.",
+                    "confidence": 0.94,
+                }
+            ]
+        }
+    )
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants weekly options on Apple in 2024.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            date_range_intent=LLMDateRangeIntent(
+                kind="calendar_year",
+                year=2024,
+            ),
+        ),
+        unsupported_constraints=[
+            LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="weekly options",
+                explanation="Weekly options are not executable yet.",
+            )
+        ],
+        semantic_turn_act="unsupported_request",
+    )
+
+    normalized = asyncio.run(
+        interpreter_module._response_ready_for_runtime(
+            response=response,
+            preferred_model="test-model",
+            request=InterpretationRequest(
+                current_user_message=(
+                    "please backtest weekly options on apple during 2024"
+                ),
+                recent_thread_history=[],
+                latest_task_snapshot=None,
+                user=UserState(user_id="u1"),
+            ),
+            asset_resolution_context=context,
+        )
+    )
+
+    draft = normalized.candidate_strategy_draft
+    observed = {
+        "assets": draft.asset_universe,
+        "date_range": draft.date_range,
+    }
+    assert normalized.intent == "unsupported_or_out_of_scope"
+    assert draft.asset_class == "equity"
+    assert draft.comparison_baseline == "SPY"
+    assert observed == {
+        "assets": ["AAPL"],
+        "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+    }
+
+
+@pytest.mark.xfail(
+    reason="#171 Sig2 - provider-backed company baskets must stay executable",
+    strict=True,
+)
+def test_company_name_basket_context_survives_underfilled_repair_to_confirmation(
+    monkeypatch,
+) -> None:
+    import asyncio
+    import json
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages.confirm import confirm_stage
+
+    async def asset_grounding_passthrough(*, response, **kwargs):
+        del kwargs
+        return response
+
+    async def schema_stub(*, schema_name: str, **kwargs):
+        del kwargs
+        if schema_name == "FocusedStrategyExtraction":
+            return FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="Plain hold test for Target, Walmart, and Costco.",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Buy and hold Target, Walmart, and Costco.",
+                asset_universe=[],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+                confidence=0.9,
+            )
+        return None
+
+    schema_stub.__module__ = "argus.llm.openrouter"
+    monkeypatch.setattr(
+        interpreter_module,
+        "_asset_grounding_audited_response",
+        asset_grounding_passthrough,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        schema_stub,
+    )
+
+    context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "target",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "TGT",
+                    "asset_class": "equity",
+                    "name": "Target Corporation",
+                    "confidence": 0.95,
+                },
+                {
+                    "raw_text": "walmart",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "WMT",
+                    "asset_class": "equity",
+                    "name": "Walmart Inc.",
+                    "confidence": 0.95,
+                },
+                {
+                    "raw_text": "costco",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "COST",
+                    "asset_class": "equity",
+                    "name": "Costco Wholesale Corporation",
+                    "confidence": 0.95,
+                },
+            ]
+        }
+    )
+    message = (
+        "try a plain hold test for target, walmart, and costco from jan 2024 "
+        "through dec 2024"
+    )
+    interpretation = asyncio.run(
+        interpreter_module._response_ready_for_runtime(
+            response=LLMInterpretationResponse(
+                intent="strategy_drafting",
+                task_relation="new_task",
+                requires_clarification=True,
+                user_goal_summary="User wants a plain hold test for retailers.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing=message,
+                    strategy_thesis=message,
+                ),
+                semantic_turn_act="new_idea",
+            ),
+            preferred_model="test-model",
+            request=InterpretationRequest(
+                current_user_message=message,
+                recent_thread_history=[],
+                latest_task_snapshot=None,
+                user=UserState(user_id="u1"),
+            ),
+            asset_resolution_context=context,
+        )
+    )
+
+    strategy = interpretation.candidate_strategy_draft
+    ready_for_confirmation = (
+        interpretation.intent in {"strategy_drafting", "backtest_execution"}
+        and interpretation.requires_clarification is False
+        and interpretation.unsupported_constraints == []
+        and strategy.strategy_type == "buy_and_hold"
+        and bool(strategy.asset_universe)
+        and bool(strategy.date_range)
+    )
+    stage_outcomes = [
+        "ready_for_confirmation" if ready_for_confirmation else "needs_clarification"
+    ]
+    capability_verdict = "unsupported"
+    if ready_for_confirmation:
+        confirm_state = RunState.new(
+            current_user_message=message,
+            recent_thread_history=[],
+        )
+        confirm_state.candidate_strategy_draft = strategy
+        confirm_result = confirm_stage(
+            state=confirm_state,
+            contract=build_default_capability_contract(),
+        )
+        stage_outcomes.append(confirm_result.outcome)
+        validation = confirm_result.patch["confirmation_payload"]["validation"]
+        if validation.get("executable") is True:
+            capability_verdict = "executable"
+
+    observed = {
+        "assets": strategy.asset_universe,
+        "date_range": strategy.date_range,
+        "capability_verdict": capability_verdict,
+        "stage_outcomes": stage_outcomes,
+    }
+    assert observed == {
+        "assets": ["TGT", "WMT", "COST"],
+        "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+        "capability_verdict": "executable",
+        "stage_outcomes": ["ready_for_confirmation", "await_approval"],
+    }
+
+
 def test_provider_context_asset_class_survives_runtime_validation(monkeypatch) -> None:
     import json
 
