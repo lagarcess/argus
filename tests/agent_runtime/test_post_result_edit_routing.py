@@ -836,6 +836,154 @@ def test_result_followup_asset_swap_with_inferred_target_confirms(
     assert "result_followup_target_inferred" in result.decision.reason_codes
 
 
+@pytest.mark.xfail(strict=True, reason="#151 — remove when fixed")
+def test_post_result_readiness_prose_materializes_confirmation_payload(
+    monkeypatch,
+) -> None:
+    """A runnable post-result variant cannot stop at model readiness prose.
+
+    The repro shape carries the same complete typed draft the model described to
+    the user, plus an assistant_response asking whether to proceed. The runtime
+    must still create the confirmation payload so the card action has typed
+    state to launch.
+    """
+
+    from argus.agent_runtime.stages import confirm as confirm_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages import interpret_actions
+    from argus.agent_runtime.stages.confirm import confirm_stage
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+    from argus.agent_runtime.state.models import ConfirmationPayload
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.setattr(interpret_module, "resolve_asset", _resolve_stub)
+    monkeypatch.setattr(
+        confirm_module,
+        "_strategy_with_latest_complete_data_adjustment",
+        lambda strategy: strategy,
+    )
+
+    async def compose_result_followup_stub(**kwargs):
+        del kwargs
+        return None
+
+    monkeypatch.setattr(
+        interpret_actions,
+        "_compose_result_followup_with_timeout",
+        compose_result_followup_stub,
+    )
+
+    planned = StructuredInterpretation(
+        intent="results_explanation",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User wants the same run with NVDA instead.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=(
+                "Could we try to buy NVDA at 500 dollars a month from the "
+                "same time period"
+            ),
+            strategy_type="dca_accumulation",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            cadence="monthly",
+            capital_amount=500,
+            date_range={"start": "2020-02-01", "end": "2026-07-02"},
+            sizing_mode="capital_amount",
+            extra_parameters={"asset_universe_operation": "replace"},
+        ),
+        assistant_response=(
+            "Got it - $500/month into NVDA, same February 2020 to today "
+            "window. Ready to run the backtest?"
+        ),
+        semantic_turn_act="result_followup",
+        result_followup_focus="general",
+        reason_codes=[
+            "latest_result_window_bound",
+            "result_followup_target_inferred",
+        ],
+        artifact_target="latest_result",
+    )
+
+    interpret_result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "Could we try to buy NVDA at 500 dollars a month from the "
+                "same time period"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="results_explanation",
+            completed=True,
+            latest_backtest_result_reference=_completed_result_reference(),
+        ),
+        selected_thread_metadata={
+            "latest_task_type": "results_explanation",
+            "last_stage_outcome": "ready_to_respond",
+        },
+        structured_interpreter=_RecordingInterpreter(planned),
+    )
+
+    assert interpret_result.outcome == "ready_for_confirmation"
+
+    confirm_state = RunState.new(
+        current_user_message=(
+            "Could we try to buy NVDA at 500 dollars a month from the same "
+            "time period"
+        ),
+        recent_thread_history=[],
+    )
+    confirm_state = confirm_state.model_copy(
+        update={
+            "candidate_strategy_draft": (
+                interpret_result.decision.candidate_strategy_draft
+            ),
+            "optional_parameter_status": interpret_result.patch[
+                "optional_parameter_status"
+            ],
+        }
+    )
+    confirm_result = confirm_stage(
+        state=confirm_state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert confirm_result.outcome == "await_approval"
+    confirmation_payload = confirm_result.patch.get("confirmation_payload")
+    assert confirmation_payload is not None
+    assert confirmation_payload["strategy"]["asset_universe"] == ["NVDA"]
+
+    approval_state = RunState.new(
+        current_user_message="run backtest",
+        recent_thread_history=[],
+        action_context={
+            "type": "run_backtest",
+            "label": "Run backtest",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+    )
+    approval_state.confirmation_payload = ConfirmationPayload.model_validate(
+        confirmation_payload
+    )
+    approval_result = interpret_stage(
+        state=approval_state,
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary.model_validate(
+                confirmation_payload["strategy"]
+            )
+        ),
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        structured_interpreter=_RecordingInterpreter(None),
+    )
+
+    assert approval_result.outcome == "approved_for_execution"
+    assert approval_result.patch.get("confirmation_payload") is not None
+
+
 def test_result_patch_asset_universe_ignores_dash_slash_spelling_difference():
     """BRK-B in the turn draft and BRK/B on the anchor are the same asset; a
     result patch must not carry a spurious asset change for the spelling."""
