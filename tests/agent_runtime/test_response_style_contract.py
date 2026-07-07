@@ -7,6 +7,7 @@ from argus.agent_runtime.response_style import (
     result_followup_response_intent,
 )
 from argus.agent_runtime.result_followups import result_followup_llm_messages
+from argus.agent_runtime.state.models import ResponseIntent
 from argus.api.chat.breakdown import _result_breakdown_llm_messages
 
 
@@ -55,6 +56,9 @@ def test_result_followup_headings_are_typed_chrome_keys() -> None:
         "kind": "result_followup_chrome",
         "facts": {"focus": "what_tested", "heading_key": "what_tested"},
     }
+    assert ResponseIntent.model_validate(
+        result_followup_response_intent("what_tested")
+    ).kind == "result_followup_chrome"
 
 
 def test_result_breakdown_prompt_includes_argus_response_style_contract() -> None:
