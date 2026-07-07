@@ -205,6 +205,27 @@ class _RecordingComposer:
         return self.response
 
 
+class _MessageSwitchInterpreter:
+    def __init__(self, responses: dict[str, StructuredInterpretation]) -> None:
+        self.responses = responses
+        self.requests: list[InterpretationRequest] = []
+
+    def __call__(self, request: InterpretationRequest) -> StructuredInterpretation:
+        self.requests.append(request)
+        return self.responses[request.current_user_message]
+
+
+class _SequencedComposer:
+    def __init__(self, responses: list[str | None]) -> None:
+        self.responses = responses
+        self.calls: list[dict[str, Any]] = []
+
+    async def __call__(self, **kwargs: Any) -> str | None:
+        self.calls.append(kwargs)
+        index = len(self.calls) - 1
+        return self.responses[index] if index < len(self.responses) else None
+
+
 def test_fact_bank_is_enriched_with_curve_and_supplemental_facts() -> None:
     fact_bank = result_followup_fact_bank(
         dict(_latest_result_reference().metadata)
@@ -666,6 +687,112 @@ async def test_workflow_refine_then_result_fact_answer_keeps_pending_state(
     assert snapshot.pending_strategy_summary is not None
     assert snapshot.pending_strategy_summary.asset_universe == ["COST", "TGT"]
     assert state.values["selected_thread_metadata"]["requested_field"] == "refinement"
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(strict=True, reason="#160(A) — remove when fixed")
+async def test_workflow_fact_answer_then_composer_none_edit_reroutes_to_planner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.artifact_edit_planner import (
+        ArtifactAssumptionEditPlan,
+        EditOperation,
+    )
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    fact_message = "what date did this strategy peak in value?"
+    edit_message = "change starting capital to $2,000"
+    composer = _SequencedComposer(
+        ["The peak portfolio value was $14,500.25 on 2021-11-09.", None]
+    )
+    monkeypatch.setattr(
+        latest_result_answer_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "compose_result_followup_response",
+        composer,
+    )
+
+    planner_calls: list[dict[str, object]] = []
+
+    async def planned_capital_edit(**kwargs: object) -> ArtifactAssumptionEditPlan:
+        planner_calls.append(kwargs)
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="User set starting capital to $2,000.",
+            operations=[
+                EditOperation(op="set", target="capital", number=2000),
+            ],
+            confidence=0.95,
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "plan_artifact_assumption_edit",
+        planned_capital_edit,
+    )
+
+    interpreter = _MessageSwitchInterpreter(
+        {
+            fact_message: StructuredInterpretation(
+                intent="results_explanation",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User asked about the latest result peak.",
+                semantic_turn_act="result_followup",
+                result_followup_focus="peak_date",
+                artifact_target="latest_result",
+                confidence=0.9,
+            ),
+            edit_message: StructuredInterpretation(
+                intent="results_explanation",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User wants to change starting capital.",
+                semantic_turn_act="result_followup",
+                result_followup_focus="result_card_fact",
+                result_followup_fact_key="starting_capital",
+                artifact_target="latest_result",
+                confidence=0.9,
+            ),
+        }
+    )
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+    thread_id = "thread-issue-160-composer-none-edit"
+
+    first = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id=thread_id,
+        message=fact_message,
+        fallback_latest_task_snapshot=_snapshot(pending=True),
+        fallback_selected_thread_metadata={
+            "latest_task_type": "backtest_execution",
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "refinement",
+            "source_result_run_id": "run-140",
+        },
+    )
+
+    assert first["stage_outcome"] == "ready_to_respond"
+
+    second = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id=thread_id,
+        message=edit_message,
+    )
+
+    assert planner_calls
+    assert second["stage_outcome"] in {"ready_for_confirmation", "needs_clarification"}
+    assert "artifact_assumption_edit_planned" in second["decision"].reason_codes
+    assert "latest_result_followup_unavailable" not in str(second)
 
 
 @pytest.mark.asyncio
