@@ -281,6 +281,22 @@ def test_agent_runtime_regression_workflow_runs_full_runtime_sweep() -> None:
         step for step in job["steps"] if step.get("uses") == "actions/setup-python@v5"
     )
     assert setup_python_step["with"]["python-version"] == "3.10"
+    checkout_steps = [
+        step for step in job["steps"] if step.get("uses") == "actions/checkout@v4"
+    ]
+    assert checkout_steps == [
+        {
+            "name": "Checkout workflow ref",
+            "if": "github.event_name != 'schedule'",
+            "uses": "actions/checkout@v4",
+        },
+        {
+            "name": "Checkout private-alpha-next for nightly schedule",
+            "if": "github.event_name == 'schedule'",
+            "uses": "actions/checkout@v4",
+            "with": {"ref": "codex/private-alpha-next"},
+        },
+    ]
 
     joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert "poetry install --with dev --no-interaction" in joined_steps
