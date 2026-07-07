@@ -89,6 +89,7 @@ from argus.agent_runtime.interpreter.date_window_repair import (  # noqa: F401
     _response_from_focused_date_window_extraction,
     _response_has_ambiguous_rule_fields,
     _response_has_repairable_current_turn_date_gap,
+    _response_has_repairable_recovery_date_gap,
     _response_needs_temporal_runtime_repair,
 )
 from argus.agent_runtime.interpreter.dca_audits import (  # noqa: F401
@@ -3216,6 +3217,12 @@ def _response_needs_focused_date_window_intent_repair(
         # The window was bound from the canonical latest result, not from
         # current-turn date text; re-auditing message evidence would strip it.
         return False
+    if "focused_date_window_intent_repair" in response.reason_codes:
+        return False
+    # A recovery/unsupported draft that dropped the user's stated window recovers it
+    # here, so the refusal keeps the window (never nulled, never trailing-defaulted).
+    if _response_has_repairable_recovery_date_gap(response=response, request=request):
+        return True
     pending_date_answer = _request_has_pending_date_answer_context(request)
     if (
         response.intent not in {"strategy_drafting", "backtest_execution"}
@@ -3228,8 +3235,6 @@ def _response_needs_focused_date_window_intent_repair(
             request=request,
         )
     )
-    if "focused_date_window_intent_repair" in response.reason_codes:
-        return False
     draft = response.candidate_strategy_draft
     if _post_result_dateless_execution_draft(response=response, request=request):
         return True

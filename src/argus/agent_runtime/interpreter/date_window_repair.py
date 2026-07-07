@@ -470,6 +470,41 @@ def _response_has_repairable_current_turn_date_gap(
     )
 
 
+def _response_has_repairable_recovery_date_gap(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    """A recovery/unsupported draft dropped the user's stated date window.
+
+    The model refused the idea but omitted the date the user gave; the focused
+    re-extraction recovers it so the recovery clarification keeps the window
+    instead of nulling it (never null, never a silent trailing-year default).
+    """
+
+    if response.intent != "unsupported_or_out_of_scope":
+        return False
+    if response.semantic_turn_act != "unsupported_request":
+        return False
+    # A refused draft carrying a constraint or a strategy-shape gap is a wrongly-refused
+    # supported idea; the strategy repair owns it (and recovers the date) first.
+    if response.unsupported_constraints:
+        return False
+    if any(
+        _field_path_base(field) != "date_range"
+        for field in response.missing_required_fields
+    ):
+        return False
+    draft = response.candidate_strategy_draft
+    if not _llm_value_is_empty(draft.date_range):
+        return False
+    if draft.date_range_intent is not None:
+        return False
+    if not (draft.asset_universe or draft.asset_class):
+        return False
+    return bool(request.current_user_message.strip())
+
+
 def _pending_supported_execution_date_answer_can_use_focused_audit(
     *,
     response: LLMInterpretationResponse,
@@ -673,6 +708,7 @@ def _response_from_focused_date_window_extraction(
         repaired.artifact_target = "active_confirmation"
     elif (
         repaired.requires_clarification
+        and response.intent != "unsupported_or_out_of_scope"
         and not repaired.missing_required_fields
         and not repaired.ambiguous_fields
         and not repaired.unsupported_constraints
