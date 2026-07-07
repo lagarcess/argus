@@ -4029,6 +4029,103 @@ def test_current_message_run_field_repair_uses_user_language_for_bounded_date_ev
     assert repaired.candidate_strategy_draft.date_range == expected_range.payload
 
 
+@pytest.mark.xfail(strict=True, reason="#160(B) — remove when fixed")
+def test_unparsed_stated_temporal_window_clarifies_instead_of_trailing_year_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+
+    def resolve_candidate(
+        query: str,
+        *,
+        field: str,
+        source: str,
+        asset_class_hint: str | None = None,
+    ) -> AssetResolution:
+        asset = ResolvedAssetStub(
+            canonical_symbol=query.strip().upper(),
+            asset_class=asset_class_hint or "equity",
+        )
+        return AssetResolution(
+            status="resolved",
+            raw_text=query,
+            asset=asset,
+            candidates=(asset,),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol=asset.canonical_symbol,
+                asset_class=asset.asset_class,
+                validated_by="provider_catalog",
+                confidence="medium",
+            ),
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "runtime_resolve_asset_candidate",
+        resolve_candidate,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.strip().upper(), "equity"),
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "detect_unsupported_constraints",
+        lambda **kwargs: [],
+    )
+
+    trailing_year_default = {"start": "2025-07-05", "end": "2026-07-04"}
+    current_turn = "Compra y mantén AAPL durante Q1 2024 con $100,000"
+    interpretation = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="AAPL buy-and-hold during Q1 2024.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=current_turn,
+            strategy_type="buy_and_hold",
+            strategy_thesis=current_turn,
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range=trailing_year_default,
+            capital_amount=100000,
+            comparison_baseline="SPY",
+            extra_parameters={
+                "date_range_raw_text": "Q1 2024",
+                "field_provenance": {
+                    "asset_universe": "explicit_user",
+                    "date_range": "explicit_user",
+                    "capital_amount": "explicit_user",
+                },
+                "evidence_spans": {"date_range": "Q1 2024"},
+            },
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+        confidence=0.9,
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=current_turn,
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", language_preference="es-419"),
+        latest_task_snapshot=None,
+        structured_interpreter=lambda request: interpretation,
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert "date_range" in result.decision.missing_required_fields
+    assert result.decision.candidate_strategy_draft.date_range != trailing_year_default
+
+
 def test_current_message_run_field_repair_prefers_explicit_bounded_range_over_mismatched_intent() -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
