@@ -25,6 +25,8 @@ _BACKTEST_ASSET_CLASSES = frozenset(get_args(BacktestAssetClass))
 
 def strategy_with_separate_benchmark_symbol(
     strategy: StrategySummary,
+    *,
+    prior_strategy: StrategySummary | None = None,
 ) -> tuple[StrategySummary, list[str]]:
     benchmark = _normalized_symbol(strategy.comparison_baseline)
     if benchmark is None:
@@ -40,44 +42,40 @@ def strategy_with_separate_benchmark_symbol(
     ]
     if len(filtered_assets) == len(normalized_assets):
         return updated, []
-    if not filtered_assets and _explicit_traded_asset_evidence(strategy, benchmark):
-        # The user's own turn names the benchmark symbol as the traded asset
-        # (a BTC hold benchmarked to BTC); an empty universe is no repair.
+    if not filtered_assets and _traded_asset_is_user_owned(
+        strategy,
+        benchmark,
+        prior_strategy=prior_strategy,
+    ):
+        # The turn's own edit or the active draft already owns this symbol as
+        # the traded asset (a BTC hold benchmarked to BTC); emptying the
+        # universe is no repair.
         updated.asset_universe = list(dict.fromkeys(normalized_assets))
         return updated, []
     updated.asset_universe = list(dict.fromkeys(filtered_assets))
     return updated, ["benchmark_symbol_removed_from_asset_universe"]
 
 
-def _explicit_traded_asset_evidence(
+def _traded_asset_is_user_owned(
     strategy: StrategySummary,
     benchmark: str,
+    *,
+    prior_strategy: StrategySummary | None,
 ) -> bool:
-    """Typed evidence the user named the benchmark symbol as the traded asset:
-    a planned-edit provenance, or a provider-resolved asset-field record. A
-    user-stated benchmark with unprovenanced assets stays the benchmark-only
-    shape and keeps its clarify."""
+    """Typed evidence the benchmark symbol is genuinely the traded asset: a
+    planned-edit provenance, or continuity with the active draft that already
+    trades it. Resolver provenance alone is not user evidence — the
+    canonicalization pass appends it to any echoed candidate, so a vague
+    benchmark-only turn must keep its strip-and-clarify."""
 
     if _strategy_field_provenance(strategy, "asset_universe") == "explicit_user":
         return True
-    if _strategy_field_provenance(strategy, "comparison_baseline") in {
-        "explicit_user",
-        "stated_run_field_fidelity_audit",
-    }:
+    if prior_strategy is None:
         return False
-    for item in strategy.resolution_provenance:
-        field = str(getattr(item, "field", "") or "")
-        status = str(getattr(item, "resolution_status", "") or "")
-        canonical = str(
-            getattr(item, "canonical_symbol", "") or ""
-        ).strip().upper()
-        if (
-            field.startswith("asset_universe")
-            and status == "resolved"
-            and canonical == benchmark
-        ):
-            return True
-    return False
+    return any(
+        _normalized_symbol(symbol) == benchmark
+        for symbol in prior_strategy.asset_universe
+    )
 
 
 def default_benchmark_for_asset_class(

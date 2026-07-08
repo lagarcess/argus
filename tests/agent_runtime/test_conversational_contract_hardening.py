@@ -7225,3 +7225,69 @@ def test_planned_window_edit_with_preserved_asset_keeps_traded_asset(
         result.decision.reason_codes
     )
     assert result.decision.missing_required_fields == []
+
+
+def test_vague_benchmark_only_idea_with_resolver_echo_still_asks_for_asset(
+    monkeypatch,
+) -> None:
+    """Codex review shape on #187: a vague new idea names BTC only as the
+    comparison and the model echoes it into the asset list; canonicalization
+    then appends a resolved asset record. Resolver provenance alone is not
+    user evidence — with no prior strategy trading BTC, the sweep must still
+    strip and ask for the traded asset."""
+
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = "".join(
+            char for char in str(symbol).upper() if char.isalnum()
+        )
+        if normalized in {"BTC", "BITCOIN"}:
+            return ResolvedAssetStub("BTC", "crypto", name="Bitcoin")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants some crypto asset tested against BTC.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="test a crypto asset against BTC in 2024",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Compare a crypto asset against BTC.",
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline="BTC",
+            resolution_provenance=[
+                {
+                    "field": "asset_universe[0]",
+                    "raw_text": "BTC",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "BTC",
+                    "asset_class": "crypto",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium",
+                }
+            ],
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="test a crypto asset against BTC in 2024",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "needs_clarification"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == []
+    assert "asset_universe" in result.decision.missing_required_fields
+    assert "benchmark_symbol_removed_from_asset_universe" in (
+        result.decision.reason_codes
+    )
