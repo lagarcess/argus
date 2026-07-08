@@ -9,7 +9,7 @@ import inspect
 import os
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, cast, get_args
+from typing import Any
 
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
 from argus.agent_runtime.artifacts.patch_policy import (
@@ -285,12 +285,6 @@ from argus.context import (
     context_packet_freshness,
     fetch_alpaca_market_movers_packet,
 )
-from argus.domain.backtesting.config import (
-    AssetClass as BacktestAssetClass,
-)
-from argus.domain.backtesting.config import (
-    default_benchmark as default_backtest_benchmark,
-)
 from argus.domain.indicators import (
     EXECUTABLE_INDICATORS,
     IndicatorExecutionSpec,
@@ -310,7 +304,6 @@ from argus.nlp.natural_time import (
 from loguru import logger
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
-_BACKTEST_ASSET_CLASSES = frozenset(get_args(BacktestAssetClass))
 
 
 def interpret_stage(
