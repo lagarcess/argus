@@ -35,3 +35,23 @@ cases:
       stage_outcomes: ["needs_clarification", "await_user_reply"]
     prose_judge:
       criteria: ["recovery_tone", "honesty", "spanish_language_integrity", "no_raw_runtime_error"]
+
+  - id: graceful_recovery_spanish_offline_clarifier_missing_period_aapl
+    prompt: "Prueba comprar y mantener AAPL"
+    user_language: es-419
+    ui_language: es-419
+    degraded_mode:
+      clarifier: offline
+    expected:
+      intent: backtest_execution
+      capability_verdict: needs_clarification
+      assets: ["AAPL"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      benchmark_symbol: SPY
+      stage_outcomes: ["needs_clarification", "await_user_reply"]
+      clarification:
+        kind: clarification
+        reason_code: missing_period
+        requested_field: date_range
+        semantic_needs: ["period"]

@@ -83,6 +83,7 @@ class TypedExpectations:
     date_range: dict[str, str] | str | None = None
     benchmark_symbol: str | None = None
     stage_outcomes: tuple[str, ...] = ()
+    clarification: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -96,6 +97,7 @@ class EvalCase:
     action: EvalAction | None = None
     snapshot: TaskSnapshot | None = None
     confirmation_payload: dict[str, Any] | None = None
+    degraded_mode: dict[str, Any] = field(default_factory=dict)
     expected_fail: ExpectedFail | None = None
     prose_judge_criteria: tuple[str, ...] = ()
     raw: dict[str, Any] = field(default_factory=dict)
@@ -141,7 +143,11 @@ def run_eval_case(
         expertise_level="beginner",
     )
     interpreter = OpenRouterStructuredInterpreter(contract=contract)
-    clarifier = OpenRouterClarificationGenerator()
+    clarifier = (
+        None
+        if case.degraded_mode.get("clarifier") == "offline"
+        else OpenRouterClarificationGenerator()
+    )
     route_token = begin_openrouter_route_receipt_capture()
     confirm_result = None
     clarify_result = None
@@ -275,6 +281,13 @@ def typed_expectation_failures(
             outcome.get("stage_outcomes"),
             failures,
         )
+    if expected.clarification is not None:
+        _compare_subset(
+            "clarification",
+            expected.clarification,
+            outcome.get("clarification"),
+            failures,
+        )
     return failures
 
 
@@ -405,6 +418,7 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             date_range=expected.get("date_range"),
             benchmark_symbol=expected.get("benchmark_symbol"),
             stage_outcomes=tuple(expected.get("stage_outcomes") or ()),
+            clarification=expected.get("clarification"),
         ),
         action=(
             None
@@ -418,6 +432,7 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
         ),
         snapshot=_snapshot_from_raw(raw_case.get("snapshot")),
         confirmation_payload=raw_case.get("confirmation_payload"),
+        degraded_mode=dict(raw_case.get("degraded_mode") or {}),
         expected_fail=(
             None
             if expected_fail is None
@@ -536,6 +551,7 @@ def _typed_outcome(
             ),
             patch=final_patch,
         ),
+        "clarification": final_patch.get("clarification"),
     }
 
 
@@ -617,6 +633,22 @@ def _compare(name: str, expected: Any, actual: Any, failures: list[str]) -> None
         return
     if actual != expected:
         failures.append(f"{name}: expected {expected!r}, got {actual!r}")
+
+
+def _compare_subset(
+    name: str,
+    expected: Any,
+    actual: Any,
+    failures: list[str],
+) -> None:
+    if isinstance(expected, dict):
+        if not isinstance(actual, dict):
+            failures.append(f"{name}: expected mapping subset {expected!r}, got {actual!r}")
+            return
+        for key, expected_value in expected.items():
+            _compare_subset(f"{name}.{key}", expected_value, actual.get(key), failures)
+        return
+    _compare(name, expected, actual, failures)
 
 
 def _compare_date_range(expected: Any, actual: Any, failures: list[str]) -> None:
