@@ -285,6 +285,9 @@ async function mockChatApi(
   options: MockChatApiOptions = {},
 ): Promise<MockChatApi> {
   const language = options.language ?? "en";
+  await page.addInitScript((detectedLanguage) => {
+    window.localStorage.setItem("i18nextLng", detectedLanguage);
+  }, language);
   const retryPrompt =
     language === "es-419" ? "Provocar reintento" : "Trigger retry case";
   const retryErrorMessage =
@@ -516,6 +519,67 @@ async function mockChatApi(
             stage_outcome: "ready_to_respond",
             assistant_response: retrySuccessMessage,
             message_id: "msg-retry-success",
+          },
+        },
+        "[DONE]",
+      ]);
+    }
+
+    if (body.message === "Prueba comprar y mantener AAPL") {
+      const compatibilityPrompt = "What date window should I use for AAPL?";
+      const clarification = {
+        kind: "clarification",
+        reason_code: "missing_period",
+        requested_field: "date_range",
+        requested_fields: ["date_range"],
+        semantic_needs: ["period"],
+        payload: {
+          strategy: {
+            strategy_type: "buy_and_hold",
+            asset_universe: ["AAPL"],
+            asset_class: "equity",
+          },
+        },
+        options: [],
+      };
+      messages.splice(
+        0,
+        messages.length,
+        persistedUserMessage("msg-user-degraded-clarification", body.message),
+        persistedAssistantMessage("msg-degraded-clarification", compatibilityPrompt, {
+          clarification,
+          pending_strategy: {
+            strategy: {
+              strategy_type: "buy_and_hold",
+              asset_universe: ["AAPL"],
+              asset_class: "equity",
+            },
+            requested_field: "date_range",
+            missing_required_fields: ["date_range"],
+            clarification,
+          },
+        }),
+      );
+      return fulfillSse(route, [
+        { type: "stage_start", stage: "clarify" },
+        {
+          type: "final",
+          payload: {
+            stage_outcome: "await_user_reply",
+            assistant_prompt: compatibilityPrompt,
+            requested_field: "date_range",
+            clarification,
+            pending_strategy: {
+              strategy: {
+                strategy_type: "buy_and_hold",
+                asset_universe: ["AAPL"],
+                asset_class: "equity",
+              },
+              requested_field: "date_range",
+              missing_required_fields: ["date_range"],
+              clarification,
+            },
+            message_id: "msg-degraded-clarification",
           },
         },
         "[DONE]",
@@ -812,7 +876,9 @@ test("private-alpha readiness smoke covers starter, Spanish edit, result, reload
 
   await page.getByTestId("chat-input").fill("Provocar reintento");
   await page.getByTestId("chat-send").click();
-  await expect(page.getByText("Los datos de mercado tardaron demasiado")).toBeVisible();
+  await expect(
+    page.getByText("Algo salió mal. Tu conversación está guardada. Intenta de nuevo."),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Reintentar" }).click();
   await expect(page.getByText("Recuperado despues de reintentar.")).toBeVisible();
 });
@@ -859,6 +925,34 @@ test("Spanish confirmation edit actions preserve context through asset, assumpti
   expect(api.streamRequests.at(-1)?.action?.type).toBe("cancel_confirmation");
 });
 
+test("Spanish degraded clarification renders from typed sidecar", async ({ page }) => {
+  const api = await mockChatApi(page, { language: "es-419" });
+
+  await page.goto("/chat", { waitUntil: "networkidle" });
+  await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.getByTestId("chat-input"),
+  ).toHaveAttribute("aria-label", "Describe una idea de inversión...");
+  await page.getByTestId("chat-input").fill("Prueba comprar y mantener AAPL");
+  await page.getByTestId("chat-send").click();
+
+  await expect(
+    page.getByText("¿Qué periodo quieres usar para AAPL?"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("What date window should I use for AAPL?"),
+  ).toHaveCount(0);
+  expect(api.streamRequests.at(-1)?.language).toBe("es-419");
+
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(
+    page.getByText("¿Qué periodo quieres usar para AAPL?"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("What date window should I use for AAPL?"),
+  ).toHaveCount(0);
+});
+
 test("retry action recovers a failed stream without duplicating user input", async ({ page }) => {
   const api = await mockChatApi(page);
   await page.goto("/chat", { waitUntil: "networkidle" });
@@ -867,7 +961,9 @@ test("retry action recovers a failed stream without duplicating user input", asy
   await page.getByTestId("chat-input").fill("Trigger retry case");
   await page.getByTestId("chat-send").click();
 
-  await expect(page.getByText("Market data timed out")).toBeVisible();
+  await expect(
+    page.getByText("Something went wrong. Your conversation is saved. Please try again."),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Retry" }).click();
   await expect(page.getByText("Recovered after retry.")).toBeVisible();
 
@@ -899,7 +995,9 @@ test("Spanish action recovery localizes retry after reload and feedback controls
 
   await page.getByTestId("chat-input").fill("Provocar reintento");
   await page.getByTestId("chat-send").click();
-  await expect(page.getByText("Los datos de mercado tardaron demasiado")).toBeVisible();
+  await expect(
+    page.getByText("Algo salió mal. Tu conversación está guardada. Intenta de nuevo."),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Reintentar" }).click();
   await expect(page.getByText("Recuperado despues de reintentar.")).toBeVisible();
 
