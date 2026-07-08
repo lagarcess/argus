@@ -301,6 +301,14 @@ def test_agent_runtime_regression_workflow_runs_full_runtime_sweep() -> None:
     joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert "poetry install --with dev --no-interaction" in joined_steps
     assert "poetry run pytest tests/agent_runtime tests/test_spine_guardrails.py -q --no-cov" in joined_steps
+    sweep_step = next(
+        step
+        for step in job["steps"]
+        if step.get("name") == "Run agent_runtime regression sweep"
+    )
+    assert sweep_step["env"] == {
+        "ARGUS_MARKET_DATA_PROVIDER_MODE": "synthetic_unit_fixture"
+    }
 
     runtime_target = ROOT / "tests" / "agent_runtime"
     hidden_regression_file = (

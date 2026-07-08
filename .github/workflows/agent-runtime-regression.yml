@@ -57,4 +57,7 @@ jobs:
         run: poetry install --with dev --no-interaction
 
       - name: Run agent_runtime regression sweep
+        env:
+          # Hermetic asset catalog: no provider keys or network on CI runners.
+          ARGUS_MARKET_DATA_PROVIDER_MODE: synthetic_unit_fixture
         run: poetry run pytest tests/agent_runtime tests/test_spine_guardrails.py -q --no-cov
