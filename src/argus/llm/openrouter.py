@@ -12,11 +12,11 @@ from threading import Lock
 from typing import Literal, TypeVar, cast
 
 import httpx
-from dotenv import load_dotenv
 from langchain_openrouter import ChatOpenRouter
 from loguru import logger
 from pydantic import BaseModel
 
+from argus.env import load_project_dotenv
 from argus.llm.openrouter_usage import (
     merge_openrouter_token_usage,
     normalize_openrouter_token_usage,
@@ -25,7 +25,7 @@ from argus.llm.openrouter_usage import (
     openrouter_usage_cost_from_payload,
 )
 
-load_dotenv()
+load_project_dotenv()
 
 OpenRouterTask = Literal[
     "interpretation",

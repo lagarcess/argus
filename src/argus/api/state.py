@@ -5,7 +5,6 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
@@ -16,8 +15,9 @@ from argus.api.chat.backtest_jobs import (
 )
 from argus.domain.store import AlphaStore
 from argus.domain.supabase_gateway import SupabaseGateway
+from argus.env import load_project_dotenv
 
-load_dotenv()
+load_project_dotenv()
 
 PERSISTENCE_MODE = os.getenv("ARGUS_PERSISTENCE_MODE", "memory").strip().lower()
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
