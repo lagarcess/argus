@@ -2452,6 +2452,13 @@ async def _planned_edit_after_fact_composer_decline(
         resolve_asset_candidate=_resolve_asset_candidate_safely,
         plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
     )
+    if interpretation is None and snapshot is not None:
+        interpretation = await _planned_active_confirmation_edit_interpretation(
+            snapshot=snapshot,
+            current_user_message=state.current_user_message,
+            resolve_asset_candidate=_resolve_asset_candidate_safely,
+            plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+        )
     if interpretation is None:
         interpretation = await _planned_latest_result_edit_interpretation(
             snapshot=snapshot,

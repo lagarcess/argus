@@ -81,4 +81,5 @@ cases:
         start: "2024-01-01"
         end: "2024-12-31"
       benchmark_symbol: SPY
+      capital_amount: 2000
       stage_outcomes: ["ready_for_confirmation", "await_approval"]

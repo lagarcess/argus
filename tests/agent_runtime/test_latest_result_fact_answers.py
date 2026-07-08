@@ -906,6 +906,97 @@ async def test_workflow_post_result_composer_none_edit_without_pending_reroutes_
 
 
 @pytest.mark.asyncio
+async def test_workflow_composer_none_edit_during_active_confirmation_reroutes_to_planner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The decline reroute must also cover the active-confirmation anchor:
+    a composer-declined edit while a card is visible plans against that card
+    instead of dead-ending in the followup recovery (#160 review follow-up)."""
+
+    from argus.agent_runtime.artifact_edit_planner import (
+        ArtifactAssumptionEditPlan,
+        EditOperation,
+    )
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
+
+    composer = _RecordingComposer(response=None)
+    monkeypatch.setattr(
+        latest_result_answer_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_actions_module,
+        "compose_result_followup_response",
+        composer,
+    )
+
+    planner_calls: list[dict[str, object]] = []
+
+    async def planned_capital_edit(**kwargs: object) -> ArtifactAssumptionEditPlan:
+        planner_calls.append(kwargs)
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="User set starting capital to $2,000.",
+            operations=[
+                EditOperation(op="set", target="capital", number=2000),
+            ],
+            confidence=0.95,
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "plan_artifact_assumption_edit",
+        planned_capital_edit,
+    )
+
+    interpreter = _StaticInterpreter(
+        StructuredInterpretation(
+            intent="results_explanation",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User wants to change starting capital.",
+            semantic_turn_act="result_followup",
+            result_followup_focus="result_card_fact",
+            result_followup_fact_key="starting_capital",
+            artifact_target="latest_result",
+            confidence=0.9,
+        )
+    )
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id="thread-issue-160-composer-none-active-confirmation",
+        message="change starting capital to $2,000",
+        fallback_latest_task_snapshot=_snapshot(confirmation=True),
+        fallback_selected_thread_metadata={
+            "latest_task_type": "backtest_execution",
+            "last_stage_outcome": "await_approval",
+        },
+    )
+
+    assert planner_calls
+    # The DCA money-role guard owns the planned edit against the visible card.
+    assert result["stage_outcome"] == "await_user_reply"
+    clarification = result["clarification"]
+    assert clarification["reason_code"] == "unsupported_dca_starting_principal"
+    anchored = clarification["payload"]["strategy"]
+    assert anchored["asset_universe"] == ["COST", "TGT"]
+    assert "latest_result_followup_unavailable" not in str(result)
+
+
+@pytest.mark.asyncio
 async def test_workflow_composer_none_without_edit_plan_keeps_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

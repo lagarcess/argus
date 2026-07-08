@@ -82,6 +82,7 @@ class TypedExpectations:
     strategy_type: str | None = None
     date_range: dict[str, str] | str | None = None
     benchmark_symbol: str | None = None
+    capital_amount: float | None = None
     stage_outcomes: tuple[str, ...] = ()
     clarification: dict[str, Any] | None = None
 
@@ -277,6 +278,12 @@ def typed_expectation_failures(
         outcome.get("benchmark_symbol"),
         failures,
     )
+    _compare(
+        "capital_amount",
+        expected.capital_amount,
+        outcome.get("capital_amount"),
+        failures,
+    )
     if expected.stage_outcomes:
         _compare(
             "stage_outcomes",
@@ -420,6 +427,7 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             strategy_type=expected.get("strategy_type"),
             date_range=expected.get("date_range"),
             benchmark_symbol=expected.get("benchmark_symbol"),
+            capital_amount=expected.get("capital_amount"),
             stage_outcomes=tuple(expected.get("stage_outcomes") or ()),
             clarification=expected.get("clarification"),
         ),
@@ -549,6 +557,9 @@ def _typed_outcome(
             launch_payload.get("benchmark_symbol")
             or strategy.get("benchmark_symbol")
             or strategy.get("comparison_baseline")
+        ),
+        "capital_amount": (
+            launch_payload.get("capital_amount") or strategy.get("capital_amount")
         ),
         "capability_verdict": _capability_verdict(
             outcome=_last_stage_outcome(
