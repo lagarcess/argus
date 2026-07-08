@@ -135,9 +135,14 @@ def _strategy_with_contextual_merge(
         is not None
     ):
         preserve_prior_asset_context = False
-    preserve_prior_money_context = _should_preserve_prior_money_context(
-        selected_thread_metadata=selected_thread_metadata,
-        semantic_turn_act=semantic_turn_act,
+    # A planned artifact edit carries its money fields as typed operations;
+    # requested_field-based preservation must not drop them.
+    preserve_prior_money_context = (
+        "artifact_assumption_edit_planned" not in set(reason_codes or [])
+        and _should_preserve_prior_money_context(
+            selected_thread_metadata=selected_thread_metadata,
+            semantic_turn_act=semantic_turn_act,
+        )
     )
     preserve_prior_date_context = _should_preserve_prior_date_context(
         strategy=strategy,

@@ -574,8 +574,16 @@ async def _stage_result_from_interpretation(
             semantic_turn_act=interpretation.semantic_turn_act,
         )
     )
+    # A turn that already carries the typed edit contract owns its field
+    # patches; the requested_field answer corridors must not re-derive them.
+    typed_artifact_edit_turn = (
+        "artifact_assumption_edit_planned" in interpretation.reason_codes
+        or _structured_interpretation_has_complete_typed_asset_patch(interpretation)
+    )
     incoming_strategy, requested_asset_answer_applied = (
-        _strategy_with_requested_asset_answer_resolution(
+        (incoming_strategy, False)
+        if typed_artifact_edit_turn
+        else _strategy_with_requested_asset_answer_resolution(
             strategy=incoming_strategy,
             explicit_strategy=interpretation.candidate_strategy_draft,
             prior_strategy=_active_strategy_from_snapshot(snapshot),
@@ -697,9 +705,13 @@ async def _stage_result_from_interpretation(
             *validated_benchmark_reason_codes,
             *default_benchmark_reason_codes,
         ]
-    strategy, optional_parameter_values = _route_contextual_money_answer(
-        strategy=strategy,
-        selected_thread_metadata=selected_thread_metadata,
+    strategy, optional_parameter_values = (
+        (strategy, {})
+        if typed_artifact_edit_turn
+        else _route_contextual_money_answer(
+            strategy=strategy,
+            selected_thread_metadata=selected_thread_metadata,
+        )
     )
     integrity_report = (
         conserve_semantic_constraints(
@@ -841,7 +853,9 @@ async def _stage_result_from_interpretation(
     ):
         missing_required_fields = []
     pending_date_edit_reason_codes: list[str] = []
-    if _pending_date_edit_reuses_prior_date_range(
+    # A planned edit may change another field while reusing the prior window;
+    # that is not a date-answer noop.
+    if not typed_artifact_edit_turn and _pending_date_edit_reuses_prior_date_range(
         strategy=strategy,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
@@ -2186,13 +2200,17 @@ def _strategy_with_requested_asset_answer_resolution(
     if requested_field != "asset_universe":
         return strategy, False
     del semantic_turn_act
+    prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
+    if len(prior_symbols) > 1:
+        # This corridor fills a single asset slot; multi-asset universes are
+        # edited only through typed EditOperations, never re-derived here.
+        return strategy, False
     asset_candidates = _requested_asset_answer_candidates(
         explicit_strategy=explicit_strategy,
         current_user_message=current_user_message,
     )
     if not asset_candidates:
         return strategy, False
-    prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
     fallback_resolution: AssetResolution | None = None
     resolution: AssetResolution | None = None
     for asset_candidate in asset_candidates:
