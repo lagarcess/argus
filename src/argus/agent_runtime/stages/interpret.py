@@ -1459,29 +1459,67 @@ def _complete_date_range_lacks_stated_window_support(
     *,
     language: str | None,
 ) -> bool:
-    """The draft names a window its own typed evidence cannot resolve.
+    """The draft's complete date_range contradicts its own stated window evidence.
 
-    A complete date_range beside an unresolvable stated window is an invented
-    default, not the user's window — it must clarify instead of executing.
+    Years named in the typed date evidence must intersect the years the range
+    spans; otherwise the range is an invented default, not the stated window.
+    Evidence without a year gives no signal and the LLM's range is trusted.
     """
 
     if not isinstance(strategy.date_range, dict):
         return False
     if has_partial_explicit_date_range(strategy.date_range):
         return False
-    if not _strategy_date_evidence_candidates(strategy):
+    candidates = _strategy_date_evidence_candidates(strategy)
+    if not candidates:
         return False
     intent = strategy.extra_parameters.get("date_range_intent")
     if isinstance(intent, dict) and resolve_date_range_intent(intent) is not None:
         return False
-    return (
+    if (
         _date_range_from_strategy_bounded_evidence(
             strategy,
             language=language,
             today=date.today(),
         )
-        is None
-    )
+        is not None
+    ):
+        return False
+    evidence_years = {
+        year for candidate in candidates for year in _stated_years(candidate)
+    }
+    if not evidence_years:
+        return False
+    range_years = _years_spanned_by_date_range(strategy.date_range)
+    if not range_years:
+        return False
+    return not (evidence_years & range_years)
+
+
+def _stated_years(text: str) -> set[int]:
+    years: set[int] = set()
+    digits: list[str] = []
+    for character in f"{text} ":
+        if character.isdigit():
+            digits.append(character)
+            continue
+        if len(digits) == 4:
+            year = int("".join(digits))
+            if 1900 <= year <= 2100:
+                years.add(year)
+        digits = []
+    return years
+
+
+def _years_spanned_by_date_range(date_range: dict[str, Any]) -> set[int]:
+    endpoints = []
+    for key in ("start", "end"):
+        raw = str(date_range.get(key) or "")
+        if len(raw) >= 4 and raw[:4].isdigit():
+            endpoints.append(int(raw[:4]))
+    if len(endpoints) != 2 or endpoints[0] > endpoints[1]:
+        return set(endpoints)
+    return set(range(endpoints[0], endpoints[1] + 1))
 
 
 def _date_range_intent_is_explicit_user_range(

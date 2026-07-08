@@ -689,9 +689,14 @@ def _response_from_focused_date_window_extraction(
     if not changed:
         return None
     pending_date_answer = _request_has_pending_date_answer_context(request)
-    # An unsupported refusal only recovers its dropped window; it never adopts the
-    # pending draft and never promotes to executable, even mid date-answer.
-    refused_turn = response.intent == "unsupported_or_out_of_scope"
+    # A constraint-less refusal (the recovery-gap shape: a pivot to an unsupported
+    # idea) only recovers its dropped window; it never adopts the pending draft and
+    # never promotes to executable, even mid date-answer. A constraint-carrying
+    # refusal here is stale context that the pending date answer may override.
+    refused_turn = (
+        response.intent == "unsupported_or_out_of_scope"
+        and not response.unsupported_constraints
+    )
     if raw_text:
         draft.date_range_raw_text = raw_text
         draft.evidence_spans = {
