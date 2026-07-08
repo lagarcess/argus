@@ -194,6 +194,7 @@ from argus.agent_runtime.stages.interpret_internal.benchmark_repairs import (
     strategy_with_unstated_benchmark_guard as _strategy_with_unstated_benchmark_guard,
 )
 from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
+    chip_clarify_answer_supplies_artifact_edit as _chip_clarify_answer_supplies_artifact_edit,
     draft_only_indicator_interpretation_when_interpreter_unavailable as _draft_only_indicator_interpretation_when_interpreter_unavailable,
     pending_response_option_interpretation_from_typed_selection as _pending_response_option_interpretation_from_typed_selection,
     pending_response_option_when_interpreter_unavailable as _pending_response_option_when_interpreter_unavailable,
@@ -2435,8 +2436,14 @@ async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
         return None
     if _structured_interpretation_has_complete_typed_asset_patch(interpretation):
         return None
-    if not _structured_interpretation_has_supported_artifact_assumption_edit(
-        interpretation
+    if not (
+        _structured_interpretation_has_supported_artifact_assumption_edit(
+            interpretation
+        )
+        or _chip_clarify_answer_supplies_artifact_edit(
+            interpretation=interpretation,
+            selected_thread_metadata=selected_thread_metadata,
+        )
     ):
         return None
     return await _planned_active_confirmation_edit_when_interpreter_unavailable(

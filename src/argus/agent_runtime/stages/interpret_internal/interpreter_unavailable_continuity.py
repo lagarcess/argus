@@ -443,6 +443,56 @@ async def _planned_artifact_edit_interpretation(
     )
 
 
+# The chip-opened clarify scopes: CONFIRMATION_EDIT_ACTION_FIELDS values in
+# stages/interpret_actions.py. The chip's field is display scope only; the
+# answer turn is planned like any natural-language edit.
+CONFIRMATION_EDIT_CLARIFY_FIELDS = frozenset(
+    {"asset_universe", "date_range", "assumption"}
+)
+
+
+def chip_clarify_answer_supplies_artifact_edit(
+    *,
+    interpretation: StructuredInterpretation,
+    selected_thread_metadata: dict[str, Any],
+) -> bool:
+    requested_field = str(
+        selected_thread_metadata.get("requested_field") or ""
+    ).partition(".")[0]
+    if requested_field not in CONFIRMATION_EDIT_CLARIFY_FIELDS:
+        return False
+    if interpretation.semantic_turn_act in {
+        "approval",
+        "educational_question",
+        "result_followup",
+        "retry_failed_action",
+        "unsupported_request",
+    }:
+        return False
+    if interpretation.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    strategy = interpretation.candidate_strategy_draft
+    extra_parameters = strategy.extra_parameters or {}
+    return bool(
+        strategy.asset_universe
+        or strategy.date_range not in (None, "", {})
+        or strategy.capital_amount is not None
+        or strategy.timeframe not in (None, "")
+        or strategy.cadence not in (None, "")
+        or strategy.comparison_baseline not in (None, "")
+        or any(
+            extra_parameters.get(key) is not None
+            for key in (
+                "initial_capital",
+                "recurring_contribution",
+                "fee_rate",
+                "slippage",
+                "date_range_intent",
+            )
+        )
+    )
+
+
 def structured_interpretation_has_supported_artifact_assumption_edit(
     interpretation: StructuredInterpretation,
 ) -> bool:

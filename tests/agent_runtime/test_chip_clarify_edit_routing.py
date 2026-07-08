@@ -20,7 +20,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from argus.agent_runtime.artifact_edit_planner import ArtifactAssumptionEditPlan
+from argus.agent_runtime.artifact_edit_planner import (
+    ArtifactAssumptionEditPlan,
+    EditOperation,
+)
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
@@ -407,5 +410,61 @@ def test_adjust_assumptions_chip_answered_with_asset_edit_applies_that_edit(
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["NVDA"]
     assert strategy.capital_amount == 1000
+
+
+def test_change_dates_chip_capital_answer_replans_through_edit_planner(
+    monkeypatch,
+) -> None:
+    """Changed-mind through the dates chip: a raw capital answer re-enters the
+    typed edit planner instead of dying in requested_field preservation."""
+
+    _stub_equity_resolution(monkeypatch)
+    calls = _stub_edit_planner(
+        monkeypatch,
+        ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed the starting capital.",
+            operations=[
+                EditOperation(op="set", target="capital", number=5000),
+            ],
+            confidence=0.9,
+        ),
+    )
+
+    result = _run_chip_answer(
+        message="actually make it $5,000",
+        pending=_pending_three_assets(),
+        requested_field="date_range",
+        interpretation=StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User changed the starting capital.",
+            candidate_strategy_draft=StrategySummary(capital_amount=5000),
+            semantic_turn_act="answer_pending_need",
+        ),
+    )
+
+    assert calls, "the chip answer must reach the typed edit planner"
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.capital_amount == 5000
+    assert strategy.asset_universe == ["TGT", "WSM", "COST"]
+    assert "artifact_assumption_edit_planned" in result.decision.reason_codes
+
+
+def test_chip_clarify_fields_match_confirmation_edit_actions() -> None:
+    """The clarify-scope set stays bound to the chip action fields."""
+
+    from argus.agent_runtime.stages.interpret_actions import (
+        CONFIRMATION_EDIT_ACTION_FIELDS,
+    )
+    from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
+        CONFIRMATION_EDIT_CLARIFY_FIELDS,
+    )
+
+    assert CONFIRMATION_EDIT_CLARIFY_FIELDS == frozenset(
+        CONFIRMATION_EDIT_ACTION_FIELDS.values()
+    )
 
 
