@@ -2744,6 +2744,9 @@ def _strategy_with_benchmark_owner_asset_repair(
     updated = strategy.model_copy(deep=True)
     updated.asset_universe = [resolved_asset.canonical_symbol]
     updated.asset_class = resolved_asset.asset_class
+    updated.resolution_provenance = _dedupe_resolution_provenance(
+        [*updated.resolution_provenance, resolutions[0].provenance]
+    )
     return updated, ["current_message_asset_grounding_repaired"]
 
 

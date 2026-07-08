@@ -2280,6 +2280,76 @@ async def test_unsupported_recovery_unparseable_date_does_not_trailing_default(
 
 
 @pytest.mark.asyncio
+async def test_dateless_refusal_recovery_stops_after_one_focused_extraction(
+    monkeypatch,
+) -> None:
+    # A confident has_date_window=false is the audit's answer; the recovery must
+    # not re-ask every model in the repair chain on each dateless refusal.
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["repair-model-a", "repair-model-b"],
+    )
+
+    focused_calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        if schema_name == "AssetGroundingAudit":
+            return interpreter_module.AssetGroundingAudit(
+                grounded_symbols=["TSLA"],
+                confidence=0.9,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            focused_calls.append(kwargs["model_name"])
+            return kwargs["schema_model"](has_date_window=False, confidence=0.9)
+        return None
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    current_message = "can you paper-trade TSLA options for me?"
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=current_message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=current_message,
+            strategy_type=None,
+            asset_universe=["TSLA"],
+            asset_class="equity",
+        ),
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=current_message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert ready_response.intent == "unsupported_or_out_of_scope"
+    assert len(focused_calls) == 1
+
+
+@pytest.mark.asyncio
 async def test_unsupported_pivot_during_pending_date_answer_stays_refused(
     monkeypatch,
 ) -> None:

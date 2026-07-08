@@ -5820,6 +5820,14 @@ def test_interpret_stage_repairs_missing_asset_when_benchmark_owner_is_known(
     assert strategy.asset_universe == ["AAPL"]
     assert strategy.comparison_baseline == "QQQ"
     assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    # The repaired asset carries its resolution record like every grounding path.
+    assert ("asset_universe[0]", "AAPL") in {
+        (
+            str(getattr(item, "field", "") or ""),
+            str(getattr(item, "canonical_symbol", "") or ""),
+        )
+        for item in strategy.resolution_provenance
+    }
 
 
 def test_benchmark_owner_repair_never_rescans_raw_message_text(

@@ -3193,6 +3193,10 @@ async def _focused_date_window_audited_response(
             continue
         if not isinstance(extraction, FocusedDateWindowExtraction):
             continue
+        if not extraction.has_date_window:
+            # An authoritative "no window in this message"; asking the remaining
+            # repair models would re-answer the same question on every dateless turn.
+            return None
         repaired = _response_from_focused_date_window_extraction(
             response=response,
             extraction=extraction,
