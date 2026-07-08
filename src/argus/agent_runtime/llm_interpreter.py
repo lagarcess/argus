@@ -3195,8 +3195,8 @@ async def _focused_date_window_audited_response(
         if not isinstance(extraction, FocusedDateWindowExtraction):
             continue
         if not extraction.has_date_window:
-            # An authoritative "no window in this message"; asking the remaining
-            # repair models would re-answer the same question on every dateless turn.
+            # A well-formed "no window" is authoritative; remaining repair models
+            # are not asked.
             return None
         repaired = _response_from_focused_date_window_extraction(
             response=response,
@@ -4909,8 +4909,8 @@ def _response_from_focused_strategy_extraction(
         response=response,
         base_response=base_response,
     )
-    # Missing fields are derived from the merged draft: context the base response
-    # already grounded (e.g. a provider-backed basket) is not re-asked.
+    # Missing fields derive from the merged draft so already-grounded context is
+    # not re-asked.
     response.missing_required_fields = (
         _capability_required_missing_fields_for_canonical_strategy(
             response.missing_required_fields,

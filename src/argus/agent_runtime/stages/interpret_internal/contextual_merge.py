@@ -571,9 +571,8 @@ def _is_field_owned_indicator_asset_candidate(
 
 
 def _cadence_root_tokens(cadence: str) -> frozenset[str]:
-    # Roots of the draft's own bound cadence enum value ("weekly" -> {"weekly",
-    # "week"}, "daily" -> {"daily", "day"}); only that cadence's word can be
-    # de-promoted, so unrelated real tickers keep their resolution attempt.
+    # Roots of the draft's own bound cadence value ("weekly" -> {"weekly", "week"},
+    # "daily" -> {"daily", "day"}); only the bound cadence's word is droppable.
     roots = {cadence}
     if cadence.endswith("ly"):
         stem = cadence[:-2]

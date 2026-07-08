@@ -309,9 +309,8 @@ def _apply_pending_response_option_replacement(
     if strategy_type != "dca_accumulation":
         _clear_dca_recurring_fields(repaired)
     if "strategy_type" in replacement_values:
-        # Stamp provenance after the field clears so the clear helpers' extra_parameters
-        # mirror cannot copy it in: a chosen strategy_type is typed provenance, not stale
-        # extra_parameters baggage.
+        # Stamped after the field clears so the clear helpers' extra_parameters
+        # mirror cannot copy it back in.
         field_provenance = dict(repaired.field_provenance or {})
         field_provenance["strategy_type"] = "pending_response_option"
         repaired.field_provenance = field_provenance

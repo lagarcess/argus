@@ -2813,8 +2813,8 @@ def _strategy_with_benchmark_owner_asset_repair(
     if len(resolutions) != 1:
         return strategy, []
     resolved_asset = resolutions[0].asset
-    # A cross-class pair is not a repairable shape: grounding the asset would let
-    # downstream validation clear the user's explicit benchmark and stamp a default.
+    # The grounded asset must share the explicit benchmark's asset class;
+    # cross-class pairs stay unrepaired and clarify.
     try:
         benchmark_resolution = provider_context_assets.resolution_from_strategy_context(
             strategy,
