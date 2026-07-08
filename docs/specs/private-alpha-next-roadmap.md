@@ -509,11 +509,11 @@ LANES BY GATE (the board agents execute from):
   as PR #146. Messy multi-symbol company-name baskets (TGT + WMT + COST) survive
   through `interpret -> asset resolution -> canonicalize -> confirmation`;
   provider-backed name resolution feeds INTO interpretation as context, never a
-  post-LLM text rescan. REGRESSION WATCH: #171 (OPEN) reports the company-name
-  case regressed on the live eval at `4eae18e` (alongside calendar-year windows
-  nulled on recovery drafts). Re-verify the `test_interpret_stage.py` basket
-  assertions before any `main` promotion; likely fallout from the recovery-draft
-  work in #166 / the B4 typed-prose series.
+  post-LLM text rescan. Historical regression note: #171 later reported this
+  company-name case regressed on the live eval at `4eae18e` (alongside
+  calendar-year windows nulled on recovery drafts), and PR #182 closed it on
+  2026-07-08. Keep the `test_interpret_stage.py` basket assertions in the
+  promotion gate.
 
 - **B3 Measurement wiring** (= P2.5 below). READY-BUILD, off-spine. One lane,
   THREE atomic slices in this ORDER, each its own PR — never combined into one
@@ -543,8 +543,10 @@ LANES BY GATE (the board agents execute from):
   (#177); migrated language surfaces are test-guarded (#176). Per-language copy
   tables (`assistant_copy_for_result`, `recovery_messages.py`) are retired;
   prose follows the detected turn language everywhere and EN/ES parity is proven
-  by the B3 eval harness, not hardcoded. WATCH: #171 flags calendar-year windows
-  nulled on recovery drafts — re-verify the recovery path before `main`.
+  by the B3 eval harness, not hardcoded. Historical note: #171 previously
+  flagged calendar-year windows nulled on recovery drafts; PR #182 closed the
+  mocked/repro gates on 2026-07-08, and the live suite still must rerun on the
+  exact promotion SHA.
 
 - **B5 Interpreter cost/perf (#156, #157).** DONE — merged as PR #172. Automatic
   stable-prefix prompt caching on structured-artifact calls
@@ -617,19 +619,20 @@ parallel edits are not.
 
 Members and roots:
 
-- **#171 (high) — live eval red, the gate.** Two regressions: Sig1 (calendar-year
-  windows nulled on recovery drafts) traces to #166 (`a5ac38b`,
+- **#171 — CLOSED (2026-07-08, PR #182).** Historical roots: Sig1
+  (calendar-year windows nulled on recovery drafts) traced to #166 (`a5ac38b`,
   `date_window_repair.py` + `llm_interpreter.py`); Sig2 (#142 basket dropped,
-  verdict flips to `unsupported`) traces to #165 (`a80d681`,
+  verdict flips to `unsupported`) traced to #165 (`a80d681`,
   `artifact_assumption_edit.py` + `unsupported_request_context.py`).
-- **#150 (re-triaged high) — the mocked half of #171 Sig2.** The strict xfails
-  tagged #150 (e.g. cadence terms promoted to assets) are the free, deterministic
-  repro; the CI-gap half is OPEN PR #169 (off-spine). Closes with #171 Sig2.
-- **#160 (high) — interpreter dead-ends.** (A) composer-`None` fall-through at
+- **#150 — CLOSED (2026-07-08).** The mocked half of #171 Sig2 and the
+  CI-visibility half are both closed: PR #182 removed the #150 strict xfails,
+  and PR #169 landed the off-spine regression-sweep CI gate.
+- **#160(A) (high) — interpreter dead-ends.** Composer-`None` fall-through at
   `_latest_result_followup_recovery_if_applicable`; (B) silent trailing-year date
-  default. (B) co-designs with #171 Sig1 as one date-provenance-on-recovery
-  policy (trust or clarify — never null, never silent-default). (A)'s blocker
-  status is conditional on the deployed grok/haiku tier.
+  default is closed with #171 Sig1 in PR #182 as one
+  date-provenance-on-recovery policy (trust or clarify — never null, never
+  silent-default). #160(A)'s blocker status is conditional on the deployed
+  grok/haiku tier.
 - **#151 (high) — card materialization.** An executable-complete post-result draft
   plus a model `assistant_response` emits prose instead of `ready_for_confirmation`,
   so a bare "yes" has nothing typed to launch (`_stage_result_from_interpretation`
@@ -780,8 +783,8 @@ moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
   (#154, PRs #174-177) retired per-language copy so recovery/degraded prose
   renders from typed codes/keys in the detected turn language. The PMF gate below
   (Spanish-preferring users complete the loop unaided) is validated by the live
-  eval harness, which is currently RED on #171 — close that before claiming the
-  gate.
+  eval harness; #171 is closed in mocked/repro gates, and current promotion
+  blockers are #160(A) and #151 plus the exact-SHA live-eval rerun.
 - Outcome: when Argus fails or hits an unsupported request, recovery preserves
   the user's idea, clarifies without making the user feel wrong, explains
   unsupported capability in product language, and never leaks raw provider/runtime
