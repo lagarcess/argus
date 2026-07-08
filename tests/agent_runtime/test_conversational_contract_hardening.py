@@ -5878,6 +5878,142 @@ def test_benchmark_owner_repair_never_rescans_raw_message_text(
     assert {query.strip().upper() for query in resolved_queries} <= {"QQQ"}
 
 
+def test_benchmark_owner_repair_asks_when_user_offered_a_choice(
+    monkeypatch,
+) -> None:
+    # "Apple or MSFT against SPY": two grounded candidates besides the benchmark
+    # mean the user offered a choice; the repair must not pick one silently, even
+    # though only one of them is ticker-styled in the message.
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized in {"AAPL", "APPLE"}:
+            return ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+        if normalized in {"MSFT", "SPY"}:
+            return ResolvedAssetStub(normalized, "equity", name=normalized)
+        raise ValueError(query)
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User is weighing Apple against MSFT with SPY as benchmark.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Compare one of two ideas with SPY.",
+            asset_universe=[],
+            asset_class=None,
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline="SPY",
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"},
+                "provider_resolved_assets": [
+                    {
+                        "raw_text": "Apple",
+                        "symbol": "AAPL",
+                        "asset_class": "equity",
+                        "name": "Apple Inc.",
+                        "raw_symbol": "AAPL",
+                        "provider": "provider_catalog",
+                        "exchange": "NASDAQ",
+                    },
+                    {
+                        "raw_text": "MSFT",
+                        "symbol": "MSFT",
+                        "asset_class": "equity",
+                        "name": "Microsoft Corporation",
+                        "raw_symbol": "MSFT",
+                        "provider": "provider_catalog",
+                        "exchange": "NASDAQ",
+                    },
+                ],
+            },
+        ),
+        semantic_turn_act="new_idea",
+        missing_required_fields=["asset_universe"],
+    )
+
+    result, _ = _interpret(
+        message="should I backtest Apple or MSFT against SPY?",
+        response=response,
+        snapshot=None,
+    )
+
+    assert "current_message_asset_grounding_repaired" not in result.decision.reason_codes
+    assert result.outcome == "needs_clarification"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == []
+
+
+def test_benchmark_owner_repair_bails_on_cross_class_benchmark(
+    monkeypatch,
+) -> None:
+    # "DCA into AAPL, compare against Bitcoin": grounding the equity would let
+    # downstream validation clear the explicit BTC benchmark and stamp SPY, so
+    # the cross-class pair must bail into clarification with BTC preserved.
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized == "AAPL":
+            return ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+        if normalized in {"BTC", "BITCOIN"}:
+            return ResolvedAssetStub("BTC", "crypto", name="Bitcoin")
+        raise ValueError(query)
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants a DCA idea compared against Bitcoin.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Recurring AAPL buys compared with Bitcoin.",
+            asset_universe=[],
+            asset_class=None,
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            cadence="monthly",
+            capital_amount=500,
+            comparison_baseline="BTC",
+            extra_parameters={
+                "field_provenance": {
+                    "comparison_baseline": "explicit_user",
+                    "capital_amount": "recurring_contribution",
+                },
+                "provider_resolved_assets": [
+                    {
+                        "raw_text": "AAPL",
+                        "symbol": "AAPL",
+                        "asset_class": "equity",
+                        "name": "Apple Inc.",
+                        "raw_symbol": "AAPL",
+                        "provider": "provider_catalog",
+                        "exchange": "NASDAQ",
+                    }
+                ],
+            },
+        ),
+        semantic_turn_act="new_idea",
+        missing_required_fields=["asset_universe"],
+    )
+
+    result, _ = _interpret(
+        message="DCA $500 into AAPL every month in 2024, compare it against Bitcoin",
+        response=response,
+        snapshot=None,
+    )
+
+    assert "current_message_asset_grounding_repaired" not in result.decision.reason_codes
+    assert result.outcome == "needs_clarification"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == []
+    # The user's explicit benchmark is never silently swapped for a default.
+    assert strategy.comparison_baseline == "BTC"
+
+
 def test_interpret_stage_does_not_guess_missing_asset_from_ambiguous_mentions(
     monkeypatch,
 ) -> None:
