@@ -11,17 +11,24 @@ realism (fees/slippage, #130/PR #178) merged flag-off, and a new interpreter
 cost/perf lane added prompt caching + per-tier reasoning controls (#156/#157,
 PR #172). Remaining P2 is the compounding loop's back half: linked versions
 (A1b) and comparison (A2), the highest-leverage PMF gate.
+The 2026-07-08 burn-down pass landed the bulk of the interpret-surface cluster:
+PR #182 fixed #171 Sig1+Sig2, #160(B), and #150's behavior half (with the #179/
+#180 repro gates un-xfailed); PR #183 replaced the degraded-fallback English
+copy with typed clarification contracts rendered by frontend static i18n
+(es-419 parity restored, the 9 stale copy tests re-pointed at typed asserts);
+and PR #169 landed the Agent Runtime Regression sweep — the full agent_runtime
+suite + spine guardrails now run hermetically (synthetic_unit_fixture catalog)
+on every runtime PR, zero hidden failures at tip (999 passed, 2 xfailed).
 Current pointer: the interpret/edit spine is between owners; A1b (linked
 IdeaVersion emission) is the next spine-chain slice and is unblocked.
-Promotion to `main` is PAUSED. The old #140/#142 blockers are both merged; the
-live blockers are one interpret-surface regression cluster — #171 (live eval
-red), #160 (interpreter dead-ends), #151 (card materialization), and #150 (the
-mocked half of #171) — sequenced under one owner in the main-promotion burn-down
-below.
+Promotion to `main` is PAUSED. Remaining live blockers: #160(A) composer-None
+fall-through and #151 card materialization (strict-xfailed, the only two xfails
+in the suite), then a full live-eval rerun on the exact promotion SHA. #164
+trails the cluster.
 Execution runs off the P2 execution board below: point an agent at any READY
 lane. The interpret/edit spine has exactly one owner lane at a time (currently
 unowned; A1b is next in the spine chain).
-Date: 2026-07-07
+Date: 2026-07-08
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
 
@@ -579,25 +586,23 @@ monetization/entitlement architecture.
 - **#149** — FIXED (PR #168). Result-followup timeout recovery no longer dead on
   Python 3.10 (`asyncio.TimeoutError` vs builtin mismatch resolved); the failing
   test now passes on a 3.10 venv.
-- **#150** — RE-TRIAGED to high-priority (2026-07-07): this is the mocked half of
-  #171 Sig2, not a deferrable chore. Three agent_runtime tests fail at the fork
-  point (date-window audit drift x2, stale provenance x1) plus strict xfails
-  tagged #150 (e.g. cadence terms promoted to assets), and the curated CI list
-  never runs the failing set. The behavior fix closes together with #171 Sig2;
-  the systemic CI half is OPEN PR #169 (off-spine). Sequenced in the
-  main-promotion burn-down below.
+- **#150** — CLOSED (2026-07-08). Behavior half fixed by #166 (calendar-year
+  audit drift) and PR #182 (stale provenance, cadence de-promotion, benchmark-
+  owner repair — all #150 xfails removed). CI-visibility half fixed by PR #169:
+  the full agent_runtime suite now runs on every runtime PR.
 - **#151** — the last surviving #141 corner: an executable-complete draft plus
   model readiness prose never materializes the confirmation card, so bare
   affirmations re-confirm verbally (violates "canonical payload and UI prose
   disagree"). Still OPEN; queue before or alongside A1b. A `main` promotion
   blocker.
-- **#171** — NEW (filed 2026-07-07). Live eval RED at `4eae18e`: calendar-year
-  windows nulled on recovery drafts and the #142 company-name case regressed.
-  Likely fallout from the recovery-draft work (#166) and/or the B4 typed-prose
-  series (#174-177). The top `main` promotion blocker — the live eval gate is
-  red. SCOUT/bisect first against the B4 + #166 merges.
+- **#171** — CLOSED (2026-07-08, PR #182). Sig1: refusal drafts materialize
+  typed date intents into date_range (plus focused recovery for dropped
+  windows); Sig2: missing fields recompute after the focused-repair context
+  merge so provider-grounded baskets stay executable. The #179/#180 strict-xfail
+  gates are un-xfailed and enforced by the #169 sweep. Residual risk is model-
+  side only (grok options-classification nondeterminism), not spine logic.
 
-##### Main-promotion burn-down — the interpret-surface lane (2026-07-07)
+##### Main-promotion burn-down — the interpret-surface lane (updated 2026-07-08: steps 1-2 SHIPPED via PR #182; #169 + #183 landed off-spine)
 
 The remaining `main`-promotion blockers are not four scattered bugs; they are one
 regression cluster on the interpret/edit spine, most introduced by the
@@ -634,31 +639,41 @@ Members and roots:
 
 Landing order (serial on the spine):
 
-1. #171 Sig2 + #150 — repair the #165 drift, un-xfail the #150 strict tests as
-   they flip, restore the TGT/WMT/COST basket. Verify against FREE mocked tests.
-2. #171 Sig1 + #160(B) — one date-provenance-on-recovery policy; repair #166's
-   over-eager distrust.
-3. #160(A) — composer-`None` falls through to the edit path.
+1. ~~#171 Sig2 + #150~~ — DONE (PR #182): basket survives the underfilled
+   repair; all #150 xfails removed.
+2. ~~#171 Sig1 + #160(B)~~ — DONE (PR #182): typed-intent materialization on
+   refusal drafts + year-contradiction guard on invented default windows; the
+   #179/#180 gates are un-xfailed.
+3. #160(A) — composer-`None` falls through to the edit path. Still open;
+   strict-xfailed (test_workflow_fact_answer_then_composer_none_edit_reroutes_
+   to_planner). Principled fix is upstream LLM classification of edits as
+   refine_current_idea (needs live eval coverage), not a deterministic patch.
 4. #151 — materialize the confirmation card from the executable-complete draft.
+   Still open; strict-xfailed; needs a multi-turn live repro shape.
 5. Full live eval on the exact SHA → gate green. Then #164.
 
-Off-spine and parallel-safe now: PR #169 (regression-sweep CI) plus writing the
-repro tests. Waiver valve: #171 permits issue-tagged scoped expected-fails to
+Off-spine, now LANDED: PR #169 (regression-sweep CI, hermetic
+synthetic_unit_fixture catalog, runs on every runtime PR + nightly) and PR #183
+(typed degraded-fallback clarifications + es-419 static rendering; the 9 stale
+per-language copy tests re-pointed at typed asserts). Waiver valve: #171 permits issue-tagged scoped expected-fails to
 unblock promotion if the founder accepts the regression short-term; the roots are
 known data-dropping regressions, so fix is preferred over waive.
 
 **Standing release discipline** (blocks `main`, not a lane): rerun the exact
 clean-checkout suite gate (issue #134 / PR #135) before any branch or `main`
 promotion instead of treating the repair as permanent proof for future SHAs.
-Promotion to `main` stays PAUSED — #140-#142 are merged; the live blockers are
-the interpret-surface cluster #171/#160/#151/#150, sequenced under one owner in
-the main-promotion burn-down above.
+Promotion to `main` stays PAUSED — #140-#142 are merged and the #171/#150/
+#160(B) cluster is fixed; the remaining blockers are #160(A) and #151 (the only
+two strict xfails in the suite), sequenced in the burn-down above.
 The eval harness (B3 slice 1, PR #143) is now a live landing gate:
 runtime-behavior PRs run the live eval suite once pre-merge; every `main`
 promotion candidate runs the full live suite on its exact SHA with no
 unexpected failures (expected-fails only for open issue-tagged bugs); rerun
-the suite after any interpreter model or provider change. #171 means that gate
-is currently RED. Integration stays a fast checkpoint; `main` is the heavyweight
+the suite after any interpreter model or provider change. #171 is fixed in the
+mocked + repro gates; the live suite must be re-run on the exact promotion SHA
+before promotion (known model-side risk: grok classifies options ideas
+nondeterministically — a tier/prompt concern tracked with #159, not spine
+logic). Integration stays a fast checkpoint; `main` is the heavyweight
 gate.
 
 "P2 done" = Argus **remembers, compares, and stays honest about staleness** — the memo's
