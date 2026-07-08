@@ -4389,49 +4389,6 @@ def test_company_name_asset_basket_canonicalizes_interpreter_identified_assets(
     assert result.decision.unsupported_constraints == []
 
 
-def test_sig2_messy_company_name_basket_stays_executable_issue_171(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # #171 Sig2 scout: the messy-English company-name basket (#142) must resolve
-    # executable and survive to ready_for_confirmation with the whole basket and a
-    # defaulted benchmark; the capability verdict must not flip to unsupported.
-    _patch_company_basket_asset_resolver(monkeypatch)
-    message = "try a plain hold test for target, walmart, and costco from jan 2024 through dec 2024"
-    response = StructuredInterpretation(
-        intent="backtest_execution",
-        task_relation="new_task",
-        requires_clarification=False,
-        user_goal_summary="User wants a plain hold test for Target, Walmart, and Costco.",
-        candidate_strategy_draft=StrategySummary(
-            raw_user_phrasing=message,
-            strategy_type="buy_and_hold",
-            strategy_thesis="Buy and hold Target, Walmart, and Costco across 2024.",
-            asset_universe=["target", "walmart", "costco"],
-            asset_class="equity",
-            date_range={"start": "2024-01-01", "end": "2024-12-31"},
-            extra_parameters={
-                "field_provenance": {
-                    "asset_universe": "explicit_user",
-                    "date_range": "explicit_user",
-                },
-            },
-        ),
-        semantic_turn_act="new_idea",
-    )
-
-    result, _ = run_interpret_with_llm(message=message, response=response)
-
-    assert result.outcome == "ready_for_confirmation"
-    strategy = result.decision.candidate_strategy_draft
-    assert strategy.strategy_type == "buy_and_hold"
-    assert strategy.asset_universe == ["TGT", "WMT", "COST"]
-    assert strategy.asset_class == "equity"
-    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
-    assert strategy.comparison_baseline == "SPY"
-    assert result.decision.missing_required_fields == []
-    assert result.decision.ambiguous_fields == []
-    assert result.decision.unsupported_constraints == []
-    assert "invalid_symbols" not in strategy.extra_parameters
 
 
 def test_ambiguous_interpreter_identified_company_name_clarifies_instead_of_dropping(

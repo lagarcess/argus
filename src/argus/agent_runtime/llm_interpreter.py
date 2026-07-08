@@ -4905,6 +4905,12 @@ def _response_from_focused_strategy_extraction(
         reason_codes=["focused_strategy_extraction_repair"],
         semantic_turn_act="new_idea",
     )
+    response = _merge_focused_repair_with_base(
+        response=response,
+        base_response=base_response,
+    )
+    # Missing fields are derived from the merged draft: context the base response
+    # already grounded (e.g. a provider-backed basket) is not re-asked.
     response.missing_required_fields = (
         _capability_required_missing_fields_for_canonical_strategy(
             response.missing_required_fields,
@@ -4915,10 +4921,7 @@ def _response_from_focused_strategy_extraction(
         response.intent = "strategy_drafting"
         response.requires_clarification = True
         response.assistant_response = None
-    return _merge_focused_repair_with_base(
-        response=response,
-        base_response=base_response,
-    )
+    return response
 
 
 def _canonical_asset_universe_from_llm_extraction(
