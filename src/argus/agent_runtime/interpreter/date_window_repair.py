@@ -486,10 +486,8 @@ def _response_has_repairable_recovery_date_gap(
         return False
     if response.semantic_turn_act != "unsupported_request":
         return False
-    # A refused draft carrying a constraint or a strategy-shape gap is a wrongly-refused
-    # supported idea; the strategy repair owns it (and recovers the date) first.
-    if response.unsupported_constraints:
-        return False
+    # A strategy-shape gap belongs to the strategy repair, which runs earlier in
+    # the readiness pipeline; only a date-only gap is recoverable here.
     if any(
         _field_path_base(field) != "date_range"
         for field in response.missing_required_fields
@@ -689,10 +687,9 @@ def _response_from_focused_date_window_extraction(
     if not changed:
         return None
     pending_date_answer = _request_has_pending_date_answer_context(request)
-    # A constraint-less refusal (the recovery-gap shape: a pivot to an unsupported
-    # idea) only recovers its dropped window; it never adopts the pending draft and
-    # never promotes to executable, even mid date-answer. A constraint-carrying
-    # refusal here is stale context that the pending date answer may override.
+    # A constraint-less refusal only recovers its dropped window — never the pending
+    # draft, never a promotion; a constraint-carrying refusal mid date-answer is
+    # stale context the pending answer may override.
     refused_turn = (
         response.intent == "unsupported_or_out_of_scope"
         and not response.unsupported_constraints
