@@ -25,6 +25,18 @@ from argus.agent_runtime.stages.interpret_types import (
 )
 from argus.agent_runtime.state.models import TaskSnapshot
 
+
+class LatestResultFactComposerDeclined:
+    """Composer refusal for a resolved fact key. The turn is fact-shaped by
+    classification but not answerable as a fact, so the caller may re-route it
+    through the typed edit planner before the generic recovery chain."""
+
+    __slots__ = ("fact_key",)
+
+    def __init__(self, fact_key: str) -> None:
+        self.fact_key = fact_key
+
+
 _FACT_FOCUSES: dict[ResultFollowupFocus, str] = {
     "peak_date": "peak_date",
     "peak_value": "peak_value",
@@ -112,7 +124,7 @@ async def latest_result_answer_stage_result_if_applicable(
     current_user_message: str,
     language: str = "en",
     compose_response_func=None,
-) -> StageResult | None:
+) -> StageResult | LatestResultFactComposerDeclined | None:
     """Answer factual latest-result questions from typed intent and run facts."""
 
     if decision.semantic_turn_act != "result_followup":
@@ -153,7 +165,7 @@ async def latest_result_answer_stage_result_if_applicable(
             },
         )
         if not response:
-            return None
+            return LatestResultFactComposerDeclined(requested_fact_key)
         facts: dict[str, Any] = {
             fact_id: fact_bank[fact_id]
             for fact_id in _PAIRED_FACT_IDS.get(requested_fact_key, (requested_fact_key,))
@@ -212,7 +224,7 @@ async def latest_result_answer_stage_result_if_applicable(
         },
     )
     if not response:
-        return None
+        return LatestResultFactComposerDeclined(requested_fact_key)
     updated_decision = decision.model_copy(
         update={
             "intent": "conversation_followup",
