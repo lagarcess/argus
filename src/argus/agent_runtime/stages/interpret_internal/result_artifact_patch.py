@@ -10,6 +10,7 @@ from typing import Any
 
 from argus.agent_runtime.artifacts.asset_edits import same_asset_universe
 from argus.agent_runtime.artifacts.continuity import (
+    ArtifactAnchor,
     apply_patch_to_anchor,
     patched_draft_from_candidate,
     resolve_artifact_anchor,
@@ -96,6 +97,8 @@ def _deterministic_result_artifact_patch_stage_result_if_applicable(
         snapshot=snapshot,
         action_payload={"run_id": reference.artifact_id},
     )
+    if _complete_draft_owns_its_own_route(decision=decision, anchor=anchor):
+        return None
     planned_asset_universe = _planned_asset_universe_for_result_patch(
         decision=decision,
         anchor_draft=anchor.draft,
@@ -125,6 +128,32 @@ def _deterministic_result_artifact_patch_stage_result_if_applicable(
         reason_code="artifact_patch_from_latest_result",
         additional_reason_codes=("artifact_date_patch_from_current_message",),
     )
+
+
+def _complete_draft_owns_its_own_route(
+    *,
+    decision: InterpretDecision,
+    anchor: ArtifactAnchor,
+) -> bool:
+    """An executable-complete unplanned draft that swaps the traded assets is
+    its own idea or edit; patching it onto the anchor would silently overwrite
+    the user's explicit assets and strategy shape with the completed run's."""
+
+    if "artifact_assumption_edit_planned" in decision.reason_codes:
+        return False
+    draft = decision.candidate_strategy_draft
+    draft_assets = [symbol for symbol in draft.asset_universe if str(symbol).strip()]
+    if not draft_assets or anchor.draft is None:
+        return False
+    if same_asset_universe(draft_assets, anchor.draft.asset_universe):
+        return False
+    missing_fields = set(
+        missing_required_fields_for_strategy(
+            draft,
+            contract=build_default_capability_contract(),
+        )
+    )
+    return not (missing_fields - {"strategy_thesis"})
 
 
 def _planned_asset_universe_for_result_patch(
@@ -179,9 +208,11 @@ def _result_followup_target_was_inferred_non_patch(
     )
     if draft_gaps - (RESULT_FOLLOWUP_EXECUTABLE_PATCH_FIELDS | {"strategy_thesis"}):
         return True
+    # sizing_mode is a derived echo of the money shape, not independent
+    # evidence that the turn drafts a new strategy.
     return strategy_has_structured_non_patch_evidence(
         strategy=decision.candidate_strategy_draft,
-        patch_fields=frozenset({"strategy_type"})
+        patch_fields=frozenset({"strategy_type", "sizing_mode"})
         | RESULT_FOLLOWUP_EXECUTABLE_PATCH_FIELDS,
     )
 

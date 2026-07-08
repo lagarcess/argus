@@ -10,6 +10,7 @@ from typing import cast, get_args
 
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
     _normalized_symbol,
+    _strategy_field_provenance,
 )
 from argus.agent_runtime.state.models import StrategySummary
 from argus.domain.backtesting.config import (
@@ -38,6 +39,13 @@ def strategy_with_separate_benchmark_symbol(
         if symbol != benchmark
     ]
     if len(filtered_assets) == len(normalized_assets):
+        return updated, []
+    if not filtered_assets and (
+        _strategy_field_provenance(strategy, "asset_universe") == "explicit_user"
+    ):
+        # The user's own edit names the benchmark symbol as the traded asset
+        # (a BTC hold benchmarked to BTC); an empty universe is no repair.
+        updated.asset_universe = list(dict.fromkeys(normalized_assets))
         return updated, []
     updated.asset_universe = list(dict.fromkeys(filtered_assets))
     return updated, ["benchmark_symbol_removed_from_asset_universe"]
