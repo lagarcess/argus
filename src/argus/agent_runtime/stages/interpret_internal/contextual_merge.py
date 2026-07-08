@@ -570,13 +570,17 @@ def _is_field_owned_indicator_asset_candidate(
     )
 
 
-# Bare root tokens of the canonical DCA cadence enum. Derived from the typed enum,
-# not a per-language copy table: in a recurring-buy draft the LLM sometimes mis-promotes
-# the cadence word itself into asset_universe (e.g. "every week"/"each month" -> asset
-# "WEEK"/"MONTH"). Drop those cadence roots unless the user gave explicit asset evidence.
-_CADENCE_ROOT_TOKENS: frozenset[str] = frozenset(
-    {"day", "week", "biweek", "month", "quarter"}
-)
+def _cadence_root_tokens(cadence: str) -> frozenset[str]:
+    # Roots of the draft's own bound cadence enum value ("weekly" -> {"weekly",
+    # "week"}, "daily" -> {"daily", "day"}); only that cadence's word can be
+    # de-promoted, so unrelated real tickers keep their resolution attempt.
+    roots = {cadence}
+    if cadence.endswith("ly"):
+        stem = cadence[:-2]
+        roots.add(stem)
+        if stem.endswith("i"):
+            roots.add(f"{stem[:-1]}y")
+    return frozenset(roots)
 
 
 def _is_cadence_word_asset_candidate(
@@ -588,9 +592,10 @@ def _is_cadence_word_asset_candidate(
 ) -> bool:
     if asset_field_requested:
         return False
-    if str(strategy.cadence or "").strip().casefold() not in SUPPORTED_DCA_CADENCES:
+    cadence = str(strategy.cadence or "").strip().casefold()
+    if cadence not in SUPPORTED_DCA_CADENCES:
         return False
-    if str(symbol or "").strip().casefold() not in _CADENCE_ROOT_TOKENS:
+    if str(symbol or "").strip().casefold() not in _cadence_root_tokens(cadence):
         return False
     return not _strategy_has_explicit_asset_evidence(
         strategy,

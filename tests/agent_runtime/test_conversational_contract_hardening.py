@@ -1029,7 +1029,14 @@ def test_dca_recurring_amount_semantic_provenance_handles_variation(
 
 
 @pytest.mark.parametrize(
-    ("message", "valid_symbol", "cadence_asset_symbol", "valid_name", "cadence_name"),
+    (
+        "message",
+        "valid_symbol",
+        "cadence_asset_symbol",
+        "valid_name",
+        "cadence_name",
+        "bound_cadence",
+    ),
     [
         (
             "What if I bought $250 of Nvidia every week in 2024?",
@@ -1037,6 +1044,7 @@ def test_dca_recurring_amount_semantic_provenance_handles_variation(
             "WEEK",
             "NVIDIA Corporation",
             "Weekly Income ETF",
+            "weekly",
         ),
         (
             "What if I bought $75 of Microsoft each month in 2025?",
@@ -1044,6 +1052,7 @@ def test_dca_recurring_amount_semantic_provenance_handles_variation(
             "MONTH",
             "Microsoft Corporation",
             "Monthly Income ETF",
+            "monthly",
         ),
     ],
 )
@@ -1054,6 +1063,7 @@ def test_dca_cadence_terms_are_not_promoted_to_assets(
     cadence_asset_symbol: str,
     valid_name: str,
     cadence_name: str,
+    bound_cadence: str,
 ) -> None:
     from argus.agent_runtime.resolution import AssetResolution
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -1125,7 +1135,7 @@ def test_dca_cadence_terms_are_not_promoted_to_assets(
             asset_universe=[valid_symbol, cadence_asset_symbol],
             asset_class="equity",
             date_range="2024",
-            cadence="weekly",
+            cadence=bound_cadence,
             capital_amount=250,
             extra_parameters={
                 "field_provenance": {
@@ -1143,6 +1153,60 @@ def test_dca_cadence_terms_are_not_promoted_to_assets(
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == [valid_symbol]
     assert cadence_asset_symbol not in strategy.asset_universe
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "DCA $500 into DAY every month in 2025",
+        "invierte $500 en DAY cada mes en 2025",
+    ],
+)
+def test_dca_real_ticker_sharing_cadence_root_keeps_resolution(
+    monkeypatch,
+    message: str,
+) -> None:
+    # DAY is a listed equity (Dayforce); under a monthly cadence it must reach
+    # provider resolution instead of being dropped as a cadence word, and the
+    # Spanish phrasing must flow through the same typed path.
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset_for(query: str) -> ResolvedAssetStub:
+        if query.strip().upper() != "DAY":
+            raise ValueError(query)
+        return ResolvedAssetStub("DAY", "equity", name="Dayforce Inc")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset_for)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants monthly recurring buys of DAY.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Dayforce monthly through 2025.",
+            asset_universe=["DAY"],
+            asset_class="equity",
+            date_range="2025",
+            cadence="monthly",
+            capital_amount=500,
+            extra_parameters={
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                }
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(message=message, response=response, snapshot=None)
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["DAY"]
+    assert strategy.cadence == "monthly"
+    assert result.decision.missing_required_fields == []
 
 
 def test_dca_tsla_monthly_recurring_contribution_does_not_ask_total_budget(
