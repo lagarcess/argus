@@ -658,13 +658,16 @@ def _response_from_focused_date_window_extraction(
     if not changed:
         return None
     pending_date_answer = _request_has_pending_date_answer_context(request)
+    # An unsupported refusal only recovers its dropped window; it never adopts the
+    # pending draft and never promotes to executable, even mid date-answer.
+    refused_turn = response.intent == "unsupported_or_out_of_scope"
     if raw_text:
         draft.date_range_raw_text = raw_text
         draft.evidence_spans = {
             **dict(draft.evidence_spans or {}),
             "date_range": raw_text,
         }
-    if pending_date_answer:
+    if pending_date_answer and not refused_turn:
         supported_pending_draft = _supported_pending_strategy_draft_for_date_answer(
             request
         )
@@ -693,6 +696,7 @@ def _response_from_focused_date_window_extraction(
         ]
     if (
         pending_date_answer
+        and not refused_turn
         and not repaired.missing_required_fields
         and not repaired.ambiguous_fields
         and not repaired.unsupported_constraints
@@ -708,7 +712,7 @@ def _response_from_focused_date_window_extraction(
         repaired.artifact_target = "active_confirmation"
     elif (
         repaired.requires_clarification
-        and response.intent != "unsupported_or_out_of_scope"
+        and not refused_turn
         and not repaired.missing_required_fields
         and not repaired.ambiguous_fields
         and not repaired.unsupported_constraints

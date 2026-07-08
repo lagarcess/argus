@@ -2280,6 +2280,103 @@ async def test_unsupported_recovery_unparseable_date_does_not_trailing_default(
 
 
 @pytest.mark.asyncio
+async def test_unsupported_pivot_during_pending_date_answer_stays_refused(
+    monkeypatch,
+) -> None:
+    # Pivoting to an unsupported idea WHILE answering a date question must stay a
+    # refusal: the recovery may keep the recovered window but must not adopt the
+    # pending supported draft or promote the turn to execution.
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        if schema_name == "AssetGroundingAudit":
+            return interpreter_module.AssetGroundingAudit(
+                grounded_symbols=["AAPL"],
+                confidence=0.92,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="from 2024-01-01 through 2024-12-31",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="explicit_range",
+                    start="2024-01-01",
+                    end="2024-12-31",
+                    confidence=0.95,
+                    evidence="from 2024-01-01 through 2024-12-31",
+                ),
+                confidence=0.95,
+                evidence="from 2024-01-01 through 2024-12-31",
+            )
+        return None
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    current_message = (
+        "actually backtest weekly options on AAPL "
+        "from 2024-01-01 through 2024-12-31 instead"
+    )
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary=current_message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=current_message,
+            strategy_type=None,
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+        ),
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=current_message,
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="backtest_execution",
+                completed=False,
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Hold NVDA while we pick a window.",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                ),
+            ),
+            selected_thread_metadata={
+                "latest_task_type": "backtest_execution",
+                "last_stage_outcome": "await_user_reply",
+                "requested_field": "date_range",
+            },
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert ready_response.intent == "unsupported_or_out_of_scope"
+    assert ready_response.semantic_turn_act != "answer_pending_need"
+    assert ready_response.artifact_target != "active_confirmation"
+    draft = ready_response.candidate_strategy_draft
+    # The refusal keeps its own draft; the pending NVDA hold is not swapped in.
+    assert draft.asset_universe == ["AAPL"]
+
+
+@pytest.mark.asyncio
 async def test_missing_date_clarification_uses_focused_date_window_intent(
     monkeypatch,
 ) -> None:
