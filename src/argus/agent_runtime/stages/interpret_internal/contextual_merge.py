@@ -34,13 +34,13 @@ from argus.agent_runtime.state.models import (
     StrategySummary,
     TaskSnapshot,
 )
-from argus.domain.cadences import SUPPORTED_DCA_CADENCES
 from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
     canonical_strategy_type,
     executable_strategy_type,
     resolve_date_range_intent,
 )
+from argus.domain.cadences import SUPPORTED_DCA_CADENCES
 from argus.domain.indicators import executable_indicator_spec
 from argus.nlp.natural_time import resolve_date_range_text
 
