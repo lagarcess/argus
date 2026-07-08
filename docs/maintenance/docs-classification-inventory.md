@@ -45,6 +45,11 @@ the active manual browser-QA script (its "legacy orchestrator path?" flag was
 unfounded) and refreshed with a status banner plus Spanish and language-mismatch
 transcripts.
 
+2026-07-08 pass: `docs/specs/private-alpha-next-refine-to-version.md` moved to
+`docs/archive/private-alpha-next-refine-to-version.md` after issue #141 / PR
+#148 shipped. A one-line pointer stub remains at the original path for existing
+roadmap links.
+
 ## Inventory
 
 | File | Classification | Rationale | Recommended next action | Notes / possible stale references |
@@ -63,6 +68,7 @@ transcripts.
 | `docs/specs/private-alpha-next-integration.md` | active staging/process context | Records integration-lane branch mechanics, quarantine rules, closed work, Jules boundaries, and P0 reintegration process. | Keep as staging/process context. | Current context, not command doc |
 | `docs/archive/private-alpha-conversation-trust.md` | archived historical evidence / completed checkpoint | Marked as merged and deployed checkpoint; useful for conversation-trust design context but not current execution scope. | Keep archived for branch archaeology. | Completed |
 | `docs/archive/private-alpha-status-action-parity-audit.md` | archived historical evidence / implemented slice | Implemented and locally verified; useful as artifact lifecycle evidence but not current execution scope. | Keep archived for branch archaeology. | Completed |
+| `docs/archive/private-alpha-next-refine-to-version.md` | archived historical evidence / implemented slice | Shipped in issue #141 / PR #148; A1b/A2 sequencing now belongs to the active roadmap. | Keep archived for branch archaeology. | Moved 2026-07-08; pointer stub remains in `docs/specs/` |
 | `docs/archive/private-alpha-readiness-orchestration.md` | archived branch-specific context | Coordination note for `codex/private-alpha-readiness-clean`; not the current Private Alpha Next roadmap. | Keep archived for readiness-lane archaeology. | Readiness lane |
 | `docs/archive/private-alpha-controlled-readiness-panel.md` | archived branch/lane-specific context | Controlled-alpha readiness panel for readiness decisions; useful evidence but not the active roadmap. | Keep archived for readiness-lane archaeology. | Readiness lane |
 | `docs/archive/private-alpha-performance-readiness-audit.md` | archived branch/lane-specific context | Supporting performance addendum for the controlled readiness slice. | Keep archived for readiness-lane archaeology. | Readiness lane |
