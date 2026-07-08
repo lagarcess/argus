@@ -158,11 +158,32 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
 }
 
 
+class RecoveryText(str):
+    code: RecoveryMessageCode
+    retryable: bool
+    params: dict[str, Any]
+
+    def __new__(
+        cls,
+        value: str,
+        *,
+        code: RecoveryMessageCode,
+        retryable: bool,
+        params: dict[str, Any],
+    ) -> "RecoveryText":
+        instance = str.__new__(cls, value)
+        instance.code = code
+        instance.retryable = retryable
+        instance.params = dict(params)
+        return instance
+
+
 def recovery_message(
     code: RecoveryMessageCode,
     *,
     language: str | None = None,
-    **params: str,
+    retryable: bool = False,
+    **params: Any,
 ) -> str:
     """Compatibility text for persisted messages.
 
@@ -173,7 +194,13 @@ def recovery_message(
 
     _ = language
     fallback_params = _fallback_params(code=code, params=params)
-    return RECOVERY_FALLBACK_MESSAGES[code].format(**fallback_params)
+    text = RECOVERY_FALLBACK_MESSAGES[code].format(**fallback_params)
+    return RecoveryText(
+        text,
+        code=code,
+        retryable=retryable,
+        params=params,
+    )
 
 
 def recovery_state(
@@ -215,6 +242,16 @@ def recovery_state_stage_patch(
     }
 
 
+def recovery_state_from_text(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, RecoveryText):
+        return None
+    return recovery_state(
+        value.code,
+        retryable=value.retryable,
+        **value.params,
+    )
+
+
 def retry_last_turn_stage_patch(message: str) -> dict[str, dict[str, str]] | None:
     cleaned = message.strip()
     if not cleaned:
@@ -225,8 +262,8 @@ def retry_last_turn_stage_patch(message: str) -> dict[str, dict[str, str]] | Non
 def _fallback_params(
     *,
     code: RecoveryMessageCode,
-    params: dict[str, str],
-) -> dict[str, str]:
+    params: dict[str, Any],
+) -> dict[str, Any]:
     if code == "artifact_action_retry_non_retryable":
         message = str(params.get("user_safe_message") or "").strip()
         return {

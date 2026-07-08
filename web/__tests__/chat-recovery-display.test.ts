@@ -81,6 +81,30 @@ describe("chat recovery display", () => {
     expect(display).toBeNull();
   });
 
+  test("renders typed clarification sidecars through locale catalogs", () => {
+    const display = recoveryDisplayFromMetadata({
+      clarification: {
+        kind: "clarification",
+        reason_code: "missing_period",
+        requested_field: "date_range",
+        semantic_needs: ["period"],
+        payload: {
+          strategy: {
+            asset_universe: ["AAPL"],
+          },
+        },
+        options: [],
+      },
+    });
+
+    expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe(
+      "What date window should I use for AAPL?",
+    );
+    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
+      "¿Qué periodo quieres usar para AAPL?",
+    );
+  });
+
   test("renders unsupported recovery options from typed replacement values", () => {
     const display = recoveryDisplayFromMetadata({
       response_intent: {
@@ -116,6 +140,41 @@ describe("chat recovery display", () => {
       "Esa regla no define por sí sola cuándo comprar o vender para NVDA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
     );
     expect(text).not.toContain("invalid_chronological_date_range");
+  });
+
+  test("renders unsupported recovery from typed clarification sidecars", () => {
+    const display = recoveryDisplayFromMetadata({
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "unsupported_strategy_logic",
+        requested_field: "unsupported_constraints",
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          raw_value: "ATR 14",
+          strategy: {
+            asset_universe: ["TSLA"],
+          },
+        },
+        options: [
+          {
+            id: "rsi_threshold",
+            replacement_values: {
+              simplify_logic: "rsi_only",
+            },
+          },
+          {
+            id: "buy_and_hold",
+            replacement_values: {
+              strategy_type: "buy_and_hold",
+            },
+          },
+        ],
+      },
+    });
+
+    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
+      "ATR 14 no define por sí solo cuándo comprar o vender para TSLA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
+    );
   });
 
   test("recovery locale keys stay in parity", () => {

@@ -1170,6 +1170,7 @@ async def chat_stream(
                     "result_conversation_id",
                     "result_fact_bank",
                     "response_intent",
+                    "clarification",
                 ):
                     value = runtime_result.get(key)
                     if value is not None:

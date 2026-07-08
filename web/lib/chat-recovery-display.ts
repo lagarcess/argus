@@ -18,6 +18,13 @@ export type RecoveryDisplay =
       };
     }
   | {
+      kind: "clarification";
+      reasonCode?: string;
+      requestedField?: string;
+      semanticNeeds: string[];
+      values?: Record<string, string>;
+    }
+  | {
       kind: "artifact_action_recovery";
       status: string;
       values?: Record<string, string>;
@@ -46,6 +53,7 @@ export function recoveryDisplayFromMetadata(
 ): RecoveryDisplay | null {
   return (
     recoveryDisplayFromRecoveryState(metadata.recovery) ??
+    recoveryDisplayFromClarification(metadata.clarification) ??
     recoveryDisplayFromResponseIntent(metadata.response_intent) ??
     recoveryDisplayFromResponseIntent(
       recordOrNull(metadata.pending_strategy)?.response_intent,
@@ -126,6 +134,9 @@ export function recoveryDisplayText(
       options: optionsText,
     });
   }
+  if (display.kind === "clarification") {
+    return clarificationDisplayText(display, t);
+  }
   const statusKey = artifactActionStatusKey(display.status);
   return t(`chat.recovery.${statusKey}`, artifactActionValues(display));
 }
@@ -173,6 +184,61 @@ function unsupportedRecoveryDisplay(
   };
 }
 
+function recoveryDisplayFromClarification(value: unknown): RecoveryDisplay | null {
+  const clarification = recordOrNull(value);
+  const kind = stringOrNull(clarification?.kind);
+  if (!clarification || !kind) {
+    return null;
+  }
+  if (kind === "unsupported_recovery") {
+    return unsupportedRecoveryDisplayFromClarification(clarification);
+  }
+  if (kind !== "clarification") {
+    return null;
+  }
+  const payload = recordOrNull(clarification.payload);
+  const semanticNeeds = stringArrayOrNull(clarification.semantic_needs) ?? [];
+  return {
+    kind: "clarification",
+    reasonCode: stringOrNull(clarification.reason_code) ?? undefined,
+    requestedField: stringOrNull(clarification.requested_field) ?? undefined,
+    semanticNeeds,
+    values: strategyValues(payload?.strategy),
+  };
+}
+
+function unsupportedRecoveryDisplayFromClarification(
+  clarification: Record<string, unknown>,
+): RecoveryDisplay | null {
+  const options = Array.isArray(clarification.options)
+    ? clarification.options
+        .map((option) => recordOrNull(option))
+        .filter((option): option is Record<string, unknown> => Boolean(option))
+        .map((option) => ({
+          label:
+            stringOrNull(option.compatibility_label) ??
+            stringOrNull(option.label) ??
+            undefined,
+          replacementValues: recordOrNull(option.replacement_values),
+        }))
+        .slice(0, 3)
+    : [];
+  if (options.length === 0) {
+    return null;
+  }
+  const payload = recordOrNull(clarification.payload);
+  const rawValue = stringOrNull(payload?.raw_value);
+  return {
+    kind: "unsupported_recovery",
+    values: {
+      rawValue:
+        rawValue && !looksLikeInternalCode(rawValue) ? rawValue : undefined,
+      symbol: primarySymbol(recordOrNull(payload?.strategy)),
+      options,
+    },
+  };
+}
+
 function strategyValues(value: unknown): Record<string, string> | undefined {
   const strategy = recordOrNull(value);
   const symbol = primarySymbol(strategy);
@@ -182,6 +248,60 @@ function strategyValues(value: unknown): Record<string, string> | undefined {
     ...(symbol ? { symbol } : {}),
     ...(assetText ? { assetText } : {}),
   };
+}
+
+function clarificationDisplayText(
+  display: Extract<RecoveryDisplay, { kind: "clarification" }>,
+  t: TFunction,
+): string {
+  const key = clarificationKey(display);
+  return key ? t(key, display.values ?? {}) : "";
+}
+
+function clarificationKey(
+  display: Extract<RecoveryDisplay, { kind: "clarification" }>,
+): string | null {
+  const semanticNeeds = new Set(display.semanticNeeds);
+  const requestedField = fieldBase(display.requestedField);
+  const symbol = display.values?.symbol;
+  const assetText = display.values?.assetText;
+  if (requestedField === "date_range" || semanticNeeds.has("period")) {
+    return symbol ? "chat.clarification.period_for_asset" : "chat.clarification.period";
+  }
+  if (requestedField === "asset_universe" || semanticNeeds.has("asset_target")) {
+    return "chat.clarification.asset_target";
+  }
+  if (requestedField === "assumption" || semanticNeeds.has("assumption")) {
+    return symbol
+      ? "chat.clarification.assumption_for_asset"
+      : "chat.clarification.assumption";
+  }
+  if (semanticNeeds.has("sizing_amount") && semanticNeeds.has("schedule")) {
+    return "chat.clarification.sizing_amount_schedule";
+  }
+  if (requestedField === "capital_amount" || semanticNeeds.has("sizing_amount")) {
+    return "chat.clarification.sizing_amount";
+  }
+  if (requestedField === "cadence" || semanticNeeds.has("schedule")) {
+    return "chat.clarification.schedule";
+  }
+  if (
+    requestedField === "entry_logic" ||
+    requestedField === "exit_logic" ||
+    semanticNeeds.has("rule_definition")
+  ) {
+    return "chat.clarification.rule_definition";
+  }
+  if (requestedField === "refinement" || semanticNeeds.has("refinement")) {
+    return assetText
+      ? "chat.clarification.refinement_for_asset"
+      : "chat.clarification.refinement";
+  }
+  return null;
+}
+
+function fieldBase(value: string | undefined): string | null {
+  return value ? value.split("[", 1)[0] : null;
 }
 
 function primarySymbol(strategy: Record<string, unknown> | null): string | undefined {

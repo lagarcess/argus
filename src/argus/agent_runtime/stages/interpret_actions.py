@@ -393,9 +393,7 @@ def approval_stage_result_if_applicable(
                     ],
                 }
             ),
-            stage_patch={
-                "assistant_response": _confirmation_action_guidance(language),
-            },
+            stage_patch=_confirmation_action_guidance_patch(language),
         )
     if decision.semantic_turn_act != "approval":
         return None
@@ -425,9 +423,7 @@ def approval_stage_result_if_applicable(
                     "semantic_turn_act": "approval",
                 }
             ),
-            stage_patch={
-                "assistant_response": _confirmation_action_guidance(language),
-            },
+            stage_patch=_confirmation_action_guidance_patch(language),
         )
     if snapshot.active_confirmation_reference is not None and (
         decision_requests_confirmation_card_action(
@@ -453,9 +449,7 @@ def approval_stage_result_if_applicable(
                     "semantic_turn_act": "approval",
                 }
             ),
-            stage_patch={
-                "assistant_response": _confirmation_action_guidance(language),
-            },
+            stage_patch=_confirmation_action_guidance_patch(language),
         )
     if not decision_is_pure_approval(
         decision=decision,
@@ -481,9 +475,7 @@ def approval_stage_result_if_applicable(
                     "semantic_turn_act": "approval",
                 }
             ),
-            stage_patch={
-                "assistant_response": _confirmation_action_guidance(language),
-            },
+            stage_patch=_confirmation_action_guidance_patch(language),
         )
     confirmation_payload = validated_approval_confirmation_payload_from_state(
         state=state,
@@ -530,14 +522,23 @@ def approval_stage_result_if_applicable(
                 "semantic_turn_act": "approval",
             }
         ),
-        stage_patch={
-            "assistant_response": _confirmation_action_guidance(language),
-        },
+        stage_patch=_confirmation_action_guidance_patch(language),
     )
 
 
 def _confirmation_action_guidance(language: str | None) -> str:
     return recovery_message("confirmation_action_guidance", language=language)
+
+
+def _confirmation_action_guidance_patch(language: str | None) -> dict[str, Any]:
+    return {
+        "assistant_response": _confirmation_action_guidance(language),
+        **recovery_state_stage_patch(
+            "confirmation_action_guidance",
+            language=language,
+            retryable=False,
+        ),
+    }
 
 
 def _active_confirmation_is_valid(snapshot: TaskSnapshot) -> bool:

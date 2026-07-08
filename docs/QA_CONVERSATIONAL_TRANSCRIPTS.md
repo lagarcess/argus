@@ -183,6 +183,15 @@ The AI mirrors the user's turn language even when the UI language differs
 The B4 hotspot: recovery and degraded copy render from typed codes in the turn
 language, never a hardcoded English fallback.
 
+1. With the clarification LLM path disabled for the local session, send
+   `Prueba comprar y mantener AAPL`.
+   - Pass: the assistant asks the missing-period clarification in Spanish, the
+     network final payload contains `clarification.kind=clarification`,
+     `reason_code=missing_period`, and `requested_field=date_range`, and reload
+     preserves the Spanish rendered question.
+   - Reject: the saved compatibility English prompt is displayed, the frontend
+     keyword-matches prose, or the final payload lacks the typed `clarification`
+     sidecar.
 1. `Prueba una estrategia de cruce de medias móviles en Tesla.` (a draft-only
    strategy that is not executable yet)
    - Pass: an honest Spanish explanation of the limitation plus an executable

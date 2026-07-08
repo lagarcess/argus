@@ -216,10 +216,10 @@ Represents individual messages within a conversation.
 - `metadata` stores token usage, model identifiers, latency, and tool execution traces.
 - Message metadata may contain reloadable chat artifacts such as
   `pending_strategy`, `confirmation_card`, `confirmation_payload`,
-  `result_card`, result identifiers, `chat_action`, `failed_action`, and
-  `retry_last_turn`. These fields hydrate the transcript and action affordances;
-  they do not make free-form transcript text the source of truth for strategy
-  state.
+  `result_card`, result identifiers, `chat_action`, `failed_action`,
+  `retry_last_turn`, `recovery`, and `clarification`. These fields hydrate the
+  transcript, action affordances, and localized degraded-fallback UI; they do
+  not make free-form transcript text the source of truth for strategy state.
 - When a turn follows an artifact-backed setup, the runtime must reconstruct the
   working draft from canonical artifact state before applying the new user
   message as a patch. Canonical artifact state comes from, in order of
