@@ -97,6 +97,8 @@ class EvalCase:
     action: EvalAction | None = None
     snapshot: TaskSnapshot | None = None
     confirmation_payload: dict[str, Any] | None = None
+    recent_thread_history: tuple[dict[str, Any], ...] = ()
+    thread_metadata: dict[str, Any] = field(default_factory=dict)
     degraded_mode: dict[str, Any] = field(default_factory=dict)
     expected_fail: ExpectedFail | None = None
     prose_judge_criteria: tuple[str, ...] = ()
@@ -131,7 +133,7 @@ def run_eval_case(
     contract = build_default_capability_contract()
     state = RunState.new(
         current_user_message=case.prompt,
-        recent_thread_history=[],
+        recent_thread_history=[dict(turn) for turn in case.recent_thread_history],
         action_context=_action_payload(case.action),
     )
     if case.confirmation_payload is not None:
@@ -159,6 +161,7 @@ def run_eval_case(
             selected_thread_metadata={
                 "ui_language": case.ui_language,
                 "last_stage_outcome": "await_approval",
+                **case.thread_metadata,
             },
             structured_interpreter=interpreter,
         )
@@ -432,6 +435,10 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
         ),
         snapshot=_snapshot_from_raw(raw_case.get("snapshot")),
         confirmation_payload=raw_case.get("confirmation_payload"),
+        recent_thread_history=tuple(
+            dict(turn) for turn in (raw_case.get("recent_thread_history") or ())
+        ),
+        thread_metadata=dict(raw_case.get("thread_metadata") or {}),
         degraded_mode=dict(raw_case.get("degraded_mode") or {}),
         expected_fail=(
             None

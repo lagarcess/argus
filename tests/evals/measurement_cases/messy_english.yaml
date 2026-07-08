@@ -31,3 +31,54 @@ cases:
         end: "2024-12-31"
       benchmark_symbol: SPY
       stage_outcomes: ["ready_for_confirmation", "await_approval"]
+
+  - id: messy_english_post_result_fact_then_capital_edit_issue_160
+    prompt: "ok now change the starting capital to $2,000"
+    user_language: en
+    ui_language: en
+    recent_thread_history:
+      - role: user
+        content: "What if I just bought and held Apple through 2024?"
+      - role: assistant
+        content: "Here is your completed buy-and-hold result for AAPL over 2024."
+      - role: user
+        content: "what was the total return?"
+      - role: assistant
+        content: "The strategy returned 18.2% over the 2024 window."
+    thread_metadata:
+      latest_task_type: results_explanation
+      last_stage_outcome: ready_to_respond
+    snapshot:
+      latest_task_type: results_explanation
+      completed: true
+      latest_backtest_result_reference:
+        artifact_kind: backtest_result
+        artifact_id: "eval-run-160-en"
+        artifact_status: completed
+        metadata:
+          run_id: "eval-run-160-en"
+          asset_class: equity
+          symbols: ["AAPL"]
+          benchmark_symbol: SPY
+          config_snapshot:
+            template: buy_and_hold
+            symbols: ["AAPL"]
+            date_range:
+              start: "2024-01-01"
+              end: "2024-12-31"
+            resolved_parameters:
+              date_range:
+                start: "2024-01-01"
+                end: "2024-12-31"
+              capital_amount: 1000
+    expected:
+      intent: backtest_execution
+      capability_verdict: executable
+      assets: ["AAPL"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]
