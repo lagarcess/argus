@@ -836,7 +836,6 @@ def test_result_followup_asset_swap_with_inferred_target_confirms(
     assert "result_followup_target_inferred" in result.decision.reason_codes
 
 
-@pytest.mark.xfail(strict=True, reason="#151 — remove when fixed")
 def test_post_result_readiness_prose_materializes_confirmation_payload(
     monkeypatch,
 ) -> None:
@@ -984,6 +983,131 @@ def test_post_result_readiness_prose_materializes_confirmation_payload(
     assert approval_result.patch.get("confirmation_payload") is not None
 
 
+def test_post_result_complete_asset_swap_keeps_swapped_assets(monkeypatch) -> None:
+    """Captured #151 live shape: grok classifies the NVDA swap as a complete
+    new_idea draft with the window bound to the latest result. The anchor date
+    patch must step aside so the user's swapped asset survives."""
+
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.setattr(interpret_module, "resolve_asset", _resolve_stub)
+    planned = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User wants the same recurring buys on NVDA.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=(
+                "Could we try to buy NVDA at 500 dollars a month from the "
+                "same time period"
+            ),
+            strategy_type="dca_accumulation",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            cadence="monthly",
+            capital_amount=500,
+            date_range={"start": "2020-02-01", "end": "2026-07-02"},
+            extra_parameters={
+                "recurring_contribution": 500,
+                "field_provenance": {
+                    "recurring_contribution": "explicit_user",
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                },
+            },
+        ),
+        semantic_turn_act="new_idea",
+        reason_codes=[
+            "latest_result_window_bound",
+            "focused_strategy_extraction_repair",
+            "focused_repair_preserved_structured_context",
+        ],
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "Could we try to buy NVDA at 500 dollars a month from the "
+                "same time period"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="results_explanation",
+            completed=True,
+            latest_backtest_result_reference=_completed_result_reference(),
+        ),
+        selected_thread_metadata={
+            "latest_task_type": "results_explanation",
+            "last_stage_outcome": "ready_to_respond",
+        },
+        structured_interpreter=_RecordingInterpreter(planned),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.capital_amount == 500
+    assert strategy.cadence == "monthly"
+    assert strategy.date_range == {"start": "2020-02-01", "end": "2026-07-02"}
+    assert "artifact_patch_from_latest_result" not in result.decision.reason_codes
+
+
+def test_post_result_fresh_complete_idea_keeps_own_strategy(monkeypatch) -> None:
+    """A fresh complete idea after a result must not be hijacked into an
+    anchor date patch that confirms the completed run's assets and shape."""
+
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.setattr(interpret_module, "resolve_asset", _resolve_stub)
+    planned = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants a fresh Tesla buy-and-hold test.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="test buying and holding TSLA for 2023",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Tesla through 2023.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range={"start": "2023-01-01", "end": "2023-12-31"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="test buying and holding TSLA for 2023",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="results_explanation",
+            completed=True,
+            latest_backtest_result_reference=_completed_result_reference(),
+        ),
+        selected_thread_metadata={
+            "latest_task_type": "results_explanation",
+            "last_stage_outcome": "ready_to_respond",
+        },
+        structured_interpreter=_RecordingInterpreter(planned),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.cadence is None
+    assert strategy.date_range == {"start": "2023-01-01", "end": "2023-12-31"}
+    assert "artifact_patch_from_latest_result" not in result.decision.reason_codes
+
+
 def test_result_patch_asset_universe_ignores_dash_slash_spelling_difference():
     """BRK-B in the turn draft and BRK/B on the anchor are the same asset; a
     result patch must not carry a spurious asset change for the spelling."""
@@ -991,7 +1115,7 @@ def test_result_patch_asset_universe_ignores_dash_slash_spelling_difference():
     from argus.agent_runtime.profile.response_profile import (
         resolve_effective_response_profile,
     )
-    from argus.agent_runtime.stages.interpret_actions import (
+    from argus.agent_runtime.stages.interpret_internal.result_artifact_patch import (
         _planned_asset_universe_for_result_patch,
     )
     from argus.agent_runtime.stages.interpret_types import InterpretDecision

@@ -9,7 +9,7 @@ import inspect
 import os
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, cast, get_args
+from typing import Any
 
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
 from argus.agent_runtime.artifacts.patch_policy import (
@@ -152,7 +152,6 @@ from argus.agent_runtime.stages.interpret_internal.asset_resolution import (  # 
     _strategy_with_execution_defaults,
     _strategy_with_hidden_context_guard,
     _strategy_with_pending_resolution_affirmation,
-    _strategy_with_separate_benchmark_symbol,
     _strategy_with_supported_indicator_simplification,
     _supported_timeframes,
     _unresolved_requested_asset_resolution,
@@ -187,6 +186,12 @@ from argus.agent_runtime.stages.interpret_internal.contextual_merge import (  # 
     _strategy_supplies_execution_context,
     _strategy_uses_rule_or_indicator_context,
     _strategy_with_contextual_merge,
+)
+from argus.agent_runtime.stages.interpret_internal.benchmark_repairs import (
+    default_benchmark_for_asset_class as _default_benchmark_for_asset_class,
+    strategy_with_default_benchmark as _strategy_with_default_benchmark,
+    strategy_with_separate_benchmark_symbol as _strategy_with_separate_benchmark_symbol,
+    strategy_with_unstated_benchmark_guard as _strategy_with_unstated_benchmark_guard,
 )
 from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
     draft_only_indicator_interpretation_when_interpreter_unavailable as _draft_only_indicator_interpretation_when_interpreter_unavailable,
@@ -280,12 +285,6 @@ from argus.context import (
     context_packet_freshness,
     fetch_alpaca_market_movers_packet,
 )
-from argus.domain.backtesting.config import (
-    AssetClass as BacktestAssetClass,
-)
-from argus.domain.backtesting.config import (
-    default_benchmark as default_backtest_benchmark,
-)
 from argus.domain.indicators import (
     EXECUTABLE_INDICATORS,
     IndicatorExecutionSpec,
@@ -305,7 +304,6 @@ from argus.nlp.natural_time import (
 from loguru import logger
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
-_BACKTEST_ASSET_CLASSES = frozenset(get_args(BacktestAssetClass))
 
 
 def interpret_stage(
@@ -2902,81 +2900,6 @@ def _strategy_with_benchmark_owner_asset_repair(
         [*updated.resolution_provenance, resolutions[0].provenance]
     )
     return updated, ["current_message_asset_grounding_repaired"]
-
-
-def _default_benchmark_for_asset_class(
-    asset_class: str,
-    *,
-    symbols: list[str],
-) -> str | None:
-    if asset_class not in _BACKTEST_ASSET_CLASSES:
-        return None
-    return default_backtest_benchmark(
-        cast(BacktestAssetClass, asset_class),
-        symbols,
-    )
-
-
-def _strategy_with_default_benchmark(
-    strategy: StrategySummary,
-) -> tuple[StrategySummary, list[str]]:
-    if _normalized_symbol(strategy.comparison_baseline):
-        return strategy, []
-    if not strategy.asset_class:
-        return strategy, []
-    benchmark = _default_benchmark_for_asset_class(
-        strategy.asset_class,
-        symbols=strategy.asset_universe,
-    )
-    if benchmark is None:
-        return strategy, []
-    updated = strategy.model_copy(deep=True)
-    updated.comparison_baseline = benchmark
-    return updated, ["default_benchmark_applied"]
-
-
-def _strategy_with_unstated_benchmark_guard(
-    *,
-    strategy: StrategySummary,
-    prior_strategy: StrategySummary | None,
-) -> tuple[StrategySummary, list[str]]:
-    benchmark = _normalized_symbol(strategy.comparison_baseline)
-    if benchmark is None:
-        return strategy, []
-    provenance = strategy.extra_parameters.get("field_provenance")
-    if isinstance(provenance, dict) and provenance.get("comparison_baseline") in {
-        "explicit_user",
-        "stated_run_field_fidelity_audit",
-    }:
-        return strategy, []
-    prior_benchmark = (
-        _normalized_symbol(prior_strategy.comparison_baseline)
-        if prior_strategy is not None
-        else None
-    )
-    if prior_benchmark == benchmark:
-        return strategy, []
-    if _strategy_uses_safe_default_benchmark(strategy, benchmark):
-        return strategy, []
-    updated = strategy.model_copy(deep=True)
-    if prior_benchmark is not None:
-        updated.comparison_baseline = prior_benchmark
-        return updated, ["unstated_benchmark_symbol_reverted"]
-    updated.comparison_baseline = None
-    return updated, ["unstated_benchmark_symbol_cleared"]
-
-
-def _strategy_uses_safe_default_benchmark(
-    strategy: StrategySummary,
-    benchmark: str,
-) -> bool:
-    if not strategy.asset_class or not strategy.asset_universe:
-        return False
-    default_benchmark = _default_benchmark_for_asset_class(
-        strategy.asset_class,
-        symbols=strategy.asset_universe,
-    )
-    return default_benchmark == benchmark
 
 
 def _strategy_with_validated_benchmark_symbol(

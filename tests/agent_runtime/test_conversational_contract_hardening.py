@@ -2800,9 +2800,13 @@ def test_interpreter_identified_exact_ticker_asset_gets_default_benchmark(
             return ResolvedAssetStub("QQQ", "equity", name="Invesco QQQ Trust")
         raise ValueError("unsupported_symbol")
 
+    from argus.agent_runtime.stages.interpret_internal import (
+        benchmark_repairs as benchmark_repairs_module,
+    )
+
     monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
     monkeypatch.setattr(
-        interpret_module,
+        benchmark_repairs_module,
         "default_backtest_benchmark",
         lambda asset_class, symbols=None: (
             "QQQ" if asset_class == "equity" else str((symbols or [""])[0])
@@ -7010,3 +7014,103 @@ def test_benchmark_only_asset_universe_requires_traded_asset(
     assert "benchmark_symbol_removed_from_asset_universe" in (
         result.decision.reason_codes
     )
+
+
+def test_explicit_asset_edit_matching_default_benchmark_keeps_traded_asset(
+    monkeypatch,
+) -> None:
+    """Captured #151 live shape: a planned "try BTC/USD instead" edit on a BTC
+    hold resolves to the same symbol as the crypto default benchmark. The
+    benchmark separation sweep must not empty the traded universe the user
+    explicitly set — self-benchmarking is a legal canonical state."""
+
+    from argus.agent_runtime.confirmation_artifacts import (
+        confirmation_artifact_reference,
+    )
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = "".join(
+            char for char in str(symbol).upper() if char.isalnum() or char == "/"
+        )
+        if normalized in {"BTC", "BTC/USD"}:
+            return ResolvedAssetStub("BTC", "crypto", name="Bitcoin")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+
+    pending = StrategySummary(
+        raw_user_phrasing="What if I bought Bitcoin this year so far?",
+        strategy_type="buy_and_hold",
+        strategy_thesis="What if I bought Bitcoin this year so far?",
+        asset_universe=["BTC"],
+        asset_class="crypto",
+        date_range={"start": "2026-01-01", "end": "2026-07-07"},
+        comparison_baseline="BTC",
+    )
+    reference = confirmation_artifact_reference(
+        confirmation_id="confirm-btc-ytd",
+        confirmation_payload={
+            "strategy": pending.model_dump(mode="python"),
+            "optional_parameters": {},
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "BTC",
+                "symbols": ["BTC"],
+                "asset_class": "crypto",
+                "timeframe": "1D",
+                "date_range": {"start": "2026-01-01", "end": "2026-07-07"},
+                "sizing_mode": "capital_amount",
+                "capital_amount": 1000,
+                "benchmark_symbol": "BTC",
+                "language": "en",
+            },
+            "validation": {"status": "ready_to_run", "executable": True},
+        },
+    )
+    snapshot = TaskSnapshot(
+        latest_task_type="backtest_execution",
+        completed=False,
+        pending_strategy_summary=pending,
+        active_confirmation_reference=reference,
+        artifact_references=[reference],
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User changed a visible confirmation assumption.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="try BTC/USD instead",
+            strategy_type="buy_and_hold",
+            strategy_thesis="try BTC/USD instead",
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            extra_parameters={
+                "asset_universe_operation": "replace",
+                "field_provenance": {"asset_universe": "explicit_user"},
+                "raw_strategy_type": "buy_and_hold",
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+        reason_codes=["artifact_assumption_edit_planned"],
+    )
+
+    result, _ = _interpret(
+        message="try BTC/USD instead",
+        response=response,
+        snapshot=snapshot,
+        selected_thread_metadata={
+            "latest_task_type": "backtest_execution",
+            "last_stage_outcome": "await_approval",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["BTC"]
+    assert strategy.comparison_baseline == "BTC"
+    assert "benchmark_symbol_removed_from_asset_universe" not in (
+        result.decision.reason_codes
+    )
+    assert result.decision.missing_required_fields == []

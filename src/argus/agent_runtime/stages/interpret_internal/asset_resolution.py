@@ -917,27 +917,6 @@ def _strategy_has_complete_no_rule_execution_shape(strategy: StrategySummary) ->
     )
 
 
-def _strategy_with_separate_benchmark_symbol(
-    strategy: StrategySummary,
-) -> tuple[StrategySummary, list[str]]:
-    benchmark = _normalized_symbol(strategy.comparison_baseline)
-    if benchmark is None:
-        return strategy, []
-    updated = strategy.model_copy(deep=True)
-    updated.comparison_baseline = benchmark
-    assets = [_normalized_symbol(symbol) for symbol in updated.asset_universe]
-    normalized_assets = [symbol for symbol in assets if symbol is not None]
-    filtered_assets = [
-        symbol
-        for symbol in normalized_assets
-        if symbol != benchmark
-    ]
-    if len(filtered_assets) == len(normalized_assets):
-        return updated, []
-    updated.asset_universe = list(dict.fromkeys(filtered_assets))
-    return updated, ["benchmark_symbol_removed_from_asset_universe"]
-
-
 def _normalized_symbol(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
