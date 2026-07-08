@@ -503,6 +503,52 @@ def _response_has_repairable_recovery_date_gap(
     return bool(request.current_user_message.strip())
 
 
+def _complete_date_range_matches_resolved_intent(draft: LLMStrategyDraft) -> bool:
+    normalized = normalize_date_range_candidate(draft.date_range)
+    if not (
+        isinstance(normalized, dict)
+        and _has_complete_date_range_payload(normalized)
+    ):
+        return False
+    resolved = resolve_date_range_intent(draft.date_range_intent)
+    if resolved is None:
+        return False
+    return _normalized_stated_field(normalized) == _normalized_stated_field(
+        resolved.payload
+    )
+
+
+def _complete_date_range_needs_current_turn_date_audit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+    has_complete_date_range: bool,
+    has_material_execution_evidence: bool,
+) -> bool:
+    if not has_complete_date_range:
+        return False
+    if not has_material_execution_evidence:
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    if not _llm_strategy_draft_has_concrete_execution_target(draft):
+        return False
+    has_semantic_date_evidence = _draft_has_semantic_date_window_evidence(draft)
+    if has_semantic_date_evidence:
+        return False
+    if _draft_complete_date_range_matches_current_turn_date_evidence(
+        draft,
+        request=request,
+    ):
+        return False
+    if _complete_date_range_matches_resolved_intent(draft):
+        return False
+    if resolve_date_range_intent(draft.date_range_intent) is not None:
+        return True
+    return True
+
+
 def response_with_recovery_intent_window_materialized(
     response: LLMInterpretationResponse,
 ) -> LLMInterpretationResponse:
