@@ -991,7 +991,7 @@ def test_result_patch_asset_universe_ignores_dash_slash_spelling_difference():
     from argus.agent_runtime.profile.response_profile import (
         resolve_effective_response_profile,
     )
-    from argus.agent_runtime.stages.interpret_actions import (
+    from argus.agent_runtime.stages.interpret_internal.result_artifact_patch import (
         _planned_asset_universe_for_result_patch,
     )
     from argus.agent_runtime.stages.interpret_types import InterpretDecision

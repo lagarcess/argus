@@ -2800,9 +2800,13 @@ def test_interpreter_identified_exact_ticker_asset_gets_default_benchmark(
             return ResolvedAssetStub("QQQ", "equity", name="Invesco QQQ Trust")
         raise ValueError("unsupported_symbol")
 
+    from argus.agent_runtime.stages.interpret_internal import (
+        benchmark_repairs as benchmark_repairs_module,
+    )
+
     monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
     monkeypatch.setattr(
-        interpret_module,
+        benchmark_repairs_module,
         "default_backtest_benchmark",
         lambda asset_class, symbols=None: (
             "QQQ" if asset_class == "equity" else str((symbols or [""])[0])
