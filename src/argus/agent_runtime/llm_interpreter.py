@@ -91,6 +91,7 @@ from argus.agent_runtime.interpreter.date_window_repair import (  # noqa: F401
     _response_has_repairable_current_turn_date_gap,
     _response_has_repairable_recovery_date_gap,
     _response_needs_temporal_runtime_repair,
+    response_with_recovery_intent_window_materialized,
 )
 from argus.agent_runtime.interpreter.dca_audits import (  # noqa: F401
     _capability_required_missing_fields_for_canonical_strategy,
@@ -5069,6 +5070,7 @@ def _normalize_response_for_runtime_context(
         asset_resolution_context=asset_resolution_context,
     )
     response = _response_with_canonical_interpreter_assets(response)
+    response = response_with_recovery_intent_window_materialized(response)
     if _request_has_latest_result(request):
         return response
     if (

@@ -505,6 +505,37 @@ def _response_has_repairable_recovery_date_gap(
     return bool(request.current_user_message.strip())
 
 
+def response_with_recovery_intent_window_materialized(
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse:
+    """Materialize a refusal draft's typed date_range_intent into date_range.
+
+    The refusal keeps the user's stated window from the typed intent alone (no
+    text re-scan); an unresolvable intent stays empty for clarification, never a
+    trailing default.
+    """
+
+    if response.intent != "unsupported_or_out_of_scope":
+        return response
+    draft = response.candidate_strategy_draft
+    if not _llm_value_is_empty(draft.date_range):
+        return response
+    intent = draft.date_range_intent
+    if intent is None or str(intent.kind or "") == "same_as_latest_result":
+        return response
+    intent_resolution = resolve_date_range_intent(intent)
+    if intent_resolution is None:
+        return response
+    repaired = response.model_copy(deep=True)
+    repaired.candidate_strategy_draft.date_range = intent_resolution.payload
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [*repaired.reason_codes, "recovery_intent_window_materialized"]
+        )
+    )
+    return repaired
+
+
 def _pending_supported_execution_date_answer_can_use_focused_audit(
     *,
     response: LLMInterpretationResponse,

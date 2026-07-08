@@ -403,10 +403,6 @@ def test_unsupported_request_preserves_provider_asset_and_explicit_window(
     assert draft.comparison_baseline == "SPY"
 
 
-@pytest.mark.xfail(
-    reason="#171 Sig1 - recovery drafts must preserve stated calendar-year windows",
-    strict=True,
-)
 def test_unsupported_recovery_calendar_year_intent_survives_without_bare_year_provenance(
     monkeypatch,
 ) -> None:
