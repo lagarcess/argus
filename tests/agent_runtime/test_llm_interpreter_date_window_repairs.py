@@ -4345,7 +4345,6 @@ def test_current_message_run_field_repair_uses_user_language_for_bounded_date_ev
     assert repaired.candidate_strategy_draft.date_range == expected_range.payload
 
 
-@pytest.mark.xfail(strict=True, reason="#160(B) — remove when fixed")
 def test_unparsed_stated_temporal_window_clarifies_instead_of_trailing_year_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -1205,6 +1205,23 @@ def _strategy_with_current_message_run_field_contract(
             "Interpret stage date range repaired from temporal contract",
             strategy_type=strategy.strategy_type,
         )
+    unresolved_stated_window = False
+    if (
+        "date_range" not in repaired_field_bases
+        and not date_endpoint_patch_applied
+        and _complete_date_range_lacks_stated_window_support(
+            updated,
+            language=language,
+        )
+    ):
+        updated.date_range = None
+        changed = True
+        unresolved_stated_window = True
+        repair_reason_codes.append("unresolved_stated_window_cleared")
+        logger.debug(
+            "Interpret stage cleared unsupported complete date range",
+            strategy_type=strategy.strategy_type,
+        )
     if (
         _strategy_has_non_executable_timeframe_label(
             updated,
@@ -1229,12 +1246,20 @@ def _strategy_with_current_message_run_field_contract(
     unsupported_constraints = list(interpretation.unsupported_constraints)
     requires_clarification = interpretation.requires_clarification
     assistant_response = interpretation.assistant_response
+    if unresolved_stated_window and not any(
+        str(field).split("[", 1)[0] == "date_range"
+        for field in missing_required_fields
+    ):
+        missing_required_fields.append("date_range")
     if (
         not missing_required_fields
         and not ambiguous_fields
         and not unsupported_constraints
     ):
         requires_clarification = False
+        assistant_response = None
+    elif unresolved_stated_window:
+        requires_clarification = True
         assistant_response = None
     repaired = interpretation.model_copy(
         update={
@@ -1427,6 +1452,36 @@ def _explicit_date_range_from_strategy_for_repair(
         }
         return payload or None
     return None
+
+
+def _complete_date_range_lacks_stated_window_support(
+    strategy: StrategySummary,
+    *,
+    language: str | None,
+) -> bool:
+    """The draft names a window its own typed evidence cannot resolve.
+
+    A complete date_range beside an unresolvable stated window is an invented
+    default, not the user's window — it must clarify instead of executing.
+    """
+
+    if not isinstance(strategy.date_range, dict):
+        return False
+    if has_partial_explicit_date_range(strategy.date_range):
+        return False
+    if not _strategy_date_evidence_candidates(strategy):
+        return False
+    intent = strategy.extra_parameters.get("date_range_intent")
+    if isinstance(intent, dict) and resolve_date_range_intent(intent) is not None:
+        return False
+    return (
+        _date_range_from_strategy_bounded_evidence(
+            strategy,
+            language=language,
+            today=date.today(),
+        )
+        is None
+    )
 
 
 def _date_range_intent_is_explicit_user_range(
