@@ -20,7 +20,6 @@ from argus.agent_runtime.artifacts.strategy_edits import (
     ArtifactPatch,
     apply_artifact_patch,
 )
-from argus.agent_runtime.asset_text_grounding import provider_ticker_mentions_from_text
 from argus.agent_runtime.capabilities.answers import (
     EXECUTABLE_STRATEGY_FAMILIES,
     capability_fact_packet,
@@ -662,10 +661,7 @@ async def _stage_result_from_interpretation(
         )
         benchmark_reason_codes.extend(unstated_benchmark_reason_codes)
         strategy, asset_repair_reason_codes = (
-            _strategy_with_benchmark_owner_asset_repair(
-                strategy,
-                current_user_message=state.current_user_message,
-            )
+            _strategy_with_benchmark_owner_asset_repair(strategy)
         )
     if expects_strategy_route:
         prior_strategy = _active_strategy_from_snapshot(snapshot)
@@ -2686,15 +2682,14 @@ def _canonicalized_strategy(
 
 def _strategy_with_benchmark_owner_asset_repair(
     strategy: StrategySummary,
-    *,
-    current_user_message: str,
 ) -> tuple[StrategySummary, list[str]]:
     """Ground the single missing traded asset when the benchmark owner is stated.
 
-    Provider-backed only: a user-stated benchmark disambiguates which current-turn
-    mention is the comparison, so exactly one other provider-resolved ticker of a
-    single asset class is the traded asset. Never guesses when the benchmark is
-    unstated or when more than one candidate remains.
+    Consumes only the interpreter's provider-grounded current-turn asset records
+    (never a raw-text re-scan): a user-stated benchmark disambiguates which
+    grounded mention is the comparison, so exactly one remaining record is the
+    traded asset. Never guesses when the benchmark is unstated or when more than
+    one candidate remains.
     """
 
     if strategy.asset_universe:
@@ -2708,37 +2703,26 @@ def _strategy_with_benchmark_owner_asset_repair(
         and provenance.get("comparison_baseline") == "explicit_user"
     ):
         return strategy, []
-    try:
-        mentions = provider_ticker_mentions_from_text(
-            current_user_message,
-            resolve_candidate=lambda query: _resolve_asset_candidate_safely(
-                query,
-                field="asset_universe",
-                source="user_mention",
-            ),
-            excluded_tokens={benchmark},
-        )
-    except Exception:
-        return strategy, []
-    resolved_symbols: list[str] = []
-    asset_classes: set[str] = set()
-    for mention in mentions:
-        symbol = str(
-            getattr(mention.asset, "canonical_symbol", "") or ""
-        ).strip().upper()
-        if not symbol or symbol == benchmark or symbol in resolved_symbols:
+    resolutions: list[AssetResolution] = []
+    for symbol in provider_context_assets.resolved_asset_symbols_from_strategy_context(
+        strategy
+    ):
+        if symbol == benchmark:
             continue
-        resolved_symbols.append(symbol)
-        asset_class = str(
-            getattr(mention.asset, "asset_class", "") or ""
-        ).strip().lower()
-        if asset_class:
-            asset_classes.add(asset_class)
-    if len(resolved_symbols) != 1 or len(asset_classes) != 1:
+        resolution = provider_context_assets.resolution_from_strategy_context(
+            strategy,
+            symbol,
+            field="asset_universe[0]",
+        )
+        if resolution is None or resolution.asset is None:
+            continue
+        resolutions.append(resolution)
+    if len(resolutions) != 1:
         return strategy, []
+    resolved_asset = resolutions[0].asset
     updated = strategy.model_copy(deep=True)
-    updated.asset_universe = resolved_symbols
-    updated.asset_class = next(iter(asset_classes))
+    updated.asset_universe = [resolved_asset.canonical_symbol]
+    updated.asset_class = resolved_asset.asset_class
     return updated, ["current_message_asset_grounding_repaired"]
 
 

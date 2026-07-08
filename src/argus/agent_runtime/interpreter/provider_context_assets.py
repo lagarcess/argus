@@ -104,6 +104,25 @@ def response_with_provider_context_assets(
     return response.model_copy(update=update)
 
 
+def resolved_asset_symbols_from_strategy_context(strategy: Any) -> list[str]:
+    """Symbols of the interpreter's provider-grounded current-turn asset records."""
+
+    extra_parameters = getattr(strategy, "extra_parameters", None)
+    if not isinstance(extra_parameters, dict):
+        return []
+    records = extra_parameters.get(_PROVIDER_RESOLVED_ASSETS_KEY)
+    if not isinstance(records, list):
+        return []
+    symbols: list[str] = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        symbol = str(record.get("symbol") or "").strip().upper()
+        if symbol and symbol not in symbols:
+            symbols.append(symbol)
+    return symbols
+
+
 def resolution_from_strategy_context(
     strategy: Any,
     symbol: str,

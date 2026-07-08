@@ -5786,6 +5786,17 @@ def test_interpret_stage_repairs_missing_asset_when_benchmark_owner_is_known(
             comparison_baseline="QQQ",
             extra_parameters={
                 "field_provenance": {"comparison_baseline": "explicit_user"},
+                "provider_resolved_assets": [
+                    {
+                        "raw_text": "AAPL",
+                        "symbol": "AAPL",
+                        "asset_class": "equity",
+                        "name": "Apple Inc.",
+                        "raw_symbol": "AAPL",
+                        "provider": "provider_catalog",
+                        "exchange": "NASDAQ",
+                    }
+                ],
                 "date_range_intent": {
                     "kind": "explicit_range",
                     "start": "2024-01-01",
@@ -5809,6 +5820,62 @@ def test_interpret_stage_repairs_missing_asset_when_benchmark_owner_is_known(
     assert strategy.asset_universe == ["AAPL"]
     assert strategy.comparison_baseline == "QQQ"
     assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+
+
+def test_benchmark_owner_repair_never_rescans_raw_message_text(
+    monkeypatch,
+) -> None:
+    # Without interpreter-grounded provider records the repair must stay silent:
+    # grounding never comes from re-scanning current_user_message, and no message
+    # word reaches the live resolver from this path.
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    resolved_queries: list[str] = []
+
+    def _asset(query: str) -> ResolvedAssetStub:
+        resolved_queries.append(str(query))
+        normalized = query.strip().upper()
+        if normalized not in {"AAPL", "QQQ"}:
+            raise ValueError(query)
+        return ResolvedAssetStub(
+            normalized,
+            "equity",
+            name=normalized,
+            raw_symbol=normalized,
+        )
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants a benchmark comparison.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold comparison.",
+            asset_universe=[],
+            asset_class=None,
+            date_range=None,
+            comparison_baseline="QQQ",
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"},
+            },
+        ),
+        semantic_turn_act="new_idea",
+        missing_required_fields=["asset_universe", "date_range"],
+    )
+
+    result, _ = _interpret(
+        message="compare AAPL with QQQ from Jan 1 2024 to Dec 31 2024",
+        response=response,
+        snapshot=None,
+    )
+
+    assert "current_message_asset_grounding_repaired" not in result.decision.reason_codes
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == []
+    # No raw message word may be fed to the resolver by the repair.
+    assert {query.strip().upper() for query in resolved_queries} <= {"QQQ"}
 
 
 def test_interpret_stage_does_not_guess_missing_asset_from_ambiguous_mentions(

@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -7150,14 +7149,6 @@ def test_interpreter_unavailable_mixed_confirmation_edit_preserves_all_operation
             "equity",
         ),
     )
-    monkeypatch.setattr(
-        interpret_module,
-        "provider_ticker_mentions_from_text",
-        lambda *args, **kwargs: [
-            SimpleNamespace(asset=SimpleNamespace(canonical_symbol="GOOGL"))
-        ],
-    )
-
     async def planned_edit(**kwargs: Any) -> ArtifactAssumptionEditPlan:
         del kwargs
         return ArtifactAssumptionEditPlan(
