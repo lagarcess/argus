@@ -470,6 +470,116 @@ def _response_has_repairable_current_turn_date_gap(
     )
 
 
+def _response_has_repairable_recovery_date_gap(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    """A recovery/unsupported draft dropped the user's stated date window.
+
+    The model refused the idea but omitted the date the user gave; the focused
+    re-extraction recovers it so the recovery clarification keeps the window
+    instead of nulling it (never null, never a silent trailing-year default).
+    """
+
+    if response.intent != "unsupported_or_out_of_scope":
+        return False
+    if response.semantic_turn_act != "unsupported_request":
+        return False
+    # A strategy-shape gap belongs to the strategy repair, which runs earlier in
+    # the readiness pipeline; only a date-only gap is recoverable here.
+    if any(
+        _field_path_base(field) != "date_range"
+        for field in response.missing_required_fields
+    ):
+        return False
+    draft = response.candidate_strategy_draft
+    if not _llm_value_is_empty(draft.date_range):
+        return False
+    if draft.date_range_intent is not None:
+        return False
+    if not (draft.asset_universe or draft.asset_class):
+        return False
+    return bool(request.current_user_message.strip())
+
+
+def _complete_date_range_matches_resolved_intent(draft: LLMStrategyDraft) -> bool:
+    normalized = normalize_date_range_candidate(draft.date_range)
+    if not (
+        isinstance(normalized, dict)
+        and _has_complete_date_range_payload(normalized)
+    ):
+        return False
+    resolved = resolve_date_range_intent(draft.date_range_intent)
+    if resolved is None:
+        return False
+    return _normalized_stated_field(normalized) == _normalized_stated_field(
+        resolved.payload
+    )
+
+
+def _complete_date_range_needs_current_turn_date_audit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+    has_complete_date_range: bool,
+    has_material_execution_evidence: bool,
+) -> bool:
+    if not has_complete_date_range:
+        return False
+    if not has_material_execution_evidence:
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) not in SUPPORTED_STRATEGY_TYPES:
+        return False
+    if not _llm_strategy_draft_has_concrete_execution_target(draft):
+        return False
+    has_semantic_date_evidence = _draft_has_semantic_date_window_evidence(draft)
+    if has_semantic_date_evidence:
+        return False
+    if _draft_complete_date_range_matches_current_turn_date_evidence(
+        draft,
+        request=request,
+    ):
+        return False
+    if _complete_date_range_matches_resolved_intent(draft):
+        return False
+    if resolve_date_range_intent(draft.date_range_intent) is not None:
+        return True
+    return True
+
+
+def response_with_recovery_intent_window_materialized(
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse:
+    """Materialize a refusal draft's typed date_range_intent into date_range.
+
+    The refusal keeps the user's stated window from the typed intent alone (no
+    text re-scan); an unresolvable intent stays empty for clarification, never a
+    trailing default.
+    """
+
+    if response.intent != "unsupported_or_out_of_scope":
+        return response
+    draft = response.candidate_strategy_draft
+    if not _llm_value_is_empty(draft.date_range):
+        return response
+    intent = draft.date_range_intent
+    if intent is None or str(intent.kind or "") == "same_as_latest_result":
+        return response
+    intent_resolution = resolve_date_range_intent(intent)
+    if intent_resolution is None:
+        return response
+    repaired = response.model_copy(deep=True)
+    repaired.candidate_strategy_draft.date_range = intent_resolution.payload
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [*repaired.reason_codes, "recovery_intent_window_materialized"]
+        )
+    )
+    return repaired
+
+
 def _pending_supported_execution_date_answer_can_use_focused_audit(
     *,
     response: LLMInterpretationResponse,
@@ -623,13 +733,20 @@ def _response_from_focused_date_window_extraction(
     if not changed:
         return None
     pending_date_answer = _request_has_pending_date_answer_context(request)
+    # A constraint-less refusal only recovers its dropped window — never the pending
+    # draft, never a promotion; a constraint-carrying refusal mid date-answer is
+    # stale context the pending answer may override.
+    refused_turn = (
+        response.intent == "unsupported_or_out_of_scope"
+        and not response.unsupported_constraints
+    )
     if raw_text:
         draft.date_range_raw_text = raw_text
         draft.evidence_spans = {
             **dict(draft.evidence_spans or {}),
             "date_range": raw_text,
         }
-    if pending_date_answer:
+    if pending_date_answer and not refused_turn:
         supported_pending_draft = _supported_pending_strategy_draft_for_date_answer(
             request
         )
@@ -658,6 +775,7 @@ def _response_from_focused_date_window_extraction(
         ]
     if (
         pending_date_answer
+        and not refused_turn
         and not repaired.missing_required_fields
         and not repaired.ambiguous_fields
         and not repaired.unsupported_constraints
@@ -673,6 +791,7 @@ def _response_from_focused_date_window_extraction(
         repaired.artifact_target = "active_confirmation"
     elif (
         repaired.requires_clarification
+        and not refused_turn
         and not repaired.missing_required_fields
         and not repaired.ambiguous_fields
         and not repaired.unsupported_constraints

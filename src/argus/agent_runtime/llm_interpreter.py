@@ -88,8 +88,12 @@ from argus.agent_runtime.interpreter.date_window_repair import (  # noqa: F401
     _request_has_pending_date_answer_context,
     _response_from_focused_date_window_extraction,
     _response_has_ambiguous_rule_fields,
+    _complete_date_range_matches_resolved_intent,
+    _complete_date_range_needs_current_turn_date_audit,
     _response_has_repairable_current_turn_date_gap,
+    _response_has_repairable_recovery_date_gap,
     _response_needs_temporal_runtime_repair,
+    response_with_recovery_intent_window_materialized,
 )
 from argus.agent_runtime.interpreter.dca_audits import (  # noqa: F401
     _capability_required_missing_fields_for_canonical_strategy,
@@ -3192,6 +3196,10 @@ async def _focused_date_window_audited_response(
             continue
         if not isinstance(extraction, FocusedDateWindowExtraction):
             continue
+        if not extraction.has_date_window:
+            # A well-formed "no window" is authoritative; remaining repair models
+            # are not asked.
+            return None
         repaired = _response_from_focused_date_window_extraction(
             response=response,
             extraction=extraction,
@@ -3216,6 +3224,12 @@ def _response_needs_focused_date_window_intent_repair(
         # The window was bound from the canonical latest result, not from
         # current-turn date text; re-auditing message evidence would strip it.
         return False
+    if "focused_date_window_intent_repair" in response.reason_codes:
+        return False
+    # A recovery/unsupported draft that dropped the user's stated window recovers it
+    # here, so the refusal keeps the window (never nulled, never trailing-defaulted).
+    if _response_has_repairable_recovery_date_gap(response=response, request=request):
+        return True
     pending_date_answer = _request_has_pending_date_answer_context(request)
     if (
         response.intent not in {"strategy_drafting", "backtest_execution"}
@@ -3228,8 +3242,6 @@ def _response_needs_focused_date_window_intent_repair(
             request=request,
         )
     )
-    if "focused_date_window_intent_repair" in response.reason_codes:
-        return False
     draft = response.candidate_strategy_draft
     if _post_result_dateless_execution_draft(response=response, request=request):
         return True
@@ -3320,57 +3332,14 @@ def _response_needs_focused_date_window_intent_repair(
         response=response,
         request=request,
         has_complete_date_range=has_complete_date_range,
+        has_material_execution_evidence=(
+            _request_current_turn_has_material_execution_evidence(request)
+        ),
     ):
         return True
     if not _llm_value_is_empty(draft.date_range_raw_text):
         return True
     return has_repairable_current_turn_date_gap
-
-
-def _complete_date_range_matches_resolved_intent(draft: LLMStrategyDraft) -> bool:
-    normalized = normalize_date_range_candidate(draft.date_range)
-    if not (
-        isinstance(normalized, dict)
-        and _has_complete_date_range_payload(normalized)
-    ):
-        return False
-    resolved = resolve_date_range_intent(draft.date_range_intent)
-    if resolved is None:
-        return False
-    return _normalized_stated_field(normalized) == _normalized_stated_field(
-        resolved.payload
-    )
-
-
-def _complete_date_range_needs_current_turn_date_audit(
-    *,
-    response: LLMInterpretationResponse,
-    request: InterpretationRequest,
-    has_complete_date_range: bool,
-) -> bool:
-    if not has_complete_date_range:
-        return False
-    if not _request_current_turn_has_material_execution_evidence(request):
-        return False
-    draft = response.candidate_strategy_draft
-    if canonical_strategy_type(draft.strategy_type) not in SUPPORTED_STRATEGY_TYPES:
-        return False
-    if not _llm_strategy_draft_has_concrete_execution_target(draft):
-        return False
-    has_semantic_date_evidence = _draft_has_semantic_date_window_evidence(draft)
-    if has_semantic_date_evidence:
-        return False
-    if _draft_complete_date_range_matches_current_turn_date_evidence(
-        draft,
-        request=request,
-    ):
-        return False
-    if _complete_date_range_matches_resolved_intent(draft):
-        return False
-    if resolve_date_range_intent(draft.date_range_intent) is not None:
-        return True
-    return True
-
 
 
 async def _plan_pending_artifact_assumption_edit(
@@ -4289,6 +4258,9 @@ def _response_has_current_message_date_range_reconciliation(
         response=response,
         request=request,
         has_complete_date_range=has_complete_date_range,
+        has_material_execution_evidence=(
+            _request_current_turn_has_material_execution_evidence(request)
+        ),
     ):
         return True
     return _normalized_stated_field(draft.date_range) != _normalized_stated_field(
@@ -4895,6 +4867,12 @@ def _response_from_focused_strategy_extraction(
         reason_codes=["focused_strategy_extraction_repair"],
         semantic_turn_act="new_idea",
     )
+    response = _merge_focused_repair_with_base(
+        response=response,
+        base_response=base_response,
+    )
+    # Missing fields derive from the merged draft so already-grounded context is
+    # not re-asked.
     response.missing_required_fields = (
         _capability_required_missing_fields_for_canonical_strategy(
             response.missing_required_fields,
@@ -4905,10 +4883,7 @@ def _response_from_focused_strategy_extraction(
         response.intent = "strategy_drafting"
         response.requires_clarification = True
         response.assistant_response = None
-    return _merge_focused_repair_with_base(
-        response=response,
-        base_response=base_response,
-    )
+    return response
 
 
 def _canonical_asset_universe_from_llm_extraction(
@@ -5060,6 +5035,7 @@ def _normalize_response_for_runtime_context(
         asset_resolution_context=asset_resolution_context,
     )
     response = _response_with_canonical_interpreter_assets(response)
+    response = response_with_recovery_intent_window_materialized(response)
     if _request_has_latest_result(request):
         return response
     if (

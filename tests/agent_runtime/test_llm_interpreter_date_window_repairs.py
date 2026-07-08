@@ -2131,6 +2131,409 @@ async def test_raw_date_evidence_does_not_trust_mismatched_calendar_year_intent(
 
 
 @pytest.mark.asyncio
+async def test_unsupported_recovery_preserves_dropped_user_date_window(
+    monkeypatch,
+) -> None:
+    # #171 Sig1: the model refused weekly options but dropped the user's stated
+    # 2024 window; the recovery draft must recover and keep it, never nulled.
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        calls.append(schema_name)
+        if schema_name == "AssetGroundingAudit":
+            return interpreter_module.AssetGroundingAudit(
+                grounded_symbols=["AAPL"],
+                confidence=0.92,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="from 2024-01-01 through 2024-12-31",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="explicit_range",
+                    start="2024-01-01",
+                    end="2024-12-31",
+                    confidence=0.95,
+                    evidence="from 2024-01-01 through 2024-12-31",
+                ),
+                confidence=0.95,
+                evidence="from 2024-01-01 through 2024-12-31",
+            )
+        # Any other audit passes through (no result) so only the date repair acts.
+        return None
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    current_message = (
+        "please backtest weekly options on apple from 2024-01-01 through 2024-12-31"
+    )
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary=current_message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=current_message,
+            strategy_type=None,
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+        ),
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=current_message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert "FocusedDateWindowExtraction" in calls
+    draft = ready_response.candidate_strategy_draft
+    assert draft.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    # Recovering the window must not promote the refusal to executable.
+    assert ready_response.intent == "unsupported_or_out_of_scope"
+
+
+@pytest.mark.asyncio
+async def test_constraint_carrying_refusal_recovers_dropped_date_window(
+    monkeypatch,
+) -> None:
+    # A genuine refusal that names a constraint but drops the stated window must
+    # still recover it, keeping the refusal and its constraint intact.
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.llm_interpreter_types import LLMUnsupportedConstraint
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        if schema_name == "AssetGroundingAudit":
+            return interpreter_module.AssetGroundingAudit(
+                grounded_symbols=["AAPL"],
+                confidence=0.92,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="from 2024-01-01 through 2024-12-31",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="explicit_range",
+                    start="2024-01-01",
+                    end="2024-12-31",
+                    confidence=0.95,
+                    evidence="from 2024-01-01 through 2024-12-31",
+                ),
+                confidence=0.95,
+                evidence="from 2024-01-01 through 2024-12-31",
+            )
+        return None
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    current_message = (
+        "please backtest weekly options on apple from 2024-01-01 through 2024-12-31"
+    )
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary=current_message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=current_message,
+            strategy_type=None,
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+        ),
+        unsupported_constraints=[
+            LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="weekly options",
+                explanation="Weekly options are not executable yet.",
+            )
+        ],
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=current_message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = ready_response.candidate_strategy_draft
+    assert draft.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert ready_response.intent == "unsupported_or_out_of_scope"
+    assert ready_response.unsupported_constraints != []
+
+
+@pytest.mark.asyncio
+async def test_unsupported_recovery_unparseable_date_does_not_trailing_default(
+    monkeypatch,
+) -> None:
+    # #160(B): when the dropped window cannot be recovered, the recovery draft must
+    # clarify rather than silently default to a trailing-year window.
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        if schema_name == "AssetGroundingAudit":
+            return interpreter_module.AssetGroundingAudit(
+                grounded_symbols=["AAPL"],
+                confidence=0.92,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](has_date_window=False, confidence=0.2)
+        return None
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    current_message = "please backtest weekly options on apple sometime recently"
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=current_message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=current_message,
+            strategy_type=None,
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+        ),
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=current_message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = ready_response.candidate_strategy_draft
+    # Unrecoverable window is left unresolved for clarification, never trailing-defaulted.
+    assert not draft.date_range
+    assert ready_response.intent == "unsupported_or_out_of_scope"
+
+
+@pytest.mark.asyncio
+async def test_dateless_refusal_recovery_stops_after_one_focused_extraction(
+    monkeypatch,
+) -> None:
+    # A confident has_date_window=false is the audit's answer; the recovery must
+    # not re-ask every model in the repair chain on each dateless refusal.
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["repair-model-a", "repair-model-b"],
+    )
+
+    focused_calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        if schema_name == "AssetGroundingAudit":
+            return interpreter_module.AssetGroundingAudit(
+                grounded_symbols=["TSLA"],
+                confidence=0.9,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            focused_calls.append(kwargs["model_name"])
+            return kwargs["schema_model"](has_date_window=False, confidence=0.9)
+        return None
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    current_message = "can you paper-trade TSLA options for me?"
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=current_message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=current_message,
+            strategy_type=None,
+            asset_universe=["TSLA"],
+            asset_class="equity",
+        ),
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=current_message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert ready_response.intent == "unsupported_or_out_of_scope"
+    assert len(focused_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_unsupported_pivot_during_pending_date_answer_stays_refused(
+    monkeypatch,
+) -> None:
+    # Pivoting to an unsupported idea WHILE answering a date question must stay a
+    # refusal: the recovery may keep the recovered window but must not adopt the
+    # pending supported draft or promote the turn to execution.
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    async def audit_stub(**kwargs):
+        schema_name = kwargs["schema_name"]
+        if schema_name == "AssetGroundingAudit":
+            return interpreter_module.AssetGroundingAudit(
+                grounded_symbols=["AAPL"],
+                confidence=0.92,
+            )
+        if schema_name == "FocusedDateWindowExtraction":
+            return kwargs["schema_model"](
+                has_date_window=True,
+                date_range_raw_text="from 2024-01-01 through 2024-12-31",
+                date_range_intent=interpreter_module.LLMDateRangeIntent(
+                    kind="explicit_range",
+                    start="2024-01-01",
+                    end="2024-12-31",
+                    confidence=0.95,
+                    evidence="from 2024-01-01 through 2024-12-31",
+                ),
+                confidence=0.95,
+                evidence="from 2024-01-01 through 2024-12-31",
+            )
+        return None
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    current_message = (
+        "actually backtest weekly options on AAPL "
+        "from 2024-01-01 through 2024-12-31 instead"
+    )
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary=current_message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=current_message,
+            strategy_type=None,
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            comparison_baseline="SPY",
+        ),
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=current_message,
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="backtest_execution",
+                completed=False,
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Hold NVDA while we pick a window.",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                ),
+            ),
+            selected_thread_metadata={
+                "latest_task_type": "backtest_execution",
+                "last_stage_outcome": "await_user_reply",
+                "requested_field": "date_range",
+            },
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert ready_response.intent == "unsupported_or_out_of_scope"
+    assert ready_response.semantic_turn_act != "answer_pending_need"
+    assert ready_response.artifact_target != "active_confirmation"
+    draft = ready_response.candidate_strategy_draft
+    # The refusal keeps its own draft; the pending NVDA hold is not swapped in.
+    assert draft.asset_universe == ["AAPL"]
+
+
+@pytest.mark.asyncio
 async def test_missing_date_clarification_uses_focused_date_window_intent(
     monkeypatch,
 ) -> None:
@@ -4029,7 +4432,6 @@ def test_current_message_run_field_repair_uses_user_language_for_bounded_date_ev
     assert repaired.candidate_strategy_draft.date_range == expected_range.payload
 
 
-@pytest.mark.xfail(strict=True, reason="#160(B) — remove when fixed")
 def test_unparsed_stated_temporal_window_clarifies_instead_of_trailing_year_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

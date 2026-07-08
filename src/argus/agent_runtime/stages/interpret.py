@@ -20,7 +20,6 @@ from argus.agent_runtime.artifacts.strategy_edits import (
     ArtifactPatch,
     apply_artifact_patch,
 )
-from argus.agent_runtime.asset_text_grounding import provider_ticker_mentions_from_text
 from argus.agent_runtime.capabilities.answers import (
     EXECUTABLE_STRATEGY_FAMILIES,
     capability_fact_packet,
@@ -175,6 +174,7 @@ from argus.agent_runtime.stages.interpret_internal.contextual_merge import (  # 
     _declared_strategy_family,
     _extra_parameters_without_unrequested_money_context,
     _has_complete_date_range,
+    _is_cadence_word_asset_candidate,
     _is_field_owned_indicator_asset_candidate,
     _merge_contextual_extra_parameters,
     _merged_contextual_date_range,
@@ -650,6 +650,7 @@ async def _stage_result_from_interpretation(
         else incoming_strategy
     )
     benchmark_reason_codes: list[str] = []
+    asset_repair_reason_codes: list[str] = []
     if expects_strategy_route:
         prior_strategy = _active_strategy_from_snapshot(snapshot)
         strategy, unstated_benchmark_reason_codes = (
@@ -659,6 +660,9 @@ async def _stage_result_from_interpretation(
             )
         )
         benchmark_reason_codes.extend(unstated_benchmark_reason_codes)
+        strategy, asset_repair_reason_codes = (
+            _strategy_with_benchmark_owner_asset_repair(strategy)
+        )
     if expects_strategy_route:
         prior_strategy = _active_strategy_from_snapshot(snapshot)
         strategy, interpretation = _strategy_with_current_message_run_field_contract(
@@ -913,6 +917,7 @@ async def _stage_result_from_interpretation(
                 else []
             ),
             *shape_default_reason_codes,
+            *asset_repair_reason_codes,
             *integrity_report.reason_codes,
             *constraint_filter_reason_codes,
             *ambiguity_filter_reason_codes,
@@ -1200,6 +1205,23 @@ def _strategy_with_current_message_run_field_contract(
             "Interpret stage date range repaired from temporal contract",
             strategy_type=strategy.strategy_type,
         )
+    unresolved_stated_window = False
+    if (
+        "date_range" not in repaired_field_bases
+        and not date_endpoint_patch_applied
+        and _complete_date_range_lacks_stated_window_support(
+            updated,
+            language=language,
+        )
+    ):
+        updated.date_range = None
+        changed = True
+        unresolved_stated_window = True
+        repair_reason_codes.append("unresolved_stated_window_cleared")
+        logger.debug(
+            "Interpret stage cleared unsupported complete date range",
+            strategy_type=strategy.strategy_type,
+        )
     if (
         _strategy_has_non_executable_timeframe_label(
             updated,
@@ -1224,12 +1246,20 @@ def _strategy_with_current_message_run_field_contract(
     unsupported_constraints = list(interpretation.unsupported_constraints)
     requires_clarification = interpretation.requires_clarification
     assistant_response = interpretation.assistant_response
+    if unresolved_stated_window and not any(
+        str(field).split("[", 1)[0] == "date_range"
+        for field in missing_required_fields
+    ):
+        missing_required_fields.append("date_range")
     if (
         not missing_required_fields
         and not ambiguous_fields
         and not unsupported_constraints
     ):
         requires_clarification = False
+        assistant_response = None
+    elif unresolved_stated_window:
+        requires_clarification = True
         assistant_response = None
     repaired = interpretation.model_copy(
         update={
@@ -1422,6 +1452,74 @@ def _explicit_date_range_from_strategy_for_repair(
         }
         return payload or None
     return None
+
+
+def _complete_date_range_lacks_stated_window_support(
+    strategy: StrategySummary,
+    *,
+    language: str | None,
+) -> bool:
+    """The draft's complete date_range contradicts its own stated window evidence.
+
+    Years named in the typed date evidence must intersect the years the range
+    spans; otherwise the range is an invented default, not the stated window.
+    Evidence without a year gives no signal and the LLM's range is trusted.
+    """
+
+    if not isinstance(strategy.date_range, dict):
+        return False
+    if has_partial_explicit_date_range(strategy.date_range):
+        return False
+    candidates = _strategy_date_evidence_candidates(strategy)
+    if not candidates:
+        return False
+    intent = strategy.extra_parameters.get("date_range_intent")
+    if isinstance(intent, dict) and resolve_date_range_intent(intent) is not None:
+        return False
+    if (
+        _date_range_from_strategy_bounded_evidence(
+            strategy,
+            language=language,
+            today=date.today(),
+        )
+        is not None
+    ):
+        return False
+    evidence_years = {
+        year for candidate in candidates for year in _stated_years(candidate)
+    }
+    if not evidence_years:
+        return False
+    range_years = _years_spanned_by_date_range(strategy.date_range)
+    if not range_years:
+        return False
+    return not (evidence_years & range_years)
+
+
+def _stated_years(text: str) -> set[int]:
+    years: set[int] = set()
+    digits: list[str] = []
+    for character in f"{text} ":
+        if character.isdigit():
+            digits.append(character)
+            continue
+        if len(digits) == 4:
+            year = int("".join(digits))
+            if 1900 <= year <= 2100:
+                years.add(year)
+        digits = []
+    return years
+
+
+def _years_spanned_by_date_range(date_range: dict[str, Any]) -> set[int]:
+    endpoints = []
+    for key in ("start", "end"):
+        raw = str(date_range.get(key) or "")
+        if len(raw) >= 4 and raw[:4].isdigit():
+            endpoints.append(int(raw[:4]))
+    if len(endpoints) != 2 or endpoints[0] > endpoints[1]:
+        return set(endpoints)
+    return set(range(endpoints[0], endpoints[1] + 1))
 
 
 def _date_range_intent_is_explicit_user_range(
@@ -2606,6 +2704,7 @@ def _canonicalized_strategy(
     asset_classes: set[str] = set()
     invalid_symbols: list[str] = []
     field_owned_indicator_symbols: list[str] = []
+    cadence_word_symbols: list[str] = []
     provenance: list[ResolutionProvenance] = []
     asset_field_requested = (
         _field_base(str(selected_thread_metadata.get("requested_field") or ""))
@@ -2620,6 +2719,14 @@ def _canonicalized_strategy(
             asset_field_requested=asset_field_requested,
         ):
             field_owned_indicator_symbols.append(symbol)
+            continue
+        if _is_cadence_word_asset_candidate(
+            symbol,
+            strategy=updated,
+            current_user_message=current_user_message,
+            asset_field_requested=asset_field_requested,
+        ):
+            cadence_word_symbols.append(symbol)
             continue
         field = f"asset_universe[{index}]"
         resolution = (
@@ -2649,7 +2756,7 @@ def _canonicalized_strategy(
 
     if canonical_symbols:
         updated.asset_universe = list(dict.fromkeys(canonical_symbols))
-    elif field_owned_indicator_symbols:
+    elif field_owned_indicator_symbols or cadence_word_symbols:
         updated.asset_universe = []
     if len(asset_classes) == 1:
         updated.asset_class = next(iter(asset_classes))
@@ -2664,6 +2771,76 @@ def _canonicalized_strategy(
         [*updated.resolution_provenance, *provenance]
     )
     return updated
+
+
+def _strategy_with_benchmark_owner_asset_repair(
+    strategy: StrategySummary,
+) -> tuple[StrategySummary, list[str]]:
+    """Ground the single missing traded asset when the benchmark owner is stated.
+
+    Consumes only the interpreter's provider-grounded current-turn asset records
+    (never a raw-text re-scan): a user-stated benchmark disambiguates which
+    grounded mention is the comparison, so exactly one remaining record is the
+    traded asset. Never guesses when the benchmark is unstated or when more than
+    one candidate remains.
+    """
+
+    if strategy.asset_universe:
+        return strategy, []
+    benchmark = _normalized_symbol(strategy.comparison_baseline)
+    if benchmark is None:
+        return strategy, []
+    provenance = strategy.extra_parameters.get("field_provenance")
+    if not (
+        isinstance(provenance, dict)
+        and provenance.get("comparison_baseline") == "explicit_user"
+    ):
+        return strategy, []
+    resolutions: list[AssetResolution] = []
+    for symbol in provider_context_assets.resolved_asset_symbols_from_strategy_context(
+        strategy
+    ):
+        if symbol == benchmark:
+            continue
+        resolution = provider_context_assets.resolution_from_strategy_context(
+            strategy,
+            symbol,
+            field="asset_universe[0]",
+        )
+        if resolution is None or resolution.asset is None:
+            continue
+        resolutions.append(resolution)
+    if len(resolutions) != 1:
+        return strategy, []
+    resolved_asset = resolutions[0].asset
+    # The grounded asset must share the explicit benchmark's asset class;
+    # cross-class pairs stay unrepaired and clarify.
+    try:
+        benchmark_resolution = provider_context_assets.resolution_from_strategy_context(
+            strategy,
+            benchmark,
+            field="comparison_baseline",
+        ) or _resolve_asset_candidate(
+            benchmark,
+            field="comparison_baseline",
+            source="llm_extraction",
+        )
+    except ValueError:
+        benchmark_resolution = None
+    if (
+        benchmark_resolution is None
+        or benchmark_resolution.status != "resolved"
+        or benchmark_resolution.asset is None
+        or benchmark_resolution.asset.asset_class != resolved_asset.asset_class
+    ):
+        return strategy, []
+    updated = strategy.model_copy(deep=True)
+    updated.asset_universe = [resolved_asset.canonical_symbol]
+    updated.asset_class = resolved_asset.asset_class
+    updated.resolution_provenance = _dedupe_resolution_provenance(
+        [*updated.resolution_provenance, resolutions[0].provenance]
+    )
+    return updated, ["current_message_asset_grounding_repaired"]
 
 
 def _default_benchmark_for_asset_class(

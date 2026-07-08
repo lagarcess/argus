@@ -40,6 +40,7 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     resolve_date_range_intent,
 )
+from argus.domain.cadences import SUPPORTED_DCA_CADENCES
 from argus.domain.indicators import executable_indicator_spec
 from argus.nlp.natural_time import resolve_date_range_text
 
@@ -561,6 +562,39 @@ def _is_field_owned_indicator_asset_candidate(
     if executable_indicator_spec(str(symbol or "")) is None:
         return False
     if not _strategy_uses_rule_or_indicator_context(strategy):
+        return False
+    return not _strategy_has_explicit_asset_evidence(
+        strategy,
+        symbol=str(symbol or ""),
+        current_user_message=current_user_message,
+    )
+
+
+def _cadence_root_tokens(cadence: str) -> frozenset[str]:
+    # Roots of the draft's own bound cadence value ("weekly" -> {"weekly", "week"},
+    # "daily" -> {"daily", "day"}); only the bound cadence's word is droppable.
+    roots = {cadence}
+    if cadence.endswith("ly"):
+        stem = cadence[:-2]
+        roots.add(stem)
+        if stem.endswith("i"):
+            roots.add(f"{stem[:-1]}y")
+    return frozenset(roots)
+
+
+def _is_cadence_word_asset_candidate(
+    symbol: str,
+    *,
+    strategy: StrategySummary,
+    current_user_message: str | None,
+    asset_field_requested: bool,
+) -> bool:
+    if asset_field_requested:
+        return False
+    cadence = str(strategy.cadence or "").strip().casefold()
+    if cadence not in SUPPORTED_DCA_CADENCES:
+        return False
+    if str(symbol or "").strip().casefold() not in _cadence_root_tokens(cadence):
         return False
     return not _strategy_has_explicit_asset_evidence(
         strategy,
