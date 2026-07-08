@@ -682,7 +682,8 @@ async def _stage_result_from_interpretation(
         )
     if expects_strategy_route:
         strategy, separate_benchmark_reason_codes = _strategy_with_separate_benchmark_symbol(
-            strategy
+            strategy,
+            prior_strategy=_active_strategy_from_snapshot(snapshot),
         )
         strategy, validated_benchmark_reason_codes = (
             _strategy_with_validated_benchmark_symbol(strategy)
