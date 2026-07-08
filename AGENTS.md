@@ -320,6 +320,19 @@ Usage:
 Argus supports two primary local scenarios. Choose the script first; do not
 manually juggle backend mode flags for normal work.
 
+### Local Environment Doctrine
+
+- Python is pinned by `.python-version` (`3.10.x`; currently `3.10.20`).
+  `.github/setup.sh` enforces the pinned runtime. A green run on Python 3.14 is
+  not deployed-runtime evidence.
+- Create Argus worktrees as siblings of the repo, never nested inside another
+  Argus checkout. Nested worktrees can inherit a parent `.env` through dotenv
+  upward search, silently turning mocked runs into live LLM/provider calls.
+- Deterministic agent-runtime sweeps use
+  `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture` and no live provider
+  keys. A clean mocked sweep should be seconds-scale; a run stretching into
+  minutes means stop and check for leaked credentials or live provider paths.
+
 ### Fast Iteration (Dev Mode)
 **Use this for:** Building features, debugging, UI work, isolated testing — no persistence needed.
 
@@ -353,6 +366,15 @@ manually juggle backend mode flags for normal work.
    poetry run pytest tests/
    cd web && bun test
    ```
+
+For the private-alpha agent-runtime regression gate, run the hermetic sweep with
+provider keys blanked:
+
+```bash
+OPENROUTER_API_KEY= ALPACA_API_KEY= ALPACA_SECRET_KEY= \
+ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture \
+poetry run pytest tests/agent_runtime tests/test_spine_guardrails.py -q --no-cov
+```
 
 ### Production Parity (QA Mode)
 **Use this for:** End-to-end testing, launch validation, browser QA matrix, release verification.

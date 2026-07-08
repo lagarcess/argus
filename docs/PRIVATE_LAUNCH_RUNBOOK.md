@@ -26,6 +26,18 @@ release manifest before testers are invited; start from
 API/web env fingerprint, workflow-service proof, canary evidence, rollback
 target, and approver.
 
+Local preflight doctrine:
+
+- Run `.github/setup.sh` first and confirm `poetry run python --version` reports
+  the `.python-version` runtime (`3.10.x`; currently `3.10.20`). Python 3.14
+  green runs are non-canonical for deployed-runtime proof.
+- Do local candidate work from sibling worktrees only, never nested inside
+  another Argus checkout, so dotenv cannot inherit a parent `.env` and turn a
+  mocked run into a live-provider run.
+- For deterministic agent-runtime sweeps, blank live provider keys and set
+  `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture`. A clean mocked sweep
+  is seconds-scale; minutes means stop and investigate live-call leakage.
+
 1. Confirm the local checkout is the candidate commit you intend to promote:
 
 ```bash

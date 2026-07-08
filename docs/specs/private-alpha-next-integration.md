@@ -70,6 +70,10 @@ Rules:
 - `main` remains the clean release checkpoint.
 - `codex/private-alpha-next` is the only integration staging branch.
 - Codex worker branches start from `codex/private-alpha-next`.
+- Create worker worktrees as siblings of the repo, never nested inside another
+  Argus checkout. Nested worktrees can inherit a parent `.env` through dotenv
+  upward search, which can silently turn mocked runs into live LLM/provider
+  calls.
 - Workers do not push directly to `main`.
 - Jules work is decommissioned for the near term. Do not create or maintain
   `jules/**` branches, `codex/private-alpha-next-jules-intake`, or Jules intake

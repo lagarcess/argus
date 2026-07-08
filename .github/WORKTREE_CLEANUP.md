@@ -3,6 +3,11 @@
 Use `.github/cleanup-worktree.sh` before deleting a disposable Argus worktree
 to reclaim dependency, build, and test-cache disk space.
 
+Create disposable Argus worktrees as siblings of the repo, never nested inside
+another Argus checkout. Nested worktrees can inherit the parent `.env` through
+dotenv upward search, which can silently turn mocked runs into live LLM/provider
+calls.
+
 Safe mode removes known generated bloat and keeps local untracked files such as
 `.env` and `web/.env.local` intact:
 
