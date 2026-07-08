@@ -11,6 +11,7 @@ from argus.agent_runtime.stages.interpret_internal import (
     latest_result_answer as latest_result_answer_module,
 )
 from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+    LatestResultFactComposerDeclined,
     latest_result_answer_stage_result_if_applicable,
 )
 from argus.agent_runtime.stages.interpret_types import (
@@ -546,8 +547,9 @@ async def test_latest_result_context_packet_ids_routes_to_limitation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_stage_returns_none_when_composition_fails() -> None:
-    # Failed composition falls through to the recovery chain.
+async def test_stage_signals_typed_decline_when_composition_fails() -> None:
+    # Composer refusal on a resolved fact key is a typed decline signal so the
+    # stage can try the edit planner before the recovery chain (#160).
     composer = _RecordingComposer(response=None)
 
     result = await latest_result_answer_stage_result_if_applicable(
@@ -558,7 +560,8 @@ async def test_stage_returns_none_when_composition_fails() -> None:
         compose_response_func=composer,
     )
 
-    assert result is None
+    assert isinstance(result, LatestResultFactComposerDeclined)
+    assert result.fact_key == "peak_date"
     assert len(composer.calls) == 1
 
 
@@ -690,7 +693,6 @@ async def test_workflow_refine_then_result_fact_answer_keeps_pending_state(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="#160(A) — remove when fixed")
 async def test_workflow_fact_answer_then_composer_none_edit_reroutes_to_planner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -790,9 +792,187 @@ async def test_workflow_fact_answer_then_composer_none_edit_reroutes_to_planner(
     )
 
     assert planner_calls
-    assert second["stage_outcome"] in {"ready_for_confirmation", "needs_clarification"}
-    assert "artifact_assumption_edit_planned" in second["decision"].reason_codes
+    # The planned edit lands in the typed edit contract: the DCA money-role
+    # guard owns the turn instead of the terminal followup recovery.
+    assert second["stage_outcome"] == "await_user_reply"
+    clarification = second["clarification"]
+    assert clarification["reason_code"] == "unsupported_dca_starting_principal"
+    anchored = clarification["payload"]["strategy"]
+    assert anchored["asset_universe"] == ["COST", "TGT"]
+    assert anchored["extra_parameters"]["recurring_contribution"] == 500
     assert "latest_result_followup_unavailable" not in str(second)
+
+
+@pytest.mark.asyncio
+async def test_workflow_post_result_composer_none_edit_without_pending_reroutes_to_planner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No-chip twin of the composer-decline reroute: nothing pending, so the
+    planned edit anchors on the strategy that actually ran (#160)."""
+
+    from argus.agent_runtime.artifact_edit_planner import (
+        ArtifactAssumptionEditPlan,
+        EditOperation,
+    )
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
+
+    composer = _RecordingComposer(response=None)
+    monkeypatch.setattr(
+        latest_result_answer_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_actions_module,
+        "compose_result_followup_response",
+        composer,
+    )
+
+    planner_calls: list[dict[str, object]] = []
+
+    async def planned_capital_edit(**kwargs: object) -> ArtifactAssumptionEditPlan:
+        planner_calls.append(kwargs)
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="User set starting capital to $2,000.",
+            operations=[
+                EditOperation(op="set", target="capital", number=2000),
+            ],
+            confidence=0.95,
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "plan_artifact_assumption_edit",
+        planned_capital_edit,
+    )
+
+    interpreter = _StaticInterpreter(
+        StructuredInterpretation(
+            intent="results_explanation",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User wants to change starting capital.",
+            semantic_turn_act="result_followup",
+            result_followup_focus="result_card_fact",
+            result_followup_fact_key="starting_capital",
+            artifact_target="latest_result",
+            confidence=0.9,
+        )
+    )
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+
+    reference = _latest_result_reference()
+    reference.metadata["config_snapshot"]["resolved_parameters"] = {
+        "date_range": {"start": "2020-02-01", "end": "2026-07-02"},
+        "cadence": "monthly",
+        "recurring_contribution": 500,
+    }
+    snapshot = TaskSnapshot(
+        latest_task_type="results_explanation",
+        completed=True,
+        latest_backtest_result_reference=reference,
+        artifact_references=[reference],
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id="thread-issue-160-composer-none-no-pending",
+        message="change starting capital to $2,000",
+        fallback_latest_task_snapshot=snapshot,
+        fallback_selected_thread_metadata={
+            "latest_task_type": "results_explanation",
+            "last_stage_outcome": "ready_to_respond",
+        },
+    )
+
+    assert planner_calls
+    assert result["stage_outcome"] == "await_user_reply"
+    clarification = result["clarification"]
+    assert clarification["reason_code"] == "unsupported_dca_starting_principal"
+    anchored = clarification["payload"]["strategy"]
+    assert anchored["asset_universe"] == ["COST", "TGT"]
+    assert "latest_result_followup_unavailable" not in str(result)
+
+
+@pytest.mark.asyncio
+async def test_workflow_composer_none_without_edit_plan_keeps_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When the planner has no edit either, the composer decline degrades to
+    the existing followup recovery — the guard never invents a route."""
+
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
+
+    composer = _RecordingComposer(response=None)
+    monkeypatch.setattr(
+        latest_result_answer_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_actions_module,
+        "compose_result_followup_response",
+        composer,
+    )
+
+    async def no_edit_plan(**kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(
+        interpret_module,
+        "plan_artifact_assumption_edit",
+        no_edit_plan,
+    )
+
+    interpreter = _StaticInterpreter(
+        StructuredInterpretation(
+            intent="results_explanation",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User asked about an unstored result value.",
+            semantic_turn_act="result_followup",
+            result_followup_focus="result_card_fact",
+            result_followup_fact_key="starting_capital",
+            artifact_target="latest_result",
+            confidence=0.9,
+        )
+    )
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id="thread-issue-160-composer-none-no-plan",
+        message="what was the starting capital?",
+        fallback_latest_task_snapshot=_snapshot(),
+        fallback_selected_thread_metadata={
+            "latest_task_type": "results_explanation",
+            "last_stage_outcome": "ready_to_respond",
+        },
+    )
+
+    assert result["stage_outcome"] == "ready_to_respond"
+    assert "latest_result_followup_unavailable" in str(result)
 
 
 @pytest.mark.asyncio

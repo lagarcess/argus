@@ -193,9 +193,13 @@ from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_conti
     pending_response_option_interpretation_from_typed_selection as _pending_response_option_interpretation_from_typed_selection,
     pending_response_option_when_interpreter_unavailable as _pending_response_option_when_interpreter_unavailable,
     planned_active_confirmation_edit_interpretation as _planned_active_confirmation_edit_interpretation,
+    planned_latest_result_edit_interpretation as _planned_latest_result_edit_interpretation,
     planned_pending_refinement_edit_interpretation as _planned_pending_refinement_edit_interpretation,
     structured_interpretation_has_complete_typed_asset_patch as _structured_interpretation_has_complete_typed_asset_patch,
     structured_interpretation_has_supported_artifact_assumption_edit as _structured_interpretation_has_supported_artifact_assumption_edit,
+)
+from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+    LatestResultFactComposerDeclined,
 )
 from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
     latest_result_answer_stage_result_if_applicable as _latest_result_answer_stage_result_if_applicable,
@@ -984,6 +988,17 @@ async def _stage_result_from_interpretation(
         current_user_message=state.current_user_message,
         language=user.language_preference,
     )
+    if isinstance(latest_result_fact_answer, LatestResultFactComposerDeclined):
+        declined_edit_result = await _planned_edit_after_fact_composer_decline(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_thread_metadata,
+        )
+        if declined_edit_result is not None:
+            return declined_edit_result
+        latest_result_fact_answer = None
     if latest_result_fact_answer is not None:
         return latest_result_fact_answer
     pending_refinement_result = _pending_refinement_misroute_result_if_applicable(
@@ -2412,6 +2427,45 @@ async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
         user=user,
         snapshot=snapshot,
         current_user_message=state.current_user_message,
+        capability_contract=capability_contract,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+
+
+async def _planned_edit_after_fact_composer_decline(
+    *,
+    state: RunState,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    capability_contract: Any,
+    selected_thread_metadata: dict[str, Any],
+) -> StageResult | None:
+    """Composer refusal on a resolved fact key re-enters the typed edit contract.
+
+    The refusal is the composer's own typed signal that the turn is not a fact
+    question; the edit planner (or nothing) decides the route from here."""
+
+    interpretation = await _planned_pending_refinement_edit_interpretation(
+        snapshot=snapshot,
+        current_user_message=state.current_user_message,
+        selected_thread_metadata=selected_thread_metadata,
+        resolve_asset_candidate=_resolve_asset_candidate_safely,
+        plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+    )
+    if interpretation is None:
+        interpretation = await _planned_latest_result_edit_interpretation(
+            snapshot=snapshot,
+            current_user_message=state.current_user_message,
+            resolve_asset_candidate=_resolve_asset_candidate_safely,
+            plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+        )
+    if interpretation is None:
+        return None
+    return await _stage_result_from_interpretation(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        interpretation=interpretation,
         capability_contract=capability_contract,
         selected_thread_metadata=selected_thread_metadata,
     )

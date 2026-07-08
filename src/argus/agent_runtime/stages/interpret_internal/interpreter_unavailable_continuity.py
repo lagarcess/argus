@@ -35,6 +35,7 @@ from argus.agent_runtime.simplification_option_contract import (
 )
 from argus.agent_runtime.stages.artifact_context import (
     active_confirmation_effective_strategy,
+    strategy_from_result_reference,
 )
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
     _dedupe_resolution_provenance,
@@ -49,6 +50,7 @@ from argus.agent_runtime.stages.interpret_types import (
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import RunState, StrategySummary, TaskSnapshot
+from argus.agent_runtime.strategy_contract import canonical_strategy_type
 from argus.domain.indicators import draft_only_indicator_from_text
 
 ResolveAssetCandidate = Callable[..., AssetResolution | None]
@@ -296,6 +298,41 @@ async def planned_pending_refinement_edit_interpretation(
     )
 
 
+async def planned_latest_result_edit_interpretation(
+    *,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+    resolve_asset_candidate: ResolveAssetCandidate,
+    plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit
+    | None = None,
+) -> StructuredInterpretation | None:
+    """Planned edit against the completed run when nothing is pending.
+
+    The post-result surface has no pending draft or confirmation card, so an
+    edit-shaped turn must plan against the strategy that actually ran."""
+
+    if snapshot is None or snapshot.latest_backtest_result_reference is None:
+        return None
+    if (
+        snapshot.pending_strategy_summary is not None
+        or snapshot.active_confirmation_reference is not None
+    ):
+        return None
+    prior_strategy = strategy_from_result_reference(
+        snapshot.latest_backtest_result_reference
+    )
+    return await _planned_artifact_edit_interpretation(
+        prior_strategy=prior_strategy,
+        active_confirmation_payload=None,
+        current_user_message=current_user_message,
+        resolve_asset_candidate=resolve_asset_candidate,
+        plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit_fn,
+        artifact_target="latest_result",
+        default_goal_summary="User changed an assumption of the completed run.",
+        latest_result_window=_latest_result_date_window_from_snapshot(snapshot),
+    )
+
+
 async def _planned_artifact_edit_interpretation(
     *,
     prior_strategy: StrategySummary,
@@ -318,7 +355,7 @@ async def _planned_artifact_edit_interpretation(
     )
     if plan is None or plan.outcome != "ready_to_confirm":
         return None
-    if artifact_target == "pending_refinement" and (
+    if artifact_target in {"pending_refinement", "latest_result"} and (
         _edit_plan_reshapes_non_recurring_strategy(
             plan,
             prior_strategy_type=prior_strategy.strategy_type,
@@ -326,6 +363,10 @@ async def _planned_artifact_edit_interpretation(
     ):
         return None
     candidate = StrategySummary(raw_user_phrasing=current_user_message)
+    if prior_strategy.strategy_type:
+        # Money-role and cadence integrity read the strategy family from the
+        # draft itself; an edit never changes the anchor's family.
+        candidate.strategy_type = prior_strategy.strategy_type
     field_provenance: dict[str, str] = {}
     if plan.operations:
         apply_resolved_artifact_edit_to_strategy_summary(
@@ -364,6 +405,21 @@ async def _planned_artifact_edit_interpretation(
     if plan.timeframe is not None:
         candidate.timeframe = str(plan.timeframe)
         field_provenance["timeframe"] = "explicit_user"
+    if (
+        field_provenance.get("capital_amount") == "starting_capital"
+        and canonical_strategy_type(prior_strategy.strategy_type)
+        == "dca_accumulation"
+    ):
+        # A starting principal is not the recurring contribution; keep it
+        # typed so the DCA money-role guard decides instead of overwriting
+        # the anchor's contribution.
+        if candidate.capital_amount is not None:
+            candidate.extra_parameters["initial_capital"] = float(
+                candidate.capital_amount
+            )
+        candidate.capital_amount = None
+        del field_provenance["capital_amount"]
+        field_provenance["initial_capital"] = "starting_capital"
     if not field_provenance:
         return None
     candidate.extra_parameters["field_provenance"] = field_provenance
