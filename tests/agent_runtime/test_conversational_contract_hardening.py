@@ -7114,3 +7114,114 @@ def test_explicit_asset_edit_matching_default_benchmark_keeps_traded_asset(
         result.decision.reason_codes
     )
     assert result.decision.missing_required_fields == []
+
+
+def test_planned_window_edit_with_preserved_asset_keeps_traded_asset(
+    monkeypatch,
+) -> None:
+    """Captured founder-demo shape (#151 follow-up): a same-thread Spanish Q1
+    restatement over the full-year BTC card routes as a planned date edit
+    that preserves the prior asset — the draft carries a provider-resolved
+    BTC with date-only field provenance. The benchmark separation sweep
+    emptied that asset against the merged default BTC benchmark ("Which
+    asset should I test?"). Resolved asset-field provenance is typed
+    evidence the user named it; benchmark-only turns still strip."""
+
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = "".join(
+            char for char in str(symbol).upper() if char.isalnum()
+        )
+        if normalized in {"BTC", "BITCOIN"}:
+            return ResolvedAssetStub("BTC", "crypto", name="Bitcoin")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+
+    pending = StrategySummary(
+        raw_user_phrasing="prueba comprar y mantener bitcoin durante 2024",
+        strategy_type="buy_and_hold",
+        strategy_thesis="prueba comprar y mantener bitcoin durante 2024",
+        asset_universe=["BTC"],
+        asset_class="crypto",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        comparison_baseline="BTC",
+    )
+    snapshot = TaskSnapshot(
+        latest_task_type="backtest_execution",
+        completed=False,
+        pending_strategy_summary=pending,
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="Usuario ajusta la ventana a enero-marzo 2024.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=(
+                "quiero probar, nada complicado, comprar y mantener bitcoin "
+                "desde enero 2024 hasta marzo 2024"
+            ),
+            strategy_type="buy_and_hold",
+            strategy_thesis=(
+                "quiero probar, nada complicado, comprar y mantener bitcoin "
+                "desde enero 2024 hasta marzo 2024"
+            ),
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            date_range={"start": "2024-01-01", "end": "2024-03-31"},
+            resolution_provenance=[
+                {
+                    "field": "asset_universe[0]",
+                    "raw_text": "BTC",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "BTC",
+                    "asset_class": "crypto",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium",
+                }
+            ],
+            extra_parameters={
+                "field_provenance": {"date_range": "explicit_user"},
+                "date_range_intent": {
+                    "kind": "explicit_range",
+                    "start": "2024-01-01",
+                    "end": "2024-03-31",
+                    "anchor": "today",
+                    "confidence": 0.9,
+                    "evidence": "desde enero 2024 hasta marzo 2024",
+                },
+                "raw_strategy_type": "buy_and_hold",
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+        reason_codes=[
+            "artifact_assumption_edit_planned",
+            "pending_non_asset_answer_preserved_prior_asset",
+        ],
+    )
+
+    result, _ = _interpret(
+        message=(
+            "quiero probar, nada complicado, comprar y mantener bitcoin "
+            "desde enero 2024 hasta marzo 2024"
+        ),
+        response=response,
+        snapshot=snapshot,
+        selected_thread_metadata={
+            "latest_task_type": "backtest_execution",
+            "last_stage_outcome": "await_approval",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["BTC"]
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-03-31"}
+    assert "benchmark_symbol_removed_from_asset_universe" not in (
+        result.decision.reason_codes
+    )
+    assert result.decision.missing_required_fields == []
