@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Protocol, runtime_checkable
 
+from argus.agent_runtime.recovery_messages import recovery_state_from_text
 from argus.agent_runtime.state.models import (
     AmbiguousField,
     IntentName,
@@ -152,6 +153,12 @@ class StageResult(BaseModel):
         patch = dict(self.stage_patch)
         if self.decision is not None:
             patch = {**self.decision.to_patch(), **patch}
+        if "recovery" not in patch:
+            recovery = recovery_state_from_text(
+                patch.get("assistant_response") or patch.get("assistant_prompt")
+            )
+            if recovery is not None:
+                patch["recovery"] = recovery
         return patch
 
 

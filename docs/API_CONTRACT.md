@@ -310,9 +310,10 @@ messages may store `pending_strategy`, `confirmation_card`,
 `result_strategy_id`, and `result_conversation_id`. Additive artifact metadata
 may also include `artifact_id`, `artifact_type`, `artifact_status`,
 `active_artifact_id`, `supersedes_artifact_id`, `saved_strategy_id`,
-`failed_action`, `retry_last_turn`, `recovery`, and `result_fact_bank`. User
-messages created by action chips may store `chat_action` so the transcript can hydrate
-the selected chip as an action item after reload. Action chip requests and
+`failed_action`, `retry_last_turn`, `recovery`, `clarification`, and
+`result_fact_bank`. User messages created by action chips may store
+`chat_action` so the transcript can hydrate the selected chip as an action item
+after reload. Action chip requests and
 persisted `chat_action` metadata should preserve `label` plus `labelKey` so
 localized transcript chips survive reload. Clients use these fields to hydrate
 cards and actions after reload. Runtime execution still validates against the
@@ -1433,9 +1434,18 @@ completed in-stream run, the final payload includes `backtest_job` and omits
 When a turn reaches a recoverable assistant response without a completed card,
 the final payload and persisted assistant message metadata may include
 `retry_last_turn` and `recovery`. `recovery` is a typed status object with a
-stable `code`, `retryable`, and normalized `language`. User-facing recovery copy
-is presentation only; clients must render retry affordances from structured
-metadata, not by matching assistant prose.
+stable `code`, `retryable`, and optional `params`. User-facing recovery copy is
+presentation only; clients must render retry affordances and localized recovery
+copy from structured metadata, not by matching assistant prose.
+
+When the clarification/composer path is degraded, the final payload and
+persisted assistant message metadata may also include `clarification`. This is
+the typed contract for localized fallback clarification UI. The backend remains
+the source of truth for the reason, requested field, strategy payload, and
+structured option payloads; frontend clients render localized strings from
+static i18n bundles using those typed fields. `assistant_prompt` or
+`assistant_response` may still carry compatibility English text for older
+clients, but new clients should prefer `clarification` when present.
 
 Recoverable streaming error frames may also include the same structured fields
 so live clients can render retry controls immediately, before reload hydration:
@@ -1453,6 +1463,68 @@ so live clients can render retry controls immediately, before reload hydration:
   },
   "retry_last_turn": {
     "message": "What if I bought BTC last year?"
+  }
+}
+```
+
+Example degraded clarification payload:
+
+```json
+{
+  "type": "final",
+  "payload": {
+    "stage_outcome": "await_user_reply",
+    "assistant_prompt": "What date window should I use for AAPL?",
+    "requested_field": "date_range",
+    "clarification": {
+      "kind": "clarification",
+      "reason_code": "missing_period",
+      "requested_field": "date_range",
+      "requested_fields": ["date_range"],
+      "semantic_needs": ["period"],
+      "payload": {
+        "strategy": {
+          "asset_universe": ["AAPL"],
+          "asset_class": "equity"
+        }
+      },
+      "options": []
+    }
+  }
+}
+```
+
+Example unsupported-recovery clarification payload:
+
+```json
+{
+  "clarification": {
+    "kind": "unsupported_recovery",
+    "reason_code": "unsupported_strategy_logic",
+    "requested_field": "unsupported_constraints",
+    "requested_fields": ["unsupported_constraints"],
+    "semantic_needs": ["simplification_choice"],
+    "payload": {
+      "strategy": {
+        "asset_universe": ["TSLA"],
+        "asset_class": "equity"
+      },
+      "raw_value": "ATR 14"
+    },
+    "options": [
+      {
+        "id": "rsi_threshold",
+        "replacement_values": {
+          "simplify_logic": "rsi_only"
+        }
+      },
+      {
+        "id": "buy_and_hold",
+        "replacement_values": {
+          "strategy_type": "buy_and_hold"
+        }
+      }
+    ]
   }
 }
 ```

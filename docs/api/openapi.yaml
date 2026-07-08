@@ -66,7 +66,12 @@ paths:
     post:
       responses:
         "200":
-          description: Server-sent token, status, title, result, and done events.
+          description: >
+            Server-sent token, status, title, result, and done events. Final
+            payloads and persisted assistant metadata may include typed
+            `recovery` and `clarification` objects so clients render localized
+            degraded-fallback UI from static i18n keys instead of assistant
+            prose.
           content:
             text/event-stream:
               schema:
@@ -242,6 +247,54 @@ paths:
           description: Feedback accepted.
 components:
   schemas:
+    ChatClarification:
+      type: object
+      description: Typed degraded clarification or unsupported-recovery sidecar for chat final payloads and assistant metadata.
+      required:
+        - kind
+        - reason_code
+        - semantic_needs
+        - payload
+        - options
+      properties:
+        kind:
+          enum: [clarification, unsupported_recovery]
+        reason_code:
+          type: string
+          examples: [missing_period, unsupported_strategy_logic]
+        requested_field:
+          type:
+            - string
+            - "null"
+        requested_fields:
+          type: array
+          items:
+            type: string
+        semantic_needs:
+          type: array
+          items:
+            type: string
+        payload:
+          type: object
+          additionalProperties: true
+          description: Typed strategy context and optional raw unsupported value.
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatClarificationOption"
+    ChatClarificationOption:
+      type: object
+      description: Button/action option identified by typed payload, not display text.
+      required:
+        - id
+        - replacement_values
+      properties:
+        id:
+          type: string
+          examples: [rsi_threshold, buy_and_hold, moving_average_crossover]
+        replacement_values:
+          type: object
+          additionalProperties: true
     BacktestRun:
       type: object
       required:

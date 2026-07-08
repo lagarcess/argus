@@ -106,12 +106,16 @@ def test_clarify_offline_fallback_uses_product_language() -> None:
     )
 
     assert result.outcome == "await_user_reply"
-    assert result.patch["assistant_prompt"] == (
-        "¿Qué periodo quieres usar para AAPL?"
-    )
-    assert "No pude formular" not in result.patch["assistant_prompt"]
-    assert "I could not" not in result.patch["assistant_prompt"]
-    assert "Which date" not in result.patch["assistant_prompt"]
+    assert result.patch["assistant_prompt"]
+    assert result.patch["response_intent"]["kind"] == "clarification"
+    assert result.patch["response_intent"]["semantic_needs"] == ["period"]
+    clarification = result.patch["clarification"]
+    assert clarification["kind"] == "clarification"
+    assert clarification["reason_code"] == "missing_period"
+    assert clarification["requested_field"] == "date_range"
+    assert clarification["semantic_needs"] == ["period"]
+    assert clarification["payload"]["strategy"]["asset_universe"] == ["AAPL"]
+    assert clarification["options"] == []
 
 
 def test_clarify_empty_llm_response_uses_intent_fallback() -> None:
@@ -557,15 +561,22 @@ def test_clarify_spanish_unsupported_recovery_fallback_uses_structured_options()
         language="es-419",
     )
 
-    prompt = result.patch["assistant_prompt"]
-    assert "No pude formular" not in prompt
-    assert "ATR 14" in prompt
-    assert "TSLA" in prompt
-    assert "Usar una regla RSI compatible" in prompt
-    assert "Comparar con comprar y mantener" in prompt
-    assert "Usar un cruce de medias móviles compatible" in prompt
-    assert "Use a moving-average crossover" not in prompt
-    assert "¿Qué camino quieres usar:" in prompt
+    assert result.patch["assistant_prompt"]
+    assert result.patch["response_intent"]["kind"] == "unsupported_recovery"
+    clarification = result.patch["clarification"]
+    assert clarification["kind"] == "unsupported_recovery"
+    assert clarification["reason_code"] == "unsupported_strategy_logic"
+    assert clarification["requested_field"] == "unsupported_constraints"
+    assert clarification["payload"]["raw_value"] == "ATR 14"
+    assert clarification["payload"]["strategy"]["asset_universe"] == ["TSLA"]
+    assert [option["id"] for option in clarification["options"]] == [
+        "rsi_threshold",
+        "buy_and_hold",
+        "moving_average_crossover",
+    ]
+    assert clarification["options"][0]["replacement_values"] == {
+        "simplify_logic": "rsi_only"
+    }
 
 
 def test_clarify_uses_generator_for_dca_cap_recovery_after_execution_fields_are_known() -> None:

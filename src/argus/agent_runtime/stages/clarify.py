@@ -5,7 +5,10 @@ import inspect
 from typing import Protocol
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
-from argus.agent_runtime.clarification_contract import offline_clarification_fallback
+from argus.agent_runtime.clarification_contract import (
+    offline_clarification_fallback,
+    typed_clarification_contract,
+)
 from argus.agent_runtime.llm_clarifier import ClarificationRequest
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
@@ -80,25 +83,33 @@ async def clarify_stage_async(
             options=options,
             language=language,
         )
+        stage_patch = {
+            "assistant_prompt": await _generate_clarifying_question(
+                state=state,
+                response_intent=response_intent,
+                missing_required_fields=[],
+                ambiguous_fields=[],
+                unsupported_constraints=unsupported_constraints,
+                optional_parameter_choices=[],
+                clarification_generator=clarification_generator,
+                language=language,
+            ),
+            "response_intent": response_intent,
+            "requested_field": state.requested_field,
+            "missing_required_fields": list(state.missing_required_fields),
+            "unsupported_constraints": unsupported_constraints,
+            "simplification_options": options,
+        }
+        stage_patch.update(
+            _clarification_sidecar_patch(
+                state=state,
+                response_intent=response_intent,
+                requested_field=state.requested_field or "unsupported_constraints",
+            )
+        )
         return StageResult(
             outcome="await_user_reply",
-            stage_patch={
-                "assistant_prompt": await _generate_clarifying_question(
-                    state=state,
-                    response_intent=response_intent,
-                    missing_required_fields=[],
-                    ambiguous_fields=[],
-                    unsupported_constraints=unsupported_constraints,
-                    optional_parameter_choices=[],
-                    clarification_generator=clarification_generator,
-                    language=language,
-                ),
-                "response_intent": response_intent,
-                "requested_field": state.requested_field,
-                "missing_required_fields": list(state.missing_required_fields),
-                "unsupported_constraints": unsupported_constraints,
-                "simplification_options": options,
-            },
+            stage_patch=stage_patch,
         )
 
     if ambiguous_fields:
@@ -110,27 +121,36 @@ async def clarify_stage_async(
             facts={"ambiguous_fields": ambiguous_fields},
             language=language,
         )
+        requested_field = _requested_field_for_ambiguous_fields(
+            state=state,
+            requested_fields=requested_fields,
+            ambiguous_fields=ambiguous_fields,
+        )
+        stage_patch = {
+            "assistant_prompt": await _generate_clarifying_question(
+                state=state,
+                response_intent=response_intent,
+                missing_required_fields=requested_fields,
+                ambiguous_fields=ambiguous_fields,
+                unsupported_constraints=[],
+                optional_parameter_choices=[],
+                clarification_generator=clarification_generator,
+                language=language,
+            ),
+            "response_intent": response_intent,
+            "requested_field": requested_field,
+            "ambiguous_fields": ambiguous_fields,
+        }
+        stage_patch.update(
+            _clarification_sidecar_patch(
+                state=state,
+                response_intent=response_intent,
+                requested_field=requested_field,
+            )
+        )
         return StageResult(
             outcome="await_user_reply",
-            stage_patch={
-                "assistant_prompt": await _generate_clarifying_question(
-                    state=state,
-                    response_intent=response_intent,
-                    missing_required_fields=requested_fields,
-                    ambiguous_fields=ambiguous_fields,
-                    unsupported_constraints=[],
-                    optional_parameter_choices=[],
-                    clarification_generator=clarification_generator,
-                    language=language,
-                ),
-                "response_intent": response_intent,
-                "requested_field": _requested_field_for_ambiguous_fields(
-                    state=state,
-                    requested_fields=requested_fields,
-                    ambiguous_fields=ambiguous_fields,
-                ),
-                "ambiguous_fields": ambiguous_fields,
-            },
+            stage_patch=stage_patch,
         )
 
     if requested_fields:
@@ -141,25 +161,32 @@ async def clarify_stage_async(
             requested_fields=requested_fields,
             language=language,
         )
+        requested_field = requested_fields[0] if len(requested_fields) == 1 else None
+        stage_patch = {
+            "assistant_prompt": await _generate_clarifying_question(
+                state=state,
+                response_intent=response_intent,
+                missing_required_fields=requested_fields,
+                ambiguous_fields=[],
+                unsupported_constraints=[],
+                optional_parameter_choices=[],
+                clarification_generator=clarification_generator,
+                language=language,
+            ),
+            "response_intent": response_intent,
+            "requested_field": requested_field,
+            "requested_fields": requested_fields,
+        }
+        stage_patch.update(
+            _clarification_sidecar_patch(
+                state=state,
+                response_intent=response_intent,
+                requested_field=requested_field,
+            )
+        )
         return StageResult(
             outcome="await_user_reply",
-            stage_patch={
-                "assistant_prompt": await _generate_clarifying_question(
-                    state=state,
-                    response_intent=response_intent,
-                    missing_required_fields=requested_fields,
-                    ambiguous_fields=[],
-                    unsupported_constraints=[],
-                    optional_parameter_choices=[],
-                    clarification_generator=clarification_generator,
-                    language=language,
-                ),
-                "response_intent": response_intent,
-                "requested_field": requested_fields[0]
-                if len(requested_fields) == 1
-                else None,
-                "requested_fields": requested_fields,
-            },
+            stage_patch=stage_patch,
         )
 
     if _is_beginner_guidance_turn(state):
@@ -281,6 +308,20 @@ def _usable_prefilled_prompt(value: str | None) -> str | None:
         return None
     cleaned = value.strip()
     return cleaned or None
+
+
+def _clarification_sidecar_patch(
+    *,
+    state: RunState,
+    response_intent: dict[str, object],
+    requested_field: str | None,
+) -> dict[str, object]:
+    clarification = typed_clarification_contract(
+        response_intent=response_intent,
+        requested_field=requested_field,
+        strategy=state.candidate_strategy_draft,
+    )
+    return {"clarification": clarification} if clarification is not None else {}
 
 
 def _response_intent(

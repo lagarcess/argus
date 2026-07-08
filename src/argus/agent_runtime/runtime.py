@@ -272,6 +272,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "failure_classification",
         "final_response_payload",
         "response_intent",
+        "clarification",
         "resolution_provenance",
         "artifact_references",
         "latest_failed_action_reference",
@@ -385,6 +386,9 @@ def _pending_strategy_payload(
         response_intent = selected_thread_metadata.get("response_intent")
         if isinstance(response_intent, dict):
             payload["response_intent"] = dict(response_intent)
+        clarification = selected_thread_metadata.get("clarification")
+        if isinstance(clarification, dict):
+            payload["clarification"] = dict(clarification)
     return payload
 
 

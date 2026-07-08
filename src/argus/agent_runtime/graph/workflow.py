@@ -87,6 +87,8 @@ class WorkflowState(TypedDict, total=False):
     result_conversation_id: str | None
     result_fact_bank: dict[str, Any]
     result_action_request: dict[str, Any]
+    clarification: dict[str, Any]
+    recovery: dict[str, Any]
 
 
 RUN_STATE_FIELD_NAMES = frozenset(RunState.model_fields)
@@ -107,6 +109,8 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
         "result_conversation_id",
         "result_fact_bank",
         "result_action_request",
+        "clarification",
+        "recovery",
     }
 )
 
@@ -675,6 +679,12 @@ def _build_thread_metadata(
         metadata["requested_field"] = requested_field
     if run_state.response_intent is not None:
         metadata["response_intent"] = run_state.response_intent.model_dump(mode="python")
+    clarification = workflow_state.get("clarification")
+    if isinstance(clarification, dict):
+        metadata["clarification"] = dict(clarification)
+    recovery = workflow_state.get("recovery")
+    if isinstance(recovery, dict):
+        metadata["recovery"] = dict(recovery)
     pending_resolution = _pending_resolution_candidate(workflow_state=workflow_state)
     if pending_resolution is not None:
         metadata["pending_resolution"] = pending_resolution

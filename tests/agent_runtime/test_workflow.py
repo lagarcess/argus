@@ -1196,8 +1196,12 @@ async def test_workflow_confirmation_assumption_action_stays_in_clarification() 
     )
 
     assert result["stage_outcome"] == "await_user_reply"
-    assert result["assistant_response"] == "¿Qué supuesto quieres ajustar para AAPL?"
-    assert "I can test" not in result["assistant_response"]
+    assert result["assistant_response"]
+    clarification = result["clarification"]
+    assert clarification["kind"] == "clarification"
+    assert clarification["reason_code"] == "missing_assumption"
+    assert clarification["requested_field"] == "assumption"
+    assert clarification["payload"]["strategy"]["asset_universe"] == ["AAPL"]
     assert "confirmation_payload" not in result
 
 

@@ -93,6 +93,15 @@ def run_interpret_with_llm(
     return result, interpreter
 
 
+def _stub_equity_asset_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def resolve_stub(symbol: str, **_: Any) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
+
+
 def test_interpret_stage_does_not_hide_unexpected_interpreter_exceptions() -> None:
     with pytest.raises(RuntimeError, match="unexpected interpreter failure"):
         interpret_stage(
@@ -620,7 +629,10 @@ def test_result_artifact_date_patch_overrides_stale_unsupported_logic() -> None:
     assert result.decision.missing_required_fields == []
 
 
-def test_spanish_atr_underfilled_draft_routes_to_unsupported_recovery() -> None:
+def test_spanish_atr_underfilled_draft_routes_to_unsupported_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_equity_asset_resolution(monkeypatch)
     response = StructuredInterpretation(
         intent="strategy_drafting",
         task_relation="new_task",
@@ -674,12 +686,20 @@ def test_spanish_atr_underfilled_draft_routes_to_unsupported_recovery() -> None:
     assert clarification.patch["response_intent"]["semantic_needs"] == [
         "simplification_choice"
     ]
-    assert "ATR 14" in clarification.patch["assistant_prompt"]
-    assert "Use a supported" not in clarification.patch["assistant_prompt"]
-    assert "Comparar con comprar y mantener" in clarification.patch["assistant_prompt"]
+    typed = clarification.patch["clarification"]
+    assert typed["reason_code"] == "unsupported_strategy_logic"
+    assert "ATR 14" in typed["payload"]["raw_value"]
+    assert [option["id"] for option in typed["options"]] == [
+        "rsi_threshold",
+        "buy_and_hold",
+        "moving_average_crossover",
+    ]
 
 
-def test_spanish_atr_llm_indicator_metadata_routes_to_unsupported_recovery() -> None:
+def test_spanish_atr_llm_indicator_metadata_routes_to_unsupported_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_equity_asset_resolution(monkeypatch)
     response = StructuredInterpretation(
         intent="strategy_drafting",
         task_relation="new_task",
@@ -742,11 +762,20 @@ def test_spanish_atr_llm_indicator_metadata_routes_to_unsupported_recovery() -> 
 
     assert clarification.outcome == "await_user_reply"
     assert clarification.patch["response_intent"]["kind"] == "unsupported_recovery"
-    assert "Use a supported" not in clarification.patch["assistant_prompt"]
-    assert "Comparar con comprar y mantener" in clarification.patch["assistant_prompt"]
+    typed = clarification.patch["clarification"]
+    assert typed["reason_code"] == "unsupported_strategy_logic"
+    assert "ATR 14" in typed["payload"]["raw_value"]
+    assert [option["id"] for option in typed["options"]] == [
+        "rsi_threshold",
+        "buy_and_hold",
+        "moving_average_crossover",
+    ]
 
 
-def test_supported_strategy_label_with_explicit_unsupported_indicator_needs_recovery() -> None:
+def test_supported_strategy_label_with_explicit_unsupported_indicator_needs_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_equity_asset_resolution(monkeypatch)
     response = StructuredInterpretation(
         intent="backtest_execution",
         task_relation="new_task",
@@ -1072,8 +1101,8 @@ def test_supported_indicator_capability_composer_failure_uses_locale_recovery(
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
     assert "I only support RSI" not in answer
-    assert "No pude formular" in answer
-    assert "intenta de nuevo" in answer
+    assert result.patch["recovery"]["code"] == "capability_answer_unavailable"
+    assert result.patch["recovery"]["retryable"] is False
     assert "Executable indicators" not in answer
     for spec in EXECUTABLE_INDICATORS.values():
         assert spec.label not in answer
@@ -1106,8 +1135,8 @@ def test_supported_indicator_capability_contradiction_uses_locale_recovery(
 
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
-    assert "No pude formular" in answer
-    assert "intenta de nuevo" in answer
+    assert result.patch["recovery"]["code"] == "capability_answer_unavailable"
+    assert result.patch["recovery"]["retryable"] is False
     assert "Executable indicators" not in answer
     assert "not supported" not in answer.lower()
     for spec in EXECUTABLE_INDICATORS.values():
@@ -1494,8 +1523,8 @@ def test_market_movers_without_packet_uses_user_language(
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
     assert completion_calls == 0
-    assert "prueba histórica compatible" in answer
-    assert "historical test" not in answer
+    assert result.patch["recovery"]["code"] == "context_market_movers_recovery"
+    assert result.patch["recovery"]["retryable"] is False
     assert "TSLA" not in answer
     assert "NVDA" not in answer
     assert "AAPL" not in answer
@@ -7507,7 +7536,7 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_selection(
     )
 
 
-def test_interpreter_unavailable_pending_simplification_uses_nested_intent_and_spanish_text(
+def test_interpreter_unavailable_pending_simplification_uses_nested_intent_selection(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -7564,6 +7593,7 @@ def test_interpreter_unavailable_pending_simplification_uses_nested_intent_and_s
         selected_thread_metadata={
             "last_stage_outcome": "await_user_reply",
             "pending_strategy": {"response_intent": response_intent},
+            "response_option_selection": {"option_index": 2},
         },
         structured_interpreter=RecordingInterpreter(None),
     )
@@ -7676,6 +7706,9 @@ def test_pending_simplification_typed_choice_overrides_llm_atr_baggage(
         selected_thread_metadata={
             "last_stage_outcome": "await_user_reply",
             "pending_strategy": {"response_intent": response_intent},
+            "response_option_selection": {
+                "replacement_values": {"strategy_type": "buy_and_hold"},
+            },
         },
         structured_interpreter=interpreter,
     )

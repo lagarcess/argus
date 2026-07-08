@@ -31,6 +31,52 @@ def offline_clarification_fallback(
     )
 
 
+def typed_clarification_contract(
+    *,
+    response_intent: dict[str, Any] | None,
+    requested_field: str | None = None,
+    strategy: StrategySummary | dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    if not isinstance(response_intent, dict):
+        return None
+    kind = response_intent.get("kind")
+    if kind == "unsupported_recovery":
+        options = _typed_options(response_intent)
+        if not options:
+            return None
+        semantic_needs = _semantic_needs(response_intent)
+        return {
+            "kind": "unsupported_recovery",
+            "reason_code": _unsupported_reason_code(response_intent),
+            "requested_field": requested_field or "unsupported_constraints",
+            "requested_fields": _requested_fields(response_intent)
+            or ["unsupported_constraints"],
+            "semantic_needs": semantic_needs,
+            "payload": {
+                "strategy": _strategy_payload(response_intent, strategy),
+                "raw_value": _unsupported_raw_value(response_intent),
+            },
+            "options": options,
+        }
+    if kind != "clarification":
+        return None
+    semantic_needs = _semantic_needs(response_intent)
+    requested_fields = _requested_fields(response_intent)
+    requested = requested_field or (requested_fields[0] if requested_fields else None)
+    return {
+        "kind": "clarification",
+        "reason_code": _clarification_reason_code(
+            requested_field=requested,
+            semantic_needs=semantic_needs,
+        ),
+        "requested_field": requested,
+        "requested_fields": requested_fields,
+        "semantic_needs": semantic_needs,
+        "payload": {"strategy": _strategy_payload(response_intent, strategy)},
+        "options": [],
+    }
+
+
 def intent_clarification_fallback(
     *,
     language: str | None,
@@ -108,6 +154,33 @@ def _option_labels(response_intent: dict[str, Any]) -> list[str]:
     return labels[:3]
 
 
+def _typed_options(response_intent: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_options = response_intent.get("options")
+    if not isinstance(raw_options, list):
+        return []
+    options: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, option in enumerate(raw_options):
+        if not isinstance(option, dict):
+            continue
+        replacement_values = option.get("replacement_values")
+        option_id = simplification_option_kind(replacement_values) or f"option_{index}"
+        if option_id in seen:
+            continue
+        seen.add(option_id)
+        typed_option: dict[str, Any] = {
+            "id": option_id,
+            "replacement_values": dict(replacement_values)
+            if isinstance(replacement_values, dict)
+            else {},
+        }
+        label = option.get("label")
+        if isinstance(label, str) and label.strip():
+            typed_option["compatibility_label"] = label.strip()
+        options.append(typed_option)
+    return options[:3]
+
+
 def _unsupported_raw_value(response_intent: dict[str, Any]) -> str | None:
     facts = response_intent.get("facts")
     if not isinstance(facts, dict):
@@ -125,6 +198,77 @@ def _unsupported_raw_value(response_intent: dict[str, Any]) -> str | None:
         if value and not _looks_like_internal_code(value):
             return value
     return None
+
+
+def _unsupported_reason_code(response_intent: dict[str, Any]) -> str:
+    facts = response_intent.get("facts")
+    if not isinstance(facts, dict):
+        return "unsupported_constraint"
+    constraints = facts.get("unsupported_constraints")
+    if not isinstance(constraints, list):
+        return "unsupported_constraint"
+    for constraint in constraints:
+        if not isinstance(constraint, dict):
+            continue
+        category = constraint.get("category")
+        if isinstance(category, str) and category.strip():
+            return category.strip()
+    return "unsupported_constraint"
+
+
+def _semantic_needs(response_intent: dict[str, Any]) -> list[str]:
+    needs = response_intent.get("semantic_needs")
+    if not isinstance(needs, list):
+        return []
+    return [need for need in needs if isinstance(need, str)]
+
+
+def _requested_fields(response_intent: dict[str, Any]) -> list[str]:
+    fields = response_intent.get("requested_fields")
+    if not isinstance(fields, list):
+        return []
+    return [field for field in fields if isinstance(field, str)]
+
+
+def _clarification_reason_code(
+    *,
+    requested_field: str | None,
+    semantic_needs: list[str],
+) -> str:
+    base_field = str(requested_field or "").split("[", 1)[0]
+    if base_field == "date_range" or "period" in semantic_needs:
+        return "missing_period"
+    if base_field == "asset_universe" or "asset_target" in semantic_needs:
+        return "missing_asset_target"
+    if base_field == "assumption" or "assumption" in semantic_needs:
+        return "missing_assumption"
+    if "sizing_amount" in semantic_needs and "schedule" in semantic_needs:
+        return "missing_sizing_amount_schedule"
+    if base_field == "capital_amount" or "sizing_amount" in semantic_needs:
+        return "missing_sizing_amount"
+    if base_field == "cadence" or "schedule" in semantic_needs:
+        return "missing_schedule"
+    if base_field in {"entry_logic", "exit_logic"} or "rule_definition" in semantic_needs:
+        return "missing_rule_definition"
+    if "refinement" in semantic_needs:
+        return "missing_refinement"
+    return "clarification_needed"
+
+
+def _strategy_payload(
+    response_intent: dict[str, Any],
+    strategy: StrategySummary | dict[str, Any] | None,
+) -> dict[str, Any]:
+    if isinstance(strategy, StrategySummary):
+        return strategy.model_dump(mode="python")
+    if isinstance(strategy, dict):
+        return dict(strategy)
+    facts = response_intent.get("facts")
+    if isinstance(facts, dict):
+        fact_strategy = facts.get("strategy")
+        if isinstance(fact_strategy, dict):
+            return dict(fact_strategy)
+    return {}
 
 
 def _looks_like_internal_code(value: str) -> bool:

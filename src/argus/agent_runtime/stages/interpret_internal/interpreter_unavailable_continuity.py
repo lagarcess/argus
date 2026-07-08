@@ -31,8 +31,6 @@ from argus.agent_runtime.interpreter.shared import (
 from argus.agent_runtime.interpreter.strategy_builder import _strategy_from_llm
 from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.simplification_option_contract import (
-    simplification_option_kind,
-    simplification_option_kind_from_selection_text,
     simplification_option_matches_selection,
 )
 from argus.agent_runtime.stages.artifact_context import (
@@ -459,17 +457,6 @@ def _pending_response_option_index_from_typed_selection(
                 option_replacement_values=option.get("replacement_values"),
                 selected_replacement_values=selected_values,
             )
-        ]
-        if len(matches) == 1:
-            return matches[0]
-    text_kind = simplification_option_kind_from_selection_text(
-        state.current_user_message
-    )
-    if text_kind is not None:
-        matches = [
-            index
-            for index, option in enumerate(options)
-            if simplification_option_kind(option.get("replacement_values")) == text_kind
         ]
         if len(matches) == 1:
             return matches[0]
