@@ -453,6 +453,34 @@ def test_change_dates_chip_capital_answer_replans_through_edit_planner(
     assert "artifact_assumption_edit_planned" in result.decision.reason_codes
 
 
+def test_change_asset_chip_planned_edit_over_symbol_limit_still_clarifies(
+    monkeypatch,
+) -> None:
+    """Typed-edit precedence does not bypass deterministic validation: a
+    planned replace beyond the 5-symbol limit still clarifies."""
+
+    _stub_equity_resolution(monkeypatch)
+    _stub_edit_planner(monkeypatch, None)
+
+    result = _run_chip_answer(
+        message="test all six of these",
+        pending=_pending_three_assets(),
+        requested_field="asset_universe",
+        interpretation=_planned_edit_interpretation(
+            _planned_asset_replace_draft(
+                ["TGT", "WSM", "COST", "AAPL", "NVDA", "MSFT"]
+            )
+        ),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.requires_clarification
+    assert any(
+        constraint.category == "asset_universe_limit"
+        for constraint in result.decision.unsupported_constraints
+    )
+
+
 def test_chip_clarify_fields_match_confirmation_edit_actions() -> None:
     """The clarify-scope set stays bound to the chip action fields."""
 
