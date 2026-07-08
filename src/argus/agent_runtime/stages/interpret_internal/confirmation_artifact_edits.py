@@ -7,6 +7,7 @@ from collections.abc import Callable
 from argus.agent_runtime.artifact_edit_planner import ResolvedArtifactEdit
 from argus.agent_runtime.interpreter.shared import (
     _date_window_intent_bound_to_latest_result,
+    _supported_dca_cadence_value,
 )
 from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.rule_specs import (
@@ -77,6 +78,12 @@ def apply_resolved_artifact_edit_to_strategy_summary(
         candidate.capital_amount = recurring_amount
         candidate.extra_parameters["recurring_contribution"] = recurring_amount
         field_provenance["capital_amount"] = "recurring_contribution"
+    if resolved.cadence is not None:
+        cadence = _supported_dca_cadence_value(resolved.cadence)
+        if cadence is not None:
+            candidate.cadence = cadence
+            candidate.extra_parameters["recurring_cadence"] = cadence
+            field_provenance["cadence"] = "explicit_user"
     if resolved.timeframe is not None:
         candidate.timeframe = resolved.timeframe
         field_provenance["timeframe"] = "explicit_user"

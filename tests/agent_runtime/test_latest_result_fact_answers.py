@@ -906,6 +906,109 @@ async def test_workflow_post_result_composer_none_edit_without_pending_reroutes_
 
 
 @pytest.mark.asyncio
+async def test_workflow_composer_none_cadence_edit_confirms_with_new_cadence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A planned cadence-only edit must materialize into the candidate; a
+    dropped cadence leaves empty provenance and dead-ends in recovery
+    (#160 codex review follow-up)."""
+
+    from argus.agent_runtime.artifact_edit_planner import (
+        ArtifactAssumptionEditPlan,
+        EditOperation,
+    )
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
+
+    composer = _RecordingComposer(response=None)
+    monkeypatch.setattr(
+        latest_result_answer_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "compose_result_followup_response",
+        composer,
+    )
+    monkeypatch.setattr(
+        interpret_actions_module,
+        "compose_result_followup_response",
+        composer,
+    )
+
+    planner_calls: list[dict[str, object]] = []
+
+    async def planned_cadence_edit(**kwargs: object) -> ArtifactAssumptionEditPlan:
+        planner_calls.append(kwargs)
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="User switched the contributions to weekly.",
+            operations=[
+                EditOperation(op="set", target="cadence", value="weekly"),
+            ],
+            confidence=0.95,
+        )
+
+    monkeypatch.setattr(
+        interpret_module,
+        "plan_artifact_assumption_edit",
+        planned_cadence_edit,
+    )
+
+    interpreter = _StaticInterpreter(
+        StructuredInterpretation(
+            intent="results_explanation",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User wants to change the cadence.",
+            semantic_turn_act="result_followup",
+            result_followup_focus="result_card_fact",
+            result_followup_fact_key="cadence",
+            artifact_target="latest_result",
+            confidence=0.9,
+        )
+    )
+    workflow = build_workflow(
+        structured_interpreter=interpreter,
+        checkpointer=MemorySaver(),
+    )
+
+    reference = _latest_result_reference()
+    reference.metadata["config_snapshot"]["resolved_parameters"] = {
+        "date_range": {"start": "2020-02-01", "end": "2026-07-02"},
+        "cadence": "monthly",
+        "recurring_contribution": 500,
+    }
+    snapshot = TaskSnapshot(
+        latest_task_type="results_explanation",
+        completed=True,
+        latest_backtest_result_reference=reference,
+        artifact_references=[reference],
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id="thread-issue-160-composer-none-cadence",
+        message="change the cadence to weekly",
+        fallback_latest_task_snapshot=snapshot,
+        fallback_selected_thread_metadata={
+            "latest_task_type": "results_explanation",
+            "last_stage_outcome": "ready_to_respond",
+        },
+    )
+
+    assert planner_calls
+    assert result["stage_outcome"] == "await_approval"
+    confirmed = result["confirmation_payload"]["strategy"]
+    assert confirmed["cadence"] == "weekly"
+    assert confirmed["asset_universe"] == ["COST", "TGT"]
+    assert confirmed["capital_amount"] == 500
+    assert "latest_result_followup_unavailable" not in str(result)
+
+
+@pytest.mark.asyncio
 async def test_workflow_composer_none_edit_during_active_confirmation_reroutes_to_planner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

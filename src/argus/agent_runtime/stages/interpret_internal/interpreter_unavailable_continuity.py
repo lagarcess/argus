@@ -27,6 +27,7 @@ from argus.agent_runtime.interpreter.pending_option import (
 )
 from argus.agent_runtime.interpreter.shared import (
     _latest_result_date_window_from_snapshot,
+    _supported_dca_cadence_value,
 )
 from argus.agent_runtime.interpreter.strategy_builder import _strategy_from_llm
 from argus.agent_runtime.resolution import AssetResolution
@@ -402,6 +403,12 @@ async def _planned_artifact_edit_interpretation(
     if plan.initial_capital is not None:
         candidate.capital_amount = float(plan.initial_capital)
         field_provenance["capital_amount"] = "starting_capital"
+    if plan.cadence is not None and not plan.operations:
+        cadence = _supported_dca_cadence_value(plan.cadence)
+        if cadence is not None:
+            candidate.cadence = cadence
+            candidate.extra_parameters["recurring_cadence"] = cadence
+            field_provenance["cadence"] = "explicit_user"
     if plan.timeframe is not None:
         candidate.timeframe = str(plan.timeframe)
         field_provenance["timeframe"] = "explicit_user"
