@@ -4,13 +4,18 @@ Behavior-preserving relocation from llm_interpreter.py (issue #131)."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from loguru import logger
 
 from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (
     _normalized_ticker_symbol,
 )
-from argus.agent_runtime.interpreter.shared import _llm_value_is_empty
+from argus.agent_runtime.interpreter.shared import (
+    _llm_value_is_empty,
+    _selected_requested_field_base,
+)
 from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
     LLMStrategyDraft,
@@ -40,7 +45,8 @@ def _active_artifact_asset_universe_operation_needs_planner(
     )
     if (
         not has_active_confirmation
-        and normalized_asset_universe_operation(draft.asset_universe_operation) is not None
+        and normalized_asset_universe_operation(draft.asset_universe_operation)
+        is not None
     ):
         return False
     prior = (
@@ -97,6 +103,24 @@ def _asset_universe_operation_clarification_response(
             ),
             "semantic_turn_act": "answer_pending_need",
         }
+    )
+
+
+def _plain_requested_asset_answer_can_use_provider_resolution(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+    draft_has_valid_requested_asset_update: Callable[
+        [LLMStrategyDraft, InterpretationRequest], bool
+    ],
+) -> bool:
+    draft = response.candidate_strategy_draft
+    return bool(
+        _selected_requested_field_base(request) == "asset_universe"
+        and response.semantic_turn_act == "answer_pending_need"
+        and response.task_relation == "continue"
+        and normalized_asset_universe_operation(draft.asset_universe_operation) is None
+        and draft_has_valid_requested_asset_update(draft, request)
     )
 
 

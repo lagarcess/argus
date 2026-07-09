@@ -14,7 +14,6 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from loguru import logger
 
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
-from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
@@ -169,6 +168,7 @@ from argus.agent_runtime.interpreter.readiness_helpers import (  # noqa: F401
     _active_artifact_asset_universe_operation_needs_planner,
     _asset_universe_operation_clarification_response,
     _log_runtime_readiness_step,
+    _plain_requested_asset_answer_can_use_provider_resolution,
 )
 from argus.agent_runtime.interpreter.run_field_audits import (  # noqa: F401
     _clear_rule_or_indicator_fields,
@@ -2692,6 +2692,12 @@ async def _ready_active_artifact_edit_planned_response(
         # questions ("how did it do in 2022?") are common there; the
         # interpreter's own result classification must keep its routing
         # instead of being overridden by a planned edit confirmation.
+        return None
+    if _plain_requested_asset_answer_can_use_provider_resolution(
+        response=response,
+        request=request,
+        draft_has_valid_requested_asset_update=_draft_has_valid_requested_asset_update,
+    ):
         return None
     if _active_artifact_asset_universe_operation_needs_planner(
         response=response,
