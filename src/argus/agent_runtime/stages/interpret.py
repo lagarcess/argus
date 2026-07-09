@@ -201,6 +201,7 @@ from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_conti
     draft_only_indicator_interpretation_when_interpreter_unavailable as _draft_only_indicator_interpretation_when_interpreter_unavailable,
     pending_response_option_interpretation_from_typed_selection as _pending_response_option_interpretation_from_typed_selection,
     pending_response_option_when_interpreter_unavailable as _pending_response_option_when_interpreter_unavailable,
+    pending_confirmation_chip_clarify_edit_requested_field as _pending_confirmation_chip_clarify_edit_requested_field,
     planned_active_confirmation_edit_interpretation as _planned_active_confirmation_edit_interpretation,
     planned_latest_result_edit_interpretation as _planned_latest_result_edit_interpretation,
     planned_pending_confirmation_edit_interpretation as _planned_pending_confirmation_edit_interpretation,
@@ -2569,11 +2570,12 @@ async def _planned_pending_confirmation_edit_from_chip_clarify_answer(
     current_user_message: str,
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
+    requested_field: str,
 ) -> StageResult | None:
     interpretation = await _planned_pending_confirmation_edit_interpretation(
         snapshot=snapshot,
         current_user_message=current_user_message,
-        selected_thread_metadata=selected_thread_metadata,
+        requested_field=requested_field,
         resolve_asset_candidate=_resolve_asset_candidate_safely,
         plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
     )
@@ -2602,11 +2604,15 @@ async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
         return None
     if "artifact_assumption_edit_planned" in interpretation.reason_codes:
         return None
-    if _structured_interpretation_has_complete_typed_asset_patch(interpretation):
-        return None
     chip_clarify_answer_supplies_edit = _chip_clarify_answer_supplies_artifact_edit(
         interpretation=interpretation,
         selected_thread_metadata=selected_thread_metadata,
+    )
+    pending_confirmation_requested_field = (
+        _pending_confirmation_chip_clarify_edit_requested_field(
+            interpretation=interpretation,
+            selected_thread_metadata=selected_thread_metadata,
+        )
     )
     if not (
         _structured_interpretation_has_supported_artifact_assumption_edit(interpretation)
@@ -2614,7 +2620,7 @@ async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
     ):
         return None
     if snapshot.active_confirmation_reference is None:
-        if not chip_clarify_answer_supplies_edit:
+        if pending_confirmation_requested_field is None:
             return None
         return await _planned_pending_confirmation_edit_from_chip_clarify_answer(
             state=state,
@@ -2623,7 +2629,10 @@ async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
             current_user_message=state.current_user_message,
             capability_contract=capability_contract,
             selected_thread_metadata=selected_thread_metadata,
+            requested_field=pending_confirmation_requested_field,
         )
+    if _structured_interpretation_has_complete_typed_asset_patch(interpretation):
+        return None
     return await _planned_active_confirmation_edit_when_interpreter_unavailable(
         state=state,
         user=user,

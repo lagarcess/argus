@@ -270,7 +270,7 @@ async def planned_pending_confirmation_edit_interpretation(
     *,
     snapshot: TaskSnapshot | None,
     current_user_message: str,
-    selected_thread_metadata: dict[str, Any],
+    requested_field: str,
     resolve_asset_candidate: ResolveAssetCandidate,
     plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit | None = None,
 ) -> StructuredInterpretation | None:
@@ -281,13 +281,9 @@ async def planned_pending_confirmation_edit_interpretation(
     display doorway; the typed edit planner must decide the actual operation.
     """
 
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field not in CONFIRMATION_EDIT_CLARIFY_FIELDS:
-        return None
-    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
-        return None
+    # The caller owns requested-field validation so its admit/drop behavior
+    # cannot diverge from this planner's preconditions.
+    del requested_field
     if (
         snapshot is None
         or snapshot.pending_strategy_summary is None
@@ -486,16 +482,48 @@ async def _planned_artifact_edit_interpretation(
 CONFIRMATION_EDIT_CLARIFY_FIELDS = frozenset(CONFIRMATION_EDIT_ACTION_FIELDS.values())
 
 
+def _chip_clarify_requested_field(
+    selected_thread_metadata: dict[str, Any],
+) -> str | None:
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field not in CONFIRMATION_EDIT_CLARIFY_FIELDS:
+        return None
+    return requested_field
+
+
+def pending_confirmation_chip_clarify_edit_requested_field(
+    *,
+    interpretation: StructuredInterpretation,
+    selected_thread_metadata: dict[str, Any],
+) -> str | None:
+    requested_field = _chip_clarify_requested_field(selected_thread_metadata)
+    if requested_field is None:
+        return None
+    last_stage_outcome = selected_thread_metadata.get("last_stage_outcome")
+    if last_stage_outcome not in (None, "await_user_reply"):
+        return None
+    if interpretation.semantic_turn_act != "answer_pending_need":
+        return None
+    if not _interpretation_supplies_chip_artifact_edit(interpretation):
+        return None
+    return requested_field
+
+
 def chip_clarify_answer_supplies_artifact_edit(
     *,
     interpretation: StructuredInterpretation,
     selected_thread_metadata: dict[str, Any],
 ) -> bool:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field not in CONFIRMATION_EDIT_CLARIFY_FIELDS:
+    if _chip_clarify_requested_field(selected_thread_metadata) is None:
         return False
+    return _interpretation_supplies_chip_artifact_edit(interpretation)
+
+
+def _interpretation_supplies_chip_artifact_edit(
+    interpretation: StructuredInterpretation,
+) -> bool:
     if interpretation.semantic_turn_act in {
         "approval",
         "educational_question",

@@ -3379,8 +3379,6 @@ def test_change_asset_action_publishes_clarification_intent_without_llm() -> Non
         result.patch["response_intent"]["facts"]["asset_edit_frame"]
         == "operation_agnostic"
     )
-    assert "remove" in result.patch["response_intent"]["facts"]["asset_edit_modes"]
-    assert "replace" in result.patch["response_intent"]["facts"]["asset_edit_modes"]
     assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
 
 

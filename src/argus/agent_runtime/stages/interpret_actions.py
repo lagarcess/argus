@@ -180,13 +180,6 @@ def structured_action_stage_result_if_applicable(
         }
         if action_type == "change_asset":
             facts["asset_edit_frame"] = "operation_agnostic"
-            facts["asset_edit_modes"] = [
-                "add",
-                "remove",
-                "keep_subset",
-                "replace",
-                "change_other_field",
-            ]
         return StageResult(
             outcome="needs_clarification",
             stage_patch={

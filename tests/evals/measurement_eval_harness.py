@@ -200,6 +200,7 @@ def run_eval_case(
             contract=contract,
             interpret_result=interpret_result,
             clarify_result=clarify_result,
+            clarification_generator=clarifier,
         )
     finally:
         route_receipts = [
@@ -403,6 +404,7 @@ def _run_followup_turn_if_needed(
     contract: Any,
     interpret_result: Any,
     clarify_result: Any | None,
+    clarification_generator: Any,
 ) -> dict[str, Any] | None:
     if not case.followup_prompt:
         return None
@@ -421,10 +423,14 @@ def _run_followup_turn_if_needed(
         state=state,
         user=user,
         latest_task_snapshot=case.snapshot,
-        selected_thread_metadata=_followup_thread_metadata(final_clarify_patch),
+        selected_thread_metadata=_followup_thread_metadata(
+            final_clarify_patch,
+            last_stage_outcome=str(clarify_result.outcome),
+        ),
         structured_interpreter=OpenRouterStructuredInterpreter(contract=contract),
     )
     followup_confirm = None
+    followup_clarify = None
     if followup_interpret.outcome == "ready_for_confirmation":
         followup_confirm = confirm_stage(
             state=_state_for_followup_confirmation(
@@ -434,14 +440,33 @@ def _run_followup_turn_if_needed(
             contract=contract,
             language=case.user_language,
         )
+    elif followup_interpret.outcome == "needs_clarification":
+        followup_clarify = clarify_stage(
+            state=_state_for_followup_clarification(
+                prompt=case.followup_prompt,
+                interpret_patch=followup_interpret.patch,
+            ),
+            contract=contract,
+            clarification_generator=clarification_generator,
+            language=case.user_language,
+            prefilled_assistant_prompt=(
+                followup_interpret.patch.get("assistant_response")
+                or followup_interpret.patch.get("assistant_prompt")
+            ),
+        )
     return {
         "interpret_result": followup_interpret,
         "confirm_result": followup_confirm,
+        "clarify_result": followup_clarify,
     }
 
 
-def _followup_thread_metadata(patch: dict[str, Any]) -> dict[str, Any]:
-    metadata: dict[str, Any] = {"last_stage_outcome": "await_user_reply"}
+def _followup_thread_metadata(
+    patch: dict[str, Any],
+    *,
+    last_stage_outcome: str,
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {"last_stage_outcome": last_stage_outcome}
     for key in (
         "requested_field",
         "missing_required_fields",
@@ -452,6 +477,24 @@ def _followup_thread_metadata(patch: dict[str, Any]) -> dict[str, Any]:
         if value not in (None, "", [], {}):
             metadata[key] = value
     return metadata
+
+
+def _state_for_followup_clarification(
+    *,
+    prompt: str,
+    interpret_patch: dict[str, Any],
+) -> RunState:
+    state = _state_for_followup_confirmation(
+        prompt=prompt,
+        interpret_patch=interpret_patch,
+    )
+    state.missing_required_fields = list(
+        interpret_patch.get("missing_required_fields") or []
+    )
+    state.requested_field = interpret_patch.get("requested_field")
+    if "response_intent" in interpret_patch:
+        state.response_intent = interpret_patch["response_intent"]
+    return state
 
 
 def _state_for_followup_confirmation(
@@ -593,19 +636,26 @@ def _snapshot_with_confirmation_payload(
         or confirmation_payload.get("artifact_id")
         or "eval-confirmation"
     )
-    reference = ArtifactReference(
+    reference_metadata = {
+        "confirmation_id": confirmation_id,
+        "confirmation_payload": dict(confirmation_payload),
+    }
+    active_reference = ArtifactReference(
         artifact_kind="confirmation",
         artifact_id=confirmation_id,
         artifact_status="active",
-        metadata={
-            "confirmation_id": confirmation_id,
-            "confirmation_payload": dict(confirmation_payload),
-        },
+        metadata=dict(reference_metadata),
+    )
+    listed_reference = ArtifactReference(
+        artifact_kind="confirmation",
+        artifact_id=confirmation_id,
+        artifact_status="active",
+        metadata=dict(reference_metadata),
     )
     return snapshot.model_copy(
         update={
-            "active_confirmation_reference": reference,
-            "artifact_references": [*snapshot.artifact_references, reference],
+            "active_confirmation_reference": active_reference,
+            "artifact_references": [*snapshot.artifact_references, listed_reference],
         },
         deep=True,
     )
@@ -666,11 +716,14 @@ def _typed_outcome(
         followup_result.get("interpret_result") if followup_result else None
     )
     followup_confirm = followup_result.get("confirm_result") if followup_result else None
+    followup_clarify = followup_result.get("clarify_result") if followup_result else None
     payload_interpret_result = followup_interpret or interpret_result
     payload_confirm_result = (
         followup_confirm if followup_interpret is not None else confirm_result
     )
-    payload_clarify_result = None if followup_interpret is not None else clarify_result
+    payload_clarify_result = (
+        followup_clarify if followup_interpret is not None else clarify_result
+    )
 
     interpret_patch = payload_interpret_result.patch
     final_patch = _final_patch(
@@ -698,6 +751,7 @@ def _typed_outcome(
             *([] if confirm_result is None else [str(confirm_result.outcome)]),
             *([] if clarify_result is None else [str(clarify_result.outcome)]),
             *([] if followup_interpret is None else [str(followup_interpret.outcome)]),
+            *([] if followup_clarify is None else [str(followup_clarify.outcome)]),
             *([] if followup_confirm is None else [str(followup_confirm.outcome)]),
         ],
         "assets": _symbols(launch_payload=launch_payload, strategy=strategy),

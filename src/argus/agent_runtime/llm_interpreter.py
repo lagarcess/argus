@@ -1092,7 +1092,7 @@ class OpenRouterStructuredInterpreter:
 def _provider_asset_resolution_context_from_extraction(extraction):
     return provider_asset_resolution_context_from_extraction(
         extraction, resolve_asset_candidate=_resolve_asset_candidate
-    )  # noqa: E501
+    )
 
 
 async def _asset_grounding_audited_response(
@@ -2184,7 +2184,7 @@ async def _response_ready_for_runtime(
 ) -> LLMInterpretationResponse:
     response = _normalize_response_for_runtime_context(
         response, request=request, asset_resolution_context=asset_resolution_context
-    )  # noqa: E501
+    )
     _log_runtime_readiness_step("started", response=response)
     planned_artifact_edit = await _ready_active_artifact_edit_planned_response(
         response=response,
@@ -2652,10 +2652,21 @@ async def _ready_active_artifact_edit_planned_response(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
+    if _request_targets_no_active_pending_artifact_edit(request):
+        last_stage_outcome = request.selected_thread_metadata.get("last_stage_outcome")
+        if last_stage_outcome not in (None, "await_user_reply"):
+            return None
+        if response.semantic_turn_act == "new_idea":
+            return None
+        if response.task_relation == "new_task":
+            return None
     if _selected_requested_field_base(request) == "asset_universe":
         snapshot = request.latest_task_snapshot
-        if snapshot is None or snapshot.active_confirmation_reference is None:
+        if snapshot is None:
             return None
+        if snapshot.active_confirmation_reference is None:
+            if snapshot.pending_strategy_summary is None:
+                return None
         if response.semantic_turn_act == "educational_question":
             return None
     if not (
@@ -2713,6 +2724,19 @@ async def _ready_active_artifact_edit_planned_response(
     if planned is None or planned.requires_clarification:
         return None
     return planned
+
+
+def _request_targets_no_active_pending_artifact_edit(
+    request: InterpretationRequest,
+) -> bool:
+    requested_field = _selected_requested_field_base(request)
+    snapshot = request.latest_task_snapshot
+    return bool(
+        requested_field in ARTIFACT_EDIT_PENDING_FIELDS
+        and snapshot is not None
+        and snapshot.pending_strategy_summary is not None
+        and snapshot.active_confirmation_reference is None
+    )
 
 
 def _response_can_skip_optional_runtime_readiness_audits(
