@@ -18,17 +18,27 @@ copy with typed clarification contracts rendered by frontend static i18n
 (es-419 parity restored, the 9 stale copy tests re-pointed at typed asserts);
 and PR #169 landed the Agent Runtime Regression sweep — the full agent_runtime
 suite + spine guardrails now run hermetically (synthetic_unit_fixture catalog)
-on every runtime PR, zero hidden failures at tip (999 passed, 2 xfailed).
+on every runtime PR, zero hidden failures at tip (1023 passed, 0 xfailed at
+`c081901`).
 Current pointer: the interpret/edit spine is between owners; A1b (linked
 IdeaVersion emission) is the next spine-chain slice and is unblocked.
-Promotion to `main` is PAUSED. Remaining live blockers: #160(A) composer-None
-fall-through and #151 card materialization (strict-xfailed, the only two xfails
-in the suite), then a full live-eval rerun on the exact promotion SHA. #164
-trails the cluster.
+The interpret/edit-surface burn-down is FULLY CLOSED (2026-07-09): PR #185
+(#160(A)) and PR #186 (#151) un-xfailed the last two strict gates; PR #187 fixed
+the demo-caught benchmark-keep regression; PR #189 closed the pre-run
+chip-clarify twin (#188) — chips and natural language now converge on one typed
+edit contract on both the post-result and confirmation surfaces. No spine
+blockers remain; the suite carries zero xfails.
+Promotion to `main` is UNBLOCKED on code. What remains is release mechanics, not
+lanes: (1) full live-eval rerun on the exact promotion SHA `c081901`; (2) the
+clean-checkout suite gate (#134/#135); (3) founder waiver on the known grok
+options-idea nondeterminism; (4) release manifest + `main` promotion PR (merge
+commit, not squash, so this is the last all-of-history diff). #164 (post-result
+followup typing / approval-vs-pending-clarify policy) is the deferred follow-up,
+not a gate.
 Execution runs off the P2 execution board below: point an agent at any READY
 lane. The interpret/edit spine has exactly one owner lane at a time (currently
 unowned; A1b is next in the spine chain).
-Date: 2026-07-08
+Date: 2026-07-09
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
 
@@ -604,11 +614,15 @@ monetization/entitlement architecture.
   gates are un-xfailed and enforced by the #169 sweep. Residual risk is model-
   side only (grok options-classification nondeterminism), not spine logic.
 
-##### Main-promotion burn-down — the interpret-surface lane (updated 2026-07-08: steps 1-2 SHIPPED via PR #182; #169 + #183 landed off-spine)
+##### Main-promotion burn-down — the interpret-surface lane (CLOSED 2026-07-09: all members landed via PRs #182/#185/#186/#187/#189; #169 + #183 off-spine)
 
-The remaining `main`-promotion blockers are not four scattered bugs; they are one
-regression cluster on the interpret/edit spine, most introduced by the
-07-06/07-07 merges. Treat them as a single burn-down lane with one owner.
+This was one regression cluster on the interpret/edit spine, most introduced by
+the 07-06/07-07 merges, worked as a single-owner burn-down lane. It is now
+fully closed — the record below is retained for provenance. No code blocker
+remains between `codex/private-alpha-next` @ `c081901` and a `main` promotion
+candidate; the only gates left are the standing release-discipline reruns
+(live eval on the exact SHA + clean-checkout gate) and the founder's options
+waiver.
 
 Shared surface (why they cannot be parallel implementers): `stages/interpret.py`,
 `interpreter/artifact_assumption_edit.py`,
@@ -627,18 +641,24 @@ Members and roots:
 - **#150 — CLOSED (2026-07-08).** The mocked half of #171 Sig2 and the
   CI-visibility half are both closed: PR #182 removed the #150 strict xfails,
   and PR #169 landed the off-spine regression-sweep CI gate.
-- **#160(A) (high) — interpreter dead-ends.** Composer-`None` fall-through at
-  `_latest_result_followup_recovery_if_applicable`; (B) silent trailing-year date
-  default is closed with #171 Sig1 in PR #182 as one
-  date-provenance-on-recovery policy (trust or clarify — never null, never
-  silent-default). #160(A)'s blocker status is conditional on the deployed
-  grok/haiku tier.
-- **#151 (high) — card materialization.** An executable-complete post-result draft
-  plus a model `assistant_response` emits prose instead of `ready_for_confirmation`,
-  so a bare "yes" has nothing typed to launch (`_stage_result_from_interpretation`
-  + `artifact_assumption_edit.py`).
+- **#160(A) — CLOSED (2026-07-09, PR #185).** Composer-`None` on a resolved fact
+  key is now a typed decline that re-enters the planned-edit contract across all
+  three anchors (pending refinement / active confirmation / completed run); the
+  interpreter classifies change-requests naming a card fact as
+  `refine_current_idea`. (B) was closed with #171 Sig1 in PR #182.
+- **#151 — CLOSED (2026-07-09, PR #186).** Executable-complete post-result and
+  confirmation-edit turns materialize the typed confirmation payload
+  (`_stage_result_from_interpretation` + result-artifact-patch route-ownership);
+  the benchmark-separation and `sizing_mode`-echo seams are fixed.
+- **#187 — CLOSED (2026-07-09).** Demo-caught: benchmark separation must not empty
+  an explicitly-owned traded universe; keep-evidence is planner provenance or
+  active-draft continuity, never resolver echo.
+- **#188 — CLOSED (2026-07-09, PR #189).** The pre-run chip-clarify twin: chip
+  answers now route through the typed edit contract (`requested_field` is display
+  scope only), so remove/replace apply set-complete, capital edits land, and
+  changed-mind cross-answers apply.
 - **#164 (med) — trailing follow-up.** Typed result-followup fact focus/key; the
-  residual refine wall behind #160(A). Not a gate; lands after the cluster.
+  residual refine wall. Still open; deferred follow-up, never a promotion gate.
 
 Landing order (serial on the spine):
 
@@ -647,13 +667,15 @@ Landing order (serial on the spine):
 2. ~~#171 Sig1 + #160(B)~~ — DONE (PR #182): typed-intent materialization on
    refusal drafts + year-contradiction guard on invented default windows; the
    #179/#180 gates are un-xfailed.
-3. #160(A) — composer-`None` falls through to the edit path. Still open;
-   strict-xfailed (test_workflow_fact_answer_then_composer_none_edit_reroutes_
-   to_planner). Principled fix is upstream LLM classification of edits as
-   refine_current_idea (needs live eval coverage), not a deterministic patch.
-4. #151 — materialize the confirmation card from the executable-complete draft.
-   Still open; strict-xfailed; needs a multi-turn live repro shape.
-5. Full live eval on the exact SHA → gate green. Then #164.
+3. ~~#160(A)~~ — DONE (PR #185): composer-`None` decline re-enters the planned-edit
+   contract; upstream classifies card-fact change-requests as refine_current_idea.
+   Gate `test_workflow_fact_answer_then_composer_none_edit_reroutes_to_planner`
+   un-xfailed.
+4. ~~#151~~ — DONE (PR #186): confirmation card materializes from the
+   executable-complete draft; gate un-xfailed. Demo follow-ups: #187 (benchmark
+   keep) + #188/#189 (pre-run chip-clarify twin) also landed.
+5. Full live eval on the exact SHA `c081901` → promotion candidate. Then #164
+   (deferred, not a gate).
 
 Off-spine, now LANDED: PR #169 (regression-sweep CI, hermetic
 synthetic_unit_fixture catalog, runs on every runtime PR + nightly) and PR #183
@@ -665,9 +687,11 @@ known data-dropping regressions, so fix is preferred over waive.
 **Standing release discipline** (blocks `main`, not a lane): rerun the exact
 clean-checkout suite gate (issue #134 / PR #135) before any branch or `main`
 promotion instead of treating the repair as permanent proof for future SHAs.
-Promotion to `main` stays PAUSED — #140-#142 are merged and the #171/#150/
-#160(B) cluster is fixed; the remaining blockers are #160(A) and #151 (the only
-two strict xfails in the suite), sequenced in the burn-down above.
+Promotion to `main` is UNBLOCKED on code (2026-07-09) — the entire interpret-surface
+cluster (#171/#150/#160(A)(B)/#151) plus the demo follow-ups (#187/#188) are fixed
+and the suite carries zero xfails. The only remaining gates are this
+standing release discipline (clean-checkout rerun + exact-SHA live eval) and the
+founder's options-waiver call.
 The eval harness (B3 slice 1, PR #143) is now a live landing gate:
 runtime-behavior PRs run the live eval suite once pre-merge; every `main`
 promotion candidate runs the full live suite on its exact SHA with no
@@ -783,8 +807,9 @@ moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
   (#154, PRs #174-177) retired per-language copy so recovery/degraded prose
   renders from typed codes/keys in the detected turn language. The PMF gate below
   (Spanish-preferring users complete the loop unaided) is validated by the live
-  eval harness; #171 is closed in mocked/repro gates, and current promotion
-  blockers are #160(A) and #151 plus the exact-SHA live-eval rerun.
+  eval harness; #171 is closed in mocked/repro gates, and the interpret-surface
+  cluster (#160/#151 + demo follow-ups #187/#188) is fully closed — the only
+  remaining promotion step is the exact-SHA live-eval rerun.
 - Outcome: when Argus fails or hits an unsupported request, recovery preserves
   the user's idea, clarifies without making the user feel wrong, explains
   unsupported capability in product language, and never leaks raw provider/runtime
