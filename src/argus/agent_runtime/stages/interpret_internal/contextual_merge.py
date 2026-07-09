@@ -29,6 +29,7 @@ from argus.agent_runtime.stages.interpret_internal.shared import (
     _field_base,
     _should_preserve_prior_asset_context,
     _strategy_supplies_executable_rule_edit,
+    _strategy_supplies_explicit_turn_money,
 )
 from argus.agent_runtime.state.models import (
     StrategySummary,
@@ -135,10 +136,12 @@ def _strategy_with_contextual_merge(
         is not None
     ):
         preserve_prior_asset_context = False
-    # A planned artifact edit carries its money fields as typed operations;
-    # requested_field-based preservation must not drop them.
+    # A planned artifact edit, or a draft whose money carries explicit
+    # this-turn provenance, owns its money fields; requested_field-based
+    # preservation must not drop them.
     preserve_prior_money_context = (
         "artifact_assumption_edit_planned" not in set(reason_codes or [])
+        and not _strategy_supplies_explicit_turn_money(strategy)
         and _should_preserve_prior_money_context(
             selected_thread_metadata=selected_thread_metadata,
             semantic_turn_act=semantic_turn_act,

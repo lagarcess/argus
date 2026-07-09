@@ -38,6 +38,9 @@ from argus.agent_runtime.stages.artifact_context import (
     active_confirmation_effective_strategy,
     strategy_from_result_reference,
 )
+from argus.agent_runtime.stages.interpret_actions import (
+    CONFIRMATION_EDIT_ACTION_FIELDS,
+)
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
     _dedupe_resolution_provenance,
 )
@@ -46,6 +49,7 @@ from argus.agent_runtime.stages.interpret_internal.confirmation_artifact_edits i
     asset_edit_symbol_resolver,
     strategy_summary_uses_rsi,
 )
+from argus.agent_runtime.stages.interpret_internal.shared import _field_base
 from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
     StructuredInterpretation,
@@ -443,12 +447,9 @@ async def _planned_artifact_edit_interpretation(
     )
 
 
-# The chip-opened clarify scopes: CONFIRMATION_EDIT_ACTION_FIELDS values in
-# stages/interpret_actions.py. The chip's field is display scope only; the
+# The chip-opened clarify scopes. The chip's field is display scope only; the
 # answer turn is planned like any natural-language edit.
-CONFIRMATION_EDIT_CLARIFY_FIELDS = frozenset(
-    {"asset_universe", "date_range", "assumption"}
-)
+CONFIRMATION_EDIT_CLARIFY_FIELDS = frozenset(CONFIRMATION_EDIT_ACTION_FIELDS.values())
 
 
 def chip_clarify_answer_supplies_artifact_edit(
@@ -456,9 +457,9 @@ def chip_clarify_answer_supplies_artifact_edit(
     interpretation: StructuredInterpretation,
     selected_thread_metadata: dict[str, Any],
 ) -> bool:
-    requested_field = str(
-        selected_thread_metadata.get("requested_field") or ""
-    ).partition(".")[0]
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
     if requested_field not in CONFIRMATION_EDIT_CLARIFY_FIELDS:
         return False
     if interpretation.semantic_turn_act in {

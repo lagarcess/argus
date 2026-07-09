@@ -239,6 +239,7 @@ from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
     _field_base,
     _should_preserve_prior_asset_context,
     _strategy_supplies_executable_rule_edit,
+    _strategy_supplies_explicit_turn_money,
     _supported_experiment_fact_packet,
 )
 from argus.agent_runtime.stages.interpret_types import (
@@ -621,6 +622,23 @@ async def _stage_result_from_interpretation(
                 ],
             }
         )
+    elif typed_artifact_edit_turn:
+        # An applied typed patch makes leftover action-rejection constraints
+        # stale, same as a corridor-confirmed answer.
+        typed_turn_constraints = _without_stale_requested_asset_rejection_constraints(
+            interpretation.unsupported_constraints,
+            strategy=incoming_strategy,
+        )
+        if len(typed_turn_constraints) < len(interpretation.unsupported_constraints):
+            interpretation = interpretation.model_copy(
+                update={
+                    "unsupported_constraints": typed_turn_constraints,
+                    "reason_codes": [
+                        *interpretation.reason_codes,
+                        "stale_requested_asset_rejection_removed",
+                    ],
+                }
+            )
     if (
         expects_strategy_route
         and interpretation.semantic_turn_act != "retry_failed_action"
@@ -854,13 +872,17 @@ async def _stage_result_from_interpretation(
     ):
         missing_required_fields = []
     pending_date_edit_reason_codes: list[str] = []
-    # A planned edit may change another field while reusing the prior window;
-    # that is not a date-answer noop.
-    if not typed_artifact_edit_turn and _pending_date_edit_reuses_prior_date_range(
-        strategy=strategy,
-        snapshot=snapshot,
-        selected_thread_metadata=selected_thread_metadata,
-        semantic_turn_act=interpretation.semantic_turn_act,
+    # A planned edit or an explicit money answer may change another field
+    # while reusing the prior window; that is not a date-answer noop.
+    if (
+        not typed_artifact_edit_turn
+        and not _strategy_supplies_explicit_turn_money(strategy)
+        and _pending_date_edit_reuses_prior_date_range(
+            strategy=strategy,
+            snapshot=snapshot,
+            selected_thread_metadata=selected_thread_metadata,
+            semantic_turn_act=interpretation.semantic_turn_act,
+        )
     ):
         missing_required_fields = list(
             dict.fromkeys([*missing_required_fields, "date_range"])

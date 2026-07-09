@@ -33,6 +33,7 @@ from argus.agent_runtime.state.models import (
     RunState,
     StrategySummary,
     TaskSnapshot,
+    UnsupportedConstraint,
     UserState,
 )
 
@@ -104,7 +105,9 @@ def _validated_confirmation_payload(strategy: StrategySummary) -> dict[str, Any]
             "entry_rule": None,
             "exit_rule": None,
             "sizing_mode": "capital_amount",
-            "capital_amount": strategy.capital_amount or 1000,
+            "capital_amount": (
+                strategy.capital_amount if strategy.capital_amount is not None else 1000
+            ),
             "position_size": None,
             "cadence": None,
             "parameters": {},
@@ -324,8 +327,12 @@ def test_adjust_assumptions_chip_capital_answer_lands_same_state_as_no_chip(
     chip_strategy = chip_result.decision.candidate_strategy_draft
     no_chip_strategy = no_chip_result.decision.candidate_strategy_draft
     assert chip_strategy.capital_amount == 10000
-    assert chip_strategy.capital_amount == no_chip_strategy.capital_amount
+    assert no_chip_strategy.capital_amount == 10000
     assert chip_strategy.asset_universe == ["AAPL"]
+    # The demotion fingerprint: the chip door must not reroute the answer
+    # into optional_parameter_status while nulling the draft's own field.
+    chip_optional_status = chip_result.patch.get("optional_parameter_status") or {}
+    assert "initial_capital" not in chip_optional_status
 
 
 def test_change_asset_chip_answered_with_capital_edit_applies_that_edit(
@@ -453,6 +460,77 @@ def test_change_dates_chip_capital_answer_replans_through_edit_planner(
     assert "artifact_assumption_edit_planned" in result.decision.reason_codes
 
 
+def test_change_dates_chip_capital_answer_survives_planner_outage(
+    monkeypatch,
+) -> None:
+    """When the replan planner yields nothing, a chip answer whose draft
+    carries explicit typed money must flow like the no-chip turn instead of
+    being dropped by requested_field preservation."""
+
+    _stub_equity_resolution(monkeypatch)
+    _stub_edit_planner(monkeypatch, None)
+
+    result = _run_chip_answer(
+        message="actually make it $5,000",
+        pending=_pending_three_assets(),
+        requested_field="date_range",
+        interpretation=StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User changed the starting capital.",
+            candidate_strategy_draft=StrategySummary(
+                capital_amount=5000,
+                extra_parameters={
+                    "field_provenance": {"capital_amount": "starting_capital"},
+                },
+            ),
+            semantic_turn_act="answer_pending_need",
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.capital_amount == 5000
+    assert strategy.asset_universe == ["TGT", "WSM", "COST"]
+
+
+def test_planned_asset_patch_is_not_blocked_by_stale_action_rejection(
+    monkeypatch,
+) -> None:
+    """A stale action-rejection constraint from the interpreter must not turn
+    an applied typed asset patch into a spurious clarification."""
+
+    _stub_equity_resolution(monkeypatch)
+    _stub_edit_planner(monkeypatch, None)
+
+    interpretation = _planned_edit_interpretation(
+        _planned_asset_replace_draft(["WSM", "COST"])
+    )
+    interpretation = interpretation.model_copy(
+        update={
+            "unsupported_constraints": [
+                UnsupportedConstraint(
+                    category="action",
+                    raw_value="remove TGT",
+                    explanation="Buttons cannot be clicked from chat.",
+                )
+            ]
+        }
+    )
+    result = _run_chip_answer(
+        message="I would like to remove TGT",
+        pending=_pending_three_assets(),
+        requested_field="asset_universe",
+        interpretation=interpretation,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["WSM", "COST"]
+    assert not result.decision.unsupported_constraints
+
+
 def test_change_asset_chip_planned_edit_over_symbol_limit_still_clarifies(
     monkeypatch,
 ) -> None:
@@ -481,18 +559,16 @@ def test_change_asset_chip_planned_edit_over_symbol_limit_still_clarifies(
     )
 
 
-def test_chip_clarify_fields_match_confirmation_edit_actions() -> None:
-    """The clarify-scope set stays bound to the chip action fields."""
+def test_chip_clarify_fields_cover_the_three_chip_actions() -> None:
+    """The clarify-scope set is derived from the chip action map; pin its
+    contents so an accidental map edit cannot silently change routing."""
 
-    from argus.agent_runtime.stages.interpret_actions import (
-        CONFIRMATION_EDIT_ACTION_FIELDS,
-    )
     from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
         CONFIRMATION_EDIT_CLARIFY_FIELDS,
     )
 
     assert CONFIRMATION_EDIT_CLARIFY_FIELDS == frozenset(
-        CONFIRMATION_EDIT_ACTION_FIELDS.values()
+        {"asset_universe", "date_range", "assumption"}
     )
 
 
