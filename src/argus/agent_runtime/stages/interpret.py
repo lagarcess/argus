@@ -27,6 +27,9 @@ from argus.agent_runtime.capabilities.answers import (
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.interpreter import provider_context_assets
+from argus.agent_runtime.presentation_i18n import (
+    asset_universe_operation_clarification_message,
+)
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
@@ -638,6 +641,23 @@ async def _stage_result_from_interpretation(
                         "stale_requested_asset_rejection_removed",
                     ],
                 }
+            )
+    else:
+        operation_symbol = _multi_asset_chip_answer_operation_symbol(
+            explicit_strategy=interpretation.candidate_strategy_draft,
+            prior_strategy=_active_strategy_from_snapshot(snapshot),
+            selected_thread_metadata=selected_thread_metadata,
+            current_user_message=state.current_user_message,
+            semantic_turn_act=interpretation.semantic_turn_act,
+        )
+        if operation_symbol is not None:
+            return _multi_asset_chip_answer_operation_clarification_result(
+                interpretation=interpretation,
+                prior_strategy=_active_strategy_from_snapshot(snapshot)
+                or incoming_strategy,
+                operation_symbol=operation_symbol,
+                current_user_message=state.current_user_message,
+                user=user,
             )
     if (
         expects_strategy_route
@@ -2203,6 +2223,100 @@ async def _compose_unhandled_conversation_answer(
         return None
     cleaned = str(response or "").strip()
     return cleaned or None
+
+
+def _multi_asset_chip_answer_operation_symbol(
+    *,
+    explicit_strategy: StrategySummary,
+    prior_strategy: StrategySummary | None,
+    selected_thread_metadata: dict[str, Any],
+    current_user_message: str,
+    semantic_turn_act: str | None,
+) -> str | None:
+    """A bare new symbol answering the asset chip on a multi-asset card is
+    add-or-replace ambiguous; the clarification must stay open instead of
+    reconfirming the unchanged card."""
+
+    if semantic_turn_act != "answer_pending_need":
+        return None
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return None
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "asset_universe":
+        return None
+    if explicit_strategy.asset_universe:
+        return None
+    prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
+    if len(prior_symbols) <= 1:
+        return None
+    answer = current_user_message.strip()
+    if not answer:
+        return None
+    resolution = _resolve_asset_candidate_safely(
+        answer,
+        field="asset_universe[0]",
+        source="user_mention",
+    )
+    if resolution is None or resolution.status != "resolved" or resolution.asset is None:
+        return None
+    symbol = resolution.asset.canonical_symbol
+    return symbol if symbol not in prior_symbols else None
+
+
+def _multi_asset_chip_answer_operation_clarification_result(
+    *,
+    interpretation: StructuredInterpretation,
+    prior_strategy: StrategySummary,
+    operation_symbol: str,
+    current_user_message: str,
+    user: UserState,
+) -> StageResult:
+    effective_profile = resolve_effective_response_profile(
+        user=user,
+        explicit_overrides=interpretation.response_profile_overrides,
+    )
+    decision = InterpretDecision(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary=interpretation.user_goal_summary,
+        candidate_strategy_draft=prior_strategy.model_copy(deep=True),
+        missing_required_fields=["asset_universe"],
+        confidence=interpretation.confidence,
+        arbitration_mode="deterministic",
+        reason_codes=[
+            *interpretation.reason_codes,
+            "asset_universe_operation_needs_clarification",
+        ],
+        effective_response_profile=effective_profile,
+        semantic_turn_act="answer_pending_need",
+    )
+    return StageResult(
+        outcome="needs_clarification",
+        decision=decision,
+        stage_patch={
+            "candidate_strategy_draft": prior_strategy.model_dump(mode="python"),
+            "assistant_response": asset_universe_operation_clarification_message(
+                language=user.language_preference
+            ),
+            "requested_field": "asset_universe",
+            "missing_required_fields": ["asset_universe"],
+            "response_intent": {
+                "kind": "clarification",
+                "semantic_needs": ["asset_target"],
+                "requested_fields": ["asset_universe"],
+                "facts": {
+                    "strategy": prior_strategy.model_dump(mode="python"),
+                    "current_user_message": current_user_message,
+                    "resolved_symbol": operation_symbol,
+                    "language": user.language_preference,
+                },
+                "options": [],
+            },
+        },
+    )
 
 
 def _strategy_with_requested_asset_answer_resolution(

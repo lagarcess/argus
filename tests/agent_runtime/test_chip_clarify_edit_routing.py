@@ -246,6 +246,37 @@ def test_change_asset_chip_raw_remove_remainder_does_not_wipe_pending_assets(
     assert "asset_universe" not in result.decision.missing_required_fields
 
 
+def test_change_asset_chip_bare_symbol_answer_on_multi_asset_card_clarifies(
+    monkeypatch,
+) -> None:
+    """A bare new symbol answering the asset chip on a multi-asset card is
+    add-or-replace ambiguous: keep the clarification open with pending state
+    intact instead of silently reconfirming the unchanged card."""
+
+    _stub_equity_resolution(monkeypatch)
+    _stub_edit_planner(monkeypatch, None)
+
+    result = _run_chip_answer(
+        message="MSFT",
+        pending=_pending_three_assets(),
+        requested_field="asset_universe",
+        interpretation=StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User answered the asset question.",
+            candidate_strategy_draft=StrategySummary(),
+            semantic_turn_act="answer_pending_need",
+        ),
+    )
+
+    assert result.outcome == "needs_clarification"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["TGT", "WSM", "COST"]
+    assert "asset_universe" in result.decision.missing_required_fields
+    assert result.patch.get("assistant_response")
+
+
 def test_change_asset_chip_compound_remove_replace_applies_set_complete(
     monkeypatch,
 ) -> None:
