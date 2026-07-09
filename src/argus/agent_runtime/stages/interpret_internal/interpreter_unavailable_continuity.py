@@ -38,6 +38,9 @@ from argus.agent_runtime.stages.artifact_context import (
     active_confirmation_effective_strategy,
     strategy_from_result_reference,
 )
+from argus.agent_runtime.stages.interpret_actions import (
+    CONFIRMATION_EDIT_ACTION_FIELDS,
+)
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
     _dedupe_resolution_provenance,
 )
@@ -46,6 +49,7 @@ from argus.agent_runtime.stages.interpret_internal.confirmation_artifact_edits i
     asset_edit_symbol_resolver,
     strategy_summary_uses_rsi,
 )
+from argus.agent_runtime.stages.interpret_internal.shared import _field_base
 from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
     StructuredInterpretation,
@@ -440,6 +444,53 @@ async def _planned_artifact_edit_interpretation(
         reason_codes=["artifact_assumption_edit_planned"],
         semantic_turn_act="answer_pending_need",
         artifact_target=artifact_target,
+    )
+
+
+# The chip-opened clarify scopes. The chip's field is display scope only; the
+# answer turn is planned like any natural-language edit.
+CONFIRMATION_EDIT_CLARIFY_FIELDS = frozenset(CONFIRMATION_EDIT_ACTION_FIELDS.values())
+
+
+def chip_clarify_answer_supplies_artifact_edit(
+    *,
+    interpretation: StructuredInterpretation,
+    selected_thread_metadata: dict[str, Any],
+) -> bool:
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field not in CONFIRMATION_EDIT_CLARIFY_FIELDS:
+        return False
+    if interpretation.semantic_turn_act in {
+        "approval",
+        "educational_question",
+        "result_followup",
+        "retry_failed_action",
+        "unsupported_request",
+    }:
+        return False
+    if interpretation.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    strategy = interpretation.candidate_strategy_draft
+    extra_parameters = strategy.extra_parameters or {}
+    return bool(
+        strategy.asset_universe
+        or strategy.date_range not in (None, "", {})
+        or strategy.capital_amount is not None
+        or strategy.timeframe not in (None, "")
+        or strategy.cadence not in (None, "")
+        or strategy.comparison_baseline not in (None, "")
+        or any(
+            extra_parameters.get(key) is not None
+            for key in (
+                "initial_capital",
+                "recurring_contribution",
+                "fee_rate",
+                "slippage",
+                "date_range_intent",
+            )
+        )
     )
 
 

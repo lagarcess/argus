@@ -34,6 +34,37 @@ def _field_base(field_name: str) -> str:
     return field_name.split("[", 1)[0]
 
 
+# Provenance sources meaning the user set the money field in THIS turn;
+# "prior" (carried context) is deliberately excluded.
+_EXPLICIT_TURN_MONEY_SOURCES = frozenset(
+    {
+        "user",
+        "explicit_user",
+        "starting_capital",
+        "starting_principal",
+        "recurring_contribution",
+        "contribution_amount",
+    }
+)
+
+
+def _strategy_supplies_explicit_turn_money(strategy: StrategySummary) -> bool:
+    extra_parameters = strategy.extra_parameters or {}
+    field_provenance = extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        return False
+    has_money_value = strategy.capital_amount is not None or any(
+        extra_parameters.get(key) is not None
+        for key in ("initial_capital", "recurring_contribution")
+    )
+    if not has_money_value:
+        return False
+    return any(
+        str(field_provenance.get(key) or "").strip() in _EXPLICIT_TURN_MONEY_SOURCES
+        for key in ("capital_amount", "initial_capital", "recurring_contribution")
+    )
+
+
 def _should_preserve_prior_asset_context(
     *,
     prior: StrategySummary,

@@ -27,6 +27,9 @@ from argus.agent_runtime.capabilities.answers import (
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.interpreter import provider_context_assets
+from argus.agent_runtime.presentation_i18n import (
+    asset_universe_operation_clarification_message,
+)
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
@@ -194,6 +197,7 @@ from argus.agent_runtime.stages.interpret_internal.benchmark_repairs import (
     strategy_with_unstated_benchmark_guard as _strategy_with_unstated_benchmark_guard,
 )
 from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
+    chip_clarify_answer_supplies_artifact_edit as _chip_clarify_answer_supplies_artifact_edit,
     draft_only_indicator_interpretation_when_interpreter_unavailable as _draft_only_indicator_interpretation_when_interpreter_unavailable,
     pending_response_option_interpretation_from_typed_selection as _pending_response_option_interpretation_from_typed_selection,
     pending_response_option_when_interpreter_unavailable as _pending_response_option_when_interpreter_unavailable,
@@ -238,6 +242,7 @@ from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
     _field_base,
     _should_preserve_prior_asset_context,
     _strategy_supplies_executable_rule_edit,
+    _strategy_supplies_explicit_turn_money,
     _supported_experiment_fact_packet,
 )
 from argus.agent_runtime.stages.interpret_types import (
@@ -574,8 +579,16 @@ async def _stage_result_from_interpretation(
             semantic_turn_act=interpretation.semantic_turn_act,
         )
     )
+    # A turn that already carries the typed edit contract owns its field
+    # patches; the requested_field answer corridors must not re-derive them.
+    typed_artifact_edit_turn = (
+        "artifact_assumption_edit_planned" in interpretation.reason_codes
+        or _structured_interpretation_has_complete_typed_asset_patch(interpretation)
+    )
     incoming_strategy, requested_asset_answer_applied = (
-        _strategy_with_requested_asset_answer_resolution(
+        (incoming_strategy, False)
+        if typed_artifact_edit_turn
+        else _strategy_with_requested_asset_answer_resolution(
             strategy=incoming_strategy,
             explicit_strategy=interpretation.candidate_strategy_draft,
             prior_strategy=_active_strategy_from_snapshot(snapshot),
@@ -612,6 +625,40 @@ async def _stage_result_from_interpretation(
                 ],
             }
         )
+    elif typed_artifact_edit_turn:
+        # An applied typed patch makes leftover action-rejection constraints
+        # stale, same as a corridor-confirmed answer.
+        typed_turn_constraints = _without_stale_requested_asset_rejection_constraints(
+            interpretation.unsupported_constraints,
+            strategy=incoming_strategy,
+        )
+        if len(typed_turn_constraints) < len(interpretation.unsupported_constraints):
+            interpretation = interpretation.model_copy(
+                update={
+                    "unsupported_constraints": typed_turn_constraints,
+                    "reason_codes": [
+                        *interpretation.reason_codes,
+                        "stale_requested_asset_rejection_removed",
+                    ],
+                }
+            )
+    else:
+        operation_symbol = _multi_asset_chip_answer_operation_symbol(
+            explicit_strategy=interpretation.candidate_strategy_draft,
+            prior_strategy=_active_strategy_from_snapshot(snapshot),
+            selected_thread_metadata=selected_thread_metadata,
+            current_user_message=state.current_user_message,
+            semantic_turn_act=interpretation.semantic_turn_act,
+        )
+        if operation_symbol is not None:
+            return _multi_asset_chip_answer_operation_clarification_result(
+                interpretation=interpretation,
+                prior_strategy=_active_strategy_from_snapshot(snapshot)
+                or incoming_strategy,
+                operation_symbol=operation_symbol,
+                current_user_message=state.current_user_message,
+                user=user,
+            )
     if (
         expects_strategy_route
         and interpretation.semantic_turn_act != "retry_failed_action"
@@ -697,9 +744,13 @@ async def _stage_result_from_interpretation(
             *validated_benchmark_reason_codes,
             *default_benchmark_reason_codes,
         ]
-    strategy, optional_parameter_values = _route_contextual_money_answer(
-        strategy=strategy,
-        selected_thread_metadata=selected_thread_metadata,
+    strategy, optional_parameter_values = (
+        (strategy, {})
+        if typed_artifact_edit_turn
+        else _route_contextual_money_answer(
+            strategy=strategy,
+            selected_thread_metadata=selected_thread_metadata,
+        )
     )
     integrity_report = (
         conserve_semantic_constraints(
@@ -841,11 +892,17 @@ async def _stage_result_from_interpretation(
     ):
         missing_required_fields = []
     pending_date_edit_reason_codes: list[str] = []
-    if _pending_date_edit_reuses_prior_date_range(
-        strategy=strategy,
-        snapshot=snapshot,
-        selected_thread_metadata=selected_thread_metadata,
-        semantic_turn_act=interpretation.semantic_turn_act,
+    # A planned edit or an explicit money answer may change another field
+    # while reusing the prior window; that is not a date-answer noop.
+    if (
+        not typed_artifact_edit_turn
+        and not _strategy_supplies_explicit_turn_money(strategy)
+        and _pending_date_edit_reuses_prior_date_range(
+            strategy=strategy,
+            snapshot=snapshot,
+            selected_thread_metadata=selected_thread_metadata,
+            semantic_turn_act=interpretation.semantic_turn_act,
+        )
     ):
         missing_required_fields = list(
             dict.fromkeys([*missing_required_fields, "date_range"])
@@ -2168,6 +2225,100 @@ async def _compose_unhandled_conversation_answer(
     return cleaned or None
 
 
+def _multi_asset_chip_answer_operation_symbol(
+    *,
+    explicit_strategy: StrategySummary,
+    prior_strategy: StrategySummary | None,
+    selected_thread_metadata: dict[str, Any],
+    current_user_message: str,
+    semantic_turn_act: str | None,
+) -> str | None:
+    """A bare new symbol answering the asset chip on a multi-asset card is
+    add-or-replace ambiguous; the clarification must stay open instead of
+    reconfirming the unchanged card."""
+
+    if semantic_turn_act != "answer_pending_need":
+        return None
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return None
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "asset_universe":
+        return None
+    if explicit_strategy.asset_universe:
+        return None
+    prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
+    if len(prior_symbols) <= 1:
+        return None
+    answer = current_user_message.strip()
+    if not answer:
+        return None
+    resolution = _resolve_asset_candidate_safely(
+        answer,
+        field="asset_universe[0]",
+        source="user_mention",
+    )
+    if resolution is None or resolution.status != "resolved" or resolution.asset is None:
+        return None
+    symbol = resolution.asset.canonical_symbol
+    return symbol if symbol not in prior_symbols else None
+
+
+def _multi_asset_chip_answer_operation_clarification_result(
+    *,
+    interpretation: StructuredInterpretation,
+    prior_strategy: StrategySummary,
+    operation_symbol: str,
+    current_user_message: str,
+    user: UserState,
+) -> StageResult:
+    effective_profile = resolve_effective_response_profile(
+        user=user,
+        explicit_overrides=interpretation.response_profile_overrides,
+    )
+    decision = InterpretDecision(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary=interpretation.user_goal_summary,
+        candidate_strategy_draft=prior_strategy.model_copy(deep=True),
+        missing_required_fields=["asset_universe"],
+        confidence=interpretation.confidence,
+        arbitration_mode="deterministic",
+        reason_codes=[
+            *interpretation.reason_codes,
+            "asset_universe_operation_needs_clarification",
+        ],
+        effective_response_profile=effective_profile,
+        semantic_turn_act="answer_pending_need",
+    )
+    return StageResult(
+        outcome="needs_clarification",
+        decision=decision,
+        stage_patch={
+            "candidate_strategy_draft": prior_strategy.model_dump(mode="python"),
+            "assistant_response": asset_universe_operation_clarification_message(
+                language=user.language_preference
+            ),
+            "requested_field": "asset_universe",
+            "missing_required_fields": ["asset_universe"],
+            "response_intent": {
+                "kind": "clarification",
+                "semantic_needs": ["asset_target"],
+                "requested_fields": ["asset_universe"],
+                "facts": {
+                    "strategy": prior_strategy.model_dump(mode="python"),
+                    "current_user_message": current_user_message,
+                    "resolved_symbol": operation_symbol,
+                    "language": user.language_preference,
+                },
+                "options": [],
+            },
+        },
+    )
+
+
 def _strategy_with_requested_asset_answer_resolution(
     *,
     strategy: StrategySummary,
@@ -2186,13 +2337,17 @@ def _strategy_with_requested_asset_answer_resolution(
     if requested_field != "asset_universe":
         return strategy, False
     del semantic_turn_act
+    prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
+    if len(prior_symbols) > 1:
+        # This corridor fills a single asset slot; multi-asset universes are
+        # edited only through typed EditOperations, never re-derived here.
+        return strategy, False
     asset_candidates = _requested_asset_answer_candidates(
         explicit_strategy=explicit_strategy,
         current_user_message=current_user_message,
     )
     if not asset_candidates:
         return strategy, False
-    prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
     fallback_resolution: AssetResolution | None = None
     resolution: AssetResolution | None = None
     for asset_candidate in asset_candidates:
@@ -2417,8 +2572,14 @@ async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
         return None
     if _structured_interpretation_has_complete_typed_asset_patch(interpretation):
         return None
-    if not _structured_interpretation_has_supported_artifact_assumption_edit(
-        interpretation
+    if not (
+        _structured_interpretation_has_supported_artifact_assumption_edit(
+            interpretation
+        )
+        or _chip_clarify_answer_supplies_artifact_edit(
+            interpretation=interpretation,
+            selected_thread_metadata=selected_thread_metadata,
+        )
     ):
         return None
     return await _planned_active_confirmation_edit_when_interpreter_unavailable(
