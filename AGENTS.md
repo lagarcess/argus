@@ -71,9 +71,16 @@ Before making code changes, agents must review these source-of-truth docs in thi
 
 # Agent Quality Pillars
 
+This is the canonical definition of the four pillars. `docs/ARCHITECTURE.md` and
+`docs/specs/private-alpha-next-roadmap.md` point here and must not restate them —
+one source, so they cannot drift.
+
 Use these pillars as a quality lens for roadmap work, subagent prompts, reviews,
 and slice specs. They are not automatic release blockers unless the active
-roadmap, runbook, or founder explicitly turns one into a gate.
+roadmap, runbook, or founder explicitly turns one into a gate. One clause is
+already a gate: the Evaluation pillar's "evaluate the full turn path" is enforced
+for interpreter-facing changes by the interpreter-facing live gate in the roadmap
+under "Standing release discipline".
 
 - **Intelligence**: Keep context anchored to Argus-owned artifacts such as
   conversations, backtest runs, Idea/IdeaVersion records, EvidenceArtifacts,

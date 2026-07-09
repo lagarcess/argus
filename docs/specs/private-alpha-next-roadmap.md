@@ -22,19 +22,21 @@ on every runtime PR, zero hidden failures at tip (1023 passed, 0 xfailed at
 `c081901`).
 Current pointer: the interpret/edit spine is between owners; A1b (linked
 IdeaVersion emission) is the next spine-chain slice and is unblocked.
-The interpret/edit-surface burn-down is FULLY CLOSED (2026-07-09): PR #185
+The interpret/edit-surface burn-down is nearly closed (2026-07-09): PR #185
 (#160(A)) and PR #186 (#151) un-xfailed the last two strict gates; PR #187 fixed
-the demo-caught benchmark-keep regression; PR #189 closed the pre-run
-chip-clarify twin (#188) — chips and natural language now converge on one typed
-edit contract on both the post-result and confirmation surfaces. No spine
-blockers remain; the suite carries zero xfails.
-Promotion to `main` is UNBLOCKED on code. What remains is release mechanics, not
-lanes: (1) full live-eval rerun on the exact promotion SHA `c081901`; (2) the
-clean-checkout suite gate (#134/#135); (3) founder waiver on the known grok
-options-idea nondeterminism; (4) release manifest + `main` promotion PR (merge
-commit, not squash, so this is the last all-of-history diff). #164 (post-result
-followup typing / approval-vs-pending-clarify policy) is the deferred follow-up,
-not a gate.
+the demo-caught benchmark-keep regression. **One blocker is open: #188.** PR #189
+merged claiming to close the pre-run chip-clarify twin, but founder browser QA
+proved it broke live (mocked tests passed; real Grok still inverted a chip
+remove) — #188 is REOPENED and the re-fix is in flight as PR #190. The suite
+carries zero xfails, but zero xfails is not the promotion bar; the live gate is.
+Promotion to `main` is BLOCKED on #190 landing verified through the
+interpreter-facing live gate (see "Standing release discipline"). Once it does,
+the remaining steps are release mechanics: (1) full live-eval rerun on the exact
+promotion SHA; (2) the clean-checkout suite gate (#134/#135); (3) founder waiver
+on the known grok options-idea nondeterminism; (4) release manifest + `main`
+promotion PR (merge commit, not squash, so this is the last all-of-history diff).
+#164 (post-result followup typing / approval-vs-pending-clarify policy) is the
+deferred follow-up, not a gate.
 Execution runs off the P2 execution board below: point an agent at any READY
 lane. The interpret/edit spine has exactly one owner lane at a time (currently
 unowned; A1b is next in the spine chain).
@@ -276,48 +278,20 @@ these is allowed; shipping them is not P2 scope.
 
 #### P2 Agent Quality Pillars
 
-Use these pillars to sharpen every P2 slice. They are quality bars for the
-existing execution board, not new lanes and not additional promotion blockers
-unless this roadmap later marks them as gates.
+The four pillars (Intelligence, Evaluation, Platform, User Experience) are
+defined once, canonically, in `AGENTS.md` → "Agent Quality Pillars". They are a
+quality lens for every P2 slice, not new lanes and not promotion blockers unless
+this roadmap marks one as a gate (see the interpreter-facing live gate under
+"Standing release discipline" below). Do not restate the pillar definitions
+here. Only the P2-specific applications live in this doc:
 
-1. **Intelligence**
-   - Keep active context pinned to canonical Argus artifacts: current
-     conversation, pending confirmation, latest run, IdeaVersion,
-     EvidenceArtifact, DecisionNote, and future user-confirmed MemoryRecord.
-   - A1b should make refinement create linked versions rather than loose
-     transcript-only state. A2 should compare canonical versions/artifacts, not
-     reconstructed prose.
-   - Retrieval or memory accelerators named in the decision memo are leverage
-     behind this contract; they must not replace Supabase/Postgres product
-     truth.
-
-2. **Evaluation**
-   - Evaluate the full turn path, not only the final assistant message:
-     structured interpretation, fact/tool sources, artifact ids, result state,
-     recovery path, cost, latency, and user-visible response.
-   - Live eval failures should be clustered by roadmap concern: artifact
-     grounding, comparison correctness, recovery/Spanish parity, hydration,
-     capability honesty, cost/performance, or release environment.
-   - Keep current release gates unchanged: exact-SHA live eval, clean-checkout
-     suite, and founder decisions remain the promotion criteria until changed
-     explicitly.
-
-3. **Platform**
-   - Prefer reusable typed contracts, correlation ids, route receipts, feature
-     flags, provider abstraction, and append-only operational evidence over
-     one-off slice plumbing.
-   - Platform work should stay thin and earned. It belongs when it reduces
-     repeated risk across the chat/backtest/evidence loop, not when it creates a
-     second runtime, dashboard, or orchestration system.
-
-4. **User Experience**
-   - The chat remains the primary workspace, but direct controls are appropriate
-     when they safely mutate typed artifacts faster than another LLM round trip.
-   - Result, comparison, recovery, and future memory surfaces must make
-     assumptions inspectable, keep the user anchored to the active artifact, and
-     avoid frontend-invented state.
-   - Unsupported behavior should be explained in product language with a nearby
-     supported path, especially in Spanish-preferring sessions.
+- **Intelligence** → A1b makes refinement create linked IdeaVersions, not loose
+  transcript state; A2 compares canonical versions/artifacts, not reconstructed
+  prose. Memo-named retrieval/memory accelerators are leverage behind this
+  contract, never a replacement for Supabase/Postgres product truth.
+- **Evaluation** → cluster live-eval failures by roadmap concern (artifact
+  grounding, comparison correctness, recovery/Spanish parity, hydration,
+  capability honesty, cost/performance, release environment).
 
 #### Why P2 is sliced this way: the quarantine lesson
 
@@ -659,15 +633,16 @@ monetization/entitlement architecture.
   gates are un-xfailed and enforced by the #169 sweep. Residual risk is model-
   side only (grok options-classification nondeterminism), not spine logic.
 
-##### Main-promotion burn-down — the interpret-surface lane (CLOSED 2026-07-09: all members landed via PRs #182/#185/#186/#187/#189; #169 + #183 off-spine)
+##### Main-promotion burn-down — the interpret-surface lane (near-closed 2026-07-09: #182/#185/#186/#187 landed; #189 merged but #188 REOPENED — re-fix in flight as PR #190; #169 + #183 off-spine)
 
 This was one regression cluster on the interpret/edit spine, most introduced by
-the 07-06/07-07 merges, worked as a single-owner burn-down lane. It is now
-fully closed — the record below is retained for provenance. No code blocker
-remains between `codex/private-alpha-next` @ `c081901` and a `main` promotion
-candidate; the only gates left are the standing release-discipline reruns
-(live eval on the exact SHA + clean-checkout gate) and the founder's options
-waiver.
+the 07-06/07-07 merges, worked as a single-owner burn-down lane. All members are
+fixed except #188: #189 claimed to close it but broke live (see the
+interpreter-facing live gate under "Standing release discipline"), so it is
+REOPENED with PR #190 in flight. Until #190 lands verified through that gate,
+#188 is the one code blocker between `codex/private-alpha-next` and a `main`
+promotion candidate; the standing release-discipline reruns (live eval on the
+exact SHA + clean-checkout gate) and the founder's options waiver remain after.
 
 Shared surface (why they cannot be parallel implementers): `stages/interpret.py`,
 `interpreter/artifact_assumption_edit.py`,
@@ -732,11 +707,19 @@ known data-dropping regressions, so fix is preferred over waive.
 **Standing release discipline** (blocks `main`, not a lane): rerun the exact
 clean-checkout suite gate (issue #134 / PR #135) before any branch or `main`
 promotion instead of treating the repair as permanent proof for future SHAs.
-Promotion to `main` is UNBLOCKED on code (2026-07-09) — the entire interpret-surface
-cluster (#171/#150/#160(A)(B)/#151) plus the demo follow-ups (#187/#188) are fixed
-and the suite carries zero xfails. The only remaining gates are this
-standing release discipline (clean-checkout rerun + exact-SHA live eval) and the
-founder's options-waiver call.
+Interpret-surface status (2026-07-09): #171/#150/#160(A)(B)/#151/#187 are fixed;
+**#188 is REOPENED** — #189's chip-clarify fix passed mocked tests but broke live
+(the exact failure the gate below now exists to catch), re-fix in flight as
+PR #190. Promotion stays blocked until #190 lands verified.
+
+**Interpreter-facing live gate (blocks issue-close, not just `main`):** an
+interpret/edit/chat-facing fix is not "closed" on mocked-green alone. Before its
+issue closes, a real-interpreter (live Grok) reproduction of its exact acceptance
+case — driven through the running runtime, asserting typed state — must pass, and
+that case must be added to the live eval suite so it guards the path permanently.
+Mocked/injected-interpretation tests prove spine application, never interpreter
+classification; treating them as sufficient is how #189 shipped a live-broken
+fix. This graduates the AGENTS.md Evaluation pillar from lens to gate.
 The eval harness (B3 slice 1, PR #143) is now a live landing gate:
 runtime-behavior PRs run the live eval suite once pre-merge; every `main`
 promotion candidate runs the full live suite on its exact SHA with no
@@ -853,8 +836,8 @@ moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
   renders from typed codes/keys in the detected turn language. The PMF gate below
   (Spanish-preferring users complete the loop unaided) is validated by the live
   eval harness; #171 is closed in mocked/repro gates, and the interpret-surface
-  cluster (#160/#151 + demo follow-ups #187/#188) is fully closed — the only
-  remaining promotion step is the exact-SHA live-eval rerun.
+  cluster (#160/#151 + demo follow-up #187) is fixed — the last blocker is #188
+  (REOPENED; PR #190 in flight), then the exact-SHA live-eval rerun.
 - Outcome: when Argus fails or hits an unsupported request, recovery preserves
   the user's idea, clarifies without making the user feel wrong, explains
   unsupported capability in product language, and never leaks raw provider/runtime
