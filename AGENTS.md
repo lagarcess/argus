@@ -69,6 +69,33 @@ Before making code changes, agents must review these source-of-truth docs in thi
 
 ---
 
+# Agent Quality Pillars
+
+Use these pillars as a quality lens for roadmap work, subagent prompts, reviews,
+and slice specs. They are not automatic release blockers unless the active
+roadmap, runbook, or founder explicitly turns one into a gate.
+
+- **Intelligence**: Keep context anchored to Argus-owned artifacts such as
+  conversations, backtest runs, Idea/IdeaVersion records, EvidenceArtifacts,
+  DecisionNotes, and future user-confirmed MemoryRecords. LLMs interpret and
+  voice responses; canonical records own durable facts.
+- **Evaluation**: Judge assistant quality at the session level, not only by
+  isolated prose. Important evals should inspect the user-visible response plus
+  the hidden structured path: interpretation, tool/fact sources, artifact ids,
+  UI state, recovery, cost, and latency when relevant.
+- **Platform**: Prefer shared typed contracts, reusable runtime services,
+  correlation ids, feature flags, and append-only operational evidence over
+  one-off feature plumbing. New platform machinery earns its place only when it
+  protects the chat/backtest/evidence loop.
+- **User Experience**: Chat stays primary, but direct artifact controls should
+  exist where they reduce friction. UI must show assumptions, preserve
+  continuity, avoid invented backend facts, and make unsupported behavior clear
+  without blaming the user.
+
+Tool-specific choices and sequencing live in
+`docs/specs/private-alpha-next-decision-memo.md`; the active execution board
+lives in `docs/specs/private-alpha-next-roadmap.md`.
+
 # 🧭 Current Milestone: Private Alpha Next P1
 
 When working from `codex/private-alpha-next` or its clean reintegration lane,

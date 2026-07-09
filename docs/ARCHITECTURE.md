@@ -54,6 +54,30 @@ Use streaming or jobs only where they materially improve UX.
 
 Prefer simpler architecture that can ship now.
 
+## Agent Quality Pillars
+
+Argus uses four assistant-quality pillars to keep future AI work grounded in the
+product architecture. These pillars guide design, review, and evaluation; they
+do not change service ownership or create new release gates by themselves.
+
+- **Intelligence**: Runtime context must be derived from canonical Argus
+  artifacts and typed contracts. LLMs can interpret, plan, and voice responses,
+  but durable facts come from product records, engine outputs, provider-backed
+  validation, and explicit user decisions.
+- **Evaluation**: Agent behavior should be evaluated as a full turn or session
+  path: input, structured interpretation, tool/fact calls, artifact mutations,
+  user-visible output, recovery behavior, cost, and latency where relevant.
+  Prose quality matters, but factual and state correctness are judged through
+  structured evidence.
+- **Platform**: Shared runtime services, typed APIs, correlation ids, provider
+  abstraction, feature flags, and first-party operational ledgers should support
+  many slices without becoming a second product brain. Platform work is valuable
+  when it reduces repeated risk in the chat/backtest/evidence loop.
+- **User Experience**: The frontend renders backend-provided truth and gives the
+  user clear, low-friction ways to inspect or correct artifacts. Every visible
+  claim about a result, assumption, comparison, recovery, or memory should trace
+  back to a canonical source or be clearly presented as model-voiced guidance.
+
 ---
 
 # 3. Product Surface Architecture

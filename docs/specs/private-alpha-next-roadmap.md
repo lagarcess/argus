@@ -274,6 +274,51 @@ excerpts (Slice K), broker/export handoff (Slice N), iOS shell (Slice L), and
 external engines beyond read-only reference (Slice M). Producing design notes for
 these is allowed; shipping them is not P2 scope.
 
+#### P2 Agent Quality Pillars
+
+Use these pillars to sharpen every P2 slice. They are quality bars for the
+existing execution board, not new lanes and not additional promotion blockers
+unless this roadmap later marks them as gates.
+
+1. **Intelligence**
+   - Keep active context pinned to canonical Argus artifacts: current
+     conversation, pending confirmation, latest run, IdeaVersion,
+     EvidenceArtifact, DecisionNote, and future user-confirmed MemoryRecord.
+   - A1b should make refinement create linked versions rather than loose
+     transcript-only state. A2 should compare canonical versions/artifacts, not
+     reconstructed prose.
+   - Retrieval or memory accelerators named in the decision memo are leverage
+     behind this contract; they must not replace Supabase/Postgres product
+     truth.
+
+2. **Evaluation**
+   - Evaluate the full turn path, not only the final assistant message:
+     structured interpretation, fact/tool sources, artifact ids, result state,
+     recovery path, cost, latency, and user-visible response.
+   - Live eval failures should be clustered by roadmap concern: artifact
+     grounding, comparison correctness, recovery/Spanish parity, hydration,
+     capability honesty, cost/performance, or release environment.
+   - Keep current release gates unchanged: exact-SHA live eval, clean-checkout
+     suite, and founder decisions remain the promotion criteria until changed
+     explicitly.
+
+3. **Platform**
+   - Prefer reusable typed contracts, correlation ids, route receipts, feature
+     flags, provider abstraction, and append-only operational evidence over
+     one-off slice plumbing.
+   - Platform work should stay thin and earned. It belongs when it reduces
+     repeated risk across the chat/backtest/evidence loop, not when it creates a
+     second runtime, dashboard, or orchestration system.
+
+4. **User Experience**
+   - The chat remains the primary workspace, but direct controls are appropriate
+     when they safely mutate typed artifacts faster than another LLM round trip.
+   - Result, comparison, recovery, and future memory surfaces must make
+     assumptions inspectable, keep the user anchored to the active artifact, and
+     avoid frontend-invented state.
+   - Unsupported behavior should be explained in product language with a nearby
+     supported path, especially in Spanish-preferring sessions.
+
 #### Why P2 is sliced this way: the quarantine lesson
 
 Two branches attempted P2 work and both broke the language-agnostic, LLM-first
