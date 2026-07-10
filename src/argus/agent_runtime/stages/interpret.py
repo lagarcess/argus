@@ -201,8 +201,10 @@ from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_conti
     draft_only_indicator_interpretation_when_interpreter_unavailable as _draft_only_indicator_interpretation_when_interpreter_unavailable,
     pending_response_option_interpretation_from_typed_selection as _pending_response_option_interpretation_from_typed_selection,
     pending_response_option_when_interpreter_unavailable as _pending_response_option_when_interpreter_unavailable,
+    pending_confirmation_chip_clarify_edit_requested_field as _pending_confirmation_chip_clarify_edit_requested_field,
     planned_active_confirmation_edit_interpretation as _planned_active_confirmation_edit_interpretation,
     planned_latest_result_edit_interpretation as _planned_latest_result_edit_interpretation,
+    planned_pending_confirmation_edit_interpretation as _planned_pending_confirmation_edit_interpretation,
     planned_pending_refinement_edit_interpretation as _planned_pending_refinement_edit_interpretation,
     structured_interpretation_has_complete_typed_asset_patch as _structured_interpretation_has_complete_typed_asset_patch,
     structured_interpretation_has_supported_artifact_assumption_edit as _structured_interpretation_has_supported_artifact_assumption_edit,
@@ -709,8 +711,8 @@ async def _stage_result_from_interpretation(
             )
         )
         benchmark_reason_codes.extend(unstated_benchmark_reason_codes)
-        strategy, asset_repair_reason_codes = (
-            _strategy_with_benchmark_owner_asset_repair(strategy)
+        strategy, asset_repair_reason_codes = _strategy_with_benchmark_owner_asset_repair(
+            strategy
         )
     if expects_strategy_route:
         prior_strategy = _active_strategy_from_snapshot(snapshot)
@@ -728,9 +730,11 @@ async def _stage_result_from_interpretation(
             _strategy_with_default_template_for_complete_no_rule_shape(strategy)
         )
     if expects_strategy_route:
-        strategy, separate_benchmark_reason_codes = _strategy_with_separate_benchmark_symbol(
-            strategy,
-            prior_strategy=_active_strategy_from_snapshot(snapshot),
+        strategy, separate_benchmark_reason_codes = (
+            _strategy_with_separate_benchmark_symbol(
+                strategy,
+                prior_strategy=_active_strategy_from_snapshot(snapshot),
+            )
         )
         strategy, validated_benchmark_reason_codes = (
             _strategy_with_validated_benchmark_symbol(strategy)
@@ -1201,10 +1205,8 @@ async def _stage_result_from_interpretation(
         # not silently dropped. Scoped to the edit-planner reason code so spurious
         # clarifications overridden to a confirmation on other routes stay
         # suppressed; clean edits leave assistant_response None -> no message.
-        if (
-            interpretation.assistant_response
-            and "artifact_assumption_edit_planned"
-            in (interpretation.reason_codes or [])
+        if interpretation.assistant_response and "artifact_assumption_edit_planned" in (
+            interpretation.reason_codes or []
         ):
             stage_patch["assistant_response"] = interpretation.assistant_response
         return StageResult(
@@ -1293,11 +1295,9 @@ def _strategy_with_current_message_run_field_contract(
             "Interpret stage cleared unsupported complete date range",
             strategy_type=strategy.strategy_type,
         )
-    if (
-        _strategy_has_non_executable_timeframe_label(
-            updated,
-            supported_timeframes=supported_timeframes,
-        )
+    if _strategy_has_non_executable_timeframe_label(
+        updated,
+        supported_timeframes=supported_timeframes,
     ):
         updated.timeframe = None
         changed = True
@@ -1318,8 +1318,7 @@ def _strategy_with_current_message_run_field_contract(
     requires_clarification = interpretation.requires_clarification
     assistant_response = interpretation.assistant_response
     if unresolved_stated_window and not any(
-        str(field).split("[", 1)[0] == "date_range"
-        for field in missing_required_fields
+        str(field).split("[", 1)[0] == "date_range" for field in missing_required_fields
     ):
         missing_required_fields.append("date_range")
     if (
@@ -1660,7 +1659,9 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     if (
         interpretation.semantic_turn_act != "answer_pending_need"
         and not interpretation.requires_clarification
-        and _candidate_strategy_has_backtest_shape(interpretation.candidate_strategy_draft)
+        and _candidate_strategy_has_backtest_shape(
+            interpretation.candidate_strategy_draft
+        )
     ):
         return interpretation
     repaired = _pending_date_answer_interpretation(
@@ -1888,7 +1889,9 @@ async def _supported_strategy_education_repair_if_needed(
         capability_contract=capability_contract,
         language=language,
     )
-    return composed or recovery_message("capability_answer_unavailable", language=language)
+    return composed or recovery_message(
+        "capability_answer_unavailable", language=language
+    )
 
 
 async def _compose_natural_context_curiosity_answer(
@@ -1909,7 +1912,8 @@ async def _compose_natural_context_curiosity_answer(
     provenance_rule = (
         "If you use visible artifact context, say so naturally with phrases like "
         "'from this result' or 'from this confirmation'."
-        if artifact_target in {"latest_result", "active_confirmation", "pending_refinement"}
+        if artifact_target
+        in {"latest_result", "active_confirmation", "pending_refinement"}
         else "Do not imply you used a prior result or hidden memory."
     )
     messages = [
@@ -1948,8 +1952,7 @@ async def _compose_natural_context_curiosity_answer(
         {
             "role": "system",
             "content": (
-                "Supported experiment paths: "
-                f"{_supported_experiment_fact_packet()}"
+                "Supported experiment paths: " f"{_supported_experiment_fact_packet()}"
             ),
         },
         {"role": "user", "content": current_user_message},
@@ -2208,8 +2211,7 @@ async def _compose_unhandled_conversation_answer(
         {
             "role": "system",
             "content": (
-                "Supported experiment paths: "
-                f"{_supported_experiment_fact_packet()}"
+                "Supported experiment paths: " f"{_supported_experiment_fact_packet()}"
             ),
         },
         {"role": "user", "content": current_user_message},
@@ -2375,7 +2377,10 @@ def _strategy_with_requested_asset_answer_resolution(
             and candidate_resolution.asset.canonical_symbol in prior_symbols
         ):
             continue
-        if candidate_resolution.status == "resolved" and candidate_resolution.asset is not None:
+        if (
+            candidate_resolution.status == "resolved"
+            and candidate_resolution.asset is not None
+        ):
             resolution = candidate_resolution
             break
         if fallback_resolution is None:
@@ -2557,6 +2562,35 @@ async def _planned_active_confirmation_edit_when_interpreter_unavailable(
     )
 
 
+async def _planned_pending_confirmation_edit_from_chip_clarify_answer(
+    *,
+    state: RunState,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+    capability_contract: Any,
+    selected_thread_metadata: dict[str, Any],
+    requested_field: str,
+) -> StageResult | None:
+    interpretation = await _planned_pending_confirmation_edit_interpretation(
+        snapshot=snapshot,
+        current_user_message=current_user_message,
+        requested_field=requested_field,
+        resolve_asset_candidate=_resolve_asset_candidate_safely,
+        plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+    )
+    if interpretation is None:
+        return None
+    return await _stage_result_from_interpretation(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        interpretation=interpretation,
+        capability_contract=capability_contract,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+
+
 async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
     *,
     state: RunState,
@@ -2566,21 +2600,38 @@ async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
     interpretation: StructuredInterpretation,
     capability_contract: Any,
 ) -> StageResult | None:
-    if snapshot is None or snapshot.active_confirmation_reference is None:
+    if snapshot is None:
         return None
     if "artifact_assumption_edit_planned" in interpretation.reason_codes:
         return None
-    if _structured_interpretation_has_complete_typed_asset_patch(interpretation):
-        return None
-    if not (
-        _structured_interpretation_has_supported_artifact_assumption_edit(
-            interpretation
-        )
-        or _chip_clarify_answer_supplies_artifact_edit(
+    chip_clarify_answer_supplies_edit = _chip_clarify_answer_supplies_artifact_edit(
+        interpretation=interpretation,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    pending_confirmation_requested_field = (
+        _pending_confirmation_chip_clarify_edit_requested_field(
             interpretation=interpretation,
             selected_thread_metadata=selected_thread_metadata,
         )
+    )
+    if not (
+        _structured_interpretation_has_supported_artifact_assumption_edit(interpretation)
+        or chip_clarify_answer_supplies_edit
     ):
+        return None
+    if snapshot.active_confirmation_reference is None:
+        if pending_confirmation_requested_field is None:
+            return None
+        return await _planned_pending_confirmation_edit_from_chip_clarify_answer(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            current_user_message=state.current_user_message,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_thread_metadata,
+            requested_field=pending_confirmation_requested_field,
+        )
+    if _structured_interpretation_has_complete_typed_asset_patch(interpretation):
         return None
     return await _planned_active_confirmation_edit_when_interpreter_unavailable(
         state=state,
@@ -2896,9 +2947,7 @@ async def _private_alpha_save_request_result_if_applicable(
         language=user.language_preference,
     )
     if response is None:
-        response = fallback_private_alpha_save_response(
-            language=user.language_preference
-        )
+        response = fallback_private_alpha_save_response(language=user.language_preference)
     return StageResult(
         outcome="ready_to_respond",
         decision=decision.model_copy(
@@ -2950,22 +2999,19 @@ def _canonicalized_strategy(
             cadence_word_symbols.append(symbol)
             continue
         field = f"asset_universe[{index}]"
-        resolution = (
-            provider_context_assets.resolution_from_strategy_context(
+        resolution = provider_context_assets.resolution_from_strategy_context(
+            updated,
+            symbol,
+            field=field,
+        ) or _resolve_asset_candidate(
+            symbol,
+            field=field,
+            source=_asset_resolution_source_for_canonicalization(
                 updated,
-                symbol,
-                field=field,
-            )
-            or _resolve_asset_candidate(
-                symbol,
-                field=field,
-                source=_asset_resolution_source_for_canonicalization(
-                    updated,
-                    index=index,
-                    symbol=symbol,
-                ),
-                asset_class_hint=updated.asset_class,
-            )
+                index=index,
+                symbol=symbol,
+            ),
+            asset_class_hint=updated.asset_class,
         )
         provenance.append(resolution.provenance)
         if resolution.status != "resolved" or resolution.asset is None:
@@ -3071,22 +3117,23 @@ def _strategy_with_validated_benchmark_symbol(
     if benchmark is None:
         return strategy, []
     try:
-        resolution = (
-            provider_context_assets.resolution_from_strategy_context(
-                strategy,
-                benchmark,
-                field="comparison_baseline",
-            )
-            or _resolve_asset_candidate(
-                benchmark,
-                field="comparison_baseline",
-                source="llm_extraction",
-                asset_class_hint=strategy.asset_class,
-            )
+        resolution = provider_context_assets.resolution_from_strategy_context(
+            strategy,
+            benchmark,
+            field="comparison_baseline",
+        ) or _resolve_asset_candidate(
+            benchmark,
+            field="comparison_baseline",
+            source="llm_extraction",
+            asset_class_hint=strategy.asset_class,
         )
     except ValueError:
         resolution = None
-    if resolution is not None and resolution.status == "resolved" and resolution.asset is not None:
+    if (
+        resolution is not None
+        and resolution.status == "resolved"
+        and resolution.asset is not None
+    ):
         benchmark_asset_class = resolution.asset.asset_class
         if strategy.asset_class and benchmark_asset_class != strategy.asset_class:
             updated = strategy.model_copy(deep=True)

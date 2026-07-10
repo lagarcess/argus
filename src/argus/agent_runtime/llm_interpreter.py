@@ -14,7 +14,6 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from loguru import logger
 
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
-from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
@@ -146,7 +145,9 @@ from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
     _merge_focused_repair_with_base,
     _openrouter_wire_messages,
 )
-from argus.agent_runtime.interpreter.execution_cost_capability import execution_cost_capability_clause
+from argus.agent_runtime.interpreter.execution_cost_capability import (
+    execution_cost_capability_clause,
+)
 from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _apply_pending_response_option_replacement,
     _clear_dca_recurring_fields,
@@ -160,11 +161,14 @@ from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _response_needs_pending_response_option_selection_audit,
 )
 from argus.agent_runtime.interpreter import provider_context_assets
-from argus.agent_runtime.interpreter import requested_asset_answer as _requested_asset_answer
+from argus.agent_runtime.interpreter import (
+    requested_asset_answer as _requested_asset_answer,
+)
 from argus.agent_runtime.interpreter.readiness_helpers import (  # noqa: F401
     _active_artifact_asset_universe_operation_needs_planner,
     _asset_universe_operation_clarification_response,
     _log_runtime_readiness_step,
+    _plain_requested_asset_answer_can_use_provider_resolution,
 )
 from argus.agent_runtime.interpreter.run_field_audits import (  # noqa: F401
     _clear_rule_or_indicator_fields,
@@ -317,7 +321,9 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMStrategyDraft,
     LLMUnsupportedConstraint,
 )
-from argus.agent_runtime.presentation_i18n import asset_universe_operation_clarification_message
+from argus.agent_runtime.presentation_i18n import (
+    asset_universe_operation_clarification_message,
+)
 from argus.agent_runtime.resolution import AssetResolution, callable_accepts_keyword
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
@@ -1015,11 +1021,13 @@ class OpenRouterStructuredInterpreter:
             "regex for those preferences.\n\n"
             "Selected thread metadata may include the pending requested_field from "
             "the visible artifact. Use it as context for short answers, not as "
-            "user-facing copy. If requested_field is asset_universe and the current "
-            "message is a company, ticker, crypto asset, or currency-pair answer, "
-            "fill only the replacement asset field in candidate_strategy_draft and "
-            "keep unrelated prior strategy fields unchanged. Use normal market-symbol "
-            "knowledge for the candidate strategy when the company or asset is common; "
+            "user-facing copy. If requested_field is asset_universe, treat the "
+            "reply as an operation-agnostic asset edit context: the user may add "
+            "assets, remove assets, keep a subset, replace assets, or change a "
+            "different setup field. Do not assume the visible chip means single-asset "
+            "replacement. Extract only the user's typed edit into "
+            "candidate_strategy_draft and keep unrelated prior strategy fields "
+            "unchanged. Use normal market-symbol knowledge for common assets; "
             "deterministic provider validation will accept, clarify, or reject it "
             "after you return. If the user gives a fresh complete idea instead of a "
             "field answer, classify that as a new idea and extract the full draft.\n\n"
@@ -1082,7 +1090,9 @@ class OpenRouterStructuredInterpreter:
 
 
 def _provider_asset_resolution_context_from_extraction(extraction):
-    return provider_asset_resolution_context_from_extraction(extraction, resolve_asset_candidate=_resolve_asset_candidate)  # noqa: E501
+    return provider_asset_resolution_context_from_extraction(
+        extraction, resolve_asset_candidate=_resolve_asset_candidate
+    )
 
 
 async def _asset_grounding_audited_response(
@@ -1161,9 +1171,7 @@ def _suspicious_extracted_asset_symbols(
     raw_tokens = set(request.current_user_message.translate(_ASSET_TOKEN_MAP).split())
     lower_tokens = {token.casefold() for token in raw_tokens}
     cashtag_tokens = {
-        token.lstrip("$").casefold()
-        for token in raw_tokens
-        if token.startswith("$")
+        token.lstrip("$").casefold() for token in raw_tokens if token.startswith("$")
     }
     grounded_symbols = {
         str(asset.canonical_symbol).strip().upper()
@@ -1275,11 +1283,7 @@ def _current_message_has_other_name_supported_asset(
         limit=5,
     )
     for mention in mentions:
-        symbol = (
-            str(getattr(mention.asset, "canonical_symbol", "") or "")
-            .strip()
-            .upper()
-        )
+        symbol = str(getattr(mention.asset, "canonical_symbol", "") or "").strip().upper()
         if (
             symbol != excluding_symbol
             and symbol not in ignored_symbols
@@ -1393,9 +1397,7 @@ def _response_without_ungrounded_symbols(
             "assistant_response": None,
             "requires_clarification": requires_clarification,
             "missing_required_fields": missing_required_fields,
-            "reason_codes": list(
-                dict.fromkeys([*response.reason_codes, reason_code])
-            ),
+            "reason_codes": list(dict.fromkeys([*response.reason_codes, reason_code])),
         }
     )
 
@@ -1474,13 +1476,15 @@ async def _requested_asset_answer_candidate_audited_response(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
-    return await _requested_asset_answer.requested_asset_answer_candidate_audited_response(
-        response=response,
-        preferred_model=preferred_model,
-        request=request,
-        invoke_schema=invoke_openrouter_json_schema,
-        resolve_asset_candidate=_resolve_asset_candidate,
-        model_candidates=_unique_repair_models,
+    return (
+        await _requested_asset_answer.requested_asset_answer_candidate_audited_response(
+            response=response,
+            preferred_model=preferred_model,
+            request=request,
+            invoke_schema=invoke_openrouter_json_schema,
+            resolve_asset_candidate=_resolve_asset_candidate,
+            model_candidates=_unique_repair_models,
+        )
     )
 
 
@@ -1544,9 +1548,7 @@ def _draft_has_valid_requested_asset_update(
     )
 
 
-_ASSET_TOKEN_MAP = str.maketrans(
-    {char: " " for char in ".,;:!?()[]{}<>\"'`"}
-)
+_ASSET_TOKEN_MAP = str.maketrans({char: " " for char in ".,;:!?()[]{}<>\"'`"})
 
 
 def _asset_grounding_audit_messages(
@@ -2177,9 +2179,12 @@ async def _response_ready_for_runtime(
     *,
     response: LLMInterpretationResponse,
     preferred_model: str,
-    request: InterpretationRequest, asset_resolution_context: str | None = None,
+    request: InterpretationRequest,
+    asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse:
-    response = _normalize_response_for_runtime_context(response, request=request, asset_resolution_context=asset_resolution_context)  # noqa: E501
+    response = _normalize_response_for_runtime_context(
+        response, request=request, asset_resolution_context=asset_resolution_context
+    )
     _log_runtime_readiness_step("started", response=response)
     planned_artifact_edit = await _ready_active_artifact_edit_planned_response(
         response=response,
@@ -2647,10 +2652,21 @@ async def _ready_active_artifact_edit_planned_response(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
+    if _request_targets_no_active_pending_artifact_edit(request):
+        last_stage_outcome = request.selected_thread_metadata.get("last_stage_outcome")
+        if last_stage_outcome not in (None, "await_user_reply"):
+            return None
+        if response.semantic_turn_act == "new_idea":
+            return None
+        if response.task_relation == "new_task":
+            return None
     if _selected_requested_field_base(request) == "asset_universe":
         snapshot = request.latest_task_snapshot
-        if snapshot is None or snapshot.active_confirmation_reference is None:
+        if snapshot is None:
             return None
+        if snapshot.active_confirmation_reference is None:
+            if snapshot.pending_strategy_summary is None:
+                return None
         if response.semantic_turn_act == "educational_question":
             return None
     if not (
@@ -2676,6 +2692,12 @@ async def _ready_active_artifact_edit_planned_response(
         # questions ("how did it do in 2022?") are common there; the
         # interpreter's own result classification must keep its routing
         # instead of being overridden by a planned edit confirmation.
+        return None
+    if _plain_requested_asset_answer_can_use_provider_resolution(
+        response=response,
+        request=request,
+        draft_has_valid_requested_asset_update=_draft_has_valid_requested_asset_update,
+    ):
         return None
     if _active_artifact_asset_universe_operation_needs_planner(
         response=response,
@@ -2708,6 +2730,20 @@ async def _ready_active_artifact_edit_planned_response(
     if planned is None or planned.requires_clarification:
         return None
     return planned
+
+
+def _request_targets_no_active_pending_artifact_edit(
+    request: InterpretationRequest,
+) -> bool:
+    requested_field = _selected_requested_field_base(request)
+    snapshot = request.latest_task_snapshot
+    return bool(
+        requested_field in ARTIFACT_EDIT_PENDING_FIELDS
+        and snapshot is not None
+        and snapshot.pending_strategy_summary is not None
+        and snapshot.active_confirmation_reference is None
+    )
+
 
 def _response_can_skip_optional_runtime_readiness_audits(
     *,
@@ -2801,10 +2837,9 @@ def _optional_runtime_readiness_audit_blocker(
         return "date_range_reconciliation"
     if _response_needs_temporal_runtime_repair(response=response, request=request):
         return "temporal_runtime_repair"
-    if (
-        canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
-        and _dca_response_needs_semantic_field_audit(response)
-    ):
+    if canonical_strategy_type(
+        draft.strategy_type
+    ) == "dca_accumulation" and _dca_response_needs_semantic_field_audit(response):
         return "dca_semantic_field_audit"
     if _response_needs_stated_starting_capital_recheck(
         response=response,
@@ -2848,9 +2883,9 @@ def _response_needs_stated_timeframe_fidelity_audit(
     if "stated_run_field_fidelity_audit" in response.reason_codes:
         return False
     draft = response.candidate_strategy_draft
-    return _llm_value_is_empty(draft.timeframe) and _draft_has_timeframe_evidence_for_audit(
-        draft
-    )
+    return _llm_value_is_empty(
+        draft.timeframe
+    ) and _draft_has_timeframe_evidence_for_audit(draft)
 
 
 def _draft_has_supported_default_benchmark(draft: LLMStrategyDraft) -> bool:
@@ -2990,21 +3025,16 @@ async def _stated_run_field_audited_response(
             preferred_model=preferred_model,
             request=request,
         )
-    if (
-        _response_needs_supported_signal_rule_recovery(
-            response,
-            current_user_message=request.current_user_message,
-        )
-        or _llm_signal_strategy_is_underfilled(response.candidate_strategy_draft)
-    ):
+    if _response_needs_supported_signal_rule_recovery(
+        response,
+        current_user_message=request.current_user_message,
+    ) or _llm_signal_strategy_is_underfilled(response.candidate_strategy_draft):
         response = await _signal_rule_checked_response(
             response=response,
             preferred_model=preferred_model,
             request=request,
         )
-    return _response_with_executable_fields_preferred_over_clarification_prose(
-        response
-    )
+    return _response_with_executable_fields_preferred_over_clarification_prose(response)
 
 
 async def _underfilled_strategy_repaired_response(
@@ -3250,11 +3280,9 @@ def _response_needs_focused_date_window_intent_repair(
     draft = response.candidate_strategy_draft
     if _post_result_dateless_execution_draft(response=response, request=request):
         return True
-    has_repairable_current_turn_date_gap = (
-        _response_has_repairable_current_turn_date_gap(
-            response=response,
-            request=request,
-        )
+    has_repairable_current_turn_date_gap = _response_has_repairable_current_turn_date_gap(
+        response=response,
+        request=request,
     )
     if response.task_relation != "new_task" and not (
         pending_date_answer
@@ -3277,13 +3305,17 @@ def _response_needs_focused_date_window_intent_repair(
         or has_repairable_current_turn_date_gap
     ):
         return False
-    if response.semantic_turn_act in {
-        "approval",
-        "refine_current_idea",
-        "result_followup",
-        "retry_failed_action",
-        "unsupported_request",
-    } and not pending_date_answer:
+    if (
+        response.semantic_turn_act
+        in {
+            "approval",
+            "refine_current_idea",
+            "result_followup",
+            "retry_failed_action",
+            "unsupported_request",
+        }
+        and not pending_date_answer
+    ):
         return False
     if response.semantic_turn_act == "educational_question" and not pending_date_answer:
         return False
@@ -3435,11 +3467,7 @@ def _request_has_planner_edit_candidate_after_model_failure(
             resolve_candidate=_resolve_candidate,
             limit=10,
         )
-        if (
-            symbol := _normalized_ticker_symbol(
-                getattr(asset, "canonical_symbol", None)
-            )
-        )
+        if (symbol := _normalized_ticker_symbol(getattr(asset, "canonical_symbol", None)))
         is not None
     }
     if not current_symbols:
@@ -4055,13 +4083,9 @@ async def _audit_supported_strategy_capability_conflict(
             schema_name="SupportedStrategyCapabilityConflictAudit",
         )
     except Exception:
-        return _structured_supported_strategy_capability_conflict_fallback(
-            response
-        )
+        return _structured_supported_strategy_capability_conflict_fallback(response)
     if not isinstance(audit, SupportedStrategyCapabilityConflictAudit):
-        return _structured_supported_strategy_capability_conflict_fallback(
-            response
-        )
+        return _structured_supported_strategy_capability_conflict_fallback(response)
     if (
         audit.drop_unsupported_strategy_logic
         and not audit.keep_unsupported_strategy_logic
@@ -4084,9 +4108,7 @@ async def _audit_supported_strategy_capability_conflict(
             request=request,
         )
     if audit.confidence < 0.7:
-        return _structured_supported_strategy_capability_conflict_fallback(
-            response
-        )
+        return _structured_supported_strategy_capability_conflict_fallback(response)
     return None
 
 
@@ -4117,9 +4139,12 @@ def _response_needs_stated_run_field_fidelity_audit(
         request=request,
     ):
         return True
-    if request is not None and _response_replays_prior_strategy_without_current_turn_update(
-        response=response,
-        request=request,
+    if (
+        request is not None
+        and _response_replays_prior_strategy_without_current_turn_update(
+            response=response,
+            request=request,
+        )
     ):
         return False
     draft = response.candidate_strategy_draft
@@ -4129,10 +4154,9 @@ def _response_needs_stated_run_field_fidelity_audit(
         requested_field = _field_path_base(
             request.selected_thread_metadata.get("requested_field")
         )
-    if (
-        canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
-        and _dca_response_needs_semantic_field_audit(response)
-    ):
+    if canonical_strategy_type(
+        draft.strategy_type
+    ) == "dca_accumulation" and _dca_response_needs_semantic_field_audit(response):
         return True
     if _response_needs_current_message_date_repair(
         response=response,
@@ -4249,10 +4273,9 @@ def _response_has_current_message_date_range_reconciliation(
         request=request,
     ):
         return False
-    if (
-        resolve_date_range_intent(draft.date_range_intent) is not None
-        and _draft_has_semantic_date_window_evidence(draft)
-    ):
+    if resolve_date_range_intent(
+        draft.date_range_intent
+    ) is not None and _draft_has_semantic_date_window_evidence(draft):
         return True
     if not isinstance(draft.date_range, dict):
         return False
@@ -4689,10 +4712,9 @@ def _strategy_extraction_repair_is_allowed(
             for item in response.unsupported_constraints
         ):
             return False
-        if (
-            _request_has_active_strategy_context(request)
-            and not _request_current_turn_has_material_execution_evidence(request)
-        ):
+        if _request_has_active_strategy_context(
+            request
+        ) and not _request_current_turn_has_material_execution_evidence(request):
             return False
         return bool(
             response.candidate_strategy_draft.raw_user_phrasing
@@ -4756,10 +4778,12 @@ def _response_from_focused_strategy_extraction(
     entry_logic = extraction.entry_logic or moving_average_crossover_text(
         extraction.entry_rule
     )
-    exit_logic = extraction.exit_logic or moving_average_crossover_text(
-        extraction.exit_rule
-    ) or moving_average_crossover_text(
-        opposite_moving_average_crossover_rule(extraction.entry_rule)
+    exit_logic = (
+        extraction.exit_logic
+        or moving_average_crossover_text(extraction.exit_rule)
+        or moving_average_crossover_text(
+            opposite_moving_average_crossover_rule(extraction.entry_rule)
+        )
     )
     asset_universe, resolved_asset_class = _canonical_asset_universe_from_llm_extraction(
         extraction.asset_universe
@@ -5048,9 +5072,7 @@ def _normalize_response_for_runtime_context(
         and response.semantic_turn_act is None
         and not _request_has_active_strategy_context(request)
         and (
-            _llm_strategy_draft_has_extractable_fields(
-                response.candidate_strategy_draft
-            )
+            _llm_strategy_draft_has_extractable_fields(response.candidate_strategy_draft)
             or _request_current_turn_has_material_execution_evidence(request)
         )
     ):
@@ -5176,18 +5198,15 @@ def _validate_capability_boundaries(
         ):
             field_owned_indicator_symbols.append(symbol)
             continue
-        resolution = (
-            provider_context_assets.resolution_from_strategy_context(
-                strategy,
-                symbol,
-                field=f"asset_universe[{index}]",
-            )
-            or _resolve_asset_candidate(
-                symbol,
-                field=f"asset_universe[{index}]",
-                source="llm_extraction",
-                asset_class_hint=strategy.asset_class,
-            )
+        resolution = provider_context_assets.resolution_from_strategy_context(
+            strategy,
+            symbol,
+            field=f"asset_universe[{index}]",
+        ) or _resolve_asset_candidate(
+            symbol,
+            field=f"asset_universe[{index}]",
+            source="llm_extraction",
+            asset_class_hint=strategy.asset_class,
         )
         resolution_provenance.append(resolution.provenance)
         if resolution.status == "ambiguous":
@@ -5195,9 +5214,9 @@ def _validate_capability_boundaries(
                 normalized
                 for candidate in resolution.candidates
                 if (
-                    normalized := str(
-                        getattr(candidate, "canonical_symbol", "") or ""
-                    ).strip().upper()
+                    normalized := str(getattr(candidate, "canonical_symbol", "") or "")
+                    .strip()
+                    .upper()
                 )
             ]
             response.ambiguous_fields.append(

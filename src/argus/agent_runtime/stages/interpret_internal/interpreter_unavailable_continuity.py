@@ -241,8 +241,7 @@ async def planned_active_confirmation_edit_interpretation(
     snapshot: TaskSnapshot,
     current_user_message: str,
     resolve_asset_candidate: ResolveAssetCandidate,
-    plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit
-    | None = None,
+    plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit | None = None,
 ) -> StructuredInterpretation | None:
     active_confirmation = snapshot.active_confirmation_reference
     if active_confirmation is None:
@@ -267,14 +266,49 @@ async def planned_active_confirmation_edit_interpretation(
     )
 
 
+async def planned_pending_confirmation_edit_interpretation(
+    *,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+    requested_field: str,
+    resolve_asset_candidate: ResolveAssetCandidate,
+    plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit | None = None,
+) -> StructuredInterpretation | None:
+    """Plan a chip-clarify answer against the pending confirmation draft.
+
+    Some live chip-answer turns carry the previous requested field but not the
+    active confirmation reference. In that state the chip is still just the
+    display doorway; the typed edit planner must decide the actual operation.
+    """
+
+    # The caller owns requested-field validation so its admit/drop behavior
+    # cannot diverge from this planner's preconditions.
+    del requested_field
+    if (
+        snapshot is None
+        or snapshot.pending_strategy_summary is None
+        or snapshot.active_confirmation_reference is not None
+    ):
+        return None
+    return await _planned_artifact_edit_interpretation(
+        prior_strategy=snapshot.pending_strategy_summary,
+        active_confirmation_payload=None,
+        current_user_message=current_user_message,
+        resolve_asset_candidate=resolve_asset_candidate,
+        plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit_fn,
+        artifact_target="active_confirmation",
+        default_goal_summary="User changed a visible confirmation assumption.",
+        latest_result_window=_latest_result_date_window_from_snapshot(snapshot),
+    )
+
+
 async def planned_pending_refinement_edit_interpretation(
     *,
     snapshot: TaskSnapshot | None,
     current_user_message: str,
     selected_thread_metadata: dict[str, Any],
     resolve_asset_candidate: ResolveAssetCandidate,
-    plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit
-    | None = None,
+    plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit | None = None,
 ) -> StructuredInterpretation | None:
     """Offline edit planning for the result-card refine pending state.
 
@@ -308,8 +342,7 @@ async def planned_latest_result_edit_interpretation(
     snapshot: TaskSnapshot | None,
     current_user_message: str,
     resolve_asset_candidate: ResolveAssetCandidate,
-    plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit
-    | None = None,
+    plan_artifact_assumption_edit_fn: PlanArtifactAssumptionEdit | None = None,
 ) -> StructuredInterpretation | None:
     """Planned edit against the completed run when nothing is pending.
 
@@ -378,9 +411,7 @@ async def _planned_artifact_edit_interpretation(
             apply_edit_operations(
                 plan.operations,
                 current_asset_universe=prior_strategy.asset_universe,
-                asset_symbol_resolver=asset_edit_symbol_resolver(
-                    resolve_asset_candidate
-                ),
+                asset_symbol_resolver=asset_edit_symbol_resolver(resolve_asset_candidate),
             ),
             candidate=candidate,
             field_provenance=field_provenance,
@@ -418,8 +449,7 @@ async def _planned_artifact_edit_interpretation(
         field_provenance["timeframe"] = "explicit_user"
     if (
         field_provenance.get("capital_amount") == "starting_capital"
-        and canonical_strategy_type(prior_strategy.strategy_type)
-        == "dca_accumulation"
+        and canonical_strategy_type(prior_strategy.strategy_type) == "dca_accumulation"
     ):
         # A starting principal is not the recurring contribution; keep it
         # typed so the DCA money-role guard decides instead of overwriting
@@ -452,16 +482,48 @@ async def _planned_artifact_edit_interpretation(
 CONFIRMATION_EDIT_CLARIFY_FIELDS = frozenset(CONFIRMATION_EDIT_ACTION_FIELDS.values())
 
 
+def _chip_clarify_requested_field(
+    selected_thread_metadata: dict[str, Any],
+) -> str | None:
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field not in CONFIRMATION_EDIT_CLARIFY_FIELDS:
+        return None
+    return requested_field
+
+
+def pending_confirmation_chip_clarify_edit_requested_field(
+    *,
+    interpretation: StructuredInterpretation,
+    selected_thread_metadata: dict[str, Any],
+) -> str | None:
+    requested_field = _chip_clarify_requested_field(selected_thread_metadata)
+    if requested_field is None:
+        return None
+    last_stage_outcome = selected_thread_metadata.get("last_stage_outcome")
+    if last_stage_outcome not in (None, "await_user_reply"):
+        return None
+    if interpretation.semantic_turn_act != "answer_pending_need":
+        return None
+    if not _interpretation_supplies_chip_artifact_edit(interpretation):
+        return None
+    return requested_field
+
+
 def chip_clarify_answer_supplies_artifact_edit(
     *,
     interpretation: StructuredInterpretation,
     selected_thread_metadata: dict[str, Any],
 ) -> bool:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field not in CONFIRMATION_EDIT_CLARIFY_FIELDS:
+    if _chip_clarify_requested_field(selected_thread_metadata) is None:
         return False
+    return _interpretation_supplies_chip_artifact_edit(interpretation)
+
+
+def _interpretation_supplies_chip_artifact_edit(
+    interpretation: StructuredInterpretation,
+) -> bool:
     if interpretation.semantic_turn_act in {
         "approval",
         "educational_question",
@@ -617,7 +679,9 @@ def _typed_selected_replacement_values(
             if isinstance(value, dict):
                 selections.append(dict(value))
         option = payload.get("response_option")
-        if isinstance(option, dict) and isinstance(option.get("replacement_values"), dict):
+        if isinstance(option, dict) and isinstance(
+            option.get("replacement_values"), dict
+        ):
             selections.append(dict(option["replacement_values"]))
     return selections
 

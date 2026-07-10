@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+import pytest
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     EditOperation,
@@ -131,22 +132,35 @@ def _snapshot_with_confirmation(strategy: StrategySummary) -> TaskSnapshot:
     )
 
 
+def _snapshot_without_active_confirmation(strategy: StrategySummary) -> TaskSnapshot:
+    return TaskSnapshot(pending_strategy_summary=strategy)
+
+
 def _run_chip_answer(
     *,
     message: str,
     pending: StrategySummary,
     interpretation: StructuredInterpretation,
     requested_field: str | None,
+    with_active_confirmation: bool = True,
+    last_stage_outcome: str | None = "await_user_reply",
 ):
-    metadata: dict[str, Any] = {"last_stage_outcome": "await_user_reply"}
+    metadata: dict[str, Any] = {}
+    if last_stage_outcome is not None:
+        metadata["last_stage_outcome"] = last_stage_outcome
     if requested_field is not None:
         metadata["requested_field"] = requested_field
         metadata["missing_required_fields"] = [requested_field]
+    snapshot = (
+        _snapshot_with_confirmation(pending)
+        if with_active_confirmation
+        else _snapshot_without_active_confirmation(pending)
+    )
     state = RunState.new(current_user_message=message, recent_thread_history=[])
     return interpret_stage(
         state=state,
         user=UserState(user_id="u1"),
-        latest_task_snapshot=_snapshot_with_confirmation(pending),
+        latest_task_snapshot=snapshot,
         selected_thread_metadata=metadata,
         structured_interpreter=RecordingInterpreter(interpretation),
     )
@@ -244,6 +258,227 @@ def test_change_asset_chip_raw_remove_remainder_does_not_wipe_pending_assets(
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["WSM", "COST"]
     assert "asset_universe" not in result.decision.missing_required_fields
+
+
+def test_change_asset_chip_remove_replans_when_active_confirmation_anchor_is_missing(
+    monkeypatch,
+) -> None:
+    """Live-shaped chip answers may carry pending strategy plus chip metadata
+    without an active artifact reference; the typed planner still owns them."""
+
+    _stub_equity_resolution(monkeypatch)
+    calls = _stub_edit_planner(
+        monkeypatch,
+        ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="User removed Target from the traded set.",
+            asset_universe=["WSM", "COST"],
+            asset_universe_operation="replace",
+            confidence=0.9,
+        ),
+    )
+
+    result = _run_chip_answer(
+        message="remove TGT",
+        pending=_pending_three_assets(),
+        requested_field="asset_universe",
+        with_active_confirmation=False,
+        interpretation=StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User answered the asset question.",
+            candidate_strategy_draft=StrategySummary(asset_universe=["TGT"]),
+            semantic_turn_act="answer_pending_need",
+        ),
+    )
+
+    assert calls, "missing active reference must not bypass typed edit planning"
+    assert calls[0]["prior_strategy"]["asset_universe"] == ["TGT", "WSM", "COST"]
+    assert calls[0]["active_confirmation"] is None
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["WSM", "COST"]
+    assert strategy.capital_amount == 1000
+    assert "artifact_assumption_edit_planned" in result.decision.reason_codes
+
+
+@pytest.mark.parametrize("semantic_turn_act", ["new_idea", "refine_current_idea"])
+def test_change_asset_chip_no_active_reference_does_not_plan_fresh_idea(
+    monkeypatch,
+    semantic_turn_act: str,
+) -> None:
+    """A stale chip requested_field must not turn a fresh complete idea into an
+    edit against the surviving pending strategy when the active card rolled off."""
+
+    _stub_equity_resolution(monkeypatch)
+    calls = _stub_edit_planner(
+        monkeypatch,
+        ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="Wrongly edited the stale pending strategy.",
+            asset_universe=["WSM", "COST"],
+            asset_universe_operation="replace",
+            confidence=0.9,
+        ),
+    )
+
+    result = _run_chip_answer(
+        message="new idea: buy and hold MSFT in 2024 with $2,000",
+        pending=_pending_three_assets(),
+        requested_field="asset_universe",
+        with_active_confirmation=False,
+        interpretation=StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="User supplied a fresh idea.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="buy_and_hold",
+                strategy_thesis="Buy and hold Microsoft in 2024.",
+                asset_universe=["MSFT"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+                capital_amount=2000,
+            ),
+            semantic_turn_act=semantic_turn_act,
+        ),
+    )
+
+    assert calls == []
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["MSFT"]
+    assert strategy.capital_amount == 2000
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+
+
+def test_change_asset_chip_no_active_reference_lost_stage_outcome_still_replans(
+    monkeypatch,
+) -> None:
+    """If reconnect metadata drops the stage outcome but the interpreter marks a
+    genuine pending-field answer, the typed planner still owns the edit."""
+
+    _stub_equity_resolution(monkeypatch)
+    calls = _stub_edit_planner(
+        monkeypatch,
+        ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="User removed Target from the traded set.",
+            asset_universe=["WSM", "COST"],
+            asset_universe_operation="replace",
+            confidence=0.9,
+        ),
+    )
+
+    result = _run_chip_answer(
+        message="remove TGT",
+        pending=_pending_three_assets(),
+        requested_field="asset_universe",
+        with_active_confirmation=False,
+        last_stage_outcome=None,
+        interpretation=StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User answered the asset question.",
+            candidate_strategy_draft=StrategySummary(asset_universe=["TGT"]),
+            semantic_turn_act="answer_pending_need",
+        ),
+    )
+
+    assert calls, "lost stage outcome must not drop a typed pending-field answer"
+    assert calls[0]["prior_strategy"]["asset_universe"] == ["TGT", "WSM", "COST"]
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["WSM", "COST"]
+    assert "artifact_assumption_edit_planned" in result.decision.reason_codes
+
+
+def test_change_asset_chip_no_active_reference_replace_framed_answer_replans(
+    monkeypatch,
+) -> None:
+    """A replace-framed interpreter can return the removed symbol as a complete
+    asset patch; a genuine chip-clarify answer must still reach the edit planner."""
+
+    _stub_equity_resolution(monkeypatch)
+    calls = _stub_edit_planner(
+        monkeypatch,
+        ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="User removed Target from the traded set.",
+            asset_universe=["WSM", "COST"],
+            asset_universe_operation="replace",
+            confidence=0.9,
+        ),
+    )
+
+    result = _run_chip_answer(
+        message="remove TGT",
+        pending=_pending_three_assets(),
+        requested_field="asset_universe",
+        with_active_confirmation=False,
+        interpretation=StructuredInterpretation(
+            intent="strategy_drafting",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User answered the asset question.",
+            candidate_strategy_draft=StrategySummary(
+                asset_universe=["TGT"],
+                extra_parameters={"asset_universe_operation": "replace"},
+            ),
+            semantic_turn_act="answer_pending_need",
+        ),
+    )
+
+    assert calls, "replace-framed chip answer must still hit the edit planner"
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["WSM", "COST"]
+    assert "artifact_assumption_edit_planned" in result.decision.reason_codes
+
+
+@pytest.mark.parametrize("last_stage_outcome", ["await_approval", "ready_to_respond"])
+def test_change_asset_chip_no_active_reference_rejects_stale_stage_outcome(
+    monkeypatch,
+    last_stage_outcome: str,
+) -> None:
+    """A stale chip requested_field from a non-pending stage must not reopen the
+    pending edit corridor after the active card reference is gone."""
+
+    _stub_equity_resolution(monkeypatch)
+    calls = _stub_edit_planner(
+        monkeypatch,
+        ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="Wrongly edited the stale pending strategy.",
+            asset_universe=["WSM", "COST"],
+            asset_universe_operation="replace",
+            confidence=0.9,
+        ),
+    )
+
+    result = _run_chip_answer(
+        message="remove TGT",
+        pending=_pending_three_assets(),
+        requested_field="asset_universe",
+        with_active_confirmation=False,
+        last_stage_outcome=last_stage_outcome,
+        interpretation=StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User answered the asset question.",
+            candidate_strategy_draft=StrategySummary(asset_universe=["TGT"]),
+            semantic_turn_act="answer_pending_need",
+        ),
+    )
+
+    assert calls == []
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["TGT"]
+    assert "artifact_assumption_edit_planned" not in result.decision.reason_codes
 
 
 def test_change_asset_chip_bare_symbol_answer_on_multi_asset_card_clarifies(
@@ -576,9 +811,7 @@ def test_change_asset_chip_planned_edit_over_symbol_limit_still_clarifies(
         pending=_pending_three_assets(),
         requested_field="asset_universe",
         interpretation=_planned_edit_interpretation(
-            _planned_asset_replace_draft(
-                ["TGT", "WSM", "COST", "AAPL", "NVDA", "MSFT"]
-            )
+            _planned_asset_replace_draft(["TGT", "WSM", "COST", "AAPL", "NVDA", "MSFT"])
         ),
     )
 
@@ -601,5 +834,3 @@ def test_chip_clarify_fields_cover_the_three_chip_actions() -> None:
     assert CONFIRMATION_EDIT_CLARIFY_FIELDS == frozenset(
         {"asset_universe", "date_range", "assumption"}
     )
-
-

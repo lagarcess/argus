@@ -229,6 +229,98 @@ def test_prose_judge_cases_fail_when_assistant_text_is_missing(monkeypatch: Any)
     assert result["prose_judge"]["failed_criteria"] == ["missing_assistant_text"]
 
 
+def test_followup_clarification_runs_clarify_stage(monkeypatch: Any) -> None:
+    case = harness.EvalCase(
+        id="followup-clarifies",
+        category="action_chip_semantics",
+        prompt="",
+        followup_prompt="MSFT",
+        user_language="en",
+        ui_language="en",
+        action=harness.EvalAction(
+            type="change_asset",
+            label="Change asset",
+            presentation="confirmation",
+            payload={"confirmation_id": "c1"},
+        ),
+        expected=harness.TypedExpectations(
+            intent="strategy_drafting",
+            capability_verdict="needs_clarification",
+            stage_outcomes=(
+                "needs_clarification",
+                "await_user_reply",
+                "needs_clarification",
+                "await_user_reply",
+            ),
+            clarification={"direct_question": "Which asset set?"},
+        ),
+    )
+    interpret_results = iter(
+        [
+            SimpleNamespace(
+                outcome="needs_clarification",
+                patch={
+                    "candidate_strategy_draft": {"asset_universe": ["AAPL", "MSFT"]},
+                    "requested_field": "asset_universe",
+                    "missing_required_fields": ["asset_universe"],
+                    "response_intent": {"kind": "clarification"},
+                },
+            ),
+            SimpleNamespace(
+                outcome="needs_clarification",
+                patch={
+                    "candidate_strategy_draft": {"asset_universe": ["AAPL", "MSFT"]},
+                    "requested_field": "asset_universe",
+                    "missing_required_fields": ["asset_universe"],
+                    "response_intent": {"kind": "clarification"},
+                },
+            ),
+        ]
+    )
+    clarify_calls: list[Any] = []
+
+    monkeypatch.setattr(
+        harness,
+        "interpret_stage",
+        lambda **_kwargs: next(interpret_results),
+    )
+
+    def clarify_stub(**_kwargs: Any) -> SimpleNamespace:
+        clarify_calls.append(_kwargs)
+        return SimpleNamespace(
+            outcome="await_user_reply",
+            patch={
+                "assistant_response": "Which asset set?",
+                "clarification": {"direct_question": "Which asset set?"},
+            },
+        )
+
+    monkeypatch.setattr(harness, "clarify_stage", clarify_stub)
+
+    result = harness.run_eval_case(case)
+
+    assert len(clarify_calls) == 2
+    assert result["status"] == "passed"
+    assert result["typed_outcome"]["clarification"] == {
+        "direct_question": "Which asset set?"
+    }
+
+
+def test_confirmation_payload_snapshot_uses_distinct_artifact_references() -> None:
+    case = next(
+        case
+        for case in load_eval_cases()
+        if case.id == "action_chip_change_asset_remove_aapl_issue_188"
+    )
+
+    assert case.snapshot is not None
+    active = case.snapshot.active_confirmation_reference
+    listed = case.snapshot.artifact_references[-1]
+    assert active is not None
+    assert listed.artifact_id == active.artifact_id
+    assert listed is not active
+
+
 def test_scorecard_reports_per_category_pass_rates() -> None:
     results = [
         {

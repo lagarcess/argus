@@ -213,6 +213,11 @@ class OpenRouterClarificationGenerator:
                     "than one target, the user-facing question must visibly ask "
                     "for every target in one concise response. Also copy "
                     "expected_detail_targets into detail_targets when present. "
+                    "When response_intent.facts.asset_edit_frame is "
+                    "'operation_agnostic', ask a neutral asset-edit question that "
+                    "allows adding assets, removing assets, keeping a subset, "
+                    "replacing assets, or changing another setup field. Do not ask "
+                    "which single asset to replace or what to use instead. "
                     "When the expected target includes DCA sizing, direct_question "
                     "must contain the concrete question the user needs to answer, "
                     "not just an acknowledgement that another detail is needed. "
@@ -467,9 +472,7 @@ def _is_decimal_point(text: str, index: int) -> bool:
 
 def _is_common_abbreviation_period(text: str, index: int) -> bool:
     compact_window = "".join(
-        char.lower()
-        for char in text[max(0, index - 4) : index + 1]
-        if not char.isspace()
+        char.lower() for char in text[max(0, index - 4) : index + 1] if not char.isspace()
     )
     if compact_window.endswith(("e.g.", "i.e.")):
         return True
@@ -493,15 +496,8 @@ def _is_embedded_direct_question(
 
 
 def _content_word_set(text: str) -> set[str]:
-    normalized_chars = [
-        char.lower() if char.isalnum() else " "
-        for char in text
-    ]
-    return {
-        token
-        for token in "".join(normalized_chars).split()
-        if len(token) > 2
-    }
+    normalized_chars = [char.lower() if char.isalnum() else " " for char in text]
+    return {token for token in "".join(normalized_chars).split() if len(token) > 2}
 
 
 def _expected_question_targets(request: ClarificationRequest) -> set[PendingNeedName]:

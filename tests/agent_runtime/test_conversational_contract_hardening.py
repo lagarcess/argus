@@ -149,7 +149,9 @@ def test_confirmation_payload_validation_rejects_stale_benchmark_launch_payload(
     assert validation.failure_code == "launch_payload_benchmark_mismatch"
 
 
-def test_confirmation_payload_validation_rejects_stale_optional_benchmark_payload() -> None:
+def test_confirmation_payload_validation_rejects_stale_optional_benchmark_payload() -> (
+    None
+):
     from argus.agent_runtime.confirmation_artifacts import (
         validate_confirmation_execution_payload,
     )
@@ -244,7 +246,9 @@ def test_confirmation_payload_visibility_match_includes_rsi_threshold_contract()
     )
 
 
-def test_confirmation_payload_validation_rejects_stale_rsi_threshold_launch_payload() -> None:
+def test_confirmation_payload_validation_rejects_stale_rsi_threshold_launch_payload() -> (
+    None
+):
     from argus.agent_runtime.confirmation_artifacts import (
         validate_confirmation_execution_payload,
     )
@@ -286,7 +290,9 @@ def test_confirmation_payload_validation_rejects_stale_rsi_threshold_launch_payl
     assert validation.failure_code == "launch_payload_rule_mismatch"
 
 
-def test_active_confirmation_effective_strategy_does_not_overwrite_visible_benchmark() -> None:
+def test_active_confirmation_effective_strategy_does_not_overwrite_visible_benchmark() -> (
+    None
+):
     from argus.agent_runtime.stages.artifact_context import (
         active_confirmation_effective_strategy,
     )
@@ -419,10 +425,7 @@ def test_active_confirmation_date_edit_refreshes_confirmation_card(
     assert strategy.asset_universe == ["NU"]
     assert strategy.date_range == {"start": "2026-01-01", "end": "2026-06-02"}
     assert result.stage_patch.get("assistant_response") is None
-    assert (
-        "semantic_date_constraint_preserved"
-        in result.decision.reason_codes
-    )
+    assert "semantic_date_constraint_preserved" in result.decision.reason_codes
 
 
 def test_pending_date_edit_rejects_noop_inherited_date_range(monkeypatch) -> None:
@@ -950,9 +953,7 @@ def test_ambiguous_asset_field_records_user_mention_not_last_candidate(
             ),
         )
 
-    monkeypatch.setattr(
-        llm_module, "runtime_resolve_asset_candidate", resolve_candidate
-    )
+    monkeypatch.setattr(llm_module, "runtime_resolve_asset_candidate", resolve_candidate)
 
     response = LLMInterpretationResponse(
         intent="backtest_execution",
@@ -2065,9 +2066,7 @@ def test_requested_asset_answer_ignores_unrelated_llm_draft_fields(
         item.field == "date_range" and item.raw_text == "2024 dates"
         for item in strategy.resolution_provenance
     )
-    assert all(
-        item.raw_text != "Apple" for item in strategy.resolution_provenance
-    )
+    assert all(item.raw_text != "Apple" for item in strategy.resolution_provenance)
 
 
 def test_requested_asset_answer_with_explicit_asset_ignores_unrelated_draft_fields(
@@ -2321,9 +2320,7 @@ def test_requested_asset_answer_repair_clears_stale_unsupported_rejection(
                 ),
             ),
         ],
-        assistant_response=(
-            "I can't run a backtest on 'google' as an investing idea."
-        ),
+        assistant_response=("I can't run a backtest on 'google' as an investing idea."),
         reason_codes=["requested_asset_answer_candidate_audit"],
     )
 
@@ -2513,10 +2510,7 @@ def test_provider_valid_llm_benchmark_is_not_preserved_without_user_request(
     )
 
     assert result.outcome == "ready_for_confirmation"
-    assert (
-        result.decision.candidate_strategy_draft.comparison_baseline
-        != noisy_benchmark
-    )
+    assert result.decision.candidate_strategy_draft.comparison_baseline != noisy_benchmark
     assert result.decision.candidate_strategy_draft.comparison_baseline == "SPY"
     assert "unstated_benchmark_symbol_cleared" in result.decision.reason_codes
     assert "default_benchmark_applied" in result.decision.reason_codes
@@ -2720,9 +2714,7 @@ def test_asset_grounding_prunes_lowercase_word_collisions_and_keeps_benchmark_ro
 
     def _asset(symbol: str) -> ResolvedAssetStub:
         resolved_queries.append(str(symbol))
-        normalized = "".join(
-            char for char in str(symbol).upper() if char.isalnum()
-        )
+        normalized = "".join(char for char in str(symbol).upper() if char.isalnum())
         if normalized in {"AAPL", "APPLE"}:
             return ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
         if normalized == "QQQ":
@@ -2786,9 +2778,7 @@ def test_interpreter_identified_exact_ticker_asset_gets_default_benchmark(
     from argus.agent_runtime.stages import interpret as interpret_module
 
     def _asset(symbol: str) -> ResolvedAssetStub:
-        normalized = "".join(
-            char for char in str(symbol).upper() if char.isalnum()
-        )
+        normalized = "".join(char for char in str(symbol).upper() if char.isalnum())
         if normalized == "NU":
             return ResolvedAssetStub(
                 "NU",
@@ -2821,8 +2811,7 @@ def test_interpreter_identified_exact_ticker_asset_gets_default_benchmark(
         task_relation="new_task",
         requires_clarification=True,
         assistant_response=(
-            "Just to confirm — by 'NU' do you mean Nu Holdings (NU) or "
-            "NVIDIA (NVDA)?"
+            "Just to confirm — by 'NU' do you mean Nu Holdings (NU) or " "NVIDIA (NVDA)?"
         ),
         user_goal_summary="User wants a $500 buy-and-hold test.",
         candidate_strategy_draft=StrategySummary(
@@ -3271,8 +3260,8 @@ def test_run_backtest_action_approves_pending_confirmation_without_llm(
             "type": "run_backtest",
             "label": "Run backtest",
             "presentation": "confirmation",
-                "payload": {},
-            },
+            "payload": {},
+        },
         confirmation_payload=_validated_confirmation_payload(pending),
     )
 
@@ -3386,6 +3375,10 @@ def test_change_asset_action_publishes_clarification_intent_without_llm() -> Non
     assert result.patch["response_intent"]["kind"] == "clarification"
     assert result.patch["response_intent"]["semantic_needs"] == ["asset_target"]
     assert result.patch["response_intent"]["requested_fields"] == ["asset_universe"]
+    assert (
+        result.patch["response_intent"]["facts"]["asset_edit_frame"]
+        == "operation_agnostic"
+    )
     assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
 
 
@@ -3470,7 +3463,9 @@ def test_model_unavailable_recovery_mentions_active_pending_setup() -> None:
     assert "interpreter" not in result.patch["assistant_response"].lower()
 
 
-def test_refine_strategy_result_action_publishes_clarification_intent_without_llm() -> None:
+def test_refine_strategy_result_action_publishes_clarification_intent_without_llm() -> (
+    None
+):
     confirmed = StrategySummary(
         strategy_type="buy_and_hold",
         strategy_thesis="Buy and hold Microsoft.",
@@ -3696,9 +3691,7 @@ def test_pending_refinement_blocks_latest_result_followup_capture(monkeypatch) -
         artifact_id="run-1",
         metadata={
             "result_card": {"title": "AAPL buy and hold"},
-            "config_snapshot": {
-                "resolved_strategy": pending.model_dump(mode="python")
-            },
+            "config_snapshot": {"resolved_strategy": pending.model_dump(mode="python")},
         },
     )
     response = StructuredInterpretation(
@@ -3756,9 +3749,7 @@ def test_latest_result_followup_requires_validated_artifact_target(monkeypatch) 
         artifact_id="run-btc",
         metadata={
             "result_card": {"title": "BTC buy and hold"},
-            "config_snapshot": {
-                "resolved_strategy": pending.model_dump(mode="python")
-            },
+            "config_snapshot": {"resolved_strategy": pending.model_dump(mode="python")},
         },
     )
     response = StructuredInterpretation(
@@ -3956,11 +3947,11 @@ def test_dca_contract_audit_skips_educational_turn_with_stale_strategy_baggage()
     )
 
 
-def test_dca_education_answer_cannot_claim_recurring_buys_unsupported(monkeypatch) -> None:
+def test_dca_education_answer_cannot_claim_recurring_buys_unsupported(
+    monkeypatch,
+) -> None:
     async def _bad_capability_composer(**_: object) -> str:
-        return (
-            "Since we can't run a pure DCA rule here, try buy and hold instead."
-        )
+        return "Since we can't run a pure DCA rule here, try buy and hold instead."
 
     monkeypatch.setattr(
         "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
@@ -4175,7 +4166,9 @@ def test_interpreter_unavailable_pending_date_answer_does_not_parse_raw_prose(
     )
 
     assert result.outcome == "ready_to_respond"
-    assert "deterministic_pending_date_answer_fallback" not in result.decision.reason_codes
+    assert (
+        "deterministic_pending_date_answer_fallback" not in result.decision.reason_codes
+    )
     assert "llm_interpreter_unavailable" in result.decision.reason_codes
 
 
@@ -4634,9 +4627,7 @@ def test_partial_explicit_date_range_requires_endpoint_clarification(
     assert strategy.asset_universe == ["AAPL"]
     assert strategy.comparison_baseline == "QQQ"
     assert result.decision.missing_required_fields == ["date_range"]
-    assert "partial_date_range_requires_clarification" in (
-        result.decision.reason_codes
-    )
+    assert "partial_date_range_requires_clarification" in (result.decision.reason_codes)
 
 
 def test_partial_explicit_date_range_requires_endpoint_clarification_variation(
@@ -4679,9 +4670,7 @@ def test_partial_explicit_date_range_requires_endpoint_clarification_variation(
     assert strategy.asset_universe == ["MSFT"]
     assert strategy.comparison_baseline == "IWM"
     assert result.decision.missing_required_fields == ["date_range"]
-    assert "partial_date_range_requires_clarification" in (
-        result.decision.reason_codes
-    )
+    assert "partial_date_range_requires_clarification" in (result.decision.reason_codes)
 
 
 def test_focused_strategy_extraction_preserves_user_stated_benchmark() -> None:
@@ -4722,7 +4711,9 @@ def test_focused_strategy_extraction_preserves_user_stated_benchmark() -> None:
     assert response.missing_required_fields == ["date_range"]
 
 
-def test_stated_run_fidelity_removes_inferred_date_endpoint_and_restores_benchmark() -> None:
+def test_stated_run_fidelity_removes_inferred_date_endpoint_and_restores_benchmark() -> (
+    None
+):
     from argus.agent_runtime.llm_interpreter import (
         StatedRunFieldFidelityAudit,
         _response_from_stated_run_field_fidelity_audit,
@@ -4891,7 +4882,9 @@ def test_stated_run_fidelity_audit_skips_complete_aligned_comparison() -> None:
     )
 
 
-def test_stated_run_fidelity_audit_catches_repaired_default_window_and_benchmark() -> None:
+def test_stated_run_fidelity_audit_catches_repaired_default_window_and_benchmark() -> (
+    None
+):
     from argus.agent_runtime.llm_interpreter import (
         _response_needs_stated_run_field_fidelity_audit,
     )
@@ -5048,7 +5041,9 @@ def test_current_message_contract_repair_preserves_partial_date_without_benchmar
         normalized = query.strip().upper()
         if normalized not in {"AAPL", "QQQ"}:
             raise ValueError(query)
-        return ResolvedAssetStub(normalized, "equity", name=normalized, raw_symbol=normalized)
+        return ResolvedAssetStub(
+            normalized, "equity", name=normalized, raw_symbol=normalized
+        )
 
     monkeypatch.setattr(llm_module, "resolve_asset", _asset)
     response = LLMInterpretationResponse(
@@ -5343,9 +5338,7 @@ async def test_dca_calendar_period_label_does_not_become_timeframe_clarification
         if schema_name == "ExecutableStrategyGroundingAudit":
             return ExecutableStrategyGroundingAudit(
                 outcome="needs_clarification",
-                assistant_response=(
-                    "Please confirm the date range before I run this."
-                ),
+                assistant_response=("Please confirm the date range before I run this."),
                 missing_required_fields=["date_range"],
                 confidence=0.9,
             )
@@ -5472,8 +5465,7 @@ async def test_current_year_so_far_refusal_enters_strategy_repair(monkeypatch) -
     )
     request = InterpretationRequest(
         current_user_message=(
-            "how did apple perform against QQQ in 2026 so far, "
-            "a simple buy and hold"
+            "how did apple perform against QQQ in 2026 so far, " "a simple buy and hold"
         ),
         user=UserState(user_id="user-1"),
     )
@@ -5532,8 +5524,7 @@ def test_stated_run_fidelity_preserves_current_year_so_far_contract() -> None:
     assert repaired is None
 
 
-def test_current_message_contract_repairs_full_future_year_to_so_far(
-) -> None:
+def test_current_message_contract_repairs_full_future_year_to_so_far() -> None:
     from argus.agent_runtime.llm_interpreter import (
         _response_from_current_message_run_field_contract,
     )
@@ -5613,7 +5604,7 @@ def test_interpret_stage_repairs_dca_calendar_period_before_clarifying_timeframe
                 "field_provenance": {
                     "capital_amount": "recurring_contribution",
                     "cadence": "explicit_user",
-                }
+                },
             },
         ),
         semantic_turn_act="new_idea",
@@ -5754,9 +5745,7 @@ def test_interpret_stage_preserves_interpreter_asset_and_repairs_explicit_date(
     assert "current_message_asset_grounding_repaired" not in (
         result.decision.reason_codes
     )
-    assert "current_message_run_field_contract_repair" in (
-        result.decision.reason_codes
-    )
+    assert "current_message_run_field_contract_repair" in (result.decision.reason_codes)
 
 
 def test_interpret_stage_repairs_missing_asset_when_benchmark_owner_is_known(
@@ -6081,8 +6070,7 @@ def test_interpret_stage_does_not_guess_missing_asset_from_ambiguous_mentions(
     assert result.decision.missing_required_fields == ["asset_universe"]
 
 
-def test_stated_run_fidelity_audit_restores_dca_recurring_amount_and_cadence(
-) -> None:
+def test_stated_run_fidelity_audit_restores_dca_recurring_amount_and_cadence() -> None:
     from argus.agent_runtime.llm_interpreter import (
         StatedRunFieldFidelityAudit,
         _response_from_stated_run_field_fidelity_audit,
@@ -6147,7 +6135,9 @@ def test_current_message_contract_repair_handles_other_symbol_dates_without_benc
         normalized = query.strip().upper()
         if normalized not in {"MSFT", "IWM"}:
             raise ValueError(query)
-        return ResolvedAssetStub(normalized, "equity", name=normalized, raw_symbol=normalized)
+        return ResolvedAssetStub(
+            normalized, "equity", name=normalized, raw_symbol=normalized
+        )
 
     monkeypatch.setattr(llm_module, "resolve_asset", _asset)
     response = LLMInterpretationResponse(
@@ -6337,9 +6327,7 @@ def test_optional_readiness_does_not_trust_unprovenanced_relative_date_intent(
         semantic_turn_act="new_idea",
     )
     request = InterpretationRequest(
-        current_user_message=(
-            "if i bought AAPL in 2024 with 10k, compare it with SPY"
-        ),
+        current_user_message=("if i bought AAPL in 2024 with 10k, compare it with SPY"),
         user=UserState(user_id="user-1"),
     )
 
@@ -7130,9 +7118,7 @@ def test_planned_window_edit_with_preserved_asset_keeps_traded_asset(
     from argus.agent_runtime.stages import interpret as interpret_module
 
     def _asset(symbol: str) -> ResolvedAssetStub:
-        normalized = "".join(
-            char for char in str(symbol).upper() if char.isalnum()
-        )
+        normalized = "".join(char for char in str(symbol).upper() if char.isalnum())
         if normalized in {"BTC", "BITCOIN"}:
             return ResolvedAssetStub("BTC", "crypto", name="Bitcoin")
         raise ValueError("unsupported_symbol")
@@ -7239,9 +7225,7 @@ def test_vague_benchmark_only_idea_with_resolver_echo_still_asks_for_asset(
     from argus.agent_runtime.stages import interpret as interpret_module
 
     def _asset(symbol: str) -> ResolvedAssetStub:
-        normalized = "".join(
-            char for char in str(symbol).upper() if char.isalnum()
-        )
+        normalized = "".join(char for char in str(symbol).upper() if char.isalnum())
         if normalized in {"BTC", "BITCOIN"}:
             return ResolvedAssetStub("BTC", "crypto", name="Bitcoin")
         raise ValueError("unsupported_symbol")

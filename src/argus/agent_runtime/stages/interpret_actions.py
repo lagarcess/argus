@@ -144,12 +144,8 @@ def structured_action_stage_result_if_applicable(
         snapshot=snapshot,
         action_payload=action.payload,
     )
-    if (
-        snapshot is None
-        or (
-            snapshot.pending_strategy_summary is None
-            and anchor.draft is None
-        )
+    if snapshot is None or (
+        snapshot.pending_strategy_summary is None and anchor.draft is None
     ):
         return StageResult(
             outcome="await_user_reply",
@@ -176,6 +172,14 @@ def structured_action_stage_result_if_applicable(
 
     if action_type in CONFIRMATION_EDIT_ACTION_FIELDS:
         requested_field = CONFIRMATION_EDIT_ACTION_FIELDS[action_type]
+        facts: dict[str, Any] = {
+            "strategy": pending.model_dump(mode="python"),
+            "current_user_message": state.current_user_message,
+            "structured_action": action.model_dump(mode="python"),
+            "language": language,
+        }
+        if action_type == "change_asset":
+            facts["asset_edit_frame"] = "operation_agnostic"
         return StageResult(
             outcome="needs_clarification",
             stage_patch={
@@ -187,12 +191,7 @@ def structured_action_stage_result_if_applicable(
                     "kind": "clarification",
                     "semantic_needs": [semantic_need_for_action(action_type)],
                     "requested_fields": [requested_field],
-                    "facts": {
-                        "strategy": pending.model_dump(mode="python"),
-                        "current_user_message": state.current_user_message,
-                        "structured_action": action.model_dump(mode="python"),
-                        "language": language,
-                    },
+                    "facts": facts,
                     "options": [],
                 },
             },
@@ -477,9 +476,8 @@ def approval_stage_result_if_applicable(
             snapshot=snapshot,
             approved_strategy=approved_strategy,
         )
-    if (
-        confirmation_payload is None
-        and not prior_stage_was_await_approval(selected_thread_metadata)
+    if confirmation_payload is None and not prior_stage_was_await_approval(
+        selected_thread_metadata
     ):
         return None
     if confirmation_payload is None:
@@ -579,9 +577,7 @@ def _retry_failed_action_stage_result(
     require_requested_failed_action_id: bool = False,
     language: str = "en",
 ) -> StageResult:
-    reference = (
-        snapshot.latest_failed_action_reference if snapshot is not None else None
-    )
+    reference = snapshot.latest_failed_action_reference if snapshot is not None else None
     if (
         require_requested_failed_action_id and requested_failed_action_id is None
     ) or not _failed_action_matches_requested_id(
@@ -591,8 +587,7 @@ def _retry_failed_action_stage_result(
         reason_codes = [*decision.reason_codes, "stale_failed_action_retry"]
         retry_status = (
             "missing_artifact_id"
-            if require_requested_failed_action_id
-            and requested_failed_action_id is None
+            if require_requested_failed_action_id and requested_failed_action_id is None
             else "stale"
         )
         return StageResult(

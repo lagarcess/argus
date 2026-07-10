@@ -69,3 +69,474 @@ cases:
         end: "2024-12-31"
       benchmark_symbol: SPY
       stage_outcomes: ["approved_for_execution"]
+
+  - id: action_chip_change_asset_remove_aapl_issue_188
+    prompt: ""
+    followup_prompt: "remove AAPL"
+    user_language: en
+    ui_language: en
+    action:
+      type: change_asset
+      label: "Change asset"
+      presentation: confirmation
+      payload:
+        confirmation_id: "eval-confirm-aapl-msft-nvda-2024"
+    snapshot:
+      pending_strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+    confirmation_payload:
+      confirmation_id: "eval-confirm-aapl-msft-nvda-2024"
+      artifact_id: "eval-confirm-aapl-msft-nvda-2024"
+      strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+      optional_parameters: {}
+      launch_payload:
+        strategy_type: buy_and_hold
+        symbol: AAPL
+        symbols: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        entry_rule: null
+        exit_rule: null
+        rule_spec: null
+        sizing_mode: capital_amount
+        capital_amount: 1000
+        position_size: null
+        cadence: null
+        parameters: {}
+        risk_rules: []
+        benchmark_symbol: SPY
+        language: en
+      validation:
+        status: ready_to_run
+        executable: true
+    expected:
+      intent: backtest_execution
+      capability_verdict: executable
+      assets: ["MSFT", "NVDA"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 1000
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+
+  - id: action_chip_change_asset_bare_ticker_append_issue_190
+    prompt: ""
+    followup_prompt: "TSLA"
+    user_language: en
+    ui_language: en
+    action:
+      type: change_asset
+      label: "Change asset"
+      presentation: confirmation
+      payload:
+        confirmation_id: "eval-confirm-aapl-msft-nvda-2024"
+    snapshot:
+      pending_strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+    confirmation_payload:
+      confirmation_id: "eval-confirm-aapl-msft-nvda-2024"
+      artifact_id: "eval-confirm-aapl-msft-nvda-2024"
+      strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+      optional_parameters: {}
+      launch_payload:
+        strategy_type: buy_and_hold
+        symbol: AAPL
+        symbols: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        entry_rule: null
+        exit_rule: null
+        rule_spec: null
+        sizing_mode: capital_amount
+        capital_amount: 1000
+        position_size: null
+        cadence: null
+        parameters: {}
+        risk_rules: []
+        benchmark_symbol: SPY
+        language: en
+      validation:
+        status: ready_to_run
+        executable: true
+    expected:
+      intent: backtest_execution
+      capability_verdict: executable
+      assets: ["AAPL", "MSFT", "NVDA", "TSLA"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 1000
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+
+  - id: action_chip_change_asset_compound_replace_issue_188
+    prompt: ""
+    followup_prompt: "remove AAPL and replace with TSLA and GOOGL"
+    user_language: en
+    ui_language: en
+    action:
+      type: change_asset
+      label: "Change asset"
+      presentation: confirmation
+      payload:
+        confirmation_id: "eval-confirm-aapl-msft-nvda-2024"
+    snapshot:
+      pending_strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+    confirmation_payload:
+      confirmation_id: "eval-confirm-aapl-msft-nvda-2024"
+      artifact_id: "eval-confirm-aapl-msft-nvda-2024"
+      strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+      optional_parameters: {}
+      launch_payload:
+        strategy_type: buy_and_hold
+        symbol: AAPL
+        symbols: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        entry_rule: null
+        exit_rule: null
+        rule_spec: null
+        sizing_mode: capital_amount
+        capital_amount: 1000
+        position_size: null
+        cadence: null
+        parameters: {}
+        risk_rules: []
+        benchmark_symbol: SPY
+        language: en
+      validation:
+        status: ready_to_run
+        executable: true
+    expected:
+      intent: backtest_execution
+      capability_verdict: executable
+      assets: ["MSFT", "NVDA", "TSLA", "GOOGL"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 1000
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+
+  - id: action_chip_change_asset_changed_mind_capital_issue_188
+    prompt: ""
+    followup_prompt: "actually make it $5,000"
+    user_language: en
+    ui_language: en
+    action:
+      type: change_asset
+      label: "Change asset"
+      presentation: confirmation
+      payload:
+        confirmation_id: "eval-confirm-aapl-msft-nvda-2024"
+    snapshot:
+      pending_strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+    confirmation_payload:
+      confirmation_id: "eval-confirm-aapl-msft-nvda-2024"
+      artifact_id: "eval-confirm-aapl-msft-nvda-2024"
+      strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+      optional_parameters: {}
+      launch_payload:
+        strategy_type: buy_and_hold
+        symbol: AAPL
+        symbols: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        entry_rule: null
+        exit_rule: null
+        rule_spec: null
+        sizing_mode: capital_amount
+        capital_amount: 1000
+        position_size: null
+        cadence: null
+        parameters: {}
+        risk_rules: []
+        benchmark_symbol: SPY
+        language: en
+      validation:
+        status: ready_to_run
+        executable: true
+    expected:
+      intent: backtest_execution
+      capability_verdict: executable
+      assets: ["AAPL", "MSFT", "NVDA"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 5000
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+
+  - id: action_chip_change_asset_no_active_ref_remove_aapl_issue_188
+    prompt: ""
+    followup_prompt: "remove AAPL"
+    user_language: en
+    ui_language: en
+    action:
+      type: change_asset
+      label: "Change asset"
+      presentation: confirmation
+      payload:
+        confirmation_id: "eval-confirm-rolled-off-aapl-msft-nvda-2024"
+    snapshot:
+      pending_strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+    expected:
+      intent: backtest_execution
+      capability_verdict: executable
+      assets: ["MSFT", "NVDA"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 1000
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+
+  - id: action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188
+    prompt: "remove AAPL"
+    user_language: en
+    ui_language: en
+    recent_thread_history:
+      - role: assistant
+        content: "Which asset should I test?"
+    thread_metadata:
+      requested_field: asset_universe
+      missing_required_fields: ["asset_universe"]
+      last_stage_outcome: null
+    snapshot:
+      pending_strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+    expected:
+      intent: backtest_execution
+      capability_verdict: executable
+      assets: ["MSFT", "NVDA"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 1000
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]
+
+  - id: action_chip_change_asset_no_active_ref_multi_op_issue_188
+    prompt: ""
+    followup_prompt: "drop AAPL and NVDA and add TSLA and AMD"
+    user_language: en
+    ui_language: en
+    action:
+      type: change_asset
+      label: "Change asset"
+      presentation: confirmation
+      payload:
+        confirmation_id: "eval-confirm-rolled-off-aapl-msft-nvda-2024"
+    snapshot:
+      pending_strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+    expected:
+      intent: backtest_execution
+      capability_verdict: executable
+      assets: ["MSFT", "TSLA", "AMD"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2024-01-01"
+        end: "2024-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 1000
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+
+  - id: action_chip_change_asset_no_active_ref_asset_and_date_issue_188
+    prompt: ""
+    followup_prompt: "remove AAPL and change the dates to 2023"
+    user_language: en
+    ui_language: en
+    action:
+      type: change_asset
+      label: "Change asset"
+      presentation: confirmation
+      payload:
+        confirmation_id: "eval-confirm-rolled-off-aapl-msft-nvda-2024"
+    snapshot:
+      pending_strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+    expected:
+      intent: backtest_execution
+      capability_verdict: executable
+      assets: ["MSFT", "NVDA"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2023-01-01"
+        end: "2023-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 1000
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+
+  - id: action_chip_change_asset_no_active_ref_fresh_idea_issue_188
+    prompt: ""
+    followup_prompt: "new idea: buy and hold TSLA in 2023 with $2,000"
+    user_language: en
+    ui_language: en
+    action:
+      type: change_asset
+      label: "Change asset"
+      presentation: confirmation
+      payload:
+        confirmation_id: "eval-confirm-rolled-off-aapl-msft-nvda-2024"
+    snapshot:
+      pending_strategy:
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024."
+        asset_universe: ["AAPL", "MSFT", "NVDA"]
+        asset_class: equity
+        date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        comparison_baseline: SPY
+        capital_amount: 1000
+    expected:
+      intent: [strategy_drafting, backtest_execution]
+      capability_verdict: executable
+      assets: ["TSLA"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2023-01-01"
+        end: "2023-12-31"
+      benchmark_symbol: SPY
+      capital_amount: 2000
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
