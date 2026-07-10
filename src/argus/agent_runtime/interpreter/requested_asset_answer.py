@@ -5,6 +5,10 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any, Protocol
 
+from argus.agent_runtime.artifacts.asset_edits import (
+    normalized_asset_symbols,
+    normalized_asset_universe_operation,
+)
 from argus.agent_runtime.interpreter.asset_grounding import (
     _prior_strategy_symbols,
     _requested_asset_answer_candidate_audit_messages,
@@ -273,7 +277,14 @@ def _response_with_requested_asset_update(
         draft = response.candidate_strategy_draft.model_copy(deep=True)
     else:
         draft = draft.model_copy(deep=True)
-    draft.asset_universe = [resolution.asset.canonical_symbol]
+    asset_universe, asset_universe_operation = _asset_universe_for_requested_update(
+        prior_symbols=draft.asset_universe,
+        resolved_symbol=resolution.asset.canonical_symbol,
+        operation=response.candidate_strategy_draft.asset_universe_operation,
+    )
+    draft.asset_universe = asset_universe
+    if asset_universe_operation is not None:
+        draft.asset_universe_operation = asset_universe_operation
     draft.asset_class = resolution.asset.asset_class
     draft.raw_user_phrasing = draft.raw_user_phrasing or request.current_user_message
     missing = [
@@ -300,6 +311,21 @@ def _response_with_requested_asset_update(
             ),
         }
     )
+
+
+def _asset_universe_for_requested_update(
+    *,
+    prior_symbols: list[str],
+    resolved_symbol: str,
+    operation: Any,
+) -> tuple[list[str], str | None]:
+    normalized_prior = normalized_asset_symbols(prior_symbols)
+    normalized_operation = normalized_asset_universe_operation(operation)
+    if normalized_operation == "append" or (
+        normalized_operation is None and len(normalized_prior) > 1
+    ):
+        return list(dict.fromkeys([*normalized_prior, resolved_symbol])), "append"
+    return [resolved_symbol], normalized_operation
 
 
 def _requested_asset_update_resolution(

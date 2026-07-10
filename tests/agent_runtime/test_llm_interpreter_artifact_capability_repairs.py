@@ -324,6 +324,70 @@ async def test_llm_interpreter_audits_pending_asset_answer_despite_educational_c
 
 
 @pytest.mark.asyncio
+async def test_plain_multi_asset_chip_answer_appends_when_operation_is_unset(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized in {"AAPL", "MSFT", "NVDA", "TSLA"}:
+            return ResolvedAssetStub(normalized, "equity", name=f"{normalized} Inc.")
+        raise ValueError("invalid_symbol")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User answered the asset chip with Tesla.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="TSLA",
+            asset_universe=["TSLA"],
+            asset_universe_operation=None,
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+    request = InterpretationRequest(
+        current_user_message="TSLA",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="buy_and_hold",
+                strategy_thesis="Buy and hold AAPL, MSFT, and NVDA.",
+                asset_universe=["AAPL", "MSFT", "NVDA"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+                capital_amount=1000,
+            )
+        ),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+        },
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=request,
+    )
+
+    assert ready_response.semantic_turn_act == "answer_pending_need"
+    assert ready_response.candidate_strategy_draft.asset_universe == [
+        "AAPL",
+        "MSFT",
+        "NVDA",
+        "TSLA",
+    ]
+    assert ready_response.candidate_strategy_draft.asset_universe_operation == "append"
+    assert ready_response.candidate_strategy_draft.asset_class == "equity"
+    assert "requested_asset_answer_provider_resolution" in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
 async def test_requested_asset_answer_audit_skips_generic_readiness_repairs(
     monkeypatch,
 ) -> None:
