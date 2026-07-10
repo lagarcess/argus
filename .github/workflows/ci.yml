@@ -53,11 +53,15 @@ jobs:
       - name: Lint backend, tests, scripts, and workflows
         run: poetry run ruff check src tests workflows scripts
 
+      - name: Check modularity budget
+        run: poetry run python scripts/check_modularity_budget.py
+
       - name: Run focused backend regression suite
         run: |
           poetry run pytest \
             tests/test_environment_scripts.py \
             tests/test_api_import_boundary.py \
+            tests/test_spine_guardrails.py \
             tests/test_render_canary_script.py \
             tests/test_render_runtime_compatibility.py \
             tests/test_private_launch_hardening.py \
@@ -65,8 +69,10 @@ jobs:
             tests/test_ci_workflow.py \
             tests/test_legacy_orchestrator_retirement.py \
             tests/test_chat_backtest_state_machine.py \
+            tests/test_chat_runtime_reload_guardrails.py \
             tests/test_openrouter_policy.py \
             tests/agent_runtime/test_execute_recovery.py \
+            tests/agent_runtime/test_latest_result_fact_answers.py \
             tests/section3/test_market_data_provider.py \
             -q --no-cov
 

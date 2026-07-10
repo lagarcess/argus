@@ -216,10 +216,10 @@ Represents individual messages within a conversation.
 - `metadata` stores token usage, model identifiers, latency, and tool execution traces.
 - Message metadata may contain reloadable chat artifacts such as
   `pending_strategy`, `confirmation_card`, `confirmation_payload`,
-  `result_card`, result identifiers, `chat_action`, `failed_action`, and
-  `retry_last_turn`. These fields hydrate the transcript and action affordances;
-  they do not make free-form transcript text the source of truth for strategy
-  state.
+  `result_card`, result identifiers, `chat_action`, `failed_action`,
+  `retry_last_turn`, `recovery`, and `clarification`. These fields hydrate the
+  transcript, action affordances, and localized degraded-fallback UI; they do
+  not make free-form transcript text the source of truth for strategy state.
 - When a turn follows an artifact-backed setup, the runtime must reconstruct the
   working draft from canonical artifact state before applying the new user
   message as a patch. Canonical artifact state comes from, in order of
@@ -346,6 +346,10 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 - Legacy persisted chart payloads may include `value_extrema`; readers may use it
   as a fallback, but new run writers should persist `value_summary`.
 - `trades` may mirror chart event markers for lightweight UI hydration. Detailed execution ledgers can preserve signals, order intents, fills, ignored signals, and position snapshots, but list endpoints must expose only lightweight result metadata.
+- When execution realism is enabled and the engine models nonzero fees/slippage,
+  `conversation_result_card.execution_costs` stores structured result evidence:
+  `fee_bps`, `slippage_bps`, gross/net total return, return drag, and benchmark
+  cost treatment. Idealized runs omit this object.
 - Saved strategies must be created from completed run state or an equivalent canonical result snapshot, not reconstructed from frontend display text.
 - Follow-up refinements from a result card must be seeded from
   `config_snapshot` or equivalent canonical run metadata. A user's partial
@@ -503,26 +507,106 @@ service role server-side; service-role grants do not relax frontend/client RLS.
 
 ## 12.1.1 P1 Observability Envelope
 
-P1 defines the private-alpha observability envelope in code without adding a new
-durable analytics or cost table in this slice.
+P1 defines the private-alpha observability envelope in code. Product events now
+flow to PostHog, and B3 measurement slice 3 adds the first durable internal cost
+ledger while keeping product analytics and eval-result persistence separate.
 
 Current behavior:
 - `argus_observability_event/v1` is the canonical event-envelope schema.
 - Default privacy mode is `metadata_only`.
-- Event categories include chat interpretation, continuity, evidence capture,
-  decision capture, recall, cost-ledger entries, and eval-suite readiness.
+- Product-event categories emitted to PostHog are evidence capture, decision
+  capture, recall usage, continuity mismatch, compare started, and eval
+  readiness.
+- The exact registered product-event name is carried as
+  `attributes.product_event`; envelope `event_type` remains in the broader memo
+  15.5 event taxonomy.
 - The sanitizer strips raw prompts, transcripts, context packets, route
   receipts, provider/model metadata, auth tokens, API keys, broker credentials,
   account balances, exact holdings, payment identifiers, and similar sensitive
   payloads.
-- Live analytics capture is suppressed with `reason = "p1_measurement_only"`.
+- Raw user, session, conversation, turn, message, job, and run identifiers are
+  hashed in the PostHog projection.
+- Live PostHog capture is enabled only when `POSTHOG_PROJECT_TOKEN` and an
+  explicit PostHog region/host are present; missing token suppresses with
+  `reason = "posthog_not_configured"`, and missing or unsupported region/host
+  suppresses with `reason = "posthog_region_not_configured"`.
+- PostHog is server-side only and personless (`$process_person_profile = false`).
+- US Cloud is the current PostHog region choice for private alpha compliance
+  posture.
 
 Deferred durable surfaces:
-- PostHog product analytics wiring.
-- Append-only provider cost ledger.
 - Eval run/case result persistence.
 - Route-receipt to cost/eval/product-event joins beyond existing product
   records.
+
+### cost_ledger_entries
+
+Append-only operational spend records. This table is the first-party source for
+provider/runtime cost attribution; PostHog is not the spend ledger.
+
+Fields:
+- `id`: `uuid` (Primary Key)
+- `source`: `text` (`api_turn`, `render_workflow`, `eval_harness`,
+  `manual_reconciliation`, `runtime_compute`, `storage`, `market_data`, `stt`,
+  `research`)
+- `service`: `text` (billing service, e.g. `openrouter`, `render`, `supabase`)
+- `provider`: `text` (provider inside the service, e.g. `openrouter`, `alpaca`,
+  `kraken`, `openai`, `elevenlabs`)
+- `model`: `text` (Nullable; LLM/STT model when applicable)
+- `feature_area`: `text` (e.g. `chat_runtime`, `result_readout`,
+  `eval_readiness`)
+- `task`: `text` (Nullable; OpenRouter task or future runtime task)
+- `user_id`: `uuid` (Nullable, references `profiles.id` ON DELETE SET NULL)
+- `conversation_id`: `uuid` (Nullable, references `conversations.id` ON DELETE SET NULL)
+- `message_id`: `uuid` (Nullable, references `messages.id` ON DELETE SET NULL)
+- `backtest_run_id`: `uuid` (Nullable, references `backtest_runs.id` ON DELETE SET NULL)
+- `backtest_job_id`: `uuid` (Nullable, references `backtest_jobs.id` ON DELETE SET NULL)
+- `route_receipt_id`: `uuid` (Nullable, references `route_receipts.id` ON DELETE SET NULL)
+- `request_id`: `text` (Nullable)
+- `correlation_id`: `text` (Required; joins cost records to a turn, run, or eval)
+- `provider_request_id`: `text` (Nullable; for providers that return request ids)
+- `upstream_id`: `text` (Nullable; future reconciliation id)
+- `usage_metadata`: `jsonb` (Default: `{}`)
+- `input_tokens`, `output_tokens`, `total_tokens`: `integer` (Nullable)
+- `billable_unit`: `text` (`token`, `request`, `compute_second`,
+  `audio_second`, `storage_byte`, `row`, `unknown`)
+- `billable_quantity`: `numeric` (Nullable)
+- `cost_amount`: `numeric` (Nullable)
+- `cost_currency`: `text` (Default: `USD`)
+- `cost_source`: `text` (`provider_reported`, `estimated`, `derived`,
+  `reconciled`, `unavailable`)
+- `latency_ms`: `integer` (Nullable)
+- `status`: `text` (`succeeded`, `failed`, `skipped`, `estimated`,
+  `reconciled`)
+- `metadata`: `jsonb` (Default: `{}`)
+- `occurred_at`: `timestamptz`
+- `created_at`: `timestamptz`
+
+Append-only rules:
+- Product code may insert rows only. There are no update, upsert, delete, or
+  frontend read paths in the private-alpha slice.
+- The migration grants service-role `insert` and `select` only. RLS is enabled,
+  and no `anon` or `authenticated` policies are added.
+- Rollback is one reversible step: drop `public.cost_ledger_entries`.
+
+Current write hooks:
+- API chat turns append OpenRouter cost rows from persisted route receipts.
+- Render workflow result-readout LLM calls append rows correlated to
+  `backtest_job_id` and `backtest_run_id`.
+- Eval harness judge calls can append rows with `source = "eval_harness"` and a
+  stable eval correlation id.
+
+Cost model notes:
+- OpenRouter rows store provider-reported `usage.cost` when available and token
+  counts in both dedicated columns and `usage_metadata`.
+- Render, Supabase, market-data providers, STT providers, research/freshness
+  providers, and future broker/export services may bill by request, compute
+  time, storage, rows, audio duration, or provider reconciliation ids. The
+  `billable_unit`, `billable_quantity`, `cost_source`, `provider_request_id`,
+  and `upstream_id` fields are intentionally generic so those services can be
+  added without changing the private-alpha chat runtime.
+- Cost rows never store raw prompts, transcripts, credentials, balances,
+  holdings, full audio, or frontend-only payloads.
 
 ## 12.2 backtest_jobs
 

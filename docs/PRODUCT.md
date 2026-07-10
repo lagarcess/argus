@@ -253,6 +253,13 @@ Strategies surface and the result-card Save action. Completed runs remain
 revisitable through conversation/history/Recents, while Refine idea remains
 available on the result card.
 
+Saved-idea recall lives in Omnisearch, not a separate dashboard. Typed search
+results and right-panel previews cover Conversation, Backtest, Evidence,
+Decision, and Idea, and the Idea Ledger browse groups saved ideas by decision
+state (promising, watching, rejected, revisit) with filter chips. Group order
+and counts are backend-owned; the frontend renders them without synthesizing
+its own groups.
+
 ## Surface Goals
 
 - scan saved strategies quickly
@@ -471,6 +478,12 @@ Every result card must include a lightweight assumptions footer to maintain inte
 - **Crypto** compares to **BTC**
 
 Example: *Long-only • Equal weight • No fees/slippage • Benchmark: SPY*
+
+The default private-alpha footer discloses no fees or slippage. Execution realism
+(fees + slippage modeling) exists in the engine behind
+`ARGUS_ENABLE_EXECUTION_REALISM` (default OFF); when enabled, the assumptions
+footer reflects the modeled costs instead. The founder deliberately disclaims
+cost assumptions for the current PMF stage, so the flag stays off in alpha.
 
 Result cards and explanations must describe executed backtest behavior, not raw
 strategy triggers. A strategy may produce many buy/sell signals, but Argus only

@@ -21,6 +21,19 @@ bilingual canary evidence, provider-path canary evidence, and a per-candidate
 release manifest. Keep this document as the release gate contract whenever a
 candidate is promoted toward tester-facing validation or deployment.
 
+Local runtime proof doctrine:
+
+- Python is pinned by `.python-version` (`3.10.x`; currently `3.10.20`), and
+  `.github/setup.sh` enforces that runtime. A green run on Python 3.14 is not
+  evidence for the deployed runtime.
+- Create worktrees as siblings of the repo, never nested inside another Argus
+  checkout. Nested worktrees can inherit the parent `.env` through dotenv upward
+  search and silently convert mocked runs into live calls.
+- Deterministic agent-runtime sweeps use
+  `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture` with live provider
+  keys absent or blank. A mocked sweep should finish in seconds; minutes means
+  stop and investigate credential leakage or live provider paths.
+
 Issue #124 tightened the gate after `argus-api` and `argus-app` were aligned to
 a candidate SHA while `argus-backtests` could still run with an effective dev
 provider mode. For tester-facing releases, deploy status alone is insufficient:

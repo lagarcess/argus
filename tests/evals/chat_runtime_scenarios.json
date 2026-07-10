@@ -528,6 +528,39 @@
       "judge_rubric": "Asset resolution should feel smart but not overconfident."
     },
     {
+      "id": "messy_english_company_name_multi_asset_issue_142",
+      "qa_id": "QA 14",
+      "buckets": ["workstream_4", "workstream_6"],
+      "priority": "must_pass",
+      "purpose": "Messy same-class company-name baskets preserve every named asset through first-pass interpretation and provider grounding.",
+      "natural_prompt_variants": [
+        "Id like to buy target Walmart and costco evenly with 500 dollars every month from February 2020 till today",
+        "buy target, walmart, and costco equally with 500 a month from feb 2020 to today",
+        "Backtest target Walmart and costco with 500 dollars since February 2020"
+      ],
+      "conversation_steps": [
+        {
+          "actor": "user",
+          "semantic_target": "company_name_multi_asset_provider_grounding",
+          "hard_checks": [
+            "confirmation card or launch payload contains exactly TGT, WMT, and COST",
+            "strategy remains DCA/recurring when the prompt asks for monthly buying",
+            "wrong-but-resolvable symbols such as TGAAF are not accepted for company-name mentions",
+            "unambiguous provider name-search results resolve without asking an asset clarification"
+          ]
+        }
+      ],
+      "artifact_checks": ["confirmation summary names the complete three-asset set"],
+      "action_checks": ["run_backtest action is available only after all three assets are validated"],
+      "reload_checks": ["all three resolved symbols hydrate after reload"],
+      "forbidden_outcomes": [
+        "silently drops Target or Costco",
+        "accepts TGAAF for the word target",
+        "asks for clarification when provider name-search clearly ranks Target Corporation"
+      ],
+      "judge_rubric": "All user-mentioned same-class company names should survive as provider-backed canonical symbols."
+    },
+    {
       "id": "qa_15_runtime_arbitration_context_binding",
       "qa_id": "QA 15",
       "buckets": ["workstream_3", "workstream_4", "workstream_6"],

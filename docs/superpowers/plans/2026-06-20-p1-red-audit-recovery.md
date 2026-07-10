@@ -1,5 +1,10 @@
 # P1 Red Audit Recovery Plan
 
+> [!NOTE]
+> Historical plan (banner added 2026-07-07). P1 completed on the reintegration
+> line and was promoted to `main`. Retained for recovery archaeology; current
+> execution board is `docs/specs/private-alpha-next-roadmap.md`.
+
 ## Goal
 
 Complete P1 on `codex/private-alpha-next-reintegration` without promotion.

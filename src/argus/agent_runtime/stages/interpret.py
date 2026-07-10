@@ -1,3 +1,7 @@
+# ruff: noqa: F401, I001
+# This stage is being modularized into argus.agent_runtime.stages.interpret_internal.*;
+# it re-exports relocated symbols and preserves its full original import surface so
+# external callers/tests that access ``interpret.<name>`` keep working.
 from __future__ import annotations
 
 import asyncio
@@ -5,13 +9,9 @@ import inspect
 import os
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, cast, get_args
+from typing import Any
 
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
-from argus.agent_runtime.artifacts.asset_edits import (
-    normalized_asset_universe_operation,
-    same_asset_universe,
-)
 from argus.agent_runtime.artifacts.patch_policy import (
     executable_artifact_patch_missing_fields,
     relevant_unsupported_constraints_for_artifact_patch,
@@ -20,17 +20,16 @@ from argus.agent_runtime.artifacts.strategy_edits import (
     ArtifactPatch,
     apply_artifact_patch,
 )
-from argus.agent_runtime.asset_text_grounding import (
-    grounded_asset_mention_has_name_support,
-    grounded_asset_mentions_from_text,
-    provider_ticker_mentions_from_text,
-)
 from argus.agent_runtime.capabilities.answers import (
     EXECUTABLE_STRATEGY_FAMILIES,
     capability_fact_packet,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.extraction import detect_unsupported_constraints
+from argus.agent_runtime.interpreter import provider_context_assets
+from argus.agent_runtime.presentation_i18n import (
+    asset_universe_operation_clarification_message,
+)
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
@@ -39,30 +38,21 @@ from argus.agent_runtime.recovery_messages import (
     recovery_state_stage_patch,
     retry_last_turn_stage_patch,
 )
-from argus.agent_runtime.resolution import AssetResolution
+from argus.agent_runtime.resolution import AssetResolution, callable_accepts_keyword
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
 from argus.agent_runtime.response_language import response_language_instruction
-from argus.agent_runtime.response_style import (
-    result_followup_heading,
-    with_response_heading,
-)
+from argus.agent_runtime.response_style import result_followup_response_intent
 from argus.agent_runtime.result_followups import (
     compose_private_alpha_save_response,
     compose_result_followup_response,
     fallback_private_alpha_save_response,
 )
 from argus.agent_runtime.rule_specs import (
-    indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
-)
-from argus.agent_runtime.rule_specs import (
     moving_average_crossover_text,
     opposite_moving_average_crossover_rule,
     strategy_rule,
-)
-from argus.agent_runtime.run_field_contract import (
-    current_message_execution_context_tokens,
 )
 from argus.agent_runtime.semantic_integrity import (
     SemanticIntegrityReport,
@@ -90,6 +80,172 @@ from argus.agent_runtime.stages.interpret_actions import (
 )
 from argus.agent_runtime.stages.interpret_actions import (
     structured_action_stage_result_if_applicable as _structured_action_stage_result_if_applicable,
+)
+from argus.agent_runtime.stages.interpret_internal.answer_composition import (  # noqa: F401
+    _STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS,
+    _SUPPORTED_STRATEGY_FAMILY_TERMS,
+    _answer_contradicts_supported_indicators,
+    _answer_contradicts_supported_strategy_families,
+    _capability_answer_respects_contract,
+    _context_answer_respects_live_packet,
+    _context_curiosity_fact_packet,
+    _context_curiosity_recovery_answer,
+    _context_packet_grounding_retry_messages,
+    _format_market_mover_symbol,
+    _join_context_symbols,
+    _LiveContextCuriosityFacts,
+    _llm_composition_unavailable_recovery_answer,
+    _market_movers_packet_fact_text,
+    _market_movers_packet_symbols,
+    _mentioned_packet_symbols,
+    _negative_support_claim_positions,
+    _packet_grounded_context_recovery_answer,
+    _plain_sentences,
+    _plain_word_tokens,
+    _route_contextual_money_answer,
+    _supported_indicator_token_spans,
+    _supported_strategy_family_token_spans,
+    _token_sequence_spans,
+)
+from argus.agent_runtime.stages.interpret_internal.asset_resolution import (  # noqa: F401
+    _USER_GROUNDED_CADENCE_SOURCES,
+    _USER_GROUNDED_CAPITAL_SOURCES,
+    STRATEGY_TURN_ACTS,
+    _active_strategy_from_snapshot,
+    _ambiguous_fields_from_resolution,
+    _asset_resolution_source_for_canonicalization,
+    _candidate_strategy_has_backtest_shape,
+    _clear_incompatible_strategy_rule_state,
+    _dedupe_ambiguous_fields,
+    _dedupe_resolution_provenance,
+    _dedupe_unsupported_constraints,
+    _educational_turn_has_strategy_baggage,
+    _extra_parameters_for_strategy_family,
+    _filter_resolved_strategy_ambiguities,
+    _fresh_complete_restatement_started_new_confirmation,
+    _indicator_key_from_strategy,
+    _indicator_parameters_from_strategy,
+    _indicator_simplification_thesis,
+    _indicator_supports_default_threshold_rule,
+    _is_ambiguous_asset_resolution,
+    _merge_non_empty_strategy_fields,
+    _missing_fields_for_interpretation,
+    _normalized_symbol,
+    _optional_parameter_stage_patch,
+    _pending_refinement_misroute_result_if_applicable,
+    _provenance_field,
+    _requested_asset_answer_candidates,
+    _RequestedAssetCandidate,
+    _strategy_canonical_asset_symbols,
+    _strategy_field_is_executable,
+    _strategy_field_provenance,
+    _strategy_has_complete_no_rule_execution_shape,
+    _strategy_has_content,
+    _strategy_has_execution_anchor,
+    _strategy_has_fresh_execution_detail,
+    _strategy_has_unstructured_strategy_thesis,
+    _strategy_has_user_grounded_cadence,
+    _strategy_has_user_grounded_capital_amount,
+    _strategy_is_semantically_confirmable,
+    _strategy_looks_like_pending_artifact_edit,
+    _strategy_route_expected,
+    _strategy_supplies_contextual_rule_edit,
+    _strategy_with_default_template_for_complete_no_rule_shape,
+    _strategy_with_current_message_draft_only_indicator_text,
+    _strategy_with_execution_defaults,
+    _strategy_with_hidden_context_guard,
+    _strategy_with_pending_resolution_affirmation,
+    _strategy_with_supported_indicator_simplification,
+    _supported_timeframes,
+    _unresolved_requested_asset_resolution,
+    _unstructured_strategy_raw_value,
+    _unsupported_constraints_from_resolution,
+    _unsupported_strategy_logic_constraint,
+    _unsupported_symbol_constraints,
+    _validated_artifact_target,
+    _without_invalid_symbols,
+    _without_stale_requested_asset_rejection_constraints,
+)
+from argus.agent_runtime.stages.interpret_internal.confirmation_artifact_edits import (
+    asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
+)
+from argus.agent_runtime.stages.interpret_internal.contextual_merge import (  # noqa: F401
+    CONTEXTUAL_EDIT_TURN_ACTS,
+    _compact_asset_evidence_token,
+    _contextual_date_range_value,
+    _declared_strategy_family,
+    _extra_parameters_without_unrequested_money_context,
+    _has_complete_date_range,
+    _is_cadence_word_asset_candidate,
+    _is_field_owned_indicator_asset_candidate,
+    _merge_contextual_extra_parameters,
+    _merged_contextual_date_range,
+    _message_has_cashtag_for_asset,
+    _reset_contextual_strategy_definition,
+    _should_preserve_pending_strategy_family,
+    _should_preserve_prior_money_context,
+    _strategy_asset_universe_is_field_owned_indicator_context,
+    _strategy_fills_pending_execution_context,
+    _strategy_supplies_execution_context,
+    _strategy_uses_rule_or_indicator_context,
+    _strategy_with_contextual_merge,
+)
+from argus.agent_runtime.stages.interpret_internal.benchmark_repairs import (
+    default_benchmark_for_asset_class as _default_benchmark_for_asset_class,
+    strategy_with_default_benchmark as _strategy_with_default_benchmark,
+    strategy_with_separate_benchmark_symbol as _strategy_with_separate_benchmark_symbol,
+    strategy_with_unstated_benchmark_guard as _strategy_with_unstated_benchmark_guard,
+)
+from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
+    chip_clarify_answer_supplies_artifact_edit as _chip_clarify_answer_supplies_artifact_edit,
+    draft_only_indicator_interpretation_when_interpreter_unavailable as _draft_only_indicator_interpretation_when_interpreter_unavailable,
+    pending_response_option_interpretation_from_typed_selection as _pending_response_option_interpretation_from_typed_selection,
+    pending_response_option_when_interpreter_unavailable as _pending_response_option_when_interpreter_unavailable,
+    pending_confirmation_chip_clarify_edit_requested_field as _pending_confirmation_chip_clarify_edit_requested_field,
+    planned_active_confirmation_edit_interpretation as _planned_active_confirmation_edit_interpretation,
+    planned_latest_result_edit_interpretation as _planned_latest_result_edit_interpretation,
+    planned_pending_confirmation_edit_interpretation as _planned_pending_confirmation_edit_interpretation,
+    planned_pending_refinement_edit_interpretation as _planned_pending_refinement_edit_interpretation,
+    structured_interpretation_has_complete_typed_asset_patch as _structured_interpretation_has_complete_typed_asset_patch,
+    structured_interpretation_has_supported_artifact_assumption_edit as _structured_interpretation_has_supported_artifact_assumption_edit,
+)
+from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+    LatestResultFactComposerDeclined,
+)
+from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
+    latest_result_answer_stage_result_if_applicable as _latest_result_answer_stage_result_if_applicable,
+)
+from argus.agent_runtime.stages.interpret_internal.pending_date_answer import (
+    pending_date_answer_interpretation as _pending_date_answer_interpretation,
+)
+from argus.agent_runtime.stages.interpret_internal.date_contract import (  # noqa: F401
+    _DATE_RANGE_EVIDENCE_KEYS,
+    _changed_date_endpoint,
+    _date_range_endpoints,
+    _pending_date_edit_reuses_prior_date_range,
+    _strategy_date_evidence_candidates,
+    _strategy_date_range_needs_current_message_repair,
+    _strategy_has_non_executable_timeframe_label,
+)
+from argus.agent_runtime.stages.interpret_internal.offline_recovery import (  # noqa: F401
+    _LATEST_RESULT_SAVE_REQUESTED_REASON,
+    _current_setup_phrase,
+    _latest_result_save_requested,
+    _offline_interpreter_unavailable_result,
+    _offline_recovery_message,
+    _pending_assumption_edit_was_not_applied,
+    _strategies_enabled,
+)
+from argus.agent_runtime.stages.interpret_internal.route_repair import (  # noqa: F401
+    _repair_fresh_restatement_route_when_pending_need_is_active,
+    _repair_retry_route_when_pending_need_is_active,
+)
+from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
+    _field_base,
+    _should_preserve_prior_asset_context,
+    _strategy_supplies_executable_rule_edit,
+    _strategy_supplies_explicit_turn_money,
+    _supported_experiment_fact_packet,
 )
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
@@ -124,7 +280,6 @@ from argus.agent_runtime.strategy_contract import (
     display_strategy_type,
     executable_strategy_type,
     has_partial_explicit_date_range,
-    strategy_can_be_approved,
 )
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
@@ -136,12 +291,6 @@ from argus.context import (
     ContextPacket,
     context_packet_freshness,
     fetch_alpaca_market_movers_packet,
-)
-from argus.domain.backtesting.config import (
-    AssetClass as BacktestAssetClass,
-)
-from argus.domain.backtesting.config import (
-    default_benchmark as default_backtest_benchmark,
 )
 from argus.domain.indicators import (
     EXECUTABLE_INDICATORS,
@@ -162,51 +311,6 @@ from argus.nlp.natural_time import (
 from loguru import logger
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
-_STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
-_LATEST_RESULT_SAVE_REQUESTED_REASON = "latest_result_save_requested"
-_BACKTEST_ASSET_CLASSES = frozenset(get_args(BacktestAssetClass))
-_DATE_RANGE_EVIDENCE_KEYS = (
-    "date_range",
-    "date_range_raw_text",
-    "date_range_intent",
-)
-_USER_GROUNDED_CAPITAL_SOURCES = frozenset(
-    {
-        "explicit_user",
-        "prior",
-        "recurring_contribution",
-        "contribution_amount",
-        "periodic_contribution",
-        "dca_contribution",
-    }
-)
-_USER_GROUNDED_CADENCE_SOURCES = frozenset(
-    {
-        "explicit_user",
-        "prior",
-        "visible_draft",
-    }
-)
-
-
-@dataclass(frozen=True)
-class _LiveContextCuriosityFacts:
-    content: str
-    packet_symbols: tuple[str, ...] = ()
-
-
-STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
-    "new_idea",
-    "answer_pending_need",
-    "refine_current_idea",
-    "approval",
-}
-
-CONTEXTUAL_EDIT_TURN_ACTS = {
-    "answer_pending_need",
-    "approval",
-    "refine_current_idea",
-}
 
 
 def interpret_stage(
@@ -282,6 +386,17 @@ async def interpret_stage_async(
             capability_contract=capability_contract,
             selected_thread_metadata=selected_metadata,
         )
+    pending_response_option_interpretation = (
+        _pending_response_option_interpretation_from_typed_selection(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            current_user_message=state.current_user_message,
+            selected_thread_metadata=selected_metadata,
+        )
+    )
+    if pending_response_option_interpretation is not None:
+        interpretation = pending_response_option_interpretation
     logger.debug(
         "Interpret stage structured interpreter completed",
         intent=interpretation.intent,
@@ -298,113 +413,6 @@ async def interpret_stage_async(
         capability_contract=capability_contract,
         selected_thread_metadata=selected_metadata,
     )
-
-
-def _pending_date_answer_route_repair_interpretation(
-    *,
-    current_user_message: str,
-    language: str | None,
-    snapshot: TaskSnapshot | None,
-    selected_thread_metadata: dict[str, Any],
-    reason_code: str = "pending_date_answer_route_repaired",
-    user_goal_summary: str = (
-        "User supplied the requested date range after structured interpretation "
-        "misrouted the pending-field answer."
-    ),
-) -> StructuredInterpretation | None:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field != "date_range":
-        return None
-    if snapshot is None or snapshot.pending_strategy_summary is None:
-        return None
-    if snapshot.latest_backtest_result_reference is not None:
-        return None
-    last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
-    if last_stage_outcome and last_stage_outcome != "await_user_reply":
-        return None
-    prior = _active_strategy_from_snapshot(snapshot)
-    if prior is None:
-        return None
-    if not _prior_strategy_allows_pending_date_answer_fallback(prior):
-        return None
-    current_date = date.today()
-    text = current_user_message.strip()
-    if not text:
-        return None
-    languages = dateparser_languages_for_user_language(language)
-    resolved_range = resolve_date_range_text(
-        text,
-        today=current_date,
-        languages=languages,
-    )
-    date_range: dict[str, str] | None = None
-    date_range_intent: dict[str, Any] | None = None
-    if resolved_range is not None:
-        date_range = resolved_range.payload
-    else:
-        endpoint = parse_date_text(
-            text,
-            today=current_date,
-            endpoint="end",
-            languages=languages,
-            prefer_dates_from="past",
-        )
-        if endpoint is None:
-            return None
-        endpoint_patch = {
-            "kind": "endpoint_patch",
-            "endpoint": "end",
-            "end": endpoint.isoformat(),
-            "confidence": 0.8,
-            "evidence": text,
-        }
-        prior_intent = prior.extra_parameters.get("date_range_intent")
-        resolved_patch = resolve_date_range_endpoint_patch(
-            prior_intent,
-            endpoint_patch,
-            today=current_date,
-        )
-        if resolved_patch is not None:
-            date_range = resolved_patch.payload
-            date_range_intent = {
-                **endpoint_patch,
-                "base_intent": prior_intent,
-            }
-        else:
-            date_range = {"end": endpoint.isoformat()}
-            date_range_intent = endpoint_patch
-    if date_range is None:
-        return None
-    extra_parameters: dict[str, Any] = {
-        "date_range_raw_text": text,
-        "evidence_spans": {"date_range": text},
-    }
-    if date_range_intent is not None:
-        extra_parameters["date_range_intent"] = date_range_intent
-    return StructuredInterpretation(
-        intent="backtest_execution",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary=user_goal_summary,
-        candidate_strategy_draft=StrategySummary(
-            date_range=date_range,
-            extra_parameters=extra_parameters,
-        ),
-        missing_required_fields=[],
-        semantic_turn_act="answer_pending_need",
-        reason_codes=[reason_code],
-    )
-
-
-def _prior_strategy_allows_pending_date_answer_fallback(
-    prior: StrategySummary,
-) -> bool:
-    if not strategy_can_be_approved(prior):
-        return False
-    endpoints = _date_range_endpoints(prior.date_range)
-    return endpoints is not None and all(endpoints)
 
 
 async def _call_structured_interpreter(
@@ -432,7 +440,6 @@ async def _stage_result_from_interpretation(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
-    original_semantic_turn_act = interpretation.semantic_turn_act
     logger.debug(
         "Interpret stage post-LLM repair started",
         intent=interpretation.intent,
@@ -466,8 +473,11 @@ async def _stage_result_from_interpretation(
     expects_strategy_route = _strategy_route_expected(
         intent=interpretation.intent,
         semantic_turn_act=interpretation.semantic_turn_act,
-    ) or _candidate_strategy_has_backtest_shape(
-        interpretation.candidate_strategy_draft
+    ) or (
+        interpretation.semantic_turn_act != "result_followup"
+        and _candidate_strategy_has_backtest_shape(
+            interpretation.candidate_strategy_draft
+        )
     )
     educational_turn_has_strategy_baggage = _educational_turn_has_strategy_baggage(
         interpretation=interpretation,
@@ -488,6 +498,18 @@ async def _stage_result_from_interpretation(
                 "semantic_turn_act": "educational_question",
             },
         )
+    planned_active_confirmation_edit = (
+        await _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            selected_thread_metadata=selected_thread_metadata,
+            interpretation=interpretation,
+            capability_contract=capability_contract,
+        )
+    )
+    if planned_active_confirmation_edit is not None:
+        return planned_active_confirmation_edit
     incoming_strategy = _strategy_with_contextual_merge(
         strategy=interpretation.candidate_strategy_draft,
         snapshot=snapshot,
@@ -520,15 +542,20 @@ async def _stage_result_from_interpretation(
                 "requires_clarification": True,
             }
         )
-    incoming_strategy, supported_indicator_simplification_applied = (
-        _strategy_with_supported_indicator_simplification(
-            strategy=incoming_strategy,
-            snapshot=snapshot,
-            selected_thread_metadata=selected_thread_metadata,
-            semantic_turn_act=interpretation.semantic_turn_act,
-            task_relation=interpretation.task_relation,
-        )
+    typed_pending_option_applied = (
+        "pending_response_option_selected" in interpretation.reason_codes
     )
+    supported_indicator_simplification_applied = False
+    if not typed_pending_option_applied:
+        incoming_strategy, supported_indicator_simplification_applied = (
+            _strategy_with_supported_indicator_simplification(
+                strategy=incoming_strategy,
+                snapshot=snapshot,
+                selected_thread_metadata=selected_thread_metadata,
+                semantic_turn_act=interpretation.semantic_turn_act,
+                task_relation=interpretation.task_relation,
+            )
+        )
     if supported_indicator_simplification_applied:
         interpretation = interpretation.model_copy(
             update={
@@ -554,8 +581,16 @@ async def _stage_result_from_interpretation(
             semantic_turn_act=interpretation.semantic_turn_act,
         )
     )
+    # A turn that already carries the typed edit contract owns its field
+    # patches; the requested_field answer corridors must not re-derive them.
+    typed_artifact_edit_turn = (
+        "artifact_assumption_edit_planned" in interpretation.reason_codes
+        or _structured_interpretation_has_complete_typed_asset_patch(interpretation)
+    )
     incoming_strategy, requested_asset_answer_applied = (
-        _strategy_with_requested_asset_answer_resolution(
+        (incoming_strategy, False)
+        if typed_artifact_edit_turn
+        else _strategy_with_requested_asset_answer_resolution(
             strategy=incoming_strategy,
             explicit_strategy=interpretation.candidate_strategy_draft,
             prior_strategy=_active_strategy_from_snapshot(snapshot),
@@ -592,6 +627,40 @@ async def _stage_result_from_interpretation(
                 ],
             }
         )
+    elif typed_artifact_edit_turn:
+        # An applied typed patch makes leftover action-rejection constraints
+        # stale, same as a corridor-confirmed answer.
+        typed_turn_constraints = _without_stale_requested_asset_rejection_constraints(
+            interpretation.unsupported_constraints,
+            strategy=incoming_strategy,
+        )
+        if len(typed_turn_constraints) < len(interpretation.unsupported_constraints):
+            interpretation = interpretation.model_copy(
+                update={
+                    "unsupported_constraints": typed_turn_constraints,
+                    "reason_codes": [
+                        *interpretation.reason_codes,
+                        "stale_requested_asset_rejection_removed",
+                    ],
+                }
+            )
+    else:
+        operation_symbol = _multi_asset_chip_answer_operation_symbol(
+            explicit_strategy=interpretation.candidate_strategy_draft,
+            prior_strategy=_active_strategy_from_snapshot(snapshot),
+            selected_thread_metadata=selected_thread_metadata,
+            current_user_message=state.current_user_message,
+            semantic_turn_act=interpretation.semantic_turn_act,
+        )
+        if operation_symbol is not None:
+            return _multi_asset_chip_answer_operation_clarification_result(
+                interpretation=interpretation,
+                prior_strategy=_active_strategy_from_snapshot(snapshot)
+                or incoming_strategy,
+                operation_symbol=operation_symbol,
+                current_user_message=state.current_user_message,
+                user=user,
+            )
     if (
         expects_strategy_route
         and interpretation.semantic_turn_act != "retry_failed_action"
@@ -632,6 +701,7 @@ async def _stage_result_from_interpretation(
         else incoming_strategy
     )
     benchmark_reason_codes: list[str] = []
+    asset_repair_reason_codes: list[str] = []
     if expects_strategy_route:
         prior_strategy = _active_strategy_from_snapshot(snapshot)
         strategy, unstated_benchmark_reason_codes = (
@@ -641,17 +711,8 @@ async def _stage_result_from_interpretation(
             )
         )
         benchmark_reason_codes.extend(unstated_benchmark_reason_codes)
-    current_message_asset_grounding_reason_codes: list[str] = []
-    if expects_strategy_route and _should_apply_current_message_asset_grounding(
-        semantic_turn_act=original_semantic_turn_act,
-        selected_thread_metadata=selected_thread_metadata,
-        snapshot=snapshot,
-    ):
-        strategy, current_message_asset_grounding_reason_codes = (
-            _strategy_with_current_message_asset_grounding(
-                strategy=strategy,
-                current_user_message=state.current_user_message,
-            )
+        strategy, asset_repair_reason_codes = _strategy_with_benchmark_owner_asset_repair(
+            strategy
         )
     if expects_strategy_route:
         prior_strategy = _active_strategy_from_snapshot(snapshot)
@@ -669,8 +730,11 @@ async def _stage_result_from_interpretation(
             _strategy_with_default_template_for_complete_no_rule_shape(strategy)
         )
     if expects_strategy_route:
-        strategy, separate_benchmark_reason_codes = _strategy_with_separate_benchmark_symbol(
-            strategy
+        strategy, separate_benchmark_reason_codes = (
+            _strategy_with_separate_benchmark_symbol(
+                strategy,
+                prior_strategy=_active_strategy_from_snapshot(snapshot),
+            )
         )
         strategy, validated_benchmark_reason_codes = (
             _strategy_with_validated_benchmark_symbol(strategy)
@@ -680,14 +744,17 @@ async def _stage_result_from_interpretation(
         )
         benchmark_reason_codes = [
             *benchmark_reason_codes,
-            *current_message_asset_grounding_reason_codes,
             *separate_benchmark_reason_codes,
             *validated_benchmark_reason_codes,
             *default_benchmark_reason_codes,
         ]
-    strategy, optional_parameter_values = _route_contextual_money_answer(
-        strategy=strategy,
-        selected_thread_metadata=selected_thread_metadata,
+    strategy, optional_parameter_values = (
+        (strategy, {})
+        if typed_artifact_edit_turn
+        else _route_contextual_money_answer(
+            strategy=strategy,
+            selected_thread_metadata=selected_thread_metadata,
+        )
     )
     integrity_report = (
         conserve_semantic_constraints(
@@ -705,6 +772,29 @@ async def _stage_result_from_interpretation(
     )
     strategy = integrity_report.strategy
     optional_parameter_values = integrity_report.optional_parameter_values
+    if expects_strategy_route:
+        strategy, draft_only_indicator_reason_codes = (
+            _strategy_with_current_message_draft_only_indicator_text(
+                strategy=strategy,
+                interpretation=interpretation,
+                current_user_message=state.current_user_message,
+            )
+        )
+        if draft_only_indicator_reason_codes:
+            interpretation = interpretation.model_copy(
+                update={
+                    "requires_clarification": True,
+                    "assistant_response": None,
+                    "reason_codes": list(
+                        dict.fromkeys(
+                            [
+                                *interpretation.reason_codes,
+                                *draft_only_indicator_reason_codes,
+                            ]
+                        )
+                    ),
+                }
+            )
     unsupported_constraints = [
         *interpretation.unsupported_constraints,
         *integrity_report.unsupported_constraints,
@@ -796,12 +886,27 @@ async def _stage_result_from_interpretation(
         strategy=strategy,
         constraints=unsupported_constraints,
     )
+    unsupported_strategy_logic_owns_pending_need = any(
+        constraint.category == "unsupported_strategy_logic"
+        for constraint in unsupported_constraints
+    )
+    if (
+        unsupported_strategy_logic_owns_pending_need
+        and "draft_only_indicator_text_preserved" in interpretation.reason_codes
+    ):
+        missing_required_fields = []
     pending_date_edit_reason_codes: list[str] = []
-    if _pending_date_edit_reuses_prior_date_range(
-        strategy=strategy,
-        snapshot=snapshot,
-        selected_thread_metadata=selected_thread_metadata,
-        semantic_turn_act=interpretation.semantic_turn_act,
+    # A planned edit or an explicit money answer may change another field
+    # while reusing the prior window; that is not a date-answer noop.
+    if (
+        not typed_artifact_edit_turn
+        and not _strategy_supplies_explicit_turn_money(strategy)
+        and _pending_date_edit_reuses_prior_date_range(
+            strategy=strategy,
+            snapshot=snapshot,
+            selected_thread_metadata=selected_thread_metadata,
+            semantic_turn_act=interpretation.semantic_turn_act,
+        )
     ):
         missing_required_fields = list(
             dict.fromkeys([*missing_required_fields, "date_range"])
@@ -856,6 +961,7 @@ async def _stage_result_from_interpretation(
         task_relation=interpretation.task_relation,
         requires_clarification=requires_clarification,
         user_goal_summary=interpretation.user_goal_summary,
+        detected_user_language=interpretation.detected_user_language,
         candidate_strategy_draft=strategy,
         missing_required_fields=missing_required_fields,
         optional_parameter_opportunity=list(capability_contract.optional_defaults),
@@ -875,6 +981,7 @@ async def _stage_result_from_interpretation(
                 else []
             ),
             *shape_default_reason_codes,
+            *asset_repair_reason_codes,
             *integrity_report.reason_codes,
             *constraint_filter_reason_codes,
             *ambiguity_filter_reason_codes,
@@ -894,6 +1001,7 @@ async def _stage_result_from_interpretation(
         resolution_provenance=list(strategy.resolution_provenance),
         semantic_turn_act=interpretation.semantic_turn_act,
         result_followup_focus=interpretation.result_followup_focus,
+        result_followup_fact_key=interpretation.result_followup_fact_key,
         capability_question_focus=interpretation.capability_question_focus,
         context_question_focus=interpretation.context_question_focus,
         artifact_target=artifact_target,
@@ -934,6 +1042,25 @@ async def _stage_result_from_interpretation(
     )
     if pending_artifact_followup_result is not None:
         return pending_artifact_followup_result
+    latest_result_fact_answer = await _latest_result_answer_stage_result_if_applicable(
+        decision=decision,
+        snapshot=snapshot,
+        current_user_message=state.current_user_message,
+        language=user.language_preference,
+    )
+    if isinstance(latest_result_fact_answer, LatestResultFactComposerDeclined):
+        declined_edit_result = await _planned_edit_after_fact_composer_decline(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_thread_metadata,
+        )
+        if declined_edit_result is not None:
+            return declined_edit_result
+        latest_result_fact_answer = None
+    if latest_result_fact_answer is not None:
+        return latest_result_fact_answer
     pending_refinement_result = _pending_refinement_misroute_result_if_applicable(
         decision=decision,
         snapshot=snapshot,
@@ -1072,10 +1199,20 @@ async def _stage_result_from_interpretation(
             stage_patch=stage_patch,
         )
     if expects_strategy_route:
+        stage_patch = dict(optional_parameter_stage_patch)
+        # Preserve the artifact-edit planner's honesty note (a mixed
+        # supported/unsupported edit) alongside the confirmation card, so it is
+        # not silently dropped. Scoped to the edit-planner reason code so spurious
+        # clarifications overridden to a confirmation on other routes stay
+        # suppressed; clean edits leave assistant_response None -> no message.
+        if interpretation.assistant_response and "artifact_assumption_edit_planned" in (
+            interpretation.reason_codes or []
+        ):
+            stage_patch["assistant_response"] = interpretation.assistant_response
         return StageResult(
             outcome="ready_for_confirmation",
             decision=decision,
-            stage_patch=optional_parameter_stage_patch,
+            stage_patch=stage_patch,
         )
     return StageResult(
         outcome="ready_to_respond",
@@ -1141,11 +1278,26 @@ def _strategy_with_current_message_run_field_contract(
             "Interpret stage date range repaired from temporal contract",
             strategy_type=strategy.strategy_type,
         )
+    unresolved_stated_window = False
     if (
-        _strategy_has_non_executable_timeframe_label(
+        "date_range" not in repaired_field_bases
+        and not date_endpoint_patch_applied
+        and _complete_date_range_lacks_stated_window_support(
             updated,
-            supported_timeframes=supported_timeframes,
+            language=language,
         )
+    ):
+        updated.date_range = None
+        changed = True
+        unresolved_stated_window = True
+        repair_reason_codes.append("unresolved_stated_window_cleared")
+        logger.debug(
+            "Interpret stage cleared unsupported complete date range",
+            strategy_type=strategy.strategy_type,
+        )
+    if _strategy_has_non_executable_timeframe_label(
+        updated,
+        supported_timeframes=supported_timeframes,
     ):
         updated.timeframe = None
         changed = True
@@ -1165,12 +1317,19 @@ def _strategy_with_current_message_run_field_contract(
     unsupported_constraints = list(interpretation.unsupported_constraints)
     requires_clarification = interpretation.requires_clarification
     assistant_response = interpretation.assistant_response
+    if unresolved_stated_window and not any(
+        str(field).split("[", 1)[0] == "date_range" for field in missing_required_fields
+    ):
+        missing_required_fields.append("date_range")
     if (
         not missing_required_fields
         and not ambiguous_fields
         and not unsupported_constraints
     ):
         requires_clarification = False
+        assistant_response = None
+    elif unresolved_stated_window:
+        requires_clarification = True
         assistant_response = None
     repaired = interpretation.model_copy(
         update={
@@ -1317,33 +1476,6 @@ def _endpoint_date_from_bounded_text(
     return parsed.isoformat() if parsed is not None else None
 
 
-def _changed_date_endpoint(
-    *,
-    date_range: dict[str, str] | None,
-    prior_date_range: Any,
-) -> tuple[str, str] | None:
-    if not isinstance(date_range, dict):
-        return None
-    start = date_range.get("start") or date_range.get("from")
-    end = date_range.get("end") or date_range.get("to")
-    start_value = str(start).strip() if start not in (None, "", [], {}) else None
-    end_value = str(end).strip() if end not in (None, "", [], {}) else None
-    if bool(start_value) != bool(end_value):
-        endpoint = "start" if start_value else "end"
-        value = start_value or end_value
-        return (endpoint, value) if value else None
-
-    prior_endpoints = _date_range_endpoints(prior_date_range)
-    if prior_endpoints is None or start_value is None or end_value is None:
-        return None
-    prior_start, prior_end = prior_endpoints
-    start_changed = prior_start is not None and start_value != prior_start
-    end_changed = prior_end is not None and end_value != prior_end
-    if start_changed == end_changed:
-        return None
-    return ("start", start_value) if start_changed else ("end", end_value)
-
-
 def _explicit_date_range_from_strategy_for_repair(
     strategy: StrategySummary,
     *,
@@ -1368,6 +1500,11 @@ def _explicit_date_range_from_strategy_for_repair(
         resolved = resolve_date_range_intent(intent, today=current_date)
         if resolved is not None:
             intent_range = resolved.payload
+    if intent_range is not None and _date_range_intent_is_explicit_user_range(
+        strategy,
+        intent,
+    ):
+        return intent_range
     if bounded_evidence_range is not None:
         if intent_range is None:
             return bounded_evidence_range
@@ -1385,6 +1522,95 @@ def _explicit_date_range_from_strategy_for_repair(
         }
         return payload or None
     return None
+
+
+def _complete_date_range_lacks_stated_window_support(
+    strategy: StrategySummary,
+    *,
+    language: str | None,
+) -> bool:
+    """The draft's complete date_range contradicts its own stated window evidence.
+
+    Years named in the typed date evidence must intersect the years the range
+    spans; otherwise the range is an invented default, not the stated window.
+    Evidence without a year gives no signal and the LLM's range is trusted.
+    """
+
+    if not isinstance(strategy.date_range, dict):
+        return False
+    if has_partial_explicit_date_range(strategy.date_range):
+        return False
+    candidates = _strategy_date_evidence_candidates(strategy)
+    if not candidates:
+        return False
+    intent = strategy.extra_parameters.get("date_range_intent")
+    if isinstance(intent, dict) and resolve_date_range_intent(intent) is not None:
+        return False
+    if (
+        _date_range_from_strategy_bounded_evidence(
+            strategy,
+            language=language,
+            today=date.today(),
+        )
+        is not None
+    ):
+        return False
+    evidence_years = {
+        year for candidate in candidates for year in _stated_years(candidate)
+    }
+    if not evidence_years:
+        return False
+    range_years = _years_spanned_by_date_range(strategy.date_range)
+    if not range_years:
+        return False
+    return not (evidence_years & range_years)
+
+
+def _stated_years(text: str) -> set[int]:
+    years: set[int] = set()
+    digits: list[str] = []
+    for character in f"{text} ":
+        if character.isdigit():
+            digits.append(character)
+            continue
+        if len(digits) == 4:
+            year = int("".join(digits))
+            if 1900 <= year <= 2100:
+                years.add(year)
+        digits = []
+    return years
+
+
+def _years_spanned_by_date_range(date_range: dict[str, Any]) -> set[int]:
+    endpoints = []
+    for key in ("start", "end"):
+        raw = str(date_range.get(key) or "")
+        if len(raw) >= 4 and raw[:4].isdigit():
+            endpoints.append(int(raw[:4]))
+    if len(endpoints) != 2 or endpoints[0] > endpoints[1]:
+        return set(endpoints)
+    return set(range(endpoints[0], endpoints[1] + 1))
+
+
+def _date_range_intent_is_explicit_user_range(
+    strategy: StrategySummary,
+    intent: Any,
+) -> bool:
+    if not isinstance(intent, dict):
+        return False
+    if str(intent.get("kind") or "").strip() != "explicit_range":
+        return False
+    if intent.get("start") in (None, "", [], {}) or intent.get("end") in (
+        None,
+        "",
+        [],
+        {},
+    ):
+        return False
+    field_provenance = strategy.extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        return False
+    return field_provenance.get("date_range") == "explicit_user"
 
 
 def _date_range_from_strategy_bounded_evidence(
@@ -1407,209 +1633,6 @@ def _date_range_from_strategy_bounded_evidence(
     return None
 
 
-def _strategy_date_evidence_candidates(strategy: StrategySummary) -> list[str]:
-    candidates: list[str] = []
-    extra_parameters = dict(strategy.extra_parameters or {})
-    raw_text = extra_parameters.get("date_range_raw_text")
-    if raw_text not in (None, "", [], {}):
-        candidates.append(str(raw_text))
-    intent = extra_parameters.get("date_range_intent")
-    if isinstance(intent, dict):
-        evidence = intent.get("evidence")
-        if evidence not in (None, "", [], {}):
-            candidates.append(str(evidence))
-    evidence_spans = extra_parameters.get("evidence_spans")
-    if isinstance(evidence_spans, dict):
-        for key in _DATE_RANGE_EVIDENCE_KEYS:
-            value = evidence_spans.get(key)
-            if value not in (None, "", [], {}):
-                candidates.append(str(value))
-    return list(dict.fromkeys(candidate.strip() for candidate in candidates if candidate.strip()))
-
-
-def _strategy_date_range_needs_current_message_repair(
-    *,
-    strategy: StrategySummary,
-    interpretation: StructuredInterpretation,
-    current_date_range: dict[str, str],
-) -> bool:
-    if interpretation.semantic_turn_act == "answer_pending_need":
-        return (
-            strategy.date_range in (None, "", [], {})
-            or has_partial_explicit_date_range(strategy.date_range)
-            or not isinstance(strategy.date_range, dict)
-            or _date_range_endpoints(strategy.date_range)
-            != _date_range_endpoints(current_date_range)
-        )
-    if strategy.date_range in (None, "", [], {}):
-        return True
-    if has_partial_explicit_date_range(strategy.date_range):
-        return True
-    if isinstance(strategy.date_range, str):
-        return False
-    if _date_range_endpoints(strategy.date_range) != _date_range_endpoints(
-        current_date_range
-    ):
-        return True
-    return any(
-        str(field).split("[", 1)[0] == "date_range"
-        for field in interpretation.missing_required_fields
-    ) or any(
-        field.field_name.split("[", 1)[0] == "date_range"
-        for field in interpretation.ambiguous_fields
-    )
-
-
-def _pending_date_edit_reuses_prior_date_range(
-    *,
-    strategy: StrategySummary,
-    snapshot: TaskSnapshot | None,
-    selected_thread_metadata: dict[str, Any],
-    semantic_turn_act: SemanticTurnAct | None,
-) -> bool:
-    if semantic_turn_act != "answer_pending_need":
-        return False
-    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
-        return False
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field != "date_range":
-        return False
-    prior = _active_strategy_from_snapshot(snapshot)
-    if prior is None:
-        return False
-    prior_endpoints = _date_range_endpoints(prior.date_range)
-    if prior_endpoints is None or not all(prior_endpoints):
-        return False
-    return _date_range_endpoints(strategy.date_range) == prior_endpoints
-
-
-def _date_range_endpoints(value: Any) -> tuple[str | None, str | None] | None:
-    if not isinstance(value, dict):
-        return None
-    start = value.get("start") or value.get("from")
-    end = value.get("end") or value.get("to")
-    return (
-        str(start).strip() if start not in (None, "", [], {}) else None,
-        str(end).strip() if end not in (None, "", [], {}) else None,
-    )
-
-
-def _strategy_has_non_executable_timeframe_label(
-    strategy: StrategySummary,
-    *,
-    supported_timeframes: tuple[str, ...],
-) -> bool:
-    if strategy.timeframe in (None, "", [], {}):
-        return False
-    normalized = str(strategy.timeframe).strip().casefold().replace(" ", "")
-    supported = {
-        str(value).strip().casefold().replace(" ", "")
-        for value in supported_timeframes
-    }
-    return bool(normalized and normalized not in supported)
-
-
-def _repair_retry_route_when_pending_need_is_active(
-    *,
-    interpretation: StructuredInterpretation,
-    snapshot: TaskSnapshot | None,
-    selected_thread_metadata: dict[str, Any],
-) -> StructuredInterpretation:
-    if interpretation.semantic_turn_act != "retry_failed_action":
-        return interpretation
-    if snapshot is None or snapshot.pending_strategy_summary is None:
-        return interpretation
-    if snapshot.latest_failed_action_reference is not None:
-        return interpretation
-    requested_field = _field_base(str(selected_thread_metadata.get("requested_field") or ""))
-    prior_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
-    if not requested_field and prior_outcome != "await_user_reply":
-        return interpretation
-    return interpretation.model_copy(
-        update={
-            "intent": "backtest_execution",
-            "task_relation": "continue",
-            "requires_clarification": False,
-            "assistant_response": None,
-            "semantic_turn_act": "answer_pending_need",
-            "reason_codes": [
-                *interpretation.reason_codes,
-                "retry_route_repaired_to_pending_need",
-            ],
-        }
-    )
-
-
-def _repair_fresh_restatement_route_when_pending_need_is_active(
-    *,
-    interpretation: StructuredInterpretation,
-    snapshot: TaskSnapshot | None,
-    selected_thread_metadata: dict[str, Any],
-) -> StructuredInterpretation:
-    if snapshot is None or snapshot.pending_strategy_summary is None:
-        return interpretation
-    if snapshot.latest_backtest_result_reference is not None:
-        return interpretation
-    if interpretation.semantic_turn_act in {
-        "approval",
-        "new_idea",
-        "retry_failed_action",
-        "unsupported_request",
-    }:
-        return interpretation
-    if interpretation.intent not in {"conversation_followup", "strategy_drafting"}:
-        return interpretation
-    prior_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if (
-        prior_outcome not in {"await_user_reply", "needs_clarification"}
-        and not requested_field
-        and selected_thread_metadata.get("fallback_source")
-        != "pending_strategy_metadata"
-    ):
-        return interpretation
-    prior = snapshot.pending_strategy_summary
-    candidate = _strategy_with_contextual_merge(
-        strategy=interpretation.candidate_strategy_draft,
-        snapshot=snapshot,
-        selected_thread_metadata=selected_thread_metadata,
-        semantic_turn_act="new_idea",
-        task_relation="new_task",
-        reason_codes=interpretation.reason_codes,
-    )
-    if not _strategy_has_execution_anchor(candidate):
-        return interpretation
-    if not candidate.strategy_type or not candidate.asset_universe or not candidate.date_range:
-        return interpretation
-    if not _strategy_has_fresh_execution_detail(strategy=candidate, prior=prior):
-        return interpretation
-    return interpretation.model_copy(
-        update={
-            "intent": "backtest_execution",
-            "task_relation": "new_task",
-            "requires_clarification": False,
-            "assistant_response": None,
-            "candidate_strategy_draft": candidate,
-            "missing_required_fields": [],
-            "semantic_turn_act": "new_idea",
-            "result_followup_focus": None,
-            "artifact_target": "none",
-            "reason_codes": list(
-                dict.fromkeys(
-                    [
-                        *interpretation.reason_codes,
-                        "fresh_restatement_followup_route_repaired",
-                    ]
-                )
-            ),
-        }
-    )
-
-
 def _repair_pending_date_answer_route_when_pending_need_is_active(
     *,
     interpretation: StructuredInterpretation,
@@ -1618,13 +1641,6 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
 ) -> StructuredInterpretation:
-    if (
-        interpretation.semantic_turn_act == "answer_pending_need"
-        and not interpretation.requires_clarification
-    ):
-        return interpretation
-    if _candidate_strategy_has_backtest_shape(interpretation.candidate_strategy_draft):
-        return interpretation
     requested_field = _field_base(
         str(selected_thread_metadata.get("requested_field") or "")
     )
@@ -1633,11 +1649,32 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
     if last_stage_outcome and last_stage_outcome != "await_user_reply":
         return interpretation
-    repaired = _pending_date_answer_route_repair_interpretation(
+    candidate_endpoints = _date_range_endpoints(
+        interpretation.candidate_strategy_draft.date_range
+    )
+    if interpretation.candidate_strategy_draft.date_range not in (None, "", [], {}):
+        return interpretation
+    if candidate_endpoints is not None and any(candidate_endpoints):
+        return interpretation
+    if (
+        interpretation.semantic_turn_act != "answer_pending_need"
+        and not interpretation.requires_clarification
+        and _candidate_strategy_has_backtest_shape(
+            interpretation.candidate_strategy_draft
+        )
+    ):
+        return interpretation
+    repaired = _pending_date_answer_interpretation(
         current_user_message=current_user_message,
         language=language,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
+        today=date.today(),
+        reason_code=(
+            "pending_date_answer_current_message_repaired"
+            if interpretation.semantic_turn_act == "answer_pending_need"
+            else "pending_date_answer_route_repaired"
+        ),
     )
     if repaired is None:
         return interpretation
@@ -1720,179 +1757,6 @@ def _repair_pending_date_answer_noop_from_current_message(
                 "pending_date_answer_current_message_repaired",
             ],
         }
-    )
-
-
-def _validated_artifact_target(
-    *,
-    interpretation: StructuredInterpretation,
-    snapshot: TaskSnapshot | None,
-    selected_thread_metadata: dict[str, Any],
-) -> tuple[ArtifactTarget | None, list[str]]:
-    proposed = interpretation.artifact_target
-    reason_codes: list[str] = []
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field == "refinement" and snapshot is not None:
-        if snapshot.pending_strategy_summary is not None:
-            if proposed != "pending_refinement":
-                reason_codes.append("pending_refinement_overrode_latest_result")
-            return "pending_refinement", reason_codes
-    if proposed == "latest_result":
-        if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
-            return "latest_result", reason_codes
-        reason_codes.append("invalid_latest_result_target_cleared")
-        return "none", reason_codes
-    if proposed == "active_confirmation":
-        if snapshot is not None and snapshot.active_confirmation_reference is not None:
-            return "active_confirmation", reason_codes
-        reason_codes.append("invalid_active_confirmation_target_cleared")
-        return "none", reason_codes
-    if proposed in {"none", "pending_refinement"}:
-        return proposed, reason_codes
-    if (
-        interpretation.semantic_turn_act == "result_followup"
-        and snapshot is not None
-        and snapshot.latest_backtest_result_reference is not None
-    ):
-        reason_codes.append(RESULT_FOLLOWUP_TARGET_INFERRED)
-        return "latest_result", reason_codes
-    if (
-        interpretation.intent == "results_explanation"
-        and snapshot is not None
-        and snapshot.latest_backtest_result_reference is not None
-    ):
-        reason_codes.append(RESULT_EXPLANATION_TARGET_INFERRED)
-        return "latest_result", reason_codes
-    return proposed, reason_codes
-
-
-def _pending_refinement_misroute_result_if_applicable(
-    *,
-    decision: InterpretDecision,
-    snapshot: TaskSnapshot | None,
-) -> StageResult | None:
-    if decision.artifact_target != "pending_refinement":
-        return None
-    if decision.semantic_turn_act != "result_followup":
-        return None
-    if _candidate_strategy_has_backtest_shape(decision.candidate_strategy_draft):
-        return None
-    strategy = (
-        snapshot.pending_strategy_summary.model_copy(deep=True)
-        if snapshot is not None and snapshot.pending_strategy_summary is not None
-        else decision.candidate_strategy_draft
-    )
-    refined = decision.model_copy(
-        update={
-            "intent": "strategy_drafting",
-            "task_relation": "refine",
-            "requires_clarification": True,
-            "candidate_strategy_draft": strategy,
-            "missing_required_fields": ["refinement"],
-            "semantic_turn_act": "answer_pending_need",
-            "artifact_target": "pending_refinement",
-            "reason_codes": [
-                *decision.reason_codes,
-                "pending_refinement_result_followup_suppressed",
-            ],
-        }
-    )
-    return StageResult(
-        outcome="needs_clarification",
-        decision=refined,
-        stage_patch={
-            "requested_field": "refinement",
-            "missing_required_fields": ["refinement"],
-            "response_intent": {
-                "kind": "clarification",
-                "semantic_needs": ["rule_definition"],
-                "requested_fields": ["refinement"],
-                "facts": {"strategy": strategy.model_dump(mode="python")},
-                "options": [],
-            },
-        },
-    )
-
-
-def _strategy_with_hidden_context_guard(
-    *,
-    strategy: StrategySummary,
-    interpretation: StructuredInterpretation,
-    snapshot: TaskSnapshot | None,
-    artifact_target: ArtifactTarget | None,
-    current_user_message: str,
-) -> tuple[StrategySummary, list[str], bool]:
-    if artifact_target != "none":
-        return strategy, [], False
-    if interpretation.semantic_turn_act != "new_idea":
-        return strategy, [], False
-    if interpretation.task_relation != "new_task":
-        return strategy, [], False
-    if snapshot is None or snapshot.pending_strategy_summary is None:
-        return strategy, [], False
-    prior = snapshot.pending_strategy_summary
-    if not prior.asset_universe or strategy.asset_universe != prior.asset_universe:
-        return strategy, [], False
-    if _strategy_has_fresh_execution_detail(strategy=strategy, prior=prior):
-        return strategy, [], False
-    if _message_explicitly_mentions_symbol(
-        current_user_message,
-        symbols=strategy.asset_universe,
-    ):
-        return strategy, [], False
-    updated = strategy.model_copy(deep=True)
-    updated.asset_universe = []
-    updated.asset_class = None
-    updated.resolution_provenance = []
-    return updated, ["hidden_artifact_asset_context_cleared"], True
-
-
-def _strategy_has_fresh_execution_detail(
-    *,
-    strategy: StrategySummary,
-    prior: StrategySummary,
-) -> bool:
-    for field_name in (
-        "date_range",
-        "timeframe",
-        "cadence",
-        "entry_logic",
-        "exit_logic",
-        "entry_rule",
-        "exit_rule",
-        "rule_spec",
-        "capital_amount",
-        "position_size",
-        "comparison_baseline",
-    ):
-        value = getattr(strategy, field_name)
-        if value in (None, "", [], {}):
-            continue
-        if value != getattr(prior, field_name):
-            return True
-    return False
-
-
-def _message_explicitly_mentions_symbol(
-    message: str,
-    *,
-    symbols: list[str],
-) -> bool:
-    punctuation = ".,;:!?()[]{}<>\"'`"
-    token_map = str.maketrans({char: " " for char in punctuation})
-    tokens = set(message.translate(token_map).split())
-    cashtag_tokens = {
-        token.lstrip("$").casefold()
-        for token in tokens
-        if token.startswith("$")
-    }
-    return any(
-        symbol in tokens
-        or f"${symbol}" in tokens
-        or symbol.casefold() in cashtag_tokens
-        for symbol in symbols
     )
 
 
@@ -2005,22 +1869,6 @@ async def _compose_natural_capability_answer(
         return None
 
 
-def _capability_answer_respects_contract(
-    *,
-    answer: str | None,
-    focus: CapabilityQuestionFocus,
-) -> bool:
-    if not answer:
-        return False
-    if focus in {"supported_strategies", "general"} and (
-        _answer_contradicts_supported_strategy_families(answer)
-    ):
-        return False
-    if focus != "supported_indicators":
-        return True
-    return not _answer_contradicts_supported_indicators(answer)
-
-
 async def _supported_strategy_education_repair_if_needed(
     *,
     semantic_turn_act: SemanticTurnAct | None,
@@ -2041,143 +1889,9 @@ async def _supported_strategy_education_repair_if_needed(
         capability_contract=capability_contract,
         language=language,
     )
-    return composed or recovery_message("capability_answer_unavailable", language=language)
-
-
-def _answer_contradicts_supported_strategy_families(answer: str) -> bool:
-    for sentence in _plain_sentences(answer):
-        tokens = _plain_word_tokens(sentence)
-        if not tokens:
-            continue
-        strategy_spans = _supported_strategy_family_token_spans(tokens)
-        if not strategy_spans:
-            continue
-        negative_positions = _negative_support_claim_positions(tokens)
-        for start, end in strategy_spans:
-            if any(start - 3 <= position <= end + 6 for position in negative_positions):
-                return True
-    return False
-
-
-def _answer_contradicts_supported_indicators(answer: str) -> bool:
-    for sentence in _plain_sentences(answer):
-        tokens = _plain_word_tokens(sentence)
-        if not tokens:
-            continue
-        indicator_spans = _supported_indicator_token_spans(tokens)
-        if not indicator_spans:
-            continue
-        negative_positions = _negative_support_claim_positions(tokens)
-        for start, end in indicator_spans:
-            if any(start - 3 <= position <= end + 6 for position in negative_positions):
-                return True
-    return False
-
-
-_SUPPORTED_STRATEGY_FAMILY_TERMS: tuple[str, ...] = (
-    "buy and hold",
-    "buy-and-hold",
-    "hold",
-    "recurring buys",
-    "recurring buy",
-    "dca",
-    "dollar cost averaging",
-    "indicator threshold",
-    "indicator rules",
-    "signal rules",
-    "moving average",
-    "macd",
-    "bollinger band",
-)
-
-
-def _supported_strategy_family_token_spans(tokens: list[str]) -> list[tuple[int, int]]:
-    spans: list[tuple[int, int]] = []
-    for term in _SUPPORTED_STRATEGY_FAMILY_TERMS:
-        term_tokens = _plain_word_tokens(term)
-        if not term_tokens:
-            continue
-        spans.extend(_token_sequence_spans(tokens, term_tokens))
-    return spans
-
-
-def _plain_sentences(text: str) -> list[str]:
-    sentences: list[str] = []
-    start = 0
-    for index, char in enumerate(str(text or "")):
-        if char not in ".?!":
-            continue
-        sentence = text[start : index + 1].strip()
-        if sentence:
-            sentences.append(sentence)
-        start = index + 1
-    trailing = text[start:].strip()
-    if trailing:
-        sentences.append(trailing)
-    return sentences
-
-
-def _plain_word_tokens(text: str) -> list[str]:
-    tokens: list[str] = []
-    current: list[str] = []
-    for char in str(text or "").casefold():
-        if char.isalnum():
-            current.append(char)
-            continue
-        if char == "'":
-            continue
-        if current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
-
-
-def _supported_indicator_token_spans(tokens: list[str]) -> list[tuple[int, int]]:
-    spans: list[tuple[int, int]] = []
-    for spec in EXECUTABLE_INDICATORS.values():
-        terms = (spec.key, spec.label, *spec.aliases)
-        for term in terms:
-            term_tokens = _plain_word_tokens(term)
-            if not term_tokens:
-                continue
-            spans.extend(_token_sequence_spans(tokens, term_tokens))
-    return spans
-
-
-def _token_sequence_spans(
-    tokens: list[str],
-    sequence: list[str],
-) -> list[tuple[int, int]]:
-    if not sequence or len(sequence) > len(tokens):
-        return []
-    spans: list[tuple[int, int]] = []
-    last_start = len(tokens) - len(sequence)
-    for start in range(last_start + 1):
-        end = start + len(sequence)
-        if tokens[start:end] == sequence:
-            spans.append((start, end - 1))
-    return spans
-
-
-def _negative_support_claim_positions(tokens: list[str]) -> set[int]:
-    positions: set[int] = set()
-    negative_words = {"not", "never", "unsupported", "unavailable"}
-    support_words = {"allowed", "available", "executable", "runnable", "supported"}
-    action_words = {"execute", "run", "use"}
-    blocking_words = {"cannot", "cant"}
-    for index, token in enumerate(tokens):
-        if token in {"unsupported", "unavailable"}:
-            positions.add(index)
-            continue
-        previous = set(tokens[max(0, index - 3) : index])
-        if token in support_words and previous.intersection(negative_words):
-            positions.add(index)
-            continue
-        if token in action_words and previous.intersection(blocking_words):
-            positions.add(index)
-    return positions
+    return composed or recovery_message(
+        "capability_answer_unavailable", language=language
+    )
 
 
 async def _compose_natural_context_curiosity_answer(
@@ -2198,7 +1912,8 @@ async def _compose_natural_context_curiosity_answer(
     provenance_rule = (
         "If you use visible artifact context, say so naturally with phrases like "
         "'from this result' or 'from this confirmation'."
-        if artifact_target in {"latest_result", "active_confirmation", "pending_refinement"}
+        if artifact_target
+        in {"latest_result", "active_confirmation", "pending_refinement"}
         else "Do not imply you used a prior result or hidden memory."
     )
     messages = [
@@ -2237,8 +1952,7 @@ async def _compose_natural_context_curiosity_answer(
         {
             "role": "system",
             "content": (
-                "Supported experiment paths: "
-                f"{_supported_experiment_fact_packet()}"
+                "Supported experiment paths: " f"{_supported_experiment_fact_packet()}"
             ),
         },
         {"role": "user", "content": current_user_message},
@@ -2273,47 +1987,6 @@ async def _compose_natural_context_curiosity_answer(
         )
     except Exception:
         return None
-
-
-def _context_curiosity_fact_packet(focus: ContextQuestionFocus) -> str:
-    facts = {
-        "macro_context": (
-            "Macro context can frame historical explanations and regime questions "
-            "such as inflation, rates, employment, recession indicators, and risk "
-            "backdrop. It is contextual only and cannot alter simulation truth or "
-            "become a trade signal. Good next steps are choosing a symbol/strategy "
-            "and comparing historical periods the user names. Allowed next steps: "
-            "ask the user to choose a symbol, strategy, and date windows; compare "
-            "buy-and-hold, recurring buys, or supported indicator rules across "
-            "those user-chosen windows."
-        ),
-        "corporate_events": (
-            "Corporate actions can provide symbol/date-scoped event context such "
-            "as splits and dividends around an equity run. They are valid context "
-            "for understanding what was happening around a historical period. They "
-            "are not direct event-trading rules, and they cannot rewrite completed "
-            "explanations or alter simulation truth. Good next steps are choosing "
-            "an equity symbol and date range, then testing a supported strategy "
-            "through that period. Allowed next steps: ask for an equity symbol and "
-            "date range around an event; test buy-and-hold, recurring buys, or a "
-            "supported indicator rule through the period. Do not propose earnings "
-            "plays, merger trades, event prediction, volume-impact models, or direct "
-            "event-driven rules."
-        ),
-        "market_movers": (
-            "Movers and most-actives context is very short-lived and narrow. It is "
-            "not a generic product feed, but it can help the user pick a current "
-            "symbol seed for a historical experiment. If a current movers packet is "
-            "available, you may mention up to five provided symbols as possible test "
-            "seeds, never as recommendations, and make clear that Argus will validate "
-            "the selected symbol before any run. Good next steps are choosing one "
-            "symbol or date window the user is curious about, then testing buy and "
-            "hold, recurring buys, or a supported indicator rule. Do not turn this "
-            "into a dashboard, ranking feed, sector-rotation screen, filter pipeline, "
-            "volume-surge test, or volume-spike strategy."
-        ),
-    }
-    return facts[focus]
 
 
 async def _live_context_curiosity_facts(
@@ -2362,178 +2035,6 @@ async def _fetch_standalone_market_movers_packet() -> ContextPacket | None:
     if freshness != packet.freshness:
         packet = packet.model_copy(update={"freshness": freshness})
     return packet
-
-
-def _market_movers_packet_fact_text(packet: ContextPacket) -> str:
-    gainers: list[str] = []
-    losers: list[str] = []
-    for fact in packet.facts:
-        if fact.kind not in {"market_mover_gainer", "market_mover_loser"}:
-            continue
-        if not isinstance(fact.value, dict):
-            continue
-        symbol = str(fact.value.get("symbol") or "").strip().upper()
-        if not symbol:
-            continue
-        formatted = _format_market_mover_symbol(
-            symbol=symbol,
-            percent_change=fact.value.get("percent_change"),
-        )
-        if fact.kind == "market_mover_gainer":
-            gainers.append(formatted)
-        else:
-            losers.append(formatted)
-    sections = []
-    if gainers:
-        sections.append(f"current gainers: {', '.join(gainers[:5])}")
-    if losers:
-        sections.append(f"current losers: {', '.join(losers[:5])}")
-    if not sections:
-        return (
-            "A current movers packet was retrieved, but it contained no usable "
-            "symbol facts. Do not fabricate mover symbols."
-        )
-    retrieved_at = packet.retrieved_at.isoformat()
-    return (
-        "Short-lived movers packet retrieved at "
-        f"{retrieved_at}; { '; '.join(sections) }. Use these only as possible "
-        "historical-test seeds, not recommendations, predictions, causal evidence, "
-        "or simulation truth. Treat symbols as unvalidated until the user chooses "
-        "one and deterministic asset validation confirms it can run."
-    )
-
-
-def _market_movers_packet_symbols(packet: ContextPacket) -> list[str]:
-    symbols: list[str] = []
-    for fact in packet.facts:
-        if fact.kind not in {"market_mover_gainer", "market_mover_loser"}:
-            continue
-        if not isinstance(fact.value, dict):
-            continue
-        symbol = str(fact.value.get("symbol") or "").strip().upper()
-        if symbol:
-            symbols.append(symbol)
-    return list(dict.fromkeys(symbols))
-
-
-def _context_answer_respects_live_packet(
-    *,
-    answer: str | None,
-    live_facts: _LiveContextCuriosityFacts,
-) -> bool:
-    if not live_facts.packet_symbols:
-        return True
-    return bool(
-        answer
-        and _mentioned_packet_symbols(
-            text=answer,
-            symbols=live_facts.packet_symbols,
-        )
-    )
-
-
-def _mentioned_packet_symbols(
-    *,
-    text: str,
-    symbols: tuple[str, ...],
-) -> list[str]:
-    token_map = str.maketrans({char: " " for char in ".,;:!?()[]{}<>\"'`"})
-    tokens = {
-        token.strip("$").upper()
-        for token in text.translate(token_map).split()
-        if token.strip("$")
-    }
-    return [symbol for symbol in symbols if symbol.upper() in tokens]
-
-
-def _context_packet_grounding_retry_messages(
-    *,
-    messages: list[dict[str, str]],
-    live_facts: _LiveContextCuriosityFacts,
-) -> list[dict[str, str]]:
-    user_message = messages[-1]
-    grounding_message = {
-        "role": "system",
-        "content": (
-            "The previous draft did not use the available short-lived context "
-            "packet. Rewrite the answer using at least one provided packet symbol "
-            "as an unvalidated historical-test seed. Do not present the packet as "
-            "a live dashboard, recommendation, ranking feed, causal proof, or "
-            "simulation truth. Keep the user moving toward choosing a symbol and "
-            "a supported historical experiment."
-        ),
-    }
-    return [
-        *messages[:-1],
-        {
-            "role": "system",
-            "content": (
-                "Packet symbols that must ground this answer: "
-                f"{', '.join(live_facts.packet_symbols)}"
-            ),
-        },
-        grounding_message,
-        user_message,
-    ]
-
-
-def _packet_grounded_context_recovery_answer(
-    *,
-    focus: ContextQuestionFocus,
-    live_facts: _LiveContextCuriosityFacts,
-    language: str,
-) -> str:
-    if focus == "market_movers" and live_facts.packet_symbols:
-        seeds = _join_context_symbols(live_facts.packet_symbols[:5])
-        return recovery_message(
-            "context_market_movers_seed_recovery",
-            language=language,
-            seeds=seeds,
-        )
-    return _context_curiosity_recovery_answer(focus, language=language)
-
-
-def _join_context_symbols(symbols: tuple[str, ...]) -> str:
-    if not symbols:
-        return "a symbol you choose"
-    if len(symbols) == 1:
-        return symbols[0]
-    return f"{', '.join(symbols[:-1])}, or {symbols[-1]}"
-
-
-def _format_market_mover_symbol(*, symbol: str, percent_change: Any) -> str:
-    if percent_change in (None, ""):
-        return symbol
-    if isinstance(percent_change, int | float):
-        return f"{symbol} ({percent_change:+g}%)"
-    text = str(percent_change).strip()
-    if not text:
-        return symbol
-    if text.endswith("%"):
-        return f"{symbol} ({text})"
-    return f"{symbol} ({text}%)"
-
-
-def _supported_experiment_fact_packet() -> str:
-    families = "; ".join(EXECUTABLE_STRATEGY_FAMILIES)
-    return (
-        f"{families}. Macro, news, corporate-action, and movers context may frame "
-        "a question or explain backdrop, but cannot alter simulation truth or become "
-        "the executable rule. Suggested next experiments must stay inside these "
-        "families instead of inventing unregistered triggers or holding-period rules."
-    )
-
-
-def _context_curiosity_recovery_answer(
-    focus: ContextQuestionFocus,
-    *,
-    language: str,
-) -> str:
-    if focus == "macro_context":
-        return recovery_message("context_macro_recovery", language=language)
-    if focus == "corporate_events":
-        return recovery_message("context_corporate_events_recovery", language=language)
-    return recovery_message("context_market_movers_recovery", language=language)
 
 
 async def _unanchored_strategy_route_answer_if_needed(
@@ -2646,10 +2147,6 @@ async def _unhandled_response_recovery_if_needed(
     return _llm_composition_unavailable_recovery_answer(language=language)
 
 
-def _llm_composition_unavailable_recovery_answer(*, language: str) -> str:
-    return recovery_message("interpreter_unavailable", language=language)
-
-
 async def _compose_general_educational_answer(
     *,
     current_user_message: str,
@@ -2714,8 +2211,7 @@ async def _compose_unhandled_conversation_answer(
         {
             "role": "system",
             "content": (
-                "Supported experiment paths: "
-                f"{_supported_experiment_fact_packet()}"
+                "Supported experiment paths: " f"{_supported_experiment_fact_packet()}"
             ),
         },
         {"role": "user", "content": current_user_message},
@@ -2731,59 +2227,98 @@ async def _compose_unhandled_conversation_answer(
     return cleaned or None
 
 
-def _route_contextual_money_answer(
+def _multi_asset_chip_answer_operation_symbol(
     *,
-    strategy: StrategySummary,
-    selected_thread_metadata: dict[str, Any],
-) -> tuple[StrategySummary, dict[str, Any]]:
-    requested_field = str(selected_thread_metadata.get("requested_field") or "")
-    if requested_field not in {"initial_capital", "capital_amount", "assumption"}:
-        return strategy, {}
-    if strategy.capital_amount is None:
-        return strategy, {}
-    if executable_strategy_type(strategy) == "dca_accumulation":
-        return strategy, {}
-    updated = strategy.model_copy(deep=True)
-    initial_capital = updated.capital_amount
-    updated.capital_amount = None
-    return updated, {"initial_capital": initial_capital}
-
-
-def _strategy_with_pending_resolution_affirmation(
-    *,
-    strategy: StrategySummary,
     explicit_strategy: StrategySummary,
+    prior_strategy: StrategySummary | None,
     selected_thread_metadata: dict[str, Any],
     current_user_message: str,
     semantic_turn_act: str | None,
-) -> tuple[StrategySummary, bool]:
+) -> str | None:
+    """A bare new symbol answering the asset chip on a multi-asset card is
+    add-or-replace ambiguous; the clarification must stay open instead of
+    reconfirming the unchanged card."""
+
     if semantic_turn_act != "answer_pending_need":
-        return strategy, False
-    pending_resolution = selected_thread_metadata.get("pending_resolution")
-    if not isinstance(pending_resolution, dict):
-        return strategy, False
-    field = _field_base(str(pending_resolution.get("field") or ""))
-    if field != "asset_universe":
-        return strategy, False
+        return None
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return None
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "asset_universe":
+        return None
     if explicit_strategy.asset_universe:
-        return strategy, False
-    del current_user_message
-    candidate = pending_resolution.get(
-        "candidate_normalized_value"
-    ) or pending_resolution.get("canonical_symbol")
-    if not isinstance(candidate, str) or not candidate.strip():
-        return strategy, False
-    updated = strategy.model_copy(deep=True)
-    updated.asset_universe = [candidate.strip().upper()]
-    asset_class = pending_resolution.get("asset_class")
-    if isinstance(asset_class, str) and asset_class.strip():
-        updated.asset_class = asset_class.strip()
-    updated.resolution_provenance = [
-        item
-        for item in updated.resolution_provenance
-        if not _is_ambiguous_asset_resolution(item)
-    ]
-    return updated, True
+        return None
+    prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
+    if len(prior_symbols) <= 1:
+        return None
+    answer = current_user_message.strip()
+    if not answer:
+        return None
+    resolution = _resolve_asset_candidate_safely(
+        answer,
+        field="asset_universe[0]",
+        source="user_mention",
+    )
+    if resolution is None or resolution.status != "resolved" or resolution.asset is None:
+        return None
+    symbol = resolution.asset.canonical_symbol
+    return symbol if symbol not in prior_symbols else None
+
+
+def _multi_asset_chip_answer_operation_clarification_result(
+    *,
+    interpretation: StructuredInterpretation,
+    prior_strategy: StrategySummary,
+    operation_symbol: str,
+    current_user_message: str,
+    user: UserState,
+) -> StageResult:
+    effective_profile = resolve_effective_response_profile(
+        user=user,
+        explicit_overrides=interpretation.response_profile_overrides,
+    )
+    decision = InterpretDecision(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary=interpretation.user_goal_summary,
+        candidate_strategy_draft=prior_strategy.model_copy(deep=True),
+        missing_required_fields=["asset_universe"],
+        confidence=interpretation.confidence,
+        arbitration_mode="deterministic",
+        reason_codes=[
+            *interpretation.reason_codes,
+            "asset_universe_operation_needs_clarification",
+        ],
+        effective_response_profile=effective_profile,
+        semantic_turn_act="answer_pending_need",
+    )
+    return StageResult(
+        outcome="needs_clarification",
+        decision=decision,
+        stage_patch={
+            "candidate_strategy_draft": prior_strategy.model_dump(mode="python"),
+            "assistant_response": asset_universe_operation_clarification_message(
+                language=user.language_preference
+            ),
+            "requested_field": "asset_universe",
+            "missing_required_fields": ["asset_universe"],
+            "response_intent": {
+                "kind": "clarification",
+                "semantic_needs": ["asset_target"],
+                "requested_fields": ["asset_universe"],
+                "facts": {
+                    "strategy": prior_strategy.model_dump(mode="python"),
+                    "current_user_message": current_user_message,
+                    "resolved_symbol": operation_symbol,
+                    "language": user.language_preference,
+                },
+                "options": [],
+            },
+        },
+    )
 
 
 def _strategy_with_requested_asset_answer_resolution(
@@ -2804,13 +2339,17 @@ def _strategy_with_requested_asset_answer_resolution(
     if requested_field != "asset_universe":
         return strategy, False
     del semantic_turn_act
+    prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
+    if len(prior_symbols) > 1:
+        # This corridor fills a single asset slot; multi-asset universes are
+        # edited only through typed EditOperations, never re-derived here.
+        return strategy, False
     asset_candidates = _requested_asset_answer_candidates(
         explicit_strategy=explicit_strategy,
         current_user_message=current_user_message,
     )
     if not asset_candidates:
         return strategy, False
-    prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
     fallback_resolution: AssetResolution | None = None
     resolution: AssetResolution | None = None
     for asset_candidate in asset_candidates:
@@ -2838,7 +2377,10 @@ def _strategy_with_requested_asset_answer_resolution(
             and candidate_resolution.asset.canonical_symbol in prior_symbols
         ):
             continue
-        if candidate_resolution.status == "resolved" and candidate_resolution.asset is not None:
+        if (
+            candidate_resolution.status == "resolved"
+            and candidate_resolution.asset is not None
+        ):
             resolution = candidate_resolution
             break
         if fallback_resolution is None:
@@ -2864,374 +2406,22 @@ def _strategy_with_requested_asset_answer_resolution(
     return updated, True
 
 
-def _without_stale_requested_asset_rejection_constraints(
-    constraints: list[UnsupportedConstraint],
-    *,
-    strategy: StrategySummary,
-) -> list[UnsupportedConstraint]:
-    if not strategy.asset_universe:
-        return list(constraints)
-    stale_rejection_categories = {"action", "navigation_or_tool"}
-    return [
-        constraint
-        for constraint in constraints
-        if constraint.category not in stale_rejection_categories
-    ]
-
-
 def _resolve_asset_candidate_safely(
     query: str,
     *,
     field: str,
     source: ResolutionSource,
+    asset_class_hint: str | None = None,
 ) -> AssetResolution | None:
     try:
-        return _resolve_asset_candidate(query, field=field, source=source)
+        return _resolve_asset_candidate(
+            query,
+            field=field,
+            source=source,
+            asset_class_hint=asset_class_hint,
+        )
     except ValueError:
         return None
-
-
-def _unresolved_requested_asset_resolution(
-    query: str,
-    *,
-    field: str,
-    source: ResolutionSource,
-) -> AssetResolution:
-    return AssetResolution(
-        status="unsupported",
-        raw_text=query,
-        asset=None,
-        candidates=(),
-        provenance=ResolutionProvenance(
-            field=field,
-            raw_text=query,
-            source=source,
-            candidate_kind="asset",
-            resolution_status="unsupported",
-            validated_by="provider_catalog",
-            confidence="low",
-        ),
-    )
-
-
-def _strategy_canonical_asset_symbols(strategy: StrategySummary | None) -> set[str]:
-    if strategy is None:
-        return set()
-    return {
-        symbol.strip().upper()
-        for symbol in strategy.asset_universe
-        if isinstance(symbol, str) and symbol.strip()
-    }
-
-
-def _provenance_field(item: ResolutionProvenance | dict[str, Any]) -> str:
-    if isinstance(item, ResolutionProvenance):
-        return item.field
-    field = item.get("field")
-    return field if isinstance(field, str) else ""
-
-
-@dataclass(frozen=True)
-class _RequestedAssetCandidate:
-    text: str
-    source: ResolutionSource
-    from_user_answer: bool = False
-
-
-def _requested_asset_answer_candidates(
-    *,
-    explicit_strategy: StrategySummary,
-    current_user_message: str,
-) -> list[_RequestedAssetCandidate]:
-    candidates: list[_RequestedAssetCandidate] = []
-    for symbol in explicit_strategy.asset_universe:
-        candidate = str(symbol or "").strip()
-        if candidate:
-            candidates.append(
-                _RequestedAssetCandidate(text=candidate, source="llm_extraction")
-            )
-    answer = current_user_message.strip()
-    if answer:
-        candidates.append(
-            _RequestedAssetCandidate(
-                text=answer,
-                source="user_mention",
-                from_user_answer=True,
-            )
-        )
-    deduped: list[_RequestedAssetCandidate] = []
-    seen: dict[str, int] = {}
-    for candidate in candidates:
-        key = candidate.text.casefold()
-        existing_index = seen.get(key)
-        if existing_index is not None:
-            existing = deduped[existing_index]
-            if candidate.from_user_answer and not existing.from_user_answer:
-                deduped[existing_index] = candidate
-            continue
-        seen[key] = len(deduped)
-        deduped.append(candidate)
-    return deduped
-
-
-def _strategy_with_supported_indicator_simplification(
-    *,
-    strategy: StrategySummary,
-    snapshot: TaskSnapshot | None,
-    selected_thread_metadata: dict[str, Any],
-    semantic_turn_act: str | None,
-    task_relation: str,
-) -> tuple[StrategySummary, bool]:
-    if semantic_turn_act == "approval":
-        return strategy, False
-    indicator_key = _indicator_key_from_strategy(strategy)
-    if indicator_key is None:
-        return strategy, False
-
-    prior = _active_strategy_from_snapshot(snapshot)
-    if prior is None and not _strategy_has_content(strategy):
-        return strategy, False
-    base = (
-        prior.model_copy(deep=True)
-        if prior is not None
-        else strategy.model_copy(deep=True)
-    )
-    spec = executable_indicator_spec(indicator_key)
-    if spec is None or not _indicator_supports_default_threshold_rule(spec):
-        return strategy, False
-
-    preserve_prior_asset_context = (
-        prior is not None
-        and _should_preserve_prior_asset_context(
-            prior=prior,
-            selected_thread_metadata=selected_thread_metadata,
-            semantic_turn_act=semantic_turn_act,
-            task_relation=task_relation,
-        )
-    )
-    merge_fields = [
-        "asset_universe",
-        "asset_class",
-        "date_range",
-        "timeframe",
-        "capital_amount",
-        "position_size",
-        "comparison_baseline",
-        "entry_logic",
-        "exit_logic",
-        "extra_parameters",
-    ]
-    if preserve_prior_asset_context:
-        merge_fields = [
-            field
-            for field in merge_fields
-            if field not in {"asset_universe", "asset_class"}
-        ]
-    updated = _merge_non_empty_strategy_fields(
-        base=base,
-        incoming=strategy,
-        field_names=tuple(merge_fields),
-    )
-    prior_strategy_type = executable_strategy_type(base)
-    incoming_indicator_parameters = _indicator_parameters_from_strategy(strategy)
-    parameters = normalize_indicator_parameters(
-        spec.key,
-        {
-            **_indicator_parameters_from_strategy(updated),
-            **incoming_indicator_parameters,
-            "indicator": spec.key,
-        },
-    )
-    updated.raw_user_phrasing = strategy.raw_user_phrasing or updated.raw_user_phrasing
-    updated.strategy_type = "indicator_threshold"
-    updated.entry_rule = None
-    updated.exit_rule = None
-    updated.strategy_thesis = _indicator_simplification_thesis(
-        strategy=updated,
-        spec=spec,
-    )
-    rewrite_threshold_logic = (
-        prior_strategy_type != "indicator_threshold" or bool(incoming_indicator_parameters)
-    )
-    if rewrite_threshold_logic or not updated.entry_logic:
-        updated.entry_logic = spec.format_threshold_rule(
-            "entry",
-            threshold=float(parameters["entry_threshold"]),
-            period=int(parameters["indicator_period"]),
-        )
-    if rewrite_threshold_logic or not updated.exit_logic:
-        updated.exit_logic = spec.format_threshold_rule(
-            "exit",
-            threshold=float(parameters["exit_threshold"]),
-            period=int(parameters["indicator_period"]),
-        )
-    updated.extra_parameters = {
-        **{
-            key: value
-            for key, value in updated.extra_parameters.items()
-            if key not in {"entry_rule", "exit_rule"}
-        },
-        "indicator": spec.key,
-        "indicator_parameters": parameters,
-        "simplified_from_strategy_type": (
-            prior.strategy_type if prior is not None else strategy.strategy_type
-        ),
-    }
-    return updated, True
-
-
-def _indicator_key_from_strategy(strategy: StrategySummary) -> str | None:
-    indicator_parameters = canonical_indicator_parameters_from_strategy(strategy)
-    parameter_indicator = indicator_parameters.get("indicator")
-    if isinstance(parameter_indicator, str) and parameter_indicator.strip():
-        return parameter_indicator.strip()
-    raw_indicator = strategy.extra_parameters.get("indicator")
-    if isinstance(raw_indicator, str) and raw_indicator.strip():
-        return raw_indicator.strip()
-    raw_parameters = strategy.extra_parameters.get("indicator_parameters")
-    if isinstance(raw_parameters, dict):
-        parameter_indicator = raw_parameters.get("indicator")
-        if isinstance(parameter_indicator, str) and parameter_indicator.strip():
-            return parameter_indicator.strip()
-    return None
-
-
-def _active_strategy_from_snapshot(snapshot: TaskSnapshot | None) -> StrategySummary | None:
-    if snapshot is None:
-        return None
-    return snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
-
-
-def _strategy_has_content(strategy: StrategySummary) -> bool:
-    return any(
-        value not in (None, "", [], {})
-        for value in strategy.model_dump(mode="python").values()
-    )
-
-
-def _indicator_supports_default_threshold_rule(
-    spec: IndicatorExecutionSpec,
-) -> bool:
-    return spec.default_entry_threshold != spec.default_exit_threshold and any(
-        parameter.key == "entry_threshold" for parameter in spec.parameter_schema
-    )
-
-
-def _indicator_parameters_from_strategy(strategy: StrategySummary) -> dict[str, Any]:
-    return canonical_indicator_parameters_from_strategy(strategy)
-
-
-def _merge_non_empty_strategy_fields(
-    *,
-    base: StrategySummary,
-    incoming: StrategySummary,
-    field_names: tuple[str, ...],
-) -> StrategySummary:
-    updated = base.model_copy(deep=True)
-    incoming_payload = incoming.model_dump(mode="python")
-    for field_name in field_names:
-        value = incoming_payload.get(field_name)
-        if value in (None, "", [], {}):
-            continue
-        setattr(updated, field_name, value)
-    return updated
-
-
-def _indicator_simplification_thesis(
-    *,
-    strategy: StrategySummary,
-    spec: IndicatorExecutionSpec,
-) -> str:
-    assets = ", ".join(strategy.asset_universe)
-    if assets:
-        return f"Test {assets} with a supported {spec.label} threshold rule."
-    return f"Test the current idea with a supported {spec.label} threshold rule."
-
-
-def _is_ambiguous_asset_resolution(item: ResolutionProvenance | dict[str, Any]) -> bool:
-    if not isinstance(item, ResolutionProvenance):
-        try:
-            item = ResolutionProvenance.model_validate(item)
-        except (TypeError, ValueError):
-            return False
-    return (
-        item.source == "llm_extraction"
-        and item.resolution_status == "ambiguous"
-        and _field_base(item.field) == "asset_universe"
-    )
-
-
-def _field_base(field_name: str) -> str:
-    return field_name.split("[", 1)[0]
-
-
-def _supported_timeframes(contract: Any) -> tuple[str, ...]:
-    parameter = contract.get_optional_parameter("timeframe")
-    if parameter is None or parameter.allowed_range is None:
-        return ()
-    return tuple(str(value) for value in parameter.allowed_range.allowed_values)
-
-
-def _optional_parameter_stage_patch(
-    *,
-    decision: InterpretDecision,
-    values: dict[str, Any],
-) -> dict[str, Any]:
-    if not values:
-        return {}
-    optional_parameter_status = dict(decision.to_patch()["optional_parameter_status"])
-    optional_parameter_status.update(values)
-    return {"optional_parameter_status": optional_parameter_status}
-
-
-def _offline_interpreter_unavailable_result(
-    *,
-    user: UserState,
-    snapshot: TaskSnapshot | None = None,
-    current_user_message: str = "",
-    selected_thread_metadata: dict[str, Any] | None = None,
-) -> StageResult:
-    effective_profile = resolve_effective_response_profile(
-        user=user,
-        explicit_overrides=None,
-    )
-    decision = InterpretDecision(
-        intent="conversation_followup",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary="Structured interpretation was unavailable for this turn.",
-        candidate_strategy_draft=StrategySummary(),
-        missing_required_fields=[],
-        optional_parameter_opportunity=[],
-        confidence=0.0,
-        arbitration_mode="deterministic",
-        reason_codes=["llm_interpreter_unavailable"],
-        effective_response_profile=effective_profile,
-        semantic_turn_act=None,
-    )
-    stage_patch: dict[str, Any] = {
-        "assistant_response": _offline_recovery_message(
-            snapshot,
-            current_user_message=current_user_message,
-            selected_thread_metadata=selected_thread_metadata or {},
-            language=user.language_preference,
-        ),
-    }
-    stage_patch.update(
-        recovery_state_stage_patch(
-            "interpreter_unavailable",
-            language=user.language_preference,
-            retryable=True,
-        )
-    )
-    retry_last_turn = retry_last_turn_stage_patch(current_user_message)
-    if retry_last_turn is not None:
-        stage_patch.update(retry_last_turn)
-    return StageResult(
-        outcome="ready_to_respond",
-        decision=decision,
-        stage_patch=stage_patch,
-    )
 
 
 async def _interpreter_unavailable_result(
@@ -3243,6 +2433,23 @@ async def _interpreter_unavailable_result(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any] | None = None,
 ) -> StageResult:
+    selected_metadata = selected_thread_metadata or {}
+    planned_refinement_edit = await _planned_pending_refinement_edit_interpretation(
+        snapshot=snapshot,
+        current_user_message=current_user_message,
+        selected_thread_metadata=selected_metadata,
+        resolve_asset_candidate=_resolve_asset_candidate_safely,
+        plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+    )
+    if planned_refinement_edit is not None:
+        return await _stage_result_from_interpretation(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            interpretation=planned_refinement_edit,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_metadata,
+        )
     result_followup = await _latest_result_followup_when_interpreter_unavailable(
         user=user,
         snapshot=snapshot,
@@ -3250,6 +2457,44 @@ async def _interpreter_unavailable_result(
     )
     if result_followup is not None:
         return result_followup
+    pending_option = _pending_response_option_when_interpreter_unavailable(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        current_user_message=current_user_message,
+        selected_thread_metadata=selected_metadata,
+    )
+    if pending_option is not None:
+        return await _stage_result_from_interpretation(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            interpretation=pending_option,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_metadata,
+        )
+    if snapshot is None or snapshot.active_confirmation_reference is None:
+        pending_date_answer = _pending_date_answer_interpretation(
+            current_user_message=current_user_message,
+            language=user.language_preference,
+            snapshot=snapshot,
+            selected_thread_metadata=selected_metadata,
+            today=date.today(),
+            reason_code="pending_date_answer_interpreter_unavailable_repaired",
+            user_goal_summary=(
+                "User supplied the requested date range while structured "
+                "interpretation was unavailable."
+            ),
+        )
+        if pending_date_answer is not None:
+            return await _stage_result_from_interpretation(
+                state=state,
+                user=user,
+                snapshot=snapshot,
+                interpretation=pending_date_answer,
+                capability_contract=capability_contract,
+                selected_thread_metadata=selected_metadata,
+            )
     active_confirmation_followup = (
         await _active_confirmation_followup_when_interpreter_unavailable(
             state=state,
@@ -3257,16 +2502,36 @@ async def _interpreter_unavailable_result(
             snapshot=snapshot,
             current_user_message=current_user_message,
             capability_contract=capability_contract,
-            selected_thread_metadata=selected_thread_metadata or {},
+            selected_thread_metadata=selected_metadata,
         )
     )
     if active_confirmation_followup is not None:
         return active_confirmation_followup
+    draft_only_indicator_interpretation = (
+        _draft_only_indicator_interpretation_when_interpreter_unavailable(
+            snapshot=snapshot,
+            current_user_message=current_user_message,
+            resolve_asset_candidate=_resolve_asset_candidate_safely,
+            default_benchmark_for_asset_class=_default_benchmark_for_asset_class,
+        )
+    )
+    if draft_only_indicator_interpretation is not None:
+        return await _stage_result_from_interpretation(
+            state=RunState.new(
+                current_user_message=current_user_message,
+                recent_thread_history=[],
+            ),
+            user=user,
+            snapshot=None,
+            interpretation=draft_only_indicator_interpretation,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_metadata,
+        )
     return _offline_interpreter_unavailable_result(
         user=user,
         snapshot=snapshot,
         current_user_message=current_user_message,
-        selected_thread_metadata=selected_thread_metadata or {},
+        selected_thread_metadata=selected_metadata,
     )
 
 
@@ -3279,92 +2544,141 @@ async def _planned_active_confirmation_edit_when_interpreter_unavailable(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
-    prior_strategy = snapshot.pending_strategy_summary
-    active_confirmation = snapshot.active_confirmation_reference
-    if prior_strategy is None or active_confirmation is None:
-        return None
-    def _resolve_candidate(query: str) -> AssetResolution | None:
-        return _resolve_asset_candidate_safely(
-            query,
-            field="asset_universe[0]",
-            source="user_mention",
-        )
-
-    current_mentions = {
-        symbol
-        for mention in provider_ticker_mentions_from_text(
-            current_user_message,
-            resolve_candidate=_resolve_candidate,
-            excluded_tokens=current_message_execution_context_tokens(
-                current_user_message,
-                strategy_type=prior_strategy.strategy_type,
-            ),
-            limit=10,
-        )
-        if (
-            symbol := _normalized_symbol(
-                getattr(mention.asset, "canonical_symbol", None)
-            )
-        )
-        is not None
-    }
-    prior_symbols = {
-        str(symbol or "").strip().upper()
-        for symbol in prior_strategy.asset_universe
-        if str(symbol or "").strip()
-    }
-    prior_benchmark = str(prior_strategy.comparison_baseline or "").strip().upper()
-    prior_context_symbols = set(prior_symbols)
-    if prior_benchmark:
-        prior_context_symbols.add(prior_benchmark)
-    if not current_mentions or current_mentions <= prior_context_symbols:
-        return None
-    plan = await plan_artifact_assumption_edit(
+    interpretation = await _planned_active_confirmation_edit_interpretation(
+        snapshot=snapshot,
         current_user_message=current_user_message,
-        prior_strategy=prior_strategy.model_dump(mode="json"),
-        active_confirmation=active_confirmation.model_dump(mode="json"),
-        preferred_model="",
+        resolve_asset_candidate=_resolve_asset_candidate_safely,
+        plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
     )
-    if plan is None or plan.outcome != "ready_to_confirm":
+    if interpretation is None:
         return None
-    candidate = StrategySummary(raw_user_phrasing=current_user_message)
-    field_provenance: dict[str, str] = {}
-    if plan.asset_universe:
-        operation = normalized_asset_universe_operation(
-            plan.asset_universe_operation
+    return await _stage_result_from_interpretation(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        interpretation=interpretation,
+        capability_contract=capability_contract,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+
+
+async def _planned_pending_confirmation_edit_from_chip_clarify_answer(
+    *,
+    state: RunState,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+    capability_contract: Any,
+    selected_thread_metadata: dict[str, Any],
+    requested_field: str,
+) -> StageResult | None:
+    interpretation = await _planned_pending_confirmation_edit_interpretation(
+        snapshot=snapshot,
+        current_user_message=current_user_message,
+        requested_field=requested_field,
+        resolve_asset_candidate=_resolve_asset_candidate_safely,
+        plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+    )
+    if interpretation is None:
+        return None
+    return await _stage_result_from_interpretation(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        interpretation=interpretation,
+        capability_contract=capability_contract,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+
+
+async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
+    *,
+    state: RunState,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+    interpretation: StructuredInterpretation,
+    capability_contract: Any,
+) -> StageResult | None:
+    if snapshot is None:
+        return None
+    if "artifact_assumption_edit_planned" in interpretation.reason_codes:
+        return None
+    chip_clarify_answer_supplies_edit = _chip_clarify_answer_supplies_artifact_edit(
+        interpretation=interpretation,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    pending_confirmation_requested_field = (
+        _pending_confirmation_chip_clarify_edit_requested_field(
+            interpretation=interpretation,
+            selected_thread_metadata=selected_thread_metadata,
         )
-        if operation is None:
-            if not same_asset_universe(
-                plan.asset_universe,
-                prior_strategy.asset_universe,
-            ):
-                return None
-        else:
-            candidate.asset_universe = list(plan.asset_universe)
-            candidate.extra_parameters["asset_universe_operation"] = operation
-            field_provenance["asset_universe"] = "explicit_user"
-    if plan.comparison_baseline is not None:
-        baseline = str(plan.comparison_baseline or "").strip().upper()
-        if baseline:
-            candidate.comparison_baseline = baseline
-            field_provenance["comparison_baseline"] = "explicit_user"
-    if not field_provenance:
-        return None
-    candidate.extra_parameters["field_provenance"] = field_provenance
-    interpretation = StructuredInterpretation(
-        intent="backtest_execution",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary=(
-            plan.user_goal_summary
-            or "User changed a visible confirmation assumption."
-        ),
-        candidate_strategy_draft=candidate,
-        confidence=plan.confidence,
-        reason_codes=["artifact_assumption_edit_planned"],
-        semantic_turn_act="answer_pending_need",
-        artifact_target="active_confirmation",
     )
+    if not (
+        _structured_interpretation_has_supported_artifact_assumption_edit(interpretation)
+        or chip_clarify_answer_supplies_edit
+    ):
+        return None
+    if snapshot.active_confirmation_reference is None:
+        if pending_confirmation_requested_field is None:
+            return None
+        return await _planned_pending_confirmation_edit_from_chip_clarify_answer(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            current_user_message=state.current_user_message,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_thread_metadata,
+            requested_field=pending_confirmation_requested_field,
+        )
+    if _structured_interpretation_has_complete_typed_asset_patch(interpretation):
+        return None
+    return await _planned_active_confirmation_edit_when_interpreter_unavailable(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        current_user_message=state.current_user_message,
+        capability_contract=capability_contract,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+
+
+async def _planned_edit_after_fact_composer_decline(
+    *,
+    state: RunState,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    capability_contract: Any,
+    selected_thread_metadata: dict[str, Any],
+) -> StageResult | None:
+    """Composer refusal on a resolved fact key re-enters the typed edit contract.
+
+    The refusal is the composer's own typed signal that the turn is not a fact
+    question; the edit planner (or nothing) decides the route from here."""
+
+    interpretation = await _planned_pending_refinement_edit_interpretation(
+        snapshot=snapshot,
+        current_user_message=state.current_user_message,
+        selected_thread_metadata=selected_thread_metadata,
+        resolve_asset_candidate=_resolve_asset_candidate_safely,
+        plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+    )
+    if interpretation is None and snapshot is not None:
+        interpretation = await _planned_active_confirmation_edit_interpretation(
+            snapshot=snapshot,
+            current_user_message=state.current_user_message,
+            resolve_asset_candidate=_resolve_asset_candidate_safely,
+            plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+        )
+    if interpretation is None:
+        interpretation = await _planned_latest_result_edit_interpretation(
+            snapshot=snapshot,
+            current_user_message=state.current_user_message,
+            resolve_asset_candidate=_resolve_asset_candidate_safely,
+            plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+        )
+    if interpretation is None:
+        return None
     return await _stage_result_from_interpretation(
         state=state,
         user=user,
@@ -3506,13 +2820,8 @@ async def _latest_result_followup_when_interpreter_unavailable(
         outcome="ready_to_respond",
         decision=decision,
         stage_patch={
-            "assistant_response": with_response_heading(
-                heading=result_followup_heading(
-                    "general",
-                    language=user.language_preference,
-                ),
-                body=response,
-            ),
+            "assistant_response": response,
+            "response_intent": result_followup_response_intent("general"),
             **(
                 recovery_state_stage_patch(
                     "latest_result_followup_unavailable",
@@ -3576,6 +2885,19 @@ async def _latest_result_followup_recovery_if_applicable(
             )
     if save_requested and not _strategies_enabled():
         used_recovery = False
+    stage_patch: dict[str, Any] = {
+        "assistant_response": response,
+    }
+    if not (save_requested and not _strategies_enabled()):
+        stage_patch["response_intent"] = result_followup_response_intent(focus)
+    if used_recovery:
+        stage_patch.update(
+            recovery_state_stage_patch(
+                "latest_result_followup_unavailable",
+                language=user.language_preference,
+                retryable=True,
+            )
+        )
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -3600,28 +2922,7 @@ async def _latest_result_followup_recovery_if_applicable(
                 ],
             }
         ),
-        stage_patch={
-            "assistant_response": (
-                response
-                if save_requested and not _strategies_enabled()
-                else with_response_heading(
-                    heading=result_followup_heading(
-                        focus,
-                        language=user.language_preference,
-                    ),
-                    body=response,
-                )
-            ),
-            **(
-                recovery_state_stage_patch(
-                    "latest_result_followup_unavailable",
-                    language=user.language_preference,
-                    retryable=True,
-                )
-                if used_recovery
-                else {}
-            ),
-        },
+        stage_patch=stage_patch,
     )
 
 
@@ -3646,9 +2947,7 @@ async def _private_alpha_save_request_result_if_applicable(
         language=user.language_preference,
     )
     if response is None:
-        response = fallback_private_alpha_save_response(
-            language=user.language_preference
-        )
+        response = fallback_private_alpha_save_response(language=user.language_preference)
     return StageResult(
         outcome="ready_to_respond",
         decision=decision.model_copy(
@@ -3664,771 +2963,6 @@ async def _private_alpha_save_request_result_if_applicable(
     )
 
 
-def _strategies_enabled() -> bool:
-    raw = os.getenv("ARGUS_STRATEGIES_ENABLED", "false").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
-
-
-def _latest_result_save_requested(decision: InterpretDecision) -> bool:
-    return _LATEST_RESULT_SAVE_REQUESTED_REASON in decision.reason_codes
-
-
-def _offline_recovery_message(
-    snapshot: TaskSnapshot | None,
-    *,
-    current_user_message: str = "",
-    selected_thread_metadata: dict[str, Any] | None = None,
-    language: str = "en",
-) -> str:
-    if snapshot is not None and snapshot.pending_strategy_summary is not None:
-        strategy = snapshot.pending_strategy_summary
-        setup_phrase = _current_setup_phrase(strategy)
-        if _pending_assumption_edit_was_not_applied(
-            current_user_message=current_user_message,
-            selected_thread_metadata=selected_thread_metadata or {},
-        ):
-            return recovery_message("assumption_edit_unapplied", language=language)
-        if snapshot.active_confirmation_reference is None:
-            return recovery_message(
-                "setup_change_unapplied",
-                language=language,
-                setup_phrase=setup_phrase,
-            )
-        assumptions_response = _draft_assumptions_response(snapshot)
-        action_guidance = recovery_message(
-            "confirmation_action_guidance",
-            language=language,
-        )
-        if assumptions_response is not None:
-            return f"{assumptions_response} {action_guidance}"
-        return recovery_message(
-            "confirmation_change_unapplied",
-            language=language,
-            setup_phrase=setup_phrase,
-            action_guidance=action_guidance,
-        )
-    if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
-        return recovery_message(
-            "latest_result_followup_unavailable",
-            language=language,
-        )
-    return recovery_message("interpreter_unavailable", language=language)
-
-
-def _current_setup_phrase(strategy: StrategySummary) -> str:
-    assets = [symbol for symbol in strategy.asset_universe if symbol]
-    asset_label = ", ".join(assets)
-    strategy_label = display_strategy_type(strategy).strip().lower()
-    if asset_label and strategy_label:
-        return f"{asset_label} {strategy_label} setup"
-    if asset_label:
-        return f"{asset_label} setup"
-    if strategy_label:
-        return f"current {strategy_label} setup"
-    return "current setup"
-
-
-def _pending_assumption_edit_was_not_applied(
-    *,
-    current_user_message: str,
-    selected_thread_metadata: dict[str, Any],
-) -> bool:
-    requested_field = _field_base(str(selected_thread_metadata.get("requested_field") or ""))
-    return requested_field == "assumption" and bool(current_user_message.strip())
-
-
-def _strategy_with_contextual_merge(
-    *,
-    strategy: StrategySummary,
-    snapshot: TaskSnapshot | None,
-    selected_thread_metadata: dict[str, Any],
-    semantic_turn_act: str | None,
-    task_relation: str,
-    current_user_message: str | None = None,
-    reason_codes: list[str] | None = None,
-) -> StrategySummary:
-    if snapshot is None:
-        return strategy
-    prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
-    if prior is None:
-        return strategy
-    if "pending_response_option_selected" in set(reason_codes or []):
-        return strategy
-    should_merge = (
-        semantic_turn_act in CONTEXTUAL_EDIT_TURN_ACTS
-        or task_relation == "refine"
-        or _strategy_supplies_contextual_rule_edit(prior=prior, strategy=strategy)
-        or _strategy_fills_pending_execution_context(
-            prior=prior,
-            strategy=strategy,
-            selected_thread_metadata=selected_thread_metadata,
-        )
-        or _strategy_looks_like_pending_artifact_edit(
-            prior=prior,
-            strategy=strategy,
-            selected_thread_metadata=selected_thread_metadata,
-        )
-    )
-    if not should_merge:
-        return strategy
-    incoming_strategy_family = _declared_strategy_family(strategy)
-    prior_strategy_family = executable_strategy_type(prior)
-    strategy_family_changed = (
-        incoming_strategy_family in SUPPORTED_STRATEGY_TYPES
-        and prior_strategy_family in SUPPORTED_STRATEGY_TYPES
-        and incoming_strategy_family != prior_strategy_family
-    )
-    preserve_prior_family = _should_preserve_pending_strategy_family(
-        prior=prior,
-        strategy=strategy,
-        incoming_strategy_family=incoming_strategy_family,
-        prior_strategy_family=prior_strategy_family,
-        selected_thread_metadata=selected_thread_metadata,
-        semantic_turn_act=semantic_turn_act,
-        task_relation=task_relation,
-    )
-    preserve_prior_asset_context = _should_preserve_prior_asset_context(
-        prior=prior,
-        selected_thread_metadata=selected_thread_metadata,
-        semantic_turn_act=semantic_turn_act,
-        task_relation=task_relation,
-    )
-    preserve_prior_money_context = _should_preserve_prior_money_context(
-        selected_thread_metadata=selected_thread_metadata,
-        semantic_turn_act=semantic_turn_act,
-    )
-    asset_field_requested = (
-        _field_base(str(selected_thread_metadata.get("requested_field") or ""))
-        == "asset_universe"
-    )
-    preserve_prior_asset_for_field_owned_indicator = bool(
-        prior.asset_universe
-        and _strategy_asset_universe_is_field_owned_indicator_context(
-            strategy,
-            current_user_message=current_user_message,
-            asset_field_requested=asset_field_requested,
-        )
-    )
-    if preserve_prior_family:
-        strategy_family_changed = False
-        incoming_strategy_family = prior_strategy_family
-    merged = (
-        _reset_contextual_strategy_definition(
-            prior,
-            incoming_strategy_family,
-        )
-        if strategy_family_changed and incoming_strategy_family is not None
-        else prior.model_copy(deep=True)
-    )
-    incoming = strategy.model_dump(mode="python")
-    for key, value in incoming.items():
-        if key == "raw_user_phrasing":
-            continue
-        if key == "strategy_thesis" and not strategy_family_changed:
-            continue
-        if key == "strategy_type" and preserve_prior_family:
-            continue
-        if (
-            preserve_prior_asset_context
-            or preserve_prior_asset_for_field_owned_indicator
-        ) and key in {
-            "asset_universe",
-            "asset_class",
-            "resolution_provenance",
-        }:
-            continue
-        if preserve_prior_money_context and key in {
-            "capital_amount",
-            "initial_capital",
-            "total_capital",
-            "position_size",
-        }:
-            continue
-        if value in (None, "", [], {}):
-            continue
-        if key == "date_range" and isinstance(value, dict):
-            value = _contextual_date_range_value(
-                base=merged.date_range,
-                incoming=value,
-                current_user_message=current_user_message,
-                selected_thread_metadata=selected_thread_metadata,
-            )
-        if key == "asset_universe":
-            operation = normalized_asset_universe_operation(
-                strategy.extra_parameters.get("asset_universe_operation")
-            )
-            if operation is None and same_asset_universe(value, merged.asset_universe):
-                continue
-            operation = operation or "replace"
-            merged = apply_artifact_patch(
-                merged,
-                ArtifactPatch(
-                    source="llm_patch",
-                    asset_universe=value,
-                    asset_universe_operation=operation,
-                ),
-            )
-            continue
-        if key == "extra_parameters":
-            if preserve_prior_family and isinstance(value, dict):
-                value = {
-                    nested_key: nested_value
-                    for nested_key, nested_value in value.items()
-                    if nested_key not in {"raw_strategy_type", "template"}
-                }
-            if preserve_prior_money_context and isinstance(value, dict):
-                value = _extra_parameters_without_unrequested_money_context(value)
-            merged.extra_parameters = _merge_contextual_extra_parameters(
-                base=merged.extra_parameters,
-                incoming=value if isinstance(value, dict) else {},
-            )
-            continue
-        setattr(merged, key, value)
-    if strategy_family_changed and incoming_strategy_family is not None:
-        merged.strategy_type = incoming_strategy_family
-    if strategy.raw_user_phrasing:
-        merged.raw_user_phrasing = strategy.raw_user_phrasing
-    declared_family = _declared_strategy_family(merged)
-    if declared_family in SUPPORTED_STRATEGY_TYPES:
-        _clear_incompatible_strategy_rule_state(merged, declared_family)
-    return merged
-
-
-def _should_preserve_prior_money_context(
-    *,
-    selected_thread_metadata: dict[str, Any],
-    semantic_turn_act: str | None,
-) -> bool:
-    if semantic_turn_act != "answer_pending_need":
-        return False
-    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
-        return False
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    return requested_field in {"asset_universe", "date_range", "timeframe"}
-
-
-def _extra_parameters_without_unrequested_money_context(
-    extra_parameters: dict[str, Any],
-) -> dict[str, Any]:
-    money_context_keys = {
-        "initial_capital",
-        "starting_capital",
-        "starting_principal",
-        "initial_lump_sum",
-        "initial_lump",
-        "lump_sum",
-        "total_capital",
-        "total_budget",
-        "max_budget",
-        "investment_budget",
-        "cap",
-        "contribution_cap",
-        "capital_cap",
-        "investment_cap",
-        "recurring_contribution",
-        "contribution_amount",
-        "periodic_contribution",
-        "dca_contribution",
-    }
-    money_provenance_keys = {
-        "capital_amount",
-        "initial_capital",
-        "total_capital",
-        "position_size",
-        "recurring_contribution",
-    }
-    cleaned: dict[str, Any] = {}
-    for key, value in extra_parameters.items():
-        if key in money_context_keys:
-            continue
-        if key == "field_provenance" and isinstance(value, dict):
-            provenance = {
-                provenance_key: provenance_value
-                for provenance_key, provenance_value in value.items()
-                if provenance_key not in money_provenance_keys
-            }
-            if provenance:
-                cleaned[key] = provenance
-            continue
-        cleaned[key] = value
-    return cleaned
-
-
-def _should_apply_current_message_asset_grounding(
-    *,
-    semantic_turn_act: str | None,
-    selected_thread_metadata: dict[str, Any],
-    snapshot: TaskSnapshot | None,
-) -> bool:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field == "asset_universe":
-        return True
-    if semantic_turn_act != "answer_pending_need":
-        return True
-    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
-        return True
-    prior = _active_strategy_from_snapshot(snapshot)
-    return not bool(prior and prior.asset_universe)
-
-
-def _contextual_date_range_value(
-    *,
-    base: Any,
-    incoming: dict[str, Any],
-    current_user_message: str | None,
-    selected_thread_metadata: dict[str, Any],
-) -> dict[str, Any]:
-    if _has_complete_date_range(incoming):
-        return incoming
-    del current_user_message
-    return _merged_contextual_date_range(
-        base=base,
-        incoming=incoming,
-    )
-
-
-def _has_complete_date_range(value: Any) -> bool:
-    endpoints = _date_range_endpoints(value)
-    return endpoints is not None and all(endpoints)
-
-
-def _merged_contextual_date_range(
-    *,
-    base: Any,
-    incoming: dict[str, Any],
-) -> dict[str, Any]:
-    incoming_endpoints = {
-        "start": incoming.get("start") or incoming.get("from"),
-        "end": incoming.get("end") or incoming.get("to"),
-    }
-    incoming_endpoints = {
-        key: value
-        for key, value in incoming_endpoints.items()
-        if value not in (None, "", [], {})
-    }
-    if set(incoming_endpoints) == {"start", "end"}:
-        return incoming
-    if not isinstance(base, dict):
-        return incoming
-    merged = {
-        "start": base.get("start") or base.get("from"),
-        "end": base.get("end") or base.get("to"),
-    }
-    merged.update(incoming_endpoints)
-    return {key: value for key, value in merged.items() if value not in (None, "")}
-
-
-def _should_preserve_pending_strategy_family(
-    *,
-    prior: StrategySummary,
-    strategy: StrategySummary,
-    incoming_strategy_family: str | None,
-    prior_strategy_family: str,
-    selected_thread_metadata: dict[str, Any],
-    semantic_turn_act: str | None,
-    task_relation: str,
-) -> bool:
-    # The LLM may label a pending-field answer as "refine"; the narrower
-    # semantic turn act and selected artifact context decide whether family
-    # changes are allowed.
-    del task_relation
-    if semantic_turn_act not in {"answer_pending_need", "new_idea"}:
-        return False
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field in {"refinement", "entry_logic", "exit_logic"}:
-        return False
-    if not _strategy_fills_pending_execution_context(
-        prior=prior,
-        strategy=strategy,
-        selected_thread_metadata=selected_thread_metadata,
-    ):
-        return False
-    if (
-        incoming_strategy_family not in SUPPORTED_STRATEGY_TYPES
-        or prior_strategy_family not in SUPPORTED_STRATEGY_TYPES
-        or incoming_strategy_family == prior_strategy_family
-    ):
-        return False
-    if incoming_strategy_family not in {"buy_and_hold", "dca_accumulation"}:
-        return False
-    if not _strategy_supplies_executable_rule_edit(prior):
-        return False
-    if _strategy_supplies_executable_rule_edit(strategy):
-        return False
-    return True
-
-
-def _should_preserve_prior_asset_context(
-    *,
-    prior: StrategySummary,
-    selected_thread_metadata: dict[str, Any],
-    semantic_turn_act: str | None,
-    task_relation: str,
-) -> bool:
-    if not prior.asset_universe:
-        return False
-    if semantic_turn_act != "answer_pending_need":
-        return False
-    if task_relation not in {"continue", "refine"}:
-        return False
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if requested_field == "asset_universe":
-        return False
-    return selected_thread_metadata.get("last_stage_outcome") == "await_user_reply"
-
-
-def _strategy_asset_universe_is_field_owned_indicator_context(
-    strategy: StrategySummary,
-    *,
-    current_user_message: str | None,
-    asset_field_requested: bool,
-) -> bool:
-    if asset_field_requested or not strategy.asset_universe:
-        return False
-    if not _strategy_uses_rule_or_indicator_context(strategy):
-        return False
-    return all(
-        _is_field_owned_indicator_asset_candidate(
-            symbol,
-            strategy=strategy,
-            current_user_message=current_user_message,
-            asset_field_requested=asset_field_requested,
-        )
-        for symbol in strategy.asset_universe
-    )
-
-
-def _is_field_owned_indicator_asset_candidate(
-    symbol: str,
-    *,
-    strategy: StrategySummary,
-    current_user_message: str | None,
-    asset_field_requested: bool,
-) -> bool:
-    if asset_field_requested:
-        return False
-    if executable_indicator_spec(str(symbol or "")) is None:
-        return False
-    if not _strategy_uses_rule_or_indicator_context(strategy):
-        return False
-    return not _strategy_has_explicit_asset_evidence(
-        strategy,
-        symbol=str(symbol or ""),
-        current_user_message=current_user_message,
-    )
-
-
-def _strategy_uses_rule_or_indicator_context(strategy: StrategySummary) -> bool:
-    return bool(
-        executable_strategy_type(strategy) in {"indicator_threshold", "signal_strategy"}
-        or _indicator_key_from_strategy(strategy) is not None
-        or strategy.entry_rule
-        or strategy.exit_rule
-        or strategy.rule_spec
-    )
-
-
-def _strategy_has_explicit_asset_evidence(
-    strategy: StrategySummary,
-    *,
-    symbol: str,
-    current_user_message: str | None,
-) -> bool:
-    target = _compact_asset_evidence_token(symbol)
-    if not target:
-        return False
-    if _message_has_cashtag_for_asset(current_user_message, target=target):
-        return True
-
-    field_provenance = strategy.extra_parameters.get("field_provenance")
-    if isinstance(field_provenance, dict):
-        for field_name, source in field_provenance.items():
-            if _field_base(str(field_name)) != "asset_universe":
-                continue
-            if str(source or "").strip() in {
-                "asset_field",
-                "asset_mention",
-                "cashtag",
-                "composer_mention",
-                "explicit_user",
-                "user",
-                "user_mention",
-            }:
-                return True
-
-    evidence_spans = strategy.extra_parameters.get("evidence_spans")
-    if isinstance(evidence_spans, dict):
-        for field_name, evidence in evidence_spans.items():
-            if _field_base(str(field_name)) != "asset_universe":
-                continue
-            evidence_text = str(evidence or "")
-            if _message_has_cashtag_for_asset(evidence_text, target=target):
-                return True
-
-    for item in strategy.resolution_provenance:
-        if _field_base(_provenance_field(item)) != "asset_universe":
-            continue
-        source = getattr(item, "source", None)
-        raw_text = getattr(item, "raw_text", "")
-        canonical_symbol = getattr(item, "canonical_symbol", "")
-        if str(source or "") == "user_mention" and target in {
-            _compact_asset_evidence_token(raw_text),
-            _compact_asset_evidence_token(canonical_symbol),
-        }:
-            return True
-    return False
-
-
-def _message_has_cashtag_for_asset(message: str | None, *, target: str) -> bool:
-    for token in str(message or "").split():
-        cleaned = "".join(
-            character
-            for character in token.strip()
-            if character.isalnum() or character == "$"
-        )
-        if cleaned.startswith("$") and _compact_asset_evidence_token(cleaned[1:]) == target:
-            return True
-    return False
-
-
-def _compact_asset_evidence_token(value: Any) -> str:
-    return "".join(
-        character.casefold()
-        for character in str(value or "")
-        if character.isalnum()
-    )
-
-
-def _strategy_fills_pending_execution_context(
-    *,
-    prior: StrategySummary,
-    strategy: StrategySummary,
-    selected_thread_metadata: dict[str, Any],
-) -> bool:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    context_fields = {
-        "asset_universe",
-        "date_range",
-        "timeframe",
-        "capital_amount",
-        "initial_capital",
-        "position_size",
-        "assumption",
-    }
-    if requested_field in context_fields:
-        return _strategy_supplies_execution_context(strategy)
-    return (
-        selected_thread_metadata.get("last_stage_outcome") == "await_user_reply"
-        and (
-            (not prior.asset_universe and bool(strategy.asset_universe))
-            or (prior.date_range in (None, "") and bool(strategy.date_range))
-            or (prior.timeframe in (None, "") and bool(strategy.timeframe))
-            or (prior.capital_amount is None and strategy.capital_amount is not None)
-            or (prior.position_size is None and strategy.position_size is not None)
-        )
-    )
-
-
-def _strategy_supplies_execution_context(strategy: StrategySummary) -> bool:
-    return bool(
-        strategy.asset_universe
-        or strategy.date_range
-        or strategy.timeframe
-        or strategy.capital_amount is not None
-        or strategy.position_size is not None
-    )
-
-
-def _merge_contextual_extra_parameters(
-    *,
-    base: dict[str, Any],
-    incoming: dict[str, Any],
-) -> dict[str, Any]:
-    merged = dict(base or {})
-    for key, value in incoming.items():
-        if key == "asset_universe_operation":
-            continue
-        if value in (None, "", [], {}):
-            continue
-        if (
-            key == "indicator_parameters"
-            and isinstance(value, dict)
-            and isinstance(merged.get(key), dict)
-        ):
-            nested = dict(merged[key])
-            for nested_key, nested_value in value.items():
-                if nested_value in (None, "", [], {}):
-                    continue
-                nested[nested_key] = nested_value
-            merged[key] = nested
-            continue
-        if (
-            key == "field_provenance"
-            and isinstance(value, dict)
-            and isinstance(merged.get(key), dict)
-        ):
-            nested = dict(merged[key])
-            for nested_key, nested_value in value.items():
-                if nested_value in (None, "", [], {}):
-                    continue
-                nested[nested_key] = nested_value
-            merged[key] = nested
-            continue
-        if (
-            key == "date_range_intent"
-            and isinstance(value, dict)
-            and isinstance(merged.get(key), dict)
-        ):
-            base_intent = dict(merged[key])
-            if (
-                str(value.get("kind") or "").strip() == "endpoint_patch"
-                and str(base_intent.get("kind") or "").strip() == "rolling_window"
-            ):
-                nested = dict(value)
-                nested["base_intent"] = base_intent
-                merged[key] = nested
-                continue
-        merged[key] = value
-    return merged
-
-
-def _declared_strategy_family(strategy: StrategySummary) -> str | None:
-    """Return the family the LLM explicitly declared, ignoring derived rule state."""
-
-    raw_candidates: list[Any] = [strategy.strategy_type]
-    extra_parameters = dict(strategy.extra_parameters or {})
-    raw_candidates.extend(
-        [
-            extra_parameters.get("raw_strategy_type"),
-            extra_parameters.get("template"),
-        ]
-    )
-    for raw_candidate in raw_candidates:
-        candidate = canonical_strategy_type(raw_candidate)
-        if candidate in SUPPORTED_STRATEGY_TYPES:
-            return candidate
-    if _indicator_key_from_strategy(strategy) is not None:
-        return "indicator_threshold"
-    return None
-
-
-def _reset_contextual_strategy_definition(
-    prior: StrategySummary,
-    incoming_strategy_family: str,
-) -> StrategySummary:
-    """Preserve context fields while clearing incompatible strategy-rule state."""
-
-    updated = prior.model_copy(deep=True)
-    updated.strategy_type = incoming_strategy_family
-    updated.strategy_thesis = None
-    _clear_incompatible_strategy_rule_state(updated, incoming_strategy_family)
-    return updated
-
-
-def _clear_incompatible_strategy_rule_state(
-    strategy: StrategySummary,
-    strategy_family: str,
-) -> None:
-    """Keep one declared strategy family from carrying another family's rules."""
-
-    if strategy_family in {"buy_and_hold", "dca_accumulation"}:
-        strategy.entry_logic = None
-        strategy.exit_logic = None
-    if strategy_family != "signal_strategy":
-        strategy.entry_rule = None
-        strategy.exit_rule = None
-        strategy.rule_spec = None
-    if strategy_family != "dca_accumulation":
-        strategy.cadence = None
-    strategy.extra_parameters = _extra_parameters_for_strategy_family(
-        strategy.extra_parameters,
-        strategy_family,
-    )
-
-
-def _extra_parameters_for_strategy_family(
-    extra_parameters: dict[str, Any],
-    strategy_family: str,
-) -> dict[str, Any]:
-    incompatible_keys = {"entry_rule", "exit_rule", "rule_spec"}
-    if strategy_family != "indicator_threshold":
-        incompatible_keys.update({"indicator", "indicator_parameters"})
-    if strategy_family != "dca_accumulation":
-        incompatible_keys.update(
-            {
-                "cadence",
-                "recurring_contribution",
-                "contribution_amount",
-                "periodic_contribution",
-                "dca_contribution",
-            }
-        )
-    return {
-        key: value
-        for key, value in extra_parameters.items()
-        if key not in incompatible_keys
-    }
-
-
-def _strategy_looks_like_pending_artifact_edit(
-    *,
-    prior: StrategySummary,
-    strategy: StrategySummary,
-    selected_thread_metadata: dict[str, Any],
-) -> bool:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if not requested_field:
-        return False
-    if requested_field == "date_range":
-        return bool(strategy.date_range)
-    if requested_field == "asset_universe":
-        return bool(strategy.asset_universe)
-    if requested_field in {"entry_logic", "exit_logic"}:
-        return _strategy_supplies_executable_rule_edit(strategy)
-    if requested_field == "refinement":
-        return _strategy_has_execution_anchor(strategy) and bool(
-            prior.asset_universe or prior.date_range
-        )
-    return False
-
-
-def _strategy_supplies_contextual_rule_edit(
-    *,
-    prior: StrategySummary,
-    strategy: StrategySummary,
-) -> bool:
-    if not _strategy_supplies_executable_rule_edit(strategy):
-        return False
-    return bool(
-        prior.asset_universe
-        or prior.date_range
-        or prior.asset_class
-        or prior.capital_amount is not None
-        or prior.position_size is not None
-    )
-
-
-def _strategy_supplies_executable_rule_edit(strategy: StrategySummary) -> bool:
-    return bool(
-        strategy_rule(strategy, "entry")
-        or strategy_rule(strategy, "exit")
-        or _valid_rule_spec_from_strategy(strategy)
-        or canonical_indicator_parameters_from_strategy(strategy)
-    )
-
-
 def _canonicalized_strategy(
     strategy: StrategySummary,
     *,
@@ -4440,6 +2974,7 @@ def _canonicalized_strategy(
     asset_classes: set[str] = set()
     invalid_symbols: list[str] = []
     field_owned_indicator_symbols: list[str] = []
+    cadence_word_symbols: list[str] = []
     provenance: list[ResolutionProvenance] = []
     asset_field_requested = (
         _field_base(str(selected_thread_metadata.get("requested_field") or ""))
@@ -4455,14 +2990,28 @@ def _canonicalized_strategy(
         ):
             field_owned_indicator_symbols.append(symbol)
             continue
-        resolution = _resolve_asset_candidate(
+        if _is_cadence_word_asset_candidate(
             symbol,
-            field=f"asset_universe[{index}]",
+            strategy=updated,
+            current_user_message=current_user_message,
+            asset_field_requested=asset_field_requested,
+        ):
+            cadence_word_symbols.append(symbol)
+            continue
+        field = f"asset_universe[{index}]"
+        resolution = provider_context_assets.resolution_from_strategy_context(
+            updated,
+            symbol,
+            field=field,
+        ) or _resolve_asset_candidate(
+            symbol,
+            field=field,
             source=_asset_resolution_source_for_canonicalization(
                 updated,
                 index=index,
                 symbol=symbol,
             ),
+            asset_class_hint=updated.asset_class,
         )
         provenance.append(resolution.provenance)
         if resolution.status != "resolved" or resolution.asset is None:
@@ -4474,7 +3023,7 @@ def _canonicalized_strategy(
 
     if canonical_symbols:
         updated.asset_universe = list(dict.fromkeys(canonical_symbols))
-    elif field_owned_indicator_symbols:
+    elif field_owned_indicator_symbols or cadence_word_symbols:
         updated.asset_universe = []
     if len(asset_classes) == 1:
         updated.asset_class = next(iter(asset_classes))
@@ -4491,668 +3040,74 @@ def _canonicalized_strategy(
     return updated
 
 
-def _strategy_with_current_message_asset_grounding(
-    *,
-    strategy: StrategySummary,
-    current_user_message: str,
-) -> tuple[StrategySummary, list[str]]:
-    if not current_user_message.strip():
-        return strategy, []
-    if not strategy.asset_universe:
-        return _strategy_with_missing_asset_grounded_from_current_message(
-            strategy=strategy,
-            current_user_message=current_user_message,
-        )
-    if _message_explicitly_mentions_symbol(
-        current_user_message,
-        symbols=strategy.asset_universe,
-    ):
-        return strategy, []
-
-    def _resolve_candidate(query: str) -> AssetResolution | None:
-        return _resolve_asset_candidate_safely(
-            query,
-            field="asset_universe[0]",
-            source="user_mention",
-        )
-
-    current_symbols = [
-        symbol
-        for symbol in (_normalized_symbol(value) for value in strategy.asset_universe)
-        if symbol is not None
-    ]
-    current_symbol_set = set(current_symbols)
-    benchmark_symbol = _normalized_symbol(strategy.comparison_baseline)
-    mentions = grounded_asset_mentions_from_text(
-        current_user_message,
-        resolve_candidate=_resolve_candidate,
-        excluded_tokens=current_message_execution_context_tokens(
-            current_user_message,
-            strategy_type=strategy.strategy_type,
-        ),
-        limit=5,
-    )
-    if not mentions:
-        repaired_symbols = _without_weak_implicit_current_symbols(
-            current_symbols=current_symbols,
-            benchmark_symbol=benchmark_symbol,
-            current_user_message=current_user_message,
-        )
-        if repaired_symbols != current_symbols:
-            updated = strategy.model_copy(deep=True)
-            updated.asset_universe = repaired_symbols
-            updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
-            return updated, ["current_message_asset_grounding_repaired"]
-        return strategy, []
-
-    grounded_assets = [
-        mention.asset
-        for mention in mentions
-        if _normalized_symbol(getattr(mention.asset, "canonical_symbol", None))
-        != benchmark_symbol
-    ]
-    grounded_symbols = [
-        str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
-        for asset in grounded_assets
-        if str(getattr(asset, "canonical_symbol", "") or "").strip()
-    ]
-    grounded_symbols = list(dict.fromkeys(grounded_symbols))
-    if not grounded_symbols:
-        repaired_symbols = _without_weak_implicit_current_symbols(
-            current_symbols=current_symbols,
-            benchmark_symbol=benchmark_symbol,
-            current_user_message=current_user_message,
-        )
-        if repaired_symbols != current_symbols:
-            updated = strategy.model_copy(deep=True)
-            updated.asset_universe = repaired_symbols
-            updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
-            return updated, ["current_message_asset_grounding_repaired"]
-        return strategy, []
-
-    grounded_symbols = _without_weak_implicit_short_symbol_mentions(
-        grounded_symbols=grounded_symbols,
-        grounded_mentions=mentions,
-        current_symbols=current_symbols,
-        benchmark_symbol=benchmark_symbol,
-        current_user_message=current_user_message,
-    )
-    grounded_symbols = _symbols_corroborated_by_strategy_text(
-        symbols=grounded_symbols,
-        strategy=strategy,
-        benchmark_symbol=benchmark_symbol,
-    )
-    grounded_symbol_set = set(grounded_symbols)
-    if not grounded_symbol_set:
-        return strategy, []
-    retained_symbols = [
-        symbol for symbol in current_symbols if symbol in grounded_symbol_set
-    ]
-    weak_current_symbols = _weak_implicit_current_symbol_set(
-        current_symbols=current_symbols,
-        benchmark_symbol=benchmark_symbol,
-        current_user_message=current_user_message,
-    )
-    if retained_symbols:
-        repaired_symbols = retained_symbols
-    elif current_symbol_set and current_symbol_set.issubset(grounded_symbol_set):
-        return strategy, []
-    else:
-        alternate_grounded_symbols = [
-            symbol for symbol in grounded_symbols if symbol not in current_symbol_set
-        ]
-        if current_symbol_set and not current_symbol_set.issubset(weak_current_symbols):
-            if not _grounded_symbols_have_name_support(
-                symbols=alternate_grounded_symbols,
-                mentions=mentions,
-            ):
-                return strategy, []
-        if current_symbol_set and len(alternate_grounded_symbols) != 1:
-            return strategy, []
-        repaired_symbols = alternate_grounded_symbols or grounded_symbols
-    if repaired_symbols == current_symbols:
-        return strategy, []
-
-    asset_class_by_symbol = {
-        str(getattr(asset, "canonical_symbol", "") or "").strip().upper(): getattr(
-            asset,
-            "asset_class",
-            None,
-        )
-        for asset in grounded_assets
-    }
-    asset_classes = {
-        str(asset_class)
-        for symbol in repaired_symbols
-        if (asset_class := asset_class_by_symbol.get(symbol))
-    }
-    updated = strategy.model_copy(deep=True)
-    updated.asset_universe = repaired_symbols
-    if len(asset_classes) == 1:
-        updated.asset_class = next(iter(asset_classes))
-    elif len(asset_classes) > 1:
-        updated.asset_class = "mixed"
-    updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
-    updated.resolution_provenance = _dedupe_resolution_provenance(
-        [
-            item
-            for item in updated.resolution_provenance
-            if _field_base(_provenance_field(item)) != "asset_universe"
-        ]
-        + [
-            mention.resolution.provenance
-            for mention in mentions
-            if str(
-                getattr(mention.resolution.asset, "canonical_symbol", "") or ""
-            ).strip().upper()
-            in repaired_symbols
-        ]
-    )
-    return updated, ["current_message_asset_grounding_repaired"]
-
-
-def _grounded_symbols_have_name_support(
-    *,
-    symbols: list[str],
-    mentions: list[Any],
-) -> bool:
-    symbol_set = set(symbols)
-    if not symbol_set:
-        return False
-    return any(
-        symbol in symbol_set and grounded_asset_mention_has_name_support(mention)
-        for mention in mentions
-        if (
-            symbol := _normalized_symbol(
-                getattr(mention.asset, "canonical_symbol", None)
-            )
-        )
-    )
-
-
-def _symbols_corroborated_by_strategy_text(
-    *,
-    symbols: list[str],
-    strategy: StrategySummary,
-    benchmark_symbol: str | None,
-) -> list[str]:
-    if len(symbols) <= 1:
-        return symbols
-    strategy_text = str(strategy.strategy_thesis or "").strip()
-    if not strategy_text:
-        return symbols
-
-    def _resolve_candidate(query: str) -> AssetResolution | None:
-        return _resolve_asset_candidate_safely(
-            query,
-            field="asset_universe[0]",
-            source="user_mention",
-        )
-
-    semantic_mentions = grounded_asset_mentions_from_text(
-        strategy_text,
-        resolve_candidate=_resolve_candidate,
-        excluded_tokens=current_message_execution_context_tokens(
-            strategy_text,
-            strategy_type=strategy.strategy_type,
-        ),
-        limit=5,
-    )
-    if not semantic_mentions:
-        return symbols
-
-    semantic_symbols = {
-        symbol
-        for mention in semantic_mentions
-        if (
-            symbol := _normalized_symbol(
-                getattr(mention.asset, "canonical_symbol", None)
-            )
-        )
-        and symbol != benchmark_symbol
-    }
-    if not semantic_symbols:
-        return symbols
-    filtered = [symbol for symbol in symbols if symbol in semantic_symbols]
-    return filtered or symbols
-
-
-def _strategy_with_missing_asset_grounded_from_current_message(
-    *,
-    strategy: StrategySummary,
-    current_user_message: str,
-) -> tuple[StrategySummary, list[str]]:
-    def _resolve_candidate(query: str) -> AssetResolution | None:
-        return _resolve_asset_candidate_safely(
-            query,
-            field="asset_universe[0]",
-            source="user_mention",
-        )
-
-    benchmark_symbol = _normalized_symbol(strategy.comparison_baseline)
-    mentions = grounded_asset_mentions_from_text(
-        current_user_message,
-        resolve_candidate=_resolve_candidate,
-        excluded_tokens=current_message_execution_context_tokens(
-            current_user_message,
-            strategy_type=strategy.strategy_type,
-        ),
-        limit=5,
-    )
-    if not mentions:
-        return _strategy_with_missing_asset_from_misplaced_benchmark(
-            strategy=strategy,
-            current_user_message=current_user_message,
-            semantic_mentions=[],
-            benchmark_symbol=benchmark_symbol,
-            resolve_candidate=_resolve_candidate,
-        )
-    grounded_assets = [
-        mention.asset
-        for mention in mentions
-        if _normalized_symbol(getattr(mention.asset, "canonical_symbol", None))
-        != benchmark_symbol
-    ]
-    grounded_symbols = [
-        str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
-        for asset in grounded_assets
-        if str(getattr(asset, "canonical_symbol", "") or "").strip()
-    ]
-    grounded_symbols = list(dict.fromkeys(grounded_symbols))
-    if len(grounded_symbols) != 1:
-        if not grounded_symbols:
-            return _strategy_with_missing_asset_from_misplaced_benchmark(
-                strategy=strategy,
-                current_user_message=current_user_message,
-                semantic_mentions=mentions,
-                benchmark_symbol=benchmark_symbol,
-                resolve_candidate=_resolve_candidate,
-            )
-        return strategy, []
-
-    asset_class = str(getattr(grounded_assets[0], "asset_class", "") or "").strip()
-    updated = strategy.model_copy(deep=True)
-    updated.asset_universe = grounded_symbols
-    if asset_class:
-        updated.asset_class = asset_class
-    updated.extra_parameters = _without_invalid_symbols(updated.extra_parameters)
-    updated.resolution_provenance = _dedupe_resolution_provenance(
-        [
-            item
-            for item in updated.resolution_provenance
-            if _field_base(_provenance_field(item)) != "asset_universe"
-        ]
-        + [
-            mention.resolution.provenance
-            for mention in mentions
-            if str(
-                getattr(mention.resolution.asset, "canonical_symbol", "") or ""
-            ).strip().upper()
-            in grounded_symbols
-        ]
-    )
-    return updated, ["current_message_asset_grounding_repaired"]
-
-
-def _strategy_with_missing_asset_from_misplaced_benchmark(
-    *,
-    strategy: StrategySummary,
-    current_user_message: str,
-    semantic_mentions: list[Any],
-    benchmark_symbol: str | None,
-    resolve_candidate: Any,
-) -> tuple[StrategySummary, list[str]]:
-    if not benchmark_symbol:
-        return strategy, []
-    if any(
-        _normalized_symbol(getattr(mention.asset, "canonical_symbol", None))
-        != benchmark_symbol
-        and grounded_asset_mention_has_name_support(mention)
-        for mention in semantic_mentions
-    ):
-        return strategy, []
-
-    ticker_mentions = provider_ticker_mentions_from_text(
-        current_user_message,
-        resolve_candidate=resolve_candidate,
-        excluded_tokens=current_message_execution_context_tokens(
-            current_user_message,
-            strategy_type=strategy.strategy_type,
-        ),
-        limit=10,
-    )
-    matching_mentions = [
-        mention
-        for mention in ticker_mentions
-        if _normalized_symbol(getattr(mention.asset, "canonical_symbol", None))
-        == benchmark_symbol
-    ]
-    if len(matching_mentions) != 1:
-        return strategy, []
-
-    mention = matching_mentions[0]
-    asset = mention.asset
-    asset_class = str(getattr(asset, "asset_class", "") or "").strip()
-    updated = strategy.model_copy(deep=True)
-    updated.asset_universe = [benchmark_symbol]
-    if asset_class:
-        updated.asset_class = asset_class
-        updated.comparison_baseline = _default_benchmark_for_asset_class(
-            asset_class,
-            symbols=[benchmark_symbol],
-        )
-    else:
-        updated.comparison_baseline = None
-    updated.strategy_thesis = None
-    updated.extra_parameters = _without_field_provenance_keys(
-        _without_invalid_symbols(updated.extra_parameters),
-        {"comparison_baseline"},
-    )
-    updated.resolution_provenance = _dedupe_resolution_provenance(
-        [
-            item
-            for item in updated.resolution_provenance
-            if _field_base(_provenance_field(item)) != "asset_universe"
-        ]
-        + [mention.resolution.provenance]
-    )
-    return updated, ["current_message_asset_grounding_repaired"]
-
-
-def _default_benchmark_for_asset_class(
-    asset_class: str,
-    *,
-    symbols: list[str],
-) -> str | None:
-    if asset_class not in _BACKTEST_ASSET_CLASSES:
-        return None
-    return default_backtest_benchmark(
-        cast(BacktestAssetClass, asset_class),
-        symbols,
-    )
-
-
-def _without_field_provenance_keys(
-    extra_parameters: dict[str, Any],
-    field_names: set[str],
-) -> dict[str, Any]:
-    if not extra_parameters:
-        return {}
-    updated = dict(extra_parameters)
-    field_provenance = updated.get("field_provenance")
-    if isinstance(field_provenance, dict):
-        remaining = {
-            key: value
-            for key, value in field_provenance.items()
-            if key not in field_names
-        }
-        if remaining:
-            updated["field_provenance"] = remaining
-        else:
-            updated.pop("field_provenance", None)
-    return updated
-
-
-def _without_invalid_symbols(extra_parameters: dict[str, Any]) -> dict[str, Any]:
-    if not extra_parameters:
-        return {}
-    updated = dict(extra_parameters)
-    updated.pop("invalid_symbols", None)
-    return updated
-
-
-def _without_weak_implicit_current_symbols(
-    *,
-    current_symbols: list[str],
-    benchmark_symbol: str | None,
-    current_user_message: str,
-) -> list[str]:
-    if benchmark_symbol is None or not current_symbols:
-        return current_symbols
-    weak_symbols = _weak_implicit_current_symbol_set(
-        current_symbols=current_symbols,
-        benchmark_symbol=benchmark_symbol,
-        current_user_message=current_user_message,
-    )
-    if not weak_symbols:
-        return current_symbols
-    stronger_symbols = [symbol for symbol in current_symbols if symbol not in weak_symbols]
-    return stronger_symbols or current_symbols
-
-
-def _weak_implicit_current_symbol_set(
-    *,
-    current_symbols: list[str],
-    benchmark_symbol: str | None,
-    current_user_message: str,
-) -> set[str]:
-    if benchmark_symbol is None:
-        return set()
-    return {
-        symbol
-        for symbol in current_symbols
-        if len(symbol) <= 2
-        and not _message_explicitly_mentions_symbol(
-            current_user_message,
-            symbols=[symbol],
-        )
-    }
-
-
-def _without_weak_implicit_short_symbol_mentions(
-    *,
-    grounded_symbols: list[str],
-    grounded_mentions: list[Any],
-    current_symbols: list[str],
-    benchmark_symbol: str | None,
-    current_user_message: str,
-) -> list[str]:
-    if benchmark_symbol is None or not current_symbols:
-        return grounded_symbols
-
-    current_symbol_set = set(current_symbols)
-    weak_symbols: set[str] = set()
-    for mention in grounded_mentions:
-        symbol = _normalized_symbol(getattr(mention.asset, "canonical_symbol", None))
-        if symbol is None or symbol not in current_symbol_set:
-            continue
-        if _message_explicitly_mentions_symbol(current_user_message, symbols=[symbol]):
-            continue
-        if len(symbol) > 2:
-            continue
-        raw_text = str(getattr(mention, "raw_text", "") or "").strip()
-        if not raw_text or raw_text != raw_text.lower() or len(raw_text.split()) != 1:
-            continue
-        weak_symbols.add(symbol)
-
-    if not weak_symbols:
-        pruned_current_symbols = _without_weak_implicit_current_symbols(
-            current_symbols=current_symbols,
-            benchmark_symbol=benchmark_symbol,
-            current_user_message=current_user_message,
-        )
-        weak_symbols = set(current_symbols) - set(pruned_current_symbols)
-        if not weak_symbols:
-            return grounded_symbols
-
-    filtered = [symbol for symbol in grounded_symbols if symbol not in weak_symbols]
-    if not filtered:
-        filtered = [symbol for symbol in current_symbols if symbol not in weak_symbols]
-    if not filtered:
-        return grounded_symbols
-    return filtered
-
-
-def _asset_resolution_source_for_canonicalization(
-    strategy: StrategySummary,
-    *,
-    index: int,
-    symbol: str,
-) -> ResolutionSource:
-    field = f"asset_universe[{index}]"
-    normalized_symbol = str(symbol or "").strip().upper()
-    for item in strategy.resolution_provenance:
-        if _field_base(_provenance_field(item)) != "asset_universe":
-            continue
-        if _provenance_field(item) != field and len(strategy.asset_universe) > 1:
-            continue
-        raw_text = (
-            item.raw_text
-            if isinstance(item, ResolutionProvenance)
-            else item.get("raw_text")
-        )
-        canonical = (
-            item.canonical_symbol
-            if isinstance(item, ResolutionProvenance)
-            else item.get("canonical_symbol")
-        )
-        if str(canonical or "").strip().upper() == normalized_symbol or (
-            str(raw_text or "").strip().upper() == normalized_symbol
-        ):
-            source = (
-                item.source
-                if isinstance(item, ResolutionProvenance)
-                else item.get("source")
-            )
-            if source in {"llm_extraction", "user_mention"}:
-                return source
-    return "llm_extraction"
-
-
-def _strategy_with_execution_defaults(strategy: StrategySummary) -> StrategySummary:
-    strategy_type = executable_strategy_type(strategy)
-    updated = strategy.model_copy(deep=True)
-    if strategy_type == "signal_strategy":
-        updated.strategy_type = "signal_strategy"
-        entry_rule = strategy_rule(updated, "entry")
-        if entry_rule is not None:
-            updated.entry_rule = entry_rule
-            updated.exit_rule = strategy_rule(
-                updated, "exit"
-            ) or opposite_moving_average_crossover_rule(entry_rule)
-            updated.extra_parameters = {
-                **updated.extra_parameters,
-                "entry_rule": updated.entry_rule,
-                "exit_rule": updated.exit_rule,
-            }
-            if not updated.entry_logic:
-                updated.entry_logic = moving_average_crossover_text(updated.entry_rule)
-            if not updated.exit_logic:
-                updated.exit_logic = moving_average_crossover_text(updated.exit_rule)
-    return updated
-
-
-def _strategy_with_default_template_for_complete_no_rule_shape(
+def _strategy_with_benchmark_owner_asset_repair(
     strategy: StrategySummary,
 ) -> tuple[StrategySummary, list[str]]:
-    if executable_strategy_type(strategy) in SUPPORTED_STRATEGY_TYPES:
-        return strategy, []
-    if strategy.strategy_type not in (None, ""):
-        return strategy, []
-    if not _strategy_has_complete_no_rule_execution_shape(strategy):
-        return strategy, []
-    if _strategy_supplies_executable_rule_edit(strategy):
-        return strategy, []
-    updated = strategy.model_copy(deep=True)
-    updated.strategy_type = "buy_and_hold"
-    _clear_incompatible_strategy_rule_state(updated, "buy_and_hold")
-    return updated, ["complete_no_rule_shape_defaulted_to_buy_and_hold"]
+    """Ground the single missing traded asset when the benchmark owner is stated.
 
+    Consumes only the interpreter's provider-grounded current-turn asset records
+    (never a raw-text re-scan): a user-stated benchmark disambiguates which
+    grounded mention is the comparison, so exactly one remaining record is the
+    traded asset. Never guesses when the benchmark is unstated or when more than
+    one candidate remains.
+    """
 
-def _strategy_has_complete_no_rule_execution_shape(strategy: StrategySummary) -> bool:
-    return bool(
-        strategy.asset_universe
-        and strategy.date_range
-        and not strategy.cadence
-        and not strategy.entry_logic
-        and not strategy.exit_logic
-        and not strategy.entry_rule
-        and not strategy.exit_rule
-        and not strategy.rule_spec
-    )
-
-
-def _strategy_with_separate_benchmark_symbol(
-    strategy: StrategySummary,
-) -> tuple[StrategySummary, list[str]]:
-    benchmark = _normalized_symbol(strategy.comparison_baseline)
-    if benchmark is None:
+    if strategy.asset_universe:
         return strategy, []
-    updated = strategy.model_copy(deep=True)
-    updated.comparison_baseline = benchmark
-    assets = [_normalized_symbol(symbol) for symbol in updated.asset_universe]
-    normalized_assets = [symbol for symbol in assets if symbol is not None]
-    filtered_assets = [
-        symbol
-        for symbol in normalized_assets
-        if symbol != benchmark
-    ]
-    if len(filtered_assets) == len(normalized_assets):
-        return updated, []
-    updated.asset_universe = list(dict.fromkeys(filtered_assets))
-    return updated, ["benchmark_symbol_removed_from_asset_universe"]
-
-
-def _strategy_with_default_benchmark(
-    strategy: StrategySummary,
-) -> tuple[StrategySummary, list[str]]:
-    if _normalized_symbol(strategy.comparison_baseline):
-        return strategy, []
-    if not strategy.asset_class:
-        return strategy, []
-    benchmark = _default_benchmark_for_asset_class(
-        strategy.asset_class,
-        symbols=strategy.asset_universe,
-    )
-    if benchmark is None:
-        return strategy, []
-    updated = strategy.model_copy(deep=True)
-    updated.comparison_baseline = benchmark
-    return updated, ["default_benchmark_applied"]
-
-
-def _strategy_with_unstated_benchmark_guard(
-    *,
-    strategy: StrategySummary,
-    prior_strategy: StrategySummary | None,
-) -> tuple[StrategySummary, list[str]]:
     benchmark = _normalized_symbol(strategy.comparison_baseline)
     if benchmark is None:
         return strategy, []
     provenance = strategy.extra_parameters.get("field_provenance")
-    if isinstance(provenance, dict) and provenance.get("comparison_baseline") in {
-        "explicit_user",
-        "stated_run_field_fidelity_audit",
-    }:
+    if not (
+        isinstance(provenance, dict)
+        and provenance.get("comparison_baseline") == "explicit_user"
+    ):
         return strategy, []
-    prior_benchmark = (
-        _normalized_symbol(prior_strategy.comparison_baseline)
-        if prior_strategy is not None
-        else None
-    )
-    if prior_benchmark == benchmark:
+    resolutions: list[AssetResolution] = []
+    for symbol in provider_context_assets.resolved_asset_symbols_from_strategy_context(
+        strategy
+    ):
+        if symbol == benchmark:
+            continue
+        resolution = provider_context_assets.resolution_from_strategy_context(
+            strategy,
+            symbol,
+            field="asset_universe[0]",
+        )
+        if resolution is None or resolution.asset is None:
+            continue
+        resolutions.append(resolution)
+    if len(resolutions) != 1:
         return strategy, []
-    if _strategy_uses_safe_default_benchmark(strategy, benchmark):
+    resolved_asset = resolutions[0].asset
+    # The grounded asset must share the explicit benchmark's asset class;
+    # cross-class pairs stay unrepaired and clarify.
+    try:
+        benchmark_resolution = provider_context_assets.resolution_from_strategy_context(
+            strategy,
+            benchmark,
+            field="comparison_baseline",
+        ) or _resolve_asset_candidate(
+            benchmark,
+            field="comparison_baseline",
+            source="llm_extraction",
+        )
+    except ValueError:
+        benchmark_resolution = None
+    if (
+        benchmark_resolution is None
+        or benchmark_resolution.status != "resolved"
+        or benchmark_resolution.asset is None
+        or benchmark_resolution.asset.asset_class != resolved_asset.asset_class
+    ):
         return strategy, []
     updated = strategy.model_copy(deep=True)
-    if prior_benchmark is not None:
-        updated.comparison_baseline = prior_benchmark
-        return updated, ["unstated_benchmark_symbol_reverted"]
-    updated.comparison_baseline = None
-    return updated, ["unstated_benchmark_symbol_cleared"]
-
-
-def _strategy_uses_safe_default_benchmark(
-    strategy: StrategySummary,
-    benchmark: str,
-) -> bool:
-    if not strategy.asset_class or not strategy.asset_universe:
-        return False
-    default_benchmark = _default_benchmark_for_asset_class(
-        strategy.asset_class,
-        symbols=strategy.asset_universe,
+    updated.asset_universe = [resolved_asset.canonical_symbol]
+    updated.asset_class = resolved_asset.asset_class
+    updated.resolution_provenance = _dedupe_resolution_provenance(
+        [*updated.resolution_provenance, resolutions[0].provenance]
     )
-    return default_benchmark == benchmark
+    return updated, ["current_message_asset_grounding_repaired"]
 
 
 def _strategy_with_validated_benchmark_symbol(
@@ -5162,14 +3117,23 @@ def _strategy_with_validated_benchmark_symbol(
     if benchmark is None:
         return strategy, []
     try:
-        resolution = _resolve_asset_candidate(
+        resolution = provider_context_assets.resolution_from_strategy_context(
+            strategy,
+            benchmark,
+            field="comparison_baseline",
+        ) or _resolve_asset_candidate(
             benchmark,
             field="comparison_baseline",
             source="llm_extraction",
+            asset_class_hint=strategy.asset_class,
         )
     except ValueError:
         resolution = None
-    if resolution is not None and resolution.status == "resolved" and resolution.asset is not None:
+    if (
+        resolution is not None
+        and resolution.status == "resolved"
+        and resolution.asset is not None
+    ):
         benchmark_asset_class = resolution.asset.asset_class
         if strategy.asset_class and benchmark_asset_class != strategy.asset_class:
             updated = strategy.model_copy(deep=True)
@@ -5186,21 +3150,21 @@ def _strategy_with_validated_benchmark_symbol(
     return updated, ["invalid_benchmark_symbol_cleared"]
 
 
-def _normalized_symbol(value: Any) -> str | None:
-    if not isinstance(value, str):
-        return None
-    normalized = value.strip().upper()
-    return normalized or None
-
-
 def _resolve_asset_candidate(
     query: str,
     *,
     field: str,
     source: ResolutionSource,
+    asset_class_hint: str | None = None,
 ) -> AssetResolution:
     if resolve_asset is _DEFAULT_RESOLVE_ASSET:
-        return runtime_resolve_asset_candidate(query, field=field, source=source)
+        kwargs: dict[str, Any] = {"field": field, "source": source}
+        if asset_class_hint is not None and callable_accepts_keyword(
+            runtime_resolve_asset_candidate,
+            "asset_class_hint",
+        ):
+            kwargs["asset_class_hint"] = asset_class_hint
+        return runtime_resolve_asset_candidate(query, **kwargs)
     resolved = resolve_asset(query)
     provenance = ResolutionProvenance(
         field=field,
@@ -5220,372 +3184,6 @@ def _resolve_asset_candidate(
         candidates=(resolved,),
         provenance=provenance,
     )
-
-
-def _unsupported_symbol_constraints(
-    *,
-    strategy: StrategySummary,
-    contract: Any,
-) -> list[UnsupportedConstraint]:
-    invalid_symbols = strategy.extra_parameters.get("invalid_symbols", [])
-    if not invalid_symbols:
-        return []
-    return [
-        UnsupportedConstraint(
-            category="unsupported_symbol",
-            raw_value=", ".join(str(symbol) for symbol in invalid_symbols),
-            explanation=(
-                "I understood the asset reference, but I could not verify it in "
-                "the supported market data universe for this run."
-            ),
-            simplification_options=contract.get_simplification_options(
-                "unsupported_symbol"
-            ),
-        )
-    ]
-
-
-def _unsupported_strategy_logic_constraint(
-    *,
-    strategy: StrategySummary,
-    existing_constraints: list[UnsupportedConstraint],
-    contract: Any,
-) -> UnsupportedConstraint | None:
-    if existing_constraints:
-        return None
-    if executable_strategy_type(strategy) in SUPPORTED_STRATEGY_TYPES:
-        return None
-    if _strategy_supplies_executable_rule_edit(strategy):
-        return None
-    if not _strategy_has_unstructured_strategy_thesis(strategy):
-        return None
-    raw_value = _unstructured_strategy_raw_value(strategy)
-    return UnsupportedConstraint(
-        category="unsupported_strategy_logic",
-        raw_value=raw_value,
-        explanation=(
-            "That idea needs a rule or data source the current backtest engine "
-            "cannot execute directly yet."
-        ),
-        simplification_options=contract.get_simplification_options(
-            "unsupported_strategy_logic"
-        ),
-    )
-
-
-def _strategy_has_unstructured_strategy_thesis(strategy: StrategySummary) -> bool:
-    return bool(
-        str(strategy.strategy_thesis or "").strip()
-        or str(strategy.raw_user_phrasing or "").strip()
-    )
-
-
-def _unstructured_strategy_raw_value(strategy: StrategySummary) -> str:
-    for value in (
-        strategy.entry_logic,
-        strategy.strategy_thesis,
-        strategy.raw_user_phrasing,
-        strategy.strategy_type,
-    ):
-        text = str(value or "").strip()
-        if text:
-            return text
-    return "unsupported strategy logic"
-
-
-def _ambiguous_fields_from_resolution(
-    provenance: list[ResolutionProvenance],
-) -> list[AmbiguousField]:
-    return [
-        AmbiguousField(
-            field_name=item.field,
-            raw_value=item.raw_text,
-            candidate_normalized_value=item.canonical_symbol,
-            reason_code=f"{item.candidate_kind}_resolution_ambiguous",
-        )
-        for item in provenance
-        if item.source == "llm_extraction" and item.resolution_status == "ambiguous"
-    ]
-
-
-def _filter_resolved_strategy_ambiguities(
-    *,
-    strategy: StrategySummary,
-    fields: list[AmbiguousField],
-) -> tuple[list[AmbiguousField], list[str]]:
-    filtered: list[AmbiguousField] = []
-    suppressed = False
-    for field in fields:
-        field_name = _field_base(field.field_name)
-        if _strategy_field_is_executable(strategy=strategy, field_name=field_name):
-            suppressed = True
-            continue
-        filtered.append(field)
-    reason_codes = ["resolved_strategy_ambiguity_suppressed"] if suppressed else []
-    return filtered, reason_codes
-
-
-def _strategy_field_is_executable(
-    *,
-    strategy: StrategySummary,
-    field_name: str,
-) -> bool:
-    if field_name == "entry_logic":
-        return bool(
-            strategy_rule(strategy, "entry")
-            or _valid_rule_spec_from_strategy(strategy)
-            or canonical_indicator_parameters_from_strategy(strategy)
-        )
-    if field_name == "exit_logic":
-        return bool(
-            strategy_rule(strategy, "exit")
-            or _valid_rule_spec_from_strategy(strategy)
-            or canonical_indicator_parameters_from_strategy(strategy)
-        )
-    if field_name in {"entry_rule", "exit_rule", "rule_spec"}:
-        return bool(
-            strategy_rule(strategy, "entry")
-            or strategy_rule(strategy, "exit")
-            or _valid_rule_spec_from_strategy(strategy)
-        )
-    if field_name == "capital_amount":
-        return _strategy_has_user_grounded_capital_amount(strategy)
-    if field_name == "cadence":
-        return _strategy_has_user_grounded_cadence(strategy)
-    return False
-
-
-def _strategy_has_user_grounded_capital_amount(strategy: StrategySummary) -> bool:
-    if strategy.capital_amount is None:
-        return False
-    return _strategy_field_provenance(strategy, "capital_amount") in (
-        _USER_GROUNDED_CAPITAL_SOURCES
-    )
-
-
-def _strategy_has_user_grounded_cadence(strategy: StrategySummary) -> bool:
-    if strategy.cadence in (None, "", [], {}):
-        return False
-    return _strategy_field_provenance(strategy, "cadence") in (
-        _USER_GROUNDED_CADENCE_SOURCES
-    )
-
-
-def _strategy_field_provenance(strategy: StrategySummary, field_name: str) -> str:
-    field_provenance = dict(strategy.extra_parameters or {}).get("field_provenance")
-    if not isinstance(field_provenance, dict):
-        return ""
-    return str(field_provenance.get(field_name) or "").strip()
-
-
-def _unsupported_constraints_from_resolution(
-    provenance: list[ResolutionProvenance],
-    *,
-    contract: Any,
-) -> list[UnsupportedConstraint]:
-    constraints: list[UnsupportedConstraint] = []
-    for item in provenance:
-        if (
-            item.resolution_status
-            not in {
-                "unsupported",
-                "unavailable_for_requested_run",
-            }
-            or item.source != "llm_extraction"
-        ):
-            continue
-        category = (
-            "unavailable_for_requested_run"
-            if item.resolution_status == "unavailable_for_requested_run"
-            else f"unsupported_{item.candidate_kind}"
-        )
-        if item.resolution_status == "unavailable_for_requested_run":
-            explanation = (
-                "I found the instrument, but the requested date range or timeframe "
-                "is not available for a supported run."
-            )
-        else:
-            explanation = (
-                "I understood the asset reference, but Argus Alpha cannot execute it "
-                "as requested yet."
-                if item.candidate_kind == "asset"
-                else "I understand that indicator, but Argus Alpha cannot execute it yet."
-            )
-        constraints.append(
-            UnsupportedConstraint(
-                category=category,
-                raw_value=item.raw_text,
-                explanation=explanation,
-                simplification_options=contract.get_simplification_options(category),
-            )
-        )
-    return constraints
-
-
-def _missing_fields_for_interpretation(
-    *,
-    interpretation: StructuredInterpretation,
-    strategy: StrategySummary,
-    contract: Any,
-    expects_strategy_route: bool | None = None,
-) -> list[str]:
-    route_expected = (
-        expects_strategy_route
-        if expects_strategy_route is not None
-        else _strategy_route_expected(
-            intent=interpretation.intent,
-            semantic_turn_act=interpretation.semantic_turn_act,
-        )
-    )
-    if not route_expected:
-        return []
-    required_missing_fields = missing_required_fields_for_strategy(
-        strategy,
-        contract=contract,
-    )
-    if executable_strategy_type(strategy) not in SUPPORTED_STRATEGY_TYPES:
-        required_missing_fields = list(
-            dict.fromkeys(["entry_logic", *required_missing_fields])
-        )
-    allowed_missing_fields = set(required_missing_fields)
-    missing = [
-        field
-        for field in interpretation.missing_required_fields
-        if isinstance(field, str) and field and field in allowed_missing_fields
-    ]
-    if "entry_logic" in required_missing_fields and "entry_logic" not in missing:
-        missing.insert(0, "entry_logic")
-    missing.extend(required_missing_fields)
-    return list(dict.fromkeys(missing))
-
-
-def _strategy_is_semantically_confirmable(
-    *,
-    expects_strategy_route: bool,
-    ambiguous_fields: list[AmbiguousField],
-    unsupported_constraints: list[UnsupportedConstraint],
-    missing_required_fields: list[str],
-) -> bool:
-    return (
-        expects_strategy_route
-        and not ambiguous_fields
-        and not unsupported_constraints
-        and not missing_required_fields
-    )
-
-
-def _fresh_complete_restatement_started_new_confirmation(
-    *,
-    interpretation: StructuredInterpretation,
-    selected_thread_metadata: dict[str, Any],
-    expects_strategy_route: bool,
-    requires_clarification: bool,
-    ambiguous_fields: list[AmbiguousField],
-    unsupported_constraints: list[UnsupportedConstraint],
-    missing_required_fields: list[str],
-) -> bool:
-    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
-        return False
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
-    if not requested_field:
-        return False
-    if interpretation.semantic_turn_act != "new_idea":
-        return False
-    if interpretation.task_relation != "new_task":
-        return False
-    return _strategy_is_semantically_confirmable(
-        expects_strategy_route=expects_strategy_route,
-        ambiguous_fields=ambiguous_fields,
-        unsupported_constraints=unsupported_constraints,
-        missing_required_fields=missing_required_fields,
-    ) and not requires_clarification
-
-
-def _strategy_route_expected(
-    *,
-    intent: IntentName,
-    semantic_turn_act: SemanticTurnAct | None,
-) -> bool:
-    return intent in {"strategy_drafting", "backtest_execution"} or (
-        semantic_turn_act in STRATEGY_TURN_ACTS
-    )
-
-
-def _educational_turn_has_strategy_baggage(
-    *,
-    interpretation: StructuredInterpretation,
-    expects_strategy_route: bool,
-) -> bool:
-    if interpretation.semantic_turn_act != "educational_question":
-        return False
-    return bool(
-        expects_strategy_route
-        or _strategy_has_content(interpretation.candidate_strategy_draft)
-        or interpretation.requires_clarification
-        or interpretation.missing_required_fields
-        or interpretation.ambiguous_fields
-        or interpretation.unsupported_constraints
-    )
-
-
-def _candidate_strategy_has_backtest_shape(strategy: StrategySummary) -> bool:
-    return _strategy_has_execution_anchor(strategy)
-
-
-def _strategy_has_execution_anchor(strategy: StrategySummary) -> bool:
-    return any(
-        value not in (None, "", [], {})
-        for value in (
-            strategy.strategy_type,
-            strategy.asset_universe,
-            strategy.asset_class,
-            strategy.date_range,
-            strategy.timeframe,
-            strategy.entry_logic,
-            strategy.exit_logic,
-            strategy.rule_spec,
-            strategy.cadence,
-            strategy.capital_amount,
-            strategy.position_size,
-            strategy.risk_rules,
-            strategy.comparison_baseline,
-            strategy.extra_parameters,
-        )
-    )
-
-
-def _dedupe_unsupported_constraints(
-    constraints: list[UnsupportedConstraint],
-) -> list[UnsupportedConstraint]:
-    seen: set[tuple[str, str]] = set()
-    deduped: list[UnsupportedConstraint] = []
-    for constraint in constraints:
-        key = (constraint.category, constraint.raw_value)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(constraint)
-    return deduped
-
-
-def _dedupe_ambiguous_fields(fields: list[AmbiguousField]) -> list[AmbiguousField]:
-    seen: set[tuple[str, str, str]] = set()
-    deduped: list[AmbiguousField] = []
-    for field in fields:
-        key = (field.field_name, field.raw_value, field.reason_code)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(field)
-    return deduped
-
-
-def _dedupe_resolution_provenance(
-    provenance: list[ResolutionProvenance | dict[str, Any]],
-) -> list[ResolutionProvenance]:
-    return dedupe_resolution_provenance_items(provenance)
 
 
 def normalize_task_snapshot(

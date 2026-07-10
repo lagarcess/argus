@@ -7,6 +7,7 @@ from argus.observability.envelope import (
     build_event_envelope,
     capture_event,
     live_analytics_sink_enabled,
+    posthog_event_payload,
     sanitize_observability_attributes,
 )
 
@@ -19,5 +20,6 @@ __all__ = [
     "build_event_envelope",
     "capture_event",
     "live_analytics_sink_enabled",
+    "posthog_event_payload",
     "sanitize_observability_attributes",
 ]

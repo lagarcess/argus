@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from typing import Any
 
@@ -258,66 +258,76 @@ EXECUTABLE_INDICATORS: dict[str, IndicatorExecutionSpec] = {
 }
 
 
-_KNOWN_INDICATORS = {
-    "rsi": IndicatorInfo(
+# Catalog metadata for the curated indicators surfaced in discovery/search. The
+# `support_status` of each entry is DERIVED (not hand-maintained) from
+# EXECUTABLE_INDICATORS membership below: an indicator is "executable" iff the engine
+# has an execution spec that computes it, otherwise it is "draft_only" (catalog/draft).
+# This keeps a single source of truth for "does this indicator compute".
+_CATALOG_INDICATORS: tuple[IndicatorInfo, ...] = (
+    IndicatorInfo(
         "rsi",
         "RSI",
         "Relative Strength Index; a momentum gauge from 0 to 100.",
-        "executable",
-        ("relative strength index", "oversold", "overbought", "momentum gauge"),
+        aliases=("relative strength index", "oversold", "overbought", "momentum gauge"),
     ),
-    "sma": IndicatorInfo(
+    IndicatorInfo(
         "sma",
         "Simple moving average",
         "Average price over a set number of bars.",
-        "executable",
         aliases=("simple moving average", "moving average", "average price"),
     ),
-    "ema": IndicatorInfo(
+    IndicatorInfo(
         "ema",
         "Exponential moving average",
         "Moving average that reacts faster to recent prices.",
-        "executable",
         aliases=("exponential moving average", "moving average"),
     ),
-    "macd": IndicatorInfo(
+    IndicatorInfo(
         "macd",
         "MACD",
         "Momentum indicator based on two moving averages.",
-        support_status="executable",
         aliases=("moving average convergence divergence", "momentum", "macd crossover"),
     ),
-    "bbands": IndicatorInfo(
+    IndicatorInfo(
         "bbands",
         "Bollinger Bands",
         "Volatility bands around a moving average.",
-        support_status="executable",
         aliases=("bollinger", "bollinger bands", "volatility bands"),
     ),
-    "atr": IndicatorInfo(
+    IndicatorInfo(
         "atr",
         "ATR",
         "Average true range, commonly used to estimate volatility.",
         aliases=("average true range", "volatility"),
     ),
-    "vwap": IndicatorInfo(
+    IndicatorInfo(
         "vwap",
         "VWAP",
         "Volume-weighted average price.",
         aliases=("volume weighted average price",),
     ),
-    "obv": IndicatorInfo(
+    IndicatorInfo(
         "obv",
         "OBV",
         "On-balance volume, a volume momentum indicator.",
         aliases=("on balance volume", "volume momentum"),
     ),
-    "stoch": IndicatorInfo(
+    IndicatorInfo(
         "stoch",
         "Stochastic oscillator",
         "Momentum indicator comparing close to recent range.",
         aliases=("stochastic", "stochastic oscillator"),
     ),
+)
+
+
+def _catalog_support_status(key: str) -> str:
+    return "executable" if key in EXECUTABLE_INDICATORS else "draft_only"
+
+
+_KNOWN_INDICATORS = {
+    info.key: replace(info, support_status=_catalog_support_status(info.key))
+    for info in _CATALOG_INDICATORS
 }
 
 
@@ -368,6 +378,34 @@ def search_indicators(query: str, *, limit: int = 12) -> list[IndicatorInfo]:
     return [item for _, item in scored[: max(1, min(limit, 25))]]
 
 
+def draft_only_indicator_from_text(text: str) -> IndicatorInfo | None:
+    normalized = _normalize_indicator_lookup_text(text)
+    if not normalized:
+        return None
+    words = set(normalized.split())
+    padded = f" {normalized} "
+    for item in _KNOWN_INDICATORS.values():
+        if item.support_status != "draft_only":
+            continue
+        for phrase in _indicator_lookup_phrases(item):
+            normalized_phrase = _normalize_indicator_lookup_text(phrase)
+            if not normalized_phrase:
+                continue
+            if " " in normalized_phrase:
+                if f" {normalized_phrase} " in padded:
+                    return item
+                continue
+            if normalized_phrase in words:
+                return item
+            if any(
+                word.startswith(normalized_phrase)
+                and word[len(normalized_phrase) :].isdigit()
+                for word in words
+            ):
+                return item
+    return None
+
+
 def executable_indicator_spec(value: str | None) -> IndicatorExecutionSpec | None:
     if not value:
         return None
@@ -377,6 +415,19 @@ def executable_indicator_spec(value: str | None) -> IndicatorExecutionSpec | Non
         compact = normalized.replace(" ", "_")
         key = _EXECUTABLE_INDICATOR_ALIASES.get(compact)
     return EXECUTABLE_INDICATORS.get(key or normalized)
+
+
+def _indicator_lookup_phrases(item: IndicatorInfo) -> tuple[str, ...]:
+    return tuple(dict.fromkeys((item.key, item.label, *item.aliases)))
+
+
+def _normalize_indicator_lookup_text(text: str) -> str:
+    return " ".join(
+        "".join(
+            character.lower() if character.isalnum() else " "
+            for character in str(text or "")
+        ).split()
+    )
 
 
 def detect_executable_indicator_key(

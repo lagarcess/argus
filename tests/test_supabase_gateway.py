@@ -183,6 +183,56 @@ def test_context_packet_and_route_receipt_persistence_payloads_are_explicit():
     assert receipt_row["context_packet_ids"] == ["packet-1"]
 
 
+def test_cost_ledger_entry_persistence_payload_is_explicit() -> None:
+    client = _RecordingSupabaseClient()
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.create_cost_ledger_entry(
+        entry={
+            "source": "api_turn",
+            "service": "openrouter",
+            "provider": "openrouter",
+            "model": "structured/primary",
+            "feature_area": "chat_runtime",
+            "task": "interpretation",
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "message_id": "message-1",
+            "backtest_run_id": None,
+            "backtest_job_id": None,
+            "route_receipt_id": "receipt-1",
+            "request_id": "req-1",
+            "correlation_id": "req-1:conversation-1:message-1",
+            "usage_metadata": {
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "total_tokens": 15,
+                "usage_cost_usd": 0.00031,
+            },
+            "input_tokens": 10,
+            "output_tokens": 5,
+            "total_tokens": 15,
+            "billable_unit": "token",
+            "billable_quantity": 15,
+            "cost_amount": 0.00031,
+            "cost_currency": "USD",
+            "cost_source": "provider_reported",
+            "latency_ms": 123,
+            "status": "succeeded",
+            "metadata": {"source": "api_turn"},
+            "occurred_at": "2026-07-02T12:00:00+00:00",
+        }
+    )
+
+    payload = client.inserted_by_table["cost_ledger_entries"]
+    assert row["correlation_id"] == "req-1:conversation-1:message-1"
+    assert payload["provider"] == "openrouter"
+    assert payload["model"] == "structured/primary"
+    assert payload["total_tokens"] == 15
+    assert payload["cost_amount"] == 0.00031
+    assert payload["route_receipt_id"] == "receipt-1"
+
+
 def _completed_run(
     *,
     conversation_id: str | None = "conversation-1",
@@ -1466,3 +1516,97 @@ def test_gateway_history_filters_chats_without_visible_messages() -> None:
     assert {row["id"] for row in default_rows["conversations"]} == {"conv-active"}
     assert {row["id"] for row in archived_rows["conversations"]} == {"conv-archived"}
     assert {row["id"] for row in deleted_rows["conversations"]} == {"conv-deleted"}
+
+
+class _SearchRowsTable:
+    """Fake table that drives the search_rows query chain over canned rows."""
+
+    def __init__(self, rows: list[dict[str, Any]]) -> None:
+        self._rows = [dict(r) for r in rows]
+        self._range: tuple[int, int] | None = None
+        self._limit: int | None = None
+
+    def select(self, *_args: object, **_kwargs: object):
+        return self
+
+    def eq(self, *_args: object, **_kwargs: object):
+        return self
+
+    def is_(self, *_args: object, **_kwargs: object):
+        return self
+
+    def order(self, *_args: object, **_kwargs: object):
+        return self
+
+    def range(self, start: int, end: int):
+        self._range = (start, end)
+        return self
+
+    def limit(self, count: int):
+        self._limit = count
+        return self
+
+    def execute(self):
+        rows = self._rows
+        if self._range is not None:
+            start, end = self._range
+            rows = rows[start : end + 1]
+        elif self._limit is not None:
+            rows = rows[: self._limit]
+        return SimpleNamespace(data=[dict(r) for r in rows])
+
+
+class _SearchRowsClient:
+    def __init__(self, rows_by_table: dict[str, list[dict[str, Any]]]) -> None:
+        self._rows_by_table = rows_by_table
+
+    def table(self, name: str):
+        return _SearchRowsTable(self._rows_by_table.get(name, []))
+
+
+def _idea_ledger_search_client() -> _SearchRowsClient:
+    return _SearchRowsClient(
+        {
+            "ideas": [
+                {
+                    "id": "idea-1",
+                    "title": "AAPL momentum",
+                    "summary": "momentum thesis",
+                    "lifecycle": "decided",
+                    "active_version_id": "ver-1",
+                    "source_conversation_id": "conv-1",
+                    "updated_at": "2026-06-29T12:00:00Z",
+                }
+            ],
+            "decision_notes": [
+                {
+                    "id": "dec-1",
+                    "idea_id": "idea-1",
+                    "decision_state": "promising",
+                    "note": "keep",
+                    "evidence_artifact_id": "art-1",
+                    "source_conversation_id": "conv-1",
+                    "updated_at": "2026-06-29T12:00:00Z",
+                }
+            ],
+        }
+    )
+
+
+def test_search_rows_rolls_up_idea_decision_state_from_unfiltered_decisions():
+    gateway = SupabaseGateway(client=_idea_ledger_search_client())
+
+    raw = gateway.search_rows(user_id="user-1", query="momentum", limit=None)
+
+    assert len(raw["ideas"]) == 1
+    assert raw["ideas"][0]["decision_state"] == "promising"
+    assert raw["decisions"] == []
+
+
+def test_search_rows_empty_query_status_browse_returns_ideas():
+    gateway = SupabaseGateway(client=_idea_ledger_search_client())
+
+    raw = gateway.search_rows(user_id="user-1", query="", limit=None)
+
+    assert len(raw["ideas"]) == 1
+    assert raw["ideas"][0]["decision_state"] == "promising"

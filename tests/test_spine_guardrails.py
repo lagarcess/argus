@@ -9,7 +9,7 @@ Context and rationale:
 
 - See ``docs/specs/private-alpha-next-roadmap.md`` (P2 board, "P2.0 Spine guardrail gate"
   and the six cross-cutting invariants) and
-  ``docs/specs/private-alpha-next-p2.1-capability-audit.md``.
+  ``docs/archive/private-alpha-next-p2.1-capability-audit.md``.
 - Both quarantines broke the spine with "tasteful" heuristics, NOT ``import re`` or
   ``if "buy" in message``. So these tripwires name banned MECHANISMS / SIGNATURES.
 - They are source-level scans on purpose: the realistic regression is cherry-picking
@@ -146,3 +146,61 @@ def test_locale_scan_covers_expected_files() -> None:
         "Locale tripwire lost its core targets; update LOCALE_FORBIDDEN_FILES if the "
         f"interpret stage moved. Resolved: {sorted(resolved)}"
     )
+
+
+# --- Tripwire 4: issue #154 migrated surfaces stay language-agnostic ----------
+# These are the S1/S3 surfaces plus the S2-cleaned heading surface already
+# migrated away from deterministic en/es runtime copy. Keep presentation helpers
+# and API schema aliases out until their typed frontend/API contracts are explicit.
+ISSUE_154_MIGRATED_LANGUAGE_SURFACES = [
+    ARGUS_SRC / "agent_runtime" / "stages" / "explain.py",
+    ARGUS_SRC / "api" / "chat" / "breakdown.py",
+    ARGUS_SRC / "api" / "chat" / "confirmation.py",
+    ARGUS_SRC / "agent_runtime" / "recovery_messages.py",
+    ARGUS_SRC / "agent_runtime" / "clarification_contract.py",
+    ARGUS_SRC / "agent_runtime" / "artifact_action_recovery.py",
+    ARGUS_SRC / "agent_runtime" / "stages" / "execute.py",
+    ARGUS_SRC / "api" / "chat" / "result_actions.py",
+    ARGUS_SRC / "agent_runtime" / "response_style.py",
+]
+
+ISSUE_154_LANGUAGE_GATES = {
+    "_is_spanish": "per-language helper gate",
+    'Literal["en", "es-419"]': "two-language runtime literal clone",
+    "Literal['en', 'es-419']": "two-language runtime literal clone",
+    "es-419": "inline locale-specific runtime copy or branch",
+    'startswith("es")': "Spanish-prefix runtime branch",
+    "startswith('es')": "Spanish-prefix runtime branch",
+}
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        pytest.param(p, id=str(p.relative_to(REPO_ROOT)))
+        for p in ISSUE_154_MIGRATED_LANGUAGE_SURFACES
+    ],
+)
+def test_issue_154_migrated_surfaces_have_no_runtime_language_gates(
+    path: Path,
+) -> None:
+    text = _read(path)
+    offenders = {
+        signature: reason
+        for signature, reason in ISSUE_154_LANGUAGE_GATES.items()
+        if signature in text
+    }
+    assert not offenders, (
+        f"Issue #154 language gate(s) found in {path.relative_to(REPO_ROOT)}: "
+        f"{offenders}. Migrated runtime prose must use typed facts plus LLM "
+        "composition or typed recovery codes plus web i18n."
+    )
+
+
+def test_issue_154_language_guard_covers_expected_migrated_surfaces() -> None:
+    missing = [
+        str(path.relative_to(REPO_ROOT))
+        for path in ISSUE_154_MIGRATED_LANGUAGE_SURFACES
+        if not path.exists()
+    ]
+    assert not missing, f"Issue #154 language guard lost target file(s): {missing}"

@@ -6,18 +6,26 @@ import os
 import time
 from collections.abc import Iterable
 from contextvars import ContextVar, Token
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from threading import Lock
-from typing import Literal, TypeVar
+from typing import Literal, TypeVar, cast
 
 import httpx
-from dotenv import load_dotenv
 from langchain_openrouter import ChatOpenRouter
 from loguru import logger
 from pydantic import BaseModel
 
-load_dotenv()
+from argus.env import load_project_dotenv
+from argus.llm.openrouter_usage import (
+    merge_openrouter_token_usage,
+    normalize_openrouter_token_usage,
+    normalize_openrouter_usage_cost,
+    openrouter_token_usage_from_payload,
+    openrouter_usage_cost_from_payload,
+)
+
+load_project_dotenv()
 
 OpenRouterTask = Literal[
     "interpretation",
@@ -61,6 +69,7 @@ class OpenRouterRouteReceipt:
     failure_mode: str | None = None
     fallback_used: bool = False
     token_usage: dict[str, int] | None = None
+    usage_cost_usd: float | None = None
     context_packet_ids: list[str] = field(default_factory=list)
     created_at: str = ""
 
@@ -77,6 +86,7 @@ class OpenRouterRouteReceipt:
             "failure_mode": self.failure_mode,
             "fallback_used": self.fallback_used,
             "token_usage": self.token_usage,
+            "usage_cost_usd": self.usage_cost_usd,
             "context_packet_ids": list(self.context_packet_ids),
             "created_at": self.created_at,
         }
@@ -95,6 +105,9 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
         "interpretation",
         temperature=0,
         max_tokens=3200,
+        # 3200 tokens + structured + reasoning needs more than the 12s default (its peers
+        # get 20-30s); proportionate bump so interpretation isn't the next timeout.
+        timeout_seconds=20,
         reasoning_effort="medium",
     ),
     "interpretation_repair": OpenRouterProfile(
@@ -117,7 +130,9 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
         reasoning_effort="medium",
     ),
     "clarification": OpenRouterProfile("clarification", temperature=0, max_tokens=360),
-    "chat_composer": OpenRouterProfile("chat_composer", temperature=0.2, max_tokens=1200),
+    "chat_composer": OpenRouterProfile(
+        "chat_composer", temperature=0.2, max_tokens=1200, timeout_seconds=25
+    ),
     "result_summary": OpenRouterProfile(
         "result_summary", temperature=0.2, max_tokens=700, timeout_seconds=30
     ),
@@ -125,7 +140,7 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
         "result_breakdown",
         temperature=0.2,
         max_tokens=2400,
-        timeout_seconds=6,
+        timeout_seconds=25,
         max_retries=0,
     ),
     "name_suggestion": OpenRouterProfile(
@@ -177,6 +192,13 @@ _TIER_CANDIDATE_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {
         "ARGUS_CONTEXT_FALLBACK_MODEL",
     ),
 }
+
+_VALID_REASONING_EFFORTS = frozenset(("xhigh", "high", "medium", "low", "minimal", "none"))
+_REASONING_EFFORT_ENV_BY_TASK: dict[OpenRouterTask, str] = {
+    "interpretation": "ARGUS_STRUCTURED_REASONING_EFFORT",
+    "capability_conflict": "ARGUS_CAPABILITY_REASONING_EFFORT",
+}
+_PROMPT_CACHE_STRUCTURED_ARTIFACT_TASKS = frozenset(("interpretation", "interpretation_repair", "field_fidelity", "capability_conflict"))
 
 
 def openrouter_model_tier_for_task(task: OpenRouterTask | None) -> OpenRouterModelTier:
@@ -291,15 +313,13 @@ def openrouter_task_timeout_seconds(task: OpenRouterTask) -> float:
 def openrouter_profile_for_task(task: OpenRouterTask) -> OpenRouterProfile:
     profile = OPENROUTER_PROFILES[task]
     timeout_override = _task_timeout_override_seconds(task)
-    if timeout_override is None:
+    reasoning_effort = _task_reasoning_effort_override(task)
+    if timeout_override is None and reasoning_effort is None:
         return profile
-    return OpenRouterProfile(
-        task=profile.task,
-        temperature=profile.temperature,
-        max_tokens=profile.max_tokens,
-        timeout_seconds=timeout_override,
-        max_retries=profile.max_retries,
-        reasoning_effort=profile.reasoning_effort,
+    return replace(
+        profile,
+        timeout_seconds=timeout_override or profile.timeout_seconds,
+        reasoning_effort=reasoning_effort or profile.reasoning_effort,
     )
 
 
@@ -326,6 +346,18 @@ def _task_timeout_override_seconds(task: OpenRouterTask) -> int | None:
     return timeout_seconds
 
 
+def _task_reasoning_effort_override(task: OpenRouterTask) -> OpenRouterReasoningEffort | None:
+    env_name = _REASONING_EFFORT_ENV_BY_TASK.get(task)
+    raw_value = os.getenv(env_name, "") if env_name else ""
+    normalized = raw_value.strip().lower()
+    if not normalized:
+        return None
+    if normalized in _VALID_REASONING_EFFORTS:
+        return cast(OpenRouterReasoningEffort, normalized)
+    logger.warning("Ignoring invalid OpenRouter reasoning effort override", llm_task=task, reasoning_effort_env_value=raw_value)
+    return None
+
+
 def record_openrouter_route_receipt(
     *,
     task: OpenRouterTask,
@@ -336,6 +368,7 @@ def record_openrouter_route_receipt(
     outcome: Literal["succeeded", "failed", "skipped"],
     failure_mode: str | None = None,
     token_usage: dict[str, int] | None = None,
+    usage_cost_usd: float | None = None,
     context_packet_ids: list[str] | None = None,
 ) -> OpenRouterRouteReceipt:
     tier = openrouter_model_tier_for_task(task)
@@ -352,6 +385,7 @@ def record_openrouter_route_receipt(
         outcome=outcome,
         failure_mode=failure_mode,
         token_usage=normalize_openrouter_token_usage(token_usage),
+        usage_cost_usd=normalize_openrouter_usage_cost(usage_cost_usd),
         context_packet_ids=_normalized_context_packet_ids(context_packet_ids),
         fallback_used=bool(
             fallback_model and resolved_model == fallback_model and resolved_model != ""
@@ -374,6 +408,7 @@ def record_openrouter_route_receipt(
         latency_ms=receipt.latency_ms,
         fallback_used=receipt.fallback_used,
         token_usage=receipt.token_usage,
+        usage_cost_usd=receipt.usage_cost_usd,
         context_packet_ids=receipt.context_packet_ids,
     ).info("OpenRouter route receipt")
     return receipt
@@ -508,7 +543,9 @@ async def invoke_openrouter_json_schema(
                 raise ValueError(
                     "OpenRouter JSON schema response did not include content"
                 )
-            result = schema_model.model_validate_json(content)
+            result = schema_model.model_validate_json(
+                _json_content_without_code_fences(content)
+            )
         except Exception as exc:
             last_exc = exc
             record_openrouter_route_receipt(
@@ -538,6 +575,7 @@ async def invoke_openrouter_json_schema(
             latency_ms=_elapsed_ms(attempt_started_at),
             outcome="succeeded",
             token_usage=openrouter_token_usage_from_payload(data),
+            usage_cost_usd=openrouter_usage_cost_from_payload(data),
             context_packet_ids=context_packet_ids,
         )
         return result
@@ -630,6 +668,7 @@ async def invoke_openrouter_chat_completion(
 
         content = _openrouter_message_content(data).strip()
         token_usage = openrouter_token_usage_from_payload(data)
+        usage_cost_usd = openrouter_usage_cost_from_payload(data)
         if not content:
             record_openrouter_route_receipt(
                 task=task,
@@ -640,6 +679,7 @@ async def invoke_openrouter_chat_completion(
                 outcome="failed",
                 failure_mode="empty_response",
                 token_usage=token_usage,
+                usage_cost_usd=usage_cost_usd,
                 context_packet_ids=context_packet_ids,
             )
             if index + 1 < len(candidate_models):
@@ -653,6 +693,7 @@ async def invoke_openrouter_chat_completion(
             latency_ms=_elapsed_ms(attempt_started_at),
             outcome="succeeded",
             token_usage=token_usage,
+            usage_cost_usd=usage_cost_usd,
             context_packet_ids=context_packet_ids,
         )
         return content
@@ -726,7 +767,9 @@ def invoke_openrouter_json_schema_sync(
                 raise ValueError(
                     "OpenRouter JSON schema response did not include content"
                 )
-            result = schema_model.model_validate_json(content)
+            result = schema_model.model_validate_json(
+                _json_content_without_code_fences(content)
+            )
         except Exception as exc:
             last_exc = exc
             record_openrouter_route_receipt(
@@ -756,67 +799,13 @@ def invoke_openrouter_json_schema_sync(
             latency_ms=_elapsed_ms(attempt_started_at),
             outcome="succeeded",
             token_usage=openrouter_token_usage_from_payload(data),
+            usage_cost_usd=openrouter_usage_cost_from_payload(data),
             context_packet_ids=context_packet_ids,
         )
         return result
     if last_exc is not None:
         raise last_exc
     return None
-
-
-def openrouter_token_usage_from_payload(data: dict[str, object]) -> dict[str, int] | None:
-    usage = data.get("usage")
-    return normalize_openrouter_token_usage(usage if isinstance(usage, dict) else None)
-
-
-def openrouter_token_usage_from_message(message: object) -> dict[str, int] | None:
-    usage_metadata = getattr(message, "usage_metadata", None)
-    normalized = normalize_openrouter_token_usage(
-        usage_metadata if isinstance(usage_metadata, dict) else None
-    )
-    if normalized is not None:
-        return normalized
-    response_metadata = getattr(message, "response_metadata", None)
-    if not isinstance(response_metadata, dict):
-        return None
-    for key in ("token_usage", "usage"):
-        value = response_metadata.get(key)
-        normalized = normalize_openrouter_token_usage(
-            value if isinstance(value, dict) else None
-        )
-        if normalized is not None:
-            return normalized
-    return None
-
-
-def merge_openrouter_token_usage(
-    current: dict[str, int] | None,
-    incoming: dict[str, int] | None,
-) -> dict[str, int] | None:
-    if current is None:
-        return dict(incoming) if incoming is not None else None
-    if incoming is None:
-        return dict(current)
-    merged = dict(current)
-    for key, value in incoming.items():
-        merged[key] = value
-    return merged
-
-
-def normalize_openrouter_token_usage(
-    value: dict[str, object] | None,
-) -> dict[str, int] | None:
-    if not value:
-        return None
-    normalized: dict[str, int] = {}
-    for key, raw in value.items():
-        if not isinstance(key, str) or isinstance(raw, bool):
-            continue
-        if isinstance(raw, int):
-            normalized[key] = raw
-        elif isinstance(raw, float) and raw.is_integer():
-            normalized[key] = int(raw)
-    return normalized or None
 
 
 def _normalized_context_packet_ids(values: list[str] | None) -> list[str]:
@@ -859,6 +848,31 @@ def _apply_reasoning_for_structured_artifact(
     payload["reasoning"] = {"effort": profile.reasoning_effort}
 
 
+def _messages_with_stable_prefix_prompt_cache(
+    messages: list[dict[str, str]],
+    *,
+    model: str,
+    task: OpenRouterTask,
+) -> list[dict[str, object]]:
+    payload_messages: list[dict[str, object]] = [dict(message) for message in messages]
+    if task not in _PROMPT_CACHE_STRUCTURED_ARTIFACT_TASKS:
+        return payload_messages
+
+    cache_index = 0
+    content = payload_messages[0].get("content") if payload_messages and payload_messages[0].get("role") == "system" else None
+    has_later_system_context = any(message.get("role") in {"system", "developer"} for message in payload_messages[1:])
+    if not isinstance(content, str) or not content or (model.startswith("google/gemini") and has_later_system_context):
+        return payload_messages
+    payload_messages[cache_index]["content"] = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
+    return payload_messages
+
+
+_SCHEMA_IN_PROMPT_INSTRUCTION = (
+    "Return a single JSON object that validates against this JSON Schema. "
+    "Output only the JSON object, no prose, no code fences.\nJSON Schema:\n"
+)
+
+
 def _json_schema_payload(
     *,
     model: str,
@@ -867,9 +881,30 @@ def _json_schema_payload(
     schema_name: str,
     profile: OpenRouterProfile,
 ) -> dict[str, object]:
-    payload: dict[str, object] = {
+    if model.startswith("anthropic/"):
+        # Anthropic strict structured outputs reject core shapes of our
+        # schemas (numeric bounds, any-typed values, open objects such as
+        # extra_parameters), so every native json_schema call 400s. Embed the
+        # schema in a system message instead; client-side pydantic validation
+        # and the candidate retry loop own correctness either way.
+        schema_message = {
+            "role": "system",
+            "content": (
+                _SCHEMA_IN_PROMPT_INSTRUCTION
+                + json.dumps(schema_model.model_json_schema())
+            ),
+        }
+        payload: dict[str, object] = {
+            "model": model,
+            "messages": _messages_with_stable_prefix_prompt_cache([schema_message, *messages], model=model, task=profile.task),
+            "temperature": profile.temperature,
+            "max_tokens": profile.max_tokens,
+        }
+        _apply_reasoning_for_structured_artifact(payload, profile)
+        return payload
+    payload = {
         "model": model,
-        "messages": messages,
+        "messages": _messages_with_stable_prefix_prompt_cache(messages, model=model, task=profile.task),
         "response_format": {
             "type": "json_schema",
             "json_schema": {
@@ -884,6 +919,46 @@ def _json_schema_payload(
     }
     _apply_reasoning_for_structured_artifact(payload, profile)
     return payload
+
+
+def _json_content_without_code_fences(content: str) -> str:
+    """Strip a markdown code fence around a JSON body, if present.
+
+    Schema-in-prompt providers occasionally fence their JSON despite
+    instructions — sometimes on one line ("```json {...}```") or with prose
+    after the closing fence; strict structured outputs never fence, so this
+    is a no-op for them.
+    """
+
+    text = content.strip()
+    if not text.startswith("```"):
+        fence_at = text.find("```")
+        if text.startswith(("{", "[")) or fence_at == -1:
+            return text
+        # A JSON value that opens before the first ``` and parses past it owns
+        # that ``` as string content; otherwise the fence is real and the
+        # fenced body wins.
+        brace_candidates = [i for i in (text.find("{"), text.find("[")) if i != -1]
+        brace_at = min(brace_candidates) if brace_candidates else -1
+        if brace_at != -1 and brace_at < fence_at:
+            try:
+                _, span = json.JSONDecoder().raw_decode(text[brace_at:])
+            except ValueError:
+                span = 0
+            if brace_at + span > fence_at:
+                return text[brace_at : brace_at + span]
+        text = text[fence_at:]
+    text = text[len("```") :]
+    info_end = 0
+    while info_end < len(text) and (
+        text[info_end].isalnum() or text[info_end] in "_-"
+    ):
+        info_end += 1
+    text = text[info_end:]
+    closing = text.rfind("```")
+    if closing != -1:
+        text = text[:closing]
+    return text.strip()
 
 
 async def _post_openrouter_json_schema(

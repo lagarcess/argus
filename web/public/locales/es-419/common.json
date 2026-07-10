@@ -37,7 +37,88 @@
     "expand": "Expandir",
     "learn_more": "Más información",
     "and": "y",
+    "or": "o",
     "tap_to_cancel": "Toca en cualquier otro lugar para cancelar"
+  },
+  "legal": {
+    "eyebrow": "Legal de alfa privada",
+    "effective_date": "Fecha de entrada en vigor: 30 de junio de 2026",
+    "footer_label": "Alfa privada de Argus",
+    "back_to_argus": "Volver a Argus",
+    "terms": {
+      "title": "Términos de uso",
+      "intro": "Argus es un producto en alfa privada para investigación educativa de inversión. Estos términos describen la experiencia actual de testers y no reemplazan una revisión legal final.",
+      "sections": {
+        "no_investment_advice": {
+          "title": "No es asesoría de inversión",
+          "body": "Argus ofrece herramientas educativas que te ayudan a estructurar y revisar ideas de inversión. Argus no ofrece asesoría de inversión, legal, fiscal, contable ni financiera. Tú eres responsable de tus propias decisiones."
+        },
+        "no_brokerage": {
+          "title": "Sin relación de corretaje ni trading",
+          "body": "Argus no es broker, dealer, asesor de inversión, fiduciario, bolsa, custodio ni centro de negociación. Argus no custodia fondos, no coloca órdenes, no ejecuta operaciones ni se conecta a cuentas de corretaje."
+        },
+        "historical_simulations": {
+          "title": "Las simulaciones históricas son hipotéticas",
+          "body": "Las simulaciones históricas son hipotéticas y dependen de los supuestos, la disponibilidad de datos, los activos compatibles, las referencias predeterminadas y los periodos que se muestran en el producto. Los rendimientos simulados no garantizan resultados futuros."
+        },
+        "alpha_changes": {
+          "title": "Disponibilidad y cambios de la alfa",
+          "body": "Argus está en alfa privada. Las funciones pueden cambiar, fallar, reiniciarse o eliminarse sin aviso. Podemos limitar el acceso, suspender cuentas o retirar contenido que genere riesgos de seguridad, abuso, cumplimiento u operación."
+        },
+        "eligibility": {
+          "title": "Elegibilidad",
+          "body": "Debes tener edad suficiente para celebrar un acuerdo vinculante en tu jurisdicción y poder usar Argus conforme a la ley aplicable. No uses Argus en nombre de otra persona u organización salvo que tengas autorización para hacerlo."
+        },
+        "acceptable_use": {
+          "title": "Uso aceptable",
+          "body": "No uses Argus para infringir la ley, abusar del servicio, aplicar ingeniería inversa a sistemas privados, sobrecargar proveedores, enviar datos sensibles de terceros ni presentar resultados generados como asesoría profesional."
+        },
+        "third_party_services": {
+          "title": "Servicios de terceros",
+          "body": "Argus depende de servicios de terceros para hosting, autenticación, datos de mercado, acceso a modelos y renderizado de gráficos. TradingView Lightweight Charts se usa para renderizar gráficos y mostrar atribución, no como fuente de datos de mercado de Argus."
+        },
+        "account_support": {
+          "title": "Soporte de cuenta",
+          "body_before_email": "Durante la alfa privada, las solicitudes de soporte y eliminación de cuenta se gestionan manualmente. Contacta a",
+          "body_after_email": " o usa la solicitud de eliminación de cuenta dentro de la app."
+        }
+      }
+    },
+    "privacy": {
+      "title": "Política de privacidad",
+      "intro": "Esta política explica qué maneja Argus durante la alfa privada para que testers sepan qué ocurre con los datos de cuenta, conversaciones, comentarios y solicitudes respaldadas por proveedores.",
+      "sections": {
+        "data_collect": {
+          "title": "Datos que recopilamos",
+          "body": "Argus puede recopilar detalles de cuenta, estado de autenticación, conversaciones, ideas de inversión que envíes, registros guardados del producto, comentarios, solicitudes de soporte, información básica del navegador y dispositivo, eventos de uso, logs y diagnósticos de errores."
+        },
+        "data_use": {
+          "title": "Cómo usamos los datos",
+          "body": "Usamos datos para operar el producto, autenticar usuarios, guardar y restaurar conversaciones, generar y revisar simulaciones históricas, depurar fallas, proteger el servicio, responder soporte y mejorar la calidad de la alfa privada."
+        },
+        "ai_market_data": {
+          "title": "Proveedores de IA y datos de mercado",
+          "body": "El contenido de conversaciones y prompts puede enviarse a OpenRouter y proveedores de modelos para que Argus interprete solicitudes y redacte respuestas. Los datos de mercado y el descubrimiento de activos pueden usar proveedores como Alpaca y Kraken. La disponibilidad de proveedores puede afectar símbolos compatibles, periodos y resultados."
+        },
+        "infrastructure": {
+          "title": "Infraestructura y servicios del producto",
+          "body": "Argus usa Supabase para autenticación y persistencia del producto, Render para hosting, OpenRouter para acceso a modelos y PostHog solo si la analítica de producto se habilita intencionalmente. TradingView Lightweight Charts se usa como biblioteca de gráficos con atribución; no es la fuente de datos de mercado de Argus."
+        },
+        "access_retention": {
+          "title": "Acceso y retención",
+          "body": "El acceso del fundador y administradores se limita a operar, depurar, proteger y mejorar la alfa privada. Conservamos datos mientras tu cuenta esté activa, mientras sean necesarios para soporte o seguridad, o mientras los registros operativos lo requieran."
+        },
+        "your_controls": {
+          "title": "Tus controles",
+          "body_before_email": "Puedes archivar o eliminar conversaciones en la app. Durante la alfa privada, la eliminación de cuentas se gestiona manualmente mediante la solicitud dentro de la app o contactando a",
+          "body_after_email": "."
+        },
+        "sale_personal_info": {
+          "title": "Venta de información personal",
+          "body": "Argus no vende información personal durante la alfa privada. Si esto cambia, la política y los controles del producto deben actualizarse antes de enviar ese comportamiento."
+        }
+      }
+    }
   },
   "feedback": {
     "title": "Enviar comentarios",
@@ -162,9 +243,99 @@
     "error_load": "No se pudo cargar esa conversación. Inténtalo de nuevo.",
     "error_backtest": "No pude terminar ese turno. Inténtalo otra vez o inicia un chat nuevo si esta conversación venía de una sesión local anterior.",
     "error_generic": "Algo salió mal. Inténtalo de nuevo.",
+    "recovery": {
+      "interpreter_unavailable": "Guardé tu mensaje, pero no pude convertirlo en una configuración de prueba confiable. Intenta de nuevo en un momento.",
+      "assumption_edit_unapplied": "Guardé tu respuesta, pero no pude aplicar ese cambio de supuesto con confianza, así que dejé la idea actual sin cambios. Intenta el cambio de nuevo en un momento.",
+      "setup_change_unapplied": "Todavía tengo {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. Intenta de nuevo en un momento.",
+      "confirmation_change_unapplied": "Todavía tengo la confirmación de {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. {{action_guidance}}",
+      "latest_result_followup_unavailable": "Todavía tengo el resultado más reciente en este chat, pero no pude responder ese seguimiento con confianza. Intenta de nuevo en un momento.",
+      "private_alpha_save_unavailable": "No puedo mover esto a Estrategias mientras esa superficie está desactivada para la alfa privada, pero la ejecución completa sigue en este chat y puedes volver a abrirla desde la conversación o Recientes.",
+      "confirmation_action_guidance": "La confirmación visible sigue lista. Usa la tarjeta para iniciar la simulación, o usa sus controles para cambiarla.",
+      "confirmation_action_missing_context": "No tengo una confirmación activa para cambiar. Describe la idea de inversión otra vez y prepararé un borrador nuevo.",
+      "confirmation_action_missing_identity": "A esa acción de confirmación le falta la identidad de la tarjeta. Usa la acción de la tarjeta más reciente antes de continuar.",
+      "confirmation_action_stale_card": "Esa confirmación ya se actualizó. Usa la tarjeta visible más reciente y mantendré intacta la confirmación actual.",
+      "confirmation_action_stale_payload": "Ese contenido de confirmación ya quedó desactualizado. Usa la tarjeta visible más reciente y mantendré intacta la confirmación actual.",
+      "confirmation_state_lost": "Perdí el estado activo de confirmación, pero tu conversación está guardada. Puedo volver a plantear la estrategia para que la confirmes otra vez.",
+      "confirmation_cancelled": "Sin problema. Dejaré ese borrador sin ejecutar.",
+      "clarification_generation_unavailable": "No pude formular bien el seguimiento en este momento. Tu borrador sigue aquí; dime el detalle que quieres cambiar, o intenta de nuevo en un momento.",
+      "result_refine_missing": "No tengo un resultado completo para ajustar. Ejecuta una estrategia primero y luego usa Ajustar idea desde la tarjeta de resultado.",
+      "context_macro_recovery": "Las condiciones macro pueden ser contexto útil para una prueba histórica. Elige un símbolo, una estrategia o una ventana de comparación y puedo ayudarte a plantear un experimento compatible.",
+      "context_corporate_events_recovery": "Los eventos corporativos son más útiles cuando están ligados a un símbolo y un periodo. Elige un ticker de acciones y puedo usar eventos como splits o dividendos como contexto de una prueba histórica compatible.",
+      "context_market_movers_recovery": "Un movimiento del mercado puede ser un buen punto de partida para un experimento. Elige un símbolo o una idea y puedo convertirlo en una prueba histórica compatible, no en un feed en vivo.",
+      "context_market_movers_seed_recovery": "Una foto momentánea de movimientos puede ayudar a elegir semillas para un experimento: {{seeds}}. Trátalas como símbolos por validar, no como recomendaciones ni como un ranking en vivo. Elige uno y puedo plantear una prueba histórica compatible.",
+      "capability_answer_unavailable": "No pude formular esa respuesta de capacidades con claridad en este momento. Dime el activo, periodo o regla compatible que quieres probar, o intenta de nuevo en un momento.",
+      "runtime_failure": "Algo salió mal. Tu conversación está guardada. Intenta de nuevo.",
+      "artifact_action_invalid_state": "Esa acción ya no está conectada al estado actual de la conversación. Usa la acción visible más reciente o dime qué quieres hacer ahora.",
+      "artifact_action_retry_stale": "Ese reintento pertenece a una ejecución fallida anterior. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",
+      "artifact_action_retry_missing_artifact_id": "A ese reintento le falta la referencia de la ejecución fallida. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",
+      "artifact_action_retry_missing_payload": "No tengo una carga de ejecución fallida para reintentar. Usa de nuevo la acción visible de ejecutar backtest, o confirma la estrategia que quieres ejecutar.",
+      "artifact_action_retry_non_retryable": "Todavía tengo la configuración fallida, pero volver a ejecutar la misma carga encontrará el mismo bloqueo{{blockerSuffix}}. Ajusta la regla, el activo o el rango de fechas y mantendré la idea intacta.",
+      "artifact_action_retry_rebuilt_confirmation": "Todavía tengo esa configuración fallida. Reconstruí el borrador para que puedas revisar la tarjeta y reintentar cuando estés listo.",
+      "artifact_action_retry_inactive": "Ese reintento ya no está conectado a una ejecución fallida activa. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",
+      "execution_data_unavailable": "La configuración sigue aquí, pero no pude obtener {{dataLabel}} para esa simulación en este momento. Inténtalo de nuevo, cambia las fechas o elige otro activo compatible.",
+      "data_kind": {
+        "benchmark": "datos de referencia",
+        "market": "datos de mercado"
+      }
+    },
+    "clarification": {
+      "period": "¿Qué periodo quieres usar?",
+      "period_for_asset": "¿Qué periodo quieres usar para {{symbol}}?",
+      "asset_target": "¿Qué activo quieres probar?",
+      "assumption": "¿Qué supuesto quieres ajustar?",
+      "assumption_for_asset": "¿Qué supuesto quieres ajustar para {{symbol}}?",
+      "sizing_amount_schedule": "¿Cuánto quieres invertir en cada compra y con qué frecuencia?",
+      "sizing_amount": "¿Cuánto quieres invertir?",
+      "schedule": "¿Con qué frecuencia quieres hacer las compras?",
+      "rule_definition": "¿Qué regla de entrada o salida quieres probar?",
+      "refinement": "¿Qué quieres ajustar de esta idea?",
+      "refinement_for_asset": "¿Qué quieres cambiar, comparar o poner a prueba ahora para {{assetText}}?",
+      "unsupported_recovery": "Esa regla no define por sí sola cuándo comprar o vender. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_recovery_for_asset": "Esa regla no define por sí sola cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_recovery_with_raw_value": "{{rawValue}} no define por sí solo cuándo comprar o vender. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} no define por sí solo cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?"
+    },
+    "simplification_options": {
+      "rsi_threshold": "Usar una regla RSI compatible",
+      "buy_and_hold": "Comparar con comprar y mantener",
+      "moving_average_crossover": "Usar un cruce de medias móviles compatible"
+    },
     "result_breakdown": {
       "aria_label": "Desglose del resultado",
       "label": "Desglose"
+    },
+    "result_followup": {
+      "headings": {
+        "general": "Qué pasó",
+        "what_tested": "Qué se probó",
+        "next_experiment": "Qué probar después",
+        "assumptions": "Supuestos",
+        "peak_date": "Fecha del máximo",
+        "peak_value": "Valor máximo",
+        "drawdown_date": "Fecha de la caída",
+        "max_drawdown": "Caída máxima",
+        "lowest_date": "Fecha del mínimo",
+        "lowest_value": "Valor más bajo",
+        "final_value": "Valor final",
+        "total_return": "Retorno total",
+        "benchmark_return": "Retorno de referencia",
+        "benchmark_delta": "Frente a la referencia",
+        "benchmark_symbol": "Referencia",
+        "annualized_return": "Retorno anualizado",
+        "profit": "Ganancia",
+        "volatility": "Volatilidad",
+        "win_rate": "Tasa de aciertos",
+        "profit_factor": "Factor de beneficio",
+        "sharpe_ratio": "Ratio de Sharpe",
+        "trade_count": "Operaciones",
+        "starting_capital": "Capital inicial",
+        "date_range": "Periodo",
+        "symbols": "Activos",
+        "strategy": "Estrategia"
+      },
+      "options": {
+        "ask_supported": "Pregunta por un dato disponible del resultado"
+      }
     },
     "result_trust_strip": "Simulación histórica · Sin comisiones/deslizamiento · No es asesoría",
     "result_trust_strip_label": "Contexto de confianza del resultado",
@@ -274,8 +445,6 @@
         "peak_value": "Valor máximo",
         "lowest_value": "Valor mínimo",
         "date_range": "Rango de fechas",
-        "peak_value": "Valor máximo",
-        "lowest_value": "Valor mínimo",
         "timeframe": "Temporalidad",
         "side": "Dirección",
         "allocation": "Asignación",
@@ -283,7 +452,12 @@
         "cadence": "Cadencia",
         "contribution": "Contribución",
         "entry_rule": "Regla de entrada",
-        "exit_rule": "Regla de salida"
+        "exit_rule": "Regla de salida",
+        "gross_return": "Retorno bruto",
+        "net_return": "Neto de costos",
+        "modeled_costs": "Costos modelados",
+        "modeled_costs_value": "comisión de {{fee}} bps + deslizamiento de {{slippage}} bps",
+        "benchmark_same_costs": "{{benchmark}} (mismos costos modelados)"
       },
       "timeframe": {
         "daily": "Datos diarios",
@@ -391,7 +565,17 @@
         "through": "Hasta {{date}}",
         "no_fees": "Sin comisiones",
         "no_slippage": "Sin deslizamiento",
-        "benchmark": "Referencia: {{symbol}}"
+        "benchmark": "Referencia: {{symbol}}",
+        "modeled_costs": "Costos modelados: comisión de {{fee}} bps + deslizamiento de {{slippage}} bps"
+      },
+      "cost_editor": {
+        "edit_chip": "Editar costos",
+        "fee_label": "Comisión % por operación",
+        "slippage_label": "Deslizamiento % por operación",
+        "apply": "Aplicar",
+        "cancel": "Cancelar",
+        "invalid": "Ingresa porcentajes de 0 o más (deslizamiento hasta {{max}}%).",
+        "message": "Ajusta las comisiones a {{fee}}% y el deslizamiento a {{slippage}}% por operación."
       }
     }
   },
@@ -504,8 +688,11 @@
         "system": "Sistema"
       }
     },
+    "preferences": {
+      "title": "Preferencias"
+    },
     "data": {
-      "title": "Datos e información",
+      "title": "Controles de datos",
       "archived_chats": "Chats archivados",
       "recently_deleted": "Borrados recientemente",
       "close_recently_deleted": "Cerrar borrados recientemente",
@@ -524,12 +711,13 @@
       "delete_all_success_other": "Se movieron {{count}} conversaciones a Borrados recientemente.",
       "delete_all_empty": "No hay conversaciones para eliminar.",
       "delete_all_error": "No se pudieron eliminar las conversaciones. Inténtalo de nuevo.",
-      "security": "Seguridad"
+      "security": "Seguridad",
+      "usage": "Uso"
     },
     "help": {
-      "title": "Ayuda",
-      "terms": "Términos de Servicio",
-      "privacy": "Política de Privacidad",
+      "title": "Ayuda y legal",
+      "terms": "Términos de uso",
+      "privacy": "Política de privacidad",
       "release_notes": "Notas de la versión"
     },
     "about": {
@@ -574,6 +762,10 @@
     "open_conversation": "Abrir conversación",
     "open_source_conversation": "Abrir conversación fuente",
     "select_preview": "Selecciona un resultado para ver sus detalles.",
+    "ledger": {
+      "decision_filters": "Filtros de decisión",
+      "no_saved_ideas": "No hay ideas guardadas en este estado"
+    },
     "status": {
       "archived": "Archivado",
       "captured": "Capturado",

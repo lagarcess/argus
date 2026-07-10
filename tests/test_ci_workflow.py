@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci.yml"
 CANARY_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-canary.yml"
 SMOKE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-smoke.yml"
+AGENT_RUNTIME_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "agent-runtime-regression.yml"
 
 
 def _workflow() -> dict:
@@ -20,6 +21,10 @@ def _canary_workflow() -> dict:
 
 def _smoke_workflow() -> dict:
     return yaml.safe_load(SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8"))
+
+
+def _agent_runtime_workflow() -> dict:
+    return yaml.safe_load(AGENT_RUNTIME_WORKFLOW_PATH.read_text(encoding="utf-8"))
 
 
 def test_ci_runs_on_main_codex_and_jules_without_deploying() -> None:
@@ -61,8 +66,10 @@ def test_ci_has_active_backend_and_frontend_quality_jobs() -> None:
     assert "tests/test_render_canary_script.py" in backend_steps
     assert "tests/test_legacy_orchestrator_retirement.py" in backend_steps
     assert "tests/test_chat_backtest_state_machine.py" in backend_steps
+    assert "tests/test_chat_runtime_reload_guardrails.py" in backend_steps
     assert "tests/test_openrouter_policy.py" in backend_steps
     assert "tests/agent_runtime/test_execute_recovery.py" in backend_steps
+    assert "tests/agent_runtime/test_latest_result_fact_answers.py" in backend_steps
     assert "tests/section3/test_market_data_provider.py" in backend_steps
     assert "--no-cov" in backend_steps
 
@@ -241,3 +248,72 @@ def test_private_alpha_smoke_workflow_runs_local_predeploy_gate() -> None:
     assert "cd web && bun install --frozen-lockfile" in joined_steps
     assert ".github/local-smoke.sh --expected-sha \"$GITHUB_SHA\"" in joined_steps
     assert "RENDER_API_KEY" not in SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+
+def test_agent_runtime_regression_workflow_runs_full_runtime_sweep() -> None:
+    workflow = _agent_runtime_workflow()
+
+    assert workflow["name"] == "Agent Runtime Regression"
+    assert set(workflow["on"]) == {
+        "workflow_dispatch",
+        "schedule",
+        "push",
+        "pull_request",
+    }
+    assert workflow["on"]["schedule"] == [{"cron": "15 9 * * *"}]
+    assert workflow["on"]["push"]["branches"] == ["codex/private-alpha-next"]
+    assert workflow["on"]["pull_request"]["branches"] == [
+        "codex/private-alpha-next"
+    ]
+    assert "src/argus/agent_runtime/**" in workflow["on"]["pull_request"]["paths"]
+    assert "tests/agent_runtime/**" in workflow["on"]["pull_request"]["paths"]
+    assert "tests/test_spine_guardrails.py" in workflow["on"]["pull_request"]["paths"]
+    assert workflow["permissions"] == {"contents": "read"}
+    assert "deploy" not in workflow["jobs"]
+
+    job = workflow["jobs"]["agent-runtime"]
+    assert job["timeout-minutes"] == 25
+    assert job["if"] == (
+        "github.event.pull_request.draft == false || "
+        "github.event_name != 'pull_request'"
+    )
+    setup_python_step = next(
+        step for step in job["steps"] if step.get("uses") == "actions/setup-python@v5"
+    )
+    assert setup_python_step["with"]["python-version"] == "3.10"
+    checkout_steps = [
+        step for step in job["steps"] if step.get("uses") == "actions/checkout@v4"
+    ]
+    assert checkout_steps == [
+        {
+            "name": "Checkout workflow ref",
+            "if": "github.event_name != 'schedule'",
+            "uses": "actions/checkout@v4",
+        },
+        {
+            "name": "Checkout private-alpha-next for nightly schedule",
+            "if": "github.event_name == 'schedule'",
+            "uses": "actions/checkout@v4",
+            "with": {"ref": "codex/private-alpha-next"},
+        },
+    ]
+
+    joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
+    assert "poetry install --with dev --no-interaction" in joined_steps
+    assert "poetry run pytest tests/agent_runtime tests/test_spine_guardrails.py -q --no-cov" in joined_steps
+    sweep_step = next(
+        step
+        for step in job["steps"]
+        if step.get("name") == "Run agent_runtime regression sweep"
+    )
+    assert sweep_step["env"] == {
+        "ARGUS_MARKET_DATA_PROVIDER_MODE": "synthetic_unit_fixture"
+    }
+
+    runtime_target = ROOT / "tests" / "agent_runtime"
+    hidden_regression_file = (
+        ROOT / "tests" / "agent_runtime" / "test_conversational_contract_hardening.py"
+    )
+    assert hidden_regression_file.exists()
+    assert hidden_regression_file.is_relative_to(runtime_target)
+    assert str(hidden_regression_file.relative_to(ROOT)) not in joined_steps

@@ -16,21 +16,34 @@ export PYTHONUNBUFFERED=1
 # ============================================================================
 # 2. PYTHON VERSION CHECK
 # ============================================================================
-echo "🔵 [Setup] Checking Python version..."
-if command -v python3 &> /dev/null; then
+# Enforce the repo pin (.python-version = what CI and Render run), not a floor:
+# a newer local Python resolves different dependency wheels and fakes test results.
+PINNED_PYTHON="$(cat .python-version 2>/dev/null || echo 3.10)"
+PINNED_MINOR="$(echo "$PINNED_PYTHON" | cut -d. -f1-2)"
+echo "🔵 [Setup] Resolving pinned Python ${PINNED_MINOR} (.python-version: ${PINNED_PYTHON})..."
+
+PYTHON_CMD=""
+if command -v uv &> /dev/null; then
+    uv python install "$PINNED_MINOR" >/dev/null 2>&1 || true
+    PYTHON_CMD="$(uv python find "$PINNED_MINOR" 2>/dev/null || true)"
+fi
+if [ -z "$PYTHON_CMD" ] && command -v "python$PINNED_MINOR" &> /dev/null; then
+    PYTHON_CMD="python$PINNED_MINOR"
+fi
+if [ -z "$PYTHON_CMD" ] && command -v python3 &> /dev/null; then
     PYTHON_CMD=python3
-elif command -v python &> /dev/null; then
-    PYTHON_CMD=python
-else
-    echo "❌ [Setup] Python not found. Install Python 3.10+."
+fi
+if [ -z "$PYTHON_CMD" ]; then
+    echo "❌ [Setup] Python not found. Install Python ${PINNED_MINOR} (e.g. 'uv python install ${PINNED_MINOR}')."
     exit 1
 fi
 
 PYTHON_VERSION=$($PYTHON_CMD --version 2>&1 | awk '{print $2}')
 echo "🔵 [Setup] Python version: $PYTHON_VERSION (command: $PYTHON_CMD)"
 
-if ! $PYTHON_CMD -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"; then
-    echo "❌ [Setup] Python 3.10+ required. Found: $PYTHON_VERSION"
+if ! $PYTHON_CMD -c "import sys; sys.exit(0 if f'{sys.version_info[0]}.{sys.version_info[1]}' == '$PINNED_MINOR' else 1)"; then
+    echo "❌ [Setup] Python ${PINNED_MINOR} required (repo pin). Found: $PYTHON_VERSION"
+    echo "   Install it with: uv python install ${PINNED_MINOR}"
     exit 1
 fi
 
@@ -63,6 +76,9 @@ fi
 # ============================================================================
 echo "🔵 [Setup] Configuring Poetry (local virtualenvs in-project)..."
 poetry config virtualenvs.in-project true
+# Bind the venv to the pinned interpreter; otherwise Poetry uses whatever
+# python3 is active (e.g. Homebrew 3.14) regardless of the repo pin.
+poetry env use "$PYTHON_CMD"
 
 # ============================================================================
 # 6. INSTALL PYTHON DEPENDENCIES

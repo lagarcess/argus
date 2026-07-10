@@ -54,6 +54,15 @@ Use streaming or jobs only where they materially improve UX.
 
 Prefer simpler architecture that can ship now.
 
+## Agent Quality Pillars
+
+The four assistant-quality pillars (Intelligence, Evaluation, Platform, User
+Experience) that keep AI work grounded in this architecture are defined once, in
+`AGENTS.md` → "Agent Quality Pillars". That is their canonical home; do not
+restate them here (a second copy drifts). This doc only adds architecture-
+specific emphasis: durable facts come from product records, engine outputs, and
+provider-backed validation — LLMs interpret and voice, they do not own truth.
+
 ---
 
 # 3. Product Surface Architecture
@@ -304,7 +313,10 @@ of the job.
 
 The simulation logic (Numba/Python) that calculates metrics and returns results.
 It remains domain code in the monorepo, but the production runtime boundary is
-the workflow execution plane.
+the workflow execution plane. Execution realism (trading fees + slippage) is
+modeled in the engine behind `ARGUS_ENABLE_EXECUTION_REALISM` (default OFF); when
+the flag is inert the legacy cost path is preserved byte-identical, so evidence
+artifacts stay reproducible across the flag boundary.
 
 *Stateless systems should scale horizontally later.*
 
@@ -343,13 +355,18 @@ Provider ownership:
 - Provider-specific windows are execution truth. Kraken OHLC returns only the latest 720 candles per interval, so the runtime must ask the user to shorten the request or widen the timeframe when the requested window cannot be served.
 - Backtests remain single asset class per run: `equity`, `crypto`, or `currency_pair`.
 
-### PostHog (When Enabled)
+### PostHog (Server-Side Product Analytics)
 
 **Use for:**
 
-- Analytics
-- Funnels
-- Feature flags
+- Measurement-only product analytics for the approved private-alpha event set.
+- Aggregate funnels, retention, and loop-health questions.
+
+**Do not use for:**
+
+- Frontend autocapture or session replay.
+- Person profiles.
+- Feature flags or product behavior decisions in this slice.
 
 ### Observability Stack
 
@@ -458,6 +475,13 @@ Structured action chips are not natural-language NLU shortcuts. They enter LangG
 | Deterministic (post-LLM) | Symbol resolution via `domain/market_data.resolve_asset()`, asset class parity check, date range limit check, missing required fields check |
 
 No regex gate intercepts a user message before the LLM sees it. No hardcoded natural language string competes with the LLM's response in any stage file.
+
+User-facing prose is language-agnostic by construction. The runtime keeps no
+per-language copy tables: LLM-authored prose is written in the detected turn
+language, degraded/recovery copy renders from typed codes, and result chrome
+renders from typed keys the frontend localizes (B4, #154). English/Spanish parity
+is proven by the eval harness, not hardcoded. See `docs/CONVERSATIONAL_RUNTIME.md`
+— "Language-Agnostic Prose Composition".
 
 ### Session State Rule
 
@@ -712,7 +736,7 @@ If not, it likely should wait.
 
 When writing any code that touches `agent_runtime/`, ask:
 
-1. **Does this add a regex or early-return gate before the LLM call?** If yes, stop. Move the logic to the LLM system prompt instead.
+1. **Does this add a regex, localized stop-word/alias table, display-label token matcher, or early-return gate before the LLM call?** If yes, stop. Move language interpretation to the LLM system prompt or consume typed action metadata instead.
 2. **Does this store derived state in `TaskSnapshot`?** If yes, stop. Compute it fresh from `pending_strategy_summary` instead.
 3. **Does this add natural language strings to a stage file?** If yes, stop. The LLM generates the response; stage files orchestrate only.
 4. **Does this use `.invoke()` on the graph in production?** If yes, stop. Use `astream_events()` instead.

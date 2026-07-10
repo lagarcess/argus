@@ -16,6 +16,10 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     resolve_date_range,
 )
+from argus.domain.backtesting.config import (
+    _execution_realism_feature_enabled,
+    _normalize_execution_realism,
+)
 from argus.domain.engine_launch.display import (
     format_data_through_label,
     format_date_range_label,
@@ -225,6 +229,10 @@ def runtime_confirmation_card(
     }
     if display_facts:
         card["display_facts"] = display_facts
+    if _execution_realism_feature_enabled():
+        # Backend capability truth: the engine can apply fee/slippage
+        # assumptions, so the confirmation surface may offer editing them.
+        card["capabilities"] = {"execution_costs_editable": True}
     asset_class = _confirmation_asset_class(strategy)
     if asset_class is not None:
         card["asset_class"] = asset_class
@@ -345,14 +353,22 @@ def _confirmation_assumptions(
     data_through_assumption = _data_through_assumption(strategy, language=language)
     if data_through_assumption:
         assumptions.append(data_through_assumption)
-    fees = _optional_parameter_value(optional_parameters, "fees")
-    if fees in (0, 0.0, "0", "0.0"):
-        assumptions.append("Sin comisiones" if _is_spanish(language) else "No fees")
-    slippage = _optional_parameter_value(optional_parameters, "slippage")
-    if slippage in (0, 0.0, "0", "0.0"):
+    execution_costs = _confirmation_execution_costs(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload or {},
+    )
+    if execution_costs is not None:
         assumptions.append(
-            "Sin deslizamiento" if _is_spanish(language) else "No slippage"
+            _execution_cost_assumption(execution_costs, language=language)
         )
+    else:
+        fees = _optional_parameter_value(optional_parameters, "fees")
+        if fees in (0, 0.0, "0", "0.0"):
+            assumptions.append("No fees")
+        slippage = _optional_parameter_value(optional_parameters, "slippage")
+        if slippage in (0, 0.0, "0", "0.0"):
+            assumptions.append("No slippage")
     benchmark_assumption = _confirmation_benchmark_assumption(
         strategy=strategy,
         optional_parameters=optional_parameters,
@@ -388,12 +404,21 @@ def _confirmation_display_facts(
     data_adjustment = _data_availability_adjustment(strategy)
     if data_adjustment is not None:
         facts["data_through"] = data_adjustment.get("through")
-    fees = _optional_parameter_value(optional_parameters, "fees")
-    if fees is not None:
-        facts["fees"] = fees
-    slippage = _optional_parameter_value(optional_parameters, "slippage")
-    if slippage is not None:
-        facts["slippage"] = slippage
+    execution_costs = _confirmation_execution_costs(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload,
+    )
+    if execution_costs is not None:
+        facts["fees"] = execution_costs["fees"]
+        facts["slippage"] = execution_costs["slippage"]
+    else:
+        fees = _optional_parameter_value(optional_parameters, "fees")
+        if fees is not None:
+            facts["fees"] = fees
+        slippage = _optional_parameter_value(optional_parameters, "slippage")
+        if slippage is not None:
+            facts["slippage"] = slippage
     benchmark_symbol = _confirmation_benchmark_symbol(
         strategy=strategy,
         optional_parameters=optional_parameters,
@@ -473,6 +498,77 @@ def _confirmation_benchmark_symbol(
     return None
 
 
+def _confirmation_execution_costs(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, Any],
+    launch_payload: dict[str, Any],
+) -> dict[str, float] | None:
+    if not _execution_realism_feature_enabled():
+        # With the engine flag off the run is idealized no matter what values a
+        # draft carries, so never advertise modeled costs.
+        return None
+
+    launch_realism = launch_payload.get("_execution_realism")
+    if isinstance(launch_realism, dict):
+        try:
+            realism = _normalize_execution_realism(launch_realism)
+        except ValueError:
+            realism = {"enabled": False, "fee_bps": 0.0, "slippage_bps": 0.0}
+    else:
+        realism = {"enabled": False, "fee_bps": 0.0, "slippage_bps": 0.0}
+    if bool(realism["enabled"]):
+        costs = {
+            "fees": float(realism["fee_bps"]) / 10000.0,
+            "slippage": float(realism["slippage_bps"]) / 10000.0,
+        }
+        if costs["fees"] > 0.0 or costs["slippage"] > 0.0:
+            return costs
+
+    extra_parameters = strategy.get("extra_parameters")
+    if isinstance(extra_parameters, dict):
+        costs = {
+            "fees": _optional_float(extra_parameters.get("fee_rate")) or 0.0,
+            "slippage": _optional_float(extra_parameters.get("slippage")) or 0.0,
+        }
+        if costs["fees"] > 0.0 or costs["slippage"] > 0.0:
+            return costs
+
+    costs = {
+        "fees": _optional_float(_optional_parameter_value(optional_parameters, "fees"))
+        or 0.0,
+        "slippage": _optional_float(
+            _optional_parameter_value(optional_parameters, "slippage")
+        )
+        or 0.0,
+    }
+    if costs["fees"] > 0.0 or costs["slippage"] > 0.0:
+        return costs
+    return None
+
+
+def _execution_cost_assumption(costs: dict[str, float], *, language: str) -> str:
+    fee_bps = _format_bps(float(costs["fees"]) * 10000.0)
+    slippage_bps = _format_bps(float(costs["slippage"]) * 10000.0)
+    return f"Modeled costs: {fee_bps} bps fee + {slippage_bps} bps slippage"
+
+
+def _optional_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_bps(value: float) -> str:
+    rounded = round(value, 2)
+    if rounded.is_integer():
+        return str(int(rounded))
+    return f"{rounded:g}"
+
+
 def _confirmation_summary(
     *,
     assets: str,
@@ -482,15 +578,6 @@ def _confirmation_summary(
     language: str = "en",
 ) -> str:
     strategy_type = executable_strategy_type(strategy)
-    if _is_spanish(language):
-        if strategy_type == "buy_and_hold":
-            return f"Listo para probar comprar y mantener {assets} del {period}."
-        if _strategy_type_uses_cadence(strategy_type):
-            return f"Listo para probar compras recurrentes de {assets} del {period}."
-        return (
-            f"Listo para probar {assets} con "
-            f"{_summary_strategy_phrase(strategy_label, language=language)} del {period}."
-        )
     if strategy_type == "buy_and_hold":
         return f"Ready to test buy-and-hold for {assets} over {period}."
     if _strategy_type_uses_cadence(strategy_type):
@@ -502,15 +589,6 @@ def _confirmation_summary(
 
 
 def _summary_strategy_phrase(strategy_label: str, *, language: str = "en") -> str:
-    if _is_spanish(language):
-        phrases = {
-            "Umbral RSI": "un umbral RSI",
-            "Compra en caidas": "una regla de compra en caidas",
-            "Umbral de indicador": "un umbral de indicador",
-            "Estrategia de senales": "una estrategia de senales",
-            "Cruce de medias moviles": "un cruce de medias moviles",
-        }
-        return phrases.get(strategy_label, strategy_label.strip().lower())
     phrases = {
         "RSI Threshold": "an RSI threshold",
         "Dip Buying": "a dip-buying rule",
@@ -558,9 +636,7 @@ def _format_confirmation_rule_value(
 
 def _format_confirmation_period(value: Any, *, language: str = "en") -> str:
     resolved = resolve_date_range(value, today=_confirmation_today())
-    if _is_spanish(language):
-        return format_date_range_label(resolved.start, resolved.end, language=language)
-    return resolved.display
+    return format_date_range_label(resolved.start, resolved.end, language=language)
 
 
 def _confirmation_period_without_parentheses(value: str) -> str:
@@ -589,15 +665,7 @@ def _localized_strategy_label(
     *,
     language: str,
 ) -> str:
-    if not _is_spanish(language):
-        return display_strategy_type(strategy)
-    labels = {
-        "buy_and_hold": "Comprar y mantener",
-        "dca_accumulation": "Compras recurrentes",
-        "indicator_threshold": "Umbral de indicador",
-        "signal_strategy": "Estrategia de senales",
-    }
-    return labels.get(executable_strategy_type(strategy), display_strategy_type(strategy))
+    return display_strategy_type(strategy)
 
 
 def _localized_strategy_slug(
@@ -605,32 +673,18 @@ def _localized_strategy_slug(
     *,
     language: str,
 ) -> str:
-    if not _is_spanish(language):
-        return display_strategy_slug(strategy)
-    label = _localized_strategy_label(strategy, language=language)
-    return label[:1].lower() + label[1:]
+    return display_strategy_slug(strategy)
 
 
 def _confirmation_title(*, assets: str, strategy_type: str, language: str) -> str:
-    if _is_spanish(language):
-        return f"{assets}: {strategy_type[:1].upper()}{strategy_type[1:]}".strip()
     return f"{assets} {strategy_type}".strip()
 
 
 def _confirmation_status_label(*, is_ready_to_run: bool, language: str) -> str:
-    if _is_spanish(language):
-        return "Listo para ejecutar" if is_ready_to_run else "Necesita cambios"
     return "Ready to run" if is_ready_to_run else "Needs change"
 
 
 def _money_assumption(value: float, *, role: str, language: str) -> str:
-    if _is_spanish(language):
-        label = (
-            "aporte recurrente"
-            if role == "recurring_contribution"
-            else "capital inicial"
-        )
-        return f"${value:,.0f} {label}"
     label = (
         "recurring contribution"
         if role == "recurring_contribution"
@@ -640,12 +694,7 @@ def _money_assumption(value: float, *, role: str, language: str) -> str:
 
 
 def _benchmark_assumption(symbol: str, *, language: str) -> str:
-    prefix = "Referencia" if _is_spanish(language) else "Benchmark"
-    return f"{prefix}: {symbol}"
-
-
-def _is_spanish(language: str) -> bool:
-    return (language or "en").lower().startswith("es")
+    return f"Benchmark: {symbol}"
 
 
 def _confirmation_today() -> date:

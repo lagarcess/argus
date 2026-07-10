@@ -1,18 +1,26 @@
 # Conversational Transcript QA
 
+> [!NOTE]
+> Status: Active — the canonical manual browser-QA script for the conversational
+> runtime (resolved + refreshed 2026-07-07). This is the human, live-app leg of
+> QA; it complements the two automated legs rather than replacing them: the
+> mocked eval harness (`tests/evals/`, run every change) and the release canary
+> (`docs/PRIVATE_LAUNCH_RUNBOOK.md`, run at the gate). Use it before promoting
+> conversational-runtime changes, as the roadmap's per-slice browser-QA evidence.
+
 Use this script before calling the chat product ready. Run it in the live web app, not only through unit tests.
 
 ## Start The App
 
 Backend:
 
-```powershell
+```bash
 poetry run fastapi dev src/argus/api/main.py
 ```
 
 Frontend:
 
-```powershell
+```bash
 cd web
 bun run dev
 ```
@@ -136,6 +144,64 @@ Run these as separate focused checks after the main transcript set.
 5. Switch light/dark/system theme and verify chart colors remain legible.
 6. Run a strategy with entry/exit events and verify markers appear without clutter.
 
+### Spanish Parity
+
+Run in a Spanish (es-419) session. Prose is model-voiced in the turn language;
+per the B4 language-gate retirement there are no per-language copy tables, so
+parity is a behavior check, not a string check.
+
+1. `Prueba comprar y mantener AAPL y NVDA con pesos iguales desde el 1 de enero de 2024 hasta hoy con 10000 dólares.`
+   - Pass: reaches confirmation with both symbols, equities, buy-and-hold, and the
+     stated window and capital — all card labels and prose in Spanish.
+   - Reject: any English leak in prose or card chrome, a dropped symbol, or a
+     re-asked field the user already supplied.
+2. `¿Por qué le fue peor que al SPY?` after a completed run.
+   - Pass: a grounded Spanish explanation from real run facts (benchmark delta,
+     drawdown); no fabricated metrics.
+   - Reject: English fallback, raw field names, or stale run context.
+3. `Explica qué es el RSI de forma sencilla.`
+   - Pass: a plain-language Spanish explanation; no forced form or field prompts.
+
+### Language Mismatch
+
+The AI mirrors the user's turn language even when the UI language differs
+(`PRODUCT.md`: "AI should mirror user language preference dynamically").
+
+1. With the UI in English, send a Spanish prompt:
+   `Invierte 500 dólares en Bitcoin cada mes desde 2021.`
+   - Pass: Argus responds and confirms in Spanish (BTC, crypto, monthly DCA, the
+     $500 recurring amount), while static UI chrome may stay in the UI language.
+   - Reject: an English assistant reply to a Spanish turn, or a dropped/renamed
+     recurring amount.
+2. With the UI in Spanish, send an English follow-up on the same thread.
+   - Pass: the assistant follows the turn language; thread context is preserved
+     across the switch.
+   - Reject: re-asking already-supplied fields after the language switch.
+
+### Recovery Honesty (Spanish)
+
+The B4 hotspot: recovery and degraded copy render from typed codes in the turn
+language, never a hardcoded English fallback.
+
+1. With the clarification LLM path disabled for the local session, send
+   `Prueba comprar y mantener AAPL`.
+   - Pass: the assistant asks the missing-period clarification in Spanish, the
+     network final payload contains `clarification.kind=clarification`,
+     `reason_code=missing_period`, and `requested_field=date_range`, and reload
+     preserves the Spanish rendered question.
+   - Reject: the saved compatibility English prompt is displayed, the frontend
+     keyword-matches prose, or the final payload lacks the typed `clarification`
+     sidecar.
+1. `Prueba una estrategia de cruce de medias móviles en Tesla.` (a draft-only
+   strategy that is not executable yet)
+   - Pass: an honest Spanish explanation of the limitation plus an executable
+     alternative; the user's idea stays preserved in the thread.
+   - Reject: English recovery copy, a raw provider/runtime error, or a reset to an
+     empty starter session.
+2. Ask for a Kraken window beyond the 720-candle limit in Spanish.
+   - Pass: the provider-limit explanation and a shorter-window / wider-timeframe
+     offer come back in Spanish.
+
 ## Evidence To Capture
 
 Record:
@@ -163,6 +229,8 @@ Record:
 - Repeating starter guidance such as `No problem. I can help you pick a starting point` after the user has already asked to draft or test a strategy.
 - Raw slot prompts such as `What should trigger the buy?` when the user's act is beginner guidance, buy-and-hold, or a complete strategy request.
 - Re-asking for a period, asset, amount, cadence, or rule after the user already supplied that field in the same active strategy frame.
+- English fallback copy, raw field names, or English card chrome in a Spanish session (violates the language-agnostic prose contract).
+- An English assistant reply to a clearly Spanish user turn, or the reverse, when the turn language is unambiguous.
 
 ## Stabilization Transcript Gates
 
@@ -183,6 +251,10 @@ Run these before PR submission whenever conversational runtime code changes:
 5. Start a DCA flow, provide the amount, then provide the period.
    - Pass: Argus preserves the user-provided recurring amount through later turns.
    - Reject: re-asking the amount after it was supplied.
+6. `Prueba comprar y mantener BTC en los últimos dos años, simple.`
+   - Pass: reaches confirmation with `BTC`, crypto, buy-and-hold, and the two-year
+     window resolved — prose and card chrome in Spanish.
+   - Reject: English leak, a request for entry/exit logic, or another period prompt.
 
 ## QA Transcript Decision Filter
 

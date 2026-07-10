@@ -20,6 +20,7 @@ from argus.agent_runtime.strategy_contract import (
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
 )
+from argus.domain.backtesting.config import _execution_realism_feature_enabled
 from argus.domain.engine_launch.display import format_data_through_label
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.engine_launch.strategies import validate_launch_supported
@@ -28,6 +29,7 @@ from argus.domain.market_data.capabilities import (
     latest_complete_data_adjustment,
     market_data_window_violation,
 )
+from argus.nlp.natural_time import resolve_date_range_intent
 from loguru import logger
 from pydantic import ValidationError
 
@@ -41,6 +43,8 @@ def confirm_stage(
     logger.debug("Confirm stage started")
     strategy = _strategy_payload(state.candidate_strategy_draft)
     strategy = _strategy_with_runtime_language(strategy, language=language)
+    strategy = _strategy_with_explicit_date_intent(strategy)
+    strategy = _strategy_without_incompatible_rule_fields(strategy)
     strategy = _strategy_with_latest_complete_data_adjustment(strategy)
     logger.debug(
         "Confirm stage latest complete data adjustment checked",
@@ -231,6 +235,29 @@ def _launch_validation_failure(error_code: str) -> dict[str, Any]:
                 },
             ),
         }
+    if error_code == "invalid_chronological_date_range":
+        return {
+            "outcome": "needs_clarification",
+            "missing_required_fields": ["date_range"],
+            "requested_field": "date_range",
+            "assistant_prompt": None,
+            "optional_parameter_status": _with_unsupported_constraint(
+                {},
+                {
+                    "category": "invalid_date_window",
+                    "raw_value": "selected date range",
+                    "explanation": (
+                        "The requested window is not usable because the start "
+                        "date is not before the end date."
+                    ),
+                    "simplification_options": [
+                        {"label": "Choose a new start date"},
+                        {"label": "Choose a new end date"},
+                        {"label": "Change the date range"},
+                    ],
+                },
+            ),
+        }
     if error_code == "indicator_data_insufficient":
         return {
             "outcome": "needs_clarification",
@@ -337,6 +364,44 @@ def _strategy_with_runtime_language(
     extra_parameters = dict(strategy.get("extra_parameters") or {})
     extra_parameters["language"] = normalized
     return {**strategy, "extra_parameters": extra_parameters}
+
+
+def _strategy_with_explicit_date_intent(strategy: dict[str, Any]) -> dict[str, Any]:
+    extra_parameters = _strategy_extra_parameters(strategy)
+    if extra_parameters is None:
+        return strategy
+    intent = extra_parameters.get("date_range_intent")
+    if not isinstance(intent, dict):
+        return strategy
+    if str(intent.get("kind") or "").strip() == "endpoint_patch":
+        return strategy
+    field_provenance = extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        return strategy
+    provenance = str(field_provenance.get("date_range") or "").strip()
+    if provenance not in {"explicit_user", "user"}:
+        return strategy
+    resolved = resolve_date_range_intent(intent, today=_today())
+    if resolved is None:
+        return strategy
+    return {**strategy, "date_range": resolved.payload}
+
+
+def _strategy_without_incompatible_rule_fields(
+    strategy: dict[str, Any],
+) -> dict[str, Any]:
+    strategy_type = canonical_strategy_type(
+        strategy.get("strategy_type"),
+        entry_logic=strategy.get("entry_logic"),
+        exit_logic=strategy.get("exit_logic"),
+        cadence=strategy.get("cadence"),
+    )
+    if strategy_type != "indicator_threshold":
+        return strategy
+    cleaned = dict(strategy)
+    for key in ("entry_rule", "exit_rule", "rule_spec"):
+        cleaned.pop(key, None)
+    return cleaned
 
 
 def _strategy_extra_parameters(strategy: dict[str, Any]) -> dict[str, Any] | None:
@@ -605,8 +670,12 @@ def _unsupported_execution_assumption(
     *,
     optional_parameter_status: dict[str, Any],
 ) -> dict[str, Any] | None:
+    # With execution realism enabled the engine applies fee and slippage
+    # assumptions, so nonzero values are supported inputs rather than
+    # unsupported constraints.
+    execution_costs_supported = _execution_realism_feature_enabled()
     fees = _parameter_value(optional_parameters, "fees")
-    if not _is_zero_assumption(fees):
+    if not execution_costs_supported and not _is_zero_assumption(fees):
         return _recoverable_constraint_patch(
             optional_parameter_status=optional_parameter_status,
             requested_field="fees",
@@ -626,7 +695,7 @@ def _unsupported_execution_assumption(
         )
 
     slippage = _parameter_value(optional_parameters, "slippage")
-    if not _is_zero_assumption(slippage):
+    if not execution_costs_supported and not _is_zero_assumption(slippage):
         return _recoverable_constraint_patch(
             optional_parameter_status=optional_parameter_status,
             requested_field="slippage",

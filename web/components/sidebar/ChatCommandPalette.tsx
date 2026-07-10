@@ -29,11 +29,14 @@ import {
   listHistory,
   patchConversation,
   searchGlobal,
+  type DecisionState,
   type HistoryItem,
   type SearchItem,
+  type SearchLedgerGroup,
 } from "@/lib/argus-api";
 import {
   commandPaletteDecisionStateFallback,
+  commandPaletteGroupsByLedgerState,
   commandPaletteItemFromHistory,
   commandPaletteItemFromSearch,
   commandPaletteOpenFallback,
@@ -56,6 +59,11 @@ type ChatCommandPaletteProps = {
 };
 
 type LayoutMode = "expanded" | "collapsed";
+type DateDisplayGroup = {
+  id: string;
+  label: string;
+  items: CommandPaletteDisplayItem[];
+};
 
 function formatRelativeDate(
   value: string,
@@ -104,7 +112,7 @@ function groupItems(
   items: CommandPaletteDisplayItem[],
   t: ReturnType<typeof useTranslation>["t"],
 ) {
-  const groups: { label: string; items: CommandPaletteDisplayItem[] }[] = [];
+  const groups: DateDisplayGroup[] = [];
   const buckets = new Map<string, CommandPaletteDisplayItem[]>();
 
   for (const item of items) {
@@ -115,7 +123,7 @@ function groupItems(
     } else {
       const bucket = [item];
       buckets.set(label, bucket);
-      groups.push({ label, items: bucket });
+      groups.push({ id: `date:${label}`, label, items: bucket });
     }
   }
 
@@ -149,6 +157,25 @@ function rawConversationId(item: HistoryItem | SearchItem) {
   return item.conversation_id ?? item.id;
 }
 
+function ledgerDecisionChipClassName(state: DecisionState, selected: boolean) {
+  const base =
+    "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:opacity-60 active:scale-[0.98]";
+  if (!selected) {
+    return `${base} border-black/8 text-black/45 hover:bg-black/[0.03] focus-visible:ring-black/15 dark:border-white/10 dark:text-white/45 dark:hover:bg-white/[0.04] dark:focus-visible:ring-white/15`;
+  }
+  switch (state) {
+    case "promising":
+      return `${base} border-[#5ba897]/34 bg-[#5ba897]/11 text-[#3f816f] focus-visible:ring-[#5ba897]/20 dark:text-[#7bc1ad]`;
+    case "rejected":
+      return `${base} border-[#d66d75]/34 bg-[#d66d75]/11 text-[#ad4e56] focus-visible:ring-[#d66d75]/18 dark:text-[#e58c93]`;
+    case "revisit_later":
+      return `${base} border-[#b79246]/34 bg-[#b79246]/11 text-[#92722d] focus-visible:ring-[#b79246]/18 dark:text-[#d7b56f]`;
+    case "watching":
+    default:
+      return `${base} border-[#6f8fb8]/34 bg-[#6f8fb8]/11 text-[#4f6f98] focus-visible:ring-[#6f8fb8]/18 dark:text-[#91afd1]`;
+  }
+}
+
 export default function ChatCommandPalette({
   onClose,
   onOpenConversation,
@@ -161,8 +188,13 @@ export default function ChatCommandPalette({
   const [recentItems, setRecentItems] = useState<HistoryItem[]>([]);
   const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
   const [searchNextCursor, setSearchNextCursor] = useState<string | null>(null);
+  const [ledgerGroups, setLedgerGroups] = useState<SearchLedgerGroup[]>([]);
+  const [isLedgerMode, setIsLedgerMode] = useState(false);
+  const [decisionStateFilter, setDecisionStateFilter] =
+    useState<DecisionState | null>(null);
   const [isColdStartLoading, setIsColdStartLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLedgerLoading, setIsLedgerLoading] = useState(false);
   const [isLoadingMoreSearch, setIsLoadingMoreSearch] = useState(false);
   const [previewItem, setPreviewItem] =
     useState<CommandPaletteDisplayItem | null>(null);
@@ -193,13 +225,64 @@ export default function ChatCommandPalette({
   }, []);
 
   useEffect(() => {
+    searchGlobal({ q: "", limit: 100, includeLedgerGroups: true })
+      .then(({ ledger_groups }) => {
+        setLedgerGroups(ledger_groups ?? []);
+      })
+      .catch(() => setLedgerGroups([]));
+  }, []);
+
+  const clearSearchAndLedger = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setQuery("");
+    setIsLedgerMode(false);
+    setDecisionStateFilter(null);
+    setSearchResults([]);
+    setSearchNextCursor(null);
+    setPreviewItem(null);
+    setIsSearching(false);
+    setIsLedgerLoading(false);
+  }, []);
+
+  const loadLedgerBrowse = useCallback(
+    async (nextDecisionState: DecisionState | null) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      setQuery("");
+      setIsLedgerMode(true);
+      setDecisionStateFilter(nextDecisionState);
+      setPreviewItem(null);
+      setIsSearching(false);
+      setIsLedgerLoading(true);
+      try {
+        const { items, next_cursor, ledger_groups } = await searchGlobal({
+          q: "",
+          limit: 100,
+          decisionState: nextDecisionState,
+          includeLedgerGroups: true,
+        });
+        setSearchResults(items);
+        setSearchNextCursor(next_cursor);
+        setLedgerGroups(ledger_groups ?? []);
+      } catch {
+        setSearchResults([]);
+        setSearchNextCursor(null);
+      } finally {
+        setIsLedgerLoading(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const trimmed = query.trim();
     setPreviewItem(null);
     if (!trimmed) {
-      setSearchResults([]);
-      setSearchNextCursor(null);
+      if (!isLedgerMode) {
+        setSearchResults([]);
+        setSearchNextCursor(null);
+      }
       setIsSearching(false);
       return;
     }
@@ -221,11 +304,12 @@ export default function ChatCommandPalette({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+  }, [isLedgerMode, query]);
 
   const isFiltering = query.trim().length > 0;
+  const isResultMode = isFiltering || isLedgerMode;
   const displayItems = useMemo(() => {
-    const items = isFiltering
+    const items = isResultMode
       ? searchResults.map((item) =>
           commandPaletteItemFromSearch(item, {
             decisionStateLabel: (state) =>
@@ -241,11 +325,25 @@ export default function ChatCommandPalette({
     return items.filter((item): item is CommandPaletteDisplayItem =>
       Boolean(item),
     );
-  }, [isFiltering, recentItems, searchResults, t]);
-  const groupedItems = useMemo(
+  }, [isResultMode, recentItems, searchResults, t]);
+  const dateGroupedItems = useMemo(
     () => groupItems(displayItems, t),
     [displayItems, t],
   );
+  const visibleLedgerGroups = useMemo(
+    () =>
+      decisionStateFilter
+        ? ledgerGroups.filter(
+            (group) => group.decision_state === decisionStateFilter,
+          )
+        : ledgerGroups,
+    [decisionStateFilter, ledgerGroups],
+  );
+  const ledgerGroupedItems = useMemo(
+    () => commandPaletteGroupsByLedgerState(displayItems, visibleLedgerGroups),
+    [displayItems, visibleLedgerGroups],
+  );
+  const groupedItems = isLedgerMode ? ledgerGroupedItems : dateGroupedItems;
   const selectedPreview = commandPaletteSelectedPreview(previewItem, displayItems);
   const selectedPreviewFields = useMemo(
     () =>
@@ -308,14 +406,17 @@ export default function ChatCommandPalette({
 
   const loadMoreSearch = async () => {
     const trimmed = query.trim();
-    if (!trimmed || !searchNextCursor || isLoadingMoreSearch) return;
+    if ((!trimmed && !isLedgerMode) || !searchNextCursor || isLoadingMoreSearch)
+      return;
 
     setIsLoadingMoreSearch(true);
     try {
       const { items, next_cursor } = await searchGlobal({
         q: trimmed,
-        limit: 30,
+        limit: isLedgerMode ? 100 : 30,
         cursor: searchNextCursor,
+        decisionState: isLedgerMode ? decisionStateFilter : null,
+        includeLedgerGroups: isLedgerMode,
       });
       setSearchResults((current) => {
         const seen = new Set(current.map((item) => `${item.type}:${item.id}`));
@@ -458,7 +559,10 @@ export default function ChatCommandPalette({
     });
   };
 
-  const isLoading = isFiltering ? isSearching : isColdStartLoading;
+  const isLoading = isResultMode
+    ? isSearching || isLedgerLoading
+    : isColdStartLoading;
+  const footerCount = displayItems.length;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-8">
@@ -482,14 +586,22 @@ export default function ChatCommandPalette({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              if (isLedgerMode || decisionStateFilter) {
+                setIsLedgerMode(false);
+                setDecisionStateFilter(null);
+                setSearchResults([]);
+                setSearchNextCursor(null);
+              }
+            }}
             placeholder={t("command_palette.search_placeholder", "Search Argus...")}
             className="w-full bg-transparent font-display text-[15px] font-medium text-black outline-none placeholder:text-black/35 dark:text-white dark:placeholder:text-white/35"
           />
-          {query && (
+          {(query || isLedgerMode) && (
             <button
               type="button"
-              onClick={() => setQuery("")}
+              onClick={clearSearchAndLedger}
               className="shrink-0 rounded-full p-1 hover:bg-black/5 dark:hover:bg-white/10"
               aria-label={t("command_palette.clear_search", "Clear search")}
             >
@@ -497,6 +609,51 @@ export default function ChatCommandPalette({
             </button>
           )}
         </div>
+
+        {ledgerGroups.length > 0 && (
+          <div
+            className="flex items-center gap-2 overflow-x-auto border-b border-black/5 px-5 py-2.5 dark:border-white/5"
+            aria-label={t(
+              "command_palette.ledger.decision_filters",
+              "Decision filters",
+            )}
+          >
+            {ledgerGroups.map((group) => {
+              const selected = decisionStateFilter === group.decision_state;
+              return (
+                <button
+                  key={group.decision_state}
+                  type="button"
+                  onClick={() => {
+                    const nextDecisionState =
+                      decisionStateFilter === group.decision_state
+                        ? null
+                        : group.decision_state;
+                    if (nextDecisionState === null) {
+                      clearSearchAndLedger();
+                      return;
+                    }
+                    void loadLedgerBrowse(nextDecisionState);
+                  }}
+                  aria-pressed={isLedgerMode && selected}
+                  disabled={isLedgerLoading}
+                  className={ledgerDecisionChipClassName(
+                    group.decision_state,
+                    isLedgerMode && selected,
+                  )}
+                >
+                  {t(
+                    `chat.result_card.decision_states.${group.decision_state}`,
+                    commandPaletteDecisionStateFallback(group.decision_state),
+                  )}
+                  <span className="ml-1 text-black/35 dark:text-white/35">
+                    {group.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
           <div
@@ -510,7 +667,7 @@ export default function ChatCommandPalette({
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-5 w-5 animate-spin text-black/20 dark:text-white/20" />
               </div>
-            ) : displayItems.length === 0 ? (
+            ) : displayItems.length === 0 && !isLedgerMode ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <Search className="mb-3 h-8 w-8 text-black/10 dark:text-white/10" />
                 <p className="text-[14px] text-black/30 dark:text-white/30">
@@ -524,14 +681,35 @@ export default function ChatCommandPalette({
               </div>
             ) : (
               <div className="flex flex-col gap-3 p-3">
-                {groupedItems.map((group) => (
-                  <div key={group.label}>
+                {groupedItems.map((group) => {
+                  const isLedgerGroup = "decisionState" in group;
+                  const groupLabel = isLedgerGroup
+                    ? t(
+                        `chat.result_card.decision_states.${group.decisionState}`,
+                        commandPaletteDecisionStateFallback(group.decisionState),
+                      )
+                    : group.label;
+                  return (
+                  <div key={group.id}>
                     <div className="px-2 pb-1.5 pt-1">
                       <span className="font-display text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
-                        {group.label}
+                        {groupLabel}
+                        {isLedgerGroup && (
+                          <span className="ml-1 text-black/30 dark:text-white/30">
+                            {group.count}
+                          </span>
+                        )}
                       </span>
                     </div>
-                    {group.items.map((item) => {
+                    {group.items.length === 0 && isLedgerGroup && group.count === 0 ? (
+                      <p className="px-2 py-2 text-[12px] text-black/30 dark:text-white/30">
+                        {t(
+                          "command_palette.ledger.no_saved_ideas",
+                          "No saved ideas in this state",
+                        )}
+                      </p>
+                    ) : (
+                    group.items.map((item) => {
                       const isCurrent =
                         item.type === "chat" &&
                         activeConversationId === item.conversationId;
@@ -734,10 +912,10 @@ export default function ChatCommandPalette({
                             )}
                         </div>
                       );
-                    })}
+                    }))}
                   </div>
-                ))}
-                {isFiltering && searchNextCursor && (
+                );})}
+                {isResultMode && searchNextCursor && (
                   <button
                     type="button"
                     onClick={() => void loadMoreSearch()}
@@ -850,13 +1028,14 @@ export default function ChatCommandPalette({
 
         <div className="flex items-center justify-between border-t border-black/5 px-4 py-2 dark:border-white/5">
           <span className="text-[11px] text-black/30 dark:text-white/30">
-            {displayItems.length > 0 &&
+            {!isLedgerMode &&
+              footerCount > 0 &&
               t(
                 isFiltering
                   ? "command_palette.result_count"
                   : "command_palette.conversation_count",
                 {
-                  count: displayItems.length,
+                  count: footerCount,
                   defaultValue_one: isFiltering
                     ? "{{count}} result"
                     : "{{count}} conversation",

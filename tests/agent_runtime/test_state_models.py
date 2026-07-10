@@ -247,6 +247,38 @@ def test_extraction_models_capture_resolution_states() -> None:
     assert unsupported.simplification_options[0].replacement_values == {"timeframe": "1D"}
 
 
+def test_simplification_option_serializes_nested_frozen_payloads() -> None:
+    unsupported = UnsupportedConstraint(
+        category="indicator",
+        raw_value="ATR 14",
+        explanation="ATR is not executable as a rule yet.",
+        simplification_options=[
+            SimplificationOption(
+                label="Use moving-average crossover",
+                replacement_values={
+                    "strategy_type": "signal_strategy",
+                    "entry_rule": {
+                        "type": "moving_average_crossover",
+                        "fast_indicator": "sma",
+                        "fast_period": 50,
+                    },
+                },
+            )
+        ],
+    )
+
+    dumped = unsupported.model_dump(mode="python")
+
+    assert dumped["simplification_options"][0]["replacement_values"] == {
+        "strategy_type": "signal_strategy",
+        "entry_rule": {
+            "type": "moving_average_crossover",
+            "fast_indicator": "sma",
+            "fast_period": 50,
+        },
+    }
+
+
 def test_capability_contract_exposes_required_and_optional_fields() -> None:
     contract = build_default_capability_contract()
 

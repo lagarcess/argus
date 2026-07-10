@@ -26,6 +26,18 @@ release manifest before testers are invited; start from
 API/web env fingerprint, workflow-service proof, canary evidence, rollback
 target, and approver.
 
+Local preflight doctrine:
+
+- Run `.github/setup.sh` first and confirm `poetry run python --version` reports
+  the `.python-version` runtime (`3.10.x`; currently `3.10.20`). Python 3.14
+  green runs are non-canonical for deployed-runtime proof.
+- Do local candidate work from sibling worktrees only, never nested inside
+  another Argus checkout, so dotenv cannot inherit a parent `.env` and turn a
+  mocked run into a live-provider run.
+- For deterministic agent-runtime sweeps, blank live provider keys and set
+  `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture`. A clean mocked sweep
+  is seconds-scale; minutes means stop and investigate live-call leakage.
+
 1. Confirm the local checkout is the candidate commit you intend to promote:
 
 ```bash
@@ -248,12 +260,41 @@ Keep true secrets manual in Render:
 - `ALPACA_API_KEY`
 - `ALPACA_SECRET_KEY`
 - `ARGUS_OPS_TOKEN`
+- `POSTHOG_PROJECT_TOKEN`
 
-Keep `NEXT_PUBLIC_POSTHOG_KEY` present but empty until PostHog is intentionally
-enabled.
+Keep `NEXT_PUBLIC_POSTHOG_KEY` present but empty. Product analytics capture is
+server-side only through the sanitized observability envelope.
+
+Set `POSTHOG_REGION="US Cloud"` (or normalized `us`) for US Cloud unless the
+founder explicitly changes the analytics data-region posture. US Cloud is a
+compliance-posture choice for the current private alpha, not an accidental
+default. Do not enable frontend PostHog, autocapture, session replay, or person
+profiles.
 
 Set `ARGUS_OPS_TOKEN` manually in Render for `argus-api`; it is intentionally
 `sync: false`. Keep `ARGUS_OPS_TOKEN` out of frontend environment variables.
+
+## Runtime Tuning Flags
+
+These are optional runtime knobs (not secrets). Defaults are safe for
+private-alpha launch; record any override in the release manifest.
+
+- `ARGUS_ENABLE_EXECUTION_REALISM` — models trading fees + slippage end to end.
+  Default OFF. Keep off for alpha: the founder deliberately disclaims cost
+  assumptions for the current PMF stage. When off, results carry the "No
+  fees/slippage" assumptions footer and the legacy cost path is byte-identical.
+- `ARGUS_STRUCTURED_REASONING_EFFORT` / `ARGUS_CAPABILITY_REASONING_EFFORT` —
+  per-tier OpenRouter reasoning-effort overrides for the structured
+  interpretation and capability-conflict calls
+  (`xhigh|high|medium|low|minimal|none`). Unset uses the profile default. Lower
+  effort saves cost in dev; run production at full effort. Invalid values are
+  ignored with a warning.
+- Prompt caching is automatic: structured-artifact calls
+  (interpretation/repair/field-fidelity/capability-conflict) send a stable
+  prefix so OpenRouter can cache it. No env toggle; it activates for those tasks.
+- `ARGUS_RUN_LIVE_EVALS=1` — runs the live eval suite under `tests/evals/` (real
+  model spend). Unset/`0` keeps evals mocked. Set it for the pre-merge
+  landing-gate run and every `main` promotion candidate.
 
 ## Smoke Test
 
@@ -295,8 +336,9 @@ Before sending the URL, make sure tester instructions say:
 - Market or benchmark data can be unavailable. If that happens, retry the same
   setup, change the dates, or choose a different supported asset/benchmark.
 - Feedback buttons and the feedback dialog are the primary first-session
-  listening channel. PostHog/product analytics stay disabled until the
-  privacy-safe event taxonomy, redaction, and consent posture are approved.
+  listening channel. PostHog is limited to the approved server-side product
+  events and must not receive raw prompts, credentials, balances, holdings,
+  audio, route receipts, provider/model metadata, or frontend session data.
 - Terms, Privacy Policy, and explicit alpha consent remain a founder-owned gate
   before inviting users outside the private circle.
 

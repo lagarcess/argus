@@ -863,8 +863,7 @@ function discoverySectionLabelKey(label: string) {
 function discoveryBadgeLabel(item: DiscoveryItem) {
   if (item.type === "asset") return "asset";
   if (item.type === "indicator") return "indicator";
-  if (item.support_status === "unavailable") return "unavailable";
-  return "draft";
+  return "indicator";
 }
 
 function isSupportedDiscoveryItem(item: DiscoveryItem) {
@@ -895,7 +894,6 @@ function createTokenElement(item: DiscoveryItem) {
   token.dataset.tokenDescription = displayDiscoveryDescription(item);
   token.dataset.tokenInsertText = item.insert_text;
   token.dataset.tokenProvider = item.provider;
-  token.dataset.tokenSupportStatus = item.support_status;
   token.className = tokenClassName(item.type);
 
   const label = document.createElement("span");
@@ -981,11 +979,6 @@ function readSegmentsFromEditor(root: HTMLDivElement | null): ComposerSegment[] 
           description: node.dataset.tokenDescription || null,
           insert_text: node.dataset.tokenInsertText ?? node.textContent ?? "",
           provider: node.dataset.tokenProvider ?? "",
-          support_status:
-            node.dataset.tokenSupportStatus === "draft_only" ||
-            node.dataset.tokenSupportStatus === "unavailable"
-              ? node.dataset.tokenSupportStatus
-              : "supported",
         },
       });
       return;
@@ -1091,7 +1084,6 @@ function setCaretTextOffset(root: HTMLDivElement | null, targetOffset: number) {
           description: node.dataset.tokenDescription || null,
           insert_text: node.dataset.tokenInsertText ?? node.textContent ?? "",
           provider: node.dataset.tokenProvider ?? "",
-          support_status: "supported",
         },
       });
       if (cursor + length >= targetOffset) {

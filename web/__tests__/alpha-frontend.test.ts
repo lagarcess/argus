@@ -1226,6 +1226,12 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(palette).toContain("searchGlobal({ q: trimmed, limit: 30 })");
     expect(palette).toContain("commandPaletteItemFromSearch");
+    expect(palette).toContain("commandPaletteGroupsByLedgerState");
+    expect(palette).not.toContain('t("command_palette.ledger.title", "Idea Ledger")');
+    expect(palette).not.toContain("command_palette.ledger.all_saved_ideas");
+    expect(palette).toContain("decisionStateFilter === group.decision_state");
+    expect(palette).toContain("clearSearchAndLedger();");
+    expect(palette).toContain("group.count === 0");
     expect(palette).toContain("commandPaletteSelectedPreview(previewItem, displayItems)");
     expect(palette).toContain("setPreviewItem(null)");
     expect(adapter).toContain("command_palette.open_source_conversation");
@@ -1253,6 +1259,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).toContain('t("command_palette.search_placeholder", "Search Argus...")');
     expect(palette).toContain("loadMoreSearch");
     expect(api).toContain("cursor?: string");
+    expect(api).toContain("decisionState?: DecisionState | null");
+    expect(api).toContain("includeLedgerGroups?: boolean");
+    expect(api).toContain('searchParams.append("decision_state", decisionState)');
+    expect(api).toContain('searchParams.append("include_ledger_groups", "true")');
     expect(api).toContain("export async function searchGlobal");
   });
 
@@ -1505,6 +1515,127 @@ describe("Argus Alpha frontend contract", () => {
     );
   });
 
+  test("profile menu groups data controls preferences and legal links", () => {
+    const profileMenu = readFileSync(
+      join(root, "components/sidebar/ProfileMenu.tsx"),
+      "utf-8",
+    );
+    const en = readFileSync(
+      join(root, "public/locales/en/common.json"),
+      "utf-8",
+    );
+    const es = readFileSync(
+      join(root, "public/locales/es-419/common.json"),
+      "utf-8",
+    );
+
+    const dataStart = profileMenu.indexOf('{activeSubmenu === "data"');
+    const preferencesStart = profileMenu.indexOf(
+      '{activeSubmenu === "settings"',
+    );
+    const legalStart = profileMenu.indexOf('{activeSubmenu === "help"');
+    expect(dataStart).toBeGreaterThan(-1);
+    expect(preferencesStart).toBeGreaterThan(dataStart);
+    expect(legalStart).toBeGreaterThan(preferencesStart);
+
+    const dataBlock = profileMenu.slice(dataStart, preferencesStart);
+    const preferencesBlock = profileMenu.slice(preferencesStart, legalStart);
+    const legalBlock = profileMenu.slice(legalStart);
+
+    expect(en).toContain('"title": "Data Controls"');
+    expect(en).toContain('"title": "Preferences"');
+    expect(en).toContain('"title": "Help & Legal"');
+    expect(en).toContain('"usage": "Usage"');
+    expect(es).toContain('"title": "Controles de datos"');
+    expect(es).toContain('"title": "Preferencias"');
+    expect(es).toContain('"title": "Ayuda y legal"');
+    expect(es).toContain('"usage": "Uso"');
+
+    expect(dataBlock).toContain("settings.data.security");
+    expect(dataBlock).toContain("settings.data.usage");
+    expect(dataBlock).toContain("disabled");
+    expect(dataBlock).toContain("settings.profile.delete_account");
+    expect(dataBlock).toContain("settings.profile.delete_account_note");
+    expect(dataBlock).toContain("handleOpenDeleteRequest");
+    expect(dataBlock).toContain("hover:bg-[#d66d75]/10");
+    expect(preferencesBlock).toContain("settings.preferences.title");
+    expect(preferencesBlock).toContain("settings.app.appearance");
+    expect(preferencesBlock).toContain("settings.app.language");
+    expect(preferencesBlock).toContain("settings.app.sidebar");
+    expect(preferencesBlock).not.toContain("settings.app.security");
+    expect(legalBlock).toContain('href="/terms"');
+    expect(legalBlock).toContain('href="/privacy"');
+    expect(legalBlock).toContain("settings.help.release_notes");
+    expect(legalBlock).toContain("disabled");
+    expect(profileMenu).toContain('href="/terms"');
+    expect(profileMenu).toContain('href="/privacy"');
+  });
+
+  test("alpha legal pages exist and disclose terms privacy and providers", () => {
+    const termsPath = join(root, "app/terms/page.tsx");
+    const privacyPath = join(root, "app/privacy/page.tsx");
+    const legalPagePath = join(root, "components/legal/AlphaLegalPage.tsx");
+
+    expect(existsSync(termsPath)).toBe(true);
+    expect(existsSync(privacyPath)).toBe(true);
+    expect(existsSync(legalPagePath)).toBe(true);
+
+    const terms = readFileSync(termsPath, "utf-8");
+    const privacy = readFileSync(privacyPath, "utf-8");
+    const legalPage = readFileSync(legalPagePath, "utf-8");
+    const en = readFileSync(
+      join(root, "public/locales/en/common.json"),
+      "utf-8",
+    );
+    const es = readFileSync(
+      join(root, "public/locales/es-419/common.json"),
+      "utf-8",
+    );
+
+    expect(terms).toContain('kind="terms"');
+    expect(terms).toContain("NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL");
+    expect(terms).not.toContain("TODO");
+    expect(privacy).toContain('kind="privacy"');
+    expect(privacy).toContain("NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL");
+    expect(privacy).not.toContain("TODO");
+
+    expect(legalPage).toContain('"use client"');
+    expect(legalPage).toContain("useTranslation");
+    expect(legalPage).toContain("legal.terms.title");
+    expect(legalPage).toContain("legal.privacy.title");
+    expect(legalPage).toContain("font-display");
+    expect(legalPage).toContain("body_before_email");
+    expect(legalPage).toContain("mailto:${supportEmail}");
+
+    expect(en).toContain('"effective_date": "Effective date: June 30, 2026"');
+    expect(en).toContain('"title": "No investment advice"');
+    expect(en).toContain("not a broker");
+    expect(en).toContain("Historical simulations are hypothetical");
+    expect(en).toContain("OpenRouter");
+    expect(en).toContain("Supabase");
+    expect(en).toContain("Render");
+    expect(en).toContain("Alpaca");
+    expect(en).toContain("Kraken");
+    expect(en).toContain("TradingView Lightweight Charts");
+    expect(en).toContain("PostHog");
+    expect(en).toContain("prompts may be sent");
+
+    expect(es).toContain(
+      '"effective_date": "Fecha de entrada en vigor: 30 de junio de 2026"',
+    );
+    expect(es).toContain("No es asesoría de inversión");
+    expect(es).toContain("Argus no es broker");
+    expect(es).toContain("Las simulaciones históricas son hipotéticas");
+    expect(es).toContain("OpenRouter");
+    expect(es).toContain("Supabase");
+    expect(es).toContain("Render");
+    expect(es).toContain("Alpaca");
+    expect(es).toContain("Kraken");
+    expect(es).toContain("TradingView Lightweight Charts");
+    expect(es).toContain("PostHog");
+    expect(es).toContain("prompts puede enviarse");
+  });
+
   test("profile menu delete all conversations is recoverable and outcome-aware", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const chat = readFileSync(
@@ -1599,9 +1730,12 @@ describe("Argus Alpha frontend contract", () => {
     expect(page).toContain('type AuthMode = "intro" | "signup" | "login"');
     expect(page).toContain('updateAuthMode("signup")');
     expect(page).toContain('const showLogin = () => updateAuthMode("login")');
+    expect(page).toContain('href="/terms"');
+    expect(page).toContain('href="/privacy"');
     expect(page).not.toContain('const authHref = "/chat"');
     expect(page).not.toContain("href={authHref}");
     expect(page).not.toContain('href="/login"');
+    expect(page).not.toContain('href="#"');
   });
 
   test("auth exits return to the clean front door", () => {
@@ -1651,7 +1785,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(settings).toContain("{showSubscriptionSection && (");
   });
 
-  test("sidebar private-alpha flags hide strategies and omnisearch without hiding recents", () => {
+  test("sidebar keeps strategies flagged while omnisearch is enabled by default", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -1667,6 +1801,9 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(flags).toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
     expect(flags).toContain("NEXT_PUBLIC_OMNISEARCH_ENABLED");
+    expect(flags).toContain(
+      'process.env.NEXT_PUBLIC_OMNISEARCH_ENABLED !== "false"',
+    );
     expect(chat).toContain("{omnisearchEnabled && searchOverlayOpen && (");
     expect(sidebar).toContain("strategiesEnabled");
     expect(sidebar).toContain("omnisearchEnabled");

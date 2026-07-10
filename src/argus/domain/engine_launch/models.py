@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from argus.domain.backtesting.date_window import validate_backtest_date_window
 
@@ -31,6 +31,8 @@ class DateRange(BaseModel):
 
 
 class LaunchBacktestRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     strategy_type: LaunchStrategyType
     symbol: str
     symbols: list[str] = Field(default_factory=list)
@@ -47,6 +49,10 @@ class LaunchBacktestRequest(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
     risk_rules: list[dict[str, Any]] = Field(default_factory=list)
     benchmark_symbol: str
+    execution_realism: dict[str, Any] | None = Field(
+        default=None,
+        alias="_execution_realism",
+    )
     language: str = "en"
 
     @model_validator(mode="after")

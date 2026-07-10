@@ -518,8 +518,8 @@ def test_spanish_approval_routes_by_llm_semantics_not_text_matching(
     assert result.decision.semantic_turn_act == "approval"
     assert result.decision.candidate_strategy_draft.asset_universe == ["ETH"]
     assert "confirmation_payload" not in result.patch
-    assert "confirmación visible" in result.patch["assistant_response"].lower()
-    assert "visible card" not in result.patch["assistant_response"].lower()
+    assert result.patch["recovery"]["code"] == "confirmation_action_guidance"
+    assert result.patch["recovery"]["retryable"] is False
 
 
 def test_spanish_result_followup_anchors_to_latest_result(

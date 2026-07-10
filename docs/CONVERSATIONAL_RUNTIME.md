@@ -23,6 +23,7 @@ This separation is intentional:
 - Deterministic code is used for capability truth, provider availability, asset class validation, required-field gating, same-asset restrictions, execution defaults, benchmark selection, indicator execution specs, backtest execution, result envelopes, persistence, and stream event shape.
 - The LLM cannot silently mark unsupported behavior as executable, invent asset availability, change symbols, skip required confirmation, or fabricate result metrics.
 - Before confirmation, Argus runs semantic conservation checks so explicit user constraints outrank defaults. If a user-supplied date, cadence, asset, or money role cannot be preserved or normalized, Argus clarifies instead of emitting a confident `Ready to run` card.
+- Asset grounding starts inside interpretation: provider-backed resolution context should help the model extract every clearly mentioned same-class asset before confirmation. Deterministic validation then resolves only the assets the interpreter identified. Ambiguous company-name matches must clarify instead of being silently dropped.
 - For DCA / recurring accumulation, `capital_amount` is the recurring contribution. Current DCA execution supports that one executable dollar amount only. Starting principal, total capital budgets, and contribution ceilings may be acknowledged as user intent, but they are future engine capabilities and must not overwrite the contribution amount.
 - Deterministic fallback cannot become the normal assistant voice. If the LLM fails, Argus may preserve truth internally, but user-facing copy must be natural recovery language rather than raw fields, enums, or starter prompts.
 
@@ -37,9 +38,10 @@ not replace LangGraph runtime memory or Supabase product records.
 Result references are derived from immutable `backtest_runs` records. The
 runtime may expose a result fact bank containing the run id, conversation id,
 strategy id, asset class, symbols, benchmark, metrics, config snapshot, result
-card, chart, and trades so follow-up answers can use actual run facts after
-reload. Engine metrics and `backtest_runs.config_snapshot` remain the canonical
-truth; the fact bank is a transport/context projection.
+card, optional structured execution-cost evidence, chart, and trades so
+follow-up answers can use actual run facts after reload. Engine metrics,
+`backtest_runs.config_snapshot`, and structured result-card evidence remain the
+canonical truth; the fact bank is a transport/context projection.
 
 Failed-action references preserve recoverable action context such as the action
 type, launch payload, failure classification, and user-safe error. They exist so
@@ -67,6 +69,28 @@ When a response fails this gate, normal ambiguity is sent back through the
 structured LLM clarifier with bounded facts and requested fields. Deterministic
 user-facing copy is reserved for explicit artifact-action recovery, such as a
 stale or non-retryable failed-run action, where code owns the safety boundary.
+
+## Language-Agnostic Prose Composition
+
+Runtime copy is composed, not templated per language. Since the B4 language-gate
+retirement (#154, PRs #174-177), Argus keeps no parallel English/Spanish copy
+tables in the runtime:
+
+- LLM-authored prose (result summaries, clarifications, explanations) is written
+  in the detected turn language from a typed fact bank. The backend supplies
+  typed facts; the model supplies the words.
+- Degraded and recovery copy renders from typed codes, not per-language strings.
+  When the LLM path is unavailable, the runtime maps a typed recovery/degraded
+  code to localized surface text at the presentation boundary, never a runtime
+  `if locale == "es-419"` branch or an `_english_*` helper.
+- Result-card chrome (labels, headings, chips) renders from typed keys the
+  frontend localizes, not from backend-baked language strings.
+
+The invariant: prose follows the detected turn language everywhere, English and
+Spanish parity is proven by the eval harness (not hardcoded copy), and no runtime
+module carries per-language copy tables, localized stop-word lists, or
+display-label token matching for semantic choice selection. This is the runtime
+expression of the P2.0 guardrail against per-language copy.
 
 ## Active Layers
 
@@ -121,7 +145,38 @@ Result actions are available only after a completed run:
 - `refine_strategy`
 - `save_strategy`
 
+Response-option actions may answer a structured clarification choice:
+
+- `select_response_option`
+
+These actions must carry typed option metadata such as `option_index` or
+`replacement_values`. The runtime may use that metadata in degraded recovery,
+but it must not infer the chosen option from translated display labels.
+
 `save_strategy` belongs inside the result card when Strategies are enabled. It saves from canonical run/result state, not reconstructed frontend prose. Under private-alpha defaults (`NEXT_PUBLIC_STRATEGIES_ENABLED=false`, `ARGUS_STRATEGIES_ENABLED=false`), hide Save in the UI and respond to save intent by reminding the user that the result remains available in conversation/history instead of creating a hidden strategy object.
+
+## Post-Result Continuity
+
+After a completed result, continuity edits are one typed contract with
+multiple entry points (shipped by #141 / PR #148):
+
+- The `refine_strategy` result action opens a refinement pending state that
+  routes the next turn through the typed artifact-edit operations — the same
+  planner used by confirmation-card edits and natural-language edits. Refine
+  is a convenience entry point, not a separate interpretation path.
+- Refinement pending state is a first-class edit context: date-window and
+  cadence changes are planner-expressible edits and must not fall back to
+  generic interpretation. Strategy reshapes still fork to full interpretation.
+- A new idea immediately after a completed result may borrow that result's
+  context: references like "the same time period" bind silently to the latest
+  run's date window, and the bound values must appear on the resulting
+  confirmation card as visible assumptions, never as hidden defaults.
+- A confirmed pending date answer materializes once; repeated affirmatives
+  must not re-ask the same confirmation.
+
+Regression coverage: `tests/agent_runtime/test_refine_action_edit_routing.py`,
+`tests/agent_runtime/test_post_result_edit_routing.py`, and
+`tests/agent_runtime/test_latest_result_window_binding.py`.
 
 ## Persistence Boundary
 

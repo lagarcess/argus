@@ -111,18 +111,10 @@ def _build_signals(
         exits = (fast < slow) & (fast.shift(1) >= slow.shift(1))
         return entries.fillna(False).astype(bool), exits.fillna(False).astype(bool)
 
-    if template == "momentum_breakout":
-        rolling_high = close.rolling(20).max().shift(1)
-        rolling_mid = close.rolling(20).mean()
-        entries = close >= rolling_high
-        exits = close < rolling_mid
-        return entries.fillna(False).astype(bool), exits.fillna(False).astype(bool)
-
-    if template == "trend_follow":
-        trend = close > close.rolling(50).mean()
-        entries = trend & ~trend.shift(1).fillna(False)
-        exits = (~trend) & trend.shift(1).fillna(False)
-        return entries.fillna(False).astype(bool), exits.fillna(False).astype(bool)
+    # momentum_breakout / trend_follow are draft templates (status="draft" in the
+    # capability registry) with no supported path: they are excluded from
+    # ALLOWED_TEMPLATES and the StrategyTemplate API enum, so they never reach here.
+    # Their orphaned handlers were retired; an unknown template raises below.
 
     if template == "buy_the_dip":
         dip = close.pct_change().fillna(0.0) <= -0.03

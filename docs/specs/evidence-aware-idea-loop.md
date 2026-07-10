@@ -1,6 +1,9 @@
 # Evidence-Aware Idea Loop
 
-**Status:** Draft active product spec
+**Status:** Source thesis / strategic background. This spec directly informed
+`docs/specs/private-alpha-next-decision-memo.md`; use the decision memo as the
+current strategic north star and `docs/specs/private-alpha-next-roadmap.md` as
+the execution board.
 **Date:** 2026-06-10
 **Branch:** `codex/private-alpha-next`
 **Audience:** Founder, Codex, future implementation agents, reviewers

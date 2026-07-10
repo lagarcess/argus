@@ -36,6 +36,8 @@ services:
         value: https://argus-app-suz5.onrender.com
       - key: ARGUS_STRATEGIES_ENABLED
         value: "false"
+      - key: ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED
+        value: "false"
       - key: ARGUS_BACKTEST_JOBS_SHADOW_ENABLED
         value: "false"
       - key: ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED
@@ -81,9 +83,9 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
       - key: ARGUS_UTILITY_MODEL
-        value: qwen/qwen3.5-9b
-      - key: ARGUS_UTILITY_FALLBACK_MODEL
         value: google/gemini-2.5-flash-lite
+      - key: ARGUS_UTILITY_FALLBACK_MODEL
+        value: qwen/qwen3.5-9b
       - key: ARGUS_CHAT_MODEL
         value: deepseek/deepseek-v4-flash
       - key: ARGUS_CHAT_FALLBACK_MODEL
@@ -91,9 +93,9 @@ services:
       - key: ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS
         value: "30"
       - key: ARGUS_STRUCTURED_MODEL
-        value: mistralai/mistral-small-2603
+        value: x-ai/grok-4.3
       - key: ARGUS_STRUCTURED_FALLBACK_MODEL
-        value: deepseek/deepseek-v4-flash
+        value: anthropic/claude-haiku-4.5
       - key: ARGUS_CONTEXT_MODEL
         value: openai/gpt-oss-120b
       - key: ARGUS_CONTEXT_FALLBACK_MODEL

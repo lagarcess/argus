@@ -4,25 +4,15 @@ import asyncio
 from typing import Any
 
 from argus.agent_runtime.artifacts.continuity import (
-    apply_patch_to_anchor,
-    patched_draft_from_candidate,
     resolve_artifact_anchor,
 )
-from argus.agent_runtime.artifacts.patch_policy import (
-    executable_artifact_patch_missing_fields,
-    relevant_unsupported_constraints_for_artifact_patch,
-)
-from argus.agent_runtime.artifacts.strategy_edits import ArtifactPatch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.clarification_contract import offline_clarification_fallback
 from argus.agent_runtime.recovery_messages import (
     recovery_message,
     recovery_state_stage_patch,
 )
-from argus.agent_runtime.response_style import (
-    result_followup_heading,
-    with_response_heading,
-)
+from argus.agent_runtime.response_style import result_followup_response_intent
 from argus.agent_runtime.result_followups import (
     compose_result_followup_response,
     context_packet_ids_from_fact_bank,
@@ -37,11 +27,9 @@ from argus.agent_runtime.stages.approval_guard import (
     decision_requests_confirmation_card_action,
 )
 from argus.agent_runtime.stages.artifact_context import (
-    RESULT_FOLLOWUP_TARGET_INFERRED,
     active_confirmation_effective_strategy,
     confirmation_payload_dict,
     confirmation_payload_is_validated_executable,
-    decision_allows_result_artifact_patch,
     decision_targets_result_artifact,
     draft_assumptions_response,
     failed_action_is_retryable,
@@ -55,6 +43,10 @@ from argus.agent_runtime.stages.artifact_context import (
     strategy_from_result_action_snapshot,
     validated_approval_confirmation_payload_from_snapshot,
     validated_approval_confirmation_payload_from_state,
+)
+from argus.agent_runtime.stages.interpret_internal.result_artifact_patch import (
+    _deterministic_result_artifact_patch_stage_result_if_applicable,
+    _result_artifact_patch_stage_result_if_applicable,
 )
 from argus.agent_runtime.stages.interpret_types import (
     InterpretDecision,
@@ -152,12 +144,8 @@ def structured_action_stage_result_if_applicable(
         snapshot=snapshot,
         action_payload=action.payload,
     )
-    if (
-        snapshot is None
-        or (
-            snapshot.pending_strategy_summary is None
-            and anchor.draft is None
-        )
+    if snapshot is None or (
+        snapshot.pending_strategy_summary is None and anchor.draft is None
     ):
         return StageResult(
             outcome="await_user_reply",
@@ -184,6 +172,14 @@ def structured_action_stage_result_if_applicable(
 
     if action_type in CONFIRMATION_EDIT_ACTION_FIELDS:
         requested_field = CONFIRMATION_EDIT_ACTION_FIELDS[action_type]
+        facts: dict[str, Any] = {
+            "strategy": pending.model_dump(mode="python"),
+            "current_user_message": state.current_user_message,
+            "structured_action": action.model_dump(mode="python"),
+            "language": language,
+        }
+        if action_type == "change_asset":
+            facts["asset_edit_frame"] = "operation_agnostic"
         return StageResult(
             outcome="needs_clarification",
             stage_patch={
@@ -195,12 +191,7 @@ def structured_action_stage_result_if_applicable(
                     "kind": "clarification",
                     "semantic_needs": [semantic_need_for_action(action_type)],
                     "requested_fields": [requested_field],
-                    "facts": {
-                        "strategy": pending.model_dump(mode="python"),
-                        "current_user_message": state.current_user_message,
-                        "structured_action": action.model_dump(mode="python"),
-                        "language": language,
-                    },
+                    "facts": facts,
                     "options": [],
                 },
             },
@@ -392,9 +383,7 @@ def approval_stage_result_if_applicable(
                     ],
                 }
             ),
-            stage_patch={
-                "assistant_response": _confirmation_action_guidance(language),
-            },
+            stage_patch=_confirmation_action_guidance_patch(language),
         )
     if decision.semantic_turn_act != "approval":
         return None
@@ -424,9 +413,7 @@ def approval_stage_result_if_applicable(
                     "semantic_turn_act": "approval",
                 }
             ),
-            stage_patch={
-                "assistant_response": _confirmation_action_guidance(language),
-            },
+            stage_patch=_confirmation_action_guidance_patch(language),
         )
     if snapshot.active_confirmation_reference is not None and (
         decision_requests_confirmation_card_action(
@@ -452,9 +439,7 @@ def approval_stage_result_if_applicable(
                     "semantic_turn_act": "approval",
                 }
             ),
-            stage_patch={
-                "assistant_response": _confirmation_action_guidance(language),
-            },
+            stage_patch=_confirmation_action_guidance_patch(language),
         )
     if not decision_is_pure_approval(
         decision=decision,
@@ -480,9 +465,7 @@ def approval_stage_result_if_applicable(
                     "semantic_turn_act": "approval",
                 }
             ),
-            stage_patch={
-                "assistant_response": _confirmation_action_guidance(language),
-            },
+            stage_patch=_confirmation_action_guidance_patch(language),
         )
     confirmation_payload = validated_approval_confirmation_payload_from_state(
         state=state,
@@ -493,9 +476,8 @@ def approval_stage_result_if_applicable(
             snapshot=snapshot,
             approved_strategy=approved_strategy,
         )
-    if (
-        confirmation_payload is None
-        and not prior_stage_was_await_approval(selected_thread_metadata)
+    if confirmation_payload is None and not prior_stage_was_await_approval(
+        selected_thread_metadata
     ):
         return None
     if confirmation_payload is None:
@@ -529,14 +511,23 @@ def approval_stage_result_if_applicable(
                 "semantic_turn_act": "approval",
             }
         ),
-        stage_patch={
-            "assistant_response": _confirmation_action_guidance(language),
-        },
+        stage_patch=_confirmation_action_guidance_patch(language),
     )
 
 
 def _confirmation_action_guidance(language: str | None) -> str:
     return recovery_message("confirmation_action_guidance", language=language)
+
+
+def _confirmation_action_guidance_patch(language: str | None) -> dict[str, Any]:
+    return {
+        "assistant_response": _confirmation_action_guidance(language),
+        **recovery_state_stage_patch(
+            "confirmation_action_guidance",
+            language=language,
+            retryable=False,
+        ),
+    }
 
 
 def _active_confirmation_is_valid(snapshot: TaskSnapshot) -> bool:
@@ -586,9 +577,7 @@ def _retry_failed_action_stage_result(
     require_requested_failed_action_id: bool = False,
     language: str = "en",
 ) -> StageResult:
-    reference = (
-        snapshot.latest_failed_action_reference if snapshot is not None else None
-    )
+    reference = snapshot.latest_failed_action_reference if snapshot is not None else None
     if (
         require_requested_failed_action_id and requested_failed_action_id is None
     ) or not _failed_action_matches_requested_id(
@@ -598,8 +587,7 @@ def _retry_failed_action_stage_result(
         reason_codes = [*decision.reason_codes, "stale_failed_action_retry"]
         retry_status = (
             "missing_artifact_id"
-            if require_requested_failed_action_id
-            and requested_failed_action_id is None
+            if require_requested_failed_action_id and requested_failed_action_id is None
             else "stale"
         )
         return StageResult(
@@ -816,10 +804,8 @@ async def artifact_followup_stage_result_if_applicable(
         outcome="ready_to_respond",
         decision=_result_followup_decision(decision, focus=focus),
         stage_patch={
-            "assistant_response": with_response_heading(
-                heading=result_followup_heading(focus, language=language),
-                body=response,
-            ),
+            "assistant_response": response,
+            "response_intent": result_followup_response_intent(focus),
             **(
                 recovery_state_stage_patch(
                     "latest_result_followup_unavailable",
@@ -830,208 +816,6 @@ async def artifact_followup_stage_result_if_applicable(
                 else {}
             ),
         },
-    )
-
-
-def _result_artifact_patch_stage_result_if_applicable(
-    *,
-    decision: InterpretDecision,
-    snapshot: TaskSnapshot | None,
-) -> StageResult | None:
-    if _result_followup_target_was_inferred_non_patch(decision):
-        return None
-    if not decision_allows_result_artifact_patch(decision=decision):
-        return None
-    reference = (
-        snapshot.latest_backtest_result_reference if snapshot is not None else None
-    )
-    if reference is None:
-        return None
-    anchor = resolve_artifact_anchor(
-        snapshot=snapshot,
-        action_payload={"run_id": reference.artifact_id},
-    )
-    patched = patched_draft_from_candidate(
-        anchor=anchor,
-        candidate=decision.candidate_strategy_draft,
-    )
-    if patched is None:
-        return None
-    return _stage_result_from_result_artifact_patch(
-        decision=decision,
-        patched=patched,
-        reason_code="artifact_patch_from_latest_result",
-    )
-
-
-def _deterministic_result_artifact_patch_stage_result_if_applicable(
-    *,
-    decision: InterpretDecision,
-    snapshot: TaskSnapshot | None,
-    current_user_message: str,
-) -> StageResult | None:
-    reference = (
-        snapshot.latest_backtest_result_reference if snapshot is not None else None
-    )
-    if reference is None:
-        return None
-    del current_user_message
-    if _result_followup_target_was_inferred_non_patch(decision):
-        return None
-    date_range = decision.candidate_strategy_draft.date_range
-    if not isinstance(date_range, dict) or not (
-        date_range.get("start") and date_range.get("end")
-    ):
-        return None
-    if not _decision_allows_deterministic_result_patch(
-        decision,
-        patch_fields=frozenset({"date_range"}),
-    ):
-        return None
-    anchor = resolve_artifact_anchor(
-        snapshot=snapshot,
-        action_payload={"run_id": reference.artifact_id},
-    )
-    patched = apply_patch_to_anchor(
-        anchor,
-        ArtifactPatch(
-            source="user_patch",
-            date_range=date_range,
-        ),
-    )
-    if patched is None:
-        return None
-    return _stage_result_from_result_artifact_patch(
-        decision=decision,
-        patched=patched,
-        reason_code="artifact_patch_from_latest_result",
-        additional_reason_codes=("artifact_date_patch_from_current_message",),
-    )
-
-
-def _result_followup_target_was_inferred_non_patch(
-    decision: InterpretDecision,
-) -> bool:
-    if RESULT_FOLLOWUP_TARGET_INFERRED not in decision.reason_codes:
-        return False
-    return _strategy_has_structured_non_patch_evidence(
-        strategy=decision.candidate_strategy_draft,
-        patch_fields=frozenset({"date_range", "strategy_type"}),
-    )
-
-
-def _decision_allows_deterministic_result_patch(
-    decision: InterpretDecision,
-    *,
-    patch_fields: frozenset[str],
-) -> bool:
-    if decision.artifact_target in {"active_confirmation", "pending_refinement"}:
-        return False
-    if decision.capability_question_focus is not None:
-        return False
-    if decision.context_question_focus is not None:
-        return False
-    if decision.intent == "unsupported_or_out_of_scope" or (
-        decision.semantic_turn_act == "unsupported_request"
-    ):
-        return not _strategy_has_structured_non_patch_evidence(
-            strategy=decision.candidate_strategy_draft,
-            patch_fields=patch_fields,
-        )
-    if decision.intent in {"beginner_guidance", "collection_management"}:
-        return False
-    if decision.semantic_turn_act in {
-        "approval",
-        "educational_question",
-        "retry_failed_action",
-    }:
-        return False
-    if decision.artifact_target == "latest_result":
-        return True
-    return (
-        decision.intent in {"backtest_execution", "strategy_drafting"}
-        or decision.task_relation == "refine"
-        or decision.semantic_turn_act
-        in {"answer_pending_need", "refine_current_idea", "result_followup"}
-    )
-
-
-def _strategy_has_structured_non_patch_evidence(
-    *,
-    strategy: StrategySummary,
-    patch_fields: frozenset[str],
-) -> bool:
-    ignored_fields = {
-        "raw_user_phrasing",
-        "strategy_thesis",
-        "resolution_provenance",
-        "extra_parameters",
-    }
-    for field_name in StrategySummary.model_fields:
-        if field_name in patch_fields or field_name in ignored_fields:
-            continue
-        if getattr(strategy, field_name) not in (None, "", [], {}):
-            return True
-    return False
-
-
-def _stage_result_from_result_artifact_patch(
-    *,
-    decision: InterpretDecision,
-    patched: StrategySummary,
-    reason_code: str,
-    additional_reason_codes: tuple[str, ...] = (),
-) -> StageResult:
-    missing_fields = missing_required_fields_for_strategy(
-        patched,
-        contract=build_default_capability_contract(),
-    )
-    missing_fields = executable_artifact_patch_missing_fields(
-        strategy=patched,
-        missing_fields=missing_fields,
-    )
-    unsupported_constraints = relevant_unsupported_constraints_for_artifact_patch(
-        strategy=patched,
-        constraints=decision.unsupported_constraints,
-    )
-    has_blocking_validation = bool(
-        missing_fields
-        or decision.ambiguous_fields
-        or unsupported_constraints
-    )
-    refined_decision = decision.model_copy(
-        update={
-            "intent": "backtest_execution",
-            "task_relation": "refine",
-            "requires_clarification": has_blocking_validation,
-            "candidate_strategy_draft": patched,
-            "missing_required_fields": list(missing_fields),
-            "unsupported_constraints": list(unsupported_constraints),
-            "semantic_turn_act": "refine_current_idea",
-            "result_followup_focus": None,
-            "reason_codes": list(
-                dict.fromkeys(
-                    [
-                        *decision.reason_codes,
-                        reason_code,
-                        *additional_reason_codes,
-                    ]
-                )
-            ),
-        }
-    )
-    stage_patch: dict[str, Any] = {
-        "candidate_strategy_draft": patched.model_dump(mode="python"),
-        "missing_required_fields": list(missing_fields),
-    }
-    return StageResult(
-        outcome=(
-            "needs_clarification"
-            if has_blocking_validation
-            else "ready_for_confirmation"
-        ),
-        decision=refined_decision,
-        stage_patch=stage_patch,
     )
 
 
@@ -1052,7 +836,7 @@ async def _compose_result_followup_with_timeout(
             ),
             timeout=RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS,
         )
-    except TimeoutError:
+    except (TimeoutError, asyncio.TimeoutError):
         fact_bank = result_followup_fact_bank(metadata)
         record_result_followup_recovery_receipt(
             task=result_followup_llm_task(fact_bank=fact_bank, focus=focus),

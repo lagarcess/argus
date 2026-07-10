@@ -131,6 +131,60 @@ def test_task_snapshot_normalizes_prior_dict_resolution_provenance() -> None:
     ]
 
 
+def test_ready_response_with_requested_fields_promotes_current_pending_strategy() -> None:
+    prior = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="signal_strategy",
+            strategy_thesis="Unsupported ATR draft.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        )
+    )
+    strategy = StrategySummary(
+        strategy_type="signal_strategy",
+        strategy_thesis="Use a 50/200 moving-average crossover.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_logic="Buy when the fast SMA crosses above the slow SMA.",
+    )
+
+    updated = _apply_stage_result(
+        {
+            "run_state": RunState(current_user_message="usa cruce de medias"),
+            "user": UserState(user_id="u1", language_preference="es-419"),
+            "latest_task_snapshot": prior,
+            "artifact_references": [],
+        },
+        StageResult(
+            outcome="ready_to_respond",
+            stage_patch={
+                "intent": "backtest_execution",
+                "task_relation": "continue",
+                "user_goal_summary": "Need the moving-average periods.",
+                "semantic_turn_act": "answer_pending_need",
+                "candidate_strategy_draft": strategy.model_dump(mode="python"),
+                "response_intent": ResponseIntent(
+                    kind="clarification",
+                    semantic_needs=["rule_definition"],
+                    requested_fields=["entry_rule"],
+                ).model_dump(mode="python"),
+                "assistant_response": "¿Qué cruce quieres usar?",
+            },
+        ),
+    )
+
+    snapshot = updated["latest_task_snapshot"]
+    assert snapshot.completed is False
+    assert snapshot.pending_strategy_summary is not None
+    assert snapshot.pending_strategy_summary.asset_universe == ["TSLA"]
+    assert snapshot.pending_strategy_summary.entry_logic == (
+        "Buy when the fast SMA crosses above the slow SMA."
+    )
+    assert updated["selected_thread_metadata"]["requested_field"] == "entry_rule"
+
+
 def test_public_result_normalizes_dict_resolution_provenance() -> None:
     run_state = RunState(current_user_message="si, ejecutalo")
     run_state.resolution_provenance = [
@@ -1006,9 +1060,12 @@ async def test_workflow_preserves_confirmation_validation_prompt(monkeypatch) ->
     response_intent = result["pending_strategy"]["response_intent"]
     assert response_intent["kind"] == "unsupported_recovery"
     assert clarifier.requests
-    assert clarifier.requests[0].response_intent["facts"][
-        "unsupported_constraints"
-    ][0]["category"] == "data_window_too_short_for_rule"
+    assert (
+        clarifier.requests[0].response_intent["facts"]["unsupported_constraints"][0][
+            "category"
+        ]
+        == "data_window_too_short_for_rule"
+    )
     assert clarifier.requests[0].response_intent["options"] == [
         {"label": "Use a longer date range"},
         {"label": "Use a shorter indicator period"},
@@ -1139,8 +1196,12 @@ async def test_workflow_confirmation_assumption_action_stays_in_clarification() 
     )
 
     assert result["stage_outcome"] == "await_user_reply"
-    assert result["assistant_response"] == "¿Qué supuesto quieres ajustar para AAPL?"
-    assert "I can test" not in result["assistant_response"]
+    assert result["assistant_response"]
+    clarification = result["clarification"]
+    assert clarification["kind"] == "clarification"
+    assert clarification["reason_code"] == "missing_assumption"
+    assert clarification["requested_field"] == "assumption"
+    assert clarification["payload"]["strategy"]["asset_universe"] == ["AAPL"]
     assert "confirmation_payload" not in result
 
 
@@ -1394,8 +1455,7 @@ async def test_spanish_explicit_day_range_survives_confirmation_payload(
     assert result["stage_outcome"] == "await_approval"
     assert result["confirmation_payload"]["strategy"]["date_range"] == expected_range
     assert (
-        result["confirmation_payload"]["launch_payload"]["date_range"]
-        == expected_range
+        result["confirmation_payload"]["launch_payload"]["date_range"] == expected_range
     )
 
     card = runtime_confirmation_card(result, language="es-419")
@@ -1466,9 +1526,7 @@ async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
     assert interpreter.requests == []
     assert prompt_result["stage_outcome"] == "await_user_reply"
     assert prompt_result["pending_strategy"]["requested_field"] == "date_range"
-    assert prompt_result["pending_strategy"]["missing_required_fields"] == [
-        "date_range"
-    ]
+    assert prompt_result["pending_strategy"]["missing_required_fields"] == ["date_range"]
 
     answer_result = await run_agent_turn(
         workflow=workflow,
@@ -1481,8 +1539,7 @@ async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
     assert interpreter.requests[0].user.language_preference == "es-419"
     assert interpreter.requests[0].latest_task_snapshot is not None
     assert (
-        interpreter.requests[0].latest_task_snapshot.pending_strategy_summary
-        is not None
+        interpreter.requests[0].latest_task_snapshot.pending_strategy_summary is not None
     )
     assert interpreter.requests[0].selected_thread_metadata["requested_field"] == (
         "date_range"
@@ -1545,9 +1602,7 @@ async def test_workflow_spanish_adjust_assumptions_answer_reenters_interpreter()
     assert interpreter.requests == []
     assert prompt_result["stage_outcome"] == "await_user_reply"
     assert prompt_result["pending_strategy"]["requested_field"] == "assumption"
-    assert prompt_result["pending_strategy"]["missing_required_fields"] == [
-        "assumption"
-    ]
+    assert prompt_result["pending_strategy"]["missing_required_fields"] == ["assumption"]
 
     answer_result = await run_agent_turn(
         workflow=workflow,
@@ -1569,9 +1624,9 @@ async def test_workflow_spanish_adjust_assumptions_answer_reenters_interpreter()
     assert strategy["comparison_baseline"] == "SPY"
     assert strategy.get("capital_amount") is None
     assert (
-        answer_result["confirmation_payload"]["optional_parameters"][
-            "initial_capital"
-        ]["value"]
+        answer_result["confirmation_payload"]["optional_parameters"]["initial_capital"][
+            "value"
+        ]
         == 250000
     )
     assert answer_result["pending_strategy"]["requested_field"] is None

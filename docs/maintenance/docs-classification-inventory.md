@@ -2,12 +2,16 @@
 
 ## Summary
 
-Snapshot note: refreshed after the clean P0 continuity reintegration on
-`codex/private-alpha-next-reintegration` at `bbd9f10`.
+Snapshot note: refreshed for `codex/private-alpha-next` after P2.0/P2.1 landed
+and after the evidence-aware loop was reclassified as source thesis for the
+decision memo. Refreshed again 2026-07-07 after the Gate A/B loop, the B4
+language-gate retirement, and execution realism landed — see the 2026-07-07 pass
+below and the updated rows for the moved/resolved docs.
 
 Current source stack after the canon docs:
 
-1. `docs/specs/private-alpha-next-roadmap.md` is the active P1 execution board.
+1. `docs/specs/private-alpha-next-roadmap.md` is the active Private Alpha Next
+   execution board.
 2. `docs/specs/private-alpha-next-decision-memo.md` is the active strategic
    north star and slice-onboarding source.
 3. `docs/specs/private-alpha-ci-cd-sota.md`,
@@ -19,15 +23,32 @@ Quarantine branches are reference material only. Do not broad cherry-pick
 runtime work from `codex/private-alpha-next-quarantine-fc231e8`; promote only
 small, reviewed, revertable slices.
 
-Snapshot note: refreshed for the `codex/private-alpha-next` CI/CD SOTA mission.
-For this branch, `docs/specs/private-alpha-ci-cd-sota.md` is the current active
-goal. `docs/specs/private-alpha-next-integration.md` remains staging/process
-context, and `docs/specs/private-alpha-next-decision-memo.md` is future context
-only.
+Release-discipline note: `docs/specs/private-alpha-ci-cd-sota.md` remains the
+release-gate reference. It does not own Private Alpha Next product sequencing.
 
 Archive pass: high-confidence stale private-alpha specs and completed checkpoint
 docs were moved from `docs/specs/` to `docs/archive/` so active agents do not
 mistake them for current command sources.
+
+2026-07-07 pass: after the Gate A/B loop (#140/#142/#153/#146), the B4
+language-gate retirement (#154, #174-177), and execution realism (#130/#178)
+landed, four more docs moved to `docs/archive/`: the two completed P2.1 specs
+(`private-alpha-next-p2.1-capability-audit.md`,
+`private-alpha-next-p2.1a-capability-registry-impl.md`) and the two
+self-declared-historical top-level docs (`PRODUCTION_READINESS_AUDIT.md`,
+`ARGUS_SYSTEM_STEERING.md`). The two completed P1 superpowers plans
+(`2026-06-19-p1-evidence-decision-spine.md`,
+`2026-06-20-p1-red-audit-recovery.md`) received historical banners in place.
+`docs/CONVERSATIONAL_RUNTIME.md` is resolved as an active runtime-contract doc,
+not a stale one. `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md` is likewise resolved as
+the active manual browser-QA script (its "legacy orchestrator path?" flag was
+unfounded) and refreshed with a status banner plus Spanish and language-mismatch
+transcripts.
+
+2026-07-08 pass: `docs/specs/private-alpha-next-refine-to-version.md` moved to
+`docs/archive/private-alpha-next-refine-to-version.md` after issue #141 / PR
+#148 shipped. A one-line pointer stub remains at the original path for existing
+roadmap links.
 
 ## Inventory
 
@@ -47,18 +68,19 @@ mistake them for current command sources.
 | `docs/specs/private-alpha-next-integration.md` | active staging/process context | Records integration-lane branch mechanics, quarantine rules, closed work, Jules boundaries, and P0 reintegration process. | Keep as staging/process context. | Current context, not command doc |
 | `docs/archive/private-alpha-conversation-trust.md` | archived historical evidence / completed checkpoint | Marked as merged and deployed checkpoint; useful for conversation-trust design context but not current execution scope. | Keep archived for branch archaeology. | Completed |
 | `docs/archive/private-alpha-status-action-parity-audit.md` | archived historical evidence / implemented slice | Implemented and locally verified; useful as artifact lifecycle evidence but not current execution scope. | Keep archived for branch archaeology. | Completed |
+| `docs/archive/private-alpha-next-refine-to-version.md` | archived historical evidence / implemented slice | Shipped in issue #141 / PR #148; A1b/A2 sequencing now belongs to the active roadmap. | Keep archived for branch archaeology. | Moved 2026-07-08; pointer stub remains in `docs/specs/` |
 | `docs/archive/private-alpha-readiness-orchestration.md` | archived branch-specific context | Coordination note for `codex/private-alpha-readiness-clean`; not the current Private Alpha Next roadmap. | Keep archived for readiness-lane archaeology. | Readiness lane |
 | `docs/archive/private-alpha-controlled-readiness-panel.md` | archived branch/lane-specific context | Controlled-alpha readiness panel for readiness decisions; useful evidence but not the active roadmap. | Keep archived for readiness-lane archaeology. | Readiness lane |
 | `docs/archive/private-alpha-performance-readiness-audit.md` | archived branch/lane-specific context | Supporting performance addendum for the controlled readiness slice. | Keep archived for readiness-lane archaeology. | Readiness lane |
-| `docs/specs/evidence-aware-idea-loop.md` | future/later context | Active refined product spec for the post-conversation-trust direction. It keeps direct test, education, light evidence, deep research, and monitoring as lanes into one durable idea loop. | Keep as future product context. | Future |
-| `docs/archive/research-lab-thesis.md` | archived historical evidence | Earlier Research Lab thesis draft. It is retained for context and explicitly refined by `docs/specs/evidence-aware-idea-loop.md`. | Keep archived for product archaeology. | Superseded by active evidence-aware loop spec. |
+| `docs/specs/evidence-aware-idea-loop.md` | source thesis / strategic background | Source product thesis for the durable idea loop. It directly informed `docs/specs/private-alpha-next-decision-memo.md`, which now owns current strategy. | Keep in `docs/specs/` with a clear source-thesis banner; do not treat as the active sequencing doc. | Provenance for the current decision memo |
+| `docs/archive/research-lab-thesis.md` | archived historical evidence | Earlier Research Lab thesis draft. It is retained for context and refined by `docs/specs/evidence-aware-idea-loop.md`, which then informed the decision memo. | Keep archived for product archaeology. | Superseded by evidence-aware source thesis and current decision memo |
 | `docs/archive/private-alpha-backtest-execution-capacity.md` | archived historical evidence | Draft from 2026-06-05; later release/runtime docs own active deployment discipline and architecture truth. | Keep archived for runtime-capacity archaeology. | Historical capacity draft |
 | `docs/archive/agent-architecture.md` | archived historical evidence | Proposed architecture from 2026-04-29. Predates the conversation trust milestone. | Keep archived for architecture archaeology. | Stale date |
-| `docs/CONVERSATIONAL_RUNTIME.md` | unclear/needs owner decision | Status is "Active Alpha implementation", but unclear if it's canon, active spec, or superseded by `docs/ARCHITECTURE.md`. | Decide if canon or stale/superseded. |  |
+| `docs/CONVERSATIONAL_RUNTIME.md` | active runtime-contract doc | Owns the conversational runtime contract (artifact spine, action events, typed-prose composition). Kept current through #178; complements, not superseded by, `docs/ARCHITECTURE.md`. | Keep active. Resolved 2026-07-07. |  |
 | `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` | archived/superseded | Explicitly marked "> Historical plan. This document records an earlier launch-closure checklist and should not be treated as the current milestone source of truth." | Archived under `docs/archive/`; use `docs/archive/private-alpha-conversation-trust.md` for the completed trust checkpoint and `docs/specs/private-alpha-ci-cd-sota.md` for release-gate discipline. | Explicitly stale. |
-| `docs/ARGUS_SYSTEM_STEERING.md` | historical evidence | "Pre-private-launch steering reference... planning reference, not an implementation ticket" from 2026-05-19. | Add historical banner. |  |
-| `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md` | unclear/needs owner decision | QA script. Could be canon process, or an active spec, or archive if out of date. | Clarify if this QA process is still active. | Uses legacy orchestrator path? |
-| `docs/PRODUCTION_READINESS_AUDIT.md` | historical evidence | Audit for `codex/production-readiness-gap-implementation` from 2026-05-05. | Add historical banner. |  |
+| `docs/archive/ARGUS_SYSTEM_STEERING.md` | historical evidence | "Pre-private-launch steering reference... planning reference, not an implementation ticket" from 2026-05-19. | Moved to `docs/archive/` (2026-07-07); carries its historical banner. |  |
+| `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md` | active QA process | Canonical manual browser-QA script for the conversational runtime; matches current runtime contracts (start command, action chips, result actions, provider/metric rules). The "legacy orchestrator path?" worry was unfounded. | Keep active. Resolved + refreshed 2026-07-07 (status banner + Spanish/language-mismatch transcripts). |  |
+| `docs/archive/PRODUCTION_READINESS_AUDIT.md` | historical evidence | Audit for `codex/production-readiness-gap-implementation` from 2026-05-05. | Moved to `docs/archive/` (2026-07-07); carries its historical banner. |  |
 | `docs/superpowers/plans/2026-05-06-streaming-persistence-ui-orchestration.md` | historical evidence | Implementation plan for Phase 5 from 2026-05-06. | Add historical banner. |  |
 | `docs/superpowers/plans/2026-05-12-conversational-contract-hardening.md` | historical evidence | Implementation plan from 2026-05-12. | Add historical banner. |  |
 | `docs/superpowers/plans/2026-05-06-agent-runtime-phase-6-structural-hygiene.md` | historical evidence | Implementation plan from 2026-05-06. | Add historical banner. |  |

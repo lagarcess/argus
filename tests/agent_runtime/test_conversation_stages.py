@@ -50,6 +50,7 @@ def test_clarify_uses_generator_for_missing_required_fields() -> None:
     ]
     assert clarifier.requests[0].language == "en"
     assert "asset_universe" not in result.patch["assistant_prompt"]
+    assert "clarification" not in result.patch
 
 
 def test_clarify_confirmation_action_period_uses_llm_voice_in_spanish() -> None:
@@ -83,6 +84,7 @@ def test_clarify_confirmation_action_period_uses_llm_voice_in_spanish() -> None:
     assert clarifier.requests[0].response_intent["semantic_needs"] == ["period"]
     assert clarifier.requests[0].response_intent["facts"]["language"] == "es-419"
     assert "Which date" not in result.patch["assistant_prompt"]
+    assert "clarification" not in result.patch
 
 
 def test_clarify_offline_fallback_uses_product_language() -> None:
@@ -106,12 +108,16 @@ def test_clarify_offline_fallback_uses_product_language() -> None:
     )
 
     assert result.outcome == "await_user_reply"
-    assert result.patch["assistant_prompt"] == (
-        "¿Qué periodo quieres usar para AAPL?"
-    )
-    assert "No pude formular" not in result.patch["assistant_prompt"]
-    assert "I could not" not in result.patch["assistant_prompt"]
-    assert "Which date" not in result.patch["assistant_prompt"]
+    assert result.patch["assistant_prompt"]
+    assert result.patch["response_intent"]["kind"] == "clarification"
+    assert result.patch["response_intent"]["semantic_needs"] == ["period"]
+    clarification = result.patch["clarification"]
+    assert clarification["kind"] == "clarification"
+    assert clarification["reason_code"] == "missing_period"
+    assert clarification["requested_field"] == "date_range"
+    assert clarification["semantic_needs"] == ["period"]
+    assert clarification["payload"]["strategy"]["asset_universe"] == ["AAPL"]
+    assert clarification["options"] == []
 
 
 def test_clarify_empty_llm_response_uses_intent_fallback() -> None:
@@ -139,6 +145,10 @@ def test_clarify_empty_llm_response_uses_intent_fallback() -> None:
     assert result.patch["assistant_prompt"] == "What date window should I use for AAPL?"
     assert clarifier.requests
     assert "I could not phrase" not in result.patch["assistant_prompt"]
+    clarification = result.patch["clarification"]
+    assert clarification["kind"] == "clarification"
+    assert clarification["reason_code"] == "missing_period"
+    assert clarification["requested_field"] == "date_range"
 
 
 def test_clarify_dca_total_budget_expands_to_execution_details() -> None:
@@ -351,6 +361,8 @@ def test_ambiguous_asset_clarification_preserves_requested_field_context() -> No
     assert result.outcome == "await_user_reply"
     assert result.patch["requested_field"] == "asset_universe"
     assert result.patch["ambiguous_fields"][0]["field_name"] == "asset_universe[0]"
+    assert result.patch["response_intent"]["semantic_needs"] == ["asset_target"]
+    assert clarifier.requests[0].response_intent["semantic_needs"] == ["asset_target"]
 
 
 def test_dca_full_setup_uses_llm_clarifier_with_all_missing_fields() -> None:
@@ -424,6 +436,153 @@ def test_clarify_uses_generator_for_unsupported_recovery() -> None:
     assert clarifier.requests[0].unsupported_constraints[0]["category"] == (
         "unsupported_asset_mix"
     )
+
+
+def test_clarify_unsupported_recovery_llm_failure_uses_structured_fallback() -> None:
+    state = RunState.new(
+        current_user_message="Test TSLA with an ATR 14 trading rule",
+        recent_thread_history=[],
+    )
+    state.intent = "strategy_drafting"
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="signal_strategy",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        entry_logic="ATR 14 trading rule",
+    )
+    state.optional_parameter_status = {
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_strategy_logic",
+                "raw_value": "ATR 14",
+                "explanation": (
+                    "ATR 14 is a volatility indicator, but it does not define "
+                    "when to buy or sell."
+                ),
+                "simplification_options": [
+                    {
+                        "label": "Use a supported RSI threshold rule",
+                        "replacement_values": {
+                            "strategy_type": "signal_strategy",
+                            "entry_rule": {
+                                "type": "rsi_threshold",
+                                "operator": "<=",
+                                "threshold": 30,
+                                "period": 14,
+                            },
+                            "exit_rule": {
+                                "type": "rsi_threshold",
+                                "operator": ">=",
+                                "threshold": 70,
+                                "period": 14,
+                            },
+                        },
+                    },
+                    {
+                        "label": "Compare with buy and hold",
+                        "replacement_values": {
+                            "strategy_type": "buy_and_hold",
+                            "entry_rule": None,
+                            "exit_rule": None,
+                        },
+                    },
+                    {
+                        "label": "Use a moving-average crossover",
+                        "replacement_values": {
+                            "strategy_type": "signal_strategy",
+                            "entry_rule": {
+                                "type": "moving_average_crossover",
+                                "fast_window": 50,
+                                "slow_window": 200,
+                            },
+                        },
+                    },
+                ],
+            }
+        ]
+    }
+    clarifier = RecordingClarifier(None)
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+    )
+
+    prompt = result.patch["assistant_prompt"]
+    assert result.outcome == "await_user_reply"
+    assert result.patch["response_intent"]["kind"] == "unsupported_recovery"
+    assert "could not phrase" not in prompt
+    assert "ATR 14" in prompt
+    assert "TSLA" in prompt
+    assert "Use a supported RSI threshold rule" in prompt
+    assert "Compare with buy and hold" in prompt
+    assert "Use a supported moving-average crossover" in prompt
+
+
+def test_clarify_spanish_unsupported_recovery_fallback_uses_structured_options() -> None:
+    state = RunState.new(
+        current_user_message="Prueba TSLA con una regla ATR 14",
+        recent_thread_history=[],
+    )
+    state.intent = "strategy_drafting"
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="signal_strategy",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        entry_logic="regla ATR 14",
+    )
+    state.optional_parameter_status = {
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_strategy_logic",
+                "raw_value": "ATR 14",
+                "explanation": "ATR 14 no define cuándo comprar o vender.",
+                "simplification_options": [
+                    {
+                        "label": "Use a supported RSI threshold rule",
+                        "replacement_values": {"simplify_logic": "rsi_only"},
+                    },
+                    {
+                        "label": "Compare with buy and hold",
+                        "replacement_values": {"strategy_type": "buy_and_hold"},
+                    },
+                    {
+                        "label": "Use a moving-average crossover",
+                        "replacement_values": {
+                            "strategy_type": "signal_strategy",
+                            "rule_family": "moving_average_crossover",
+                        },
+                    },
+                ],
+            }
+        ]
+    }
+    clarifier = RecordingClarifier(None)
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+        language="es-419",
+    )
+
+    assert result.patch["assistant_prompt"]
+    assert result.patch["response_intent"]["kind"] == "unsupported_recovery"
+    clarification = result.patch["clarification"]
+    assert clarification["kind"] == "unsupported_recovery"
+    assert clarification["reason_code"] == "unsupported_strategy_logic"
+    assert clarification["requested_field"] == "unsupported_constraints"
+    assert clarification["payload"]["raw_value"] == "ATR 14"
+    assert clarification["payload"]["strategy"]["asset_universe"] == ["TSLA"]
+    assert [option["id"] for option in clarification["options"]] == [
+        "rsi_threshold",
+        "buy_and_hold",
+        "moving_average_crossover",
+    ]
+    assert clarification["options"][0]["replacement_values"] == {
+        "simplify_logic": "rsi_only"
+    }
 
 
 def test_clarify_uses_generator_for_dca_cap_recovery_after_execution_fields_are_known() -> None:
@@ -713,6 +872,78 @@ def test_clarification_renderer_collapses_adjacent_duplicate_sentences() -> None
     rendered = _render_clarification_response(response, request=request)
 
     assert rendered == "I can keep the runnable version. Which direction should I use?"
+
+
+def test_clarification_renderer_collapses_duplicates_after_direct_question_append() -> None:
+    repeated = (
+        "ATR 14 is a volatility indicator, but I need an explicit entry or exit "
+        "rule to run a test."
+    )
+    request = ClarificationRequest(
+        current_user_message="Test TSLA with an ATR 14 trading rule",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="signal_strategy",
+            asset_universe=["TSLA"],
+        ),
+        response_intent={
+            "kind": "unsupported_recovery",
+            "semantic_needs": ["simplification_choice"],
+        },
+    )
+    response = ClarificationResponse(
+        question=repeated,
+        direct_question=(
+            f"{repeated} Which direction would you like to go? Use a supported "
+            "RSI threshold rule, compare with buy and hold, or use a supported "
+            "moving-average crossover?"
+        ),
+        question_targets=["simplification_choice"],
+        directly_asks_user=True,
+        detail_targets=["simplification_choice"],
+    )
+
+    rendered = _render_clarification_response(response, request=request)
+
+    assert rendered.count(repeated) == 1
+    assert rendered == (
+        f"{repeated} Which direction would you like to go? Use a supported RSI "
+        "threshold rule, compare with buy and hold, or use a supported "
+        "moving-average crossover?"
+    )
+
+
+def test_clarification_renderer_collapses_repeated_context_block_before_question() -> None:
+    first = (
+        "El ATR 14 es un indicador de volatilidad que aún no podemos ejecutar "
+        "como regla de entrada o salida."
+    )
+    second = "Podemos probar TSLA en 2024 con $1,000 de otras formas."
+    direct = (
+        "¿Te interesa usar un cruce de medias móviles, una regla de RSI, "
+        "o simplemente comparar con comprar y mantener?"
+    )
+    request = ClarificationRequest(
+        current_user_message="Prueba TSLA con ATR 14 durante 2024 con $1,000",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="signal_strategy",
+            asset_universe=["TSLA"],
+        ),
+        response_intent={
+            "kind": "unsupported_recovery",
+            "semantic_needs": ["simplification_choice"],
+        },
+        language="es-419",
+    )
+    response = ClarificationResponse(
+        question=f"{first} {second} {first} {second} {direct}",
+        question_targets=["simplification_choice"],
+        directly_asks_user=True,
+        detail_targets=["simplification_choice"],
+    )
+
+    rendered = _render_clarification_response(response, request=request)
+
+    assert rendered == f"{first} {second} {direct}"
 
 
 def test_clarifier_system_prompt_enforces_user_language() -> None:
@@ -2309,6 +2540,139 @@ def test_confirm_stage_prefers_structured_indicator_parameters_for_launch() -> N
     }
 
 
+def test_confirm_stage_keeps_date_edit_visible_card_and_launch_payload_in_sync() -> None:
+    from argus.api.chat.confirmation import runtime_confirmation_card
+
+    state = RunState.new(
+        current_user_message=(
+            "change the period to show march 2 of 2025 until april 14 of 2026"
+        ),
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold selected equities.",
+        asset_universe=["AAPL", "GOOG", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=100000,
+        extra_parameters={
+            "date_range_intent": {
+                "kind": "explicit_range",
+                "start": "2025-03-02",
+                "end": "2026-04-14",
+                "confidence": 1.0,
+                "evidence": (
+                    "change the period to show march 2 of 2025 "
+                    "until april 14 of 2026"
+                ),
+            },
+            "field_provenance": {"date_range": "explicit_user"},
+        },
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    confirmation_payload = result.patch["confirmation_payload"]
+    assert result.outcome == "await_approval"
+    assert confirmation_payload["strategy"]["date_range"] == {
+        "start": "2025-03-02",
+        "end": "2026-04-14",
+    }
+    assert confirmation_payload["launch_payload"]["date_range"] == {
+        "start": "2025-03-02",
+        "end": "2026-04-14",
+    }
+
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": confirmation_payload,
+        }
+    )
+    assert card is not None
+    assert card["status"] == "ready_to_run"
+    assert any(action["type"] == "run_backtest" for action in card["actions"])
+    assert next(row["value"] for row in card["rows"] if row["key"] == "period") == (
+        "March 2, 2025 - April 14, 2026"
+    )
+
+
+def test_confirm_stage_clears_stale_rule_spec_after_rsi_threshold_edit() -> None:
+    from argus.api.chat.confirmation import runtime_confirmation_card
+
+    stale_rule_spec = {
+        "entry": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "rsi", "period": 14},
+                    "operator": "lt",
+                    "right": {"kind": "constant", "value": 30},
+                }
+            ]
+        },
+        "exit": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "rsi", "period": 14},
+                    "operator": "gt",
+                    "right": {"kind": "constant", "value": 70},
+                }
+            ]
+        },
+    }
+    state = RunState.new(
+        current_user_message="baja la entrada RSI a 20 y la salida a 60",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Backtest Tesla RSI.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=1000,
+        entry_logic="Buy when RSI(14) drops to 20 or below",
+        exit_logic="Sell when RSI(14) rises to 60 or above",
+        rule_spec=stale_rule_spec,
+        extra_parameters={
+            "indicator": "rsi",
+            "indicator_parameters": {
+                "indicator": "rsi",
+                "indicator_period": 14,
+                "entry_threshold": 20,
+                "exit_threshold": 60,
+            },
+            "field_provenance": {
+                "entry_threshold": "explicit_user",
+                "exit_threshold": "explicit_user",
+            },
+        },
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    confirmation_payload = result.patch["confirmation_payload"]
+    strategy = confirmation_payload["strategy"]
+    launch_payload = confirmation_payload["launch_payload"]
+    assert result.outcome == "await_approval"
+    assert strategy.get("rule_spec") is None
+    assert launch_payload["strategy_type"] == "indicator_threshold"
+    assert launch_payload["rule_spec"] is None
+    assert launch_payload["entry_rule"]["threshold"] == 20.0
+    assert launch_payload["exit_rule"]["threshold"] == 60.0
+
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": confirmation_payload,
+        }
+    )
+    assert card is not None
+    assert card["status"] == "ready_to_run"
+    assert any(action["type"] == "run_backtest" for action in card["actions"])
+
+
 def test_confirm_stage_prefers_typed_indicator_overrides_over_default_bundle() -> None:
     state = RunState.new(
         current_user_message="Use RSI entry 20 exit 60.",
@@ -2389,7 +2753,10 @@ def test_confirm_stage_preserves_user_indicator_period_in_launch_payload() -> No
     assert launch_payload["exit_rule"]["period"] == 7
 
 
-def test_confirm_stage_blocks_unsupported_nonzero_fee_assumption() -> None:
+def test_confirm_stage_blocks_unsupported_nonzero_fee_assumption(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     state = RunState.new(
         current_user_message="Backtest Tesla with fees.",
         recent_thread_history=[],
@@ -2413,6 +2780,34 @@ def test_confirm_stage_blocks_unsupported_nonzero_fee_assumption() -> None:
     ][0]
     assert constraint["category"] == "unsupported_execution_assumption"
     assert constraint["raw_value"] == "custom trading fees"
+
+
+def test_confirm_stage_accepts_nonzero_costs_when_execution_realism_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    state = RunState.new(
+        current_user_message="Backtest Tesla with 0.1% fees.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Backtest Tesla with fees.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range="last year",
+    )
+    state.optional_parameter_status = {"fees": 0.001, "slippage": 0.0005}
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_approval"
+    launch_payload = result.patch["confirmation_payload"]["launch_payload"]
+    assert launch_payload["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
 
 
 def test_confirm_stage_clarifies_vague_signal_before_ready_card() -> None:

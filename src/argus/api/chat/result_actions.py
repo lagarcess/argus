@@ -4,20 +4,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from argus.agent_runtime.artifacts.drafts import draft_from_result_metadata
-from argus.agent_runtime.recovery_messages import resolve_recovery_language
+from argus.agent_runtime.recovery_messages import recovery_message, recovery_state
 from argus.agent_runtime.stages.artifact_context import latest_run_id_for_action
 from argus.api.chat.artifacts import result_reference_from_run
 from argus.api.schemas import BacktestRun, ChatActionPayload
-
-MISSING_REFINEMENT_RESULT_MESSAGE = (
-    "I could not find the completed backtest to refine. Use Refine strategy from "
-    "the latest result card, or run the strategy again."
-)
-MISSING_REFINEMENT_RESULT_MESSAGE_ES = (
-    "No pude encontrar el backtest completado para ajustar la idea. Usa Ajustar "
-    "idea desde la tarjeta de resultado más reciente, o ejecuta la estrategia "
-    "de nuevo."
-)
 
 
 @dataclass(frozen=True)
@@ -93,19 +83,22 @@ def missing_refine_strategy_action_turn(
     action: ChatActionPayload,
     language: str = "en",
 ) -> ResultActionTurn:
-    assistant_text = (
-        MISSING_REFINEMENT_RESULT_MESSAGE_ES
-        if str(language or "").lower().startswith("es")
-        else MISSING_REFINEMENT_RESULT_MESSAGE
+    assistant_text = recovery_message("result_refine_missing", language=language)
+    recovery = recovery_state(
+        "result_refine_missing",
+        language=language,
+        retryable=False,
     )
     metadata = {
         "conversation_mode": "result_review",
         "agent_runtime_stage_outcome": "ready_to_respond",
         "chat_action": action.model_dump(mode="python"),
+        "recovery": recovery,
     }
     final_payload = {
         "stage_outcome": "ready_to_respond",
         "assistant_response": assistant_text,
+        "recovery": recovery,
     }
     return ResultActionTurn(
         stage="interpret",
@@ -139,20 +132,13 @@ def _refinement_response_intent(
 
 
 def _refinement_prompt(*, strategy: dict[str, Any], language: str) -> str:
-    resolved_language = resolve_recovery_language(language)
+    _ = language
     assets = strategy.get("asset_universe")
     asset_text = (
         ", ".join(str(asset) for asset in assets if str(asset).strip())
         if isinstance(assets, list)
         else ""
     )
-    if resolved_language == "es-419":
-        if asset_text:
-            return (
-                "¿Qué quieres cambiar, comparar o poner a prueba ahora "
-                f"para {asset_text}?"
-            )
-        return "¿Qué quieres cambiar, comparar o poner a prueba ahora?"
     if asset_text:
         return f"What would you like to change, compare, or stress-test next for {asset_text}?"
     return "What would you like to change, compare, or stress-test next?"

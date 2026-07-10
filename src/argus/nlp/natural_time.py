@@ -160,6 +160,50 @@ def resolve_rolling_window_intent_text(
     }
 
 
+def resolve_calendar_year_intent_text(
+    text: str,
+    *,
+    today: date | None = None,
+    languages: tuple[str, ...] | None = None,
+    confidence: float = 0.8,
+) -> dict[str, Any] | None:
+    """Recover a canonical calendar-year intent from bounded date-answer text.
+
+    This helper is for typed pending-date contracts, not general chat routing.
+    It uses dateparser to identify a single explicit year, then returns the same
+    machine intent shape produced by the structured interpreter.
+    """
+
+    raw = str(text or "").strip()
+    if not raw:
+        return None
+    current_date = today or date.today()
+    years: list[int] = []
+    for span, _ in _search_date_spans(
+        raw,
+        today=current_date,
+        languages=languages,
+        return_time_span=False,
+    ):
+        parsed = _parse_date_span(span, today=current_date, languages=languages)
+        if parsed is None or parsed.period != "year":
+            continue
+        if not _span_has_explicit_year(parsed.span):
+            continue
+        if parsed.value.year > current_date.year:
+            continue
+        years.append(parsed.value.year)
+    unique_years = list(dict.fromkeys(years))
+    if len(unique_years) != 1:
+        return None
+    return {
+        "kind": "calendar_year",
+        "year": unique_years[0],
+        "confidence": confidence,
+        "evidence": raw,
+    }
+
+
 def resolve_date_range_intent(
     intent: Mapping[str, Any] | object | None,
     *,
@@ -271,6 +315,17 @@ def resolve_date_range_intent(
     return None
 
 
+def _is_leap_day_clamp_pair(start: date, end: date) -> bool:
+    """True when a Feb-29 anchor clamped to Feb-28 marks the same month/year day.
+
+    A trailing 1-year window ending on Feb 29 subtracts to Feb 28 of the prior
+    (non-leap) year, so the endpoints share a month-aligned anchor even though
+    their day-of-month differs.
+    """
+
+    return {(start.month, start.day), (end.month, end.day)} == {(2, 28), (2, 29)}
+
+
 def _rolling_window_fields_from_range(
     *,
     start: date,
@@ -280,7 +335,7 @@ def _rolling_window_fields_from_range(
     if end < start or end != today:
         return None
     month_delta = (end.year - start.year) * 12 + (end.month - start.month)
-    if month_delta > 0 and start.day == end.day:
+    if month_delta > 0 and (start.day == end.day or _is_leap_day_clamp_pair(start, end)):
         return {"count": month_delta, "unit": "month"}
     day_delta = end.toordinal() - start.toordinal()
     if day_delta <= 0:

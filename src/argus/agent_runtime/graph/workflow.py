@@ -81,7 +81,14 @@ class WorkflowState(TypedDict, total=False):
     final_response_payload: dict[str, Any]
     latest_failed_action_reference: ArtifactReference | dict[str, Any]
     next_actions: list[str]
+    latest_run_id: str | None
+    result_run_id: str | None
+    result_strategy_id: str | None
+    result_conversation_id: str | None
+    result_fact_bank: dict[str, Any]
     result_action_request: dict[str, Any]
+    clarification: dict[str, Any]
+    recovery: dict[str, Any]
 
 
 RUN_STATE_FIELD_NAMES = frozenset(RunState.model_fields)
@@ -96,8 +103,14 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
         "final_response_payload",
         "latest_failed_action_reference",
         "next_actions",
+        "latest_run_id",
+        "result_run_id",
+        "result_strategy_id",
+        "result_conversation_id",
         "result_fact_bank",
         "result_action_request",
+        "clarification",
+        "recovery",
     }
 )
 
@@ -421,23 +434,27 @@ def _build_task_snapshot(
         latest_backtest_reference=latest_backtest_reference,
         latest_collection_reference=latest_collection_reference,
     )
+    capture_current_pending_strategy = _should_capture_current_pending_strategy(
+        run_state=run_state,
+        stage_outcome_value=stage_outcome_value,
+    )
     completed = (
-        stage_outcome_value in completed_outcomes and not preserve_pending_strategy
+        stage_outcome_value in completed_outcomes
+        and not preserve_pending_strategy
+        and not capture_current_pending_strategy
     )
-    pending_strategy_summary = (
-        prior_task_snapshot.pending_strategy_summary
-        if preserve_pending_strategy and prior_task_snapshot is not None
-        else (
-            run_state.candidate_strategy_draft
-            if stage_outcome_value in {"await_user_reply", "await_approval"}
-            else (
-                prior_task_snapshot.pending_strategy_summary
-                if prior_task_snapshot is not None
-                and stage_outcome_value not in completed_outcomes
-                else None
-            )
-        )
-    )
+    if capture_current_pending_strategy:
+        pending_strategy_summary = run_state.candidate_strategy_draft
+    elif preserve_pending_strategy and prior_task_snapshot is not None:
+        pending_strategy_summary = prior_task_snapshot.pending_strategy_summary
+    elif stage_outcome_value in {"await_user_reply", "await_approval"}:
+        pending_strategy_summary = run_state.candidate_strategy_draft
+    elif (
+        prior_task_snapshot is not None and stage_outcome_value not in completed_outcomes
+    ):
+        pending_strategy_summary = prior_task_snapshot.pending_strategy_summary
+    else:
+        pending_strategy_summary = None
     prior_confirmed_strategy = (
         prior_task_snapshot.confirmed_strategy_summary
         if prior_task_snapshot is not None
@@ -492,6 +509,7 @@ def _build_task_snapshot(
         last_unresolved_follow_up=(
             run_state.user_goal_summary
             if stage_outcome_value in {"await_user_reply", "await_approval"}
+            or capture_current_pending_strategy
             else None
         ),
         resolution_provenance=dedupe_resolution_provenance_items(
@@ -520,10 +538,48 @@ def _should_preserve_pending_strategy(
         or prior_task_snapshot.pending_strategy_summary is None
     ):
         return False
-    if latest_backtest_reference is not None or latest_collection_reference is not None:
+    if _has_new_artifact_reference(
+        latest_backtest_reference,
+        prior_task_snapshot.latest_backtest_result_reference,
+    ) or _has_new_artifact_reference(
+        latest_collection_reference,
+        prior_task_snapshot.latest_collection_action_reference,
+    ):
         return False
     action = run_state.structured_action
     return action is None or action.type != "cancel_confirmation"
+
+
+def _should_capture_current_pending_strategy(
+    *,
+    run_state: RunState,
+    stage_outcome_value: str,
+) -> bool:
+    if stage_outcome_value != "ready_to_respond":
+        return False
+    if not _strategy_summary_has_content(run_state.candidate_strategy_draft):
+        return False
+    response_intent = run_state.response_intent
+    if response_intent is None:
+        return False
+    return bool(response_intent.semantic_needs or response_intent.requested_fields)
+
+
+def _has_new_artifact_reference(
+    current: ArtifactReference | None,
+    prior: ArtifactReference | None,
+) -> bool:
+    if current is None:
+        return False
+    if prior is None:
+        return True
+    return (
+        current.artifact_kind,
+        current.artifact_id,
+    ) != (
+        prior.artifact_kind,
+        prior.artifact_id,
+    )
 
 
 def _current_failed_action_reference(
@@ -603,10 +659,32 @@ def _build_thread_metadata(
     requested_field = workflow_state.get("requested_field")
     if requested_field in (None, ""):
         requested_field = run_state.requested_field
+    if (
+        requested_field in (None, "")
+        and run_state.response_intent is not None
+        and run_state.response_intent.requested_fields
+    ):
+        requested_field = run_state.response_intent.requested_fields[0]
+    if requested_field in (None, ""):
+        prior_metadata = workflow_state.get("selected_thread_metadata")
+        snapshot = workflow_state.get("latest_task_snapshot")
+        if (
+            stage_outcome_value == "ready_to_respond"
+            and isinstance(prior_metadata, dict)
+            and isinstance(snapshot, TaskSnapshot)
+            and snapshot.pending_strategy_summary is not None
+        ):
+            requested_field = prior_metadata.get("requested_field")
     if isinstance(requested_field, str) and requested_field:
         metadata["requested_field"] = requested_field
     if run_state.response_intent is not None:
         metadata["response_intent"] = run_state.response_intent.model_dump(mode="python")
+    clarification = workflow_state.get("clarification")
+    if isinstance(clarification, dict):
+        metadata["clarification"] = dict(clarification)
+    recovery = workflow_state.get("recovery")
+    if isinstance(recovery, dict):
+        metadata["recovery"] = dict(recovery)
     pending_resolution = _pending_resolution_candidate(workflow_state=workflow_state)
     if pending_resolution is not None:
         metadata["pending_resolution"] = pending_resolution

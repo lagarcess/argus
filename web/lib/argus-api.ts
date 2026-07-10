@@ -3,6 +3,7 @@ import type { AssetClass } from "./argus-types";
 import type {
   ChatActionOption,
   ChatMention,
+  ExecutionCostEvidence,
   StrategyConfirmationPayload,
 } from "@/components/chat/types";
 import {
@@ -96,6 +97,7 @@ export type ConversationResultCard = {
   assumptions: string[];
   actions: ChatActionOption[];
   chart?: ResultChartPayload | null;
+  execution_costs?: ExecutionCostEvidence | null;
 };
 
 // ─── Domain objects ──────────────────────────────────────────────────────────
@@ -303,7 +305,19 @@ export type SearchItem = {
   updated_at: string;
   conversation_id?: string | null;
   lifecycle?: ArtifactLifecycle | null;
+  decision_state?: DecisionState | null;
   preview?: Record<string, unknown> | null;
+};
+
+export type SearchLedgerGroup = {
+  decision_state: DecisionState;
+  count: number;
+};
+
+export type SearchResponse = {
+  items: SearchItem[];
+  next_cursor: string | null;
+  ledger_groups?: SearchLedgerGroup[] | null;
 };
 
 // ─── Chat stream event types ──────────────────────────────────────────────────
@@ -385,7 +399,9 @@ export type DiscoveryItem = {
   description?: string | null;
   insert_text: string;
   provider: string;
-  support_status: "supported" | "draft_only" | "unavailable";
+  // Optional: provider-backed discovery items carry it (the picker filters indicators
+  // to "supported"); composer tokens reconstructed from the DOM do not need it.
+  support_status?: "supported" | "draft_only" | "unavailable";
 };
 
 type DiscoveryResponsePayload = { items: DiscoveryItem[] };
@@ -487,6 +503,7 @@ export function resultCardFromConversationCard(
       label: displayResultActionLabel(action),
     })),
     chart: card.chart ?? null,
+    executionCosts: card.execution_costs ?? null,
   };
 }
 
@@ -860,14 +877,26 @@ export async function searchGlobal(params: {
   q: string;
   limit?: number;
   cursor?: string;
+  decisionState?: DecisionState | null;
+  includeLedgerGroups?: boolean;
 }) {
-  const { q, limit = 20, cursor } = params;
+  const {
+    q,
+    limit = 20,
+    cursor,
+    decisionState,
+    includeLedgerGroups = false,
+  } = params;
   const searchParams = new URLSearchParams({
     q,
     limit: String(limit),
   });
   if (cursor) searchParams.append("cursor", cursor);
-  return apiFetch<{ items: SearchItem[]; next_cursor: string | null }>(
+  if (decisionState) searchParams.append("decision_state", decisionState);
+  if (includeLedgerGroups) {
+    searchParams.append("include_ledger_groups", "true");
+  }
+  return apiFetch<SearchResponse>(
     `/search?${searchParams.toString()}`,
   );
 }

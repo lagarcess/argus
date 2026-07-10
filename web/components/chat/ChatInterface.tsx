@@ -77,6 +77,8 @@ import {
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
+import { recoveryDisplayFromMetadata } from "@/lib/chat-recovery-display";
+import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
 import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
 import {
@@ -846,6 +848,11 @@ export default function ChatInterface() {
     }
   }
 
+  function markSettledStreamAttention(activeStreamTargetConversationId?: string | null) {
+    schedulePostTurnHistoryRefresh(activeStreamTargetConversationId);
+    markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
+  }
+
   const loadMoreHistory = () => {
     if (!historyNextCursor || isLoadingMoreHistory) return;
     setIsLoadingMoreHistory(true);
@@ -1365,10 +1372,12 @@ export default function ChatInterface() {
       }
       if (event.event === "error") {
         if (!canApplyOwnedUpdate) {
+          markSettledStreamAttention(activeStreamTargetConversationId);
           return;
         }
         const errorPayload = event.data as typeof event.data & Record<string, unknown>;
         const persistedErrorMessageId = event.data.message_id?.trim();
+        const errorRecoveryDisplay = recoveryDisplayFromMetadata(errorPayload);
         const metadataRetryAction = retryLastTurnActionFromMetadata(errorPayload, {
           assistantMessageId: persistedErrorMessageId,
         });
@@ -1395,6 +1404,7 @@ export default function ChatInterface() {
                         event.data.detail,
                         t('chat.error_backtest'),
                       ),
+                      recoveryDisplay: errorRecoveryDisplay,
                       actions: visibleRetryAction ? [visibleRetryAction] : m.actions,
                     }
                   : m,
@@ -1403,10 +1413,11 @@ export default function ChatInterface() {
             ),
           ),
         );
-        markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
+        markSettledStreamAttention(activeStreamTargetConversationId);
       }
       if (event.event === "final") {
         if (!canApplyOwnedUpdate) {
+          markSettledStreamAttention(activeStreamTargetConversationId);
           return;
         }
         setStreamStatus(null);
@@ -1418,6 +1429,7 @@ export default function ChatInterface() {
           typeof finalPayload.message_id === "string"
             ? finalPayload.message_id
             : undefined;
+        const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
         const finalRetryActions = [
           failedActionRetryActionFromMetadata(finalPayload),
           retryLastTurnActionFromMetadata(finalPayload, {
@@ -1516,6 +1528,7 @@ export default function ChatInterface() {
             ),
           );
         } else if (finalText) {
+          const finalFactHeadingKey = resultFactHeadingKeyFromMetadata(finalPayload);
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
@@ -1524,10 +1537,12 @@ export default function ChatInterface() {
                   assistantId,
                   finalText,
                   finalActions: finalRetryActions,
+                  recoveryDisplay: finalRecoveryDisplay,
                   contentPresentation:
                     action?.type === "show_breakdown"
                       ? "result_breakdown"
                       : undefined,
+                  resultFactHeadingKey: finalFactHeadingKey,
                 }),
               ),
               assistantId,
@@ -1537,10 +1552,12 @@ export default function ChatInterface() {
                 kind: "text",
                 content: finalText,
                 actions: finalRetryActions.length > 0 ? finalRetryActions : undefined,
+                recoveryDisplay: finalRecoveryDisplay,
                 contentPresentation:
                   action?.type === "show_breakdown"
                     ? "result_breakdown"
                     : undefined,
+                resultFactHeadingKey: finalFactHeadingKey,
               },
             );
             if (
@@ -1575,13 +1592,13 @@ export default function ChatInterface() {
       }
       if (event.event === "done") {
         if (!canApplyOwnedUpdate) {
+          markSettledStreamAttention(activeStreamTargetConversationId);
           return;
         }
         setStreamStatus(null);
         setIsStreamingResponse(false);
         activeStreamConversationIdRef.current = null;
-        schedulePostTurnHistoryRefresh(activeStreamTargetConversationId);
-        markConversationAttentionIfOutOfFocus(activeStreamTargetConversationId);
+        markSettledStreamAttention(activeStreamTargetConversationId);
       }
     };
 

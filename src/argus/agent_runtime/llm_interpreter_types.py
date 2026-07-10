@@ -19,6 +19,50 @@ class LLMRiskRule(BaseModel):
     mode: str | None = None
 
 
+class LLMAssetMentionCandidate(BaseModel):
+    raw_text: str = Field(
+        default="",
+        description=(
+            "Exact short user-message span that names a possible traded asset, "
+            "company, ticker, crypto asset, currency pair, benchmark, or "
+            "comparison asset."
+        ),
+    )
+    role: Literal["traded_asset", "benchmark", "unknown"] = Field(
+        default="unknown",
+        description=(
+            "Use traded_asset when the user wants to buy, hold, test, or include "
+            "the asset in the strategy. Use benchmark when it is only a comparison "
+            "or reference baseline."
+        ),
+    )
+    mention_kind: Literal[
+        "company_name",
+        "ticker",
+        "crypto",
+        "currency_pair",
+        "unknown",
+    ] = Field(
+        default="unknown",
+        description=(
+            "Classify the raw span itself. Use company_name for public company "
+            "names like Target or Costco, ticker for stock symbols like TGT or "
+            "AAPL, crypto for assets like Bitcoin, and currency_pair for FX pairs."
+        ),
+    )
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+
+
+class LLMAssetMentionExtraction(BaseModel):
+    asset_mentions: list[LLMAssetMentionCandidate] = Field(
+        default_factory=list,
+        description=(
+            "Provider-resolution candidates identified by the LLM from the current "
+            "message. Keep at most five distinct asset-like mentions."
+        ),
+    )
+
+
 class LLMDateRangeIntent(BaseModel):
     kind: (
         Literal[
@@ -28,6 +72,7 @@ class LLMDateRangeIntent(BaseModel):
             "calendar_year",
             "since",
             "endpoint_patch",
+            "same_as_latest_result",
         ]
         | None
     ) = Field(
@@ -35,7 +80,9 @@ class LLMDateRangeIntent(BaseModel):
         description=(
             "Canonical, language-neutral temporal intent. Use this for relative "
             "or semantic windows such as last 12 months or year to date instead "
-            "of asking deterministic code to parse localized prose."
+            "of asking deterministic code to parse localized prose. Use "
+            "same_as_latest_result when the user references the latest completed "
+            "test's window; the runtime binds the dates from the canonical run."
         ),
     )
     start: str | None = Field(
@@ -129,10 +176,29 @@ class LLMStrategyDraft(BaseModel):
     extra_parameters: dict[str, Any] = Field(default_factory=dict)
 
 
+class LLMSimplificationOption(BaseModel):
+    label: str
+    replacement_values: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Canonical action payload for this simplification option. Labels are "
+            "display text only; executable recovery must use this structured "
+            "payload, for example {'strategy_type': 'buy_and_hold'}."
+        ),
+    )
+
+
 class LLMUnsupportedConstraint(BaseModel):
     category: str
     raw_value: str
     explanation: str
+    simplification_options: list[LLMSimplificationOption] = Field(
+        default_factory=list,
+        description=(
+            "Language-neutral simplification actions. Populate replacement_values "
+            "with the canonical payload; keep label as display text."
+        ),
+    )
     simplification_labels: list[str] = Field(default_factory=list)
 
 
@@ -156,6 +222,14 @@ class LLMInterpretationResponse(BaseModel):
     task_relation: Literal["new_task", "continue", "refine", "ambiguous"]
     requires_clarification: bool = False
     user_goal_summary: str
+    detected_user_language: str | None = Field(
+        default=None,
+        description=(
+            "Detected language of the current user message as a BCP-47-style code "
+            "such as en, es, or es-419. Populate this for every turn; it is typed "
+            "turn metadata, not an executable strategy field."
+        ),
+    )
     candidate_strategy_draft: LLMStrategyDraft = Field(default_factory=LLMStrategyDraft)
     missing_required_fields: list[str] = Field(default_factory=list)
     assistant_response: str | None = None
@@ -181,6 +255,22 @@ class LLMInterpretationResponse(BaseModel):
         | None
     ) = None
     result_followup_focus: ResultFollowupFocus | None = None
+    result_followup_fact_key: str | None = Field(
+        default=None,
+        description=(
+            "Canonical snake_case key for the single factual latest-result value "
+            "the user asked about. Known keys: total_return, benchmark_return, "
+            "benchmark_delta, benchmark_symbol, max_drawdown, drawdown_date, "
+            "peak_date, peak_value, lowest_date, lowest_value, final_value, "
+            "annualized_return, profit, volatility, win_rate, profit_factor, "
+            "sharpe_ratio, trade_count, starting_capital, date_range, symbols, "
+            "strategy. For another single result metric, emit its plain "
+            "snake_case name (for example sortino_ratio) — never a sentence or "
+            "synonym phrase. Leave unset when the question is not about one "
+            "specific result value. Use this only with "
+            "semantic_turn_act=result_followup."
+        ),
+    )
     capability_question_focus: CapabilityQuestionFocus | None = None
     context_question_focus: ContextQuestionFocus | None = None
     artifact_target: ArtifactTarget | None = None

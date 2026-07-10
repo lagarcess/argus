@@ -122,33 +122,11 @@ class FakeStructuredModel:
         schema_name = getattr(self.schema, "__name__", "")
         if schema_name == "ResultBreakdownDraft":
             return self.schema(  # type: ignore[misc, operator]
-                language_quality="matches_prompt_language",
-                sections=[
-                    {
-                        "heading": "Reading the run",
-                        "parts": [
-                            {
-                                "kind": "text",
-                                "text": "The tested result is ",
-                            },
-                            {"kind": "fact", "fact_id": "title"},
-                            {
-                                "kind": "text",
-                                "text": ". The context to keep in view is ",
-                            },
-                            {"kind": "fact", "fact_id": "caveat"},
-                        ],
-                    },
-                    {
-                        "heading": "Benchmark and risk context",
-                        "parts": [
-                            {
-                                "kind": "text",
-                                "text": "Use the card metrics as the source of truth.",
-                            },
-                        ],
-                    },
-                ]
+                answer_blocks=[
+                    "The tested result is grounded in the stored result and its caveat.",
+                    "Use the card metrics as the source of truth.",
+                ],
+                fact_ids=["title", "caveat"],
             )
         return LLMInterpretationResponse(
             intent="conversation_followup",
@@ -187,30 +165,14 @@ class FakeBreakdownSchemaClient:
             return self.response
         schema = kwargs["schema_model"]
         return schema(
-            language_quality="matches_prompt_language",
-            sections=[
-                {
-                    "heading": "Reading the run",
-                    "parts": [
-                        {"kind": "text", "text": "The tested result is "},
-                        {"kind": "fact", "fact_id": "title"},
-                        {
-                            "kind": "text",
-                            "text": ". The context to keep in view is ",
-                        },
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                },
-                {
-                    "heading": "Benchmark and risk context",
-                    "parts": [
-                        {
-                            "kind": "text",
-                            "text": "Use the card metrics as the source of truth.",
-                        },
-                    ],
-                },
-            ]
+            answer_blocks=[
+                (
+                    "The stored result is grounded in the completed backtest and "
+                    "its historical-simulation caveat."
+                ),
+                "Use the card metrics as the source of truth.",
+            ],
+            fact_ids=["title", "caveat"],
         )
 
 
@@ -245,7 +207,7 @@ def test_openrouter_factory_applies_task_token_budget(
             "model_name": "test/model",
             "temperature": 0,
             "max_tokens": 3200,
-            "timeout": 12,
+            "timeout": 20,
             "max_retries": 1,
             "openrouter_api_key": "test-key",
         }
@@ -257,6 +219,64 @@ def test_interpretation_profile_has_bounded_reasoning_for_semantic_repair() -> N
 
     assert profile.temperature == 0
     assert profile.reasoning_effort == "medium"
+
+
+def test_structured_reasoning_effort_can_be_overridden_for_dev_eval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_STRUCTURED_REASONING_EFFORT", "low")
+
+    profile = openrouter_profile_for_task("interpretation")
+
+    assert profile.reasoning_effort == "low"
+
+
+def test_capability_reasoning_effort_can_be_overridden_for_dev_eval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_CAPABILITY_REASONING_EFFORT", "none")
+
+    profile = openrouter_profile_for_task("capability_conflict")
+
+    assert profile.reasoning_effort == "none"
+
+
+def test_invalid_reasoning_effort_override_preserves_profile_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_STRUCTURED_REASONING_EFFORT", "cheap")
+
+    profile = openrouter_profile_for_task("interpretation")
+
+    assert profile.reasoning_effort == "medium"
+
+
+@pytest.mark.parametrize(
+    ("task", "env_name", "effort"),
+    [
+        ("interpretation", "ARGUS_STRUCTURED_REASONING_EFFORT", "low"),
+        ("capability_conflict", "ARGUS_CAPABILITY_REASONING_EFFORT", "none"),
+    ],
+)
+def test_reasoning_effort_override_is_sent_in_json_schema_payload(
+    monkeypatch: pytest.MonkeyPatch,
+    task: openrouter.OpenRouterTask,
+    env_name: str,
+    effort: openrouter.OpenRouterReasoningEffort,
+) -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    monkeypatch.setenv(env_name, effort)
+
+    payload = openrouter._json_schema_payload(
+        model="qwen/qwen3.5-9b",
+        messages=[{"role": "user", "content": "hello"}],
+        schema_model=LLMDateRangeIntent,
+        schema_name="LLMDateRangeIntent",
+        profile=openrouter_profile_for_task(task),
+    )
+
+    assert payload["reasoning"] == {"effort": effort}
 
 
 def test_interpretation_repair_uses_structured_tier_without_reasoning() -> None:
@@ -429,7 +449,7 @@ def test_structured_interpreter_uses_bounded_interpretation_profile(
         "model_name": "custom/model",
         "temperature": 0,
         "max_tokens": 3200,
-        "timeout": 12,
+        "timeout": 20,
         "max_retries": 1,
         "openrouter_api_key": "test-key",
     }
@@ -471,8 +491,22 @@ def test_result_breakdown_prompt_carries_product_language_contract() -> None:
     )
 
     assert "product_language" in messages[0]["content"]
-    assert "language_quality" in messages[0]["content"]
+    assert "fact_ids" in messages[0]["content"]
+    assert "Answer in Spanish" in messages[0]["content"]
     assert "es-419" in messages[1]["content"]
+
+
+def test_result_breakdown_schema_requires_visible_blocks_and_fact_ids() -> None:
+    from argus.api.chat.breakdown import ResultBreakdownDraft
+    from pydantic import ValidationError
+
+    schema = ResultBreakdownDraft.model_json_schema()
+
+    assert {"answer_blocks", "fact_ids"}.issubset(set(schema["required"]))
+    with pytest.raises(ValidationError):
+        ResultBreakdownDraft.model_validate({})
+    with pytest.raises(ValidationError):
+        ResultBreakdownDraft.model_validate({"answer_blocks": [], "fact_ids": []})
 
 
 def test_spanish_result_breakdown_rejects_mixed_language_llm_output() -> None:
@@ -480,24 +514,20 @@ def test_spanish_result_breakdown_rejects_mixed_language_llm_output() -> None:
 
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "language_quality": "mixed_or_wrong_language",
-            "sections": [
-                {
-                    "heading": "Setup",
-                    "parts": [
-                        {"kind": "text", "text": "Here's the deeper read."},
-                        {"kind": "fact", "fact_id": "title"},
-                        {"kind": "fact", "fact_id": "symbols"},
-                        {"kind": "fact", "fact_id": "date_range"},
-                        {"kind": "fact", "fact_id": "total_return"},
-                        {"kind": "fact", "fact_id": "benchmark_symbol"},
-                        {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "fact", "fact_id": "benchmark_comparison"},
-                        {"kind": "fact", "fact_id": "max_drawdown"},
-                        {"kind": "fact", "fact_id": "assumptions"},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                }
+            "answer_blocks": [
+                "The fact_bank says here's the deeper read.",
+            ],
+            "fact_ids": [
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_comparison",
+                "max_drawdown",
+                "assumptions",
+                "caveat",
             ],
         }
     )
@@ -527,7 +557,7 @@ def test_spanish_result_breakdown_rejects_mixed_language_llm_output() -> None:
     assert text is None
 
 
-def test_spanish_result_breakdown_fallback_is_localized_and_grounded() -> None:
+def test_spanish_result_breakdown_fallback_is_grounded_without_language_branch() -> None:
     from argus.api.chat import breakdown as chat_service
 
     text = chat_service.fallback_result_breakdown_message(
@@ -555,21 +585,16 @@ def test_spanish_result_breakdown_fallback_is_localized_and_grounded() -> None:
         language="es-419",
     )
 
-    assert "lectura más detallada" in text
-    assert "**Configuración.**" in text
-    assert "**Cómo leerlo.**" in text
-    assert "**Riesgo y supuestos.**" in text
-    assert "**Siguiente prueba útil.**" in text
-    assert "Regla: compra al inicio del periodo y mantén hasta el final." in text
-    assert "Superó por 23.6 puntos porcentuales" in text
-    assert "Entry rule" not in text
-    assert "exit rule" not in text
-    assert "Beat by" not in text
-    assert "percentage points" not in text
+    assert "Here's the deeper read" in text
+    assert "**Setup.**" in text
+    assert "**How to read it.**" in text
+    assert "**Risk and assumptions.**" in text
+    assert "**Useful next check.**" in text
+    assert "Entry rule: buy at the start of the period" in text
+    assert "Beat by 23.6 percentage points" in text
     assert "Prueba siguiente: Prueba siguiente" not in text
-    assert "Here's the deeper read" not in text
-    assert "Setup" not in text
-    assert "How to read it" not in text
+    assert "lectura más detallada" not in text
+    assert "Superó por" not in text
 
 
 def test_result_breakdown_llm_has_hard_action_budget() -> None:
@@ -2119,6 +2144,10 @@ def test_interpreter_sends_pending_field_metadata_with_artifact_context(
     )
 
     assert result is not None
+    assert result.candidate_strategy_draft.strategy_type == "indicator_threshold"
+    assert result.candidate_strategy_draft.asset_universe == ["GOOGL"]
+    assert result.candidate_strategy_draft.asset_class == "equity"
+    assert "requested_asset_answer_provider_resolution" in result.reason_codes
     wire_text = "\n".join(message["content"] for message in seen_messages)
     assert "Selected thread metadata JSON" in wire_text
     assert '"requested_field": "asset_universe"' in wire_text
@@ -2324,8 +2353,9 @@ def test_result_breakdown_prompt_asks_for_fact_bank_references(
     system_prompt = messages[0]["content"]
     user_payload = messages[1]["content"]
     assert "non-template" in system_prompt.lower()
-    assert "vary the section headings" in system_prompt.lower()
-    assert "fact reference" in system_prompt.lower()
+    assert "answer_blocks" in system_prompt
+    assert "fact_ids" in system_prompt
+    assert "grounding metadata" in system_prompt.lower()
     assert "plain language" in system_prompt.lower()
     assert "curiosity-forward" in system_prompt.lower()
     assert "dense financial pdf" in system_prompt.lower()
@@ -2349,44 +2379,33 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Reading this run",
-                    "parts": [
-                        {"kind": "text", "text": "The tested idea was "},
-                        {"kind": "fact", "fact_id": "title"},
-                        {"kind": "text", "text": " across "},
-                        {"kind": "fact", "fact_id": "date_range"},
-                        {"kind": "text", "text": "."},
-                    ],
-                },
-                {
-                    "heading": "Return and benchmark",
-                    "parts": [
-                        {"kind": "fact", "fact_id": "symbols"},
-                        {"kind": "text", "text": " finished at "},
-                        {"kind": "fact", "fact_id": "total_return"},
-                        {"kind": "text", "text": " while "},
-                        {"kind": "fact", "fact_id": "benchmark_symbol"},
-                        {"kind": "text", "text": " returned "},
-                        {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "text", "text": ", leaving "},
-                        {"kind": "fact", "fact_id": "benchmark_comparison"},
-                        {"kind": "text", "text": " of relative performance."},
-                    ],
-                },
-                {
-                    "heading": "Risk and caveat",
-                    "parts": [
-                        {"kind": "text", "text": "The largest drawdown was "},
-                        {"kind": "fact", "fact_id": "max_drawdown"},
-                        {"kind": "text", "text": ". Assumptions: "},
-                        {"kind": "fact", "fact_id": "assumptions"},
-                        {"kind": "text", "text": " "},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                },
-            ]
+            "answer_blocks": [
+                (
+                    "AAPL Buy and Hold tested AAPL across past year using the "
+                    "stored backtest setup."
+                ),
+                (
+                    "AAPL finished at +39.5% while SPY returned +25.6%, a 13.9 "
+                    "percentage point lead."
+                ),
+                (
+                    "The largest drawdown was -13.8%. Assumptions: Universe: AAPL. "
+                    "Benchmark: SPY. This is historical simulation evidence, not a "
+                    "prediction."
+                ),
+            ],
+            "fact_ids": [
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_comparison",
+                "max_drawdown",
+                "assumptions",
+                "caveat",
+            ],
         }
     )
 
@@ -2425,14 +2444,13 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
     )
 
     assert text is not None
-    assert "### Reading this run" in text
     assert "AAPL Buy and Hold" in text
     assert "past year" in text
     assert "AAPL" in text
     assert "+39.5%" in text
     assert "SPY" in text
     assert "+25.6%" in text
-    assert "Beat by 13.9 percentage points" in text
+    assert "13.9 percentage point lead" in text
     assert "-13.8%" in text
     assert "Universe: AAPL." in text
     assert "not a prediction" in text.lower()
@@ -2473,46 +2491,32 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Reading this run",
-                    "parts": [
-                        {"kind": "text", "text": "The tested idea was"},
-                        {"kind": "fact", "fact_id": "title"},
-                        {"kind": "text", "text": "over"},
-                        {"kind": "fact", "fact_id": "date_range"},
-                        {"kind": "text", "text": "and returned"},
-                        {"kind": "fact", "fact_id": "total_return"},
-                        {"kind": "text", "text": "."},
-                    ],
-                },
-                {
-                    "heading": "Benchmark context",
-                    "parts": [
-                        {"kind": "fact", "fact_id": "symbols"},
-                        {"kind": "text", "text": "was compared with"},
-                        {"kind": "fact", "fact_id": "benchmark_symbol"},
-                        {"kind": "text", "text": "at"},
-                        {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "text", "text": "for a relative spread of"},
-                        {"kind": "fact", "fact_id": "benchmark_comparison"},
-                        {"kind": "text", "text": "."},
-                    ],
-                },
-                {
-                    "heading": "Risk, assumptions, and next step",
-                    "parts": [
-                        {"kind": "text", "text": "The max drawdown was"},
-                        {"kind": "fact", "fact_id": "max_drawdown"},
-                        {"kind": "text", "text": ". Assumptions:"},
-                        {"kind": "fact", "fact_id": "assumptions"},
-                        {"kind": "text", "text": "Next runnable checks:"},
-                        {"kind": "fact", "fact_id": "runnable_next_tests"},
-                        {"kind": "text", "text": "."},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                },
-            ]
+            "answer_blocks": [
+                "BABA Buy and Hold tested BABA over last month and returned +1.7%.",
+                (
+                    "SPY returned +26.6%, so BABA lagged by 24.9 percentage points "
+                    "versus that benchmark."
+                ),
+                (
+                    "The max drawdown was -36.8%. Assumptions: Universe: BABA. "
+                    "Benchmark: SPY. A useful next check is one of the supported "
+                    "same-asset-class variations. This is historical simulation "
+                    "evidence, not a prediction."
+                ),
+            ],
+            "fact_ids": [
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_comparison",
+                "max_drawdown",
+                "assumptions",
+                "runnable_next_tests",
+                "caveat",
+            ],
         }
     )
 
@@ -2538,13 +2542,13 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
     )
 
     assert text is not None
-    assert "**Test:** BABA Buy and Hold, last month." in text
-    assert "**Performance:** total return +1.7%." in text
-    assert (
-        "**Performance:** SPY benchmark return +26.6%; Lagged by 24.9 percentage points."
-        in text
-    )
-    assert "**Risk marker:** max drawdown -36.8%." in text
+    assert "BABA Buy and Hold tested BABA over last month and returned +1.7%." in text
+    assert "SPY returned +26.6%" in text
+    assert "lagged by 24.9 percentage points" in text
+    assert "The max drawdown was -36.8%." in text
+    assert "**Test:**" not in text
+    assert "**Performance:**" not in text
+    assert "**Risk marker:**" not in text
     assert "The tested idea was over and returned." not in text
     assert "wasBABA" not in text
     assert "Holdover" not in text
@@ -2552,7 +2556,7 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
     assert "BABA Buy and Hold BABA last month" not in text
 
 
-def test_result_breakdown_rejects_malformed_generated_connective_text(
+def test_result_breakdown_rejects_empty_generated_body(
     monkeypatch,
 ) -> None:
     from argus.api.chat import breakdown as chat_service
@@ -2560,31 +2564,19 @@ def test_result_breakdown_rejects_malformed_generated_connective_text(
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Reading the run",
-                    "parts": [
-                        {
-                            "kind": "text",
-                            "text": (
-                                "The benchmark return for the same window was "
-                            ),
-                        },
-                        {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "text", "text": " — a spread of "},
-                        {"kind": "fact", "fact_id": "benchmark_comparison"},
-                        {"kind": "text", "text": "."},
-                        {"kind": "fact", "fact_id": "title"},
-                        {"kind": "fact", "fact_id": "symbols"},
-                        {"kind": "fact", "fact_id": "date_range"},
-                        {"kind": "fact", "fact_id": "total_return"},
-                        {"kind": "fact", "fact_id": "benchmark_symbol"},
-                        {"kind": "fact", "fact_id": "max_drawdown"},
-                        {"kind": "fact", "fact_id": "assumptions"},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                }
-            ]
+            "answer_blocks": [],
+            "fact_ids": [
+                "benchmark_return",
+                "benchmark_comparison",
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "max_drawdown",
+                "assumptions",
+                "caveat",
+            ],
         }
     )
 
@@ -2613,11 +2605,7 @@ def test_result_breakdown_rejects_malformed_generated_connective_text(
         invoke_json_schema_func=fake_schema,
     )
 
-    assert text is not None
-    assert "was — a spread of" not in text
-    assert "**Test:** AAPL DCA Accumulation, March 1, 2024 to October 31, 2024." in text
-    assert "SPY benchmark return +5.5%" in text
-    assert "Beat by 7.0 percentage points" in text
+    assert text is None
 
 
 def test_result_breakdown_rejects_quick_take_headings(monkeypatch) -> None:
@@ -2626,23 +2614,19 @@ def test_result_breakdown_rejects_quick_take_headings(monkeypatch) -> None:
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Quick Take",
-                    "parts": [
-                        {"kind": "fact", "fact_id": "title"},
-                        {"kind": "fact", "fact_id": "symbols"},
-                        {"kind": "fact", "fact_id": "date_range"},
-                        {"kind": "fact", "fact_id": "total_return"},
-                        {"kind": "fact", "fact_id": "benchmark_symbol"},
-                        {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "fact", "fact_id": "benchmark_comparison"},
-                        {"kind": "fact", "fact_id": "max_drawdown"},
-                        {"kind": "fact", "fact_id": "assumptions"},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                }
-            ]
+            "answer_blocks": ["### Quick Take\nThis should not render."],
+            "fact_ids": [
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_comparison",
+                "max_drawdown",
+                "assumptions",
+                "caveat",
+            ],
         }
     )
 
@@ -2676,15 +2660,8 @@ def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> N
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Invented future",
-                    "parts": [
-                        {"kind": "text", "text": "The future expectation is "},
-                        {"kind": "fact", "fact_id": "future_return"},
-                    ],
-                }
-            ]
+            "answer_blocks": ["The future expectation is higher than the saved run."],
+            "fact_ids": ["future_return"],
         }
     )
 
@@ -2711,6 +2688,63 @@ def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> N
     assert text is None
 
 
+def test_result_breakdown_rejects_mismatched_visible_fact_values(monkeypatch) -> None:
+    from argus.api.chat import breakdown as chat_service
+
+    del monkeypatch
+    fake_schema = FakeBreakdownSchemaClient(
+        {
+            "answer_blocks": [
+                (
+                    "AAPL Buy and Hold tested AAPL across past year using the "
+                    "stored backtest setup."
+                ),
+                (
+                    "AAPL finished at +46.7% while SPY returned +20.0%, a 13.9 "
+                    "percentage point lead."
+                ),
+                (
+                    "Benchmark: SPY. This is historical simulation evidence, not a "
+                    "prediction."
+                ),
+            ],
+            "fact_ids": [
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_comparison",
+                "caveat",
+            ],
+        }
+    )
+
+    text = chat_service.llm_result_breakdown_message(
+        {
+            "title": "AAPL Buy and Hold",
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "date_range": "past year",
+            "raw_metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 39.5,
+                        "benchmark_return_pct": 25.6,
+                        "delta_vs_benchmark_pct": 13.9,
+                        "max_drawdown_pct": -13.8,
+                    }
+                }
+            },
+            "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
+        },
+        invoke_json_schema_func=fake_schema,
+    )
+
+    assert text is None
+
+
 def test_result_breakdown_rejects_user_visible_internal_context_terms(
     monkeypatch,
 ) -> None:
@@ -2719,30 +2753,24 @@ def test_result_breakdown_rejects_user_visible_internal_context_terms(
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Context and caveats",
-                    "parts": [
-                        {
-                            "kind": "text",
-                            "text": (
-                                "Macro snapshots from the FRED data packet provide "
-                                "background market conditions but do not influence trades."
-                            ),
-                        },
-                        {"kind": "fact", "fact_id": "title"},
-                        {"kind": "fact", "fact_id": "symbols"},
-                        {"kind": "fact", "fact_id": "date_range"},
-                        {"kind": "fact", "fact_id": "total_return"},
-                        {"kind": "fact", "fact_id": "benchmark_symbol"},
-                        {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "fact", "fact_id": "benchmark_comparison"},
-                        {"kind": "fact", "fact_id": "max_drawdown"},
-                        {"kind": "fact", "fact_id": "assumptions"},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                }
-            ]
+            "answer_blocks": [
+                (
+                    "Macro snapshots from the FRED data packet provide background "
+                    "market conditions but do not influence trades."
+                )
+            ],
+            "fact_ids": [
+                "title",
+                "symbols",
+                "date_range",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_comparison",
+                "max_drawdown",
+                "assumptions",
+                "caveat",
+            ],
         }
     )
 
@@ -2776,15 +2804,8 @@ def test_result_breakdown_requires_core_fact_coverage(monkeypatch) -> None:
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-            "sections": [
-                {
-                    "heading": "Too thin",
-                    "parts": [
-                        {"kind": "text", "text": "The run needs more context. "},
-                        {"kind": "fact", "fact_id": "caveat"},
-                    ],
-                }
-            ]
+            "answer_blocks": ["The run needs more context."],
+            "fact_ids": ["caveat"],
         }
     )
 
@@ -2991,7 +3012,7 @@ async def test_agent_runtime_turn_uses_interpretation_profile_without_legacy_com
             "model_name": "custom/model",
             "temperature": 0,
             "max_tokens": 3200,
-            "timeout": 12,
+            "timeout": 20,
             "max_retries": 1,
             "openrouter_api_key": "test-key",
         }
@@ -3210,6 +3231,93 @@ def test_capability_conflict_json_schema_uses_context_route_with_reasoning(
     assert receipt.outcome == "succeeded"
 
 
+@pytest.mark.parametrize(
+    "task",
+    [
+        "interpretation",
+        "interpretation_repair",
+        "field_fidelity",
+        "capability_conflict",
+    ],
+)
+def test_structured_artifact_payload_marks_stable_system_prefix_for_prompt_cache(
+    task: openrouter.OpenRouterTask,
+) -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    payload = openrouter._json_schema_payload(
+        model="qwen/qwen3.5-9b",
+        messages=[
+            {"role": "system", "content": "stable Argus interpreter policy"},
+            {"role": "system", "content": "dynamic turn context"},
+            {"role": "user", "content": "dynamic user request"},
+        ],
+        schema_model=LLMDateRangeIntent,
+        schema_name="LLMDateRangeIntent",
+        profile=openrouter_profile_for_task(task),
+    )
+
+    system_message = payload["messages"][0]
+    assert system_message["role"] == "system"
+    assert system_message["content"] == [
+        {
+            "type": "text",
+            "text": "stable Argus interpreter policy",
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+    assert payload["messages"][1] == {"role": "system", "content": "dynamic turn context"}
+    assert payload["messages"][2] == {
+        "role": "user",
+        "content": "dynamic user request",
+    }
+
+
+def test_gemini_payload_skips_prompt_cache_when_later_system_context_is_dynamic() -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    payload = openrouter._json_schema_payload(
+        model="google/gemini-2.5-flash-lite",
+        messages=[
+            {"role": "system", "content": "stable Argus interpreter policy"},
+            {"role": "system", "content": "dynamic turn context"},
+            {"role": "user", "content": "dynamic user request"},
+        ],
+        schema_model=LLMDateRangeIntent,
+        schema_name="LLMDateRangeIntent",
+        profile=openrouter_profile_for_task("interpretation"),
+    )
+
+    assert payload["messages"][0] == {
+        "role": "system",
+        "content": "stable Argus interpreter policy",
+    }
+    assert payload["messages"][1] == {
+        "role": "system",
+        "content": "dynamic turn context",
+    }
+
+
+def test_non_target_json_schema_payload_does_not_add_prompt_cache_marker() -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    payload = openrouter._json_schema_payload(
+        model="qwen/qwen3.5-9b",
+        messages=[
+            {"role": "system", "content": "stable naming policy"},
+            {"role": "user", "content": "dynamic user request"},
+        ],
+        schema_model=LLMDateRangeIntent,
+        schema_name="LLMDateRangeIntent",
+        profile=openrouter_profile_for_task("name_suggestion"),
+    )
+
+    assert payload["messages"][0] == {
+        "role": "system",
+        "content": "stable naming policy",
+    }
+
+
 def test_direct_json_schema_records_missing_key_route_receipt(monkeypatch) -> None:
     openrouter.clear_openrouter_route_receipts()
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
@@ -3262,6 +3370,79 @@ def test_route_receipt_capture_collects_current_runtime_calls() -> None:
     }
     assert captured[0].context_packet_ids == ["packet-1"]
     assert captured[0].as_dict()["context_packet_ids"] == ["packet-1"]
+
+
+def test_direct_json_schema_route_receipt_preserves_provider_usage_cost(
+    monkeypatch,
+) -> None:
+    openrouter.clear_openrouter_route_receipts()
+
+    class FakeAsyncClient:
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def post(self, _url: str, **_kwargs: Any) -> object:
+            class FakeResponse:
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict[str, Any]:
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": LLMInterpretationResponse(
+                                        intent="conversation_followup",
+                                        task_relation="new_task",
+                                        requires_clarification=False,
+                                        user_goal_summary="what Argus supports",
+                                        assistant_response=(
+                                            "I can help test supported ideas."
+                                        ),
+                                        uses_latest_result_context=False,
+                                        confidence=0.91,
+                                        semantic_turn_act="educational_question",
+                                    ).model_dump_json()
+                                }
+                            }
+                        ],
+                        "usage": {
+                            "prompt_tokens": 12,
+                            "completion_tokens": 6,
+                            "total_tokens": 18,
+                            "cost": 0.00054,
+                        },
+                    }
+
+            return FakeResponse()
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "structured/primary")
+    monkeypatch.setattr(
+        openrouter.httpx, "AsyncClient", lambda **_kwargs: FakeAsyncClient()
+    )
+
+    result = asyncio.run(
+        openrouter.invoke_openrouter_json_schema(
+            task="interpretation",
+            messages=[{"role": "user", "content": "what can you do?"}],
+            schema_model=LLMInterpretationResponse,
+            schema_name="LLMInterpretationResponse",
+        )
+    )
+
+    assert result is not None
+    receipt = openrouter.get_openrouter_route_receipts()[0]
+    assert receipt.token_usage == {
+        "prompt_tokens": 12,
+        "completion_tokens": 6,
+        "total_tokens": 18,
+    }
+    assert receipt.usage_cost_usd == 0.00054
+    assert receipt.as_dict()["usage_cost_usd"] == 0.00054
 
 
 def test_route_receipt_latency_summary_keeps_failure_and_context_evidence() -> None:
@@ -3337,6 +3518,10 @@ def test_direct_json_schema_records_openrouter_token_usage(monkeypatch) -> None:
                     "prompt_tokens": 44,
                     "completion_tokens": 21,
                     "total_tokens": 65,
+                    "prompt_tokens_details": {
+                        "cached_tokens": 32,
+                        "cache_write_tokens": 12,
+                    },
                 },
             }
 
@@ -3374,6 +3559,8 @@ def test_direct_json_schema_records_openrouter_token_usage(monkeypatch) -> None:
         "prompt_tokens": 44,
         "completion_tokens": 21,
         "total_tokens": 65,
+        "cached_tokens": 32,
+        "cache_write_tokens": 12,
     }
 
 
@@ -3570,3 +3757,118 @@ def test_direct_chat_completion_tries_configured_fallback_and_records_usage(
         "total_tokens": 19,
     }
     assert receipts[1].context_packet_ids == ["packet-1"]
+
+
+def test_anthropic_structured_calls_use_schema_in_prompt_not_response_format() -> None:
+    """Anthropic strict structured outputs reject core shapes of our schemas
+    (numeric bounds, any-typed values, open objects like extra_parameters), so
+    every native json_schema call to anthropic/* returned 400 and the
+    interpretation fallback never worked. Anthropic models get the schema
+    embedded in a system message instead; tolerant providers keep the native
+    strict response_format. Client-side pydantic validation enforces the
+    schema either way.
+    """
+
+    import json as _json
+
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    def _payload(model: str) -> dict:
+        return openrouter._json_schema_payload(
+            model=model,
+            messages=[{"role": "user", "content": "probe"}],
+            schema_model=LLMDateRangeIntent,
+            schema_name="LLMDateRangeIntent",
+            profile=openrouter_profile_for_task("interpretation"),
+        )
+
+    anthropic_payload = _payload("anthropic/claude-haiku-4.5")
+    grok_payload = _payload("x-ai/grok-4.3")
+
+    assert "response_format" not in anthropic_payload
+    assert "provider" not in anthropic_payload
+    schema_message = anthropic_payload["messages"][0]
+    assert schema_message["role"] == "system"
+    schema_content = schema_message["content"]
+    assert schema_content[0]["cache_control"] == {"type": "ephemeral"}
+    assert '"same_as_latest_result"' in schema_content[0]["text"]
+    assert anthropic_payload["messages"][-1]["content"] == "probe"
+
+    grok_schema = grok_payload["response_format"]["json_schema"]
+    assert grok_schema["strict"] is True
+    assert "minimum" in _json.dumps(grok_schema["schema"])
+    assert grok_payload["provider"] == {"require_parameters": True}
+
+    # Client-side enforcement stays the real gate for both providers.
+    with pytest.raises(ValueError):
+        LLMDateRangeIntent(kind="explicit_range", confidence=5.0)
+
+
+def test_json_content_code_fence_stripping_is_safe() -> None:
+    fenced = '```json\n{"ok": true}\n```'
+    plain = '{"ok": true}'
+    assert openrouter._json_content_without_code_fences(fenced) == '{"ok": true}'
+    assert openrouter._json_content_without_code_fences(plain) == plain
+    # Degenerate fence-only content stays unusable either way; it must simply
+    # not crash and not fabricate JSON.
+    assert openrouter._json_content_without_code_fences("```") == ""
+
+
+def test_json_content_code_fence_stripping_handles_provider_variants() -> None:
+    """Schema-in-prompt providers fence on one line, skip the language tag,
+    or wrap the fence in prose on either side; all must still yield the body."""
+
+    single_line = '```json {"ok": true}```'
+    no_language_tag = '```\n{"ok": true}\n```'
+    inline_no_tag = '```{"ok": true}```'
+    trailing_prose = '```json\n{"ok": true}\n```\nThis JSON matches the schema.'
+    leading_prose = 'Here is the JSON:\n```json\n{"ok": true}\n```'
+    unterminated = '```json\n{"ok": true}'
+    for content in (
+        single_line,
+        no_language_tag,
+        inline_no_tag,
+        trailing_prose,
+        leading_prose,
+        unterminated,
+    ):
+        assert (
+            openrouter._json_content_without_code_fences(content) == '{"ok": true}'
+        ), content
+    # Bare JSON that happens to contain a fence inside a string stays intact.
+    bare_json_with_fence = '{"note": "wrap code in ``` blocks"}'
+    assert (
+        openrouter._json_content_without_code_fences(bare_json_with_fence)
+        == bare_json_with_fence
+    )
+
+
+def test_json_content_fence_inside_json_string_value_is_not_a_fence() -> None:
+    """A ``` inside a JSON string value is content, not a fence: when a JSON
+    value opens before the first ``` and parses past it, that value is
+    extracted instead of being truncated at the embedded fence."""
+
+    prose_then_json = 'Note: {"note": "wrap code in ``` blocks", "ok": true}'
+    assert (
+        openrouter._json_content_without_code_fences(prose_then_json)
+        == '{"note": "wrap code in ``` blocks", "ok": true}'
+    )
+    prose_then_array = 'Result: ["keep ``` intact", "ok"]'
+    assert (
+        openrouter._json_content_without_code_fences(prose_then_array)
+        == '["keep ``` intact", "ok"]'
+    )
+
+
+def test_json_content_prose_brace_before_real_fence_still_yields_body() -> None:
+    """A brace inside leading prose does not demote a real fenced body: junk
+    braces and prose JSON that closes before the fence both defer to it."""
+
+    junk_brace = 'Here is the schema {...}: ```json\n{"ok": true}\n```'
+    schema_mention = (
+        'Matching {"type": "object"} as requested: ```json\n{"ok": true}\n```'
+    )
+    for content in (junk_brace, schema_mention):
+        assert (
+            openrouter._json_content_without_code_fences(content) == '{"ok": true}'
+        ), content

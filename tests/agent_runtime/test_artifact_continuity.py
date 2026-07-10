@@ -71,6 +71,36 @@ def test_result_draft_preserves_dca_money_cadence_timeframe_and_benchmark() -> N
     assert draft.comparison_baseline == "SPY"
 
 
+def test_result_draft_recovers_dca_contribution_from_config_snapshot() -> None:
+    # Older metadata can lack resolved_parameters; the flat config snapshot
+    # still carries canonical recurring_contribution + parameters.dca_cadence.
+    draft = draft_from_result_metadata(
+        {
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {
+                "template": "dca_accumulation",
+                "symbols": ["AAPL"],
+                "date_range": {"start": "2020-01-01", "end": "2026-07-03"},
+                "recurring_contribution": 500.0,
+                "starting_principal": 0.0,
+                "parameters": {"dca_cadence": "monthly"},
+                "resolved_parameters": {
+                    "date_range": {"start": "2020-01-01", "end": "2026-07-03"},
+                },
+            },
+        }
+    )
+
+    assert draft.strategy_type == "dca_accumulation"
+    assert draft.asset_universe == ["AAPL"]
+    assert draft.date_range == {"start": "2020-01-01", "end": "2026-07-03"}
+    assert draft.capital_amount == 500
+    assert draft.cadence == "monthly"
+    assert draft.comparison_baseline == "SPY"
+
+
 def test_confirmation_edit_action_carries_product_language_to_response_intent() -> None:
     state = RunState.new(
         current_user_message="Cambiar fechas",

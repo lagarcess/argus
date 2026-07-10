@@ -1,8 +1,45 @@
 # Private Alpha Next Roadmap
 
-Status: P1 checkpoint closed; P2 board defined; P2.0 guardrail gate + P2.1
-capability truth are the active next slices
-Date: 2026-06-26
+Status: P2.0 + P2.1 DONE (spine gate, capability registry, conversational edit
+contract). The Gate A/B loop landed through 2026-07-07: refine routing
+(#141/PR #148), Idea Ledger portfolio browse (#147), latest-result fact answers
+(#140/PR #153), messy company-name asset preservation (#142/PR #146), and the
+B3 measurement trio (eval harness #143, PostHog product events #144, append-only
+cost ledger #145). B4 retired the per-language copy tables — runtime prose and
+recovery copy now compose from typed facts/codes (#154, PRs #174-177). Execution
+realism (fees/slippage, #130/PR #178) merged flag-off, and a new interpreter
+cost/perf lane added prompt caching + per-tier reasoning controls (#156/#157,
+PR #172). Remaining P2 is the compounding loop's back half: linked versions
+(A1b) and comparison (A2), the highest-leverage PMF gate.
+The 2026-07-08 burn-down pass landed the bulk of the interpret-surface cluster:
+PR #182 fixed #171 Sig1+Sig2, #160(B), and #150's behavior half (with the #179/
+#180 repro gates un-xfailed); PR #183 replaced the degraded-fallback English
+copy with typed clarification contracts rendered by frontend static i18n
+(es-419 parity restored, the 9 stale copy tests re-pointed at typed asserts);
+and PR #169 landed the Agent Runtime Regression sweep — the full agent_runtime
+suite + spine guardrails now run hermetically (synthetic_unit_fixture catalog)
+on every runtime PR, zero hidden failures at tip (1023 passed, 0 xfailed at
+`c081901`).
+Current pointer: the interpret/edit spine is between owners; A1b (linked
+IdeaVersion emission) is the next spine-chain slice and is unblocked.
+The interpret/edit-surface burn-down is CLOSED (2026-07-10): PR #185 (#160(A)),
+PR #186 (#151), PR #187 (benchmark-keep), and PR #190 (#188, tip `08d92f9`) are
+all merged. #188's history is the arc's key lesson: #189 merged on green mocked
+tests but broke live; founder browser QA caught it, it was reopened, and PR #190
+fixed it — chip asset edits are now operation-agnostic, the two P1 desync corners
+are closed, and the fix was proven live with real Grok before belief, then merged.
+Promotion to `main` is UNBLOCKED on code — the suite carries zero xfails and every
+interpret-surface issue is closed. Remaining steps are release mechanics: (1) full
+live-eval rerun on the exact promotion SHA (now includes the chip cases); (2) the
+clean-checkout suite gate (#134/#135); (3) founder waiver on the known grok
+options-idea nondeterminism; (4) release manifest + `main` promotion PR (merge
+commit, not squash, so this is the last all-of-history diff).
+#164 (post-result followup typing / approval-vs-pending-clarify policy) is the
+deferred follow-up, not a gate.
+Execution runs off the P2 execution board below: point an agent at any READY
+lane. The interpret/edit spine has exactly one owner lane at a time (currently
+unowned; A1b is next in the spine chain).
+Date: 2026-07-09
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
 
@@ -48,10 +85,12 @@ Done behavior:
   multi-turn edits, reload, and run handoff.
 - max 5 symbols is enforced with clarification rather than silent truncation.
 
-Do not reopen P0 unless a new reproducible bug appears. The quarantine branch
-`codex/private-alpha-next-quarantine-fc231e8` remains read-only reference
-material for ideas, tests, and failure evidence. Do not broad cherry-pick
-runtime code from quarantine.
+Do not reopen P0 unless a new reproducible bug appears. The quarantine work is
+preserved as local tags `archive/quarantine-fc231e8` and
+`archive/p2.1-quarantine` (branches deleted 2026-07-01, all salvageable content
+verified landed or on the execution board) — read-only reference material for
+ideas, tests, and failure evidence. Do not broad cherry-pick runtime code from
+quarantine.
 
 ## What P1 Means
 
@@ -236,6 +275,23 @@ excerpts (Slice K), broker/export handoff (Slice N), iOS shell (Slice L), and
 external engines beyond read-only reference (Slice M). Producing design notes for
 these is allowed; shipping them is not P2 scope.
 
+#### P2 Agent Quality Pillars
+
+The four pillars (Intelligence, Evaluation, Platform, User Experience) are
+defined once, canonically, in `AGENTS.md` → "Agent Quality Pillars". They are a
+quality lens for every P2 slice, not new lanes and not promotion blockers unless
+this roadmap marks one as a gate (see the interpreter-facing live gate under
+"Standing release discipline" below). Do not restate the pillar definitions
+here. Only the P2-specific applications live in this doc:
+
+- **Intelligence** → A1b makes refinement create linked IdeaVersions, not loose
+  transcript state; A2 compares canonical versions/artifacts, not reconstructed
+  prose. Memo-named retrieval/memory accelerators are leverage behind this
+  contract, never a replacement for Supabase/Postgres product truth.
+- **Evaluation** → cluster live-eval failures by roadmap concern (artifact
+  grounding, comparison correctness, recovery/Spanish parity, hydration,
+  capability honesty, cost/performance, release environment).
+
 #### Why P2 is sliced this way: the quarantine lesson
 
 Two branches attempted P2 work and both broke the language-agnostic, LLM-first
@@ -262,8 +318,10 @@ branch used `import re` or `if "word" in message`; the spine was broken with
 heuristics that pass a naive grep, so the prohibitions below name mechanisms, not
 just regex.
 
-These branches remain read-only reference for product direction, anti-patterns,
-UI ideas, and test inspiration. Do not broad cherry-pick runtime code from them.
+This work is preserved as local tags (`archive/quarantine-fc231e8`,
+`archive/p2.1-quarantine`; the branches themselves were deleted 2026-07-01) —
+read-only reference for product direction, anti-patterns, UI ideas, and test
+inspiration. Do not broad cherry-pick runtime code from the tags.
 
 #### Cross-cutting invariants (the P2.0 guardrail gate, inherited by every slice)
 
@@ -286,7 +344,9 @@ release blocker.
 5. No per-language copy tables or branches in the runtime (`if locale ==
    "es-419"`, `_english_*` helpers, `" y "` versus `" and "` connectors).
    Capability, clarification, and recovery copy is model-voiced; English/Spanish
-   parity is proven by eval, not hardcoded.
+   parity is proven by eval, not hardcoded. Localized stop-word lists, alias
+   tables, or display-label token matching for semantic choice selection are the
+   same anti-pattern; degraded fallbacks must consume typed ids / payloads.
 6. Backend stays canonical truth; the frontend renders backend-provided state and
    never invents it; one LLM intent-classification call per turn.
 
@@ -295,13 +355,386 @@ disease cannot recur silently.
 
 #### Milestones
 
-Each milestone owns a PMF gate, is demoable in a founder-guided session, and is
-one revertable slice family. Sequence: P2.0 (now, ongoing) -> P2.1 (foundation)
--> P2.2 -> P2.3. P2.4 and P2.5 parallelize around the spine; start P2.5
-instrumentation early so founder-guided sessions generate gate signal from day
-one.
+Each slice owns a PMF gate, is demoable in a founder-guided session, and is one
+revertable slice family.
 
-##### P2.0 Spine guardrail gate (active now)
+##### P2 execution board: decision memo gates + unlock status (AUTHORITATIVE, 2026-07-07)
+
+Evidence-grounded after a live walkthrough + code grounding pass. The decision memo's
+moat is the loop where ideas are tested, remembered, compared, and trusted (memo §4.1,
+§5.6, §5.7). P2's remaining work is closing that loop. Treat the items below as
+execution gates, not as a second roadmap and not as hard order dependencies. The
+P2.x specs further below remain the per-slice detail (PMF gates, verification, stop
+conditions).
+
+How to use this board: each gate lists lanes with an unlock status. Point an
+agent at any READY lane without waiting on the others; the status IS the
+authorization. Status legend:
+
+- READY-BUILD: implement now (fresh worktree from `origin/codex/private-alpha-next`,
+  child branch, tests, browser QA, review, one revertable slice family).
+- READY-SPEC: write the spec and ask the founder product questions now;
+  implementation stays locked until the board flips the lane to READY-BUILD.
+- SCOUT: diagnosis, reproduction fixtures, and failing tests only. No runtime
+  edits.
+- ASYNC: isolated lane in its own worktree; cherry-pick discipline, no merge
+  pressure, never blocks the board.
+- BLOCKED(x): do not start; waiting on the named unlock.
+- DESIGN-ONLY: notes/mocks allowed; no runtime, schema, or UI code.
+
+Spine ownership rule: exactly one lane at a time may edit the interpret/edit
+spine (`agent_runtime/stages/*`, `agent_runtime/interpreter/*`,
+`llm_interpreter*.py`, `artifact_edit_planner.py`). The spine is currently
+between owners — A1 (#141), B1 (#140), and the B4 typed-prose series all landed;
+A1b is next in the chain. Parallel runtime lanes keep new logic in their own
+modules, touch shared dispatch minimally, and take rebase duty; the spine owner
+merges first.
+
+**Gate A: memory-backed compounding loop (highest leverage).**
+
+End-to-end shape: messy idea -> canonical idea -> backtest/evidence artifact ->
+saved decision -> refine creates a linked version -> compare versions -> revisit
+later with context. This includes structured Argus product memory earlier in the
+plan than generic retrieval work: `Idea`, `IdeaVersion`, `EvidenceArtifact`,
+`DecisionNote`, user-confirmed `MemoryRecord`, and retrieval from those product
+objects are the contract. RAG, graph RAG, agentic RAG, Mem0, Zep, Graphiti, and
+similar tools are optional implementation leverage behind that contract, not the
+source of truth.
+
+**Gate B: trust, recovery, and measurement (runs alongside Gate A).**
+
+Wire product events, eval cases, cost/latency ledger, correlation IDs, recovery
+tests, Spanish parity, and browser QA evidence as the loop lands. This is not a
+separate product surface; it makes founder-guided sessions measurable and keeps
+runtime behavior honest. PR #139 (merged `128818f`) was a Gate B/P2.4 repair
+slice, not a replacement for the Gate A product swing; issues #140 and #142
+continue this gate.
+
+**Gate C: evidence credibility (parallel, isolated).**
+
+Execution realism, fees/slippage, benchmark clarity, data assumptions, and the
+`BacktestEngine` boundary improve the trustworthiness of evidence artifacts. This
+work is async under issue #130 and must remain flag-safe and surgically replayed
+from any stale branch evidence; do not broad-merge an old engine branch.
+
+**Gate D: memory controls and privacy (required for memory expansion).**
+
+Memory must be earned opt-in, inspectable, editable, deletable, resettable, and
+explainable ("why was this used?"). Alpha legal/Data Controls work (#137) is the
+surface to extend. Do not add automatic broad personalization memory before these
+controls exist.
+
+**Parallel design/prototype lanes.**
+
+These may progress without touching the runtime spine: sanitized public excerpt
+design/mock, voice-to-composer STT prototype, thin iOS shell proof, broker/export
+packet design, security/privacy review, and monetization/entitlement architecture.
+They become implementation work only when the active gate explicitly starts them.
+
+**Avoid for now.**
+
+Do not add generic RAG as canonical memory, always-on automatic memory, a new
+dashboard competing with chat, public raw conversation links, broker sandbox auth
+or execution, speech-to-speech, a native iOS release, payments, or a second chat
+interpreter/orchestrator.
+
+DONE + landed on `codex/private-alpha-next`:
+
+- P2.0 spine guardrail gate (tripwires live).
+- P2.1.a capability registry (single derivation surface).
+- Conversational edit contract (messy multi-op edits + chips -> one typed operation
+  set, no silent drop, language-aware, model-voiced honesty note; 6 commits; verified
+  unit + live probe EN/ES + EN browser). NOTE: the capability-honesty interpreter
+  polish (the old "P2.1.b") was reassessed as LOW-VALUE — MACD is reachable via a
+  generic `signal_strategy` rule, and draft strategies already 422 — so it is OFF the
+  critical path.
+- Idea Ledger — lightweight recall (loop Slice 3): saved-idea decision status surfaced
+  in Omnisearch + a `?decision_state=` filter (#132, merged).
+- Spine modularization: `llm_interpreter.py` + `stages/interpret.py` split into cohesive
+  submodule packages behind behavior-preserving re-export facades (#133, merged;
+  addresses #131 — issue kept OPEN until it lands on `main`).
+- Gate B/P2.4 chat-continuity regression repair (#139, merged `128818f`):
+  unsupported-recovery continuation, confirmation-card edits, pending date
+  answers, RSI threshold edits, Recents attention, Omnisearch default-on QA;
+  degraded fallbacks now consume typed ids/payloads instead of display-label
+  text.
+- A1 refine routing + loop repair (#141, PR #148): refine chip + NL edits route
+  through the typed edit contract; same-period references bind to the latest run.
+- A3 Idea Ledger portfolio browse (#147): saved ideas grouped by decision state
+  in Omnisearch; backend-owned `ledger_groups` are the source of truth.
+- B1 latest-result fact answers (#140, PR #153): peak-date/drawdown follow-ups
+  answered from canonical `backtest_runs` facts, pending edit state preserved.
+- B2 company-name asset preservation (#142, PR #146): messy multi-symbol
+  company-name baskets survive to confirmation. CAVEAT: #171 reports this case
+  regressed on the live eval at `4eae18e` — verify before `main`.
+- B3 measurement trio: eval harness (#143), server-side PostHog product events
+  (#144), append-only CostLedger (#145). The eval harness is a live landing gate.
+- B4 language-gate retirement (#154, PRs #174-177): runtime prose composes from
+  typed facts; degraded recovery copy and result chrome render from typed
+  codes/keys; per-language copy tables retired, parity proven by eval.
+- C1 execution realism — fees/slippage (#130, PR #178): merged flag-off behind
+  `ARGUS_ENABLE_EXECUTION_REALISM`; legacy float path preserved when inert.
+- Interpreter cost/perf (#156/#157, PR #172): automatic stable-prefix prompt
+  caching on structured-artifact calls + per-tier reasoning-effort env overrides
+  (`ARGUS_STRUCTURED_REASONING_EFFORT`, `ARGUS_CAPABILITY_REASONING_EFFORT`).
+- #149 result-followup timeout recovery fixed for Python 3.10 (#168).
+- `codex/p2.1a-capability-registry` is SUPERSEDED — its deploy work (onboarding-flag
+  gate, grok-4.3/claude-haiku model swap, deploy contract, widened LLM timeouts) is
+  already in integration; the branch carries no unique runtime. Retire it, no rescue.
+
+LANES BY GATE (the board agents execute from):
+
+**Gate A — compounding loop (highest leverage):**
+
+- **A1 Refine routing + loop repair (#141).** DONE — merged as PR #148
+  (`5fc7a9a`). Refine chip and natural-language edits now route through the
+  typed edit contract; refinement pending state is a first-class edit context;
+  same-period references bind silently to the latest run's window; the
+  supported-edit discriminator counts date-window and cadence evidence.
+  Regression suites added: `test_refine_action_edit_routing.py`,
+  `test_post_result_edit_routing.py`, `test_latest_result_window_binding.py`.
+  Spec: `docs/specs/private-alpha-next-refine-to-version.md`.
+
+- **A1b Linked IdeaVersion emission.** READY-BUILD — next spine-chain slice;
+  the spine is unowned until this lane starts. Emit a new `IdeaVersion` linked
+  to the prior idea on refine (P1 spine supports lineage). Split out of #141
+  by founder scope decision 2026-07-01; this is the slice that UNBLOCKS
+  comparison (A2). Prefer starting it after PR #146 lands so only one lane at
+  a time sits on the interpret surface.
+
+- **A2 Comparison readout** (= P2.3 detail below). READY-SPEC (spec + founder
+  questions now); BUILD is BLOCKED(A1b) — needs clean linked versions to
+  compare. Stands on the BUILT P1 spine (each `IdeaVersion`/`EvidenceArtifact`
+  carries its metrics; a `compare_started` event is pre-registered in the
+  observability envelope). "vs your last version" — return Δ, drawdown Δ, what
+  changed; short, model-voiced. The differentiator from one-off output.
+
+- **A3 Idea Ledger portfolio view.** DONE — merged as PR #147 (`e9180c8`).
+  Saved ideas browse inside Omnisearch grouped by decision state
+  (promising/watching/rejected/revisit) with filter chips; backend-owned
+  `ledger_groups` are the source of truth for group order and counts (clients
+  must not synthesize groups — recorded in `API_CONTRACT.md`); EN/es-419
+  localized; live browser QA passed in both languages.
+
+- **A4 Freshness on return** (memo §5.6 SOTA north — the MOAT-DEFINER, the
+  biggest). BLOCKED(research/web lane; A1-A3 landing first); design notes
+  allowed. Freshness infra (`context/freshness.py`) exists for context packets,
+  not saved ideas. Smallest version: saved ideas show "Last reviewed" + a
+  re-run-on-fresh-data delta + "what changed since I saved this?". Phase LAST;
+  its own arc.
+
+**Gate B — trust, recovery, measurement:**
+
+- **B1 Latest-result answers from run facts (#140).** DONE — merged as PR #153.
+  Peak-date/value and drawdown follow-ups answer from canonical
+  `backtest_runs`/result facts; when pending edit state is active and a turn
+  classifies as a result question, it answers and leaves the pending state
+  intact (the #148 regression suites stayed green); `result_run_id` is preserved
+  in response metadata. FOLLOW-UP: #164 (OPEN) tracks the residual refine wall
+  for untyped fact questions — emit a typed result-followup fact focus/key.
+
+- **B2 Asset preservation in messy company-name prompts (#142).** DONE — merged
+  as PR #146. Messy multi-symbol company-name baskets (TGT + WMT + COST) survive
+  through `interpret -> asset resolution -> canonicalize -> confirmation`;
+  provider-backed name resolution feeds INTO interpretation as context, never a
+  post-LLM text rescan. Historical regression note: #171 later reported this
+  company-name case regressed on the live eval at `4eae18e` (alongside
+  calendar-year windows nulled on recovery drafts), and PR #182 closed it on
+  2026-07-08. Keep the `test_interpret_stage.py` basket assertions in the
+  promotion gate.
+
+- **B3 Measurement wiring** (= P2.5 below). READY-BUILD, off-spine. One lane,
+  THREE atomic slices in this ORDER, each its own PR — never combined into one
+  push:
+  (1) **Eval harness** — MERGED (PR #143 at `e303aa3`, Fable-reviewed).
+  `tests/evals/` with typed-outcome fixtures, prose-only judge
+  (`argus-prose-quality-v1`), issue-tagged expected-fails (#142), gitignored
+  scorecards, live spend behind `ARGUS_RUN_LIVE_EVALS=1`. Run policy: see
+  `tests/evals/README.md` + the standing release discipline below. The
+  landing gate is LIVE — runtime-behavior PRs run the live suite pre-merge
+  from now on.
+  (2) **Product events** — MERGED (PR #144): server-side-only PostHog capture
+  through the sanitizer; US Cloud region recorded; frontend key stays
+  present-but-empty per the launch runbook. Review fixes landed: off-loop
+  emission (no event-loop stalls), payload built inside the guard, loud
+  unrecognized-region warning, real `privacy_mode` emission.
+  (3) **Append-only CostLedger** — MERGED (PR #145): reversible migration with
+  structural append-only enforcement (revoke before grant), correlation ids,
+  eval-run metering, shared entry normalizer; OpenRouter usage/cost parsers
+  extracted to `openrouter_usage.py` to satisfy the merged-state modularity
+  budget. Apply the migration to dev/prod Supabase at next deploy.
+  B3 lane COMPLETE — harness gates merges, events flow, spend is metered.
+
+- **B4 Recovery-copy / language-gate retirement (#154).** DONE — merged as PRs
+  #174-177. Runtime prose composes from typed facts (#174); degraded recovery
+  copy renders from typed codes (#175); result chrome renders from typed keys
+  (#177); migrated language surfaces are test-guarded (#176). Per-language copy
+  tables (`assistant_copy_for_result`, `recovery_messages.py`) are retired;
+  prose follows the detected turn language everywhere and EN/ES parity is proven
+  by the B3 eval harness, not hardcoded. Historical note: #171 previously
+  flagged calendar-year windows nulled on recovery drafts; PR #182 closed the
+  mocked/repro gates on 2026-07-08, and the live suite still must rerun on the
+  exact promotion SHA.
+
+- **B5 Interpreter cost/perf (#156, #157).** DONE — merged as PR #172. Automatic
+  stable-prefix prompt caching on structured-artifact calls
+  (interpretation/repair/field-fidelity/capability-conflict) and per-tier
+  reasoning-effort env overrides (`ARGUS_STRUCTURED_REASONING_EFFORT`,
+  `ARGUS_CAPABILITY_REASONING_EFFORT`) so dev runs cheap and production runs at
+  full effort. OPEN follow-up on this lane: #159 (quality-gated model cascade —
+  cheap primary, capable escalation; low-priority/deferred). NOTE: #160
+  (interpreter dead-ends) surfaced from this lane's investigation but is a
+  high-priority `main` blocker, not cost/perf polish — it lives in the
+  main-promotion burn-down below, not here.
+
+**Gate C — evidence credibility:**
+
+- **C1 Execution realism — fees/slippage (#130).** DONE — merged as PR #178 into
+  `codex/private-alpha-next` (9 atomic commits). Fees + slippage model end to
+  end behind `ARGUS_ENABLE_EXECUTION_REALISM` (default OFF); the legacy float
+  cost path is preserved byte-identical when the flag is inert; cost-surface
+  fields recorded in API_CONTRACT and DATA_MODEL. Still OFF the critical path —
+  the founder deliberately disclaims assumptions for the PMF stage — but it is
+  now integration truth, not an async cherry-pick lane.
+
+**Gate D — memory controls and privacy:**
+
+- **D1 Memory controls spec** (inspect/edit/delete/reset/"why was this
+  used?"). READY-SPEC (spec + founder questions; extends the #137 Data
+  Controls surface). BUILD is BLOCKED(user-confirmed `MemoryRecord` landing in
+  the Gate A contract). No automatic broad personalization memory before these
+  controls exist.
+
+**Design-only lanes** (all READY for notes/mocks; no runtime, schema, or UI
+code): sanitized public excerpt design, voice-to-composer STT prototype, thin
+iOS shell proof, broker/export packet design, security/privacy review,
+monetization/entitlement architecture.
+
+**Integration health (filed during #148 review verification; triaged
+2026-07-03, refreshed 2026-07-07):**
+
+- **#149** — FIXED (PR #168). Result-followup timeout recovery no longer dead on
+  Python 3.10 (`asyncio.TimeoutError` vs builtin mismatch resolved); the failing
+  test now passes on a 3.10 venv.
+- **#150** — CLOSED (2026-07-08). Behavior half fixed by #166 (calendar-year
+  audit drift) and PR #182 (stale provenance, cadence de-promotion, benchmark-
+  owner repair — all #150 xfails removed). CI-visibility half fixed by PR #169:
+  the full agent_runtime suite now runs on every runtime PR.
+- **#151** — the last surviving #141 corner: an executable-complete draft plus
+  model readiness prose never materializes the confirmation card, so bare
+  affirmations re-confirm verbally (violates "canonical payload and UI prose
+  disagree"). Still OPEN; queue before or alongside A1b. A `main` promotion
+  blocker.
+- **#171** — CLOSED (2026-07-08, PR #182). Sig1: refusal drafts materialize
+  typed date intents into date_range (plus focused recovery for dropped
+  windows); Sig2: missing fields recompute after the focused-repair context
+  merge so provider-grounded baskets stay executable. The #179/#180 strict-xfail
+  gates are un-xfailed and enforced by the #169 sweep. Residual risk is model-
+  side only (grok options-classification nondeterminism), not spine logic.
+
+##### Main-promotion burn-down — the interpret-surface lane (CLOSED 2026-07-10: #182/#185/#186/#187/#190 landed; #169 + #183 off-spine)
+
+This was one regression cluster on the interpret/edit spine, most introduced by
+the 07-06/07-07 merges, worked as a single-owner burn-down lane. All members are
+fixed and merged. #188 is the arc's cautionary tale: #189 claimed to close it but
+broke live; founder browser QA caught it, it was reopened, and PR #190 (`08d92f9`)
+fixed it and was proven live with real Grok before merge (the interpreter-facing
+live gate under "Standing release discipline" now enforces that permanently). No
+code blocker remains between `codex/private-alpha-next` and a `main` promotion
+candidate; the standing release-discipline reruns (live eval on the exact SHA +
+clean-checkout gate) and the founder's options waiver remain after.
+
+Shared surface (why they cannot be parallel implementers): `stages/interpret.py`,
+`interpreter/artifact_assumption_edit.py`,
+`interpreter/unsupported_request_context.py`,
+`interpreter/date_window_repair.py`, `llm_interpreter.py`. This is the spine —
+exactly one implementation owner at a time. Parallel SCOUT/repro is fine;
+parallel edits are not.
+
+Members and roots:
+
+- **#171 — CLOSED (2026-07-08, PR #182).** Historical roots: Sig1
+  (calendar-year windows nulled on recovery drafts) traced to #166 (`a5ac38b`,
+  `date_window_repair.py` + `llm_interpreter.py`); Sig2 (#142 basket dropped,
+  verdict flips to `unsupported`) traced to #165 (`a80d681`,
+  `artifact_assumption_edit.py` + `unsupported_request_context.py`).
+- **#150 — CLOSED (2026-07-08).** The mocked half of #171 Sig2 and the
+  CI-visibility half are both closed: PR #182 removed the #150 strict xfails,
+  and PR #169 landed the off-spine regression-sweep CI gate.
+- **#160(A) — CLOSED (2026-07-09, PR #185).** Composer-`None` on a resolved fact
+  key is now a typed decline that re-enters the planned-edit contract across all
+  three anchors (pending refinement / active confirmation / completed run); the
+  interpreter classifies change-requests naming a card fact as
+  `refine_current_idea`. (B) was closed with #171 Sig1 in PR #182.
+- **#151 — CLOSED (2026-07-09, PR #186).** Executable-complete post-result and
+  confirmation-edit turns materialize the typed confirmation payload
+  (`_stage_result_from_interpretation` + result-artifact-patch route-ownership);
+  the benchmark-separation and `sizing_mode`-echo seams are fixed.
+- **#187 — CLOSED (2026-07-09).** Demo-caught: benchmark separation must not empty
+  an explicitly-owned traded universe; keep-evidence is planner provenance or
+  active-draft continuity, never resolver echo.
+- **#188 — CLOSED (2026-07-09, PR #189).** The pre-run chip-clarify twin: chip
+  answers now route through the typed edit contract (`requested_field` is display
+  scope only), so remove/replace apply set-complete, capital edits land, and
+  changed-mind cross-answers apply.
+- **#164 (med) — trailing follow-up.** Typed result-followup fact focus/key; the
+  residual refine wall. Still open; deferred follow-up, never a promotion gate.
+
+Landing order (serial on the spine):
+
+1. ~~#171 Sig2 + #150~~ — DONE (PR #182): basket survives the underfilled
+   repair; all #150 xfails removed.
+2. ~~#171 Sig1 + #160(B)~~ — DONE (PR #182): typed-intent materialization on
+   refusal drafts + year-contradiction guard on invented default windows; the
+   #179/#180 gates are un-xfailed.
+3. ~~#160(A)~~ — DONE (PR #185): composer-`None` decline re-enters the planned-edit
+   contract; upstream classifies card-fact change-requests as refine_current_idea.
+   Gate `test_workflow_fact_answer_then_composer_none_edit_reroutes_to_planner`
+   un-xfailed.
+4. ~~#151~~ — DONE (PR #186): confirmation card materializes from the
+   executable-complete draft; gate un-xfailed. Demo follow-ups: #187 (benchmark
+   keep) + #188/#189 (pre-run chip-clarify twin) also landed.
+5. Full live eval on the exact SHA `c081901` → promotion candidate. Then #164
+   (deferred, not a gate).
+
+Off-spine, now LANDED: PR #169 (regression-sweep CI, hermetic
+synthetic_unit_fixture catalog, runs on every runtime PR + nightly) and PR #183
+(typed degraded-fallback clarifications + es-419 static rendering; the 9 stale
+per-language copy tests re-pointed at typed asserts). Waiver valve: #171 permits issue-tagged scoped expected-fails to
+unblock promotion if the founder accepts the regression short-term; the roots are
+known data-dropping regressions, so fix is preferred over waive.
+
+**Standing release discipline** (blocks `main`, not a lane): rerun the exact
+clean-checkout suite gate (issue #134 / PR #135) before any branch or `main`
+promotion instead of treating the repair as permanent proof for future SHAs.
+Interpret-surface status (2026-07-10): #171/#150/#160(A)(B)/#151/#187/#188 are
+all fixed and merged. #188 is why the gate below exists — #189's chip-clarify fix
+passed mocked tests but broke live; PR #190 re-fixed it and was proven live before
+merge. No interpret-surface blocker remains; promotion is unblocked on code.
+
+**Interpreter-facing live gate (blocks issue-close, not just `main`):** an
+interpret/edit/chat-facing fix is not "closed" on mocked-green alone. Before its
+issue closes, a real-interpreter (live Grok) reproduction of its exact acceptance
+case — driven through the running runtime, asserting typed state — must pass, and
+that case must be added to the live eval suite so it guards the path permanently.
+Mocked/injected-interpretation tests prove spine application, never interpreter
+classification; treating them as sufficient is how #189 shipped a live-broken
+fix. This graduates the AGENTS.md Evaluation pillar from lens to gate.
+The eval harness (B3 slice 1, PR #143) is now a live landing gate:
+runtime-behavior PRs run the live eval suite once pre-merge; every `main`
+promotion candidate runs the full live suite on its exact SHA with no
+unexpected failures (expected-fails only for open issue-tagged bugs); rerun
+the suite after any interpreter model or provider change. #171 is fixed in the
+mocked + repro gates; the live suite must be re-run on the exact promotion SHA
+before promotion (known model-side risk: grok classifies options ideas
+nondeterministically — a tier/prompt concern tracked with #159, not spine
+logic). Integration stays a fast checkpoint; `main` is the heavyweight
+gate.
+
+"P2 done" = Argus **remembers, compares, and stays honest about staleness** — the memo's
+moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
+
+##### P2.0 Spine guardrail gate (DONE — landed)
 
 - Outcome: the six cross-cutting invariants above become an enforced review
   contract plus automated tripwire tests that fail when a deterministic text
@@ -318,7 +751,7 @@ one.
 - Stop conditions: if enforcing a rule requires changing runtime behavior, stop
   and split that into its owning milestone.
 
-##### P2.1 Capability truth, done right (spec first)
+##### P2.1 Capability truth (DONE — registry + edit contract landed; honesty polish deprioritized)
 
 - Outcome: Argus stops overpromising. It honestly tells the user, in their own
   language, what it can and cannot run yet (for example "I can't run MACD yet,
@@ -344,7 +777,7 @@ one.
   `draft_only` token plumbing (`web/components/chat/ChatInput.tsx`,
   `web/components/chat/types.ts`); and retire or guard the orphaned `signals.py`
   handlers for the two drafts. Stay narrow: do not widen the supported set in this
-  slice. See `docs/specs/private-alpha-next-p2.1-capability-audit.md`.
+  slice. See `docs/archive/private-alpha-next-p2.1-capability-audit.md`.
 - Allowed surfaces: capability registry domain module, interpreter
   context/tools wiring, typed post-LLM capability validation, registry-backed
   result/clarification copy that is model-voiced, docs (`API_CONTRACT.md`,
@@ -369,8 +802,12 @@ one.
 - PMF gate: users describe a decision Argus clarified; trust foundation for all
   later slices.
 
-##### P2.2 Backtest credibility ladder and engine boundary
+##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, flag-off)
 
+- Status: DONE (PR #178, 9 atomic commits). Fees + slippage model end to end
+  behind `ARGUS_ENABLE_EXECUTION_REALISM` (default OFF); legacy float cost path
+  preserved byte-identical when inert; cost-surface fields recorded in
+  API_CONTRACT and DATA_MODEL. The scope below is delivered, not pending.
 - Outcome: results carry assumptions a user can explain without founder help.
 - Scope: a `BacktestEngine` interface with the current engine as an adapter (no
   VectorBT/engine internals leaking into product objects); audit and surface
@@ -392,8 +829,15 @@ one.
 - PMF gate: at least two of five users voluntarily revisit or compare. This is
   the retention loop. Full verification/QA/rollback spec authored at activation.
 
-##### P2.4 Failure and recovery trust
+##### P2.4 Failure and recovery trust (recovery pattern DONE via B4; live parity gate open)
 
+- Status: the model-voiced, language-agnostic recovery pattern is DELIVERED — B4
+  (#154, PRs #174-177) retired per-language copy so recovery/degraded prose
+  renders from typed codes/keys in the detected turn language. The PMF gate below
+  (Spanish-preferring users complete the loop unaided) is validated by the live
+  eval harness; #171 is closed in mocked/repro gates, and the interpret-surface
+  cluster (#160/#151 + demo follow-ups #187/#188) is fully fixed and merged — the
+  remaining promotion step is the exact-SHA live-eval rerun.
 - Outcome: when Argus fails or hits an unsupported request, recovery preserves
   the user's idea, clarifies without making the user feel wrong, explains
   unsupported capability in product language, and never leaks raw provider/runtime
@@ -417,10 +861,15 @@ one.
 - Start instrumentation early, in parallel with P2.1-P2.3, so gates are
   measurable as features land.
 
-##### Design candidate: Conversational edit contract (macro pattern)
+##### Conversational edit contract (macro pattern) — DONE (landed `0fb32c1`)
 
-Status: design-only, not yet sliced or scheduled. Founder-identified 2026-06-27.
-Captured here so it stays current and pickup-ready; do not implement until sliced.
+Status: BUILT + LANDED on `codex/private-alpha-next` (6 commits). Typed `EditOperation`
+(add/remove/replace/set/clear × assets/benchmark/dates/capital/DCA/timeframe/fees/
+slippage), deterministic applier (multi-op, no silent drop), language-aware planner,
+conflict-aware prompt, model-voiced honesty note. Verified unit + live probe EN/ES + EN
+browser. Spec: `docs/specs/private-alpha-next-conversational-edit-contract.md`. The
+remaining seam is loop **Slice 1 (refine -> linked version)** above — refine routes to
+the wrong brain. Original design notes preserved below for reference.
 
 - Idea: the confirmation-card action chips (Run backtest, Change dates, Change
   asset, Adjust assumptions, Cancel) and natural-language turn edits should be two
@@ -454,9 +903,13 @@ Stop immediately and escalate to the founder if:
 - a slice grows beyond one revertable commit family;
 - live browser QA fails after tests pass, especially Spanish parity.
 
-Until a milestone is activated, do not implement its runtime, backend, schema, or
-UI changes. P2.0 and P2.1 are the only active slices; P2.2-P2.5 are defined but
-not yet authorized for implementation.
+Until a lane is READY on the execution board, do not implement its runtime,
+backend, schema, or UI changes. The board status is the authorization:
+READY-BUILD lanes may implement now, READY-SPEC lanes may write specs and ask
+the founder questions only, SCOUT lanes may add fixtures/failing tests only,
+and BLOCKED/DESIGN-ONLY lanes stay out of runtime. The interpret/edit spine has
+one owner lane at a time (currently A1, #141); parallel runtime lanes take
+rebase duty.
 
 ## Parallelization Rules
 

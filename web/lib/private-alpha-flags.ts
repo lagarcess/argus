@@ -5,7 +5,7 @@ export const collectionsEnabled =
   process.env.NEXT_PUBLIC_COLLECTIONS_ENABLED === "true";
 
 export const omnisearchEnabled =
-  process.env.NEXT_PUBLIC_OMNISEARCH_ENABLED === "true";
+  process.env.NEXT_PUBLIC_OMNISEARCH_ENABLED !== "false";
 
 export const privateAlphaOnboardingEnabled =
   process.env.NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED === "true";

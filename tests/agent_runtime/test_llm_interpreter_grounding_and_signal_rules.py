@@ -71,6 +71,8 @@ def test_provider_ticker_mentions_support_lowercase_exact_ticker_evidence() -> N
         normalized = query.strip().upper()
         if normalized == "APPLE":
             asset = ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+        elif normalized == "GOOGL":
+            asset = ResolvedAssetStub("GOOGL", "equity", name="Alphabet Inc.")
         elif normalized == "QQQ":
             asset = ResolvedAssetStub("QQQ", "equity", name="Invesco QQQ Trust")
         elif normalized == "NU":
@@ -102,6 +104,17 @@ def test_provider_ticker_mentions_support_lowercase_exact_ticker_evidence() -> N
 
     assert [mention.raw_text for mention in mentions] == ["qqq", "nu"]
     assert [mention.asset.canonical_symbol for mention in mentions] == ["QQQ", "NU"]
+
+    compound_mentions = provider_ticker_mentions_from_text(
+        "add Google/GOOGL to the card",
+        resolve_candidate=resolve_candidate,
+    )
+
+    assert [mention.raw_text for mention in compound_mentions] == ["GOOGL"]
+    assert [mention.asset.canonical_symbol for mention in compound_mentions] == [
+        "GOOGL"
+    ]
+
 
 @pytest.mark.asyncio
 async def test_asset_grounding_keeps_lowercase_provider_ticker_from_messy_turn(
@@ -1467,12 +1480,12 @@ async def test_llm_interpreter_plans_active_artifact_assumption_edit_after_model
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        lambda *args, **kwargs: ["test-model"],
     )
     monkeypatch.setattr(
         artifact_edit_planner,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        lambda *args, **kwargs: ["test-model"],
     )
 
     calls: list[str] = []
@@ -1531,7 +1544,8 @@ async def test_llm_interpreter_plans_active_artifact_assumption_edit_after_model
     assert result.semantic_turn_act == "answer_pending_need"
     assert result.candidate_strategy_draft.capital_amount == 5000
     assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
-        "capital_amount": "starting_capital"
+        "capital_amount": "starting_capital",
+        "initial_capital": "starting_capital",
     }
     assert "artifact_assumption_edit_planned" in result.reason_codes
 
@@ -1546,18 +1560,20 @@ async def test_llm_interpreter_plans_active_artifact_benchmark_after_prose_only_
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        lambda *args, **kwargs: ["test-model"],
     )
     monkeypatch.setattr(
         artifact_edit_planner,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        lambda *args, **kwargs: ["test-model"],
     )
-    monkeypatch.setattr(
-        interpreter_module,
-        "resolve_asset",
-        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
-    )
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized not in {"AAPL", "MSFT", "QQQ", "TSLA"}:
+            raise ValueError("invalid_symbol")
+        return ResolvedAssetStub(normalized, "equity")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
 
     calls: list[str] = []
 
@@ -1646,12 +1662,12 @@ async def test_llm_interpreter_plans_underfilled_active_artifact_assumption_edit
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        lambda *args, **kwargs: ["test-model"],
     )
     monkeypatch.setattr(
         artifact_edit_planner,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        lambda *args, **kwargs: ["test-model"],
     )
 
     calls: list[str] = []
@@ -1722,7 +1738,8 @@ async def test_llm_interpreter_plans_underfilled_active_artifact_assumption_edit
     assert result.intent == "backtest_execution"
     assert result.candidate_strategy_draft.capital_amount == 5000
     assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
-        "capital_amount": "starting_capital"
+        "capital_amount": "starting_capital",
+        "initial_capital": "starting_capital",
     }
     assert "artifact_assumption_edit_planned" in result.reason_codes
 
@@ -1737,12 +1754,12 @@ async def test_llm_interpreter_plans_active_artifact_asset_append_after_model_fa
     monkeypatch.setattr(
         interpreter_module,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        lambda *args, **kwargs: ["test-model"],
     )
     monkeypatch.setattr(
         artifact_edit_planner,
         "openrouter_structured_model_candidates",
-        lambda: ["test-model"],
+        lambda *args, **kwargs: ["test-model"],
     )
 
     calls: list[str] = []
@@ -1813,6 +1830,779 @@ async def test_llm_interpreter_plans_active_artifact_asset_append_after_model_fa
         "asset_universe": "explicit_user"
     }
     assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_routes_active_confirmation_compound_asset_edit_to_planner(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        aliases = {
+            "AAPL": "AAPL",
+            "GOOGL": "GOOGL",
+            "MICROSOFT": "MSFT",
+            "MSFT": "MSFT",
+            "TSLA": "TSLA",
+        }
+        canonical = aliases.get(normalized)
+        if canonical is None:
+            raise ValueError("invalid_symbol")
+        names = {
+            "AAPL": "Apple Inc.",
+            "GOOGL": "Alphabet Inc.",
+            "MSFT": "Microsoft Corporation",
+            "TSLA": "Tesla Inc.",
+        }
+        return ResolvedAssetStub(canonical, "equity", name=names[canonical])
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User edited the visible confirmation.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing=(
+                        "Add GOOGL, remove Microsoft, set capital to $75,000, "
+                        "date March 1, 2026 to June 5, 2026"
+                    ),
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold the selected equities.",
+                    asset_universe=["MSFT"],
+                    asset_universe_operation="replace",
+                    date_range={"start": "2026-03-01", "end": "2026-06-05"},
+                    capital_amount=75000,
+                    field_provenance={
+                        "asset_universe": "explicit_user",
+                        "date_range": "explicit_user",
+                        "capital_amount": "explicit_user",
+                    },
+                ),
+                semantic_turn_act="answer_pending_need",
+            )
+        if schema_model.__name__ == "StatedRunFieldFidelityAudit":
+            return StatedRunFieldFidelityAudit(confidence=0.9)
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed multiple visible assumptions.",
+            operations=[
+                artifact_edit_planner.EditOperation(
+                    op="add",
+                    target="asset",
+                    symbols=["GOOGL"],
+                ),
+                artifact_edit_planner.EditOperation(
+                    op="remove",
+                    target="asset",
+                    symbols=["Microsoft"],
+                ),
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="capital",
+                    number=75000,
+                ),
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window=LLMDateRangeIntent(
+                        kind="explicit_range",
+                        start="2026-03-01",
+                        end="2026-06-05",
+                        confidence=0.95,
+                        evidence="March 1, 2026 to June 5, 2026",
+                    ),
+                ),
+            ],
+            confidence=0.93,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    active_strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2026-01-01", "end": "2026-06-30"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message=(
+                "Add GOOGL, remove Microsoft, set capital to $75,000, "
+                "date March 1, 2026 to June 5, 2026"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                active_confirmation_reference=ArtifactReference(
+                    artifact_kind="confirmation",
+                    artifact_id="confirmation-1",
+                    artifact_status="active",
+                    metadata={
+                        "confirmation_payload": {
+                            "strategy": active_strategy.model_dump(mode="json"),
+                            "launch_payload": {
+                                "strategy_type": "buy_and_hold",
+                                "symbols": ["AAPL", "MSFT", "TSLA"],
+                                "asset_class": "equity",
+                                "date_range": {
+                                    "start": "2026-01-01",
+                                    "end": "2026-06-30",
+                                },
+                                "capital_amount": 100000,
+                                "benchmark_symbol": "SPY",
+                            },
+                        }
+                    },
+                ),
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls[:2] == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert result is not None
+    assert result.intent == "backtest_execution"
+    assert result.candidate_strategy_draft.asset_universe == [
+        "AAPL",
+        "TSLA",
+        "GOOGL",
+    ]
+    assert result.candidate_strategy_draft.capital_amount == 75000
+    assert result.candidate_strategy_draft.date_range == {
+        "start": "2026-03-01",
+        "end": "2026-06-05",
+    }
+    assert result.candidate_strategy_draft.extra_parameters[
+        "date_range_intent"
+    ] == {
+        "kind": "explicit_range",
+        "start": "2026-03-01",
+        "end": "2026-06-05",
+        "day_offset": None,
+        "count": None,
+        "unit": None,
+        "anchor": "today",
+        "year": None,
+        "endpoint": None,
+        "confidence": 0.95,
+        "evidence": "March 1, 2026 to June 5, 2026",
+    }
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_routes_messy_scalar_asset_edit_to_planner(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        aliases = {
+            "AAPL": "AAPL",
+            "MICROSOFT": "MSFT",
+            "TSLA": "TSLA",
+            "GOOGL": "GOOGL",
+        }
+        canonical = aliases.get(normalized)
+        if canonical is None:
+            raise ValueError("invalid_symbol")
+        names = {
+            "AAPL": "Apple Inc.",
+            "GOOGL": "Alphabet Inc.",
+            "MSFT": "Microsoft Corporation",
+            "TSLA": "Tesla Inc.",
+        }
+        return ResolvedAssetStub(canonical, "equity", name=names[canonical])
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User edited the visible confirmation.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing=(
+                        "ok tweak the card: add Google/GOOGL, ditch Microsoft, "
+                        "make cash seventy five grand, dates 3/1/26 thru june 5 2026"
+                    ),
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold the selected equities.",
+                    date_range={"start": "2026-03-01", "end": "2026-06-05"},
+                    capital_amount=75000,
+                    field_provenance={
+                        "date_range": "explicit_user",
+                        "capital_amount": "explicit_user",
+                    },
+                ),
+                semantic_turn_act="answer_pending_need",
+            )
+        if schema_model.__name__ == "StatedRunFieldFidelityAudit":
+            return StatedRunFieldFidelityAudit(confidence=0.9)
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed multiple visible assumptions.",
+            operations=[
+                artifact_edit_planner.EditOperation(
+                    op="add",
+                    target="asset",
+                    symbols=["Google/GOOGL"],
+                ),
+                artifact_edit_planner.EditOperation(
+                    op="remove",
+                    target="asset",
+                    symbols=["Microsoft"],
+                ),
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="capital",
+                    number=75000,
+                ),
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window=LLMDateRangeIntent(
+                        kind="explicit_range",
+                        start="2026-03-01",
+                        end="2026-06-05",
+                        confidence=0.95,
+                        evidence="3/1/26 thru june 5 2026",
+                    ),
+                ),
+            ],
+            confidence=0.93,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    active_strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2026-01-01", "end": "2026-06-30"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message=(
+                "ok tweak the card: add Google/GOOGL, ditch Microsoft, "
+                "make cash seventy five grand, dates 3/1/26 thru june 5 2026"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                active_confirmation_reference=ArtifactReference(
+                    artifact_kind="confirmation",
+                    artifact_id="confirmation-1",
+                    artifact_status="active",
+                    metadata={
+                        "confirmation_payload": {
+                            "strategy": active_strategy.model_dump(mode="json"),
+                            "launch_payload": {
+                                "strategy_type": "buy_and_hold",
+                                "symbols": ["AAPL", "MSFT", "TSLA"],
+                                "asset_class": "equity",
+                                "date_range": {
+                                    "start": "2026-01-01",
+                                    "end": "2026-06-30",
+                                },
+                                "capital_amount": 100000,
+                                "benchmark_symbol": "SPY",
+                            },
+                        }
+                    },
+                ),
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert result is not None
+    assert result.intent == "backtest_execution"
+    assert result.candidate_strategy_draft.asset_universe == [
+        "AAPL",
+        "TSLA",
+        "GOOGL",
+    ]
+    assert result.candidate_strategy_draft.capital_amount == 75000
+    assert result.candidate_strategy_draft.date_range == {
+        "start": "2026-03-01",
+        "end": "2026-06-05",
+    }
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_routes_lowercase_ticker_asset_edit_to_planner(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        aliases = {
+            "AAPL": "AAPL",
+            "GOOGL": "GOOGL",
+            "MSFT": "MSFT",
+            "TSLA": "TSLA",
+        }
+        canonical = aliases.get(normalized)
+        if canonical is None:
+            raise ValueError("invalid_symbol")
+        names = {
+            "AAPL": "Apple Inc.",
+            "GOOGL": "Alphabet Inc.",
+            "MSFT": "Microsoft Corporation",
+            "TSLA": "Tesla Inc.",
+        }
+        return ResolvedAssetStub(canonical, "equity", name=names[canonical])
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User edited the visible confirmation.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing=(
+                        "can you add googl, remove msft, and keep it at 75k?"
+                    ),
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold the selected equities.",
+                    capital_amount=75000,
+                    field_provenance={"capital_amount": "explicit_user"},
+                ),
+                semantic_turn_act="answer_pending_need",
+            )
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed multiple visible assumptions.",
+            operations=[
+                artifact_edit_planner.EditOperation(
+                    op="add",
+                    target="asset",
+                    symbols=["googl"],
+                ),
+                artifact_edit_planner.EditOperation(
+                    op="remove",
+                    target="asset",
+                    symbols=["msft"],
+                ),
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="capital",
+                    number=75000,
+                ),
+            ],
+            confidence=0.93,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    active_strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL, MSFT, and TSLA.",
+        asset_universe=["AAPL", "MSFT", "TSLA"],
+        asset_class="equity",
+        date_range={"start": "2026-01-01", "end": "2026-06-30"},
+        capital_amount=100000,
+        comparison_baseline="SPY",
+    )
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message=(
+                "can you add googl, remove msft, and keep it at 75k?"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                active_confirmation_reference=ArtifactReference(
+                    artifact_kind="confirmation",
+                    artifact_id="confirmation-1",
+                    artifact_status="active",
+                    metadata={
+                        "confirmation_payload": {
+                            "strategy": active_strategy.model_dump(mode="json"),
+                            "launch_payload": {
+                                "strategy_type": "buy_and_hold",
+                                "symbols": ["AAPL", "MSFT", "TSLA"],
+                                "asset_class": "equity",
+                                "date_range": {
+                                    "start": "2026-01-01",
+                                    "end": "2026-06-30",
+                                },
+                                "capital_amount": 100000,
+                                "benchmark_symbol": "SPY",
+                            },
+                        }
+                    },
+                ),
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert result is not None
+    assert result.intent == "backtest_execution"
+    assert result.candidate_strategy_draft.asset_universe == [
+        "AAPL",
+        "TSLA",
+        "GOOGL",
+    ]
+    assert result.candidate_strategy_draft.capital_amount == 75000
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_allows_rsi_threshold_edit_from_active_confirmation_payload(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="conversation_followup",
+                task_relation="continue",
+                requires_clarification=True,
+                user_goal_summary="User wants to edit the RSI thresholds.",
+                candidate_strategy_draft=LLMStrategyDraft(),
+                assistant_response="I can change those thresholds on the card.",
+                semantic_turn_act="educational_question",
+            )
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed RSI thresholds on the visible card.",
+            operations=[
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="indicator_entry_threshold",
+                    number=20,
+                ),
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="indicator_exit_threshold",
+                    number=60,
+                ),
+            ],
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    active_strategy = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Buy TSLA when RSI is oversold and exit when overbought.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=1000,
+        comparison_baseline="SPY",
+        entry_logic="Buy when RSI(14) drops to 30 or below.",
+        exit_logic="Sell when RSI(14) rises to 70 or above.",
+        extra_parameters={
+            "indicator": "rsi",
+            "indicator_parameters": {
+                "indicator": "rsi",
+                "indicator_period": 14,
+                "entry_threshold": 30,
+                "exit_threshold": 70,
+            },
+        },
+    )
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message=(
+                "Change the RSI entry threshold to 20 and exit threshold to 60"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                active_confirmation_reference=ArtifactReference(
+                    artifact_kind="confirmation",
+                    artifact_id="confirmation-1",
+                    artifact_status="active",
+                    metadata={
+                        "confirmation_payload": {
+                            "strategy": active_strategy.model_dump(mode="json"),
+                            "launch_payload": {
+                                "strategy_type": "indicator_threshold",
+                                "symbols": ["TSLA"],
+                                "asset_class": "equity",
+                                "date_range": {
+                                    "start": "2024-01-01",
+                                    "end": "2024-12-31",
+                                },
+                                "capital_amount": 1000,
+                                "benchmark_symbol": "SPY",
+                                "indicator": "rsi",
+                                "indicator_period": 14,
+                                "entry_threshold": 30,
+                                "exit_threshold": 70,
+                            },
+                        }
+                    },
+                ),
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert result is not None
+    assert result.intent == "backtest_execution"
+    parameters = result.candidate_strategy_draft.extra_parameters[
+        "indicator_parameters"
+    ]
+    assert parameters["indicator"] == "rsi"
+    assert parameters["entry_threshold"] == 20.0
+    assert parameters["exit_threshold"] == 60.0
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_rejects_rsi_threshold_edit_on_buy_hold_card(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda *args, **kwargs: ["test-model"],
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_response_can_skip_optional_runtime_readiness_audits",
+        lambda *args, **kwargs: True,
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="conversation_followup",
+                task_relation="continue",
+                requires_clarification=True,
+                user_goal_summary="User wants to edit RSI thresholds.",
+                candidate_strategy_draft=LLMStrategyDraft(),
+                assistant_response="I can change RSI thresholds on an RSI card.",
+                semantic_turn_act="educational_question",
+            )
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed RSI thresholds on the visible card.",
+            operations=[
+                artifact_edit_planner.EditOperation(
+                    op="set",
+                    target="indicator_entry_threshold",
+                    number=20,
+                ),
+            ],
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    active_strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold TSLA.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=1000,
+        comparison_baseline="SPY",
+    )
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message="Change the RSI entry threshold to 20",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                active_confirmation_reference=ArtifactReference(
+                    artifact_kind="confirmation",
+                    artifact_id="confirmation-1",
+                    artifact_status="active",
+                    metadata={
+                        "confirmation_payload": {
+                            "strategy": active_strategy.model_dump(mode="json"),
+                            "launch_payload": {
+                                "strategy_type": "buy_and_hold",
+                                "symbols": ["TSLA"],
+                                "asset_class": "equity",
+                                "date_range": {
+                                    "start": "2024-01-01",
+                                    "end": "2024-12-31",
+                                },
+                                "capital_amount": 1000,
+                                "benchmark_symbol": "SPY",
+                            },
+                        }
+                    },
+                ),
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert result is not None
+    assert result.intent != "backtest_execution"
+    assert result.requires_clarification
+    assert result.candidate_strategy_draft.strategy_type != "indicator_threshold"
+    assert "indicator_parameters" not in result.candidate_strategy_draft.extra_parameters
 
 
 @pytest.mark.asyncio
@@ -2459,6 +3249,58 @@ def test_artifact_assumption_edit_plan_maps_benchmark() -> None:
     assert draft.field_provenance == {"comparison_baseline": "explicit_user"}
 
 
+def test_artifact_assumption_edit_plan_applies_compound_operations() -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    # The canonical failing case: add an asset AND change the date in one turn.
+    plan = artifact_edit_planner.ArtifactAssumptionEditPlan(
+        outcome="ready_to_confirm",
+        user_goal_summary="User added AMZN and moved the start date.",
+        operations=[
+            artifact_edit_planner.EditOperation(
+                op="add", target="asset", symbols=["AMZN"]
+            ),
+            artifact_edit_planner.EditOperation(
+                op="set",
+                target="date_window",
+                date_window=LLMDateRangeIntent(
+                    kind="rolling_window", count=12, unit="month"
+                ),
+            ),
+        ],
+        confidence=0.9,
+    )
+
+    response = interpreter_module._response_from_artifact_assumption_edit_plan(
+        plan=plan,
+        request=InterpretationRequest(
+            current_user_message="add AMZN and use the last 12 months",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    date_range={"start": "2024-01-01", "end": "today"},
+                )
+            ),
+            selected_thread_metadata={},
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = response.candidate_strategy_draft
+    # asset added to the current set, not replacing it or dropping the date
+    assert draft.asset_universe == ["AAPL", "AMZN"]
+    assert draft.asset_universe_operation == "replace"
+    assert draft.date_range is not None
+    assert draft.date_range_intent is not None
+    assert draft.field_provenance["asset_universe"] == "explicit_user"
+    assert draft.field_provenance["date_range"] == "explicit_user"
+
+
 def test_strategy_from_llm_preserves_asset_operation_in_extra_parameters() -> None:
     strategy = _strategy_from_llm(
         LLMStrategyDraft(
@@ -2964,7 +3806,7 @@ async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
     assert draft.exit_logic
 
 @pytest.mark.asyncio
-async def test_structured_signal_draft_recovers_missing_asset_from_context(
+async def test_structured_signal_draft_canonicalizes_interpreter_asset(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -2972,7 +3814,7 @@ async def test_structured_signal_draft_recovers_missing_asset_from_context(
 
     async def fail_if_model_called(**kwargs):
         del kwargs
-        raise AssertionError("catalog-backed asset recovery should not need a model")
+        raise AssertionError("asset canonicalization should not need a model")
 
     def resolve_stub(symbol: str) -> ResolvedAssetStub:
         if symbol.lower() in {"tesla", "tsla"}:
@@ -2994,7 +3836,7 @@ async def test_structured_signal_draft_recovers_missing_asset_from_context(
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
-        requires_clarification=True,
+        requires_clarification=False,
         user_goal_summary=(
             "Backtest a 50/200 moving-average crossover for Tesla."
         ),
@@ -3010,6 +3852,7 @@ async def test_structured_signal_draft_recovers_missing_asset_from_context(
                 "200-day SMA between January 2022 and today, starting with "
                 "$10,000 capital."
             ),
+            asset_universe=["TSLA"],
             date_range={"start": "2022-01-01", "end": "today"},
             capital_amount=10000,
             entry_rule={
@@ -3029,10 +3872,7 @@ async def test_structured_signal_draft_recovers_missing_asset_from_context(
                 "slow_indicator": "sma",
             },
         ),
-        missing_required_fields=["asset_universe"],
-        assistant_response=(
-            "Just to confirm, are you testing this on TSLA stock?"
-        ),
+        assistant_response=None,
     )
 
     repaired = await interpreter_module._response_ready_for_runtime(
@@ -3054,7 +3894,7 @@ async def test_structured_signal_draft_recovers_missing_asset_from_context(
     assert repaired.requires_clarification is False
     assert repaired.assistant_response is None
     assert repaired.missing_required_fields == []
-    assert "provider_catalog_asset_recovery" in repaired.reason_codes
+    assert "provider_catalog_asset_recovery" not in repaired.reason_codes
     assert draft.asset_universe == ["TSLA"]
     assert draft.asset_class == "equity"
     assert draft.entry_rule and draft.exit_rule
@@ -3163,9 +4003,10 @@ async def test_unsupported_supported_rule_classification_gets_signal_rule_repair
     async def plan_stub(**kwargs):
         del kwargs
         calls.append("signal_rule_plan")
-        return _sma_50_200_crossover_plan(
+        plan = _sma_50_200_crossover_plan(
             strategy_thesis="Test Tesla with a 50/200 moving-average crossover."
         )
+        return plan.model_copy(update={"asset_universe": ["Tesla"]})
 
     async def field_fidelity_audit_stub(*, response, request, **kwargs):
         del kwargs
@@ -3264,7 +4105,7 @@ async def test_supported_rule_repair_audits_dropped_user_stated_capital(
                 "Test Tesla with a 50/200 moving-average crossover using $10,000."
             ),
         )
-        return plan
+        return plan.model_copy(update={"asset_universe": ["Tesla"]})
 
     async def field_fidelity_audit_stub(*, response, request, **kwargs):
         del kwargs
@@ -3333,6 +4174,87 @@ async def test_supported_rule_repair_audits_dropped_user_stated_capital(
         repaired.candidate_strategy_draft.field_provenance["capital_amount"]
         == "starting_capital"
     )
+
+
+@pytest.mark.asyncio
+async def test_pending_signal_rule_answer_uses_entry_rule_metadata(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[dict[str, object]] = []
+
+    async def plan_stub(**kwargs):
+        calls.append(kwargs)
+        assert kwargs["current_user_message"] == "usa 50 y 200 dias"
+        assert kwargs["prior_strategy"]["asset_universe"] == ["TSLA"]
+        return _sma_50_200_crossover_plan(
+            strategy_thesis="Test TSLA with a 50/200 moving-average crossover."
+        )
+
+    monkeypatch.setattr(interpreter_module, "repair_signal_rule_plan", plan_stub)
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied the moving-average periods.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="usa 50 y 200 dias",
+            language="es-419",
+            strategy_type="buy_and_hold",
+            strategy_thesis="usa el cruce de medias moviles compatible",
+            asset_universe=["USA"],
+            asset_class="equity",
+            date_range={"start": "2025-12-13", "end": "2026-07-01"},
+            date_range_raw_text="50 y 200 dias",
+            field_provenance={"asset_universe": "explicit_user"},
+            evidence_spans={
+                "asset_universe": "usa",
+                "entry_rule": "50 y 200 dias",
+                "date_range": "50 y 200 dias",
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+    request = InterpretationRequest(
+        current_user_message="usa 50 y 200 dias",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="signal_strategy",
+                strategy_thesis="Test TSLA with a moving-average crossover.",
+                asset_universe=["TSLA"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+                entry_logic="Use a moving-average crossover.",
+            )
+        ),
+        selected_thread_metadata={
+            "requested_field": "entry_rule",
+            "last_stage_outcome": "await_user_reply",
+        },
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+
+    repaired = await interpreter_module._signal_rule_checked_response(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+    runtime = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )._to_runtime_interpretation(repaired, request=request)
+
+    assert calls
+    assert repaired.candidate_strategy_draft.strategy_type == "signal_strategy"
+    assert "signal_rule_plan_repair" in repaired.reason_codes
+    strategy = runtime.candidate_strategy_draft
+    assert strategy.strategy_type == "signal_strategy"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.rule_spec is not None
+    assert "pending_non_asset_answer_preserved_prior_asset" in runtime.reason_codes
+
 
 @pytest.mark.asyncio
 async def test_vague_valuation_idea_is_audited_before_buy_hold_confirmation(

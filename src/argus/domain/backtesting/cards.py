@@ -57,24 +57,28 @@ def build_result_card(
 
     status_label = "Simulación Completa" if is_es else "Simulation Complete"
 
+    cost_assumption = _execution_realism_assumption(
+        realism=realism,
+        is_es=is_es,
+    )
     if is_es:
         assumptions = [
             "Solo largo",
             "Peso igual",
             "Sin comisiones/deslizamiento",
-            f"Referencia: {config['benchmark_symbol']}",
+            _benchmark_assumption(config, realism=realism, is_es=True),
         ]
-        if bool(realism["enabled"]):
-            assumptions[2] = "Realismo de ejecución activado"
+        if cost_assumption is not None:
+            assumptions[2] = cost_assumption
     else:
         assumptions = [
             "Long-only",
             "Equal weight",
             "No fees/slippage",
-            f"Benchmark: {config['benchmark_symbol']}",
+            _benchmark_assumption(config, realism=realism, is_es=False),
         ]
-        if bool(realism["enabled"]):
-            assumptions[2] = "Execution realism enabled"
+        if cost_assumption is not None:
+            assumptions[2] = cost_assumption
     if is_dca:
         assumptions = _dca_assumptions(config, is_es=is_es) + assumptions
 
@@ -141,7 +145,7 @@ def build_result_card(
             "payload": {},
         },
     ]
-    return {
+    card = {
         "title": f"{symbols} {template_display}",
         "symbols": list(config["symbols"]),
         "strategy_label": template_display,
@@ -163,12 +167,80 @@ def build_result_card(
         "actions": actions,
         "chart": chart,
     }
+    execution_costs = _execution_costs_payload(performance)
+    if execution_costs is not None:
+        card["execution_costs"] = execution_costs
+    return card
+
+
+def _execution_costs_payload(performance: dict[str, Any]) -> dict[str, Any] | None:
+    # Structured cost evidence for the client: present only when the engine
+    # actually modeled costs, so idealized cards stay byte-identical.
+    effect = performance.get("execution_realism")
+    if not isinstance(effect, dict) or not bool(effect.get("enabled")):
+        return None
+    return {
+        "fee_bps": effect.get("fee_bps"),
+        "slippage_bps": effect.get("slippage_bps"),
+        "gross_total_return_pct": effect.get("gross_total_return_pct"),
+        "net_total_return_pct": effect.get("net_total_return_pct"),
+        "return_drag_pct": effect.get("return_drag_pct"),
+        "benchmark_treatment": "same_modeled_costs",
+    }
 
 
 def _should_show_win_rate(config: dict[str, Any], efficiency: dict[str, Any]) -> bool:
     if config["template"] in {"buy_and_hold", "dca_accumulation"}:
         return False
     return int(efficiency.get("total_trades", 0) or 0) > 1
+
+
+def _execution_realism_assumption(
+    *,
+    realism: dict[str, float | bool],
+    is_es: bool,
+) -> str | None:
+    # One tight honesty line; the gross-vs-net numbers live in the details
+    # pane, so the strip only states that returns already include the costs.
+    if not bool(realism["enabled"]):
+        return None
+    fee_bps = float(realism["fees"]) * 10000.0
+    slippage_bps = float(realism["slippage"]) * 10000.0
+    if fee_bps <= 0.0 and slippage_bps <= 0.0:
+        return None
+    if is_es:
+        return (
+            f"Neto de comisión de {_format_bps(fee_bps)} bps + "
+            f"deslizamiento de {_format_bps(slippage_bps)} bps"
+        )
+    return (
+        f"Net of {_format_bps(fee_bps)} bps fee + "
+        f"{_format_bps(slippage_bps)} bps slippage"
+    )
+
+
+def _benchmark_assumption(
+    config: dict[str, Any],
+    *,
+    realism: dict[str, float | bool],
+    is_es: bool,
+) -> str:
+    symbol = config["benchmark_symbol"]
+    has_modeled_costs = bool(realism["enabled"]) and (
+        float(realism["fees"]) > 0.0 or float(realism["slippage"]) > 0.0
+    )
+    if is_es:
+        suffix = " (mismos costos modelados)" if has_modeled_costs else ""
+        return f"Referencia: {symbol}{suffix}"
+    suffix = " (same modeled costs)" if has_modeled_costs else ""
+    return f"Benchmark: {symbol}{suffix}"
+
+
+def _format_bps(value: float) -> str:
+    rounded = round(value, 2)
+    if rounded.is_integer():
+        return str(int(rounded))
+    return f"{rounded:g}"
 
 
 def _dca_assumptions(config: dict[str, Any], *, is_es: bool) -> list[str]:

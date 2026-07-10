@@ -340,7 +340,7 @@ def _metadata_has_authoritative_artifact(
         return any(
             isinstance(reference, dict)
             and str(reference.get("artifact_kind") or "")
-            in {"confirmation", "result", "backtest_job"}
+            in {"confirmation", "result", "backtest_result", "backtest_job"}
             for reference in artifact_references
         )
     return False

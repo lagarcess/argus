@@ -446,7 +446,10 @@ def test_backtest_rejects_explicit_asset_class_conflict() -> None:
     }
 
 
-def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None:
+def test_backtest_run_normalizes_defaults_persists_metrics_and_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
@@ -763,7 +766,7 @@ def test_execution_realism_payload_is_ignored_when_feature_flag_off(
 ) -> None:
     from argus.domain.engine import normalize_backtest_config
 
-    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
     config = normalize_backtest_config(
         {
             "template": "rsi_mean_reversion",
@@ -879,6 +882,39 @@ def test_backtest_rejects_unknown_symbol() -> None:
     assert response.json()["code"] == "invalid_symbol"
 
 
+def test_draft_strategy_templates_have_no_api_path() -> None:
+    """Containment by construction: draft templates are rejected at the API boundary.
+
+    StrategyTemplate is derived from the capability registry's executable set, so the
+    two draft strategies (momentum_breakout, trend_follow) cannot be saved or run via a
+    direct API call outside the chat UI.
+    """
+    client = _client()
+    for template in ("momentum_breakout", "trend_follow"):
+        created = client.post(
+            "/api/v1/strategies",
+            json={
+                "name": "Draft probe",
+                "template": template,
+                "asset_class": "equity",
+                "symbols": ["AAPL"],
+                "parameters": {},
+            },
+        )
+        assert created.status_code == 422, f"{template} accepted by POST /strategies"
+
+        ran = client.post(
+            "/api/v1/backtests/run",
+            headers={"Idempotency-Key": f"draft-{template}"},
+            json={
+                "template": template,
+                "asset_class": "equity",
+                "symbols": ["AAPL"],
+            },
+        )
+        assert ran.status_code == 422, f"{template} accepted by POST /backtests/run"
+
+
 def test_collections_are_organizational_and_can_mix_strategy_asset_classes() -> None:
     client = _client()
     equity_strategy = client.post(
@@ -894,8 +930,8 @@ def test_collections_are_organizational_and_can_mix_strategy_asset_classes() -> 
     crypto_strategy = client.post(
         "/api/v1/strategies",
         json={
-            "name": "Bitcoin momentum",
-            "template": "momentum_breakout",
+            "name": "Bitcoin buy and hold",
+            "template": "buy_and_hold",
             "asset_class": "crypto",
             "symbols": ["BTC"],
             "parameters": {},
@@ -1240,6 +1276,63 @@ def test_search_supports_cursor_and_mixed_types() -> None:
     assert first_ids.isdisjoint(second_ids)
 
 
+def test_search_memory_mode_matches_multi_word_queries_like_supabase() -> None:
+    # Memory mode shares the Supabase matcher semantics: a multi-word query
+    # matches when every token appears, not only as one contiguous substring.
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post(
+        "/api/v1/conversations", json={"title": "Tesla alpha chat"}
+    ).json()["conversation"]
+
+    response = client.get("/api/v1/search", params={"q": "tesla chat"})
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [
+        item["id"] for item in items if item["type"] == "chat"
+    ] == [conversation["id"]]
+
+
+def test_search_emits_recall_usage_product_event(monkeypatch) -> None:
+    observed: list[dict[str, object]] = []
+
+    def fake_capture(kind: str, **kwargs: object) -> None:
+        observed.append({"kind": kind, **kwargs})
+
+    monkeypatch.setattr(
+        "argus.api.routers.search.capture_product_event",
+        fake_capture,
+        raising=False,
+    )
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    memory_conversation(
+        title="Tesla recall source",
+        title_source="user_renamed",
+        language="en",
+        user_id=user_id,
+    )
+
+    response = client.get("/api/v1/search?q=tesla&limit=20")
+
+    assert response.status_code == 200
+    assert observed == [
+        {
+            "kind": "recall_usage",
+            "user_id": user_id,
+            "status": "completed",
+            "attributes": {
+                "query_present": True,
+                "decision_state_filter_present": False,
+                "result_count": 1,
+                "returned_types": ["chat"],
+                "has_more": False,
+                "source": "memory",
+            },
+        }
+    ]
+
+
 def test_search_orders_p1_artifacts_before_source_conversation() -> None:
     client = _client()
     user_id = api_state.store.get_or_create_dev_user().id
@@ -1343,6 +1436,281 @@ def test_search_orders_p1_artifacts_before_source_conversation() -> None:
     chat_index = ordered_types.index("chat")
     for artifact_type in ("backtest", "evidence", "idea", "decision"):
         assert ordered_types.index(artifact_type) < chat_index
+
+
+def test_search_idea_result_carries_latest_decision_state() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    idea = Idea(
+        id="idea-ledger-status",
+        source_conversation_id="conversation-ledger-status",
+        title="NVDA momentum ledger idea",
+        summary="NVDA momentum ledger summary",
+        lifecycle="decided",
+        active_version_id="version-ledger-status",
+        created_at=now - timedelta(minutes=10),
+        updated_at=now,
+    )
+    older_decision = DecisionNote(
+        id="decision-ledger-older",
+        idea_id=idea.id,
+        idea_version_id="version-ledger-status",
+        evidence_artifact_id="artifact-ledger-status",
+        source_conversation_id="conversation-ledger-status",
+        decision_state="watching",
+        note="Initial watch.",
+        created_at=now - timedelta(minutes=5),
+        updated_at=now - timedelta(minutes=5),
+    )
+    latest_decision = DecisionNote(
+        id="decision-ledger-latest",
+        idea_id=idea.id,
+        idea_version_id="version-ledger-status",
+        evidence_artifact_id="artifact-ledger-status",
+        source_conversation_id="conversation-ledger-status",
+        decision_state="promising",
+        note="Upgraded after a fresh re-run.",
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.ideas[idea.id] = idea
+    api_state.store.idea_owners[idea.id] = user_id
+    for decision in (older_decision, latest_decision):
+        api_state.store.decision_notes[decision.id] = decision
+        api_state.store.decision_note_owners[decision.id] = user_id
+
+    response = client.get("/api/v1/search?q=ledger&limit=10")
+
+    assert response.status_code == 200
+    idea_items = [item for item in response.json()["items"] if item["type"] == "idea"]
+    assert idea_items, "expected the saved idea in search results"
+    assert idea_items[0]["decision_state"] == "promising"
+
+
+def test_search_decision_state_filter_returns_only_matching_ideas() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    promising_idea = Idea(
+        id="idea-ledger-promising",
+        source_conversation_id="conversation-ledger-promising",
+        title="QQQ trend idea",
+        summary="QQQ trend summary",
+        lifecycle="decided",
+        active_version_id="version-ledger-promising",
+        created_at=now,
+        updated_at=now,
+    )
+    rejected_idea = Idea(
+        id="idea-ledger-rejected",
+        source_conversation_id="conversation-ledger-rejected",
+        title="ARKK reversion idea",
+        summary="ARKK reversion summary",
+        lifecycle="decided",
+        active_version_id="version-ledger-rejected",
+        created_at=now,
+        updated_at=now,
+    )
+    promising_decision = DecisionNote(
+        id="decision-ledger-promising",
+        idea_id=promising_idea.id,
+        idea_version_id="version-ledger-promising",
+        evidence_artifact_id="artifact-ledger-promising",
+        source_conversation_id="conversation-ledger-promising",
+        decision_state="promising",
+        note="Keep.",
+        created_at=now,
+        updated_at=now,
+    )
+    rejected_decision = DecisionNote(
+        id="decision-ledger-rejected",
+        idea_id=rejected_idea.id,
+        idea_version_id="version-ledger-rejected",
+        evidence_artifact_id="artifact-ledger-rejected",
+        source_conversation_id="conversation-ledger-rejected",
+        decision_state="rejected",
+        note="Drop.",
+        created_at=now,
+        updated_at=now,
+    )
+    for idea in (promising_idea, rejected_idea):
+        api_state.store.ideas[idea.id] = idea
+        api_state.store.idea_owners[idea.id] = user_id
+    for decision in (promising_decision, rejected_decision):
+        api_state.store.decision_notes[decision.id] = decision
+        api_state.store.decision_note_owners[decision.id] = user_id
+
+    response = client.get("/api/v1/search?q=&decision_state=promising&limit=20")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert items, "expected the promising idea"
+    assert all(item["type"] == "idea" for item in items)
+    assert all(item["decision_state"] == "promising" for item in items)
+    returned_ids = {item["id"] for item in items}
+    assert promising_idea.id in returned_ids
+    assert rejected_idea.id not in returned_ids
+
+
+def test_search_ledger_groups_are_backend_ordered_and_counted() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    ideas = [
+        Idea(
+            id="idea-ledger-group-promising-1",
+            source_conversation_id="conversation-ledger-group-promising-1",
+            title="AAPL promising idea",
+            summary="AAPL promising summary",
+            lifecycle="decided",
+            active_version_id="version-ledger-group-promising-1",
+            created_at=now - timedelta(minutes=3),
+            updated_at=now - timedelta(minutes=3),
+        ),
+        Idea(
+            id="idea-ledger-group-promising-2",
+            source_conversation_id="conversation-ledger-group-promising-2",
+            title="MSFT promising idea",
+            summary="MSFT promising summary",
+            lifecycle="decided",
+            active_version_id="version-ledger-group-promising-2",
+            created_at=now - timedelta(minutes=2),
+            updated_at=now - timedelta(minutes=2),
+        ),
+        Idea(
+            id="idea-ledger-group-watching",
+            source_conversation_id="conversation-ledger-group-watching",
+            title="BTC watching idea",
+            summary="BTC watching summary",
+            lifecycle="decided",
+            active_version_id="version-ledger-group-watching",
+            created_at=now - timedelta(minutes=1),
+            updated_at=now - timedelta(minutes=1),
+        ),
+    ]
+    decisions = [
+        DecisionNote(
+            id="decision-ledger-group-promising-1",
+            idea_id=ideas[0].id,
+            idea_version_id="version-ledger-group-promising-1",
+            evidence_artifact_id="artifact-ledger-group-promising-1",
+            source_conversation_id=ideas[0].source_conversation_id,
+            decision_state="promising",
+            note="Keep reviewing.",
+            created_at=now - timedelta(minutes=3),
+            updated_at=now - timedelta(minutes=3),
+        ),
+        DecisionNote(
+            id="decision-ledger-group-promising-2",
+            idea_id=ideas[1].id,
+            idea_version_id="version-ledger-group-promising-2",
+            evidence_artifact_id="artifact-ledger-group-promising-2",
+            source_conversation_id=ideas[1].source_conversation_id,
+            decision_state="promising",
+            note="Still promising.",
+            created_at=now - timedelta(minutes=2),
+            updated_at=now - timedelta(minutes=2),
+        ),
+        DecisionNote(
+            id="decision-ledger-group-watching",
+            idea_id=ideas[2].id,
+            idea_version_id="version-ledger-group-watching",
+            evidence_artifact_id="artifact-ledger-group-watching",
+            source_conversation_id=ideas[2].source_conversation_id,
+            decision_state="watching",
+            note="Watch for a better window.",
+            created_at=now - timedelta(minutes=1),
+            updated_at=now - timedelta(minutes=1),
+        ),
+    ]
+    for idea in ideas:
+        api_state.store.ideas[idea.id] = idea
+        api_state.store.idea_owners[idea.id] = user_id
+    for decision in decisions:
+        api_state.store.decision_notes[decision.id] = decision
+        api_state.store.decision_note_owners[decision.id] = user_id
+
+    response = client.get("/api/v1/search?q=&include_ledger_groups=true&limit=20")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ledger_groups"] == [
+        {"decision_state": "promising", "count": 2},
+        {"decision_state": "watching", "count": 1},
+        {"decision_state": "rejected", "count": 0},
+        {"decision_state": "revisit_later", "count": 0},
+    ]
+    assert {item["id"] for item in payload["items"]} == {idea.id for idea in ideas}
+    assert all(item["type"] == "idea" for item in payload["items"])
+
+
+def test_search_decision_state_filter_keeps_unfiltered_ledger_groups() -> None:
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    now = utcnow()
+    promising_idea = Idea(
+        id="idea-ledger-filter-group-promising",
+        source_conversation_id="conversation-ledger-filter-group-promising",
+        title="NVDA promising idea",
+        summary="NVDA promising summary",
+        lifecycle="decided",
+        active_version_id="version-ledger-filter-group-promising",
+        created_at=now,
+        updated_at=now,
+    )
+    watching_idea = Idea(
+        id="idea-ledger-filter-group-watching",
+        source_conversation_id="conversation-ledger-filter-group-watching",
+        title="ETH watching idea",
+        summary="ETH watching summary",
+        lifecycle="decided",
+        active_version_id="version-ledger-filter-group-watching",
+        created_at=now,
+        updated_at=now,
+    )
+    promising_decision = DecisionNote(
+        id="decision-ledger-filter-group-promising",
+        idea_id=promising_idea.id,
+        idea_version_id="version-ledger-filter-group-promising",
+        evidence_artifact_id="artifact-ledger-filter-group-promising",
+        source_conversation_id=promising_idea.source_conversation_id,
+        decision_state="promising",
+        note="Promising.",
+        created_at=now,
+        updated_at=now,
+    )
+    watching_decision = DecisionNote(
+        id="decision-ledger-filter-group-watching",
+        idea_id=watching_idea.id,
+        idea_version_id="version-ledger-filter-group-watching",
+        evidence_artifact_id="artifact-ledger-filter-group-watching",
+        source_conversation_id=watching_idea.source_conversation_id,
+        decision_state="watching",
+        note="Watching.",
+        created_at=now,
+        updated_at=now,
+    )
+    for idea in (promising_idea, watching_idea):
+        api_state.store.ideas[idea.id] = idea
+        api_state.store.idea_owners[idea.id] = user_id
+    for decision in (promising_decision, watching_decision):
+        api_state.store.decision_notes[decision.id] = decision
+        api_state.store.decision_note_owners[decision.id] = user_id
+
+    response = client.get(
+        "/api/v1/search?q=&decision_state=promising&include_ledger_groups=true&limit=20"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["id"] for item in payload["items"]] == [promising_idea.id]
+    assert payload["ledger_groups"] == [
+        {"decision_state": "promising", "count": 1},
+        {"decision_state": "watching", "count": 1},
+        {"decision_state": "rejected", "count": 0},
+        {"decision_state": "revisit_later", "count": 0},
+    ]
 
 
 def test_search_preserves_pinned_chat_above_p1_artifacts() -> None:

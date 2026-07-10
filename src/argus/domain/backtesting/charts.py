@@ -56,6 +56,8 @@ def build_result_chart(
                 close=close,
                 entries=entries,
                 contribution=allocation_capital,
+                fees=float(realism["fees"]),
+                slippage=float(realism["slippage"]),
             )
         else:
             portfolio = vbt.Portfolio.from_signals(

@@ -9,6 +9,7 @@ from tests.evals.chat_runtime_eval_harness import (
     capability_context_payload,
     iter_eval_cases,
     parse_sse_events,
+    persist_eval_harness_cost_ledger_entries,
 )
 
 MANIFEST_PATH = Path(__file__).with_name("chat_runtime_scenarios.json")
@@ -185,6 +186,36 @@ def test_eval_harness_builds_judge_payload_from_runtime_capabilities() -> None:
     assert payload["runtime_output"]["route_receipts"][0]["task"] == "interpretation"
 
 
+def test_eval_case_iteration_emits_eval_readiness_product_event(monkeypatch) -> None:
+    observed: list[dict[str, object]] = []
+
+    def fake_capture(kind: str, **kwargs: object) -> None:
+        observed.append({"kind": kind, **kwargs})
+
+    monkeypatch.setattr(
+        "tests.evals.chat_runtime_eval_harness.capture_product_event",
+        fake_capture,
+        raising=False,
+    )
+
+    manifest = _load_manifest()
+    cases = iter_eval_cases(priority="must_pass")
+
+    assert cases
+    assert observed == [
+        {
+            "kind": "eval_readiness",
+            "user_id": None,
+            "status": "completed",
+            "attributes": {
+                "priority": "must_pass",
+                "case_count": len(cases),
+                "scenario_count": len(manifest["scenarios"]),
+            },
+        }
+    ]
+
+
 def test_eval_harness_parses_canonical_sse_frames() -> None:
     events = parse_sse_events(
         "\n".join(
@@ -202,3 +233,42 @@ def test_eval_harness_parses_canonical_sse_frames() -> None:
         "token",
         "final",
     ]
+
+
+def test_eval_harness_persists_judge_cost_ledger_entries() -> None:
+    from argus.llm.openrouter import OpenRouterRouteReceipt
+
+    class FakeGateway:
+        def __init__(self) -> None:
+            self.entries: list[dict[str, Any]] = []
+
+        def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
+            self.entries.append(entry)
+            return {"id": "ledger-1", **entry}
+
+    gateway = FakeGateway()
+    persist_eval_harness_cost_ledger_entries(
+        gateway=gateway,
+        receipts=[
+            OpenRouterRouteReceipt(
+                task="capability_conflict",
+                tier="context",
+                model="judge/model",
+                fallback_model="judge/fallback",
+                mode="json_schema",
+                schema_name="SemanticEvalJudge",
+                latency_ms=250,
+                outcome="succeeded",
+                token_usage={"prompt_tokens": 50, "completion_tokens": 10},
+                usage_cost_usd=0.001,
+            )
+        ],
+        eval_suite_id="private-alpha-next",
+        eval_case_id="qa-1",
+    )
+
+    assert len(gateway.entries) == 1
+    assert gateway.entries[0]["source"] == "eval_harness"
+    assert gateway.entries[0]["feature_area"] == "eval_readiness"
+    assert gateway.entries[0]["correlation_id"] == "eval:private-alpha-next:qa-1"
+    assert gateway.entries[0]["cost_amount"] == 0.001

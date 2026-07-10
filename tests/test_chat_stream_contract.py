@@ -405,7 +405,7 @@ def test_chat_stream_confirmation_uses_final_payload_without_named_events(
     assert "run" not in payload
 
 
-def test_chat_stream_persists_repaired_current_message_asset_grounding(
+def test_chat_stream_persists_provider_canonicalized_company_name_asset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.agent_runtime.capabilities.contract import (
@@ -430,7 +430,7 @@ def test_chat_stream_persists_repaired_current_message_asset_grounding(
                     raw_user_phrasing=request.current_user_message,
                     strategy_type="buy_and_hold",
                     strategy_thesis="Comprar y mantener Apple.",
-                    asset_universe=["APPLE"],
+                    asset_universe=["Apple"],
                     date_range={"start": "2025-06-16", "end": "2026-06-16"},
                     capital_amount=100000,
                 ),
@@ -460,7 +460,7 @@ def test_chat_stream_persists_repaired_current_message_asset_grounding(
                     confidence="high",
                 ),
             )
-        if raw.casefold() == "apple" and source == "user_mention":
+        if raw.casefold() == "apple":
             asset = ResolvedAsset(
                 canonical_symbol="AAPL",
                 asset_class="equity",
@@ -529,8 +529,8 @@ def test_chat_stream_persists_repaired_current_message_asset_grounding(
     )
 
     assert response.status_code == 200
-    assert ("APPLE", "llm_extraction") in provider_queries
-    assert ("Apple", "user_mention") in provider_queries
+    assert ("Apple", "llm_extraction") in provider_queries
+    assert ("Apple", "user_mention") not in provider_queries
     payload = _final_payload(response.text)
     confirmation_payload = payload["confirmation_payload"]
     strategy = confirmation_payload["strategy"]
@@ -898,7 +898,6 @@ def test_chat_stream_visible_failure_path_is_terminal_for_turn(
             "recovery": {
                 "code": "runtime_failure",
                 "retryable": True,
-                "language": "en",
             },
             "retry_last_turn": {"message": prompt},
         }
@@ -1068,11 +1067,10 @@ def test_chat_stream_runtime_initialization_failure_emits_recoverable_error(
     assert len(events) == 1
     assert events[0]["type"] == "error"
     assert events[0]["code"] == "agent_runtime_failure"
-    assert "Algo salió mal" in events[0]["message"]
+    assert "conversation is saved" in events[0]["message"]
     assert events[0]["recovery"] == {
         "code": "runtime_failure",
         "retryable": True,
-        "language": "es-419",
     }
     assert events[0]["retry_last_turn"] == {"message": message}
     assert response.text.count("data: [DONE]") == 1
@@ -1123,14 +1121,13 @@ def test_chat_stream_runtime_failure_persists_retry_last_turn_metadata(
     assert assistant_message["metadata"]["recovery"] == {
         "code": "runtime_failure",
         "retryable": True,
-        "language": "en",
     }
     assert assistant_message["metadata"]["agent_runtime_stage_outcome"] == (
         "agent_runtime_failure"
     )
 
 
-def test_chat_stream_runtime_failure_localizes_recovery_for_spanish_user(
+def test_chat_stream_runtime_failure_emits_typed_recovery_for_spanish_user(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api.routers import agent as agent_router
@@ -1160,12 +1157,10 @@ def test_chat_stream_runtime_failure_localizes_recovery_for_spanish_user(
     events = _data_events(response.text)
     error_event = events[-1]
     assert error_event["type"] == "error"
-    assert "Algo salió mal" in error_event["message"]
-    assert "Something went wrong" not in error_event["message"]
+    assert "conversation is saved" in error_event["message"]
     assert error_event["recovery"] == {
         "code": "runtime_failure",
         "retryable": True,
-        "language": "es-419",
     }
     assert error_event["retry_last_turn"] == {"message": message}
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
@@ -1283,7 +1278,6 @@ def test_chat_stream_empty_final_persists_visible_recovery_for_user_turn(
     assert events[-1]["recovery"] == {
         "code": "runtime_failure",
         "retryable": True,
-        "language": "en",
     }
     assert response.text.count("data: [DONE]") == 1
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[

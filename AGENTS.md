@@ -69,6 +69,40 @@ Before making code changes, agents must review these source-of-truth docs in thi
 
 ---
 
+# Agent Quality Pillars
+
+This is the canonical definition of the four pillars. `docs/ARCHITECTURE.md` and
+`docs/specs/private-alpha-next-roadmap.md` point here and must not restate them —
+one source, so they cannot drift.
+
+Use these pillars as a quality lens for roadmap work, subagent prompts, reviews,
+and slice specs. They are not automatic release blockers unless the active
+roadmap, runbook, or founder explicitly turns one into a gate. One clause is
+already a gate: the Evaluation pillar's "evaluate the full turn path" is enforced
+for interpreter-facing changes by the interpreter-facing live gate in the roadmap
+under "Standing release discipline".
+
+- **Intelligence**: Keep context anchored to Argus-owned artifacts such as
+  conversations, backtest runs, Idea/IdeaVersion records, EvidenceArtifacts,
+  DecisionNotes, and future user-confirmed MemoryRecords. LLMs interpret and
+  voice responses; canonical records own durable facts.
+- **Evaluation**: Judge assistant quality at the session level, not only by
+  isolated prose. Important evals should inspect the user-visible response plus
+  the hidden structured path: interpretation, tool/fact sources, artifact ids,
+  UI state, recovery, cost, and latency when relevant.
+- **Platform**: Prefer shared typed contracts, reusable runtime services,
+  correlation ids, feature flags, and append-only operational evidence over
+  one-off feature plumbing. New platform machinery earns its place only when it
+  protects the chat/backtest/evidence loop.
+- **User Experience**: Chat stays primary, but direct artifact controls should
+  exist where they reduce friction. UI must show assumptions, preserve
+  continuity, avoid invented backend facts, and make unsupported behavior clear
+  without blaming the user.
+
+Tool-specific choices and sequencing live in
+`docs/specs/private-alpha-next-decision-memo.md`; the active execution board
+lives in `docs/specs/private-alpha-next-roadmap.md`.
+
 # 🧭 Current Milestone: Private Alpha Next P1
 
 When working from `codex/private-alpha-next` or its clean reintegration lane,
@@ -131,6 +165,10 @@ Integration guardrails:
   pass focused backend/frontend tests and live browser QA before promotion to
   `codex/private-alpha-next`; use Render canary evidence when preparing a
   tester-facing or deploy-facing checkpoint.
+- For eval work, read `tests/evals/README.md` "Test Tiers" before running
+  checks. Use the mocked harness for every change, reserve live eval for the
+  three documented gates, and treat Browser QA as real-API work because every
+  turn spends tokens.
 - For release checkpoints, CI/CD SOTA warmup and canary evidence must be
   gathered against the branch-deployed staging/private-alpha Render validation surface
   for the exact candidate SHA. Do not treat merge to `main` as a prerequisite for canary evidence; `main` is the later promotion target after founder approval.
@@ -207,7 +245,7 @@ Argus is chat-first, AI-first, and trust-first. The assistant should help a norm
 
 These principles come from the recent modular monolith / LangGraph migration plans in `docs/superpowers/plans/` and must not regress:
 
-- **LLM-first interpretation**: Normal user language must reach the structured LLM interpreter before routing decisions. Do not add regex, hardcoded language gates, or legacy NLU shortcuts before the interpreter.
+- **LLM-first interpretation**: Normal user language must reach the structured LLM interpreter before routing decisions. Do not add regex, hardcoded language gates, localized stop-word or alias tables, display-label token matching, or legacy NLU shortcuts before the interpreter. Offline fallback choices must use typed action metadata such as button ids or `replacement_values`, not per-language phrasebooks.
 - **Deterministic guardrails after interpretation**: Code validates facts the LLM cannot own: asset resolution, provider availability, same-asset constraints, max symbol limits, date/data windows, executable indicator support, benchmark defaults, and required fields.
 - **One active chat brain**: The LangGraph runtime is the only active conversational runtime. Do not restore or recreate a parallel legacy orchestrator, state machine, or second intent taxonomy.
 - **LangGraph owns runtime memory**: Runtime thread state belongs in the LangGraph checkpointer using `thread_id == conversation_id`. Supabase owns product persistence such as messages, conversations, backtest runs, strategies, collections, feedback, and usage counters.
@@ -316,6 +354,19 @@ Usage:
 Argus supports two primary local scenarios. Choose the script first; do not
 manually juggle backend mode flags for normal work.
 
+### Local Environment Doctrine
+
+- Python is pinned by `.python-version` (`3.10.x`; currently `3.10.20`).
+  `.github/setup.sh` enforces the pinned runtime. A green run on Python 3.14 is
+  not deployed-runtime evidence.
+- Create Argus worktrees as siblings of the repo, never nested inside another
+  Argus checkout. Nested worktrees can inherit a parent `.env` through dotenv
+  upward search, silently turning mocked runs into live LLM/provider calls.
+- Deterministic agent-runtime sweeps use
+  `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture` and no live provider
+  keys. A clean mocked sweep should be seconds-scale; a run stretching into
+  minutes means stop and check for leaked credentials or live provider paths.
+
 ### Fast Iteration (Dev Mode)
 **Use this for:** Building features, debugging, UI work, isolated testing — no persistence needed.
 
@@ -349,6 +400,15 @@ manually juggle backend mode flags for normal work.
    poetry run pytest tests/
    cd web && bun test
    ```
+
+For the private-alpha agent-runtime regression gate, run the hermetic sweep with
+provider keys blanked:
+
+```bash
+OPENROUTER_API_KEY= ALPACA_API_KEY= ALPACA_SECRET_KEY= \
+ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture \
+poetry run pytest tests/agent_runtime tests/test_spine_guardrails.py -q --no-cov
+```
 
 ### Production Parity (QA Mode)
 **Use this for:** End-to-end testing, launch validation, browser QA matrix, release verification.
@@ -416,11 +476,12 @@ versioned, manual QA should use `live_provider` so symbol recognition exercises
 the same provider-backed resolution path production will use.
 
 ### Feature Flags (All Private-Alpha)
-Keep these disabled unless explicitly testing:
+Keep deferred surfaces disabled unless explicitly testing. Omnisearch is enabled
+by default and should only be disabled for a targeted regression check:
 ```bash
 NEXT_PUBLIC_STRATEGIES_ENABLED=false
 NEXT_PUBLIC_COLLECTIONS_ENABLED=false
-NEXT_PUBLIC_OMNISEARCH_ENABLED=false
+NEXT_PUBLIC_OMNISEARCH_ENABLED=true
 NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED=false
 ```

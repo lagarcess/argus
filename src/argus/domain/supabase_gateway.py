@@ -29,6 +29,7 @@ from argus.api.schemas import (
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
+from argus.observability.cost_ledger import normalize_cost_ledger_entry
 from supabase import Client, ClientOptions, create_client
 
 
@@ -1270,6 +1271,12 @@ class SupabaseGateway:
         created = self.client.table("route_receipts").insert(payload).execute()
         return dict(_row_one(created) or {})
 
+    def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
+        payload = normalize_cost_ledger_entry(entry)
+        payload["occurred_at"] = payload["occurred_at"] or _now_iso()
+        created = self.client.table("cost_ledger_entries").insert(payload).execute()
+        return dict(_row_one(created) or {})
+
     def health_check(self) -> dict[str, Any]:
         started = time.perf_counter()
         self.client.table("profiles").select("id").limit(1).execute()
@@ -1526,7 +1533,7 @@ class SupabaseGateway:
         decisions_query = (
             self.client.table("decision_notes")
             .select(
-                "id,decision_state,note,evidence_artifact_id,"
+                "id,idea_id,decision_state,note,evidence_artifact_id,"
                 "source_conversation_id,updated_at"
             )
             .eq("user_id", user_id)
@@ -1604,10 +1611,31 @@ class SupabaseGateway:
                 ),
             )
         ]
+        # Idea Ledger: roll up each idea's CURRENT (latest) decision_state from the
+        # UNFILTERED decisions, so the status survives a search that matched the idea
+        # by title/summary but not its decision text, and so an empty-query status
+        # browse (q="" + a decision_state filter, which the /search router permits)
+        # still returns ideas. raw["decisions"] below is query-filtered and must NOT
+        # be used for this rollup.
+        idea_decision_state: dict[str, Any] = {}
+        idea_decision_ts: dict[str, Any] = {}
+        for drow in decisions_raw:
+            idea_key = str(drow.get("idea_id") or "")
+            state = drow.get("decision_state")
+            if not idea_key or not state:
+                continue
+            ts = drow.get("updated_at")
+            prior_ts = idea_decision_ts.get(idea_key)
+            if idea_key not in idea_decision_state or (
+                ts is not None and (prior_ts is None or ts >= prior_ts)
+            ):
+                idea_decision_ts[idea_key] = ts
+                idea_decision_state[idea_key] = state
         ideas = [
-            row
+            {**row, "decision_state": idea_decision_state.get(str(row.get("id")))}
             for row in ideas_raw
-            if search_text_matches_query(
+            if not normalized_query
+            or search_text_matches_query(
                 query=normalized_query,
                 text=f"{row.get('title', '')} {row.get('summary') or ''}",
             )

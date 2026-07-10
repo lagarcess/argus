@@ -5,7 +5,10 @@ from typing import Any, Literal
 
 import pandas as pd
 
-from argus.domain.backtesting.config import _execution_realism_feature_enabled
+from argus.domain.backtesting.config import (
+    _execution_realism_feature_enabled,
+    _normalize_execution_realism,
+)
 
 
 @dataclass(frozen=True)
@@ -23,17 +26,11 @@ class ExecutionEvent:
 def _execution_realism_settings(config: dict[str, Any]) -> dict[str, float | bool]:
     if not _execution_realism_feature_enabled():
         return {"enabled": False, "fees": 0.0, "slippage": 0.0}
-    raw = config.get("_execution_realism") or {}
-    enabled = bool(raw.get("enabled", False))
-    fee_bps = float(raw.get("fee_bps", 0.0))
-    slippage_bps = float(raw.get("slippage_bps", 0.0))
-    if not enabled:
-        fee_bps = 0.0
-        slippage_bps = 0.0
+    realism = _normalize_execution_realism(config.get("_execution_realism"))
     return {
-        "enabled": enabled,
-        "fees": fee_bps / 10000.0,
-        "slippage": slippage_bps / 10000.0,
+        "enabled": bool(realism["enabled"]),
+        "fees": float(realism["fee_bps"]) / 10000.0,
+        "slippage": float(realism["slippage_bps"]) / 10000.0,
     }
 
 
@@ -192,9 +189,13 @@ def _dca_equity_curve(
     close: pd.Series,
     entries: pd.Series,
     contribution: float,
+    fees: float = 0.0,
+    slippage: float = 0.0,
 ) -> tuple[pd.Series, float]:
     entry_mask = entries.reindex(close.index).fillna(False).astype(bool)
-    shares_bought = (contribution / close).where(entry_mask, 0.0)
+    fill_price = close * (1.0 + slippage)
+    cash_per_share = fill_price * (1.0 + fees)
+    shares_bought = (contribution / cash_per_share).where(entry_mask, 0.0)
     cumulative_shares = shares_bought.cumsum()
     equity = cumulative_shares * close
     invested_capital = float(entry_mask.sum()) * contribution

@@ -40,6 +40,9 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
+from argus.api.chat.measurement_events import (
+    schedule_runtime_measurement_events_after_stream,
+)
 from argus.api.chat.onboarding import (
     parse_onboarding_control_message,
     persist_onboarding_update,
@@ -576,7 +579,12 @@ async def chat_stream(
     )
     if stale_confirmation_message is not None:
         runtime_fallback = RuntimeFallbackContext(
-            recovery_message=stale_confirmation_message
+            recovery_message=stale_confirmation_message,
+            recovery=recovery_state(
+                "confirmation_action_stale_card",
+                language=language,
+                retryable=False,
+            ),
         )
     elif is_confirmation_action(payload):
         metadata_fallback = confirmation_metadata_fallback_context(
@@ -620,7 +628,12 @@ async def chat_stream(
             )
         elif missing_run_confirmation_action_id:
             runtime_fallback = RuntimeFallbackContext(
-                recovery_message=missing_run_confirmation_action_id_message(language)
+                recovery_message=missing_run_confirmation_action_id_message(language),
+                recovery=recovery_state(
+                    "confirmation_action_missing_identity",
+                    language=language,
+                    retryable=False,
+                ),
             )
         elif metadata_fallback is not None:
             runtime_fallback = metadata_fallback
@@ -669,10 +682,20 @@ async def chat_stream(
                         runtime_fallback = result_fallback
     request_message_record = persist_request_message()
 
-    onboarding_required = current_user_profile.onboarding.stage in {
-        "language_selection",
-        "primary_goal_selection",
-    }
+    # Onboarding feature flag on the API service. Default enabled so prod/QA/tests keep the
+    # flow; dev mode sets it false. The deployed API must set this to match the web
+    # service's NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED — enforced by the API release
+    # env audit in .github/render-env-sync.sh — so onboarding-off is honored on the API,
+    # not just the frontend. (Deliberately NOT read from the NEXT_PUBLIC_* var: that frontend
+    # flag is false in .env, which would disable the onboarding flow in dev/QA and tests.)
+    onboarding_enabled = (
+        os.getenv("ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED", "true").strip().lower()
+        != "false"
+    )
+    onboarding_required = onboarding_enabled and (
+        current_user_profile.onboarding.stage
+        in {"language_selection", "primary_goal_selection"}
+    )
 
     async def events() -> AsyncIterator[str]:
         naming_language = (
@@ -830,6 +853,8 @@ async def chat_stream(
             }
             if payload.action is not None:
                 metadata["chat_action"] = payload.action.model_dump(mode="python")
+            if runtime_fallback.recovery is not None:
+                metadata["recovery"] = dict(runtime_fallback.recovery)
             assistant_message = create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -838,7 +863,8 @@ async def chat_stream(
                 metadata=metadata,
             )
             yield sse_data({"type": "stage_start", "stage": "clarify"})
-            yield sse_data({"type": "token", "content": assistant_text})
+            if runtime_fallback.recovery is None:
+                yield sse_data({"type": "token", "content": assistant_text})
             yield sse_data(
                 {
                     "type": "final",
@@ -846,6 +872,11 @@ async def chat_stream(
                         "stage_outcome": "await_user_reply",
                         "assistant_response": assistant_text,
                         "message_id": assistant_message.id,
+                        **(
+                            {"recovery": runtime_fallback.recovery}
+                            if runtime_fallback.recovery is not None
+                            else {}
+                        ),
                     },
                 }
             )
@@ -1132,6 +1163,18 @@ async def chat_stream(
                             runtime_result["result_strategy_id"] = (
                                 saved_strategy_id_for_naming
                             )
+                for key in (
+                    "latest_run_id",
+                    "result_run_id",
+                    "result_strategy_id",
+                    "result_conversation_id",
+                    "result_fact_bank",
+                    "response_intent",
+                    "clarification",
+                ):
+                    value = runtime_result.get(key)
+                    if value is not None:
+                        metadata[key] = value
                 if runtime_result.get("resolution_provenance"):
                     metadata["resolution_provenance"] = runtime_result[
                         "resolution_provenance"
@@ -1256,6 +1299,8 @@ async def chat_stream(
                     )
                     receipt_message_id = assistant_message.id
                 receipt_metadata = {
+                    "request_id": request.state.request_id,
+                    "source": "api_turn",
                     "stage_outcome": stage_status,
                     "conversation_mode": metadata.get("conversation_mode"),
                 }
@@ -1276,6 +1321,12 @@ async def chat_stream(
                     yield sse_data({"type": "token", "content": assistant_text})
                 yield sse_data({"type": "final", "payload": runtime_result})
                 yield sse_done()
+                schedule_runtime_measurement_events_after_stream(
+                    user_id=user.id,
+                    conversation_id=conversation.id,
+                    runtime_result=runtime_result,
+                    metadata=metadata,
+                )
                 schedule_artifact_naming(
                     assistant_message=persisted_text,
                     current_run=result_action_run or run,
@@ -1344,6 +1395,8 @@ async def chat_stream(
             )
             receipt_message_id = assistant_message.id
             receipt_metadata = {
+                "request_id": request.state.request_id,
+                "source": "api_turn",
                 "stage_outcome": "agent_runtime_failure",
                 "conversation_mode": "recovery",
             }

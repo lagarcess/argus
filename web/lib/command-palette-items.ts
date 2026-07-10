@@ -1,4 +1,4 @@
-import type { HistoryItem, SearchItem } from "./argus-api";
+import type { HistoryItem, SearchItem, SearchLedgerGroup } from "./argus-api";
 
 export type CommandPaletteDisplayItem = {
   id: string;
@@ -9,6 +9,7 @@ export type CommandPaletteDisplayItem = {
   updatedAt: string;
   source: "recent" | "search";
   lifecycle?: string | null;
+  decisionState?: string | null;
   preview?: Record<string, unknown> | null;
   canManageConversation: boolean;
   activation: "open_conversation";
@@ -19,6 +20,13 @@ export type CommandPalettePreviewField = {
   labelKey: string;
   labelFallback: string;
   value: string;
+};
+
+export type CommandPaletteLedgerDisplayGroup = {
+  id: string;
+  decisionState: string;
+  count: number;
+  items: CommandPaletteDisplayItem[];
 };
 
 export type CommandPaletteItemCopy = {
@@ -39,6 +47,7 @@ export function commandPaletteItemFromHistory(
     updatedAt: item.created_at,
     source: "recent",
     lifecycle: null,
+    decisionState: null,
     preview: null,
     canManageConversation: true,
     activation: "open_conversation",
@@ -63,6 +72,7 @@ export function commandPaletteItemFromSearch(
     updatedAt: item.updated_at,
     source: "search",
     lifecycle: item.lifecycle ?? null,
+    decisionState: item.decision_state ?? null,
     preview: safeCommandPalettePreview(item.preview),
     canManageConversation: item.type === "chat" && Boolean(conversationId),
     activation: "open_conversation",
@@ -85,6 +95,21 @@ export function commandPaletteSelectedPreview(
     return previewItem;
   }
   return displayItems[0] ?? null;
+}
+
+export function commandPaletteGroupsByLedgerState(
+  items: readonly CommandPaletteDisplayItem[],
+  ledgerGroups: readonly SearchLedgerGroup[],
+): CommandPaletteLedgerDisplayGroup[] {
+  return ledgerGroups.map((group) => ({
+    id: `ledger:${group.decision_state}`,
+    decisionState: group.decision_state,
+    count: group.count,
+    items: items.filter(
+      (item) =>
+        item.type === "idea" && item.decisionState === group.decision_state,
+    ),
+  }));
 }
 
 export function commandPaletteTypeLabelKey(type: SearchItem["type"]) {
@@ -114,11 +139,19 @@ export function commandPaletteTypeFallback(type: SearchItem["type"]) {
 }
 
 export function commandPaletteStatusLabelKey(item: CommandPaletteDisplayItem) {
+  // Idea Ledger: a decided idea shows its decision (Promising/Rejected/...) as the
+  // status pill, which is more useful than the generic "Decided" lifecycle.
+  if (item.type === "idea" && item.decisionState) {
+    return `chat.result_card.decision_states.${item.decisionState}`;
+  }
   const status = commandPaletteStatusId(item);
   return status ? `command_palette.status.${status}` : null;
 }
 
 export function commandPaletteStatusFallback(item: CommandPaletteDisplayItem) {
+  if (item.type === "idea" && item.decisionState) {
+    return commandPaletteDecisionStateFallback(item.decisionState);
+  }
   switch (commandPaletteStatusId(item)) {
     case "archived":
       return "Archived";

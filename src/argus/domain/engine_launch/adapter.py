@@ -8,6 +8,10 @@ from typing import Any
 
 from loguru import logger
 
+from argus.domain.backtesting.config import (
+    _execution_realism_feature_enabled,
+    _normalize_execution_realism,
+)
 from argus.domain.engine import (
     build_result_card,
     build_result_chart,
@@ -576,7 +580,7 @@ def _build_periodic_config(
     if benchmark_asset.asset_class != asset_class:
         raise ValueError("invalid_benchmark_symbol")
 
-    return {
+    config = {
         "template": "dca_accumulation",
         "asset_class": asset_class,
         "symbols": symbols,
@@ -593,6 +597,7 @@ def _build_periodic_config(
         "recurring_contribution": recurring_contribution,
         "starting_principal": 0.0,
     }
+    return _with_execution_realism(config, request)
 
 
 def _build_launch_result_card(
@@ -650,7 +655,7 @@ def _build_buy_and_hold_config(
     if benchmark_asset.asset_class != asset_class:
         raise ValueError("invalid_benchmark_symbol")
 
-    return {
+    config = {
         "template": "buy_and_hold",
         "asset_class": asset_class,
         "symbols": symbols,
@@ -663,6 +668,7 @@ def _build_buy_and_hold_config(
         "benchmark_symbol": benchmark_asset.symbol,
         "parameters": {},
     }
+    return _with_execution_realism(config, request)
 
 
 def _build_indicator_threshold_config(
@@ -677,7 +683,7 @@ def _build_indicator_threshold_config(
     if benchmark_asset.asset_class != asset_class:
         raise ValueError("invalid_benchmark_symbol")
 
-    return {
+    config = {
         "template": normalize_template_name(request),
         "asset_class": asset_class,
         "symbols": symbols,
@@ -690,6 +696,7 @@ def _build_indicator_threshold_config(
         "benchmark_symbol": benchmark_asset.symbol,
         "parameters": indicator_parameters,
     }
+    return _with_execution_realism(config, request)
 
 
 def _build_signal_strategy_config(
@@ -704,7 +711,7 @@ def _build_signal_strategy_config(
     if benchmark_asset.asset_class != asset_class:
         raise ValueError("invalid_benchmark_symbol")
 
-    return {
+    config = {
         "template": normalize_template_name(request),
         "asset_class": asset_class,
         "symbols": symbols,
@@ -716,6 +723,21 @@ def _build_signal_strategy_config(
         "allocation_method": "equal_weight",
         "benchmark_symbol": benchmark_asset.symbol,
         "parameters": {"rule_spec": rule_spec},
+    }
+    return _with_execution_realism(config, request)
+
+
+def _with_execution_realism(
+    config: dict[str, Any],
+    request: LaunchBacktestRequest,
+) -> dict[str, Any]:
+    if not _execution_realism_feature_enabled():
+        return config
+    if request.execution_realism is None:
+        return config
+    return {
+        **config,
+        "_execution_realism": _normalize_execution_realism(request.execution_realism),
     }
 
 
@@ -812,7 +834,9 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
     }
     if error_code in {"market_data_unavailable", "benchmark_data_unavailable"}:
         return "upstream_dependency_error", "failed_upstream"
-    if error_code in invalid_inputs:
+    if error_code in invalid_inputs or error_code.startswith(
+        "invalid_execution_realism_"
+    ):
         return "parameter_validation_error", "blocked_invalid_input"
     if error_code in unsupported:
         return "unsupported_capability", "blocked_unsupported"

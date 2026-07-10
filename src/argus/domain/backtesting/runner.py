@@ -117,15 +117,15 @@ def compute_alpha_metrics(
     build_benchmark_curve_func=build_benchmark_curve,
 ) -> dict[str, Any]:
     by_symbol: dict[str, Any] = {}
-    symbol_returns: list[pd.Series] = []
-    benchmark_returns_aligned: list[pd.Series] = []
     symbol_equity_curves: list[pd.Series] = []
     benchmark_equity_curves: list[pd.Series] = []
+    gross_symbol_equity_curves: list[pd.Series] = []
     periods_per_year = _periods_per_year(config["timeframe"])
     start = date.fromisoformat(config["start_date"])
     end = date.fromisoformat(config["end_date"])
     allocation_capital = float(config["starting_capital"]) / len(config["symbols"])
     realism = _execution_realism_settings(config)
+    has_modeled_costs = _execution_realism_has_costs(realism)
     is_dca = config["template"] == "dca_accumulation"
 
     for symbol in config["symbols"]:
@@ -154,15 +154,24 @@ def compute_alpha_metrics(
                 close=close,
                 entries=entries,
                 contribution=allocation_capital,
+                fees=float(realism["fees"]),
+                slippage=float(realism["slippage"]),
             )
             benchmark_equity, benchmark_invested_capital = _dca_equity_curve(
                 close=benchmark_normalized,
                 entries=entries,
                 contribution=allocation_capital,
+                fees=float(realism["fees"]),
+                slippage=float(realism["slippage"]),
             )
+            if has_modeled_costs:
+                gross_symbol_equity, _ = _dca_equity_curve(
+                    close=close,
+                    entries=entries,
+                    contribution=allocation_capital,
+                )
+                gross_symbol_equity_curves.append(gross_symbol_equity)
             invested_capital = max(invested_capital, benchmark_invested_capital)
-            strategy_returns = symbol_equity.pct_change().fillna(0.0)
-            benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
             by_symbol[symbol] = _compute_metrics_from_equity(
                 strategy_equity=symbol_equity,
                 benchmark_equity=benchmark_equity,
@@ -185,19 +194,52 @@ def compute_alpha_metrics(
             symbol_equity = pd.Series(
                 portfolio.value().values, index=close.index, dtype=float
             )
-            strategy_returns = symbol_equity.pct_change().fillna(0.0)
-            benchmark_equity = benchmark_normalized * allocation_capital
-            benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
-            by_symbol[symbol] = _compute_metrics(
-                strategy_returns=strategy_returns,
-                benchmark_returns=benchmark_returns,
+            if has_modeled_costs:
+                gross_portfolio = vbt.Portfolio.from_signals(
+                    close=close,
+                    entries=entries,
+                    exits=exits,
+                    fees=0.0,
+                    slippage=0.0,
+                    init_cash=allocation_capital,
+                    freq=_vbt_freq(config["timeframe"]),
+                    accumulate=False,
+                )
+                gross_symbol_equity_curves.append(
+                    pd.Series(
+                        gross_portfolio.value().values,
+                        index=close.index,
+                        dtype=float,
+                    )
+                )
+            benchmark_equity = _benchmark_buy_and_hold_equity(
+                close=benchmark_normalized,
                 allocation_capital=allocation_capital,
-                periods_per_year=periods_per_year,
-                trade_count=_execution_fill_count(execution_events),
+                fees=float(realism["fees"]),
+                slippage=float(realism["slippage"]),
+                timeframe=config["timeframe"],
             )
+            if has_modeled_costs:
+                # Equity-based math captures the entry-cost hit at t0 that a
+                # pct_change return series cannot see.
+                by_symbol[symbol] = _compute_metrics_from_equity(
+                    strategy_equity=symbol_equity,
+                    benchmark_equity=benchmark_equity,
+                    invested_capital=allocation_capital,
+                    periods_per_year=periods_per_year,
+                    trade_count=_execution_fill_count(execution_events),
+                )
+            else:
+                # No modeled costs: keep the legacy returns-based computation
+                # bit-for-bit so flag-off output stays byte-identical.
+                by_symbol[symbol] = _compute_metrics(
+                    strategy_returns=symbol_equity.pct_change().fillna(0.0),
+                    benchmark_returns=benchmark_equity.pct_change().fillna(0.0),
+                    allocation_capital=allocation_capital,
+                    periods_per_year=periods_per_year,
+                    trade_count=_execution_fill_count(execution_events),
+                )
 
-        symbol_returns.append(strategy_returns)
-        benchmark_returns_aligned.append(benchmark_returns)
         symbol_equity_curves.append(symbol_equity)
         benchmark_equity_curves.append(benchmark_equity)
 
@@ -207,9 +249,6 @@ def compute_alpha_metrics(
     aggregate_benchmark_equity = (
         pd.concat(benchmark_equity_curves, axis=1).ffill().bfill().sum(axis=1)
     )
-    aggregate_strategy_returns = aggregate_strategy_equity.pct_change().fillna(0.0)
-    aggregate_benchmark_returns = aggregate_benchmark_equity.pct_change().fillna(0.0)
-
     trade_count = sum(row["efficiency"]["total_trades"] for row in by_symbol.values())
     if is_dca:
         aggregate_invested = allocation_capital * max(trade_count, 1)
@@ -221,12 +260,40 @@ def compute_alpha_metrics(
             trade_count=trade_count,
         )
     else:
-        aggregate_metrics = _compute_metrics(
-            strategy_returns=aggregate_strategy_returns,
-            benchmark_returns=aggregate_benchmark_returns,
-            allocation_capital=float(config["starting_capital"]),
+        aggregate_invested = float(config["starting_capital"])
+        if has_modeled_costs:
+            aggregate_metrics = _compute_metrics_from_equity(
+                strategy_equity=aggregate_strategy_equity,
+                benchmark_equity=aggregate_benchmark_equity,
+                invested_capital=aggregate_invested,
+                periods_per_year=periods_per_year,
+                trade_count=trade_count,
+            )
+        else:
+            aggregate_metrics = _compute_metrics(
+                strategy_returns=aggregate_strategy_equity.pct_change().fillna(0.0),
+                benchmark_returns=aggregate_benchmark_equity.pct_change().fillna(0.0),
+                allocation_capital=aggregate_invested,
+                periods_per_year=periods_per_year,
+                trade_count=trade_count,
+            )
+    if has_modeled_costs and gross_symbol_equity_curves:
+        gross_aggregate_equity = (
+            pd.concat(gross_symbol_equity_curves, axis=1).ffill().bfill().sum(axis=1)
+        )
+        gross_metrics = _compute_metrics_from_equity(
+            strategy_equity=gross_aggregate_equity,
+            benchmark_equity=aggregate_benchmark_equity,
+            invested_capital=aggregate_invested,
             periods_per_year=periods_per_year,
             trade_count=trade_count,
+        )
+        aggregate_metrics.setdefault("performance", {})[
+            "execution_realism"
+        ] = _execution_realism_performance_summary(
+            realism=realism,
+            gross_performance=gross_metrics["performance"],
+            net_performance=aggregate_metrics["performance"],
         )
     value_summary = portfolio_value_summary(aggregate_strategy_equity)
     if value_summary is not None:
@@ -237,4 +304,55 @@ def compute_alpha_metrics(
     return {
         "aggregate": aggregate_metrics,
         "by_symbol": by_symbol,
+    }
+
+
+def _execution_realism_has_costs(realism: dict[str, float | bool]) -> bool:
+    return bool(realism["enabled"]) and (
+        float(realism["fees"]) > 0.0 or float(realism["slippage"]) > 0.0
+    )
+
+
+def _benchmark_buy_and_hold_equity(
+    *,
+    close: pd.Series,
+    allocation_capital: float,
+    fees: float,
+    slippage: float,
+    timeframe: str,
+) -> pd.Series:
+    if fees <= 0.0 and slippage <= 0.0:
+        return close * allocation_capital
+    entries = pd.Series(False, index=close.index, dtype=bool)
+    if not entries.empty:
+        entries.iloc[0] = True
+    exits = pd.Series(False, index=close.index, dtype=bool)
+    portfolio = vbt.Portfolio.from_signals(
+        close=close,
+        entries=entries,
+        exits=exits,
+        fees=fees,
+        slippage=slippage,
+        init_cash=allocation_capital,
+        freq=_vbt_freq(timeframe),
+        accumulate=False,
+    )
+    return pd.Series(portfolio.value().values, index=close.index, dtype=float)
+
+
+def _execution_realism_performance_summary(
+    *,
+    realism: dict[str, float | bool],
+    gross_performance: dict[str, Any],
+    net_performance: dict[str, Any],
+) -> dict[str, Any]:
+    gross_return = float(gross_performance["total_return_pct"])
+    net_return = float(net_performance["total_return_pct"])
+    return {
+        "enabled": True,
+        "fee_bps": round(float(realism["fees"]) * 10000.0, 4),
+        "slippage_bps": round(float(realism["slippage"]) * 10000.0, 4),
+        "gross_total_return_pct": gross_return,
+        "net_total_return_pct": net_return,
+        "return_drag_pct": round(gross_return - net_return, 2),
     }

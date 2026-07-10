@@ -87,7 +87,6 @@ describe("chat composer model", () => {
         description: "Alphabet Class C",
         insert_text: "GOOG",
         provider: "alpaca",
-        support_status: "supported",
       },
     ]);
   });
@@ -125,7 +124,6 @@ describe("chat composer model", () => {
         description: "Alphabet Class C",
         insert_text: "GOOG",
         provider: "alpaca",
-        support_status: "supported",
       },
       {
         id: "indicator:rsi",
@@ -135,7 +133,6 @@ describe("chat composer model", () => {
         description: "Relative Strength Index",
         insert_text: "RSI",
         provider: "pandas-ta-classic",
-        support_status: "supported",
       },
     ]);
   });

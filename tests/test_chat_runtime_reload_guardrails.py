@@ -951,7 +951,13 @@ def test_stale_confirmation_card_without_structured_payload_returns_recovery(
 
     assert response.status_code == 200
     assert runtime_calls == 0
-    text = _stream_payloads(response.text, "token")[0]["content"]
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    text = final["assistant_response"]
+    assert final["recovery"] == {
+        "code": "confirmation_state_lost",
+        "retryable": False,
+    }
     assert "lost the active confirmation state" in text
     assert "confirm it again" in text
 
@@ -998,11 +1004,13 @@ def test_stale_confirmation_card_without_structured_payload_returns_spanish_reco
 
     assert response.status_code == 200
     assert runtime_calls == 0
-    text = _stream_payloads(response.text, "token")[0]["content"]
-    lowered = text.lower()
-    assert "confirmación" in lowered
-    assert "guardada" in lowered
-    assert "lost the active confirmation state" not in lowered
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["recovery"] == {
+        "code": "confirmation_state_lost",
+        "retryable": False,
+    }
+    assert "lost the active confirmation state" in final["assistant_response"].lower()
 
 
 def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
@@ -1064,7 +1072,13 @@ def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert runtime_calls == 0
-    text = _stream_payloads(response.text, "token")[0]["content"]
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    text = final["assistant_response"]
+    assert final["recovery"] == {
+        "code": "confirmation_action_stale_card",
+        "retryable": False,
+    }
     assert "confirmation was updated" in text.lower()
     assert "latest" in text.lower()
 
@@ -1128,11 +1142,13 @@ def test_stale_confirmation_action_id_returns_spanish_recovery(monkeypatch) -> N
 
     assert response.status_code == 200
     assert runtime_calls == 0
-    text = _stream_payloads(response.text, "token")[0]["content"]
-    lowered = text.lower()
-    assert "confirmación" in lowered
-    assert "tarjeta" in lowered
-    assert "confirmation was updated" not in lowered
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["recovery"] == {
+        "code": "confirmation_action_stale_card",
+        "retryable": False,
+    }
+    assert "confirmation was updated" in final["assistant_response"].lower()
 
 
 def test_run_confirmation_action_without_confirmation_id_does_not_execute(
@@ -1175,7 +1191,13 @@ def test_run_confirmation_action_without_confirmation_id_does_not_execute(
 
     assert response.status_code == 200
     assert runtime_calls == 0
-    text = _stream_payloads(response.text, "token")[0]["content"]
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    text = final["assistant_response"]
+    assert final["recovery"] == {
+        "code": "confirmation_action_missing_identity",
+        "retryable": False,
+    }
     lowered = text.lower()
     assert "confirmation action" in lowered
     assert "latest card action" in lowered
@@ -1221,11 +1243,13 @@ def test_run_confirmation_action_without_confirmation_id_returns_spanish_recover
 
     assert response.status_code == 200
     assert runtime_calls == 0
-    text = _stream_payloads(response.text, "token")[0]["content"]
-    lowered = text.lower()
-    assert "identidad" in lowered
-    assert "tarjeta" in lowered
-    assert "confirmation action" not in lowered
+    assert _stream_payloads(response.text, "token") == []
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["recovery"] == {
+        "code": "confirmation_action_missing_identity",
+        "retryable": False,
+    }
+    assert "confirmation action" in final["assistant_response"].lower()
 
 
 def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:
@@ -1423,6 +1447,17 @@ def test_result_followup_after_reload_carries_latest_run_reference(
             "payload": {
                 "stage_outcome": "ready_to_respond",
                 "assistant_response": "It underperformed SPY by 4.2 percentage points.",
+                "latest_run_id": "runtime-run",
+                "result_run_id": "runtime-run",
+                "result_conversation_id": "runtime-conversation",
+                "result_fact_bank": {"run_id": "runtime-run"},
+                "response_intent": {
+                    "kind": "unsupported_recovery",
+                    "facts": {
+                        "limitation_code": "latest_result_metric_unavailable",
+                        "requested_metric": "sortino_ratio",
+                    },
+                },
             },
         }
 
@@ -1499,6 +1534,26 @@ def test_result_followup_after_reload_carries_latest_run_reference(
     )
 
     assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["latest_run_id"] == "runtime-run"
+    assert final["response_intent"]["kind"] == "unsupported_recovery"
+    assert final["response_intent"]["facts"]["requested_metric"] == "sortino_ratio"
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    latest_assistant = messages[-1]
+    assert latest_assistant["metadata"]["latest_run_id"] == "runtime-run"
+    assert latest_assistant["metadata"]["result_run_id"] == "runtime-run"
+    assert latest_assistant["metadata"]["result_conversation_id"] == (
+        "runtime-conversation"
+    )
+    assert latest_assistant["metadata"]["result_fact_bank"] == {"run_id": "runtime-run"}
+    assert latest_assistant["metadata"]["response_intent"]["kind"] == (
+        "unsupported_recovery"
+    )
+    assert latest_assistant["metadata"]["response_intent"]["facts"][
+        "requested_metric"
+    ] == "sortino_ratio"
     snapshot = captured["fallback_latest_task_snapshot"]
     reference = snapshot.latest_backtest_result_reference
     assert reference is not None
@@ -2382,6 +2437,75 @@ def test_result_followup_after_reload_preserves_saved_strategy_id() -> None:
     assert reference.metadata["latest_run_id"] == run_id
 
 
+def test_result_followup_after_process_reload_uses_canonical_run_row(
+    monkeypatch,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import latest_result_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run = BacktestRun(
+        id="run-live-reload",
+        conversation_id=conversation["id"],
+        strategy_id="strategy-live-reload",
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 8.1}}},
+        config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "rows": [
+                {"key": "total_return_pct", "label": "Total Return", "value": "+8.1%"}
+            ],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart={
+            "series": [
+                {"date": "2024-01-02", "value": 10000.0},
+                {"date": "2024-03-01", "value": 11200.0},
+            ]
+        },
+        trades=[],
+    )
+
+    class _Gateway:
+        def list_messages(self, **kwargs):
+            del kwargs
+            return []
+
+        def get_latest_completed_run_for_conversation(self, **kwargs):
+            assert kwargs == {
+                "user_id": user_id,
+                "conversation_id": conversation["id"],
+            }
+            return run
+
+    monkeypatch.setattr(api_state, "supabase_gateway", _Gateway())
+
+    fallback = latest_result_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["fallback_source"] == "backtest_runs"
+    snapshot = fallback.latest_task_snapshot
+    assert snapshot is not None
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.artifact_id == run.id
+    assert reference.metadata["run_id"] == run.id
+    assert reference.metadata["latest_run_id"] == run.id
+    assert reference.metadata["chart"] == run.chart
+
+
 def test_pending_refinement_fallback_carries_source_result_reference() -> None:
     from argus.api import state as api_state
     from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
@@ -2476,6 +2600,148 @@ def test_pending_refinement_fallback_carries_source_result_reference() -> None:
     assert fallback.selected_thread_metadata is not None
     assert fallback.selected_thread_metadata["requested_field"] == "refinement"
     assert fallback.selected_thread_metadata["source_result_run_id"] == run.id
+
+
+def test_pending_refinement_fallback_uses_response_intent_latest_run_id() -> None:
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = api_state.store.new_id()
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 35.0,
+                    "benchmark_return_pct": 24.0,
+                    "delta_vs_benchmark_pct": 11.0,
+                }
+            }
+        },
+        config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
+        conversation_result_card={"title": "AAPL buy and hold", "rows": []},
+        created_at=utcnow(),
+        chart={
+            "series": [
+                {"date": "2024-01-02", "value": 1000.0},
+                {"date": "2024-01-23", "value": 1051.63},
+            ]
+        },
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="What would you like to change?",
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "await_user_reply",
+            "chat_action": {"type": "refine_strategy", "payload": {"run_id": run.id}},
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                    "comparison_baseline": "SPY",
+                },
+                "requested_field": "refinement",
+                "missing_required_fields": ["refinement"],
+                "response_intent": {
+                    "kind": "clarification",
+                    "facts": {"latest_run_id": run.id},
+                    "requested_fields": ["refinement"],
+                },
+            },
+        },
+    )
+
+    fallback = pending_strategy_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["requested_field"] == "refinement"
+    assert fallback.selected_thread_metadata["source_result_run_id"] == run.id
+    snapshot = fallback.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.pending_strategy_summary is not None
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.artifact_id == run.id
+    assert reference.metadata["latest_run_id"] == run.id
+    assert reference.metadata["chart"] == run.chart
+
+
+def test_pending_response_intent_fallback_survives_ready_to_respond_outcome() -> None:
+    from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "semantic_needs": ["simplification_choice"],
+        "options": [
+            {
+                "label": "Compare with buy and hold",
+                "replacement_values": {"strategy_type": "buy_and_hold"},
+            }
+        ],
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content=(
+            "ATR 14 is not executable directly. Choose RSI, buy and hold, "
+            "or moving-average crossover."
+        ),
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": None,
+                    "strategy_thesis": "Test TSLA with ATR 14 during 2024.",
+                    "asset_universe": ["TSLA"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                    "capital_amount": 1000,
+                    "entry_logic": "ATR 14",
+                },
+                "requested_field": None,
+                "missing_required_fields": [],
+                "response_intent": response_intent,
+            },
+        },
+    )
+
+    fallback = pending_strategy_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    assert fallback.latest_task_snapshot is not None
+    assert fallback.latest_task_snapshot.pending_strategy_summary is not None
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["response_intent"] == response_intent
 
 
 def test_pending_edit_prompt_takes_precedence_over_older_confirmation_fallback() -> None:
@@ -3642,3 +3908,235 @@ def test_show_breakdown_action_without_canonical_run_id_does_not_use_latest(
     assert captured["run"] is None
     text = _stream_payloads(response.text, "token")[0]["content"]
     assert "could not find" in text
+
+
+def _seed_completed_run(user_id: str, conversation_id: str) -> str:
+    from argus.api import state as api_state
+
+    run_id = api_state.store.new_id()
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation_id,
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={
+            "aggregate": {
+                "performance": {"total_return_pct": 46.8},
+                "risk": {"max_drawdown_pct": -13.8},
+            },
+            "by_symbol": {},
+        },
+        config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "status_label": "Simulation Complete",
+            "rows": [],
+        },
+        created_at=utcnow(),
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    return run_id
+
+
+def _fact_answer_metadata(run_id: str) -> dict[str, Any]:
+    return {
+        "conversation_mode": "confirm",
+        "agent_runtime_stage_outcome": "ready_to_respond",
+        "result_run_id": run_id,
+        "latest_run_id": run_id,
+        "response_intent": {
+            "kind": "unsupported_recovery",
+            "facts": {
+                "limitation_code": "latest_result_metric_unavailable",
+                "requested_metric": "sortino_ratio",
+            },
+        },
+    }
+
+
+def test_confirmation_fallback_preserves_latest_result_context() -> None:
+    from argus.api.chat.recovery import confirmation_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Simulation complete.",
+        metadata={
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "result_run_id": run_id,
+            "result_card": {"title": "AAPL buy and hold"},
+        },
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Ready to run the six month version.",
+        metadata=_confirmation_metadata(),
+    )
+
+    fallback = confirmation_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    snapshot = fallback.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.active_confirmation_reference is not None
+    assert snapshot.pending_strategy_summary is not None
+    # A typed result question during an active confirmation must still see the
+    # completed run, or the interpreter loses the latest-result context.
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.metadata["result_run_id"] == run_id
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["source_result_run_id"] == run_id
+
+
+def test_fact_answer_message_does_not_invalidate_active_confirmation() -> None:
+    from argus.api.chat.recovery import confirmation_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Ready to run the six month version.",
+        metadata=_confirmation_metadata(),
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The Sortino ratio is not stored for this result.",
+        metadata=_fact_answer_metadata(run_id),
+    )
+
+    fallback = confirmation_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    # The typed fact reply carries result_run_id for continuity, but it is not
+    # a new result card: the pending confirmation must stay active.
+    assert fallback is not None
+    assert fallback.latest_task_snapshot is not None
+    assert fallback.latest_task_snapshot.active_confirmation_reference is not None
+    assert fallback.latest_task_snapshot.latest_backtest_result_reference is not None
+
+
+def test_fact_answer_message_does_not_block_pending_strategy_fallback() -> None:
+    from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    pending_metadata = _pending_strategy_metadata()
+    pending_metadata["pending_strategy"]["strategy"]["date_range"] = {
+        "start": "2025-01-01",
+        "end": "2025-12-31",
+    }
+    pending_metadata["pending_strategy"]["source_result"] = {
+        "run_id": run_id,
+        "strategy_id": None,
+        "conversation_id": conversation["id"],
+    }
+    pending_metadata["source_result_run_id"] = run_id
+
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="What would you like to change?",
+        metadata=pending_metadata,
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The Sortino ratio is not stored for this result.",
+        metadata=_fact_answer_metadata(run_id),
+    )
+
+    fallback = pending_strategy_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    snapshot = fallback.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.pending_strategy_summary is not None
+    assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.artifact_id == run_id
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["source_result_run_id"] == run_id
+
+
+def test_pending_refinement_after_fact_answer_recovers_latest_result_reference() -> None:
+    from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Simulation complete.",
+        metadata={
+            "agent_runtime_stage_outcome": "execution_succeeded",
+            "result_run_id": run_id,
+            "latest_run_id": run_id,
+            "result_card": {"title": "AAPL buy and hold"},
+        },
+    )
+    pending_metadata = _pending_strategy_metadata()
+    pending_metadata["pending_strategy"]["requested_field"] = "refinement"
+    pending_metadata["pending_strategy"]["missing_required_fields"] = ["refinement"]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="What would you like to change?",
+        metadata=pending_metadata,
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The peak date was June 2, 2026.",
+        metadata=_fact_answer_metadata(run_id),
+    )
+
+    fallback = pending_strategy_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    assert fallback.latest_task_snapshot is not None
+    reference = fallback.latest_task_snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.artifact_id == run_id
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["requested_field"] == "refinement"
+    assert fallback.selected_thread_metadata["source_result_run_id"] == run_id

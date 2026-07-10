@@ -10,6 +10,10 @@ from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID
 
 from argus.api.schemas import BacktestRun
+from argus.observability.cost_ledger import (
+    normalize_cost_ledger_entry,
+    persist_openrouter_cost_ledger_entries,
+)
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -90,6 +94,9 @@ class BacktestJobGateway(Protocol):
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Persist LLM route telemetry produced during workflow execution."""
+
+    def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
+        """Append provider/runtime spend produced during workflow execution."""
 
 
 class BacktestTool(Protocol):
@@ -375,12 +382,34 @@ def _persist_result_readout_route_receipts(
     }
     for receipt in receipts:
         try:
-            gateway.create_route_receipt(
+            created = gateway.create_route_receipt(
                 user_id=user_id,
                 conversation_id=conversation_id,
                 run_id=result_run_id,
                 metadata=metadata,
                 receipt=receipt.as_dict(),
+            )
+            persist_openrouter_cost_ledger_entries(
+                gateway=gateway,
+                receipts=[receipt],
+                source="render_workflow",
+                feature_area="result_readout",
+                user_id=user_id,
+                conversation_id=conversation_id,
+                backtest_run_id=result_run_id,
+                backtest_job_id=job_id,
+                route_receipt_rows=[created],
+                correlation_id=":".join(
+                    part
+                    for part in (
+                        "workflow",
+                        workflow_run_id,
+                        job_id,
+                        result_run_id,
+                    )
+                    if part
+                ),
+                metadata=metadata,
             )
         except Exception as exc:
             logger.warning(
@@ -939,6 +968,86 @@ class PostgresBacktestJobGateway:
                         "metadata": Jsonb(metadata or {}),
                         "created_at": receipt.get("created_at") or utcnow_iso(),
                     },
+                )
+                row = cur.fetchone()
+        return _json_safe(row)
+
+    def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
+        from psycopg.types.json import Jsonb
+
+        params = normalize_cost_ledger_entry(entry)
+        params["usage_metadata"] = Jsonb(params["usage_metadata"])
+        params["metadata"] = Jsonb(params["metadata"])
+        params["occurred_at"] = params["occurred_at"] or utcnow_iso()
+        with self._connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into public.cost_ledger_entries (
+                      source,
+                      service,
+                      provider,
+                      model,
+                      feature_area,
+                      task,
+                      user_id,
+                      conversation_id,
+                      message_id,
+                      backtest_run_id,
+                      backtest_job_id,
+                      route_receipt_id,
+                      request_id,
+                      correlation_id,
+                      provider_request_id,
+                      upstream_id,
+                      usage_metadata,
+                      input_tokens,
+                      output_tokens,
+                      total_tokens,
+                      billable_unit,
+                      billable_quantity,
+                      cost_amount,
+                      cost_currency,
+                      cost_source,
+                      latency_ms,
+                      status,
+                      metadata,
+                      occurred_at
+                    )
+                    values (
+                      %(source)s,
+                      %(service)s,
+                      %(provider)s,
+                      %(model)s,
+                      %(feature_area)s,
+                      %(task)s,
+                      %(user_id)s,
+                      %(conversation_id)s,
+                      %(message_id)s,
+                      %(backtest_run_id)s,
+                      %(backtest_job_id)s,
+                      %(route_receipt_id)s,
+                      %(request_id)s,
+                      %(correlation_id)s,
+                      %(provider_request_id)s,
+                      %(upstream_id)s,
+                      %(usage_metadata)s,
+                      %(input_tokens)s,
+                      %(output_tokens)s,
+                      %(total_tokens)s,
+                      %(billable_unit)s,
+                      %(billable_quantity)s,
+                      %(cost_amount)s,
+                      %(cost_currency)s,
+                      %(cost_source)s,
+                      %(latency_ms)s,
+                      %(status)s,
+                      %(metadata)s,
+                      %(occurred_at)s
+                    )
+                    returning *
+                    """,
+                    params,
                 )
                 row = cur.fetchone()
         return _json_safe(row)

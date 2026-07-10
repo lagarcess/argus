@@ -213,6 +213,11 @@ class OpenRouterClarificationGenerator:
                     "than one target, the user-facing question must visibly ask "
                     "for every target in one concise response. Also copy "
                     "expected_detail_targets into detail_targets when present. "
+                    "When response_intent.facts.asset_edit_frame is "
+                    "'operation_agnostic', ask a neutral asset-edit question that "
+                    "allows adding assets, removing assets, keeping a subset, "
+                    "replacing assets, or changing another setup field. Do not ask "
+                    "which single asset to replace or what to use instead. "
                     "When the expected target includes DCA sizing, direct_question "
                     "must contain the concrete question the user needs to answer, "
                     "not just an acknowledgement that another detail is needed. "
@@ -339,8 +344,10 @@ def _render_clarification_response(
             direct_question=direct_question,
         )
         if context:
-            return f"{context} {direct_question}".strip()
-        return direct_question
+            return _collapse_adjacent_duplicate_sentences(
+                f"{context} {direct_question}".strip()
+            )
+        return _collapse_adjacent_duplicate_sentences(direct_question)
     return question
 
 
@@ -364,22 +371,25 @@ def _collapse_adjacent_duplicate_sentences(text: str) -> str:
 def _collapse_repeated_sentence_block(sentences: list[str]) -> list[str]:
     if len(sentences) < 2:
         return sentences
-    identities = [_sentence_identity(sentence) for sentence in sentences]
-    for block_size in range(1, (len(sentences) // 2) + 1):
-        if len(sentences) % block_size != 0:
-            continue
-        block = identities[:block_size]
-        if not all(block):
-            continue
-        repeats = len(sentences) // block_size
-        if repeats < 2:
-            continue
-        if all(
-            identities[index : index + block_size] == block
-            for index in range(block_size, len(identities), block_size)
-        ):
-            return sentences[:block_size]
-    return sentences
+    collapsed = list(sentences)
+    changed = True
+    while changed:
+        changed = False
+        identities = [_sentence_identity(sentence) for sentence in collapsed]
+        for block_size in range(1, (len(collapsed) // 2) + 1):
+            for start in range(0, len(collapsed) - (block_size * 2) + 1):
+                block = identities[start : start + block_size]
+                if not all(block):
+                    continue
+                next_start = start + block_size
+                if identities[next_start : next_start + block_size] != block:
+                    continue
+                del collapsed[next_start : next_start + block_size]
+                changed = True
+                break
+            if changed:
+                break
+    return collapsed
 
 
 def _sentence_identity(sentence: str) -> str:
@@ -462,9 +472,7 @@ def _is_decimal_point(text: str, index: int) -> bool:
 
 def _is_common_abbreviation_period(text: str, index: int) -> bool:
     compact_window = "".join(
-        char.lower()
-        for char in text[max(0, index - 4) : index + 1]
-        if not char.isspace()
+        char.lower() for char in text[max(0, index - 4) : index + 1] if not char.isspace()
     )
     if compact_window.endswith(("e.g.", "i.e.")):
         return True
@@ -488,15 +496,8 @@ def _is_embedded_direct_question(
 
 
 def _content_word_set(text: str) -> set[str]:
-    normalized_chars = [
-        char.lower() if char.isalnum() else " "
-        for char in text
-    ]
-    return {
-        token
-        for token in "".join(normalized_chars).split()
-        if len(token) > 2
-    }
+    normalized_chars = [char.lower() if char.isalnum() else " " for char in text]
+    return {token for token in "".join(normalized_chars).split() if len(token) > 2}
 
 
 def _expected_question_targets(request: ClarificationRequest) -> set[PendingNeedName]:

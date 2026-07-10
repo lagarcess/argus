@@ -2,9 +2,17 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    WithJsonSchema,
+    field_validator,
+    model_validator,
+)
 
 from argus.api.feedback_context import (
     MAX_FEEDBACK_CONTEXT_DEPTH,
@@ -12,6 +20,7 @@ from argus.api.feedback_context import (
     MAX_FEEDBACK_CONTEXT_SERIALIZED_LENGTH,
     MAX_FEEDBACK_MESSAGE_LENGTH,
 )
+from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
 
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
@@ -33,14 +42,27 @@ EvidenceArtifactType = Literal["backtest"]
 DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
-StrategyTemplate = Literal[
-    "buy_and_hold",
-    "buy_the_dip",
-    "rsi_mean_reversion",
-    "moving_average_crossover",
-    "dca_accumulation",
-    "momentum_breakout",
-    "trend_follow",
+# Single source of truth: executable templates live only in the capability registry
+# (derived from each StrategyCapability's status). StrategyTemplate validates against that
+# set at runtime and publishes its OpenAPI enum from it, so there is no second hardcoded
+# list to keep in sync. Draft templates are absent from the registry's executable set, so
+# the API rejects them at the request boundary.
+def _ensure_executable_template(value: str) -> str:
+    if value not in EXECUTABLE_TEMPLATES:
+        raise ValueError(f"unsupported strategy template: {value!r}")
+    return value
+
+
+StrategyTemplate = Annotated[
+    str,
+    AfterValidator(_ensure_executable_template),
+    WithJsonSchema(
+        {
+            "type": "string",
+            "enum": sorted(EXECUTABLE_TEMPLATES),
+            "title": "StrategyTemplate",
+        }
+    ),
 ]
 
 
@@ -184,6 +206,19 @@ class Strategy(BaseModel):
     created_at: datetime
     updated_at: datetime
     strategy_surface_metrics: dict[str, Any] | None = None
+
+    @field_validator("template", mode="before")
+    @classmethod
+    def _tolerate_retired_template(cls, value: Any) -> Any:
+        # Persisted strategies saved before a template was retired (e.g. the draft
+        # momentum_breakout / trend_follow) must still load. Coerce any non-executable
+        # template to buy_and_hold on read, matching the save-path fallback in
+        # api/chat/strategies.strategy_template_from_run. Write models (StrategyCreate,
+        # BacktestRunRequest) intentionally stay strict so the API still rejects drafts
+        # at the request boundary.
+        if value not in EXECUTABLE_TEMPLATES:
+            return "buy_and_hold"
+        return value
 
 
 class StrategyResponse(BaseModel):
@@ -393,12 +428,19 @@ class SearchItem(BaseModel):
     updated_at: datetime
     conversation_id: str | None = None
     lifecycle: ArtifactLifecycle | None = None
+    decision_state: DecisionState | None = None
     preview: dict[str, Any] | None = None
+
+
+class SearchLedgerGroup(BaseModel):
+    decision_state: DecisionState
+    count: int
 
 
 class PaginatedSearch(BaseModel):
     items: list[SearchItem]
     next_cursor: str | None = None
+    ledger_groups: list[SearchLedgerGroup] | None = None
 
 
 ChatActionType = Literal[
@@ -411,6 +453,7 @@ ChatActionType = Literal[
     "refine_strategy",
     "save_strategy",
     "retry_failed_action",
+    "select_response_option",
 ]
 
 

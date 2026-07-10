@@ -310,9 +310,10 @@ messages may store `pending_strategy`, `confirmation_card`,
 `result_strategy_id`, and `result_conversation_id`. Additive artifact metadata
 may also include `artifact_id`, `artifact_type`, `artifact_status`,
 `active_artifact_id`, `supersedes_artifact_id`, `saved_strategy_id`,
-`failed_action`, `retry_last_turn`, `recovery`, and `result_fact_bank`. User
-messages created by action chips may store `chat_action` so the transcript can hydrate
-the selected chip as an action item after reload. Action chip requests and
+`failed_action`, `retry_last_turn`, `recovery`, `clarification`, and
+`result_fact_bank`. User messages created by action chips may store
+`chat_action` so the transcript can hydrate the selected chip as an action item
+after reload. Action chip requests and
 persisted `chat_action` metadata should preserve `label` plus `labelKey` so
 localized transcript chips survive reload. Clients use these fields to hydrate
 cards and actions after reload. Runtime execution still validates against the
@@ -546,6 +547,14 @@ Ownership hardening:
       "No slippage or fees included.",
       "Benchmark: SPY."
     ],
+    "execution_costs": {
+      "fee_bps": 10.0,
+      "slippage_bps": 5.0,
+      "gross_total_return_pct": 23.2,
+      "net_total_return_pct": 23.0,
+      "return_drag_pct": 0.2,
+      "benchmark_treatment": "same_modeled_costs"
+    },
     "actions": [
       {
         "type": "show_breakdown",
@@ -627,6 +636,13 @@ commitment is represented by an explicit `DecisionNote`.
 - Legacy persisted `chart.value_extrema` may be read as a fallback only; new writers must emit `chart.value_summary` as the canonical shape.
 - `chart.markers` contains capped entry/exit events derived from executed fills only. Raw strategy signals, blocked exits while flat, and duplicate blocked entries must not appear as chart markers.
 - The frontend must keep TradingView attribution visible when rendering Lightweight Charts.
+
+**Result execution costs contract:**
+- `execution_costs` is optional and appears only when the engine modeled nonzero execution costs for the completed run.
+- Idealized legacy runs omit `execution_costs` and keep the existing no-fees/slippage assumption.
+- `fee_bps` and `slippage_bps` are modeled per-trade costs in basis points.
+- `gross_total_return_pct`, `net_total_return_pct`, and `return_drag_pct` describe strategy return before costs, after costs, and the gross-minus-net drag in percentage points.
+- `benchmark_treatment` is currently `same_modeled_costs`, meaning the benchmark comparison used the same modeled cost assumptions.
 
 **Reproducibility contract:**
 - Direct `/backtests/run` records store the normalized engine config directly in
@@ -1050,6 +1066,7 @@ Argus supports English and Spanish (Latin America) in Alpha.
 ## Runtime Language Contract
 - User input may arrive in any supported language, currently English or Spanish (Latin America).
 - LLM interpretation owns natural-language semantics and must return canonical machine fields; runtime code must not branch on localized whole-turn phrases before interpretation.
+- Offline or degraded-mode recovery may apply typed action metadata such as button ids, `chat_action`, or `replacement_values`; it must not infer semantic choices from localized display labels, stop-word lists, or alias phrasebooks.
 - User-facing assistant prose should follow the resolved `language`, while executable fields such as `strategy_type`, `asset_class`, `timeframe`, `cadence`, `date_range`, `date_range_intent`, and `comparison_baseline` remain language-neutral.
 - Locale-specific rendering, such as compact dates and currency/number formats, belongs in locale-aware presentation code, not backend prose contracts.
 - Capability registries may keep machine compatibility aliases such as snake_case legacy identifiers, but they must not become natural-language phrasebooks in English, Spanish, or future languages.
@@ -1227,6 +1244,10 @@ Soft delete conversation.
   gating (for example `ARGUS_STRATEGIES_ENABLED=false`) and must not create a
   hidden saved-strategy object when the Strategies surface is disabled.
 - `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose. Assistant message metadata must record `result_breakdown_source`, `result_breakdown_fallback_used`, and, when applicable, `result_breakdown_failure_mode` so optional Explain-result fallback does not masquerade as the normal LLM path.
+- `select_response_option` is valid only for typed response-intent options. Its
+  payload must identify the selected option through `option_index` or
+  `replacement_values`. Labels are display text only and must not drive runtime
+  selection.
 
 ### Conversation Artifact Continuity Contract
 
@@ -1413,9 +1434,18 @@ completed in-stream run, the final payload includes `backtest_job` and omits
 When a turn reaches a recoverable assistant response without a completed card,
 the final payload and persisted assistant message metadata may include
 `retry_last_turn` and `recovery`. `recovery` is a typed status object with a
-stable `code`, `retryable`, and normalized `language`. User-facing recovery copy
-is presentation only; clients must render retry affordances from structured
-metadata, not by matching assistant prose.
+stable `code`, `retryable`, and optional `params`. User-facing recovery copy is
+presentation only; clients must render retry affordances and localized recovery
+copy from structured metadata, not by matching assistant prose.
+
+When the clarification/composer path is degraded, the final payload and
+persisted assistant message metadata may also include `clarification`. This is
+the typed contract for localized fallback clarification UI. The backend remains
+the source of truth for the reason, requested field, strategy payload, and
+structured option payloads; frontend clients render localized strings from
+static i18n bundles using those typed fields. `assistant_prompt` or
+`assistant_response` may still carry compatibility English text for older
+clients, but new clients should prefer `clarification` when present.
 
 Recoverable streaming error frames may also include the same structured fields
 so live clients can render retry controls immediately, before reload hydration:
@@ -1433,6 +1463,68 @@ so live clients can render retry controls immediately, before reload hydration:
   },
   "retry_last_turn": {
     "message": "What if I bought BTC last year?"
+  }
+}
+```
+
+Example degraded clarification payload:
+
+```json
+{
+  "type": "final",
+  "payload": {
+    "stage_outcome": "await_user_reply",
+    "assistant_prompt": "What date window should I use for AAPL?",
+    "requested_field": "date_range",
+    "clarification": {
+      "kind": "clarification",
+      "reason_code": "missing_period",
+      "requested_field": "date_range",
+      "requested_fields": ["date_range"],
+      "semantic_needs": ["period"],
+      "payload": {
+        "strategy": {
+          "asset_universe": ["AAPL"],
+          "asset_class": "equity"
+        }
+      },
+      "options": []
+    }
+  }
+}
+```
+
+Example unsupported-recovery clarification payload:
+
+```json
+{
+  "clarification": {
+    "kind": "unsupported_recovery",
+    "reason_code": "unsupported_strategy_logic",
+    "requested_field": "unsupported_constraints",
+    "requested_fields": ["unsupported_constraints"],
+    "semantic_needs": ["simplification_choice"],
+    "payload": {
+      "strategy": {
+        "asset_universe": ["TSLA"],
+        "asset_class": "equity"
+      },
+      "raw_value": "ATR 14"
+    },
+    "options": [
+      {
+        "id": "rsi_threshold",
+        "replacement_values": {
+          "simplify_logic": "rsi_only"
+        }
+      },
+      {
+        "id": "buy_and_hold",
+        "replacement_values": {
+          "strategy_type": "buy_and_hold"
+        }
+      }
+    ]
   }
 }
 ```
@@ -1982,6 +2074,10 @@ Global omni-search across conversations and typed recall objects.
 - `q`
 - `limit`
 - `cursor`
+- `decision_state`: optional Idea Ledger browse filter. Valid values:
+  `watching`, `promising`, `rejected`, `revisit_later`.
+- `include_ledger_groups`: optional boolean. When true, the response includes
+  backend-owned Idea Ledger decision-state groups and counts.
 
 **Response:**
 ```json
@@ -2017,7 +2113,13 @@ Global omni-search across conversations and typed recall objects.
       }
     }
   ],
-  "next_cursor": null
+  "next_cursor": null,
+  "ledger_groups": [
+    { "decision_state": "promising", "count": 2 },
+    { "decision_state": "watching", "count": 1 },
+    { "decision_state": "rejected", "count": 0 },
+    { "decision_state": "revisit_later", "count": 0 }
+  ]
 }
 ```
 
@@ -2062,6 +2164,12 @@ is reserved for grounded display context such as digest, symbols, benchmark,
 assumptions, compact metrics summaries, quick take, and breakdown context when
 available.
 
+When `include_ledger_groups=true`, `ledger_groups` is the source of truth for
+Idea Ledger group order and counts. Empty groups must be returned with
+`count = 0`; clients must not synthesize missing groups or counts locally.
+Clients localize the stable `decision_state` enum for display, but must keep the
+enum value from the backend attached to filters, pills, and grouped rows.
+
 For typed P1 objects, Omnisearch treats artifacts as first-class results and
 the source conversation as provenance. Evidence-like objects do not expose chat
 owner actions such as rename, archive, or delete.
@@ -2072,9 +2180,13 @@ owner actions such as rename, archive, or delete.
 
 # 17.1 Private Alpha Observability Envelope
 
-P1 defines a stable measurement envelope for future analytics, cost, and eval
-readiness. This is a contract-only surface in the current slice: Argus can build
-and sanitize event envelopes, but live analytics emission remains disabled.
+P1 defines a stable measurement envelope for product analytics, future cost
+accounting, and eval readiness. B3 slice 2 emits the approved product-event set
+to PostHog when `POSTHOG_PROJECT_TOKEN` and an explicit PostHog region or host
+are configured. If the token is missing, capture is suppressed with
+`reason = "posthog_not_configured"`. If the region/host is missing or
+unsupported, capture is suppressed with
+`reason = "posthog_region_not_configured"`.
 
 Event envelope schema version: `argus_observability_event/v1`.
 
@@ -2114,9 +2226,30 @@ Privacy posture:
   receipts, provider/model metadata, auth tokens, API keys, broker credentials,
   account balances, exact holdings, payment identifiers, and similar sensitive
   payloads before capture.
-- `capture_event` returns a suppressed result with
-  `reason = "p1_measurement_only"` in this slice. PostHog, cost-ledger tables,
-  and eval-result persistence are future implementation surfaces.
+- PostHog receives only the sanitized projection. Raw identifiers are hashed
+  before emission.
+- Capture is server-side only. Frontend PostHog, autocapture, session replay,
+  and product behavior reads from analytics remain out of scope.
+- Person profiles are disabled per event with `$process_person_profile = false`.
+- Current PostHog region is US Cloud, selected deliberately for the private
+  alpha compliance posture via `POSTHOG_REGION=us` / `https://us.i.posthog.com`.
+
+Approved product events:
+- `evidence_capture`
+- `decision_capture`
+- `recall_usage`
+- `continuity_mismatch`
+- `compare_started`
+- `eval_readiness`
+
+Each approved product event sets `attributes.product_event` to the registered
+name above while preserving the envelope `event_type` taxonomy and
+`event_action` state model from memo 15.5.
+
+Deferred surfaces:
+- Append-only provider cost ledger.
+- Durable eval run/case result persistence.
+- Product dashboards or feature decisions based on analytics.
 
 ---
 
@@ -2180,7 +2313,7 @@ Feature flags may be returned in session/profile responses.
 
 For Alpha, the Settings "Upgrade" button may be shown behind a feature flag as a visual placeholder only. No billing, entitlement mutation, or upgrade API behavior is implemented.
 
-Backend runtime flags may also control internal engine behavior. For Alpha, `ARGUS_ENABLE_EXECUTION_REALISM` exists for staged development and is `false` by default. While disabled, Alpha API behavior and snapshots remain canonical "no fees/slippage" with no public request/response contract expansion.
+Backend runtime flags may also control internal engine behavior. `ARGUS_ENABLE_EXECUTION_REALISM` is enabled by default; setting it to `false` (also `0`, `off`, or `no`) is a kill switch that restores the pre-realism behavior byte-for-byte. Execution costs remain user opt-in per idea either way: runs without stated fees or slippage stay canonical "no fees/slippage". With the kill switch engaged, confirmation cards omit `capabilities.execution_costs_editable` and result cards omit `execution_costs`.
 
 ---
 
