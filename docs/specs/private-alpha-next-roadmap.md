@@ -22,19 +22,18 @@ on every runtime PR, zero hidden failures at tip (1023 passed, 0 xfailed at
 `c081901`).
 Current pointer: the interpret/edit spine is between owners; A1b (linked
 IdeaVersion emission) is the next spine-chain slice and is unblocked.
-The interpret/edit-surface burn-down is nearly closed (2026-07-09): PR #185
-(#160(A)) and PR #186 (#151) un-xfailed the last two strict gates; PR #187 fixed
-the demo-caught benchmark-keep regression. **One blocker is open: #188.** PR #189
-merged claiming to close the pre-run chip-clarify twin, but founder browser QA
-proved it broke live (mocked tests passed; real Grok still inverted a chip
-remove) — #188 is REOPENED and the re-fix is in flight as PR #190. The suite
-carries zero xfails, but zero xfails is not the promotion bar; the live gate is.
-Promotion to `main` is BLOCKED on #190 landing verified through the
-interpreter-facing live gate (see "Standing release discipline"). Once it does,
-the remaining steps are release mechanics: (1) full live-eval rerun on the exact
-promotion SHA; (2) the clean-checkout suite gate (#134/#135); (3) founder waiver
-on the known grok options-idea nondeterminism; (4) release manifest + `main`
-promotion PR (merge commit, not squash, so this is the last all-of-history diff).
+The interpret/edit-surface burn-down is CLOSED (2026-07-10): PR #185 (#160(A)),
+PR #186 (#151), PR #187 (benchmark-keep), and PR #190 (#188, tip `08d92f9`) are
+all merged. #188's history is the arc's key lesson: #189 merged on green mocked
+tests but broke live; founder browser QA caught it, it was reopened, and PR #190
+fixed it — chip asset edits are now operation-agnostic, the two P1 desync corners
+are closed, and the fix was proven live with real Grok before belief, then merged.
+Promotion to `main` is UNBLOCKED on code — the suite carries zero xfails and every
+interpret-surface issue is closed. Remaining steps are release mechanics: (1) full
+live-eval rerun on the exact promotion SHA (now includes the chip cases); (2) the
+clean-checkout suite gate (#134/#135); (3) founder waiver on the known grok
+options-idea nondeterminism; (4) release manifest + `main` promotion PR (merge
+commit, not squash, so this is the last all-of-history diff).
 #164 (post-result followup typing / approval-vs-pending-clarify policy) is the
 deferred follow-up, not a gate.
 Execution runs off the P2 execution board below: point an agent at any READY
@@ -633,16 +632,17 @@ monetization/entitlement architecture.
   gates are un-xfailed and enforced by the #169 sweep. Residual risk is model-
   side only (grok options-classification nondeterminism), not spine logic.
 
-##### Main-promotion burn-down — the interpret-surface lane (near-closed 2026-07-09: #182/#185/#186/#187 landed; #189 merged but #188 REOPENED — re-fix in flight as PR #190; #169 + #183 off-spine)
+##### Main-promotion burn-down — the interpret-surface lane (CLOSED 2026-07-10: #182/#185/#186/#187/#190 landed; #169 + #183 off-spine)
 
 This was one regression cluster on the interpret/edit spine, most introduced by
 the 07-06/07-07 merges, worked as a single-owner burn-down lane. All members are
-fixed except #188: #189 claimed to close it but broke live (see the
-interpreter-facing live gate under "Standing release discipline"), so it is
-REOPENED with PR #190 in flight. Until #190 lands verified through that gate,
-#188 is the one code blocker between `codex/private-alpha-next` and a `main`
-promotion candidate; the standing release-discipline reruns (live eval on the
-exact SHA + clean-checkout gate) and the founder's options waiver remain after.
+fixed and merged. #188 is the arc's cautionary tale: #189 claimed to close it but
+broke live; founder browser QA caught it, it was reopened, and PR #190 (`08d92f9`)
+fixed it and was proven live with real Grok before merge (the interpreter-facing
+live gate under "Standing release discipline" now enforces that permanently). No
+code blocker remains between `codex/private-alpha-next` and a `main` promotion
+candidate; the standing release-discipline reruns (live eval on the exact SHA +
+clean-checkout gate) and the founder's options waiver remain after.
 
 Shared surface (why they cannot be parallel implementers): `stages/interpret.py`,
 `interpreter/artifact_assumption_edit.py`,
@@ -707,10 +707,10 @@ known data-dropping regressions, so fix is preferred over waive.
 **Standing release discipline** (blocks `main`, not a lane): rerun the exact
 clean-checkout suite gate (issue #134 / PR #135) before any branch or `main`
 promotion instead of treating the repair as permanent proof for future SHAs.
-Interpret-surface status (2026-07-09): #171/#150/#160(A)(B)/#151/#187 are fixed;
-**#188 is REOPENED** — #189's chip-clarify fix passed mocked tests but broke live
-(the exact failure the gate below now exists to catch), re-fix in flight as
-PR #190. Promotion stays blocked until #190 lands verified.
+Interpret-surface status (2026-07-10): #171/#150/#160(A)(B)/#151/#187/#188 are
+all fixed and merged. #188 is why the gate below exists — #189's chip-clarify fix
+passed mocked tests but broke live; PR #190 re-fixed it and was proven live before
+merge. No interpret-surface blocker remains; promotion is unblocked on code.
 
 **Interpreter-facing live gate (blocks issue-close, not just `main`):** an
 interpret/edit/chat-facing fix is not "closed" on mocked-green alone. Before its
@@ -836,8 +836,8 @@ moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
   renders from typed codes/keys in the detected turn language. The PMF gate below
   (Spanish-preferring users complete the loop unaided) is validated by the live
   eval harness; #171 is closed in mocked/repro gates, and the interpret-surface
-  cluster (#160/#151 + demo follow-up #187) is fixed — the last blocker is #188
-  (REOPENED; PR #190 in flight), then the exact-SHA live-eval rerun.
+  cluster (#160/#151 + demo follow-ups #187/#188) is fully fixed and merged — the
+  remaining promotion step is the exact-SHA live-eval rerun.
 - Outcome: when Argus fails or hits an unsupported request, recovery preserves
   the user's idea, clarifies without making the user feel wrong, explains
   unsupported capability in product language, and never leaks raw provider/runtime
