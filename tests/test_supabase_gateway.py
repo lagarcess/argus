@@ -434,6 +434,7 @@ class _BacktestJobClient:
         self.existing_jobs = existing_jobs or []
         self.inserted_jobs: list[dict[str, Any]] = []
         self.updated_jobs: list[dict[str, Any]] = []
+        self.updated_job_filters: list[dict[str, object]] = []
 
     def table(self, table_name: str):
         assert table_name == "backtest_jobs"
@@ -492,8 +493,11 @@ class _BacktestJobTable:
                 for row in self.client.existing_jobs
                 if all(row.get(key) == value for key, value in self.filters.items())
             ]
-            updated = {**matches[0], **self.payload} if matches else dict(self.payload)
+            if not matches:
+                return SimpleNamespace(data=[])
+            updated = {**matches[0], **self.payload}
             self.client.updated_jobs.append(updated)
+            self.client.updated_job_filters.append(dict(self.filters))
             return SimpleNamespace(data=[updated])
         return SimpleNamespace(data=[])
 
@@ -730,6 +734,98 @@ def test_mark_backtest_job_running_filters_by_user_and_increments_attempts() -> 
     }
     assert client.updated_jobs[0]["user_id"] == "user-1"
     assert client.updated_jobs[0]["id"] == "job-1"
+    assert client.updated_job_filters[0] == {
+        "user_id": "user-1",
+        "id": "job-1",
+        "status": "queued",
+    }
+
+
+def test_mark_backtest_job_running_rejects_already_running_job() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "status": "running",
+        "attempts": 1,
+        "started_at": "2026-07-13T08:00:00+00:00",
+        "execution_metadata": {"workflow_run_id": "first-worker"},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    with pytest.raises(ValueError, match="cannot be started or retried"):
+        gateway.mark_backtest_job_running(
+            user_id="user-1",
+            job_id="job-1",
+            execution_metadata={"workflow_run_id": "overlapping-worker"},
+        )
+
+    assert client.updated_jobs == []
+
+
+def test_mark_backtest_job_running_rejects_lost_compare_and_set_race() -> None:
+    queued_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "status": "queued",
+        "attempts": 0,
+        "started_at": None,
+        "execution_metadata": {},
+    }
+    client = _BacktestJobClient(existing_jobs=[dict(queued_job)])
+    gateway = SupabaseGateway(client=client)
+
+    def stale_queued_read(*, user_id: str, job_id: str) -> dict[str, Any]:
+        assert user_id == "user-1"
+        assert job_id == "job-1"
+        client.existing_jobs[0]["status"] = "running"
+        return dict(queued_job)
+
+    gateway.get_backtest_job = stale_queued_read  # type: ignore[method-assign]
+
+    with pytest.raises(ValueError, match="cannot be started or retried"):
+        gateway.mark_backtest_job_running(
+            user_id="user-1",
+            job_id="job-1",
+            execution_metadata={"workflow_run_id": "overlapping-worker"},
+        )
+
+    assert client.updated_jobs == []
+
+
+def test_mark_backtest_job_running_allows_finalization_retry() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "status": "failed",
+        "attempts": 1,
+        "started_at": "2026-07-13T08:00:00+00:00",
+        "failure_code": "finalization_failed",
+        "failure_detail": "execution_failed",
+        "retryable": True,
+        "execution_metadata": {},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.mark_backtest_job_running(
+        user_id="user-1",
+        job_id="job-1",
+        execution_metadata={"workflow_run_id": "finalization-retry"},
+    )
+
+    assert row["status"] == "running"
+    assert row["attempts"] == 2
+    assert client.updated_job_filters[0] == {
+        "user_id": "user-1",
+        "id": "job-1",
+        "status": "failed",
+        "failure_code": "finalization_failed",
+        "retryable": True,
+    }
 
 
 def test_mark_backtest_job_failed_filters_by_user_and_sets_failure_metadata() -> None:

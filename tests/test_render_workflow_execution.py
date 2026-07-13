@@ -347,6 +347,62 @@ def test_postgres_backtest_job_gateway_reuses_connection_in_context(
     assert connect_calls == 1
 
 
+def test_postgres_backtest_job_gateway_rejects_running_job_claim(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows.backtest_job import (
+        PostgresBacktestJobGateway,
+        WorkflowBacktestJobError,
+    )
+
+    captured: dict[str, str] = {}
+
+    class FakeCursor:
+        def __enter__(self) -> FakeCursor:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def execute(self, query: str, params: object = None) -> None:
+            del params
+            captured["query"] = " ".join(query.split())
+
+        def fetchone(self) -> dict[str, object] | None:
+            if "status in ('queued', 'running')" in captured["query"]:
+                return {"id": "job-1", "status": "running"}
+            return None
+
+    class FakeConnection:
+        def __enter__(self) -> FakeConnection:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def cursor(self) -> FakeCursor:
+            return FakeCursor()
+
+    monkeypatch.setattr(
+        PostgresBacktestJobGateway,
+        "_connect",
+        lambda _self: FakeConnection(),
+    )
+    gateway = PostgresBacktestJobGateway("postgres://example")
+
+    with pytest.raises(WorkflowBacktestJobError, match="cannot be started or retried"):
+        gateway.mark_backtest_job_running(
+            user_id="user-1",
+            job_id="job-1",
+            execution_metadata={"workflow_run_id": "overlap"},
+        )
+
+    assert "status = 'queued'" in captured["query"]
+    assert "status in ('queued', 'running')" not in captured["query"]
+    assert "status = 'failed'" in captured["query"]
+    assert "failure_code = 'finalization_failed'" in captured["query"]
+
+
 def test_postgres_backtest_job_gateway_appends_cost_ledger_entry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

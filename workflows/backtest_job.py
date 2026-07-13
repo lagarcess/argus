@@ -54,7 +54,7 @@ class BacktestJobGateway(Protocol):
         execution_metadata: dict[str, Any],
         started_at: str | None = None,
     ) -> dict[str, Any]:
-        """Transition a queued job to running."""
+        """Claim a queued or retryable-finalization job for one worker."""
 
     def finalize_backtest_completion(
         self,
@@ -888,7 +888,7 @@ class PostgresBacktestJobGateway:
                     where id = %(job_id)s
                       and user_id = %(user_id)s
                       and (
-                        status in ('queued', 'running')
+                        status = 'queued'
                         or (
                           status = 'failed'
                           and failure_code = 'finalization_failed'
