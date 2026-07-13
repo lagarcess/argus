@@ -5,6 +5,10 @@ from unittest.mock import MagicMock
 
 import pytest
 from argus.api.schemas import BacktestRun
+from argus.domain.backtest_finalization import (
+    BacktestFinalizationInput,
+    finalize_backtest_completion,
+)
 from argus.domain.evidence import build_backtest_evidence_capture, build_decision_note
 from argus.domain.search_text import search_text_matches_query
 from argus.domain.store import utcnow
@@ -260,6 +264,67 @@ def _completed_run(
         chart=None,
         trades=[],
     )
+
+
+class _FinalizationRpcClient:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    def rpc(self, function_name: str, params: dict[str, Any]):
+        self.calls.append((function_name, params))
+        return _FinalizationRpc(params)
+
+
+class _FinalizationRpc:
+    def __init__(self, params: dict[str, Any]) -> None:
+        self.params = params
+
+    def execute(self) -> SimpleNamespace:
+        return SimpleNamespace(
+            data=[
+                {
+                    "run": self.params["p_run"],
+                    "idea": self.params["p_idea"],
+                    "idea_version": self.params["p_idea_version"],
+                    "evidence_artifact": self.params["p_evidence_artifact"],
+                }
+            ]
+        )
+
+
+def _backtest_finalization_input() -> BacktestFinalizationInput:
+    run = _completed_run()
+    return BacktestFinalizationInput(
+        user_id="user-1",
+        execution_identity="backtest_job:job-1",
+        run=run,
+        result_card=dict(run.conversation_result_card),
+        idea_id="idea-1",
+        idea_version_id="version-1",
+        evidence_artifact_id="artifact-1",
+        finalized_at=utcnow(),
+    )
+
+
+def test_supabase_finalizer_uses_one_rpc_and_returns_canonical_identity() -> None:
+    client = _FinalizationRpcClient()
+    gateway = SupabaseGateway(client=client)
+
+    finalized = finalize_backtest_completion(
+        gateway,
+        _backtest_finalization_input(),
+    )
+
+    assert [name for name, _params in client.calls] == ["finalize_backtest_completion"]
+    params = client.calls[0][1]
+    assert params["p_user_id"] == "user-1"
+    assert params["p_execution_identity"] == "backtest_job:job-1"
+    assert params["p_run"]["id"] == "run-1"
+    assert params["p_run"]["conversation_result_card"]["evidence_artifact_id"] == (
+        "artifact-1"
+    )
+    assert finalized.identity.run_id == "run-1"
+    assert finalized.identity.evidence_artifact_id == "artifact-1"
 
 
 def test_create_backtest_run_rejects_unowned_parent_conversation() -> None:

@@ -7,6 +7,11 @@ from types import ModuleType
 from uuid import UUID, uuid4
 
 import pytest
+from argus.domain.backtest_finalization import (
+    BacktestFinalizationInput,
+    finalize_backtest_completion,
+)
+from argus.domain.store import utcnow
 
 
 class FakeBacktestJobGateway:
@@ -401,6 +406,86 @@ def test_postgres_backtest_job_gateway_appends_cost_ledger_entry(
     assert params["billable_quantity"] == 30
     assert params["cost_amount"] == 0.0009
     assert params["occurred_at"] == "2026-07-02T18:00:00+00:00"
+
+
+def test_postgres_backtest_job_gateway_calls_shared_finalization_rpc(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.schemas import BacktestRun
+
+    from workflows.backtest_job import PostgresBacktestJobGateway
+
+    captured: dict[str, object] = {}
+    run = BacktestRun(
+        id="run-1",
+        conversation_id="conversation-1",
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 12.4}}},
+        config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
+        conversation_result_card={"title": "AAPL buy and hold", "actions": []},
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+
+    class FakeCursor:
+        def __enter__(self) -> FakeCursor:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def execute(self, query: str, params: object = None) -> None:
+            captured["query"] = query
+            captured["params"] = params
+
+        def fetchone(self) -> dict[str, object]:
+            params = captured["params"]
+            assert isinstance(params, dict)
+            return {
+                "run": params["run"].obj,
+                "idea": params["idea"].obj,
+                "idea_version": params["idea_version"].obj,
+                "evidence_artifact": params["evidence_artifact"].obj,
+            }
+
+    class FakeConnection:
+        def __enter__(self) -> FakeConnection:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def cursor(self) -> FakeCursor:
+            return FakeCursor()
+
+    monkeypatch.setattr(
+        PostgresBacktestJobGateway,
+        "_connect",
+        lambda _self: FakeConnection(),
+    )
+    gateway = PostgresBacktestJobGateway("postgres://example")
+    finalization = BacktestFinalizationInput(
+        user_id="user-1",
+        execution_identity="backtest_job:job-1",
+        run=run,
+        result_card=dict(run.conversation_result_card),
+        idea_id="idea-1",
+        idea_version_id="version-1",
+        evidence_artifact_id="artifact-1",
+        finalized_at=utcnow(),
+    )
+
+    finalized = finalize_backtest_completion(gateway, finalization)
+
+    assert "public.finalize_backtest_completion" in str(captured["query"])
+    assert finalized.identity.run_id == "run-1"
+    assert finalized.identity.evidence_artifact_id == "artifact-1"
 
 
 def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_run() -> (

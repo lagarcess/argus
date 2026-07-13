@@ -26,6 +26,10 @@ from argus.api.schemas import (
     Strategy,
     User,
 )
+from argus.domain.backtest_finalization import (
+    FinalizedBacktest,
+    PreparedBacktestFinalization,
+)
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
@@ -497,6 +501,39 @@ class SupabaseGateway:
         payload["user_id"] = user_id
         created = self.client.table("backtest_runs").insert(payload).execute()
         return BacktestRun.model_validate(_row_one(created))
+
+    def finalize_backtest_completion(
+        self,
+        *,
+        finalization: PreparedBacktestFinalization,
+    ) -> FinalizedBacktest:
+        captured = finalization.captured
+        result = self.client.rpc(
+            "finalize_backtest_completion",
+            {
+                "p_user_id": finalization.user_id,
+                "p_execution_identity": finalization.execution_identity,
+                "p_run": finalization.run.model_dump(mode="json"),
+                "p_idea": captured.idea.model_dump(mode="json"),
+                "p_idea_version": captured.idea_version.model_dump(mode="json"),
+                "p_evidence_artifact": captured.evidence_artifact.model_dump(mode="json"),
+            },
+        ).execute()
+        row = _row_one(result)
+        if row is None:
+            raise RuntimeError(
+                "Backtest finalization did not return durable artifact state."
+            )
+        return FinalizedBacktest(
+            run=BacktestRun.model_validate(row["run"]),
+            captured=CapturedEvidence(
+                idea=Idea.model_validate(row["idea"]),
+                idea_version=IdeaVersion.model_validate(row["idea_version"]),
+                evidence_artifact=EvidenceArtifact.model_validate(
+                    row["evidence_artifact"]
+                ),
+            ),
+        )
 
     def update_backtest_run_result_card(
         self,

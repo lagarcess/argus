@@ -587,6 +587,27 @@ def test_backtest_jobs_migration_defines_durable_workflow_boundary() -> None:
     assert "grant all privileges on table public.backtest_jobs to service_role" in sql
 
 
+def test_backtest_finalization_migration_defines_transactional_service_role_rpc() -> None:
+    migration = (
+        ROOT
+        / "supabase"
+        / "migrations"
+        / "20260713000001_finalize_backtest_completion.sql"
+    )
+
+    assert migration.exists()
+    sql = migration.read_text(encoding="utf-8").lower()
+    assert "function public.finalize_backtest_completion" in sql
+    assert "insert into public.backtest_runs" in sql
+    assert "insert into public.ideas" in sql
+    assert "insert into public.idea_versions" in sql
+    assert "insert into public.evidence_artifacts" in sql
+    assert "for update" in sql
+    assert "revoke all on function public.finalize_backtest_completion" in sql
+    assert "grant execute on function public.finalize_backtest_completion" in sql
+    assert "to service_role" in sql
+
+
 def test_api_contract_documents_backtest_job_boundary_fields() -> None:
     contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
     section_start = contract.index("\n## Backtest Job\n")

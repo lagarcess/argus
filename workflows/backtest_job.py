@@ -9,7 +9,12 @@ from math import isfinite
 from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID
 
-from argus.api.schemas import BacktestRun
+from argus.api.schemas import BacktestRun, EvidenceArtifact, Idea, IdeaVersion
+from argus.domain.backtest_finalization import (
+    FinalizedBacktest,
+    PreparedBacktestFinalization,
+)
+from argus.domain.evidence import CapturedEvidence
 from argus.observability.cost_ledger import (
     normalize_cost_ledger_entry,
     persist_openrouter_cost_ledger_entries,
@@ -881,6 +886,57 @@ class PostgresBacktestJobGateway:
                 )
                 row = cur.fetchone()
         return _json_safe(row)
+
+    def finalize_backtest_completion(
+        self,
+        *,
+        finalization: PreparedBacktestFinalization,
+    ) -> FinalizedBacktest:
+        from psycopg.types.json import Jsonb
+
+        captured = finalization.captured
+        with self._connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select *
+                    from public.finalize_backtest_completion(
+                      %(user_id)s::uuid,
+                      %(execution_identity)s::text,
+                      %(run)s::jsonb,
+                      %(idea)s::jsonb,
+                      %(idea_version)s::jsonb,
+                      %(evidence_artifact)s::jsonb
+                    )
+                    """,
+                    {
+                        "user_id": finalization.user_id,
+                        "execution_identity": finalization.execution_identity,
+                        "run": Jsonb(finalization.run.model_dump(mode="json")),
+                        "idea": Jsonb(captured.idea.model_dump(mode="json")),
+                        "idea_version": Jsonb(
+                            captured.idea_version.model_dump(mode="json")
+                        ),
+                        "evidence_artifact": Jsonb(
+                            captured.evidence_artifact.model_dump(mode="json")
+                        ),
+                    },
+                )
+                row = cur.fetchone()
+        if row is None:
+            raise WorkflowBacktestJobError(
+                "Backtest finalization did not return durable artifact state."
+            )
+        return FinalizedBacktest(
+            run=BacktestRun.model_validate(row["run"]),
+            captured=CapturedEvidence(
+                idea=Idea.model_validate(row["idea"]),
+                idea_version=IdeaVersion.model_validate(row["idea_version"]),
+                evidence_artifact=EvidenceArtifact.model_validate(
+                    row["evidence_artifact"]
+                ),
+            ),
+        )
 
     def create_route_receipt(
         self,
