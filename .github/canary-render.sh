@@ -1028,7 +1028,7 @@ PY
 verify_omnisearch_source_identity() {
   if ! curl -fsS \
     -b "$COOKIE_JAR" \
-    "${API_URL}/api/v1/search?q=AAPL&include_ledger_groups=true&decision_state=$(python3 "$RELEASE_PROFILE_TOOL" canary-value decision_state)" > "$SEARCH_RESPONSE"; then
+    "${API_URL}/api/v1/search?q=AAPL&include_ledger_groups=true" > "$SEARCH_RESPONSE"; then
     return 1
   fi
   CANARY_EVIDENCE_ARTIFACT_ID="$EVIDENCE_ARTIFACT_ID" \

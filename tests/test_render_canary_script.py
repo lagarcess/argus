@@ -330,6 +330,16 @@ def test_canary_requires_finalized_evidence_decision_reload_and_omnisearch_ident
     assert 'fail_canary "omnisearch" "omnisearch_source_identity_failed"' in source
 
 
+def test_canary_queries_evidence_without_the_idea_only_decision_filter() -> None:
+    source = _source(".github/canary-render.sh")
+    omnisearch_body = source.split("verify_omnisearch_source_identity() {", maxsplit=1)[
+        1
+    ].split("\n}", maxsplit=1)[0]
+
+    assert "/api/v1/search?q=AAPL&include_ledger_groups=true" in omnisearch_body
+    assert "decision_state=$(python3" not in omnisearch_body
+
+
 def test_canary_uses_confirmation_card_run_action_payload() -> None:
     source = _source(".github/canary-render.sh")
 
