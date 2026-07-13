@@ -267,6 +267,17 @@ def test_canary_language_can_be_overridden_for_spanish_live_qa() -> None:
     assert '"language": "en"' not in source
 
 
+def test_canary_runs_spanish_static_ui_regression_assertions() -> None:
+    workflow = _source(".github/workflows/private-alpha-canary.yml")
+
+    frontend_dependencies = workflow.index("Install frontend dependencies")
+    static_ui_assertions = workflow.index("Run Spanish static UI canary assertions")
+    local_smoke = workflow.index("Run local predeploy smoke")
+
+    assert frontend_dependencies < static_ui_assertions < local_smoke
+    assert "cd web && bun test __tests__/spanish-ui-smoke.test.ts" in workflow
+
+
 def test_canary_fails_async_jobs_that_use_result_readout_fallback() -> None:
     source = _source(".github/canary-render.sh")
 
