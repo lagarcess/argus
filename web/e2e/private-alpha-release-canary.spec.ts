@@ -15,7 +15,7 @@ function label(key: string): string {
   return value;
 }
 
-test("Spanish signup surface and login hydrate the canary profile", async ({ page }) => {
+test("Spanish signup submission and login hydrate the canary profile", async ({ page }) => {
   test.skip(!email || !password || !language, "browser canary credentials are required");
 
   await page.addInitScript((nextLanguage) => {
@@ -26,6 +26,22 @@ test("Spanish signup surface and login hydrate the canary profile", async ({ pag
   await expect(page.locator("html")).toHaveAttribute("lang", language);
   await expect(page.getByRole("button", { name: label("auth.signup.submit") })).toBeVisible();
   await expect(page.getByRole("button", { name: label("landing.sign_up_email") })).toHaveCount(0);
+
+  // The reusable canary account is already allowlisted and provisioned. Submit
+  // the real Spanish signup form with that existing identity and require the
+  // privacy-safe duplicate response before testing its independent login path.
+  const signupResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/auth/signup") &&
+      response.request().method() === "POST",
+  );
+  await page.locator('input[type="text"]').fill("Argus Release Canary");
+  await page.locator('input[type="email"]').fill(email);
+  await page.locator('input[type="password"]').fill(password);
+  await page.getByRole("button", { name: label("auth.signup.submit") }).click();
+  const signupResponse = await signupResponsePromise;
+  expect(signupResponse.status()).toBe(400);
+  await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
 
   await page.goto("/?auth=login", { waitUntil: "networkidle" });
   await expect(page.locator("html")).toHaveAttribute("lang", language);

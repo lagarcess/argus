@@ -377,6 +377,7 @@ def test_canary_requires_an_async_workflow_job_for_the_release_profile() -> None
 def test_canary_runs_the_profile_driven_browser_signup_and_login_proof() -> None:
     source = _source(".github/canary-render.sh")
     browser_source = _source(".github/canary-browser.sh")
+    browser_test_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
     workflow = _source(".github/workflows/private-alpha-canary.yml")
 
     assert "run_browser_canary" in source
@@ -385,6 +386,14 @@ def test_canary_runs_the_profile_driven_browser_signup_and_login_proof() -> None
     assert "static-key-values" in browser_source
     assert "private-alpha-release-canary.spec.ts" in browser_source
     assert "Install Chromium for the deployed browser canary" in workflow
+    assert "input[type=\"text\"]" in browser_test_source
+    assert 'input[type="email"]' in browser_test_source
+    assert 'input[type="password"]' in browser_test_source
+    assert "/api/v1/auth/signup" in browser_test_source
+    assert "signupResponse.status()).toBe(400)" in browser_test_source
+    assert browser_test_source.index("/api/v1/auth/signup") < browser_test_source.index(
+        'page.goto("/?auth=login"'
+    )
 
 
 def test_canary_uses_temp_file_for_reload_messages_payload() -> None:

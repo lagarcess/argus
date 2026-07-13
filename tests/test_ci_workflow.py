@@ -119,7 +119,7 @@ def test_private_alpha_canary_workflow_runs_real_workflow_gate() -> None:
     assert 'unzip -q "$tmpdir/render.zip" -d "$tmpdir"' in joined_steps
     assert 'sudo mv "$tmpdir/cli_v2.20.0" /usr/local/bin/render' in joined_steps
     assert "render --version" in joined_steps
-    assert ".github/local-smoke.sh --expected-sha \"$GITHUB_SHA\"" in joined_steps
+    assert '.github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"' in joined_steps
     assert joined_steps.index(".github/local-smoke.sh") < joined_steps.index(
         ".github/warmup-render.sh"
     )
@@ -200,6 +200,21 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     assert "path: temp/canary-evidence/*\n" in CANARY_WORKFLOW_PATH.read_text(
         encoding="utf-8"
     )
+
+
+def test_private_alpha_canary_schedule_uses_the_integration_candidate_sha() -> None:
+    workflow = _canary_workflow()
+    steps_by_name = {step["name"]: step for step in workflow["jobs"]["canary"]["steps"]}
+    checkout = steps_by_name["Checkout"]
+    joined_steps = "\n".join(
+        str(step.get("run", "")) for step in workflow["jobs"]["canary"]["steps"]
+    )
+
+    assert checkout["with"]["ref"] == (
+        "${{ github.event_name == 'schedule' && 'codex/private-alpha-next' || github.sha }}"
+    )
+    assert '.github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"' in joined_steps
+    assert 'ARGUS_CANARY_SHA="$(git rev-parse HEAD)"' in joined_steps
 
 
 def test_private_alpha_smoke_workflow_runs_local_predeploy_gate() -> None:
