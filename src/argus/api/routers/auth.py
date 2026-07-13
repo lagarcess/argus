@@ -176,6 +176,7 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
             password=body.password,
             display_name=body.display_name,
             username=body.username,
+            language=body.language,
         )
         return auth_response(request, result)
     except Exception:

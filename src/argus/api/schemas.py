@@ -544,6 +544,7 @@ def _context_depth(value: Any) -> int:
 class SignupRequest(BaseModel):
     email: str
     password: str
+    language: Language = "en"
     display_name: str | None = None
     username: str | None = None
 

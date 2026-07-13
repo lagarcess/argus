@@ -48,6 +48,10 @@ export function OnboardingGate({
       try {
         const me = await getMe();
         let resolvedUser = me.user;
+        const profileLanguage = normalizeEnabledLanguage(resolvedUser.language);
+        if (profileLanguage !== normalizeEnabledLanguage(i18n.language)) {
+          await i18n.changeLanguage(profileLanguage);
+        }
         if (
           !privateAlphaOnboardingEnabled &&
           !me.user.onboarding.completed &&
@@ -91,7 +95,7 @@ export function OnboardingGate({
       }
     }
     checkUser();
-  }, []);
+  }, [i18n]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

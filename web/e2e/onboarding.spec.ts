@@ -209,6 +209,52 @@ test("signup and login expose persisted account entry", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
 });
 
+test("authenticated profile language wins before the chat renders", async ({ page }) => {
+  let profileRequestCount = 0;
+  let releaseSecondProfileRequest: (() => void) | undefined;
+  const secondProfileRequest = new Promise<void>((resolve) => {
+    releaseSecondProfileRequest = resolve;
+  });
+  const spanishProfile = {
+    user: {
+      id: "profile-language-user",
+      language: "es-419",
+      locale: "es-419",
+      onboarding: {
+        completed: true,
+        stage: "completed",
+        language_confirmed: true,
+        primary_goal: "test_stock_idea",
+      },
+    },
+  };
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("i18nextLng", "en");
+  });
+  await page.route("**/api/v1/me", async (route) => {
+    profileRequestCount += 1;
+    if (profileRequestCount >= 2) {
+      await secondProfileRequest;
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(spanishProfile),
+    });
+  });
+
+  try {
+    await page.goto("/chat", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("html")).toHaveAttribute("lang", "es-419", {
+      timeout: 500,
+    });
+  } finally {
+    releaseSecondProfileRequest?.();
+  }
+});
+
 test("real-auth signup submits invite identity and renders sanitized rejection", async ({
   page,
 }) => {
@@ -218,6 +264,9 @@ test("real-auth signup submits invite identity and renders sanitized rejection",
   );
 
   const signupRequests: Array<Record<string, unknown>> = [];
+  await page.addInitScript(() => {
+    window.localStorage.setItem("i18nextLng", "es-419");
+  });
   await page.route("**/api/v1/me", async (route) =>
     route.fulfill({
       status: 401,
@@ -242,10 +291,10 @@ test("real-auth signup submits invite identity and renders sanitized rejection",
 
   await page.goto("/?auth=signup", { waitUntil: "networkidle" });
 
-  await page.getByPlaceholder("Name").fill("Private Alpha Candidate");
-  await page.getByPlaceholder("Email address").fill("candidate@example.com");
-  await page.getByPlaceholder("Password").fill("launch-passphrase");
-  await page.getByRole("button", { name: "Sign up" }).click();
+  await page.locator('input[type="text"]').fill("Private Alpha Candidate");
+  await page.locator('input[type="email"]').fill("candidate@example.com");
+  await page.locator('input[type="password"]').fill("launch-passphrase");
+  await page.locator('form button[type="submit"]').click();
 
   await expect
     .poll(() => signupRequests.length, { timeout: 5_000 })
@@ -253,6 +302,7 @@ test("real-auth signup submits invite identity and renders sanitized rejection",
   expect(signupRequests[0]).toMatchObject({
     display_name: "Private Alpha Candidate",
     email: "candidate@example.com",
+    language: "es-419",
     password: "launch-passphrase",
   });
   await expect(page.getByText("Signup failed. Please try again.")).toBeVisible();
