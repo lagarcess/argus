@@ -4,7 +4,7 @@
 
 **Goal:** Make `.github/setup.sh` automatically and safely link canonical Argus environment files into sibling worker worktrees.
 
-**Architecture:** A focused Bash helper discovers the checked-out `codex/private-alpha-next` worktree through Git's porcelain worktree inventory and provisions only missing symlinks. The existing setup script calls the helper once and remains the sole user-facing entrypoint.
+**Architecture:** A focused Bash helper discovers the checked-out `codex/private-alpha-next` worktree through Git's porcelain worktree inventory and provisions only missing symlinks. The tracked Codex local-environment configuration delegates to the existing setup and cleanup scripts, keeping `.github/setup.sh` as the sole user-facing entrypoint and eliminating embedded copies.
 
 **Tech Stack:** Bash, Git worktrees, pytest, Python subprocess fixtures
 
@@ -58,6 +58,7 @@ Expected: FAIL because `.github/setup-worktree-env.sh` and the setup delegation 
 - Create: `.github/setup-worktree-env.sh`
 - Modify: `.github/setup.sh`
 - Modify: `.github/WORKTREE_CLEANUP.md`
+- Modify: `.codex/environments/environment.toml`
 
 **Interfaces:**
 - Consumes: optional `ARGUS_CANONICAL_WORKTREE_ROOT`, otherwise the local Git worktree inventory.
@@ -91,6 +92,9 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ```
 
 - [ ] **Step 4: Document that setup is automatic and cleanup removes only worktree-local links**
+
+The Codex environment setup and cleanup bodies must use `exec` to delegate to
+the tracked scripts and contain no duplicated Poetry, Bun, or credential logic.
 
 - [ ] **Step 5: Run the focused tests and verify GREEN**
 
@@ -129,6 +133,6 @@ Expected: diff check passes; the final command fails because the secret files re
 
 ```bash
 git add .github/setup.sh .github/setup-worktree-env.sh .github/WORKTREE_CLEANUP.md tests/test_worktree_environment_setup.py docs/superpowers/specs/2026-07-13-worktree-environment-bootstrap-design.md docs/superpowers/plans/2026-07-13-worktree-environment-bootstrap.md
+git add -f .codex/environments/environment.toml
 git commit -m "chore(dev): provision worktree environment links"
 ```
-

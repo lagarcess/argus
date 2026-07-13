@@ -10,8 +10,10 @@ every sibling worker worktree automatically.
 
 ## Design
 
-`.github/setup.sh` invokes one small helper before dependency installation. The
-helper finds the worktree currently checked out on
+The tracked Codex local-environment configuration delegates setup and cleanup to
+the existing repository scripts instead of embedding copies. `.github/setup.sh`
+invokes one small helper before dependency installation. The helper finds the
+worktree currently checked out on
 `codex/private-alpha-next`, then creates absolute symlinks for a missing `.env`
 and `web/.env.local` from that canonical worktree.
 
@@ -39,6 +41,7 @@ Allowed:
 
 - `.github/setup.sh`
 - `.github/setup-worktree-env.sh`
+- `.codex/environments/environment.toml`
 - focused setup tests
 - worktree setup documentation
 
@@ -54,4 +57,3 @@ Forbidden:
 Automated tests prove first-run linking, idempotent reruns, preservation of
 existing files and conflicting links, clean-checkout fallback, override
 behavior, setup delegation, and absence of secret values in command output.
-
