@@ -26,6 +26,10 @@ from argus.api.schemas import (
     Strategy,
     User,
 )
+from argus.domain.backtest_finalization import (
+    FinalizedBacktest,
+    PreparedBacktestFinalization,
+)
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
@@ -497,6 +501,39 @@ class SupabaseGateway:
         payload["user_id"] = user_id
         created = self.client.table("backtest_runs").insert(payload).execute()
         return BacktestRun.model_validate(_row_one(created))
+
+    def finalize_backtest_completion(
+        self,
+        *,
+        finalization: PreparedBacktestFinalization,
+    ) -> FinalizedBacktest:
+        captured = finalization.captured
+        result = self.client.rpc(
+            "finalize_backtest_completion",
+            {
+                "p_user_id": finalization.user_id,
+                "p_execution_identity": finalization.execution_identity,
+                "p_run": finalization.run.model_dump(mode="json"),
+                "p_idea": captured.idea.model_dump(mode="json"),
+                "p_idea_version": captured.idea_version.model_dump(mode="json"),
+                "p_evidence_artifact": captured.evidence_artifact.model_dump(mode="json"),
+            },
+        ).execute()
+        row = _row_one(result)
+        if row is None:
+            raise RuntimeError(
+                "Backtest finalization did not return durable artifact state."
+            )
+        return FinalizedBacktest(
+            run=BacktestRun.model_validate(row["run"]),
+            captured=CapturedEvidence(
+                idea=Idea.model_validate(row["idea"]),
+                idea_version=IdeaVersion.model_validate(row["idea_version"]),
+                evidence_artifact=EvidenceArtifact.model_validate(
+                    row["evidence_artifact"]
+                ),
+            ),
+        )
 
     def update_backtest_run_result_card(
         self,
@@ -1029,6 +1066,9 @@ class SupabaseGateway:
         if mark_succeeded:
             payload["status"] = "succeeded"
             payload["finished_at"] = _now_iso()
+            payload["failure_code"] = None
+            payload["failure_detail"] = None
+            payload["retryable"] = False
 
         updated = (
             self.client.table("backtest_jobs")
@@ -1050,6 +1090,14 @@ class SupabaseGateway:
         existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
         if existing is None:
             raise ValueError("Backtest job not found or not owned by user.")
+        can_retry_finalization = (
+            existing.get("status") == "failed"
+            and existing.get("failure_code") == "finalization_failed"
+            and bool(existing.get("retryable"))
+        )
+        existing_status = str(existing.get("status") or "")
+        if existing_status != "queued" and not can_retry_finalization:
+            raise ValueError("Backtest job cannot be started or retried.")
 
         metadata = dict(existing.get("execution_metadata") or {})
         metadata.update(execution_metadata or {})
@@ -1057,17 +1105,30 @@ class SupabaseGateway:
             "status": "running",
             "started_at": started_at or existing.get("started_at") or _now_iso(),
             "attempts": int(existing.get("attempts") or 0) + 1,
+            "result_run_id": None,
+            "finished_at": None,
+            "failure_code": None,
+            "failure_detail": None,
+            "retryable": False,
             "execution_metadata": metadata,
             "updated_at": _now_iso(),
         }
-        updated = (
+        update_query = (
             self.client.table("backtest_jobs")
             .update(payload)
             .eq("user_id", user_id)
             .eq("id", job_id)
-            .execute()
+            .eq("status", existing_status)
         )
-        return dict(_row_one(updated) or {})
+        if can_retry_finalization:
+            update_query = update_query.eq(
+                "failure_code", "finalization_failed"
+            ).eq("retryable", True)
+        updated = update_query.execute()
+        row = _row_one(updated)
+        if row is None:
+            raise ValueError("Backtest job cannot be started or retried.")
+        return dict(row)
 
     def mark_backtest_job_failed(
         self,
@@ -1088,6 +1149,7 @@ class SupabaseGateway:
         metadata.update(execution_metadata or {})
         payload = {
             "status": "failed",
+            "result_run_id": None,
             "finished_at": finished_at or _now_iso(),
             "failure_code": failure_code,
             "failure_detail": failure_detail,

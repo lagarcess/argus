@@ -59,6 +59,7 @@ import {
   isRetryAction,
   retryLastTurnActionFromMetadata,
   retryLastTurnActionFromMessage,
+  retryLastTurnChatActionFromAction,
   retryLastTurnFailedAssistantIdFromAction,
   retryLastTurnMessageFromAction,
   retryLoadConversationIdFromAction,
@@ -1914,9 +1915,10 @@ export default function ChatInterface() {
     }
     if (action.type === "retry_last_turn") {
       const retryText = retryLastTurnMessageFromAction(action);
+      const retryChatAction = retryLastTurnChatActionFromAction(action);
       const failedAssistantId = retryLastTurnFailedAssistantIdFromAction(action);
       if (retryText) {
-        void handleSend(retryText, [], undefined, {
+        void handleSend(retryText, retryChatAction ?? [], undefined, {
           renderUserMessage: false,
           replacementAssistantId: failedAssistantId ?? undefined,
         });

@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from threading import Event, Thread
+
 from argus.api import state as api_state
 from argus.api.schemas import BacktestRun, Conversation, DecisionNoteCreate, User
+from argus.domain.backtest_finalization import (
+    BacktestFinalizationInput,
+    MemoryBacktestFinalizationGateway,
+    PreparedBacktestFinalization,
+    finalize_backtest_completion,
+)
 from argus.domain.evidence import (
     build_backtest_evidence_capture,
     evidence_preview_from_artifact,
 )
-from argus.domain.store import utcnow
+from argus.domain.store import AlphaStore, utcnow
 
 
 def _user() -> User:
@@ -156,6 +164,68 @@ def test_completed_backtest_auto_captures_idea_version_and_evidence() -> None:
     assert run.conversation_result_card["idea_version_id"] == captured.idea_version.id
 
 
+def test_memory_search_waits_for_complete_backtest_finalization(monkeypatch) -> None:
+    from argus.api.search_assembly import scored_memory_search_items
+
+    artifact_published = Event()
+    release_finalizer = Event()
+
+    class PausingArtifactDict(dict):
+        def __setitem__(self, key, value) -> None:
+            super().__setitem__(key, value)
+            artifact_published.set()
+            assert release_finalizer.wait(timeout=2)
+
+    store = AlphaStore()
+    store.evidence_artifacts = PausingArtifactDict()
+    monkeypatch.setattr(api_state, "store", store)
+    run = _run()
+    finalization = BacktestFinalizationInput(
+        user_id="user-1",
+        execution_identity="backtest_job:job-1",
+        run=run,
+        result_card=dict(run.conversation_result_card),
+        idea_id="idea-1",
+        idea_version_id="version-1",
+        evidence_artifact_id="artifact-1",
+        finalized_at=utcnow(),
+    )
+    finalization_errors: list[BaseException] = []
+    search_results: list[tuple[int, object]] = []
+    search_finished = Event()
+
+    def finalize() -> None:
+        try:
+            finalize_backtest_completion(
+                MemoryBacktestFinalizationGateway(store),
+                finalization,
+            )
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            finalization_errors.append(exc)
+
+    def search() -> None:
+        search_results.extend(scored_memory_search_items(user=_user(), query="aapl"))
+        search_finished.set()
+
+    finalizer_thread = Thread(target=finalize)
+    search_thread = Thread(target=search)
+    finalizer_thread.start()
+    assert artifact_published.wait(timeout=1)
+    search_thread.start()
+
+    try:
+        assert not search_finished.wait(timeout=0.1)
+    finally:
+        release_finalizer.set()
+        finalizer_thread.join(timeout=2)
+        search_thread.join(timeout=2)
+
+    assert not finalization_errors
+    assert search_finished.is_set()
+    result_types = {item.type for _, item in search_results}
+    assert {"backtest", "idea", "evidence"}.issubset(result_types)
+
+
 def test_completed_backtest_capture_emits_product_event(monkeypatch) -> None:
     from argus.api.chat.evidence import auto_capture_completed_backtest
 
@@ -281,30 +351,28 @@ def test_completed_backtest_capture_reuses_durable_sidecar_after_restart(
     from argus.api.chat.evidence import auto_capture_completed_backtest
 
     class _Gateway:
-        def __init__(self, existing):
-            self.existing = existing
-            self.create_calls = 0
-            self.updated_cards: list[dict[str, object]] = []
+        def __init__(self, existing, run: BacktestRun):  # noqa: ANN001
+            self.store = AlphaStore()
+            self.finalization_calls = 0
+            self.store.backtest_runs[run.id] = run
+            self.store.backtest_run_owners[run.id] = "user-1"
+            self.store.ideas[existing.idea.id] = existing.idea
+            self.store.idea_owners[existing.idea.id] = "user-1"
+            self.store.idea_versions[existing.idea_version.id] = existing.idea_version
+            self.store.idea_version_owners[existing.idea_version.id] = "user-1"
+            artifact = existing.evidence_artifact
+            self.store.evidence_artifacts[artifact.id] = artifact
+            self.store.evidence_artifact_owners[artifact.id] = "user-1"
 
-        def get_evidence_capture_by_run(self, *, user_id, run_id):  # noqa: ANN001
-            if user_id == "user-1" and run_id == "run-1":
-                return self.existing
-            return None
-
-        def create_backtest_evidence_capture(self, *, user_id, captured):  # noqa: ANN001
-            self.create_calls += 1
-            return captured
-
-        def update_backtest_run_result_card(
+        def finalize_backtest_completion(
             self,
             *,
-            user_id,  # noqa: ANN001
-            run_id,  # noqa: ANN001
-            conversation_result_card,  # noqa: ANN001
-        ) -> None:
-            assert user_id == "user-1"
-            assert run_id == "run-1"
-            self.updated_cards.append(dict(conversation_result_card))
+            finalization: PreparedBacktestFinalization,
+        ):
+            self.finalization_calls += 1
+            return MemoryBacktestFinalizationGateway(
+                self.store
+            ).finalize_backtest_completion(finalization=finalization)
 
     api_state.store.reset()
     user = _user()
@@ -317,7 +385,7 @@ def test_completed_backtest_capture_reuses_durable_sidecar_after_restart(
         evidence_artifact_id="00000000-0000-0000-0000-000000000103",
         now=utcnow(),
     )
-    gateway = _Gateway(existing)
+    gateway = _Gateway(existing, run)
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
 
     captured = auto_capture_completed_backtest(
@@ -327,10 +395,9 @@ def test_completed_backtest_capture_reuses_durable_sidecar_after_restart(
     )
 
     assert captured.evidence_artifact.id == existing.evidence_artifact.id
-    assert gateway.create_calls == 0
-    assert gateway.updated_cards
+    assert gateway.finalization_calls == 1
     assert (
-        gateway.updated_cards[-1]["evidence_artifact_id"]
+        run.conversation_result_card["evidence_artifact_id"]
         == existing.evidence_artifact.id
     )
     assert len(api_state.store.evidence_artifacts) == 1

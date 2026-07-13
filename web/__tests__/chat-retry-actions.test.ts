@@ -6,6 +6,7 @@ import {
   hasFailedActionMetadata,
   retryLastTurnActionFromMetadata,
   retryLastTurnActionFromMessage,
+  retryLastTurnChatActionFromAction,
   retryLoadConversationIdFromAction,
   retryLastTurnMessageFromAction,
   isRetryAction,
@@ -175,6 +176,30 @@ describe("failed-action retry UI contract", () => {
         message: "what if I bought $125 of BTC every two weeks in 2022?",
         failed_assistant_id: "assistant-failed-persisted",
       },
+    });
+  });
+
+  test("preserves a typed chat action for finalization retry", () => {
+    const action = retryLastTurnActionFromMetadata(
+      {
+        retry_last_turn: {
+          message: "run backtest",
+          action: {
+            type: "run_backtest",
+            label: "Run backtest",
+            payload: { confirmation_id: "confirmation-1" },
+            presentation: "confirmation",
+          },
+        },
+      },
+      { assistantMessageId: "assistant-finalization-failed" },
+    );
+
+    expect(retryLastTurnChatActionFromAction(action)).toEqual({
+      type: "run_backtest",
+      label: "Run backtest",
+      payload: { confirmation_id: "confirmation-1" },
+      presentation: "confirmation",
     });
   });
 

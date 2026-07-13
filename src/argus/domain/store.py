@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from threading import RLock
 from typing import Any
 from uuid import uuid4
 
@@ -36,6 +37,12 @@ class AlphaStore:
     collection_strategies: dict[str, set[str]] = field(default_factory=dict)
     backtest_runs: dict[str, Any] = field(default_factory=dict)
     backtest_run_owners: dict[str, str] = field(default_factory=dict)
+    backtest_finalizations: dict[tuple[str, str], str] = field(default_factory=dict)
+    backtest_finalization_lock: Any = field(
+        default_factory=RLock,
+        repr=False,
+        compare=False,
+    )
     ideas: dict[str, Idea] = field(default_factory=dict)
     idea_owners: dict[str, str] = field(default_factory=dict)
     idea_versions: dict[str, IdeaVersion] = field(default_factory=dict)
@@ -59,6 +66,7 @@ class AlphaStore:
         self.collection_strategies.clear()
         self.backtest_runs.clear()
         self.backtest_run_owners.clear()
+        self.backtest_finalizations.clear()
         self.ideas.clear()
         self.idea_owners.clear()
         self.idea_versions.clear()
