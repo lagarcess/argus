@@ -27,6 +27,8 @@ job ids; use the privacy-safe labels from canary evidence.
 ## Environment Proof
 
 - Expected mode:
+- Release profile hash:
+- Effective locales and capabilities:
 - api_web_env_fingerprint:
 - workflow_env_fingerprint:
 - workflow_env_status:
@@ -55,20 +57,15 @@ job ids; use the privacy-safe labels from canary evidence.
 - Warmup command:
 - Warmup result:
 - Canary evidence artifact: `private-alpha-canary-evidence`
-- English canary:
+- Authoritative Spanish release canary:
   - JSON evidence:
+  - Exact candidate SHA verified:
+  - Finalized evidence/result labels:
+  - Decision-note label and reload hydration:
+  - Omnisearch source identity:
+  - Browser signup/login proof:
   - Failed-capture replay, if failed:
   - Exit status:
-- Spanish canary:
-  - JSON evidence:
-  - Failed-capture replay, if failed:
-  - Exit status:
-- Provider-path canary:
-  - JSON evidence:
-  - Focused symbol path:
-  - Failed-capture replay, if failed:
-  - Exit status:
-- Browser QA, if applicable:
 
 ## Release Decision
 
@@ -82,6 +79,8 @@ job ids; use the privacy-safe labels from canary evidence.
 
 - No raw conversation, user, run, or job ids.
 - Canary labels are stable hashes for audit correlation only.
+- The release profile contains no credentials, account ids, deploy ids, or
+  candidate SHA; record its hash with the candidate evidence instead.
 - Failed-capture artifacts are sanitized replay inputs, not raw transcripts.
 - Service-role credentials, cookies, prompts, and route receipt payloads are not
   copied into this manifest.

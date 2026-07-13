@@ -127,6 +127,11 @@ assert_api_mode() {
   printf "%s\n" "$status"
 
   require_status_line "$status" "status=ready"
+  require_status_line "$status" "release_profile_status=ready"
+  if ! grep -Eq '^release_profile_hash=[0-9a-f]{64}$' <<< "$status"; then
+    echo "ERROR: release config audit did not emit release_profile_hash."
+    return 1
+  fi
   if ! grep -Eq '^env_fingerprint=[0-9a-f]{64}$' <<< "$status"; then
     echo "ERROR: release config audit did not emit env_fingerprint."
     return 1
