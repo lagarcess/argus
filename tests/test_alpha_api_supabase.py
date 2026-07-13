@@ -175,6 +175,76 @@ def test_gateway_auth_flows_use_separate_auth_client():
     service_client.auth.sign_in_with_password.assert_not_called()
 
 
+def test_gateway_signup_records_language_for_profile_bootstrap():
+    service_client = MagicMock()
+    auth_client = MagicMock()
+    signup_response = MagicMock()
+    signup_response.user = object()
+    signup_response.model_dump.return_value = {"user": {"id": "auth-user"}}
+    auth_client.auth.sign_up.return_value = signup_response
+    gateway = SupabaseGateway(client=service_client, auth_client=auth_client)
+
+    gateway.signup(
+        email="alpha@example.com",
+        password="password",
+        language="es-419",
+    )
+
+    auth_client.auth.sign_up.assert_called_once_with(
+        {
+            "email": "alpha@example.com",
+            "password": "password",
+            "options": {
+                "data": {
+                    "display_name": None,
+                    "username": None,
+                    "language": "es-419",
+                }
+            },
+        }
+    )
+
+
+def test_gateway_profile_bootstrap_derives_locale_from_signup_language():
+    service_client = MagicMock()
+    gateway = SupabaseGateway(client=service_client)
+    gateway.private_alpha_role_for_email = MagicMock(return_value="user")
+    gateway.get_user = MagicMock(return_value=None)
+    now = utcnow().isoformat()
+    service_client.table.return_value.insert.return_value.execute.return_value.data = [
+        {
+            "id": "00000000-0000-0000-0000-000000000009",
+            "email": "alpha@example.com",
+            "username": None,
+            "display_name": "Alpha",
+            "language": "es-419",
+            "locale": "es-419",
+            "theme": "dark",
+            "is_admin": False,
+            "onboarding": OnboardingState().model_dump(),
+            "created_at": now,
+            "updated_at": now,
+        }
+    ]
+
+    profile = gateway.get_or_create_profile_for_auth_user(
+        {
+            "id": "00000000-0000-0000-0000-000000000009",
+            "email": "alpha@example.com",
+            "user_metadata": {
+                "display_name": "Alpha",
+                "language": "es-419",
+            },
+        }
+    )
+
+    assert profile.language == "es-419"
+    assert profile.locale == "es-419"
+    persisted = service_client.table.return_value.insert.call_args.args[0]
+    assert persisted["language"] == "es-419"
+    assert persisted["locale"] == "es-419"
+
+
 def test_gateway_private_alpha_role_reads_active_allowlist_row():
     client_mock = MagicMock()
     query = MagicMock()
@@ -1309,6 +1379,51 @@ def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatc
         call[0] for call in mock_gateway.method_calls
     ]
     assert response.cookies.get("sb-auth-token") == "access-token-123"
+
+
+def test_signup_passes_selected_language_to_gateway(mock_gateway, monkeypatch):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.signup.return_value = {"user": {"id": "user-1"}}
+
+    response = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "alpha@example.com",
+            "password": "password123",
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    mock_gateway.signup.assert_called_once_with(
+        email="alpha@example.com",
+        password="password123",
+        display_name=None,
+        username=None,
+        language="es-419",
+    )
+
+
+def test_signup_rejects_unsupported_language_before_provider_signup(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+
+    response = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "alpha@example.com",
+            "password": "password123",
+            "language": "fr-CA",
+        },
+    )
+
+    assert response.status_code == 422
+    mock_gateway.signup.assert_not_called()
 
 
 def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(

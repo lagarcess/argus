@@ -676,6 +676,7 @@ export async function getStarterPrompts() {
 export async function signupWithEmail(payload: {
   email: string;
   password: string;
+  language: ApiLanguage;
   display_name?: string | null;
   username?: string | null;
 }) {

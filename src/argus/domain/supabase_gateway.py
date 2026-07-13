@@ -21,6 +21,8 @@ from argus.api.schemas import (
     EvidenceArtifact,
     Idea,
     IdeaVersion,
+    Language,
+    Locale,
     Message,
     OnboardingState,
     Strategy,
@@ -46,6 +48,10 @@ class DecisionCaptureIntegrityError(RuntimeError):
 
 
 _USAGE_COUNTER_LOCK = threading.Lock()
+_PROFILE_LOCALE_BY_LANGUAGE: dict[Language, Locale] = {
+    "en": "en-US",
+    "es-419": "es-419",
+}
 
 
 def _now_iso() -> str:
@@ -294,6 +300,7 @@ class SupabaseGateway:
         password: str,
         display_name: str | None = None,
         username: str | None = None,
+        language: Language = "en",
     ) -> dict[str, Any]:
         try:
             auth_client = self.auth_client or self.client
@@ -302,7 +309,11 @@ class SupabaseGateway:
                     "email": email,
                     "password": password,
                     "options": {
-                        "data": {"display_name": display_name, "username": username}
+                        "data": {
+                            "display_name": display_name,
+                            "username": username,
+                            "language": language,
+                        }
                     },
                 }
             )
@@ -2054,15 +2065,22 @@ class SupabaseGateway:
             return existing
 
         now = _now_iso()
-        user_metadata = auth_user.get("user_metadata") or {}
+        raw_user_metadata = auth_user.get("user_metadata")
+        user_metadata = (
+            raw_user_metadata if isinstance(raw_user_metadata, dict) else {}
+        )
+        metadata_language = user_metadata.get("language")
+        language: Language = (
+            "es-419" if metadata_language == "es-419" else "en"
+        )
         # Canonical defaults per requirements
         payload = {
             "id": user_id,
             "email": email,
             "username": user_metadata.get("username"),
             "display_name": user_metadata.get("display_name"),
-            "language": "en",
-            "locale": "en-US",
+            "language": language,
+            "locale": _PROFILE_LOCALE_BY_LANGUAGE[language],
             "theme": "dark",
             "is_admin": is_admin,
             "onboarding": {
