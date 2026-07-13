@@ -133,6 +133,10 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 ### Constraints & Notes
 - **Supported Languages**: `en`, `es-419`
 - **Supported Locales**: `en-US`, `es-419`
+- Private-alpha signup persists `language` and its server-derived `locale` in
+  the profile creation path. Browser detection is only a pre-auth hint; after
+  authentication this row is authoritative and no frontend repair update is
+  required.
 - `display_name` is used for personalization.
 - `email` is for authentication, not primary UX identity.
 - `username` is optional for Alpha.
@@ -366,6 +370,11 @@ Represents an immutable result of a simulation. Every run is reproducible from i
   - `artifact_type = "backtest"`
   - `decision_note_id` and `decision_state` after explicit decision capture.
   These fields are stable codes/ids, not localized display prose.
+- Local/in-process and Render Workflow writers pass a stable, preallocated run
+  id into the same typed finalizer. Finalization commits the completed run,
+  Idea, IdeaVersion, EvidenceArtifact, and result-card identity as one logical
+  transaction. Readers must not observe a run as completed before that tuple is
+  finalized, and retries must reuse the same run id.
 ---
 
 ## 12.1 P1 Idea / Evidence / Decision Spine
@@ -467,6 +476,9 @@ Payload rules:
 - `UNIQUE(user_id, source_run_id)` keeps completed-run capture idempotent.
   Replays or worker restarts must reuse the existing sidecar instead of
   creating another evidence artifact for the same completed run.
+- Evidence search and recall require the source run's finalized identity. An
+  incomplete finalization is not eligible for conversation reload, history, or
+  Omnisearch, even if metric computation already finished.
 
 ### decision_notes
 
@@ -660,6 +672,12 @@ Job lifecycle status is separate from engine/runtime failure semantics.
 - `execution_metadata` may store private operational evidence such as workflow
   run id, cache hit/miss, provider fetch duration, compute duration, attempt
   count, and source error kind.
+- `succeeded` is valid only after `result_run_id` links to the fully finalized
+  run/evidence tuple. A recoverable persistence-side failure uses
+  `status = failed`, `failure_code = finalization_failed`, and
+  `retryable = true`; `result_run_id` remains null until retry finalizes the
+  stable run identity. `finalization_failed` is a failure code, not a new job
+  status.
 
 Unknown failures default to `failed`, `failed_internal` semantics,
 `retryable=false`, and a safe generic user message until a new stable
