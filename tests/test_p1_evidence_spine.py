@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from threading import Event, Thread
+
 from argus.api import state as api_state
 from argus.api.schemas import BacktestRun, Conversation, DecisionNoteCreate, User
 from argus.domain.backtest_finalization import (
+    BacktestFinalizationInput,
     MemoryBacktestFinalizationGateway,
     PreparedBacktestFinalization,
+    finalize_backtest_completion,
 )
 from argus.domain.evidence import (
     build_backtest_evidence_capture,
@@ -158,6 +162,68 @@ def test_completed_backtest_auto_captures_idea_version_and_evidence() -> None:
     )
     assert run.conversation_result_card["idea_id"] == captured.idea.id
     assert run.conversation_result_card["idea_version_id"] == captured.idea_version.id
+
+
+def test_memory_search_waits_for_complete_backtest_finalization(monkeypatch) -> None:
+    from argus.api.search_assembly import scored_memory_search_items
+
+    artifact_published = Event()
+    release_finalizer = Event()
+
+    class PausingArtifactDict(dict):
+        def __setitem__(self, key, value) -> None:
+            super().__setitem__(key, value)
+            artifact_published.set()
+            assert release_finalizer.wait(timeout=2)
+
+    store = AlphaStore()
+    store.evidence_artifacts = PausingArtifactDict()
+    monkeypatch.setattr(api_state, "store", store)
+    run = _run()
+    finalization = BacktestFinalizationInput(
+        user_id="user-1",
+        execution_identity="backtest_job:job-1",
+        run=run,
+        result_card=dict(run.conversation_result_card),
+        idea_id="idea-1",
+        idea_version_id="version-1",
+        evidence_artifact_id="artifact-1",
+        finalized_at=utcnow(),
+    )
+    finalization_errors: list[BaseException] = []
+    search_results: list[tuple[int, object]] = []
+    search_finished = Event()
+
+    def finalize() -> None:
+        try:
+            finalize_backtest_completion(
+                MemoryBacktestFinalizationGateway(store),
+                finalization,
+            )
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            finalization_errors.append(exc)
+
+    def search() -> None:
+        search_results.extend(scored_memory_search_items(user=_user(), query="aapl"))
+        search_finished.set()
+
+    finalizer_thread = Thread(target=finalize)
+    search_thread = Thread(target=search)
+    finalizer_thread.start()
+    assert artifact_published.wait(timeout=1)
+    search_thread.start()
+
+    try:
+        assert not search_finished.wait(timeout=0.1)
+    finally:
+        release_finalizer.set()
+        finalizer_thread.join(timeout=2)
+        search_thread.join(timeout=2)
+
+    assert not finalization_errors
+    assert search_finished.is_set()
+    result_types = {item.type for _, item in search_results}
+    assert {"backtest", "idea", "evidence"}.issubset(result_types)
 
 
 def test_completed_backtest_capture_emits_product_event(monkeypatch) -> None:

@@ -320,12 +320,13 @@ def _attach_decision_to_cached_result_surfaces(
 
 
 def _evidence_artifact_for_user(*, user_id: str, artifact_id: str) -> EvidenceArtifact:
-    artifact = api_state.store.evidence_artifacts.get(artifact_id)
-    if (
-        artifact is not None
-        and api_state.store.evidence_artifact_owners.get(artifact_id) == user_id
-    ):
-        return artifact
+    with api_state.store.backtest_finalization_lock:
+        artifact = api_state.store.evidence_artifacts.get(artifact_id)
+        if (
+            artifact is not None
+            and api_state.store.evidence_artifact_owners.get(artifact_id) == user_id
+        ):
+            return artifact
     if api_state.supabase_gateway is not None:
         fetched = api_state.supabase_gateway.get_evidence_artifact(
             user_id=user_id,

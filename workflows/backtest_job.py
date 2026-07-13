@@ -178,6 +178,7 @@ def run_backtest_job(
         timings.record_elapsed("dependency_or_tool_load", phase_started)
     else:
         tool = backtest_tool
+    finalization_committed = False
     try:
         phase_started = time.perf_counter()
         result = tool.run(request)
@@ -293,6 +294,7 @@ def run_backtest_job(
                 timings=timings,
             )
         timings.record_elapsed("backtest_finalization", phase_started)
+        finalization_committed = True
         result_run_id = finalized.identity.run_id
         phase_started = time.perf_counter()
         _persist_result_readout_route_receipts(
@@ -352,14 +354,17 @@ def run_backtest_job(
             ),
         }
     except Exception as exc:
+        failure_code = (
+            "finalization_failed" if finalization_committed else "failed_internal"
+        )
         return _mark_failed(
             gateway,
             row=gateway.fetch_job(job_id) or running,
             job_id=job_id,
             user_id=user_id,
-            failure_code="failed_internal",
+            failure_code=failure_code,
             failure_detail="execution_failed",
-            retryable=False,
+            retryable=finalization_committed,
             workflow_run_id=workflow_run_id,
             source_error=exc,
             timings=timings,

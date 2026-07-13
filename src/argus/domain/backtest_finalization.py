@@ -203,19 +203,19 @@ def cache_finalized_backtest(
     user_id: str,
     finalized: FinalizedBacktest,
 ) -> None:
-    captured = finalized.captured
-    # Publish the run last. Memory readers cannot discover a completed run before
-    # all of its sidecars and card identity exist.
-    store.ideas[captured.idea.id] = captured.idea
-    store.idea_owners[captured.idea.id] = user_id
-    store.idea_versions[captured.idea_version.id] = captured.idea_version
-    store.idea_version_owners[captured.idea_version.id] = user_id
-    store.evidence_artifacts[captured.evidence_artifact.id] = (
-        captured.evidence_artifact
-    )
-    store.evidence_artifact_owners[captured.evidence_artifact.id] = user_id
-    store.backtest_runs[finalized.run.id] = finalized.run
-    store.backtest_run_owners[finalized.run.id] = user_id
+    with store.backtest_finalization_lock:
+        captured = finalized.captured
+        # Publish the run last while finalization-aware readers hold the same lock.
+        store.ideas[captured.idea.id] = captured.idea
+        store.idea_owners[captured.idea.id] = user_id
+        store.idea_versions[captured.idea_version.id] = captured.idea_version
+        store.idea_version_owners[captured.idea_version.id] = user_id
+        store.evidence_artifacts[captured.evidence_artifact.id] = (
+            captured.evidence_artifact
+        )
+        store.evidence_artifact_owners[captured.evidence_artifact.id] = user_id
+        store.backtest_runs[finalized.run.id] = finalized.run
+        store.backtest_run_owners[finalized.run.id] = user_id
 
 
 def _prepare_finalization(
