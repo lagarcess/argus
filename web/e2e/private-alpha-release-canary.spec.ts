@@ -40,6 +40,7 @@ test("Spanish signup submission and login hydrate the canary profile", async ({ 
   await page.locator('input[type="password"]').fill(password);
   await page.getByRole("button", { name: label("auth.signup.submit") }).click();
   const signupResponse = await signupResponsePromise;
+  expect(signupResponse.request().postDataJSON()).toMatchObject({ language });
   expect(signupResponse.status()).toBe(400);
   await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
 

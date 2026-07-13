@@ -390,6 +390,9 @@ def test_canary_runs_the_profile_driven_browser_signup_and_login_proof() -> None
     assert 'input[type="email"]' in browser_test_source
     assert 'input[type="password"]' in browser_test_source
     assert "/api/v1/auth/signup" in browser_test_source
+    assert "signupResponse.request().postDataJSON()).toMatchObject({ language })" in (
+        browser_test_source
+    )
     assert "signupResponse.status()).toBe(400)" in browser_test_source
     assert browser_test_source.index("/api/v1/auth/signup") < browser_test_source.index(
         'page.goto("/?auth=login"'
