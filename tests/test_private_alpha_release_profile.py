@@ -8,7 +8,6 @@ from pathlib import Path
 
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE_PATH = ROOT / ".github" / "private-alpha-release-profile.json"
 PROFILE_UTILITY = ROOT / ".github" / "private-alpha-release-profile.py"
