@@ -800,6 +800,92 @@ def test_chat_stream_finalization_failure_returns_retryable_error(mock_gateway):
     )
 
 
+def test_chat_stream_finalization_retry_reuses_original_execution_identity(
+    mock_gateway,
+):
+    now = utcnow()
+    conversation = Conversation(
+        id="conv-finalization-retry",
+        title="New conversation",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview=None,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    persisted_messages: list[Message] = []
+
+    def create_message(**kwargs) -> Message:
+        message = Message(
+            id=f"msg-{len(persisted_messages) + 1}",
+            conversation_id=kwargs["conversation_id"],
+            role=kwargs["role"],
+            content=kwargs["content"],
+            metadata=kwargs.get("metadata") or {},
+            created_at=utcnow(),
+        )
+        persisted_messages.append(message)
+        return message
+
+    mock_gateway.create_message.side_effect = create_message
+    mock_gateway.list_messages.side_effect = lambda **_: list(persisted_messages)
+    finalization_store = AlphaStore()
+    finalization_calls = []
+
+    def commit_then_lose_first_response(*, finalization):
+        finalization_calls.append(finalization)
+        finalized = MemoryBacktestFinalizationGateway(
+            finalization_store
+        ).finalize_backtest_completion(finalization=finalization)
+        if len(finalization_calls) == 1:
+            raise RuntimeError("finalization response lost")
+        return finalized
+
+    mock_gateway.finalize_backtest_completion.side_effect = (
+        commit_then_lose_first_response
+    )
+    payload = {
+        "conversation_id": conversation.id,
+        "message": "Test TSLA dip idea",
+    }
+
+    first = client.post(
+        "/api/v1/chat/stream",
+        json=payload,
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "first-transport-attempt",
+        },
+    )
+    second = client.post(
+        "/api/v1/chat/stream",
+        json=payload,
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "retry-transport-attempt",
+        },
+    )
+
+    assert next(
+        event for event in _stream_events(first.text) if event.get("type") == "error"
+    )["code"] == "finalization_failed"
+    assert _final_payload(second.text)["run"]["id"] == next(
+        iter(finalization_store.backtest_runs)
+    )
+    assert len(finalization_calls) == 2
+    assert (
+        finalization_calls[1].execution_identity
+        == finalization_calls[0].execution_identity
+    )
+    assert finalization_calls[1].run.id == finalization_calls[0].run.id
+    assert len(finalization_store.backtest_runs) == 1
+    assert len(finalization_store.evidence_artifacts) == 1
+
+
 def test_chat_stream_supabase_rejects_memory_only_conversation(mock_gateway):
     from argus.api import state as api_state
 

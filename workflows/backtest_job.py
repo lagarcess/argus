@@ -179,6 +179,7 @@ def run_backtest_job(
     else:
         tool = backtest_tool
     finalization_committed = False
+    result_run_id: str | None = None
     try:
         phase_started = time.perf_counter()
         result = tool.run(request)
@@ -354,12 +355,24 @@ def run_backtest_job(
             ),
         }
     except Exception as exc:
+        latest = gateway.fetch_job(job_id) or running
+        if (
+            finalization_committed
+            and result_run_id is not None
+            and latest.get("status") == "succeeded"
+            and latest.get("result_run_id") == result_run_id
+        ):
+            return _already_succeeded_result(
+                latest,
+                job_id=job_id,
+                workflow_run_id=workflow_run_id,
+            )
         failure_code = (
             "finalization_failed" if finalization_committed else "failed_internal"
         )
         return _mark_failed(
             gateway,
-            row=gateway.fetch_job(job_id) or running,
+            row=latest,
             job_id=job_id,
             user_id=user_id,
             failure_code=failure_code,

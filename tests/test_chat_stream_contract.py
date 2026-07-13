@@ -59,6 +59,38 @@ def _final_payload(stream: str) -> dict[str, Any]:
     return payload
 
 
+def test_finalization_retry_metadata_preserves_structured_action() -> None:
+    from argus.api.chat.retry import retry_last_turn_metadata
+    from argus.api.schemas import ChatActionPayload, ChatStreamRequest
+
+    metadata = retry_last_turn_metadata(
+        payload=ChatStreamRequest(
+            conversation_id="conversation-1",
+            action=ChatActionPayload(
+                type="run_backtest",
+                label="Run backtest",
+                payload={"confirmation_id": "confirmation-1"},
+                presentation="confirmation",
+            ),
+        ),
+        request_message="run backtest",
+        include_structured_action=True,
+    )
+
+    assert metadata == {
+        "retry_last_turn": {
+            "message": "run backtest",
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "labelKey": None,
+                "payload": {"confirmation_id": "confirmation-1"},
+                "presentation": "confirmation",
+            },
+        }
+    }
+
+
 @pytest.fixture(autouse=True)
 def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import state as api_state

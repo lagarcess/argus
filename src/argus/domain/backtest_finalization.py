@@ -131,6 +131,8 @@ class MemoryBacktestFinalizationGateway:
                 self.store.backtest_finalizations[execution_key] = run_id
                 return existing
 
+            self._reject_conflicting_sidecar_ids(finalization)
+
             stored_run = self.store.backtest_runs.get(run_id)
             if stored_run is not None and not _same_immutable_run(
                 stored_run,
@@ -150,6 +152,42 @@ class MemoryBacktestFinalizationGateway:
             )
             self.store.backtest_finalizations[execution_key] = run_id
             return finalized
+
+    def _reject_conflicting_sidecar_ids(
+        self,
+        finalization: PreparedBacktestFinalization,
+    ) -> None:
+        captured = finalization.captured
+        candidates = (
+            (
+                "idea",
+                captured.idea.id,
+                self.store.ideas,
+                self.store.idea_owners,
+            ),
+            (
+                "idea version",
+                captured.idea_version.id,
+                self.store.idea_versions,
+                self.store.idea_version_owners,
+            ),
+            (
+                "evidence artifact",
+                captured.evidence_artifact.id,
+                self.store.evidence_artifacts,
+                self.store.evidence_artifact_owners,
+            ),
+        )
+        for label, object_id, objects, owners in candidates:
+            owner = owners.get(object_id)
+            if owner is not None and owner != finalization.user_id:
+                raise BacktestFinalizationError(
+                    f"Backtest finalization {label} is owned by another user."
+                )
+            if object_id in objects or owner is not None:
+                raise BacktestFinalizationError(
+                    f"Backtest finalization {label} identity is already in use."
+                )
 
     def _existing_finalization(
         self,
@@ -206,16 +244,44 @@ def cache_finalized_backtest(
     with store.backtest_finalization_lock:
         captured = finalized.captured
         # Publish the run last while finalization-aware readers hold the same lock.
-        store.ideas[captured.idea.id] = captured.idea
-        store.idea_owners[captured.idea.id] = user_id
-        store.idea_versions[captured.idea_version.id] = captured.idea_version
-        store.idea_version_owners[captured.idea_version.id] = user_id
-        store.evidence_artifacts[captured.evidence_artifact.id] = (
-            captured.evidence_artifact
-        )
-        store.evidence_artifact_owners[captured.evidence_artifact.id] = user_id
-        store.backtest_runs[finalized.run.id] = finalized.run
-        store.backtest_run_owners[finalized.run.id] = user_id
+        # Roll every write back if any publication step fails so the lock never
+        # releases a partial tuple to subsequent readers.
+        writes: list[tuple[Any, str, Any]] = [
+            (store.ideas, captured.idea.id, captured.idea),
+            (store.idea_owners, captured.idea.id, user_id),
+            (
+                store.idea_versions,
+                captured.idea_version.id,
+                captured.idea_version,
+            ),
+            (store.idea_version_owners, captured.idea_version.id, user_id),
+            (
+                store.evidence_artifacts,
+                captured.evidence_artifact.id,
+                captured.evidence_artifact,
+            ),
+            (
+                store.evidence_artifact_owners,
+                captured.evidence_artifact.id,
+                user_id,
+            ),
+            (store.backtest_runs, finalized.run.id, finalized.run),
+            (store.backtest_run_owners, finalized.run.id, user_id),
+        ]
+        missing = object()
+        previous = [
+            (mapping, key, mapping.get(key, missing)) for mapping, key, _ in writes
+        ]
+        try:
+            for mapping, key, value in writes:
+                mapping[key] = value
+        except Exception:
+            for mapping, key, prior in reversed(previous):
+                if prior is missing:
+                    mapping.pop(key, None)
+                else:
+                    mapping[key] = prior
+            raise
 
 
 def _prepare_finalization(

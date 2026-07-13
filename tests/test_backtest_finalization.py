@@ -127,6 +127,30 @@ def test_memory_finalizer_rejects_cross_owner_run_replay() -> None:
         finalize_backtest_completion(gateway, other_owner)
 
 
+def test_memory_finalizer_rejects_cross_owner_sidecar_id_reuse() -> None:
+    store = AlphaStore()
+    gateway = MemoryBacktestFinalizationGateway(store)
+    finalize_backtest_completion(gateway, _input())
+    other_owner = replace(
+        _input(
+            run_id="run-2",
+            idea_id="idea-1",
+            idea_version_id="version-2",
+            evidence_artifact_id="artifact-2",
+        ),
+        user_id="user-2",
+        execution_identity="backtest_job:job-2",
+    )
+
+    with pytest.raises(BacktestFinalizationError, match="owned by another user"):
+        finalize_backtest_completion(gateway, other_owner)
+
+    assert store.idea_owners["idea-1"] == "user-1"
+    assert "run-2" not in store.backtest_runs
+    assert "version-2" not in store.idea_versions
+    assert "artifact-2" not in store.evidence_artifacts
+
+
 def test_memory_finalizer_rejects_incomplete_existing_evidence_tuple() -> None:
     store = AlphaStore()
     gateway = MemoryBacktestFinalizationGateway(store)
@@ -135,6 +159,42 @@ def test_memory_finalizer_rejects_incomplete_existing_evidence_tuple() -> None:
 
     with pytest.raises(BacktestFinalizationError, match="incomplete"):
         finalize_backtest_completion(gateway, _input())
+
+
+def test_memory_finalizer_rolls_back_partial_publication_and_retries() -> None:
+    class FailOnceOwnerDict(dict):
+        should_fail = True
+
+        def __setitem__(self, key, value) -> None:
+            if self.should_fail:
+                self.should_fail = False
+                raise RuntimeError("injected owner-map failure")
+            super().__setitem__(key, value)
+
+    store = AlphaStore()
+    store.evidence_artifact_owners = FailOnceOwnerDict()
+    gateway = MemoryBacktestFinalizationGateway(store)
+
+    with pytest.raises(BacktestFinalizationError, match="finalization failed"):
+        finalize_backtest_completion(gateway, _input())
+
+    assert store.backtest_runs == {}
+    assert store.backtest_run_owners == {}
+    assert store.ideas == {}
+    assert store.idea_owners == {}
+    assert store.idea_versions == {}
+    assert store.idea_version_owners == {}
+    assert store.evidence_artifacts == {}
+    assert store.evidence_artifact_owners == {}
+    assert store.backtest_finalizations == {}
+
+    finalized = finalize_backtest_completion(gateway, _input())
+
+    assert finalized.identity.evidence_artifact_id == "artifact-1"
+    assert len(store.backtest_runs) == 1
+    assert len(store.ideas) == 1
+    assert len(store.idea_versions) == 1
+    assert len(store.evidence_artifacts) == 1
 
 
 def test_finalizer_rejects_non_completed_run_before_gateway_write() -> None:

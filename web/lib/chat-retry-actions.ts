@@ -10,6 +10,39 @@ function stringOrNull(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+const STRUCTURED_CHAT_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"]>>([
+  "run_backtest",
+  "change_dates",
+  "change_asset",
+  "adjust_assumptions",
+  "cancel_confirmation",
+  "show_breakdown",
+  "refine_strategy",
+  "save_strategy",
+  "retry_failed_action",
+  "select_response_option",
+]);
+
+function structuredChatActionOrNull(value: unknown): ChatActionOption | null {
+  const record = recordOrNull(value);
+  const type = stringOrNull(record?.type) as ChatActionOption["type"] | null;
+  if (!type || !STRUCTURED_CHAT_ACTION_TYPES.has(type)) {
+    return null;
+  }
+  const presentation = stringOrNull(record?.presentation);
+  return {
+    type,
+    label: stringOrNull(record?.label) ?? "Retry",
+    ...(stringOrNull(record?.labelKey)
+      ? { labelKey: stringOrNull(record?.labelKey) ?? undefined }
+      : {}),
+    ...(recordOrNull(record?.payload) ? { payload: recordOrNull(record?.payload) ?? {} } : {}),
+    ...(presentation === "confirmation" || presentation === "result"
+      ? { presentation }
+      : {}),
+  };
+}
+
 function failedActionPayloadFromMetadata(
   metadata: Record<string, unknown>,
 ): {
@@ -89,6 +122,7 @@ export function failedActionRetryActionFromMetadata(
 
 type RetryLastTurnOptions = {
   assistantMessageId?: string;
+  chatAction?: ChatActionOption | null;
 };
 
 export function retryLastTurnActionFromMessage(
@@ -109,6 +143,7 @@ export function retryLastTurnActionFromMessage(
     payload: {
       message: trimmed,
       ...(failedAssistantId ? { failed_assistant_id: failedAssistantId } : {}),
+      ...(options?.chatAction ? { chat_action: options.chatAction } : {}),
     },
   };
 }
@@ -122,7 +157,10 @@ export function retryLastTurnActionFromMetadata(
   if (!message) {
     return null;
   }
-  return retryLastTurnActionFromMessage(message, options);
+  return retryLastTurnActionFromMessage(message, {
+    ...options,
+    chatAction: structuredChatActionOrNull(retryLastTurn?.action),
+  });
 }
 
 export function retryLastTurnMessageFromAction(
@@ -142,6 +180,15 @@ export function retryLastTurnFailedAssistantIdFromAction(
     return null;
   }
   return stringOrNull(action.payload?.failed_assistant_id)?.trim() || null;
+}
+
+export function retryLastTurnChatActionFromAction(
+  action: ChatActionOption | null | undefined,
+): ChatActionOption | null {
+  if (action?.type !== "retry_last_turn") {
+    return null;
+  }
+  return structuredChatActionOrNull(action.payload?.chat_action);
 }
 
 export function conversationLoadRetryActionFromConversationId(

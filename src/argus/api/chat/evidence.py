@@ -109,11 +109,19 @@ def finalize_completed_backtest(
             finalized_at=utcnow(),
         ),
     )
-    cache_finalized_backtest(
-        api_state.store,
-        user_id=user_id,
-        finalized=finalized,
-    )
+    if api_state.supabase_gateway is not None:
+        try:
+            cache_finalized_backtest(
+                api_state.store,
+                user_id=user_id,
+                finalized=finalized,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Durable backtest finalized but memory cache refresh failed",
+                error=str(exc),
+                run_id=finalized.run.id,
+            )
     _emit_product_event(
         "evidence_capture",
         user_id=user_id,

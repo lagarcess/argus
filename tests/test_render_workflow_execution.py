@@ -28,6 +28,7 @@ class FakeBacktestJobGateway:
         self.finalization_calls: list[PreparedBacktestFinalization] = []
         self.fail_finalization_after_commit_once = False
         self.fail_result_link_once = False
+        self.fail_result_link_after_commit_once = False
 
     def fetch_job(self, job_id: str) -> dict[str, object] | None:
         if self.row["id"] != job_id:
@@ -108,6 +109,9 @@ class FakeBacktestJobGateway:
         self.row["retryable"] = False
         self.row["finished_at"] = datetime.now(timezone.utc).isoformat()
         self.row["execution_metadata"] = metadata
+        if self.fail_result_link_after_commit_once:
+            self.fail_result_link_after_commit_once = False
+            raise RuntimeError("job result link response lost")
         return dict(self.row)
 
     def mark_backtest_job_failed(
@@ -699,6 +703,38 @@ def test_run_backtest_job_result_link_failure_retries_finalized_tuple() -> None:
     assert len(gateway.finalization_store.idea_versions) == 1
     assert len(gateway.finalization_store.evidence_artifacts) == 1
     assert len(gateway.finalization_calls) == 2
+
+
+def test_run_backtest_job_reconciles_result_link_response_loss() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    gateway.fail_result_link_after_commit_once = True
+    tool = FakeBacktestTool(_successful_tool_result())
+    expected_run_id = stable_backtest_run_id("user-1", f"backtest_job:{job['id']}")
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="ambiguous-link-attempt",
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["result_run_id"] == expected_run_id
+    assert gateway.row["status"] == "succeeded"
+    assert gateway.row["result_run_id"] == expected_run_id
+    assert gateway.failed_updates == []
+    assert len(gateway.finalization_store.backtest_runs) == 1
+    assert len(gateway.finalization_store.evidence_artifacts) == 1
+    assert tool.calls == [_request_payload()]
 
 
 def test_run_backtest_job_replay_after_success_does_not_recompute() -> None:

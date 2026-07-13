@@ -121,6 +121,28 @@ def _runtime_event_keepalive_seconds() -> float:
     )
 
 
+def _retryable_finalization_execution_identity(
+    metadata: dict[str, Any] | None,
+    *,
+    request_message: str,
+) -> str | None:
+    if not isinstance(metadata, dict) or metadata.get("failure_code") != (
+        "finalization_failed"
+    ):
+        return None
+    retry_last_turn = metadata.get("retry_last_turn")
+    if not isinstance(retry_last_turn, dict):
+        return None
+    failed_message = str(retry_last_turn.get("message") or "").strip()
+    if not failed_message or failed_message != request_message.strip():
+        return None
+    finalization = metadata.get("backtest_finalization")
+    if not isinstance(finalization, dict):
+        return None
+    execution_identity = str(finalization.get("execution_identity") or "").strip()
+    return execution_identity or None
+
+
 def _positive_float_env(name: str, default: float, *, min_value: float) -> float:
     raw = os.getenv(name)
     if raw is None or not raw.strip():
@@ -468,11 +490,18 @@ async def chat_stream(
         )
 
     workflow: Any | None = None
+    retry_finalization_execution_identity: str | None = None
     try:
         workflow = api_state.get_agent_runtime_workflow(request)
         terminal_failure_metadata = latest_unresolved_terminal_runtime_failure_metadata(
             user_id=user.id,
             conversation_id=conversation.id,
+        )
+        retry_finalization_execution_identity = (
+            _retryable_finalization_execution_identity(
+                terminal_failure_metadata,
+                request_message=request_message,
+            )
         )
         if terminal_failure_metadata is not None:
             await mark_terminal_runtime_failure_checkpoint(
@@ -699,6 +728,7 @@ async def chat_stream(
     )
 
     async def events() -> AsyncIterator[str]:
+        active_finalization_execution_identity: str | None = None
         naming_language = (
             payload.language
             or conversation.language
@@ -1054,10 +1084,11 @@ async def chat_stream(
                         if isinstance(backtest_job, dict)
                         else ""
                     )
-                    execution_identity = (
+                    active_finalization_execution_identity = (
                         f"backtest_job:{durable_job_id}"
                         if durable_job_id
-                        else (
+                        else retry_finalization_execution_identity
+                        or (
                             "/api/v1/chat/stream:"
                             f"{clean_idempotency_key or request.state.request_id}"
                         )
@@ -1068,7 +1099,7 @@ async def chat_stream(
                         result_card=result_card,
                         envelope=envelope,
                         quick_take=assistant_text,
-                        execution_identity=execution_identity,
+                        execution_identity=active_finalization_execution_identity,
                     )
                     persist_onboarding_update(
                         current_user_profile,
@@ -1372,7 +1403,7 @@ async def chat_stream(
             )
             failure_metadata: dict[str, Any] = {
                 "conversation_mode": "recovery",
-                "agent_runtime_stage_outcome": failure_code,
+                "agent_runtime_stage_outcome": "agent_runtime_failure",
                 "failure_code": failure_code,
                 "retryable": finalization_failed,
                 "agent_runtime_turn": {
@@ -1384,9 +1415,14 @@ async def chat_stream(
             }
             if runtime_diagnostics is not None:
                 failure_metadata["runtime_diagnostics"] = runtime_diagnostics
+            if finalization_failed and active_finalization_execution_identity:
+                failure_metadata["backtest_finalization"] = {
+                    "execution_identity": active_finalization_execution_identity,
+                }
             retry_metadata = retry_last_turn_metadata(
                 payload=payload,
                 request_message=request_message,
+                include_structured_action=finalization_failed,
             )
             recovery = recovery_state(
                 "runtime_failure",
