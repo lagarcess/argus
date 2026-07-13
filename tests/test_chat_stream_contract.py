@@ -91,6 +91,63 @@ def test_finalization_retry_metadata_preserves_structured_action() -> None:
     }
 
 
+def test_finalization_retry_identity_requires_matching_failed_turn() -> None:
+    from argus.api.chat.retry import retryable_finalization_execution_identity
+
+    metadata = {
+        "failure_code": "finalization_failed",
+        "retry_last_turn": {"message": "run backtest"},
+        "backtest_finalization": {"execution_identity": "chat:original"},
+    }
+
+    assert (
+        retryable_finalization_execution_identity(
+            metadata,
+            request_message="run backtest",
+        )
+        == "chat:original"
+    )
+    assert (
+        retryable_finalization_execution_identity(
+            metadata,
+            request_message="different turn",
+        )
+        is None
+    )
+
+
+def test_finalization_identity_prefers_job_then_retry_then_request() -> None:
+    from argus.api.chat.retry import backtest_finalization_execution_identity
+
+    assert (
+        backtest_finalization_execution_identity(
+            backtest_job={"id": "job-1"},
+            retry_execution_identity="chat:original",
+            idempotency_key="idempotency-1",
+            request_id="request-1",
+        )
+        == "backtest_job:job-1"
+    )
+    assert (
+        backtest_finalization_execution_identity(
+            backtest_job=None,
+            retry_execution_identity="chat:original",
+            idempotency_key="idempotency-1",
+            request_id="request-1",
+        )
+        == "chat:original"
+    )
+    assert (
+        backtest_finalization_execution_identity(
+            backtest_job=None,
+            retry_execution_identity=None,
+            idempotency_key=None,
+            request_id="request-1",
+        )
+        == "/api/v1/chat/stream:request-1"
+    )
+
+
 @pytest.fixture(autouse=True)
 def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import state as api_state

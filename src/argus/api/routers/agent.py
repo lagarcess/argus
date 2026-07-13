@@ -17,6 +17,7 @@ from argus.agent_runtime.resolution import mention_to_provenance
 from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
+from argus.api.chat import retry as chat_retry
 from argus.api.chat.actions import (
     chat_display_message,
     chat_request_message,
@@ -58,7 +59,6 @@ from argus.api.chat.recovery import (
     pending_strategy_metadata_fallback_context,
     runtime_checkpoint_values,
 )
-from argus.api.chat.retry import retry_last_turn_metadata
 from argus.api.chat.route_receipts import persist_route_receipts
 from argus.api.chat.runtime_worker import (
     runtime_worker_enabled,
@@ -119,28 +119,6 @@ def _runtime_event_keepalive_seconds() -> float:
             min_value=0.1,
         ),
     )
-
-
-def _retryable_finalization_execution_identity(
-    metadata: dict[str, Any] | None,
-    *,
-    request_message: str,
-) -> str | None:
-    if not isinstance(metadata, dict) or metadata.get("failure_code") != (
-        "finalization_failed"
-    ):
-        return None
-    retry_last_turn = metadata.get("retry_last_turn")
-    if not isinstance(retry_last_turn, dict):
-        return None
-    failed_message = str(retry_last_turn.get("message") or "").strip()
-    if not failed_message or failed_message != request_message.strip():
-        return None
-    finalization = metadata.get("backtest_finalization")
-    if not isinstance(finalization, dict):
-        return None
-    execution_identity = str(finalization.get("execution_identity") or "").strip()
-    return execution_identity or None
 
 
 def _positive_float_env(name: str, default: float, *, min_value: float) -> float:
@@ -498,7 +476,7 @@ async def chat_stream(
             conversation_id=conversation.id,
         )
         retry_finalization_execution_identity = (
-            _retryable_finalization_execution_identity(
+            chat_retry.retryable_finalization_execution_identity(
                 terminal_failure_metadata,
                 request_message=request_message,
             )
@@ -524,7 +502,7 @@ async def chat_stream(
         persist_request_message()
         language = payload.language or conversation.language or current_user_profile.language
         assistant_text = recovery_message("runtime_failure", language=language)
-        retry_metadata = retry_last_turn_metadata(
+        retry_metadata = chat_retry.retry_last_turn_metadata(
             payload=payload,
             request_message=request_message,
         )
@@ -1079,18 +1057,12 @@ async def chat_stream(
                 if result_card is not None:
                     from argus.api.chat.persistence import persist_runtime_backtest_run
 
-                    durable_job_id = (
-                        str(backtest_job.get("id") or "").strip()
-                        if isinstance(backtest_job, dict)
-                        else ""
-                    )
                     active_finalization_execution_identity = (
-                        f"backtest_job:{durable_job_id}"
-                        if durable_job_id
-                        else retry_finalization_execution_identity
-                        or (
-                            "/api/v1/chat/stream:"
-                            f"{clean_idempotency_key or request.state.request_id}"
+                        chat_retry.backtest_finalization_execution_identity(
+                            backtest_job=backtest_job,
+                            retry_execution_identity=retry_finalization_execution_identity,
+                            idempotency_key=clean_idempotency_key,
+                            request_id=request.state.request_id,
                         )
                     )
                     run = persist_runtime_backtest_run(
@@ -1419,7 +1391,7 @@ async def chat_stream(
                 failure_metadata["backtest_finalization"] = {
                     "execution_identity": active_finalization_execution_identity,
                 }
-            retry_metadata = retry_last_turn_metadata(
+            retry_metadata = chat_retry.retry_last_turn_metadata(
                 payload=payload,
                 request_message=request_message,
                 include_structured_action=finalization_failed,
