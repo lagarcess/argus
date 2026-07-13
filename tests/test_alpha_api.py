@@ -478,6 +478,12 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history(
     assert isinstance(
         run["metrics"]["aggregate"]["performance"]["total_return_pct"], float
     )
+    artifact_id = run["conversation_result_card"]["evidence_artifact_id"]
+    assert run["conversation_result_card"]["idea_id"]
+    assert run["conversation_result_card"]["idea_version_id"]
+    assert run["conversation_result_card"]["evidence_lifecycle"] == "captured"
+    assert run["conversation_result_card"]["artifact_type"] == "backtest"
+    assert api_state.store.evidence_artifacts[artifact_id].source_run_id == run["id"]
     assert run["conversation_result_card"]["assumptions"] == [
         "Long-only",
         "Equal weight",
@@ -1897,6 +1903,26 @@ def test_decision_endpoint_marks_evidence_artifact_decided() -> None:
         and card.get("decision_state") == "promising"
         for card in assistant_result_cards
     )
+    reloaded = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    )
+    assert reloaded.status_code == 200
+    reloaded_cards = [
+        item.get("metadata", {}).get("result_card")
+        for item in reloaded.json()["items"]
+        if isinstance(item.get("metadata", {}).get("result_card"), dict)
+    ]
+    assert any(
+        card.get("evidence_artifact_id") == artifact_id
+        and card.get("decision_state") == "promising"
+        for card in reloaded_cards
+    )
+    recalled = client.get("/api/v1/search?q=Worth%20revisiting&limit=20")
+    assert recalled.status_code == 200
+    recalled_decision = next(
+        item for item in recalled.json()["items"] if item["type"] == "decision"
+    )
+    assert recalled_decision["matched_text"].startswith("Worth revisiting.")
 
 
 def test_decision_endpoint_is_idempotent_per_evidence_artifact() -> None:

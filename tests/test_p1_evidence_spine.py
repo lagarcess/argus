@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from argus.api import state as api_state
 from argus.api.schemas import BacktestRun, Conversation, DecisionNoteCreate, User
+from argus.domain.backtest_finalization import (
+    MemoryBacktestFinalizationGateway,
+    PreparedBacktestFinalization,
+)
 from argus.domain.evidence import (
     build_backtest_evidence_capture,
     evidence_preview_from_artifact,
 )
-from argus.domain.store import utcnow
+from argus.domain.store import AlphaStore, utcnow
 
 
 def _user() -> User:
@@ -281,30 +285,28 @@ def test_completed_backtest_capture_reuses_durable_sidecar_after_restart(
     from argus.api.chat.evidence import auto_capture_completed_backtest
 
     class _Gateway:
-        def __init__(self, existing):
-            self.existing = existing
-            self.create_calls = 0
-            self.updated_cards: list[dict[str, object]] = []
+        def __init__(self, existing, run: BacktestRun):  # noqa: ANN001
+            self.store = AlphaStore()
+            self.finalization_calls = 0
+            self.store.backtest_runs[run.id] = run
+            self.store.backtest_run_owners[run.id] = "user-1"
+            self.store.ideas[existing.idea.id] = existing.idea
+            self.store.idea_owners[existing.idea.id] = "user-1"
+            self.store.idea_versions[existing.idea_version.id] = existing.idea_version
+            self.store.idea_version_owners[existing.idea_version.id] = "user-1"
+            artifact = existing.evidence_artifact
+            self.store.evidence_artifacts[artifact.id] = artifact
+            self.store.evidence_artifact_owners[artifact.id] = "user-1"
 
-        def get_evidence_capture_by_run(self, *, user_id, run_id):  # noqa: ANN001
-            if user_id == "user-1" and run_id == "run-1":
-                return self.existing
-            return None
-
-        def create_backtest_evidence_capture(self, *, user_id, captured):  # noqa: ANN001
-            self.create_calls += 1
-            return captured
-
-        def update_backtest_run_result_card(
+        def finalize_backtest_completion(
             self,
             *,
-            user_id,  # noqa: ANN001
-            run_id,  # noqa: ANN001
-            conversation_result_card,  # noqa: ANN001
-        ) -> None:
-            assert user_id == "user-1"
-            assert run_id == "run-1"
-            self.updated_cards.append(dict(conversation_result_card))
+            finalization: PreparedBacktestFinalization,
+        ):
+            self.finalization_calls += 1
+            return MemoryBacktestFinalizationGateway(
+                self.store
+            ).finalize_backtest_completion(finalization=finalization)
 
     api_state.store.reset()
     user = _user()
@@ -317,7 +319,7 @@ def test_completed_backtest_capture_reuses_durable_sidecar_after_restart(
         evidence_artifact_id="00000000-0000-0000-0000-000000000103",
         now=utcnow(),
     )
-    gateway = _Gateway(existing)
+    gateway = _Gateway(existing, run)
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
 
     captured = auto_capture_completed_backtest(
@@ -327,10 +329,9 @@ def test_completed_backtest_capture_reuses_durable_sidecar_after_restart(
     )
 
     assert captured.evidence_artifact.id == existing.evidence_artifact.id
-    assert gateway.create_calls == 0
-    assert gateway.updated_cards
+    assert gateway.finalization_calls == 1
     assert (
-        gateway.updated_cards[-1]["evidence_artifact_id"]
+        run.conversation_result_card["evidence_artifact_id"]
         == existing.evidence_artifact.id
     )
     assert len(api_state.store.evidence_artifacts) == 1

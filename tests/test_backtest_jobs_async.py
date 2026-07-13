@@ -462,6 +462,48 @@ def test_backtest_job_status_endpoint_returns_job_and_result(
     assert payload["result_readout_fallback_used"] is False
 
 
+def test_backtest_job_status_does_not_return_run_for_failed_finalization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+
+    class _FailedFinalizationHydrationGateway(_HydrationGateway):
+        def get_backtest_job(
+            self,
+            *,
+            user_id: str,
+            job_id: str,
+        ) -> dict[str, object] | None:
+            job = super().get_backtest_job(user_id=user_id, job_id=job_id)
+            assert job is not None
+            return {
+                **job,
+                "status": "failed",
+                "result_run_id": "run-workflow-1",
+                "failure_code": "finalization_failed",
+                "failure_detail": "execution_failed",
+                "retryable": True,
+            }
+
+        def get_backtest_run(
+            self,
+            *,
+            user_id: str,
+            run_id: str,
+        ) -> BacktestRun | None:
+            raise AssertionError("failed finalization must not hydrate a run")
+
+    gateway = _FailedFinalizationHydrationGateway()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    client = TestClient(app)
+
+    response = client.get("/api/v1/backtest-jobs/job-async-1")
+
+    assert response.status_code == 200
+    assert response.json()["job"]["status"] == "failed"
+    assert response.json()["run"] is None
+
+
 def test_terminal_render_task_timeout_reconciles_running_job() -> None:
     from argus.api.chat.backtest_jobs import reconcile_terminal_render_task_run
 

@@ -9,19 +9,24 @@ from uuid import UUID, uuid4
 import pytest
 from argus.domain.backtest_finalization import (
     BacktestFinalizationInput,
+    MemoryBacktestFinalizationGateway,
+    PreparedBacktestFinalization,
     finalize_backtest_completion,
+    stable_backtest_run_id,
 )
-from argus.domain.store import utcnow
+from argus.domain.store import AlphaStore, utcnow
 
 
 class FakeBacktestJobGateway:
     def __init__(self, row: dict[str, object]) -> None:
         self.row = dict(row)
         self.transitions: list[str] = []
-        self.created_runs: list[dict[str, object]] = []
         self.failed_updates: list[dict[str, object]] = []
         self.route_receipts: list[dict[str, object]] = []
         self.cost_ledger_entries: list[dict[str, object]] = []
+        self.finalization_store = AlphaStore()
+        self.finalization_calls: list[PreparedBacktestFinalization] = []
+        self.fail_finalization_after_commit_once = False
 
     def fetch_job(self, job_id: str) -> dict[str, object] | None:
         if self.row["id"] != job_id:
@@ -42,14 +47,28 @@ class FakeBacktestJobGateway:
         self.row["status"] = "running"
         self.row["started_at"] = started_at
         self.row["attempts"] = int(self.row.get("attempts") or 0) + 1
+        self.row["result_run_id"] = None
+        self.row["finished_at"] = None
+        self.row["failure_code"] = None
+        self.row["failure_detail"] = None
+        self.row["retryable"] = False
         self.row["execution_metadata"] = execution_metadata
         return dict(self.row)
 
-    def create_backtest_run(self, *, user_id: str, run: object) -> object:
-        assert self.row["user_id"] == user_id
-        self.transitions.append("create_run")
-        self.created_runs.append({"user_id": user_id, "run": run})
-        return run
+    def finalize_backtest_completion(
+        self,
+        *,
+        finalization: PreparedBacktestFinalization,
+    ):
+        self.transitions.append("finalize")
+        self.finalization_calls.append(finalization)
+        finalized = MemoryBacktestFinalizationGateway(
+            self.finalization_store
+        ).finalize_backtest_completion(finalization=finalization)
+        if self.fail_finalization_after_commit_once:
+            self.fail_finalization_after_commit_once = False
+            raise RuntimeError("finalization response lost")
+        return finalized
 
     def merge_backtest_job_execution_metadata(
         self,
@@ -80,6 +99,9 @@ class FakeBacktestJobGateway:
         metadata.update(execution_metadata or {})
         self.row["status"] = "succeeded"
         self.row["result_run_id"] = result_run_id
+        self.row["failure_code"] = None
+        self.row["failure_detail"] = None
+        self.row["retryable"] = False
         self.row["finished_at"] = datetime.now(timezone.utc).isoformat()
         self.row["execution_metadata"] = metadata
         return dict(self.row)
@@ -104,6 +126,7 @@ class FakeBacktestJobGateway:
         self.row["failure_code"] = failure_code
         self.row["failure_detail"] = failure_detail
         self.row["retryable"] = retryable
+        self.row["result_run_id"] = None
         self.row["finished_at"] = finished_at
         self.row["execution_metadata"] = metadata
         self.failed_updates.append(
@@ -515,9 +538,9 @@ def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_ru
     assert result["job_id"] == job["id"]
     assert result["status"] == "succeeded"
     assert result["result_run_id"] == "run-workflow"
-    assert gateway.transitions == ["running", "create_run", "succeeded"]
+    assert gateway.transitions == ["running", "finalize", "succeeded"]
     assert tool.calls == [request]
-    created_run = gateway.created_runs[0]["run"]
+    created_run = gateway.finalization_store.backtest_runs["run-workflow"]
     assert created_run.id == "run-workflow"
     assert created_run.conversation_id == "conversation-1"
     assert created_run.status == "completed"
@@ -528,6 +551,10 @@ def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_ru
         == "run-workflow"
     )
     assert gateway.row["result_run_id"] == "run-workflow"
+    assert len(gateway.finalization_store.ideas) == 1
+    assert len(gateway.finalization_store.idea_versions) == 1
+    assert len(gateway.finalization_store.evidence_artifacts) == 1
+    assert created_run.conversation_result_card["evidence_artifact_id"]
     assert gateway.row["execution_metadata"]["existing"] == "kept"
     assert (
         gateway.row["execution_metadata"]["workflow_backtest"]["workflow_run_id"]
@@ -566,11 +593,96 @@ def test_run_backtest_job_persists_workflow_internal_timings_on_success() -> Non
         "job_fetch",
         "mark_running",
         "backtest_tool_run_total",
-        "backtest_run_persist",
+        "backtest_finalization",
         "result_readout_total",
         "link_result",
     ):
         assert timings[key] >= 0.0
+
+
+def test_run_backtest_job_finalization_failure_is_retryable_and_replay_safe() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    gateway.fail_finalization_after_commit_once = True
+    tool = FakeBacktestTool(_successful_tool_result())
+    expected_run_id = stable_backtest_run_id("user-1", f"backtest_job:{job['id']}")
+
+    first = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="first-attempt",
+    )
+
+    assert first == {
+        "job_id": job["id"],
+        "status": "failed",
+        "failure_code": "finalization_failed",
+        "failure_detail": "execution_failed",
+        "retryable": True,
+        "workflow_run_id": "first-attempt",
+        "execution_metadata": gateway.row["execution_metadata"],
+    }
+    assert gateway.row["result_run_id"] is None
+    assert len(gateway.finalization_store.backtest_runs) == 1
+    assert len(gateway.finalization_store.evidence_artifacts) == 1
+
+    second = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="retry-attempt",
+    )
+
+    assert second["status"] == "succeeded"
+    assert second["result_run_id"] == expected_run_id
+    assert len(gateway.finalization_store.backtest_runs) == 1
+    assert len(gateway.finalization_store.ideas) == 1
+    assert len(gateway.finalization_store.idea_versions) == 1
+    assert len(gateway.finalization_store.evidence_artifacts) == 1
+    assert len(gateway.finalization_calls) == 2
+
+
+def test_run_backtest_job_replay_after_success_does_not_recompute() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(_successful_tool_result())
+
+    first = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="first-attempt",
+    )
+    transitions_after_success = list(gateway.transitions)
+    second = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="replayed-task",
+    )
+
+    assert second["status"] == "succeeded"
+    assert second["result_run_id"] == first["result_run_id"]
+    assert tool.calls == [_request_payload()]
+    assert gateway.transitions == transitions_after_success
+    assert len(gateway.finalization_calls) == 1
 
 
 def test_run_backtest_job_persists_backend_result_readout(
@@ -842,7 +954,7 @@ def test_run_backtest_job_marks_tool_failure_with_structured_metadata() -> None:
     assert result["failure_detail"] == "market_data_issue"
     assert result["retryable"] is True
     assert gateway.transitions == ["running", "failed"]
-    assert gateway.created_runs == []
+    assert gateway.finalization_calls == []
     assert gateway.row["failure_code"] == "upstream_dependency_error"
     assert gateway.row["failure_detail"] == "market_data_issue"
     assert gateway.row["retryable"] is True

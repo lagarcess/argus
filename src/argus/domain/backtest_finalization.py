@@ -142,27 +142,14 @@ class MemoryBacktestFinalizationGateway:
 
             captured = finalization.captured
             finalized_run = _run_with_capture(finalization.run, captured)
-
-            # Publish the run last. Memory readers cannot discover a completed run
-            # before all of its sidecars and card identity exist.
-            self.store.ideas[captured.idea.id] = captured.idea
-            self.store.idea_owners[captured.idea.id] = finalization.user_id
-            self.store.idea_versions[captured.idea_version.id] = (
-                captured.idea_version
+            finalized = FinalizedBacktest(run=finalized_run, captured=captured)
+            cache_finalized_backtest(
+                self.store,
+                user_id=finalization.user_id,
+                finalized=finalized,
             )
-            self.store.idea_version_owners[captured.idea_version.id] = (
-                finalization.user_id
-            )
-            self.store.evidence_artifacts[captured.evidence_artifact.id] = (
-                captured.evidence_artifact
-            )
-            self.store.evidence_artifact_owners[captured.evidence_artifact.id] = (
-                finalization.user_id
-            )
-            self.store.backtest_runs[run_id] = finalized_run
-            self.store.backtest_run_owners[run_id] = finalization.user_id
             self.store.backtest_finalizations[execution_key] = run_id
-            return FinalizedBacktest(run=finalized_run, captured=captured)
+            return finalized
 
     def _existing_finalization(
         self,
@@ -208,6 +195,27 @@ class MemoryBacktestFinalizationGateway:
         canonical_run = _run_with_capture(run, captured)
         self.store.backtest_runs[run_id] = canonical_run
         return FinalizedBacktest(run=canonical_run, captured=captured)
+
+
+def cache_finalized_backtest(
+    store: AlphaStore,
+    *,
+    user_id: str,
+    finalized: FinalizedBacktest,
+) -> None:
+    captured = finalized.captured
+    # Publish the run last. Memory readers cannot discover a completed run before
+    # all of its sidecars and card identity exist.
+    store.ideas[captured.idea.id] = captured.idea
+    store.idea_owners[captured.idea.id] = user_id
+    store.idea_versions[captured.idea_version.id] = captured.idea_version
+    store.idea_version_owners[captured.idea_version.id] = user_id
+    store.evidence_artifacts[captured.evidence_artifact.id] = (
+        captured.evidence_artifact
+    )
+    store.evidence_artifact_owners[captured.evidence_artifact.id] = user_id
+    store.backtest_runs[finalized.run.id] = finalized.run
+    store.backtest_run_owners[finalized.run.id] = user_id
 
 
 def _prepare_finalization(
@@ -258,11 +266,30 @@ def _run_with_capture(
             "artifact_type": captured.evidence_artifact.artifact_type,
         }
     )
+    actions = result_card.get("actions")
+    if isinstance(actions, list):
+        enriched_actions: list[dict[str, Any]] = []
+        for action in actions:
+            if not isinstance(action, dict):
+                continue
+            payload = action.get("payload")
+            enriched_payload = dict(payload) if isinstance(payload, dict) else {}
+            enriched_payload.update(
+                {
+                    "idea_id": captured.idea.id,
+                    "idea_version_id": captured.idea_version.id,
+                    "evidence_artifact_id": captured.evidence_artifact.id,
+                }
+            )
+            enriched_actions.append({**action, "payload": enriched_payload})
+        result_card["actions"] = enriched_actions
     return run.model_copy(update={"conversation_result_card": result_card})
 
 
 def _same_immutable_run(left: BacktestRun, right: BacktestRun) -> bool:
-    ignored = {"conversation_result_card"}
+    # Result-card lifecycle metadata can advance after commit, and a retry can
+    # rebuild the attempt timestamp. Neither changes the computed run truth.
+    ignored = {"conversation_result_card", "created_at"}
     left_payload = left.model_dump(mode="json", exclude=ignored)
     right_payload = right.model_dump(mode="json", exclude=ignored)
     return left_payload == right_payload

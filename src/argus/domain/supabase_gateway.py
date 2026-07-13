@@ -1066,6 +1066,9 @@ class SupabaseGateway:
         if mark_succeeded:
             payload["status"] = "succeeded"
             payload["finished_at"] = _now_iso()
+            payload["failure_code"] = None
+            payload["failure_detail"] = None
+            payload["retryable"] = False
 
         updated = (
             self.client.table("backtest_jobs")
@@ -1087,6 +1090,15 @@ class SupabaseGateway:
         existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
         if existing is None:
             raise ValueError("Backtest job not found or not owned by user.")
+        can_retry_finalization = (
+            existing.get("status") == "failed"
+            and existing.get("failure_code") == "finalization_failed"
+            and bool(existing.get("retryable"))
+        )
+        if existing.get("status") not in {"queued", "running"} and not (
+            can_retry_finalization
+        ):
+            raise ValueError("Backtest job cannot be started or retried.")
 
         metadata = dict(existing.get("execution_metadata") or {})
         metadata.update(execution_metadata or {})
@@ -1094,6 +1106,11 @@ class SupabaseGateway:
             "status": "running",
             "started_at": started_at or existing.get("started_at") or _now_iso(),
             "attempts": int(existing.get("attempts") or 0) + 1,
+            "result_run_id": None,
+            "finished_at": None,
+            "failure_code": None,
+            "failure_detail": None,
+            "retryable": False,
             "execution_metadata": metadata,
             "updated_at": _now_iso(),
         }
@@ -1125,6 +1142,7 @@ class SupabaseGateway:
         metadata.update(execution_metadata or {})
         payload = {
             "status": "failed",
+            "result_run_id": None,
             "finished_at": finished_at or _now_iso(),
             "failure_code": failure_code,
             "failure_detail": failure_detail,

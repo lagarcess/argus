@@ -6,7 +6,6 @@ from datetime import datetime
 from loguru import logger
 
 from argus.api import state as api_state
-from argus.api.dependencies import dev_memory_fallback_enabled
 from argus.api.schemas import (
     BacktestRun,
     Conversation,
@@ -17,10 +16,16 @@ from argus.api.schemas import (
     IdeaVersion,
     User,
 )
+from argus.domain.backtest_finalization import (
+    BacktestFinalizationInput,
+    FinalizedBacktest,
+    MemoryBacktestFinalizationGateway,
+    cache_finalized_backtest,
+    finalize_backtest_completion,
+)
 from argus.domain.evidence import (
     CapturedEvidence,
     attach_decision_to_result_card,
-    build_backtest_evidence_capture,
     build_decision_note,
 )
 from argus.domain.store import utcnow
@@ -71,58 +76,60 @@ def auto_capture_completed_backtest(
     conversation: Conversation,
     run: BacktestRun,
 ) -> CapturedEvidence:
-    existing = _existing_capture_for_run(user_id=user.id, run_id=run.id)
-    if existing is not None:
-        _attach_capture_to_result_card(run=run, captured=existing)
-        _persist_result_card_capture(user_id=user.id, run=run)
-        return existing
-
-    captured = build_backtest_evidence_capture(
-        run=run,
-        idea_id=api_state.store.new_id(),
-        idea_version_id=api_state.store.new_id(),
-        evidence_artifact_id=api_state.store.new_id(),
-        now=utcnow(),
-    )
-    supabase_capture_persisted = False
-
-    if api_state.supabase_gateway is not None:
-        try:
-            captured = api_state.supabase_gateway.create_backtest_evidence_capture(
-                user_id=user.id,
-                captured=captured,
-            )
-            _store_capture_in_memory(user_id=user.id, captured=captured)
-            supabase_capture_persisted = True
-        except Exception as exc:
-            if not dev_memory_fallback_enabled():
-                raise
-            logger.warning(
-                "Supabase evidence capture failed; using dev memory fallback",
-                error=str(exc),
-                run_id=run.id,
-            )
-            _store_capture_in_memory(user_id=user.id, captured=captured)
-    else:
-        _store_capture_in_memory(user_id=user.id, captured=captured)
-
-    _attach_capture_to_result_card(run=run, captured=captured)
-    if supabase_capture_persisted:
-        _persist_result_card_capture(user_id=user.id, run=run)
-    _emit_product_event(
-        "evidence_capture",
+    finalized = finalize_completed_backtest(
         user_id=user.id,
         conversation_id=conversation.id,
-        backtest_run_id=run.id,
+        run=run,
+        execution_identity=f"legacy_evidence_capture:{run.id}",
+    )
+    run.conversation_result_card = dict(finalized.run.conversation_result_card)
+    return finalized.captured
+
+
+def finalize_completed_backtest(
+    *,
+    user_id: str,
+    conversation_id: str | None,
+    run: BacktestRun,
+    execution_identity: str,
+) -> FinalizedBacktest:
+    gateway = api_state.supabase_gateway or MemoryBacktestFinalizationGateway(
+        api_state.store
+    )
+    finalized = finalize_backtest_completion(
+        gateway,
+        BacktestFinalizationInput(
+            user_id=user_id,
+            execution_identity=execution_identity,
+            run=run,
+            result_card=dict(run.conversation_result_card),
+            idea_id=api_state.store.new_id(),
+            idea_version_id=api_state.store.new_id(),
+            evidence_artifact_id=api_state.store.new_id(),
+            finalized_at=utcnow(),
+        ),
+    )
+    cache_finalized_backtest(
+        api_state.store,
+        user_id=user_id,
+        finalized=finalized,
+    )
+    _emit_product_event(
+        "evidence_capture",
+        user_id=user_id,
+        conversation_id=conversation_id,
+        backtest_run_id=finalized.run.id,
         status="completed",
         attributes={
-            "asset_class": run.asset_class,
-            "symbol_count": len(run.symbols),
-            "benchmark_present": bool(run.benchmark_symbol),
-            "persistence": "supabase" if supabase_capture_persisted else "memory",
+            "asset_class": finalized.run.asset_class,
+            "symbol_count": len(finalized.run.symbols),
+            "benchmark_present": bool(finalized.run.benchmark_symbol),
+            "persistence": (
+                "supabase" if api_state.supabase_gateway is not None else "memory"
+            ),
         },
     )
-    return captured
+    return finalized
 
 
 def create_decision_for_evidence_artifact(
@@ -210,61 +217,6 @@ def create_decision_for_evidence_artifact(
     return decision, artifact
 
 
-def _existing_capture_for_run(*, user_id: str, run_id: str) -> CapturedEvidence | None:
-    for artifact in api_state.store.evidence_artifacts.values():
-        if (
-            artifact.source_run_id == run_id
-            and api_state.store.evidence_artifact_owners.get(artifact.id) == user_id
-        ):
-            idea = api_state.store.ideas.get(artifact.idea_id)
-            version = api_state.store.idea_versions.get(artifact.idea_version_id)
-            if idea is not None and version is not None:
-                return CapturedEvidence(
-                    idea=idea,
-                    idea_version=version,
-                    evidence_artifact=artifact,
-                )
-    if api_state.supabase_gateway is not None:
-        captured = api_state.supabase_gateway.get_evidence_capture_by_run(
-            user_id=user_id,
-            run_id=run_id,
-        )
-        if captured is not None:
-            _store_capture_in_memory(user_id=user_id, captured=captured)
-            return captured
-    return None
-
-
-def _store_capture_in_memory(*, user_id: str, captured: CapturedEvidence) -> None:
-    api_state.store.ideas[captured.idea.id] = captured.idea
-    api_state.store.idea_owners[captured.idea.id] = user_id
-    api_state.store.idea_versions[captured.idea_version.id] = captured.idea_version
-    api_state.store.idea_version_owners[captured.idea_version.id] = user_id
-    api_state.store.evidence_artifacts[captured.evidence_artifact.id] = (
-        captured.evidence_artifact
-    )
-    api_state.store.evidence_artifact_owners[captured.evidence_artifact.id] = user_id
-
-
-def _persist_result_card_capture(*, user_id: str, run: BacktestRun) -> None:
-    if api_state.supabase_gateway is None:
-        return
-    try:
-        api_state.supabase_gateway.update_backtest_run_result_card(
-            user_id=user_id,
-            run_id=run.id,
-            conversation_result_card=run.conversation_result_card,
-        )
-    except Exception as exc:
-        if not dev_memory_fallback_enabled():
-            raise
-        logger.warning(
-            "Supabase evidence card enrichment failed; using in-memory card",
-            error=str(exc),
-            run_id=run.id,
-        )
-
-
 def _decision_for_artifact(*, user_id: str, artifact_id: str) -> DecisionNote | None:
     for decision in api_state.store.decision_notes.values():
         if (
@@ -317,34 +269,6 @@ def _store_decision_in_memory(
                 update={"lifecycle": "decided"}
             )
             api_state.store.idea_version_owners[stored_version.id] = user_id
-
-
-def _attach_capture_to_result_card(
-    *, run: BacktestRun, captured: CapturedEvidence
-) -> None:
-    card = dict(run.conversation_result_card)
-    card["idea_id"] = captured.idea.id
-    card["idea_version_id"] = captured.idea_version.id
-    card["evidence_artifact_id"] = captured.evidence_artifact.id
-    card["evidence_lifecycle"] = captured.evidence_artifact.lifecycle
-    card["artifact_type"] = "backtest"
-    actions = card.get("actions")
-    if isinstance(actions, list):
-        enriched_actions: list[dict[str, object]] = []
-        for action in actions:
-            if not isinstance(action, dict):
-                continue
-            payload = dict(action.get("payload") or {})
-            payload.update(
-                {
-                    "idea_id": captured.idea.id,
-                    "idea_version_id": captured.idea_version.id,
-                    "evidence_artifact_id": captured.evidence_artifact.id,
-                }
-            )
-            enriched_actions.append({**action, "payload": payload})
-        card["actions"] = enriched_actions
-    run.conversation_result_card = card
 
 
 def _attach_decision_to_cached_result_surfaces(

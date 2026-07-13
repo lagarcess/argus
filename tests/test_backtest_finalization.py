@@ -30,7 +30,7 @@ def _run(*, run_id: str = "run-1") -> BacktestRun:
             "title": "AAPL buy and hold",
             "quick_take": "AAPL returned 12.4% in this historical test.",
             "assumptions": ["Benchmark: SPY"],
-            "actions": [],
+            "actions": [{"type": "save_strategy", "payload": {"run_id": run_id}}],
         },
         created_at=utcnow(),
         chart=None,
@@ -107,6 +107,12 @@ def test_memory_finalizer_commits_one_complete_tuple_and_reuses_it() -> None:
     assert stored_card["evidence_artifact_id"] == "artifact-1"
     assert stored_card["evidence_lifecycle"] == "captured"
     assert stored_card["artifact_type"] == "backtest"
+    assert stored_card["actions"][0]["payload"] == {
+        "run_id": "run-1",
+        "idea_id": "idea-1",
+        "idea_version_id": "version-1",
+        "evidence_artifact_id": "artifact-1",
+    }
 
 
 def test_memory_finalizer_rejects_cross_owner_run_replay() -> None:
@@ -143,4 +149,3 @@ def test_finalizer_rejects_non_completed_run_before_gateway_write() -> None:
         )
 
     assert gateway.store.backtest_runs == {}
-
