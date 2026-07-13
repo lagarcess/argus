@@ -357,6 +357,7 @@
     "try_new_strategy": "Probar una nueva estrategia",
     "empty_history": "Tus chats pasados aparecerán aquí.",
     "history": {
+      "pinned": "Anclados",
       "today": "Hoy",
       "yesterday": "Ayer",
       "last_7_days": "Últimos 7 días",
@@ -687,6 +688,14 @@
         "dark": "Oscuro",
         "system": "Sistema"
       }
+    },
+    "sidebar": {
+      "title": "Preferencia de barra lateral",
+      "description": "Elige cómo se comporta la barra lateral.",
+      "expanded": "Expandida",
+      "collapsed": "Solo iconos",
+      "hover": "Al pasar el cursor",
+      "close": "Cerrar modal de preferencias de la barra lateral"
     },
     "preferences": {
       "title": "Preferencias"

@@ -357,6 +357,7 @@
     "try_new_strategy": "Try a new strategy",
     "empty_history": "Your past chats will appear here.",
     "history": {
+      "pinned": "Pinned",
       "today": "Today",
       "yesterday": "Yesterday",
       "last_7_days": "Last 7 days",
@@ -687,6 +688,14 @@
         "dark": "Dark",
         "system": "System"
       }
+    },
+    "sidebar": {
+      "title": "Sidebar preference",
+      "description": "Choose how the sidebar behaves.",
+      "expanded": "Expanded",
+      "collapsed": "Icons only",
+      "hover": "On hover",
+      "close": "Close sidebar preference modal"
     },
     "preferences": {
       "title": "Preferences"

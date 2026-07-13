@@ -87,6 +87,12 @@ export type ChatSidebarProps = {
 
 // ─── Date grouping helpers ────────────────────────────────────────────────────
 
+type HistoryGroup = {
+  label: string;
+  items: HistoryItem[];
+  isPinned: boolean;
+};
+
 function groupByDate(
   items: HistoryItem[],
   t: TFunction,
@@ -123,13 +129,13 @@ function groupByDate(
     }
   });
 
-  const groups: { label: string; items: HistoryItem[] }[] = [];
-  if (pinned.length > 0) groups.push({ label: t("chat.history.pinned", "Pinned"), items: pinned });
-  if (today.length > 0) groups.push({ label: t("chat.history.today"), items: today });
-  if (yesterday.length > 0) groups.push({ label: t("chat.history.yesterday"), items: yesterday });
-  if (last7Days.length > 0) groups.push({ label: t("chat.history.last_7_days"), items: last7Days });
-  if (last30Days.length > 0) groups.push({ label: t("chat.history.last_30_days", "Last 30 Days"), items: last30Days });
-  if (older.length > 0) groups.push({ label: t("chat.history.earlier"), items: older });
+  const groups: HistoryGroup[] = [];
+  if (pinned.length > 0) groups.push({ label: t("chat.history.pinned"), items: pinned, isPinned: true });
+  if (today.length > 0) groups.push({ label: t("chat.history.today"), items: today, isPinned: false });
+  if (yesterday.length > 0) groups.push({ label: t("chat.history.yesterday"), items: yesterday, isPinned: false });
+  if (last7Days.length > 0) groups.push({ label: t("chat.history.last_7_days"), items: last7Days, isPinned: false });
+  if (last30Days.length > 0) groups.push({ label: t("chat.history.last_30_days", "Last 30 Days"), items: last30Days, isPinned: false });
+  if (older.length > 0) groups.push({ label: t("chat.history.earlier"), items: older, isPinned: false });
   return groups;
 }
 
@@ -485,7 +491,7 @@ export default function ChatSidebar({
                     <div key={group.label} className="flex flex-col">
                       <div className="px-11 py-2">
                         <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
-                          {group.label === t("chat.history.pinned", "Pinned") && (
+                          {group.isPinned && (
                             <Pin className="h-3 w-3" />
                           )}
                           {group.label}
