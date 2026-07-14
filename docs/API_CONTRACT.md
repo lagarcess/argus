@@ -2350,7 +2350,13 @@ Feature flags may be returned in session/profile responses.
 
 For Alpha, the Settings "Upgrade" button may be shown behind a feature flag as a visual placeholder only. No billing, entitlement mutation, or upgrade API behavior is implemented.
 
-Backend runtime flags may also control internal engine behavior. `ARGUS_ENABLE_EXECUTION_REALISM` is enabled by default; setting it to `false` (also `0`, `off`, or `no`) is a kill switch that restores the pre-realism behavior byte-for-byte. Execution costs remain user opt-in per idea either way: runs without stated fees or slippage stay canonical "no fees/slippage". With the kill switch engaged, confirmation cards omit `capabilities.execution_costs_editable` and result cards omit `execution_costs`.
+Backend runtime flags may also control internal engine behavior. Execution realism
+is active by default behind `ARGUS_ENABLE_EXECUTION_REALISM`, while modeled costs
+remain opt-in per idea. An explicit `false|0|off|no` value is the kill switch and
+restores the pre-realism behavior byte-for-byte. Runs without stated fees or
+slippage stay canonical "no fees/slippage". With the kill switch engaged,
+confirmation cards omit `capabilities.execution_costs_editable` and result cards
+omit `execution_costs`.
 
 ---
 
@@ -2366,7 +2372,9 @@ Never silently change shapes.
 - Must follow supported strategy templates.
 - Ask for missing required user intent when needed.
 - Use backend defaults when appropriate and explain them in plain language.
-- Never claim shorting, slippage, fees, or execution realism are supported in Alpha.
+- Never claim shorting is supported in Alpha. Describe fees or slippage only from
+  backend-provided execution-cost capability or result evidence; otherwise retain
+  the canonical no-fees/slippage assumption.
 - Never use unsupported timeframes or invent unsupported metrics.
 
 ## Product

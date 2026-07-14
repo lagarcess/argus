@@ -42,6 +42,22 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "approver" in runbook
 
 
+def test_execution_realism_contract_is_consistent_across_canon_and_release_docs() -> None:
+    for path in (
+        "docs/PRODUCT.md",
+        "docs/ARCHITECTURE.md",
+        "docs/API_CONTRACT.md",
+        "docs/PRIVATE_LAUNCH_RUNBOOK.md",
+        "docs/specs/private-alpha-next-roadmap.md",
+    ):
+        source = " ".join(_source(path).split())
+
+        assert "ARGUS_ENABLE_EXECUTION_REALISM" in source
+        assert "active by default" in source
+        assert "costs remain opt-in per idea" in source
+        assert "`false|0|off|no`" in source
+
+
 def test_private_alpha_release_manifest_template_has_required_audit_fields() -> None:
     template = _source("docs/release-manifests/TEMPLATE.md")
 
