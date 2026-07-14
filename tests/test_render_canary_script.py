@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import stat
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -410,6 +411,12 @@ def test_canary_runs_the_profile_driven_browser_signup_and_login_proof() -> None
     assert browser_test_source.index("/api/v1/auth/signup") < browser_test_source.index(
         'page.goto("/?auth=login"'
     )
+
+
+def test_canary_browser_runner_is_executable() -> None:
+    mode = (ROOT / ".github/canary-browser.sh").stat().st_mode
+
+    assert mode & stat.S_IXUSR
 
 
 def test_canary_uses_temp_file_for_reload_messages_payload() -> None:
