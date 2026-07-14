@@ -475,12 +475,10 @@ class SupabaseGateway:
         return hydrate_completed_backtest_job_messages(
             messages,
             load_job=lambda job_id: self.get_backtest_job(
-                user_id=user_id,
-                job_id=job_id,
+                user_id=user_id, job_id=job_id,
             ),
             load_run=lambda run_id: self.get_backtest_run(
-                user_id=user_id,
-                run_id=run_id,
+                user_id=user_id, run_id=run_id,
             ),
         )
 
