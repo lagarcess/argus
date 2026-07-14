@@ -667,7 +667,7 @@ def test_company_name_basket_context_survives_underfilled_repair_to_confirmation
     }
 
 
-def test_partial_provider_context_does_not_shrink_company_basket_confirmation(
+def test_partial_provider_context_confirms_after_current_message_grounding(
     monkeypatch,
 ) -> None:
     import json
@@ -701,6 +701,10 @@ def test_partial_provider_context_does_not_shrink_company_basket_confirmation(
     monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
     monkeypatch.setattr(interpret_module, "resolve_asset", resolve_asset)
 
+    message = (
+        "try a plain hold test for target, walmart, and costco from jan 2024 "
+        "through dec 2024"
+    )
     context = json.dumps(
         {
             "asset_resolution_candidates": [
@@ -715,10 +719,6 @@ def test_partial_provider_context_does_not_shrink_company_basket_confirmation(
                 }
             ]
         }
-    )
-    message = (
-        "try a plain hold test for target, walmart, and costco from jan 2024 "
-        "through dec 2024"
     )
     contract = build_default_capability_contract()
 
@@ -779,10 +779,117 @@ def test_partial_provider_context_does_not_shrink_company_basket_confirmation(
         "provider_context_partial_preserved_fuller_draft"
         in interpret_result.decision.reason_codes
     )
+    assert (
+        "provider_context_partial_grounded_by_current_message"
+        in interpret_result.decision.reason_codes
+    )
+    assert interpret_result.decision.ambiguous_fields == []
     assert confirm_result.outcome == "await_approval"
     assert confirm_result.patch["confirmation_payload"]["validation"][
         "executable"
     ] is True
+
+
+def test_partial_provider_context_cannot_confirm_unmentioned_llm_assets(
+    monkeypatch,
+) -> None:
+    import asyncio
+    import json
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    assets = {
+        "TGT": ResolvedAssetStub("TGT", "equity", name="Target Corporation"),
+        "WMT": ResolvedAssetStub("WMT", "equity", name="Walmart Inc."),
+        "COST": ResolvedAssetStub(
+            "COST",
+            "equity",
+            name="Costco Wholesale Corporation",
+        ),
+    }
+    aliases = {"target": "TGT", "walmart": "WMT", "costco": "COST"}
+
+    def resolve_asset(symbol: str) -> ResolvedAssetStub:
+        raw = symbol.strip()
+        normalized = aliases.get(raw.casefold(), raw.upper())
+        if normalized not in assets:
+            raise ValueError("invalid_symbol")
+        return assets[normalized]
+
+    async def audit_stub(**kwargs):
+        assert kwargs["schema_name"] == "AssetGroundingAudit"
+        return interpreter_module.AssetGroundingAudit(
+            grounded_symbols=["TGT"],
+            confidence=0.95,
+        )
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "target",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "TGT",
+                    "asset_class": "equity",
+                    "name": "Target Corporation",
+                    "confidence": 0.95,
+                }
+            ]
+        }
+    )
+    message = "try a plain hold test for target from jan 2024 through dec 2024"
+    response = interpreter_module._normalize_response_for_runtime_context(
+        LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="User wants a plain hold test for Target.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=message,
+                strategy_type="buy_and_hold",
+                strategy_thesis=message,
+                asset_universe=["target", "walmart", "costco"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            ),
+            semantic_turn_act="new_idea",
+        ),
+        request=InterpretationRequest(
+            current_user_message=message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+        asset_resolution_context=context,
+    )
+
+    audited = asyncio.run(
+        interpreter_module._asset_grounding_audited_response(
+            response=response,
+            preferred_model="test-model",
+            request=InterpretationRequest(
+                current_user_message=message,
+                recent_thread_history=[],
+                latest_task_snapshot=None,
+                user=UserState(user_id="u1"),
+            ),
+        )
+    )
+
+    assert audited.requires_clarification is True
+    assert audited.candidate_strategy_draft.asset_universe == ["TGT"]
+    assert [field.reason_code for field in audited.ambiguous_fields] == [
+        "asset_resolution_context_underfilled"
+    ]
 
 
 def test_partial_provider_context_conflict_clarifies_instead_of_confirming_subset(

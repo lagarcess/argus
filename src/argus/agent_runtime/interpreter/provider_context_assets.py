@@ -77,19 +77,26 @@ def response_with_provider_context_assets(
         for value in draft.asset_universe
         if str(value).strip()
     ]
-    context_is_partial = len(candidate_rows) < len(draft_assets)
-    context_symbols_match_draft = all(
-        any(_provider_record_matches_symbol(record, value) for value in draft_assets)
+    context_has_foreign_record = any(
+        not any(
+            _provider_record_matches_symbol(record, value) for value in draft_assets
+        )
         for record in resolved_records
     )
-    preserved_fuller_draft = context_is_partial and context_symbols_match_draft
+    context_is_partial = len(resolved_symbols) < len(draft_assets)
+    preserved_fuller_draft = context_is_partial and not context_has_foreign_record
     if not context_is_partial:
         draft.asset_universe = resolved_symbols
-    elif not context_symbols_match_draft:
+    else:
         ambiguous_fields.append(
             _ambiguous_field_from_partial_context(
                 rows=candidate_rows,
                 resolved_symbols=resolved_symbols,
+                reason_code=(
+                    "asset_resolution_context_conflict"
+                    if context_has_foreign_record
+                    else "asset_resolution_context_underfilled"
+                ),
             )
         )
     if len(asset_classes) == 1:
@@ -136,6 +143,42 @@ def response_with_provider_context_assets(
             }
         )
     return response.model_copy(update=update)
+
+
+def response_with_grounded_partial_context(
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse:
+    if "provider_context_partial_preserved_fuller_draft" not in response.reason_codes:
+        return response
+    remaining_ambiguous_fields = [
+        field
+        for field in response.ambiguous_fields
+        if field.reason_code != "asset_resolution_context_underfilled"
+    ]
+    if len(remaining_ambiguous_fields) == len(response.ambiguous_fields):
+        return response
+    can_clear_clarification = (
+        not remaining_ambiguous_fields
+        and not response.missing_required_fields
+        and not response.unsupported_constraints
+        and response.assistant_response is None
+    )
+    return response.model_copy(
+        update={
+            "requires_clarification": (
+                False if can_clear_clarification else response.requires_clarification
+            ),
+            "ambiguous_fields": remaining_ambiguous_fields,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "provider_context_partial_grounded_by_current_message",
+                    ]
+                )
+            ),
+        }
+    )
 
 
 def resolved_asset_symbols_from_strategy_context(strategy: Any) -> list[str]:
@@ -347,6 +390,7 @@ def _ambiguous_field_from_partial_context(
     *,
     rows: list[dict[str, Any]],
     resolved_symbols: list[str],
+    reason_code: str,
 ) -> LLMAmbiguousField:
     raw_values = [
         str(row.get("raw_text") or "").strip()
@@ -357,7 +401,7 @@ def _ambiguous_field_from_partial_context(
         field_name="asset_universe",
         raw_value=", ".join(raw_values),
         candidate_normalized_value=resolved_symbols or None,
-        reason_code="asset_resolution_context_conflict",
+        reason_code=reason_code,
     )
 
 

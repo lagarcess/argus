@@ -1102,14 +1102,13 @@ async def _asset_grounding_audited_response(
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
     suspicious_symbols = _suspicious_extracted_asset_symbols(
-        response=response,
-        request=request,
+        response=response, request=request
     )
     if not suspicious_symbols:
-        return _response_with_misplaced_benchmark_asset_recovered(
-            response=response,
-            request=request,
+        response = _response_with_misplaced_benchmark_asset_recovered(
+            response=response, request=request
         )
+        return provider_context_assets.response_with_grounded_partial_context(response)
     try:
         audit = await invoke_openrouter_json_schema(
             task="interpretation",
