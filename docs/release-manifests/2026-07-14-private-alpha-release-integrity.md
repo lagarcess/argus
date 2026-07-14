@@ -16,7 +16,8 @@ production release or tester-access approval.
 - Validation surface: existing private-alpha Render validation surface
 - Runtime mode: `real-workflow`
 - Market-data provider mode: `live_provider`
-- Workflow task: `argus-backtests/run_backtest_job`
+- Workflow proof task: `argus-backtests/workflow_proof`
+- Real workflow task: `argus-backtests/run_backtest_job`
 - Locale: `es-419`
 - Immediate rollback SHA: `6985c6443de89374d019a61907127f1eba4c032f`
 
