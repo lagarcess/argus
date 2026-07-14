@@ -72,7 +72,26 @@ def response_with_provider_context_assets(
             asset_classes.add(asset_class)
 
     draft = response.candidate_strategy_draft.model_copy(deep=True)
-    draft.asset_universe = resolved_symbols
+    draft_assets = [
+        str(value).strip()
+        for value in draft.asset_universe
+        if str(value).strip()
+    ]
+    context_is_partial = len(candidate_rows) < len(draft_assets)
+    context_symbols_match_draft = all(
+        any(_provider_record_matches_symbol(record, value) for value in draft_assets)
+        for record in resolved_records
+    )
+    preserved_fuller_draft = context_is_partial and context_symbols_match_draft
+    if not context_is_partial:
+        draft.asset_universe = resolved_symbols
+    elif not context_symbols_match_draft:
+        ambiguous_fields.append(
+            _ambiguous_field_from_partial_context(
+                rows=candidate_rows,
+                resolved_symbols=resolved_symbols,
+            )
+        )
     if len(asset_classes) == 1:
         draft.asset_class = next(iter(asset_classes))
     elif len(asset_classes) > 1:
@@ -87,9 +106,22 @@ def response_with_provider_context_assets(
         if not resolved_symbols:
             return response
         ambiguous_fields = []
-    if not ambiguous_fields and draft == response.candidate_strategy_draft:
+    if (
+        not ambiguous_fields
+        and not preserved_fuller_draft
+        and draft == response.candidate_strategy_draft
+    ):
         return response
     update: dict[str, Any] = {"candidate_strategy_draft": draft}
+    if preserved_fuller_draft:
+        update["reason_codes"] = list(
+            dict.fromkeys(
+                [
+                    *response.reason_codes,
+                    "provider_context_partial_preserved_fuller_draft",
+                ]
+            )
+        )
     if ambiguous_fields:
         update.update(
             {
@@ -304,6 +336,24 @@ def _ambiguous_field_from_context_row(row: dict[str, Any]) -> LLMAmbiguousField:
         raw_value=str(row.get("raw_text") or "").strip(),
         candidate_normalized_value=candidates or None,
         reason_code="asset_resolution_ambiguous",
+    )
+
+
+def _ambiguous_field_from_partial_context(
+    *,
+    rows: list[dict[str, Any]],
+    resolved_symbols: list[str],
+) -> LLMAmbiguousField:
+    raw_values = [
+        str(row.get("raw_text") or "").strip()
+        for row in rows
+        if str(row.get("raw_text") or "").strip()
+    ]
+    return LLMAmbiguousField(
+        field_name="asset_universe",
+        raw_value=", ".join(raw_values),
+        candidate_normalized_value=resolved_symbols or None,
+        reason_code="asset_resolution_context_conflict",
     )
 
 
