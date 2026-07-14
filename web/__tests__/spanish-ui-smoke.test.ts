@@ -34,6 +34,7 @@ describe("Spanish UI Smoke Harness", () => {
     "chat.asset_class.equity",
     "chat.asset_class.crypto",
     "chat.asset_class.currency_pair",
+    "chat.strategy_type.buy_and_hold",
     "chat.cadence.daily",
     "chat.cadence.weekly",
     "chat.cadence.biweekly",
@@ -64,6 +65,7 @@ describe("Spanish UI Smoke Harness", () => {
   ];
 
   const requiredSpanishStaticValues = {
+    "chat.strategy_type.buy_and_hold": "Comprar y mantener",
     "chat.history.pinned": "Anclados",
     "settings.sidebar.title": "Preferencia de barra lateral",
     "settings.sidebar.description": "Elige cómo se comporta la barra lateral.",
