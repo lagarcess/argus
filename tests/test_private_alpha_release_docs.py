@@ -58,6 +58,13 @@ def test_execution_realism_contract_is_consistent_across_canon_and_release_docs(
         assert "`false|0|off|no`" in source
 
 
+def test_api_contract_does_not_exclude_supported_execution_costs() -> None:
+    source = " ".join(_source("docs/API_CONTRACT.md").split())
+
+    assert "slippage, fees, order queue modeling" not in source
+    assert "Modeled fees and slippage are supported when a user opts in" in source
+
+
 def test_private_alpha_release_manifest_template_has_required_audit_fields() -> None:
     template = _source("docs/release-manifests/TEMPLATE.md")
 

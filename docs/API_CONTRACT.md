@@ -875,8 +875,10 @@ The canonical backtest config used by the engine for execution and reproducibili
 - *Language-agnostic temporal contract:* Normal chat interpretation must not use localized regex/phrase gates to decide executable date intent before the LLM. The interpreter should emit canonical `date_range` values when confident, canonical `date_range_intent` for relative or semantic windows such as rolling windows, year-to-date, calendar-year, since, or endpoint patches, and bounded `date_range_raw_text` only as evidence for the natural-time wrapper. Endpoint patches must use ISO dates or canonical offset math such as `anchor=today` plus `day_offset=-1`, not localized relative words. Deterministic code may resolve canonical intent and bounded evidence, then apply provider/data-availability validation.
 
 ## Reality Gap (Deferred)
-Argus Alpha is a "perfect world" simulation. The following are explicitly excluded from Alpha MVP:
-- slippage, fees, order queue modeling, liquidity/spread modeling, volatility hazards.
+Modeled fees and slippage are supported when a user opts in by stating those
+costs for an idea. Runs without stated costs remain idealized. The following
+market-microstructure effects remain excluded from Alpha MVP:
+- order queue modeling, liquidity/spread modeling, volatility hazards.
 
 ---
 
