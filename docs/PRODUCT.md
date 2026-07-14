@@ -480,10 +480,12 @@ Every result card must include a lightweight assumptions footer to maintain inte
 Example: *Long-only • Equal weight • No fees/slippage • Benchmark: SPY*
 
 The default private-alpha footer discloses no fees or slippage. Execution realism
-(fees + slippage modeling) exists in the engine behind
-`ARGUS_ENABLE_EXECUTION_REALISM` (default OFF); when enabled, the assumptions
-footer reflects the modeled costs instead. The founder deliberately disclaims
-cost assumptions for the current PMF stage, so the flag stays off in alpha.
+(fees + slippage modeling) is active by default behind
+`ARGUS_ENABLE_EXECUTION_REALISM`, while modeled costs remain opt-in per idea.
+Runs without stated fees or slippage stay idealized; when a user states costs,
+the assumptions footer reflects them. Set the flag explicitly to
+`false|0|off|no` only as a kill switch; that restores the pre-realism path
+byte-for-byte.
 
 Result cards and explanations must describe executed backtest behavior, not raw
 strategy triggers. A strategy may produce many buy/sell signals, but Argus only

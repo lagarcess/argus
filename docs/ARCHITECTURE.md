@@ -314,9 +314,10 @@ of the job.
 The simulation logic (Numba/Python) that calculates metrics and returns results.
 It remains domain code in the monorepo, but the production runtime boundary is
 the workflow execution plane. Execution realism (trading fees + slippage) is
-modeled in the engine behind `ARGUS_ENABLE_EXECUTION_REALISM` (default OFF); when
-the flag is inert the legacy cost path is preserved byte-identical, so evidence
-artifacts stay reproducible across the flag boundary.
+modeled in the engine behind `ARGUS_ENABLE_EXECUTION_REALISM`. The capability is
+active by default, while modeled costs remain opt-in per idea. An explicit
+`false|0|off|no` value is the kill switch and preserves the pre-realism cost path
+byte-identical, so evidence artifacts stay reproducible across the flag boundary.
 
 *Stateless systems should scale horizontally later.*
 

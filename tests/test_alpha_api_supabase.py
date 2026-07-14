@@ -657,7 +657,12 @@ def test_delete_all_conversations_supabase_delegates_with_user_ownership(
     )
 
 
-def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock_gateway):
+def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+):
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+
     response = client.post(
         "/api/v1/backtests/run",
         json={"template": "rsi_mean_reversion", "symbols": ["TSLA"]},
@@ -672,7 +677,12 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock
     assert run["config_snapshot"]["side"] == "long"
     assert run["config_snapshot"]["starting_capital"] == 1000
     assert run["config_snapshot"]["benchmark_symbol"] == "SPY"
-    assert "_execution_realism" not in run["config_snapshot"]
+    assert run["config_snapshot"]["_execution_realism"] == {
+        "enabled": False,
+        "fee_bps": 0.0,
+        "slippage_bps": 0.0,
+    }
+    assert "No fees/slippage" in run["conversation_result_card"]["assumptions"]
     assert run["conversation_result_card"]["assumptions"][-1] == "Benchmark: SPY"
     assert run["conversation_result_card"]["benchmark_note"] is None
     mock_gateway.finalize_backtest_completion.assert_called_once()
@@ -681,6 +691,38 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock
     ].run
     assert isinstance(called_run, BacktestRun)
     assert called_run.config_snapshot["starting_capital"] == 1000
+    assert called_run.config_snapshot["_execution_realism"] == {
+        "enabled": False,
+        "fee_bps": 0.0,
+        "slippage_bps": 0.0,
+    }
+
+
+def test_run_backtest_supabase_kill_switch_restores_legacy_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+):
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={"template": "rsi_mean_reversion", "symbols": ["TSLA"]},
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "supabase-execution-realism-kill-switch",
+        },
+    )
+
+    assert response.status_code == 200
+    run = response.json()["run"]
+    assert "_execution_realism" not in run["config_snapshot"]
+    assert "No fees/slippage" in run["conversation_result_card"]["assumptions"]
+    mock_gateway.finalize_backtest_completion.assert_called_once()
+    called_run = mock_gateway.finalize_backtest_completion.call_args.kwargs[
+        "finalization"
+    ].run
+    assert isinstance(called_run, BacktestRun)
+    assert "_execution_realism" not in called_run.config_snapshot
 
 
 def test_run_backtest_finalization_failure_is_explicit_and_retryable(mock_gateway):
