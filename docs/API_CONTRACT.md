@@ -716,6 +716,10 @@ references it through `result_run_id`.
   public `result_run_id`; no new public job status is introduced.
 - Job retrieval, conversation reload, history, and search must not expose a
   partially finalized result.
+- When a completed asynchronous job is loaded after a refresh, the API projects
+  the canonical finalized result and its owned evidence and decision metadata.
+  It does not reconstruct a replacement result from display prose or stale
+  queued-job state.
 - The private-alpha UI currently polls the job status endpoint; Supabase Realtime
   remains the selected target transport for job row changes once subscriptions
   are wired.

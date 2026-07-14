@@ -584,8 +584,10 @@ Mapped internally to:
     failure uses the existing `failed` status with
     `failure_code = finalization_failed` and `retryable = true`.
 13. Supabase Realtime notifies the browser of job status changes.
-14. The chat UI hydrates only finalized result or failure state from durable
-    Supabase records; reload, history, and search cannot expose partial state.
+14. The server reconciles a completed asynchronous job to its canonical
+    finalized result before the chat UI hydrates durable Supabase records. The
+    result, evidence, and decision identities therefore survive reload; reload,
+    history, and search cannot expose partial or client-reconstructed state.
 15. The finalized run appears in history.
 
 The execution ledger is the boundary between strategy logic and result

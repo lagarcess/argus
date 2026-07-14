@@ -20,8 +20,20 @@ release-config audit, live API/web deploy SHA checks, workflow env parity proof,
 an authoritative Spanish release canary, and a per-candidate release manifest.
 The Spanish journey proves the real workflow, finalized evidence/result metadata,
 decision-note hydration, Omnisearch provenance, and deployed signup/login UI.
-Keep this document as the release gate contract whenever a candidate is promoted
-toward tester-facing validation or deployment.
+Keep this document as the release gate contract whenever a candidate is
+validated on the private-alpha surface or later considered for tester-facing
+deployment.
+
+## 2026-07-14 Validated Private-Alpha Checkpoint
+
+Candidate `373d1a12dd5f538a81150b20903f4f43db27c639` passed the full release
+gate on the branch-deployed private-alpha Render validation surface. Its durable
+record is
+[`2026-07-14-private-alpha-release-integrity.md`](../release-manifests/2026-07-14-private-alpha-release-integrity.md)
+and the live closure evidence is [issue #197](https://github.com/lagarcess/argus/issues/197#issuecomment-4965556704).
+This checkpoint validates the existing private-alpha surface only: it is not a
+`main` merge, production deployment, automatic production deployment, founder
+approval, tester invitation, or tester exposure.
 
 Local runtime proof doctrine:
 
@@ -159,8 +171,9 @@ permissions.
 - `codex/private-alpha-next`: integration staging branch only.
 - `staging`: the internet-reachable validation surface, with controlled config
   and no automatic promotion to production.
-- `private-alpha prod`: the private-audience production surface. It should be
-  treated like production for release discipline, even if access is limited.
+- `private-alpha validation`: the branch-deployed private-alpha Render
+  validation surface. It uses production-grade release discipline, but it is
+  not production and does not imply tester exposure or automatic promotion.
 - production: only receives promoted `main` releases or equivalent tagged
   release artifacts.
 

@@ -8,6 +8,14 @@
 > `docs/release-manifests/TEMPLATE.md` for release gating.
 > For CI/CD promotion decisions, the decision memo is a later-context document, not part of this release gate.
 
+> [!NOTE]
+> The validated 2026-07-14 private-alpha checkpoint is recorded in
+> [`docs/release-manifests/2026-07-14-private-alpha-release-integrity.md`](release-manifests/2026-07-14-private-alpha-release-integrity.md)
+> and [#197's closure evidence](https://github.com/lagarcess/argus/issues/197#issuecomment-4965556704).
+> It validates the existing branch-deployed private-alpha Render surface; it did
+> not merge `main`, deploy production, enable automatic production deployment,
+> invite testers, or expose testers.
+
 This runbook is for the first trusted-user internet tests on Render.
 
 ## Launch URLs
@@ -72,8 +80,9 @@ For local founder/operator runs, `.github/canary-render.sh` also accepts
 `SUPABASE_SERVICE_ROLE_KEY` from the root `.env`. The `ARGUS_CANARY_*` names
 remain the preferred GitHub Actions secret names.
 
-7. Confirm the API is in real workflow tester mode. This mode keeps the API
-   lean and sends `Run backtest` through the durable Render Workflow job path:
+7. Confirm the API is in real-workflow private-alpha validation mode. This mode
+   keeps the API lean and sends `Run backtest` through the durable Render
+   Workflow job path:
 
 ```bash
 .github/render-env-sync.sh api-real-workflow-on
@@ -223,7 +232,7 @@ Use explicit API modes instead of editing individual flags by hand:
 .github/render-env-sync.sh api-real-workflow-on
 ```
 
-`api-real-workflow-on` is the controlled private-alpha tester mode: `Run
+`api-real-workflow-on` is the controlled private-alpha validation mode: `Run
 backtest` creates a durable real job and the UI reads queued/running/succeeded/
 failed state from Supabase. `api-proof-shadow-on` is only for proof dispatch
 validation. `api-safe-off` is the emergency rollback mode that disables workflow

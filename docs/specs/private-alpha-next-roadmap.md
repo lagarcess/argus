@@ -11,6 +11,22 @@ realism (fees/slippage, #130/PR #178) merged flag-off, and a new interpreter
 cost/perf lane added prompt caching + per-tier reasoning controls (#156/#157,
 PR #172). Remaining P2 is the compounding loop's back half: linked versions
 (A1b) and comparison (A2), the highest-leverage PMF gate.
+
+**Release-integrity checkpoint (#192) — COMPLETE.** [#193](https://github.com/lagarcess/argus/issues/193)
+approved the contract; [#194](https://github.com/lagarcess/argus/issues/194),
+[#195](https://github.com/lagarcess/argus/issues/195), and
+[#196](https://github.com/lagarcess/argus/issues/196) landed finalization,
+signup-language persistence, and Spanish static parity; [#197](https://github.com/lagarcess/argus/issues/197)
+landed the authoritative release profile and passed the exact-SHA Spanish
+real-user canary; [#198](https://github.com/lagarcess/argus/issues/198) records
+the as-built documentation and manifest. The validated runtime candidate is
+`373d1a12dd5f538a81150b20903f4f43db27c639`; its authoritative live evidence is
+the [#197 closure record](https://github.com/lagarcess/argus/issues/197#issuecomment-4965556704).
+This validates only the branch-deployed private-alpha Render surface—there was
+no `main` merge, production deployment, automatic production deployment,
+tester invitation, or tester exposure. It does not alter the current direction:
+A1b remains the next READY-BUILD spine slice, and A2 implementation remains
+BLOCKED(A1b).
 The 2026-07-08 burn-down pass landed the bulk of the interpret-surface cluster:
 PR #182 fixed #171 Sig1+Sig2, #160(B), and #150's behavior half (with the #179/
 #180 repro gates un-xfailed); PR #183 replaced the degraded-fallback English
