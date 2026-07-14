@@ -62,9 +62,12 @@ def test_replay_capture_renders_canonical_quick_take_from_sanitized_payload() ->
         "status": "failed",
     }
     assert report["route_receipt"]["status"] == "present"
-    assert "La estrategia rindió 12.8% mientras SPY rindió 26.1%" in report[
-        "quick_take"
-    ]
+    assert report["resolved_language"] == "es-419"
+    quick_take = report["quick_take"]
+    assert "12.8%" in quick_take
+    assert "SPY" in quick_take
+    assert "26.1%" in quick_take
+    assert "lagged by 13.3 percentage points" in quick_take
 
 
 def test_replay_capture_accepts_future_locale_shape_through_fallback_language() -> None:

@@ -628,7 +628,16 @@ def test_chat_stream_persists_provider_canonicalized_company_name_asset(
     assert "invalid_symbols" not in strategy.get("extra_parameters", {})
     assert confirmation_payload["launch_payload"]["symbol"] == "AAPL"
     assert confirmation_payload["launch_payload"]["symbols"] == ["AAPL"]
-    assert payload["confirmation"]["title"] == "AAPL: Comprar y mantener"
+    confirmation = payload["confirmation"]
+    assert confirmation["strategy_type"] == "buy_and_hold"
+    assert confirmation["asset_class"] == "equity"
+    strategy_row = next(
+        row for row in confirmation["rows"] if row["key"] == "strategy"
+    )
+    assert strategy_row["labelKey"] == "chat.confirmation.rows.strategy"
+    assets_row = next(row for row in confirmation["rows"] if row["key"] == "assets")
+    assert assets_row["labelKey"] == "chat.confirmation.rows.assets"
+    assert assets_row["value"] == "AAPL"
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"

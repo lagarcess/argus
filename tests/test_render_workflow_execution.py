@@ -972,14 +972,16 @@ def test_run_backtest_job_uses_mainline_llm_quick_take_path(
 
     from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
 
+    model_takeaway = "AAPL beat SPY by 4.2 percentage points in this historical test."
+    model_tested_bullet = "Tested AAPL buy and hold over the requested window."
+    model_meaning_bullet = "The result is grounded in the completed backtest run."
+
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
         return {
             "relative_performance_claim": "beat_benchmark",
-            "takeaway": (
-                "AAPL beat SPY by 4.2 percentage points in this historical test."
-            ),
-            "tested_bullet": "Tested AAPL buy and hold over the requested window.",
-            "meaning_bullet": "The result is grounded in the completed backtest run.",
+            "takeaway": model_takeaway,
+            "tested_bullet": model_tested_bullet,
+            "meaning_bullet": model_meaning_bullet,
             "next_check_bullet": None,
             "assumption_bullet": None,
             "caveat_bullet": "Historical simulation only.",
@@ -1016,11 +1018,14 @@ def test_run_backtest_job_uses_mainline_llm_quick_take_path(
         run_id_factory=lambda: "run-workflow",
     )
 
-    assert "The strategy returned 12.3% while SPY returned 8.1%" in result["result_readout"]
-    assert "outperformed by 4.2 percentage points" in result["result_readout"]
+    readout = result["result_readout"]
+    assert readout.splitlines()[0] == model_takeaway.rstrip(".")
+    assert f"- {model_tested_bullet.rstrip('.')}" in readout
+    assert f"- {model_meaning_bullet.rstrip('.')}" in readout
     metadata = gateway.row["execution_metadata"]["workflow_backtest"]
     assert metadata["result_readout_source"] == "llm_explain_stage"
     assert metadata["result_readout_fallback_used"] is False
+    assert "result_readout_failure_mode" not in metadata
 
 
 def test_run_backtest_job_marks_result_readout_fallback_provenance(
@@ -1055,10 +1060,15 @@ def test_run_backtest_job_marks_result_readout_fallback_provenance(
         run_id_factory=lambda: "run-workflow",
     )
 
-    assert result["result_readout"].startswith("**Quick take**")
+    readout = result["result_readout"]
+    assert "12.3%" in readout
+    assert "SPY" in readout
+    assert "8.1%" in readout
+    assert "outperformed by 4.2 percentage points" in readout
     metadata = gateway.row["execution_metadata"]["workflow_backtest"]
     assert metadata["result_readout_source"] == "deterministic_fallback"
     assert metadata["result_readout_fallback_used"] is True
+    assert metadata["result_readout_failure_mode"] == "llm_unavailable_or_rejected"
 
 
 def test_run_backtest_job_marks_tool_failure_with_structured_metadata() -> None:
