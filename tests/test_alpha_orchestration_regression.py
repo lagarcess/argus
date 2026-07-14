@@ -229,6 +229,11 @@ async def test_spanish_multiturn_strategy_context_uses_agent_runtime(monkeypatch
         "capital_amount": "starting_capital",
         "date_range": "explicit_user",
     }
+    assert confirmed_strategy["extra_parameters"]["evidence_spans"] == {
+        "asset_universe": "GOOG",
+        "capital_amount": "10mil",
+        "date_range": "1 anio hacia atras desde hoy",
+    }
     assert confirmed_strategy["capital_amount"] == 10000
     assert third["confirmation_payload"]["validation"]["status"] == "ready_to_run"
     assert seen_requests[1].latest_task_snapshot is not None
