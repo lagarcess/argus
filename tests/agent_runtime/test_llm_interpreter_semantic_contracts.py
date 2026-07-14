@@ -809,8 +809,14 @@ def test_partial_provider_context_keeps_grounded_asset_when_extras_fail_audit(
             "equity",
             name="Costco Wholesale Corporation",
         ),
+        "BTC": ResolvedAssetStub("BTC", "crypto", name="Bitcoin"),
     }
-    aliases = {"target": "TGT", "walmart": "WMT", "costco": "COST"}
+    aliases = {
+        "target": "TGT",
+        "walmart": "WMT",
+        "costco": "COST",
+        "bitcoin": "BTC",
+    }
 
     def resolve_asset(symbol: str) -> ResolvedAssetStub:
         raw = symbol.strip()
@@ -861,7 +867,7 @@ def test_partial_provider_context_keeps_grounded_asset_when_extras_fail_audit(
                 raw_user_phrasing=message,
                 strategy_type="buy_and_hold",
                 strategy_thesis=message,
-                asset_universe=["target", "walmart", "costco"],
+                asset_universe=["target", "walmart", "costco", "bitcoin"],
                 asset_class="equity",
                 date_range={"start": "2024-01-01", "end": "2024-12-31"},
             ),
@@ -891,6 +897,7 @@ def test_partial_provider_context_keeps_grounded_asset_when_extras_fail_audit(
 
     assert audited.requires_clarification is True
     assert audited.candidate_strategy_draft.asset_universe == ["TGT"]
+    assert audited.candidate_strategy_draft.asset_class == "equity"
     assert [field.reason_code for field in audited.ambiguous_fields] == [
         "asset_resolution_context_underfilled"
     ]
@@ -934,28 +941,21 @@ def test_successful_asset_audit_clears_partial_context_ambiguity() -> None:
     assert audited.ambiguous_fields == []
 
 
-def test_partial_provider_context_conflict_clarifies_instead_of_confirming_subset(
-    monkeypatch,
-) -> None:
+def test_partial_provider_context_name_variation_defers_to_grounding() -> None:
     import json
 
-    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.interpreter import provider_context_assets
 
-    monkeypatch.setattr(
-        interpreter_module,
-        "resolve_asset",
-        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
-    )
     context = json.dumps(
         {
             "asset_resolution_candidates": [
                 {
-                    "raw_text": "target",
+                    "raw_text": "walmart",
                     "role": "traded_asset",
                     "status": "resolved",
-                    "symbol": "TGT",
+                    "symbol": "WMT",
                     "asset_class": "equity",
-                    "name": "Target Corporation",
+                    "name": "Walmart Inc.",
                     "confidence": 0.95,
                 }
             ]
@@ -965,38 +965,32 @@ def test_partial_provider_context_conflict_clarifies_instead_of_confirming_subse
         intent="strategy_drafting",
         task_relation="new_task",
         requires_clarification=False,
-        user_goal_summary="User wants a plain hold test for retailers.",
+        user_goal_summary="User wants a plain hold test for two retailers.",
         candidate_strategy_draft=LLMStrategyDraft(
             strategy_type="buy_and_hold",
-            asset_universe=["TGAAF", "WMT", "COST"],
+            asset_universe=["Walmart Inc", "Costco Wholesale"],
             asset_class="equity",
             date_range={"start": "2024-01-01", "end": "2024-12-31"},
         ),
         semantic_turn_act="new_idea",
     )
 
-    normalized = interpreter_module._normalize_response_for_runtime_context(
+    normalized = provider_context_assets.response_with_provider_context_assets(
         response,
-        request=InterpretationRequest(
-            current_user_message=(
-                "try a plain hold test for target, walmart, and costco in 2024"
-            ),
-            recent_thread_history=[],
-            latest_task_snapshot=None,
-            user=UserState(user_id="u1"),
-        ),
         asset_resolution_context=context,
     )
 
     assert normalized.candidate_strategy_draft.asset_universe == [
-        "TGAAF",
-        "WMT",
-        "COST",
+        "Walmart Inc",
+        "Costco Wholesale",
     ]
     assert normalized.requires_clarification is True
     assert [field.reason_code for field in normalized.ambiguous_fields] == [
-        "asset_resolution_context_conflict"
+        "asset_resolution_context_underfilled"
     ]
+    assert "provider_context_partial_preserved_fuller_draft" in (
+        normalized.reason_codes
+    )
 
 
 def test_unsupported_turn_with_partial_provider_context_drops_ungrounded_assets(

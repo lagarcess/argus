@@ -77,14 +77,8 @@ def response_with_provider_context_assets(
         for value in draft.asset_universe
         if str(value).strip()
     ]
-    context_has_foreign_record = any(
-        not any(
-            _provider_record_matches_symbol(record, value) for value in draft_assets
-        )
-        for record in resolved_records
-    )
     context_is_partial = len(resolved_symbols) < len(draft_assets)
-    preserved_fuller_draft = context_is_partial and not context_has_foreign_record
+    preserved_fuller_draft = context_is_partial
     if not context_is_partial:
         draft.asset_universe = resolved_symbols
     else:
@@ -92,11 +86,7 @@ def response_with_provider_context_assets(
             _ambiguous_field_from_partial_context(
                 rows=candidate_rows,
                 resolved_symbols=resolved_symbols,
-                reason_code=(
-                    "asset_resolution_context_conflict"
-                    if context_has_foreign_record
-                    else "asset_resolution_context_underfilled"
-                ),
+                reason_code="asset_resolution_context_underfilled",
             )
         )
     if len(asset_classes) == 1:

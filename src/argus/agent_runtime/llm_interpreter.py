@@ -1373,13 +1373,13 @@ def _response_without_ungrounded_symbols(
     grounded = {symbol.strip().upper() for symbol in grounded_symbols if symbol.strip()}
     draft = response.candidate_strategy_draft.model_copy(deep=True)
     original_symbols = [str(symbol).strip().upper() for symbol in draft.asset_universe]
+    draft.asset_universe = [symbol for symbol in original_symbols if symbol in grounded]
     mixed_asset_response = _response_with_mixed_asset_guardrail_from_symbols(
         response=response,
-        symbols=original_symbols,
+        symbols=draft.asset_universe,
     )
     if mixed_asset_response is not None:
         return mixed_asset_response
-    draft.asset_universe = [symbol for symbol in original_symbols if symbol in grounded]
     if len(draft.asset_universe) == len(original_symbols):
         return provider_context_assets.response_with_grounded_partial_context(response)
     missing_required_fields = list(response.missing_required_fields)
@@ -1391,7 +1391,7 @@ def _response_without_ungrounded_symbols(
                 dict.fromkeys([*missing_required_fields, "asset_universe"])
             )
             requires_clarification = True
-    return response.model_copy(
+    return _response_with_canonical_interpreter_assets(response.model_copy(
         update={
             "candidate_strategy_draft": draft,
             "assistant_response": None,
@@ -1399,7 +1399,7 @@ def _response_without_ungrounded_symbols(
             "missing_required_fields": missing_required_fields,
             "reason_codes": list(dict.fromkeys([*response.reason_codes, reason_code])),
         }
-    )
+    ))
 
 
 def _response_with_mixed_asset_guardrail_from_symbols(
