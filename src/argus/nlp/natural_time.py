@@ -524,24 +524,6 @@ def parse_date_text(
     return _endpoint_date(parsed, endpoint=endpoint, today=current_date)
 
 
-def parse_explicit_date_text(
-    text: str,
-    *,
-    today: date | None = None,
-    endpoint: Literal["start", "end"] = "start",
-    languages: tuple[str, ...] | None = None,
-) -> date | None:
-    raw = str(text or "").strip()
-    if not raw or not any(char.isdigit() for char in raw):
-        return None
-    return parse_date_text(
-        raw,
-        today=today,
-        endpoint=endpoint,
-        languages=languages,
-    )
-
-
 def dateparser_languages_for_user_language(language: str | None) -> tuple[str, ...]:
     primary = str(language or "en").strip().replace("_", "-").split("-", 1)[0]
     primary = primary.casefold()
@@ -550,45 +532,6 @@ def dateparser_languages_for_user_language(language: str | None) -> tuple[str, .
     if primary == "en":
         return ("en",)
     return (primary, "en")
-
-
-def parse_relative_endpoint_text(
-    text: str,
-    *,
-    today: date | None = None,
-    languages: tuple[str, ...] | None = None,
-) -> date | None:
-    """Parse a short relative endpoint token without accepting calendar names.
-
-    This is intentionally narrower than parse_date_text because current-turn edit
-    markers like "end date to yesterday" scan nearby tokens. Dateparser can treat
-    ordinary words or month names as dates, so endpoint repair only accepts dates
-    adjacent to the current day.
-    """
-
-    current_date = today or date.today()
-    parsed = parse_date_text(text, today=current_date, languages=languages)
-    if parsed is None:
-        return None
-    if abs(parsed.toordinal() - current_date.toordinal()) <= 1:
-        return parsed
-    return None
-
-
-def relative_range_label_from_text(
-    text: str,
-    *,
-    today: date | None = None,
-    languages: tuple[str, ...] | None = None,
-) -> str | None:
-    resolved = resolve_date_range_text(text, today=today, languages=languages)
-    if resolved is None:
-        return None
-    return _relative_window_label(
-        start=resolved.start,
-        end=resolved.end,
-        today=today or date.today(),
-    )
 
 
 def shift_months(value: date, months: int) -> date:

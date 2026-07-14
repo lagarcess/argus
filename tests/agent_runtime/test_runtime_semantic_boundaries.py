@@ -124,7 +124,6 @@ def test_runtime_contracts_do_not_own_human_language_date_tables() -> None:
             "MONTH_ALIASES",
             "parse_date_text",
             "resolve_date_range_text",
-            "relative_range_label_from_text",
             "_month_year_span",
             "_month_span_with_shared_year",
             "_build_month_year_date",

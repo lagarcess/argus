@@ -36,7 +36,6 @@ from argus.llm.openrouter import (
     log_openrouter_failure,
     openrouter_profile_for_task,
     openrouter_structured_model_candidates,
-    resolve_openrouter_structured_model,
 )
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -414,12 +413,11 @@ def test_structured_model_uses_argus_tier_models_unless_explicitly_overridden(
     monkeypatch.delenv("ARGUS_STRUCTURED_MODEL", raising=False)
     monkeypatch.delenv("ARGUS_STRUCTURED_FALLBACK_MODEL", raising=False)
 
-    assert resolve_openrouter_structured_model() == ""
     assert openrouter_structured_model_candidates() == []
 
     monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "argus/structured")
 
-    assert resolve_openrouter_structured_model() == "argus/structured"
+    assert openrouter_structured_model_candidates() == ["argus/structured"]
 
 
 def test_structured_interpreter_uses_bounded_interpretation_profile(
