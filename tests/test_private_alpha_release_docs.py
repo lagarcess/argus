@@ -46,6 +46,7 @@ def test_execution_realism_contract_is_consistent_across_canon_and_release_docs(
     for path in (
         "docs/PRODUCT.md",
         "docs/ARCHITECTURE.md",
+        "docs/API_CONTRACT.md",
         "docs/PRIVATE_LAUNCH_RUNBOOK.md",
         "docs/specs/private-alpha-next-roadmap.md",
     ):
