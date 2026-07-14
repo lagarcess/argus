@@ -123,6 +123,15 @@ class MemoryBacktestFinalizationGateway:
                     "Backtest run is owned by another user."
                 )
 
+            stored_run = self.store.backtest_runs.get(run_id)
+            if stored_run is not None and not _same_immutable_run(
+                stored_run,
+                finalization.run,
+            ):
+                raise BacktestFinalizationError(
+                    "Backtest run identity collided with different immutable payload."
+                )
+
             existing = self._existing_finalization(
                 user_id=finalization.user_id,
                 run_id=run_id,
@@ -132,15 +141,6 @@ class MemoryBacktestFinalizationGateway:
                 return existing
 
             self._reject_conflicting_sidecar_ids(finalization)
-
-            stored_run = self.store.backtest_runs.get(run_id)
-            if stored_run is not None and not _same_immutable_run(
-                stored_run,
-                finalization.run,
-            ):
-                raise BacktestFinalizationError(
-                    "Backtest run identity collided with different immutable payload."
-                )
 
             captured = finalization.captured
             finalized_run = _run_with_capture(finalization.run, captured)
