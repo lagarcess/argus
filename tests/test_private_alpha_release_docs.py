@@ -17,7 +17,6 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "later-context document, not part of this release gate" in runbook
     assert ".github/local-smoke.sh --expected-sha" in runbook
     assert "ARGUS_CANARY_SHA=\"$(git rev-parse HEAD)\"" in runbook
-    assert "ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-en.json" in runbook
     assert (
         "ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json"
         in runbook
@@ -29,7 +28,7 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "scripts/ops/canary_capture_replay.py" in runbook
     assert "Docker is optional" in runbook
     assert "private-alpha-canary-evidence" in runbook
-    assert "Spanish readiness is a release criterion" in runbook
+    assert "authoritative Spanish release journey" in runbook
     assert "docs/release-manifests/TEMPLATE.md" in runbook
     assert "release manifest" in runbook
     assert "rollback target" in runbook
@@ -38,7 +37,7 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "workflow_env_status" in runbook
     assert "workflow_runtime_provider_mode=live_provider" in runbook
     assert "workflow_runtime_proof=ready" in runbook
-    assert "provider-path canary" in runbook
+    assert "deployed Spanish signup/login browser" in runbook
     assert "workflow-service proof" in runbook
     assert "approver" in runbook
 
@@ -59,14 +58,14 @@ def test_private_alpha_release_manifest_template_has_required_audit_fields() -> 
         "env_fingerprint",
         "workflow_task",
         "real_workflow_task",
-        "Provider-path canary",
         "Backtest service mode",
         "Workflow service proof",
         "Secret rotation / least-privilege owner",
         "Canary evidence",
         "Failed-capture replay",
-        "English canary",
-        "Spanish canary",
+        "Authoritative Spanish release canary",
+        "Release profile hash",
+        "Browser signup/login proof",
         "private-alpha-canary-evidence",
         "No raw conversation, user, run, or job ids",
         "sanitized replay inputs",

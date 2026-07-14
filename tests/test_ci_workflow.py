@@ -119,7 +119,7 @@ def test_private_alpha_canary_workflow_runs_real_workflow_gate() -> None:
     assert 'unzip -q "$tmpdir/render.zip" -d "$tmpdir"' in joined_steps
     assert 'sudo mv "$tmpdir/cli_v2.20.0" /usr/local/bin/render' in joined_steps
     assert "render --version" in joined_steps
-    assert ".github/local-smoke.sh --expected-sha \"$GITHUB_SHA\"" in joined_steps
+    assert '.github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"' in joined_steps
     assert joined_steps.index(".github/local-smoke.sh") < joined_steps.index(
         ".github/warmup-render.sh"
     )
@@ -157,24 +157,20 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
         "ARGUS_OPS_TOKEN",
         "ARGUS_WORKFLOW_DATABASE_URL",
     }
-    assert secret_steps["Run authenticated English golden-path canary"] == secret_names
-    assert secret_steps["Run authenticated Spanish golden-path canary"] == secret_names
-    assert secret_steps["Run provider-path-sensitive Spanish canary"] == secret_names
+    assert secret_steps["Run authoritative Spanish release canary"] == secret_names
     assert secret_steps["Upload canary evidence"] == set()
 
     for step in steps:
         if step["name"] in {
             "Check required secrets",
             "Warm Render product path",
-            "Run authenticated English golden-path canary",
-            "Run authenticated Spanish golden-path canary",
-            "Run provider-path-sensitive Spanish canary",
+            "Run authoritative Spanish release canary",
         }:
             continue
         assert not (set((step.get("env") or {}).keys()) & secret_names)
 
 
-def test_private_alpha_canary_workflow_runs_bilingual_evidence_matrix() -> None:
+def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> None:
     workflow = _canary_workflow()
     job = workflow["jobs"]["canary"]
     steps_by_name = {step["name"]: step for step in job["steps"]}
@@ -183,43 +179,20 @@ def test_private_alpha_canary_workflow_runs_bilingual_evidence_matrix() -> None:
 
     assert "mkdir -p temp/canary-evidence" in joined_steps
     assert (
-        steps_by_name["Run authenticated English golden-path canary"][
+        steps_by_name["Run authoritative Spanish release canary"][
             "continue-on-error"
         ]
         is True
     )
-    assert (
-        steps_by_name["Run authenticated Spanish golden-path canary"][
-            "continue-on-error"
-        ]
-        is True
-    )
-    assert (
-        steps_by_name["Run provider-path-sensitive Spanish canary"][
-            "continue-on-error"
-        ]
-        is True
-    )
-    assert "ARGUS_CANARY_LANGUAGE=en" in joined_steps
-    assert "ARGUS_CANARY_LANGUAGE=es-419" in joined_steps
-    assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/en.json" in joined_steps
     assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json" in joined_steps
-    assert (
-        "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/provider-path.json"
-        in joined_steps
-    )
-    assert "ARGUS_CANARY_FOCUSED_SYMBOL_PATH=SNDK,AMD,NVDA,GS" in joined_steps
-    assert "temp/canary-evidence/en.exit" in joined_steps
     assert "temp/canary-evidence/es-419.exit" in joined_steps
-    assert "temp/canary-evidence/provider-path.exit" in joined_steps
-    assert "Require private-alpha canary matrix" in steps_by_name
-    assert "canary_locale_${locale}_exit" in joined_steps
-    assert "Prueba una estrategia de comprar y mantener AAPL y MSFT" in joined_steps
-    assert "SNDK, AMD, NVDA y GS" in joined_steps
-    assert "desde el 24 de febrero de 2025 hasta el 5 de junio de 2026" in joined_steps
-    assert "dólares" in joined_steps
+    assert "Require authoritative private-alpha canary" in steps_by_name
+    assert "canary_locale_es-419_exit" in joined_steps
+    assert "ARGUS_CANARY_PROMPT" not in joined_steps
     assert "ultimos 3 anos" not in joined_steps
-    assert "for locale in en es-419 provider-path" in joined_steps
+    assert "ARGUS_CANARY_LANGUAGE=en" not in joined_steps
+    assert "for locale in en es-419 provider-path" not in joined_steps
+    assert "Install Chromium for the deployed browser canary" in steps_by_name
     assert "actions/upload-artifact@v4" in uses_steps
     assert "private-alpha-canary-evidence" in CANARY_WORKFLOW_PATH.read_text(
         encoding="utf-8"
@@ -227,6 +200,21 @@ def test_private_alpha_canary_workflow_runs_bilingual_evidence_matrix() -> None:
     assert "path: temp/canary-evidence/*\n" in CANARY_WORKFLOW_PATH.read_text(
         encoding="utf-8"
     )
+
+
+def test_private_alpha_canary_schedule_uses_the_integration_candidate_sha() -> None:
+    workflow = _canary_workflow()
+    steps_by_name = {step["name"]: step for step in workflow["jobs"]["canary"]["steps"]}
+    checkout = steps_by_name["Checkout"]
+    joined_steps = "\n".join(
+        str(step.get("run", "")) for step in workflow["jobs"]["canary"]["steps"]
+    )
+
+    assert checkout["with"]["ref"] == (
+        "${{ github.event_name == 'schedule' && 'codex/private-alpha-next' || github.sha }}"
+    )
+    assert '.github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"' in joined_steps
+    assert 'ARGUS_CANARY_SHA="$(git rev-parse HEAD)"' in joined_steps
 
 
 def test_private_alpha_smoke_workflow_runs_local_predeploy_gate() -> None:

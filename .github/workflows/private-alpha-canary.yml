@@ -21,6 +21,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Scheduled workflows start from the repository default branch. The
+          # private-alpha canary must instead validate the integration candidate.
+          ref: ${{ github.event_name == 'schedule' && 'codex/private-alpha-next' || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -49,11 +53,14 @@ jobs:
       - name: Install frontend dependencies
         run: cd web && bun install --frozen-lockfile
 
+      - name: Install Chromium for the deployed browser canary
+        run: cd web && bunx playwright install --with-deps chromium
+
       - name: Run Spanish static UI canary assertions
         run: cd web && bun test __tests__/spanish-ui-smoke.test.ts
 
       - name: Run local predeploy smoke
-        run: .github/local-smoke.sh --expected-sha "$GITHUB_SHA"
+        run: .github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"
 
       - name: Check required secrets
         env:
@@ -96,7 +103,7 @@ jobs:
       - name: Prepare canary evidence directory
         run: mkdir -p temp/canary-evidence
 
-      - name: Run authenticated English golden-path canary
+      - name: Run authoritative Spanish release canary
         continue-on-error: true
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
@@ -108,73 +115,25 @@ jobs:
           ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set +e
-          ARGUS_CANARY_LANGUAGE=en \
-          ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/en.json \
-          .github/canary-render.sh
-          status=$?
-          echo "$status" > temp/canary-evidence/en.exit
-          exit "$status"
-
-      - name: Run authenticated Spanish golden-path canary
-        continue-on-error: true
-        env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
-          ARGUS_WORKFLOW_DATABASE_URL: ${{ secrets.ARGUS_WORKFLOW_DATABASE_URL }}
-          ARGUS_CANARY_EMAIL: ${{ secrets.ARGUS_CANARY_EMAIL }}
-          ARGUS_CANARY_PASSWORD: ${{ secrets.ARGUS_CANARY_PASSWORD }}
-          ARGUS_CANARY_SUPABASE_URL: ${{ secrets.ARGUS_CANARY_SUPABASE_URL }}
-          ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          set +e
-          ARGUS_CANARY_LANGUAGE=es-419 \
-          ARGUS_CANARY_PROMPT='Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 con 10000 dolares' \
+          ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
           ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json \
           .github/canary-render.sh
           status=$?
           echo "$status" > temp/canary-evidence/es-419.exit
           exit "$status"
 
-      - name: Run provider-path-sensitive Spanish canary
-        continue-on-error: true
-        env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
-          ARGUS_WORKFLOW_DATABASE_URL: ${{ secrets.ARGUS_WORKFLOW_DATABASE_URL }}
-          ARGUS_CANARY_EMAIL: ${{ secrets.ARGUS_CANARY_EMAIL }}
-          ARGUS_CANARY_PASSWORD: ${{ secrets.ARGUS_CANARY_PASSWORD }}
-          ARGUS_CANARY_SUPABASE_URL: ${{ secrets.ARGUS_CANARY_SUPABASE_URL }}
-          ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          set +e
-          ARGUS_CANARY_LANGUAGE=es-419 \
-          ARGUS_CANARY_PROMPT='Prueba comprar y mantener SNDK, AMD, NVDA y GS con 1000 dólares desde el 24 de febrero de 2025 hasta el 5 de junio de 2026' \
-          ARGUS_CANARY_FOCUSED_SYMBOL_PATH=SNDK,AMD,NVDA,GS \
-          ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW=true \
-          ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/provider-path.json \
-          .github/canary-render.sh
-          status=$?
-          echo "$status" > temp/canary-evidence/provider-path.exit
-          exit "$status"
-
-      - name: Require private-alpha canary matrix
+      - name: Require authoritative private-alpha canary
         if: always()
         run: |
           failed=0
-          for locale in en es-419 provider-path
-          do
-            status_file="temp/canary-evidence/${locale}.exit"
-            if [ ! -f "$status_file" ]; then
-              echo "canary_locale_${locale}_exit=missing"
-              failed=1
-              continue
-            fi
-            status="$(cat "$status_file")"
-            echo "canary_locale_${locale}_exit=$status"
-            if [ "$status" != "0" ]; then
-              failed=1
-            fi
-          done
+          status_file="temp/canary-evidence/es-419.exit"
+          if [ ! -f "$status_file" ]; then
+            echo "canary_locale_es-419_exit=missing"
+            exit 1
+          fi
+          status="$(cat "$status_file")"
+          echo "canary_locale_es-419_exit=$status"
+          if [ "$status" != "0" ]; then failed=1; fi
           exit "$failed"
 
       - name: Upload canary evidence

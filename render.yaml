@@ -39,13 +39,13 @@ services:
       - key: ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED
         value: "false"
       - key: ARGUS_BACKTEST_JOBS_SHADOW_ENABLED
-        value: "false"
+        value: "true"
       - key: ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED
-        value: "false"
+        value: "true"
       - key: ARGUS_BACKTEST_WORKFLOW_TASK
         value: argus-backtests/workflow_proof
       - key: ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED
-        value: "false"
+        value: "true"
       - key: ARGUS_BACKTEST_REAL_WORKFLOW_TASK
         value: argus-backtests/run_backtest_job
       - key: ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT
