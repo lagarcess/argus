@@ -72,7 +72,7 @@ export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsVi
             <p className="text-[12px] text-black/40 dark:text-white/40 mt-0.5">
               {t(
                 "settings.data.deleted_retention_note",
-                "Items stay here temporarily before permanent deletion.",
+                "Items in this list can currently be restored.",
               )}
             </p>
           </div>
@@ -114,11 +114,10 @@ export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsVi
                       <span className="text-[15px] font-medium text-black dark:text-white truncate">
                         {item.title}
                       </span>
-                      {/* Deferred(future): exact restore windows need deleted_at or retention_expires_at on HistoryItem. */}
                       <span className="text-[12px] text-black/40 dark:text-white/40">
                         {t(
                           "settings.data.deleted_item_note",
-                          "Eligible for permanent deletion soon",
+                          "Currently restorable.",
                         )}
                       </span>
                     </div>
