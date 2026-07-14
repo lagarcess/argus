@@ -115,6 +115,22 @@ def test_memory_finalizer_commits_one_complete_tuple_and_reuses_it() -> None:
     }
 
 
+def test_memory_finalizer_rejects_replay_with_changed_immutable_run() -> None:
+    store = AlphaStore()
+    gateway = MemoryBacktestFinalizationGateway(store)
+    first_input = _input()
+    finalize_backtest_completion(gateway, first_input)
+    changed_run = first_input.run.model_copy(
+        update={"metrics": {"aggregate": {"performance": {"total_return_pct": 99.9}}}}
+    )
+
+    with pytest.raises(BacktestFinalizationError, match="immutable payload"):
+        finalize_backtest_completion(
+            gateway,
+            replace(first_input, run=changed_run),
+        )
+
+
 def test_memory_finalizer_rejects_cross_owner_run_replay() -> None:
     store = AlphaStore()
     gateway = MemoryBacktestFinalizationGateway(store)
