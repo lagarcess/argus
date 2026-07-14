@@ -1381,7 +1381,7 @@ def _response_without_ungrounded_symbols(
         return mixed_asset_response
     draft.asset_universe = [symbol for symbol in original_symbols if symbol in grounded]
     if len(draft.asset_universe) == len(original_symbols):
-        return response
+        return provider_context_assets.response_with_grounded_partial_context(response)
     missing_required_fields = list(response.missing_required_fields)
     requires_clarification = response.requires_clarification
     if not draft.asset_universe:

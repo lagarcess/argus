@@ -896,6 +896,44 @@ def test_partial_provider_context_keeps_grounded_asset_when_extras_fail_audit(
     ]
 
 
+def test_successful_asset_audit_clears_partial_context_ambiguity() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.llm_interpreter_types import LLMAmbiguousField
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants a plain hold test for three retailers.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["TGT", "WMT", "COST"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        ),
+        reason_codes=["provider_context_partial_preserved_fuller_draft"],
+        ambiguous_fields=[
+            LLMAmbiguousField(
+                field_name="asset_universe",
+                raw_value="target",
+                candidate_normalized_value=["TGT"],
+                reason_code="asset_resolution_context_underfilled",
+            )
+        ],
+        semantic_turn_act="new_idea",
+    )
+
+    audited = interpreter_module._response_without_ungrounded_symbols(
+        response=response,
+        grounded_symbols=["TGT", "WMT", "COST"],
+        reason_code="asset_grounding_audit_removed_unsubstantiated_symbols",
+    )
+
+    assert audited.requires_clarification is False
+    assert audited.candidate_strategy_draft.asset_universe == ["TGT", "WMT", "COST"]
+    assert audited.ambiguous_fields == []
+
+
 def test_partial_provider_context_conflict_clarifies_instead_of_confirming_subset(
     monkeypatch,
 ) -> None:
