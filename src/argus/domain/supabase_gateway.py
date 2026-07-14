@@ -32,6 +32,9 @@ from argus.domain.backtest_finalization import (
     FinalizedBacktest,
     PreparedBacktestFinalization,
 )
+from argus.domain.backtest_message_projection import (
+    hydrate_completed_backtest_job_messages,
+)
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
@@ -468,7 +471,16 @@ class SupabaseGateway:
             rows_data = self._fetch_all_rows(lambda start, end: query.range(start, end))
         else:
             rows_data = query.limit(limit).execute().data or []
-        return [Message.model_validate(row) for row in rows_data]
+        messages = [Message.model_validate(row) for row in rows_data]
+        return hydrate_completed_backtest_job_messages(
+            messages,
+            load_job=lambda job_id: self.get_backtest_job(
+                user_id=user_id, job_id=job_id,
+            ),
+            load_run=lambda run_id: self.get_backtest_run(
+                user_id=user_id, run_id=run_id,
+            ),
+        )
 
     def create_message(
         self,

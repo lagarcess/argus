@@ -208,6 +208,9 @@ def test_canary_can_write_manual_failed_capture_artifact() -> None:
     assert "route_receipt" in source
     assert "failure" in source
     assert "no_raw_ids" in source
+    assert "canary_capture_sanitizer" in source
+    assert "sanitized_payload = sanitize(payload)" in source
+    assert "assert_sanitized_capture(sanitized_payload)" in source
     assert "ARGUS_CANARY_CAPTURE_PATH" in source
     assert '"workflow_env_fingerprint": os.environ["CANARY_WORKFLOW_ENV_FINGERPRINT"]' in source
     assert '"workflow_env_status": os.environ["CANARY_WORKFLOW_ENV_STATUS"]' in source

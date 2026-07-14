@@ -462,23 +462,15 @@ write_canary_capture() {
   CANARY_JOB_RESPONSE_FILE="${JOB_RESPONSE:-}" \
   CANARY_RECEIPT_ROWS_FILE="$temp_receipts" \
   python3 - <<'PY' || exit_code=$?
-import hashlib
 import json
 import os
 import pathlib
-import uuid
 from typing import Any
 
-SECRET_KEY_PARTS = ("password", "token", "secret", "service_role", "apikey", "email")
-ID_KEY_NAMES = {
-    "id",
-    "conversation_id",
-    "run_id",
-    "result_run_id",
-    "backtest_job_id",
-    "message_id",
-    "user_id",
-}
+from scripts.ops.canary_capture_sanitizer import (
+    assert_sanitized_capture,
+    sanitize_capture_value as sanitize,
+)
 
 
 def read_json_file(path: str) -> Any:
@@ -491,32 +483,6 @@ def read_json_file(path: str) -> Any:
         return json.loads(file_path.read_text(encoding="utf-8"))
     except Exception:
         return None
-
-
-def hash_label(prefix: str, value: str) -> str:
-    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
-    return f"{prefix}_{digest}"
-
-
-def sanitize(value: Any, *, key: str = "") -> Any:
-    key_lower = key.lower()
-    if any(part in key_lower for part in SECRET_KEY_PARTS):
-        return "<redacted>"
-    if isinstance(value, dict):
-        return {str(k): sanitize(v, key=str(k)) for k, v in value.items()}
-    if isinstance(value, list):
-        return [sanitize(item, key=key) for item in value]
-    if isinstance(value, str):
-        stripped = value.strip()
-        try:
-            uuid.UUID(stripped)
-        except ValueError:
-            pass
-        else:
-            return hash_label("uuid", stripped)
-        if key_lower in ID_KEY_NAMES and stripped:
-            return hash_label(key_lower, stripped)
-    return value
 
 
 def first_dict(*values: Any) -> dict[str, Any] | None:
@@ -647,8 +613,10 @@ payload = {
 }
 
 path = pathlib.Path(os.environ["CANARY_CAPTURE_PATH"])
+sanitized_payload = sanitize(payload)
+assert_sanitized_capture(sanitized_payload)
 path.write_text(
-    json.dumps(sanitize(payload), indent=2, sort_keys=True) + "\n",
+    json.dumps(sanitized_payload, indent=2, sort_keys=True) + "\n",
     encoding="utf-8",
 )
 print(f"canary_capture_path={path}")

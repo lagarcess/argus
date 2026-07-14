@@ -4,7 +4,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from argus.api.schemas import BacktestRun
+from argus.api.schemas import BacktestRun, Message
 from argus.domain.backtest_finalization import (
     BacktestFinalizationInput,
     finalize_backtest_completion,
@@ -22,6 +22,70 @@ from argus.domain.supabase_gateway import (
 def test_batched_fetch_helper_exists_for_unbounded_queries():
     gateway = SupabaseGateway(client=MagicMock())
     assert hasattr(gateway, "_fetch_all_rows")
+
+
+def test_list_messages_projects_completed_workflow_result_for_reload() -> None:
+    client = MagicMock()
+    gateway = SupabaseGateway(client=client)
+    queued = Message(
+        id="message-1",
+        conversation_id="conversation-1",
+        role="assistant",
+        content="Queued",
+        metadata={
+            "backtest_job_id": "job-1",
+            "backtest_job": {"id": "job-1", "status": "queued"},
+        },
+        created_at=utcnow(),
+    )
+    gateway._fetch_all_rows = MagicMock(  # type: ignore[method-assign]
+        return_value=[queued.model_dump(mode="json")]
+    )
+    gateway.get_backtest_job = MagicMock(  # type: ignore[method-assign]
+        return_value={
+            "id": "job-1",
+            "conversation_id": "conversation-1",
+            "status": "succeeded",
+            "result_run_id": "run-1",
+            "execution_metadata": {
+                "workflow_backtest": {"result_readout": "Completed readout"}
+            },
+        }
+    )
+    gateway.get_backtest_run = MagicMock(  # type: ignore[method-assign]
+        return_value=BacktestRun(
+            id="run-1",
+            conversation_id="conversation-1",
+            strategy_id=None,
+            status="completed",
+            asset_class="equity",
+            symbols=["AAPL"],
+            allocation_method="equal_weight",
+            benchmark_symbol="SPY",
+            metrics={},
+            config_snapshot={"template": "buy_and_hold"},
+            conversation_result_card={
+                "title": "AAPL result",
+                "evidence_artifact_id": "evidence-1",
+                "decision_note_id": "decision-1",
+                "decision_state": "promising",
+            },
+            created_at=utcnow(),
+            chart=None,
+            trades=[],
+        )
+    )
+
+    messages = gateway.list_messages(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        limit=None,
+    )
+
+    assert messages[0].content == "Completed readout"
+    assert messages[0].metadata["result_card"]["decision_note_id"] == "decision-1"
+    gateway.get_backtest_job.assert_called_once_with(user_id="user-1", job_id="job-1")
+    gateway.get_backtest_run.assert_called_once_with(user_id="user-1", run_id="run-1")
 
 
 def test_supabase_search_matcher_handles_punctuation_and_multi_token_queries():
