@@ -266,14 +266,6 @@ def fallback_private_alpha_save_response(language: str | None = None) -> str:
     return _fallback_private_alpha_save_response(language=language)
 
 
-def result_breakdown_message(run: BacktestRun | None, *, language: str = "en") -> str:
-    from argus.api.chat.breakdown import (
-        result_breakdown_message as _result_breakdown_message,
-    )
-
-    return _result_breakdown_message(run, language=language)
-
-
 def result_breakdown_message_with_metadata(
     run: BacktestRun | None,
     *,
