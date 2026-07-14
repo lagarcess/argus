@@ -685,9 +685,15 @@ def test_partial_provider_context_does_not_shrink_company_basket_confirmation(
             name="Costco Wholesale Corporation",
         ),
     }
+    aliases = {
+        "target": "TGT",
+        "walmart": "WMT",
+        "costco": "COST",
+    }
 
     def resolve_asset(symbol: str) -> ResolvedAssetStub:
-        normalized = symbol.strip().upper()
+        raw = symbol.strip()
+        normalized = aliases.get(raw.casefold(), raw.upper())
         if normalized not in assets:
             raise ValueError("invalid_symbol")
         return assets[normalized]
@@ -728,7 +734,7 @@ def test_partial_provider_context_does_not_shrink_company_basket_confirmation(
                         raw_user_phrasing=message,
                         strategy_type="buy_and_hold",
                         strategy_thesis=message,
-                        asset_universe=["TGT", "WMT", "COST"],
+                        asset_universe=["target", "walmart", "costco"],
                         asset_class="equity",
                         date_range={
                             "start": "2024-01-01",
@@ -842,6 +848,54 @@ def test_partial_provider_context_conflict_clarifies_instead_of_confirming_subse
     assert [field.reason_code for field in normalized.ambiguous_fields] == [
         "asset_resolution_context_conflict"
     ]
+
+
+def test_unsupported_turn_with_partial_provider_context_drops_ungrounded_assets(
+) -> None:
+    import json
+
+    from argus.agent_runtime.interpreter import provider_context_assets
+
+    context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "target",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "TGT",
+                    "asset_class": "equity",
+                    "name": "Target Corporation",
+                    "confidence": 0.95,
+                }
+            ]
+        }
+    )
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User asked for unsupported logic on a retailer basket.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["TGT", "FAKE"],
+            asset_class="equity",
+        ),
+        semantic_turn_act="unsupported_request",
+    )
+
+    normalized = provider_context_assets.response_with_provider_context_assets(
+        response,
+        asset_resolution_context=context,
+        include_unsupported_request=True,
+    )
+
+    assert normalized.intent == "unsupported_or_out_of_scope"
+    assert normalized.candidate_strategy_draft.asset_universe == ["TGT"]
+    assert (
+        "provider_context_partial_preserved_fuller_draft"
+        not in normalized.reason_codes
+    )
 
 
 def test_provider_context_asset_class_survives_runtime_validation(monkeypatch) -> None:

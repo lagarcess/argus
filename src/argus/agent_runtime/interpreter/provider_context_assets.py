@@ -105,6 +105,8 @@ def response_with_provider_context_assets(
     if response.intent == "unsupported_or_out_of_scope":
         if not resolved_symbols:
             return response
+        draft.asset_universe = resolved_symbols
+        preserved_fuller_draft = False
         ambiguous_fields = []
     if (
         not ambiguous_fields
@@ -318,6 +320,8 @@ def _provider_record_matches_symbol(record: dict[str, Any], symbol: str) -> bool
     candidates = {
         str(record.get("symbol") or "").strip().upper(),
         str(record.get("raw_symbol") or "").strip().upper(),
+        str(record.get("raw_text") or "").strip().upper(),
+        str(record.get("name") or "").strip().upper(),
     }
     return any(
         candidate and candidate.replace("/", "") == compact
