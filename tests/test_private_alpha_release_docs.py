@@ -73,6 +73,19 @@ def test_private_alpha_release_manifest_template_has_required_audit_fields() -> 
         assert expected in template
 
 
+def test_dated_release_manifest_distinguishes_workflow_tasks() -> None:
+    manifest = _source(
+        "docs/release-manifests/2026-07-14-private-alpha-release-integrity.md"
+    )
+
+    assert (
+        "- Workflow proof task: `argus-backtests/workflow_proof`" in manifest
+    )
+    assert (
+        "- Real workflow task: `argus-backtests/run_backtest_job`" in manifest
+    )
+
+
 def test_private_alpha_integration_doc_points_to_current_gate_and_later_memo() -> None:
     integration = _source("docs/specs/private-alpha-next-integration.md")
 
