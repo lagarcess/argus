@@ -375,6 +375,10 @@ Represents an immutable result of a simulation. Every run is reproducible from i
   Idea, IdeaVersion, EvidenceArtifact, and result-card identity as one logical
   transaction. Readers must not observe a run as completed before that tuple is
   finalized, and retries must reuse the same run id.
+- Reload reconciliation projects a succeeded job from that canonical finalized
+  tuple. Its result-card evidence identity and any decision note/state remain
+  attached to the same owner-scoped run, rather than being rebuilt from display
+  copy or a stale queued-job projection.
 ---
 
 ## 12.1 P1 Idea / Evidence / Decision Spine

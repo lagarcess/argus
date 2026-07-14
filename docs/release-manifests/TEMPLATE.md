@@ -1,13 +1,19 @@
 # Private Alpha Release Manifest Template
 
-Use one manifest per promoted candidate. Fill this after the release gate passes
-and before sending tester links. Do not include raw conversation, user, run, or
-job ids; use the privacy-safe labels from canary evidence.
+Use one manifest per validated candidate checkpoint or promoted candidate. Fill
+this after the release gate passes and before sending tester links. A validated
+private-alpha checkpoint records technical evidence only; it does not itself
+authorize a `main` merge, production deployment, automatic production
+deployment, tester invitation, or tester exposure. Do not include raw
+conversation, user, run, or job ids; use the privacy-safe labels from canary
+evidence.
 
 ## Candidate
 
 - Candidate SHA:
 - Candidate branch:
+- Validation status:
+- Validation surface:
 - Promotion target: `main`
 - Release captain:
 - Approver:
