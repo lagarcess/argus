@@ -790,8 +790,10 @@ def test_partial_provider_context_confirms_after_current_message_grounding(
     ] is True
 
 
-def test_partial_provider_context_cannot_confirm_unmentioned_llm_assets(
+@pytest.mark.parametrize("audit_available", [True, False])
+def test_partial_provider_context_keeps_grounded_asset_when_extras_fail_audit(
     monkeypatch,
+    audit_available: bool,
 ) -> None:
     import asyncio
     import json
@@ -819,8 +821,10 @@ def test_partial_provider_context_cannot_confirm_unmentioned_llm_assets(
 
     async def audit_stub(**kwargs):
         assert kwargs["schema_name"] == "AssetGroundingAudit"
+        if not audit_available:
+            raise RuntimeError("asset grounding audit unavailable")
         return interpreter_module.AssetGroundingAudit(
-            grounded_symbols=["TGT"],
+            grounded_symbols=[],
             confidence=0.95,
         )
 

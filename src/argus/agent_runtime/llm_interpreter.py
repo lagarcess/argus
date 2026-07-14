@@ -160,7 +160,7 @@ from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _response_from_pending_response_option_selection_audit,
     _response_needs_pending_response_option_selection_audit,
 )
-from argus.agent_runtime.interpreter import provider_context_assets
+from argus.agent_runtime.interpreter import asset_grounding, provider_context_assets
 from argus.agent_runtime.interpreter import (
     requested_asset_answer as _requested_asset_answer,
 )
@@ -1104,6 +1104,7 @@ async def _asset_grounding_audited_response(
     suspicious_symbols = _suspicious_extracted_asset_symbols(
         response=response, request=request
     )
+    trusted = asset_grounding.trusted_asset_symbols(response, suspicious_symbols)
     if not suspicious_symbols:
         response = _response_with_misplaced_benchmark_asset_recovered(
             response=response, request=request
@@ -1130,18 +1131,18 @@ async def _asset_grounding_audited_response(
         )
         return _response_without_ungrounded_symbols(
             response=response,
-            grounded_symbols=[],
+            grounded_symbols=trusted,
             reason_code="asset_grounding_audit_unavailable_cleared_suspicious_symbols",
         )
     if not isinstance(audit, AssetGroundingAudit) or audit.confidence < 0.6:
         return _response_without_ungrounded_symbols(
             response=response,
-            grounded_symbols=[],
+            grounded_symbols=trusted,
             reason_code="asset_grounding_audit_low_confidence_cleared_suspicious_symbols",
         )
     audited_response = _response_without_ungrounded_symbols(
         response=response,
-        grounded_symbols=audit.grounded_symbols,
+        grounded_symbols=[*trusted, *audit.grounded_symbols],
         reason_code="asset_grounding_audit_removed_unsubstantiated_symbols",
     )
     return _response_with_misplaced_benchmark_asset_recovered(
