@@ -273,9 +273,11 @@ These are optional runtime knobs (not secrets). Defaults are safe for
 private-alpha launch; record any override in the release manifest.
 
 - `ARGUS_ENABLE_EXECUTION_REALISM` — models trading fees + slippage end to end.
-  Default OFF. Keep off for alpha: the founder deliberately disclaims cost
-  assumptions for the current PMF stage. When off, results carry the "No
-  fees/slippage" assumptions footer and the legacy cost path is byte-identical.
+  The capability is active by default, but modeled costs remain opt-in per
+  idea. Runs without stated fees or slippage stay idealized and retain the "No
+  fees/slippage" assumptions footer. Set the flag explicitly to
+  `false|0|off|no` only as a kill switch; that restores the pre-realism path
+  byte-for-byte. Record any kill-switch override in the release manifest.
 - `ARGUS_STRUCTURED_REASONING_EFFORT` / `ARGUS_CAPABILITY_REASONING_EFFORT` —
   per-tier OpenRouter reasoning-effort overrides for the structured
   interpretation and capability-conflict calls
