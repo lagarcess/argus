@@ -103,16 +103,26 @@ tester invitation or exposure.
 
 ## Rollback
 
-- Immediate rollback SHA:
+- Same-tree provenance fallback SHA:
   `b3fc38ea6257aef36bd694a42ed928297c97051d`
-- API rollback deploy: `dep-d9bepfrtqb8s73cf71lg`
-- App rollback deploy: `dep-d9beqm6cjfls738761r0`
-- Workflow rollback version: `wfv-d9beromrnols73ek1e0g`
-- Deeper validated rollback SHA:
+  - API deploy: `dep-d9bepfrtqb8s73cf71lg`
+  - App deploy: `dep-d9beqm6cjfls738761r0`
+  - Workflow version: `wfv-d9beromrnols73ek1e0g`
+  - This tree is identical to the promoted production tree. Redeploying it can
+    restore pre-merge SHA provenance, but it is not a functional rollback for
+    health, canary, workflow, or product defects.
+- Immediate functional rollback SHA:
   `373d1a12dd5f538a81150b20903f4f43db27c639`
+  - API deploy: `dep-d9arv80js32c73a9kc0g`
+  - App deploy: `dep-d9as0gtaeets739rifkg`
+  - Workflow version: `wfv-d9as1gfavr4c73av09ig`
+- Deeper source rollback SHA:
+  `6985c6443de89374d019a61907127f1eba4c032f`
 - Rollback remains manual and founder/release-captain owned.
-- Roll back for exact-SHA drift, persistent health/warmup/canary failure,
+- Use the functional rollback for persistent health/warmup/canary failure,
   workflow finalization failure, or contradictory persisted artifact state.
+  Exact-SHA provenance drift alone may use the same-tree fallback after the
+  running tree is independently verified.
 
 ## Release Decision And Boundaries
 
