@@ -734,7 +734,7 @@ def test_partial_provider_context_confirms_after_current_message_grounding(
                         raw_user_phrasing=message,
                         strategy_type="buy_and_hold",
                         strategy_thesis=message,
-                        asset_universe=["target", "walmart", "costco"],
+                        asset_universe=["walmart", "costco"],
                         asset_class="equity",
                         date_range={
                             "start": "2024-01-01",
@@ -791,7 +791,7 @@ def test_partial_provider_context_confirms_after_current_message_grounding(
 
 
 @pytest.mark.parametrize("audit_available", [True, False])
-def test_partial_provider_context_keeps_grounded_asset_when_extras_fail_audit(
+def test_partial_provider_context_seeds_omitted_grounded_asset_when_extras_fail_audit(
     monkeypatch,
     audit_available: bool,
 ) -> None:
@@ -867,7 +867,7 @@ def test_partial_provider_context_keeps_grounded_asset_when_extras_fail_audit(
                 raw_user_phrasing=message,
                 strategy_type="buy_and_hold",
                 strategy_thesis=message,
-                asset_universe=["target", "walmart", "costco", "bitcoin"],
+                asset_universe=["walmart", "costco", "bitcoin"],
                 asset_class="equity",
                 date_range={"start": "2024-01-01", "end": "2024-12-31"},
             ),
@@ -941,7 +941,7 @@ def test_successful_asset_audit_clears_partial_context_ambiguity() -> None:
     assert audited.ambiguous_fields == []
 
 
-def test_partial_provider_context_name_variation_defers_to_grounding() -> None:
+def test_partial_provider_context_seeds_symbol_and_defers_name_variation() -> None:
     import json
 
     from argus.agent_runtime.interpreter import provider_context_assets
@@ -981,6 +981,7 @@ def test_partial_provider_context_name_variation_defers_to_grounding() -> None:
     )
 
     assert normalized.candidate_strategy_draft.asset_universe == [
+        "WMT",
         "Walmart Inc",
         "Costco Wholesale",
     ]

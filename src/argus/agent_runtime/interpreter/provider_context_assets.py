@@ -82,6 +82,11 @@ def response_with_provider_context_assets(
     if not context_is_partial:
         draft.asset_universe = resolved_symbols
     else:
+        draft_symbols = {value.upper() for value in draft_assets}
+        draft.asset_universe = [
+            *[symbol for symbol in resolved_symbols if symbol not in draft_symbols],
+            *draft_assets,
+        ]
         ambiguous_fields.append(
             _ambiguous_field_from_partial_context(
                 rows=candidate_rows,
