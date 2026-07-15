@@ -160,7 +160,7 @@ from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _response_from_pending_response_option_selection_audit,
     _response_needs_pending_response_option_selection_audit,
 )
-from argus.agent_runtime.interpreter import provider_context_assets
+from argus.agent_runtime.interpreter import asset_grounding, provider_context_assets
 from argus.agent_runtime.interpreter import (
     requested_asset_answer as _requested_asset_answer,
 )
@@ -1102,14 +1102,14 @@ async def _asset_grounding_audited_response(
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
     suspicious_symbols = _suspicious_extracted_asset_symbols(
-        response=response,
-        request=request,
+        response=response, request=request
     )
+    trusted = asset_grounding.trusted_asset_symbols(response, suspicious_symbols)
     if not suspicious_symbols:
-        return _response_with_misplaced_benchmark_asset_recovered(
-            response=response,
-            request=request,
+        response = _response_with_misplaced_benchmark_asset_recovered(
+            response=response, request=request
         )
+        return provider_context_assets.response_with_grounded_partial_context(response)
     try:
         audit = await invoke_openrouter_json_schema(
             task="interpretation",
@@ -1131,18 +1131,18 @@ async def _asset_grounding_audited_response(
         )
         return _response_without_ungrounded_symbols(
             response=response,
-            grounded_symbols=[],
+            grounded_symbols=trusted,
             reason_code="asset_grounding_audit_unavailable_cleared_suspicious_symbols",
         )
     if not isinstance(audit, AssetGroundingAudit) or audit.confidence < 0.6:
         return _response_without_ungrounded_symbols(
             response=response,
-            grounded_symbols=[],
+            grounded_symbols=trusted,
             reason_code="asset_grounding_audit_low_confidence_cleared_suspicious_symbols",
         )
     audited_response = _response_without_ungrounded_symbols(
         response=response,
-        grounded_symbols=audit.grounded_symbols,
+        grounded_symbols=[*trusted, *audit.grounded_symbols],
         reason_code="asset_grounding_audit_removed_unsubstantiated_symbols",
     )
     return _response_with_misplaced_benchmark_asset_recovered(
@@ -1373,15 +1373,15 @@ def _response_without_ungrounded_symbols(
     grounded = {symbol.strip().upper() for symbol in grounded_symbols if symbol.strip()}
     draft = response.candidate_strategy_draft.model_copy(deep=True)
     original_symbols = [str(symbol).strip().upper() for symbol in draft.asset_universe]
+    draft.asset_universe = [symbol for symbol in original_symbols if symbol in grounded]
     mixed_asset_response = _response_with_mixed_asset_guardrail_from_symbols(
         response=response,
-        symbols=original_symbols,
+        symbols=draft.asset_universe,
     )
     if mixed_asset_response is not None:
         return mixed_asset_response
-    draft.asset_universe = [symbol for symbol in original_symbols if symbol in grounded]
     if len(draft.asset_universe) == len(original_symbols):
-        return response
+        return provider_context_assets.response_with_grounded_partial_context(response)
     missing_required_fields = list(response.missing_required_fields)
     requires_clarification = response.requires_clarification
     if not draft.asset_universe:
@@ -1391,7 +1391,7 @@ def _response_without_ungrounded_symbols(
                 dict.fromkeys([*missing_required_fields, "asset_universe"])
             )
             requires_clarification = True
-    return response.model_copy(
+    return _response_with_canonical_interpreter_assets(response.model_copy(
         update={
             "candidate_strategy_draft": draft,
             "assistant_response": None,
@@ -1399,7 +1399,7 @@ def _response_without_ungrounded_symbols(
             "missing_required_fields": missing_required_fields,
             "reason_codes": list(dict.fromkeys([*response.reason_codes, reason_code])),
         }
-    )
+    ))
 
 
 def _response_with_mixed_asset_guardrail_from_symbols(
