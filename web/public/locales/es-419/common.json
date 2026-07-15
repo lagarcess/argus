@@ -357,6 +357,7 @@
     "try_new_strategy": "Probar una nueva estrategia",
     "empty_history": "Tus chats pasados aparecerán aquí.",
     "history": {
+      "pinned": "Anclados",
       "today": "Hoy",
       "yesterday": "Ayer",
       "last_7_days": "Últimos 7 días",
@@ -688,6 +689,14 @@
         "system": "Sistema"
       }
     },
+    "sidebar": {
+      "title": "Preferencia de barra lateral",
+      "description": "Elige cómo se comporta la barra lateral.",
+      "expanded": "Expandida",
+      "collapsed": "Solo iconos",
+      "hover": "Al pasar el cursor",
+      "close": "Cerrar modal de preferencias de la barra lateral"
+    },
     "preferences": {
       "title": "Preferencias"
     },
@@ -696,8 +705,8 @@
       "archived_chats": "Chats archivados",
       "recently_deleted": "Borrados recientemente",
       "close_recently_deleted": "Cerrar borrados recientemente",
-      "deleted_retention_note": "Los elementos permanecen aquí temporalmente antes de eliminarse permanentemente.",
-      "deleted_item_note": "Puede eliminarse permanentemente pronto",
+      "deleted_retention_note": "Los elementos de esta lista se pueden restaurar actualmente.",
+      "deleted_item_note": "Se puede restaurar actualmente.",
       "no_deleted_items": "No hay elementos borrados recientemente",
       "chat_item": "Chat",
       "strategy_item": "Estrategia",

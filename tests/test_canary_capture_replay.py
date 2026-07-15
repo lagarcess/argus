@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 
 from scripts.ops.canary_capture_replay import replay_capture
@@ -58,9 +62,12 @@ def test_replay_capture_renders_canonical_quick_take_from_sanitized_payload() ->
         "status": "failed",
     }
     assert report["route_receipt"]["status"] == "present"
-    assert "La estrategia rindió 12.8% mientras SPY rindió 26.1%" in report[
-        "quick_take"
-    ]
+    assert report["resolved_language"] == "es-419"
+    quick_take = report["quick_take"]
+    assert "12.8%" in quick_take
+    assert "SPY" in quick_take
+    assert "26.1%" in quick_take
+    assert "lagged by 13.3 percentage points" in quick_take
 
 
 def test_replay_capture_accepts_future_locale_shape_through_fallback_language() -> None:
@@ -79,6 +86,39 @@ def test_replay_capture_rejects_raw_ids_or_secret_like_values() -> None:
 
     with pytest.raises(ValueError, match="raw UUID"):
         replay_capture(payload)
+
+
+def test_replay_capture_rejects_embedded_or_artifact_identifiers() -> None:
+    payload = _capture_payload()
+    payload["source"] = "result/453523c4-164c-423f-814c-2afad15d7ce0/reload"
+
+    with pytest.raises(ValueError, match="raw UUID"):
+        replay_capture(payload)
+
+    payload = _capture_payload()
+    payload["artifact_id"] = "artifact-without-a-safe-label"
+
+    with pytest.raises(ValueError, match="raw id-like field"):
+        replay_capture(payload)
+
+
+def test_replay_capture_direct_cli_loads_shared_sanitizer() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "scripts" / "ops" / "canary_capture_replay.py"),
+            "--help",
+        ],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "sanitized canary capture" in result.stdout
 
 
 def test_replay_capture_accepts_sanitized_labels_and_redactions() -> None:

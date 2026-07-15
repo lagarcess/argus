@@ -224,15 +224,6 @@ def resolve_openrouter_model(
     return _first_configured_model(env_names)
 
 
-def resolve_openrouter_structured_model(
-    model_name: str | None = None,
-    *,
-    task: OpenRouterTask = "interpretation",
-) -> str:
-    candidates = openrouter_model_candidates(model_name, task=task)
-    return candidates[0] if candidates else ""
-
-
 def openrouter_model_candidates(
     model_name: str | None = None,
     *,

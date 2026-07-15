@@ -21,14 +21,24 @@ from argus.api.schemas import (
     EvidenceArtifact,
     Idea,
     IdeaVersion,
+    Language,
+    Locale,
     Message,
     OnboardingState,
     Strategy,
     User,
 )
+from argus.domain.backtest_finalization import (
+    FinalizedBacktest,
+    PreparedBacktestFinalization,
+)
+from argus.domain.backtest_message_projection import (
+    hydrate_completed_backtest_job_messages,
+)
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
+from argus.domain.supabase_backtest_finalization import finalize_backtest
 from argus.observability.cost_ledger import normalize_cost_ledger_entry
 from supabase import Client, ClientOptions, create_client
 
@@ -42,6 +52,10 @@ class DecisionCaptureIntegrityError(RuntimeError):
 
 
 _USAGE_COUNTER_LOCK = threading.Lock()
+_PROFILE_LOCALE_BY_LANGUAGE: dict[Language, Locale] = {
+    "en": "en-US",
+    "es-419": "es-419",
+}
 
 
 def _now_iso() -> str:
@@ -290,6 +304,7 @@ class SupabaseGateway:
         password: str,
         display_name: str | None = None,
         username: str | None = None,
+        language: Language = "en",
     ) -> dict[str, Any]:
         try:
             auth_client = self.auth_client or self.client
@@ -298,7 +313,11 @@ class SupabaseGateway:
                     "email": email,
                     "password": password,
                     "options": {
-                        "data": {"display_name": display_name, "username": username}
+                        "data": {
+                            "display_name": display_name,
+                            "username": username,
+                            "language": language,
+                        }
                     },
                 }
             )
@@ -452,7 +471,16 @@ class SupabaseGateway:
             rows_data = self._fetch_all_rows(lambda start, end: query.range(start, end))
         else:
             rows_data = query.limit(limit).execute().data or []
-        return [Message.model_validate(row) for row in rows_data]
+        messages = [Message.model_validate(row) for row in rows_data]
+        return hydrate_completed_backtest_job_messages(
+            messages,
+            load_job=lambda job_id: self.get_backtest_job(
+                user_id=user_id, job_id=job_id,
+            ),
+            load_run=lambda run_id: self.get_backtest_run(
+                user_id=user_id, run_id=run_id,
+            ),
+        )
 
     def create_message(
         self,
@@ -497,6 +525,13 @@ class SupabaseGateway:
         payload["user_id"] = user_id
         created = self.client.table("backtest_runs").insert(payload).execute()
         return BacktestRun.model_validate(_row_one(created))
+
+    def finalize_backtest_completion(
+        self,
+        *,
+        finalization: PreparedBacktestFinalization,
+    ) -> FinalizedBacktest:
+        return finalize_backtest(self.client, finalization=finalization)
 
     def update_backtest_run_result_card(
         self,
@@ -1029,6 +1064,9 @@ class SupabaseGateway:
         if mark_succeeded:
             payload["status"] = "succeeded"
             payload["finished_at"] = _now_iso()
+            payload["failure_code"] = None
+            payload["failure_detail"] = None
+            payload["retryable"] = False
 
         updated = (
             self.client.table("backtest_jobs")
@@ -1050,6 +1088,14 @@ class SupabaseGateway:
         existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
         if existing is None:
             raise ValueError("Backtest job not found or not owned by user.")
+        can_retry_finalization = (
+            existing.get("status") == "failed"
+            and existing.get("failure_code") == "finalization_failed"
+            and bool(existing.get("retryable"))
+        )
+        existing_status = str(existing.get("status") or "")
+        if existing_status != "queued" and not can_retry_finalization:
+            raise ValueError("Backtest job cannot be started or retried.")
 
         metadata = dict(existing.get("execution_metadata") or {})
         metadata.update(execution_metadata or {})
@@ -1057,17 +1103,30 @@ class SupabaseGateway:
             "status": "running",
             "started_at": started_at or existing.get("started_at") or _now_iso(),
             "attempts": int(existing.get("attempts") or 0) + 1,
+            "result_run_id": None,
+            "finished_at": None,
+            "failure_code": None,
+            "failure_detail": None,
+            "retryable": False,
             "execution_metadata": metadata,
             "updated_at": _now_iso(),
         }
-        updated = (
+        update_query = (
             self.client.table("backtest_jobs")
             .update(payload)
             .eq("user_id", user_id)
             .eq("id", job_id)
-            .execute()
+            .eq("status", existing_status)
         )
-        return dict(_row_one(updated) or {})
+        if can_retry_finalization:
+            update_query = update_query.eq(
+                "failure_code", "finalization_failed"
+            ).eq("retryable", True)
+        updated = update_query.execute()
+        row = _row_one(updated)
+        if row is None:
+            raise ValueError("Backtest job cannot be started or retried.")
+        return dict(row)
 
     def mark_backtest_job_failed(
         self,
@@ -1088,6 +1147,7 @@ class SupabaseGateway:
         metadata.update(execution_metadata or {})
         payload = {
             "status": "failed",
+            "result_run_id": None,
             "finished_at": finished_at or _now_iso(),
             "failure_code": failure_code,
             "failure_detail": failure_detail,
@@ -1992,15 +2052,22 @@ class SupabaseGateway:
             return existing
 
         now = _now_iso()
-        user_metadata = auth_user.get("user_metadata") or {}
+        raw_user_metadata = auth_user.get("user_metadata")
+        user_metadata = (
+            raw_user_metadata if isinstance(raw_user_metadata, dict) else {}
+        )
+        metadata_language = user_metadata.get("language")
+        language: Language = (
+            "es-419" if metadata_language == "es-419" else "en"
+        )
         # Canonical defaults per requirements
         payload = {
             "id": user_id,
             "email": email,
             "username": user_metadata.get("username"),
             "display_name": user_metadata.get("display_name"),
-            "language": "en",
-            "locale": "en-US",
+            "language": language,
+            "locale": _PROFILE_LOCALE_BY_LANGUAGE[language],
             "theme": "dark",
             "is_admin": is_admin,
             "onboarding": {

@@ -220,6 +220,13 @@ Machine-readable values must remain ISO 8601 (YYYY-MM-DD). User-facing cards and
 
 The API stores and returns language/locale preferences. Static UI translation is handled by the frontend i18n layer. AI response language is handled by backend prompt/orchestration using the resolved user language.
 
+For the enabled private-alpha surface, every literal static translation key used
+by frontend source must exist in both `en` and `es-419`. Catalog equality alone
+is not sufficient: CI also checks source-extracted literal keys plus an explicit
+typed inventory for dynamic keys. Runtime fallback can protect rendering but
+cannot satisfy CI or release acceptance. Translated labels are presentation
+only; application state and comparisons use language-neutral fields or enums.
+
 **Reserved for later monetization:**
 - **402 Payment Required**: Quota exhausted or paid entitlement required
 
@@ -699,6 +706,20 @@ references it through `result_run_id`.
 
 **Job contract:**
 - Supabase is the source of truth for job lifecycle state.
+- Local/in-process and Render Workflow execution use the same typed backtest
+  finalizer. A job becomes `succeeded` only after the immutable run, Idea,
+  IdeaVersion, EvidenceArtifact, and enriched result-card identity have been
+  finalized as one logical operation and `result_run_id` points to that run.
+- Finalization retries reuse a stable run identity and return the same artifact
+  ids. A recoverable finalization failure remains in the existing `failed`
+  status with `failure_code = finalization_failed`, `retryable = true`, and no
+  public `result_run_id`; no new public job status is introduced.
+- Job retrieval, conversation reload, history, and search must not expose a
+  partially finalized result.
+- When a completed asynchronous job is loaded after a refresh, the API projects
+  the canonical finalized result and its owned evidence and decision metadata.
+  It does not reconstruct a replacement result from display prose or stale
+  queued-job state.
 - The private-alpha UI currently polls the job status endpoint; Supabase Realtime
   remains the selected target transport for job row changes once subscriptions
   are wired.
@@ -854,8 +875,10 @@ The canonical backtest config used by the engine for execution and reproducibili
 - *Language-agnostic temporal contract:* Normal chat interpretation must not use localized regex/phrase gates to decide executable date intent before the LLM. The interpreter should emit canonical `date_range` values when confident, canonical `date_range_intent` for relative or semantic windows such as rolling windows, year-to-date, calendar-year, since, or endpoint patches, and bounded `date_range_raw_text` only as evidence for the natural-time wrapper. Endpoint patches must use ISO dates or canonical offset math such as `anchor=today` plus `day_offset=-1`, not localized relative words. Deterministic code may resolve canonical intent and bounded evidence, then apply provider/data-availability validation.
 
 ## Reality Gap (Deferred)
-Argus Alpha is a "perfect world" simulation. The following are explicitly excluded from Alpha MVP:
-- slippage, fees, order queue modeling, liquidity/spread modeling, volatility hazards.
+Modeled fees and slippage are supported when a user opts in by stating those
+costs for an idea. Runs without stated costs remain idealized. The following
+market-microstructure effects remain excluded from Alpha MVP:
+- order queue modeling, liquidity/spread modeling, volatility hazards.
 
 ---
 
@@ -895,9 +918,21 @@ Create account.
   "email": "user@email.com",
   "password": "string",
   "display_name": "Lucas",
-  "username": "lucas"
+  "username": "lucas",
+  "language": "es-419"
 }
 ```
+
+**Language persistence:**
+- The private-alpha web client sends its selected `language` (`en` or `es-419`)
+  in this request. The server validates it and derives `locale` (`en-US` or
+  `es-419`); signup does not trust a separate client-supplied locale.
+- Profile creation persists language and derived locale in the server-owned
+  signup path. The client must not depend on a second profile patch.
+- Omitted language may retain the canonical English fallback for compatible API
+  clients, but omission is invalid for the private-alpha web signup contract.
+- Unsupported language returns `422`. Allowlist and provider failures retain
+  the generic private-alpha signup response below.
 
 **Response:**
 ```json
@@ -1074,6 +1109,10 @@ Argus supports English and Spanish (Latin America) in Alpha.
 ## Source of Truth Rules
 - **Authenticated Users**: `profiles.language` and `profiles.locale` are the persisted source of truth. Profile preference wins over browser detection.
 - **Logged-out Users**: Frontend may store preferences in `localStorage`. API does not persist these unless guest sessions are implemented.
+- Successful signup writes both profile values from the validated signup
+  language before the authenticated application renders. Login, session
+  hydration, and reload replace browser/local hints with the stored profile;
+  pre-auth browser detection is never durable authority.
 
 ## Frontend Resolution Order
 1. Authenticated user profile preference
@@ -2313,7 +2352,13 @@ Feature flags may be returned in session/profile responses.
 
 For Alpha, the Settings "Upgrade" button may be shown behind a feature flag as a visual placeholder only. No billing, entitlement mutation, or upgrade API behavior is implemented.
 
-Backend runtime flags may also control internal engine behavior. `ARGUS_ENABLE_EXECUTION_REALISM` is enabled by default; setting it to `false` (also `0`, `off`, or `no`) is a kill switch that restores the pre-realism behavior byte-for-byte. Execution costs remain user opt-in per idea either way: runs without stated fees or slippage stay canonical "no fees/slippage". With the kill switch engaged, confirmation cards omit `capabilities.execution_costs_editable` and result cards omit `execution_costs`.
+Backend runtime flags may also control internal engine behavior. Execution realism
+is active by default behind `ARGUS_ENABLE_EXECUTION_REALISM`, while modeled costs
+remain opt-in per idea. An explicit `false|0|off|no` value is the kill switch and
+restores the pre-realism behavior byte-for-byte. Runs without stated fees or
+slippage stay canonical "no fees/slippage". With the kill switch engaged,
+confirmation cards omit `capabilities.execution_costs_editable` and result cards
+omit `execution_costs`.
 
 ---
 
@@ -2329,7 +2374,9 @@ Never silently change shapes.
 - Must follow supported strategy templates.
 - Ask for missing required user intent when needed.
 - Use backend defaults when appropriate and explain them in plain language.
-- Never claim shorting, slippage, fees, or execution realism are supported in Alpha.
+- Never claim shorting is supported in Alpha. Describe fees or slippage only from
+  backend-provided execution-cost capability or result evidence; otherwise retain
+  the canonical no-fees/slippage assumption.
 - Never use unsupported timeframes or invent unsupported metrics.
 
 ## Product

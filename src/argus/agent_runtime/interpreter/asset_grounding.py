@@ -54,6 +54,19 @@ def _normalized_extracted_symbols(values: list[Any]) -> set[str]:
     return symbols
 
 
+def trusted_asset_symbols(
+    response: LLMInterpretationResponse,
+    suspicious_symbols: list[str],
+) -> list[str]:
+    suspicious = _normalized_extracted_symbols(suspicious_symbols)
+    return [
+        symbol
+        for value in response.candidate_strategy_draft.asset_universe
+        if (symbol := _normalized_extracted_symbol(value)) is not None
+        and symbol not in suspicious
+    ]
+
+
 def _comparison_baseline_has_trusted_provenance(draft: LLMStrategyDraft) -> bool:
     provenance = draft.field_provenance or {}
     return provenance.get("comparison_baseline") in {

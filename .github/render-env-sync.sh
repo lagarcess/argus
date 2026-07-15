@@ -39,7 +39,7 @@ Commands:
   api-proof-shadow-on     Enable proof-only shadow dispatch to workflow_proof.
   api-real-workflow-on    Enable real async dispatch to run_backtest_job.
   api-runtime             Sync argus-api build/start commands and Poetry pin.
-  release-config-audit    Read-only API/web/workflow env audit with redacted fingerprints.
+  release-config-audit    Read-only release-profile audit with redacted fingerprints.
   workflow-proof          Sync workflow DB/task/provider env vars on argus-backtests.
   workflow-release        Release argus-backtests so env/build changes reach new runs.
   workflow-runtime        Sync workflow build/start commands on argus-backtests.
@@ -69,69 +69,36 @@ Additional local env for workflow-proof:
 USAGE
 }
 
-ARGUS_RELEASE_API_ENV_EXPECTED=(
-  "APP_ENV=production"
-  "POETRY_VERSION=$ARGUS_RENDER_POETRY_VERSION"
-  "ARGUS_PERSISTENCE_MODE=supabase"
-  "ARGUS_DEV_MEMORY_FALLBACK=false"
-  "ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider"
-  "MARKET_DATA_CACHE_TTL=43200"
-  "ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS=180"
-  "ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS=15"
-  "ARGUS_CHECKPOINTER_MODE=postgres"
-  "ARGUS_MOCK_AUTH=false"
-  "ARGUS_CORS_ALLOW_ORIGINS=$ARGUS_PRIVATE_LAUNCH_CORS_ORIGINS"
-  "ARGUS_STRATEGIES_ENABLED=false"
-  "ARGUS_BACKTEST_WORKFLOW_TASK=$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"
-  "ARGUS_BACKTEST_REAL_WORKFLOW_TASK=$ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT"
-  "ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT=1"
-  "ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT=2"
-  "ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT=5"
-  "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT=10"
-  "ARGUS_CONTEXT_PACKETS_ENABLED=true"
-  "ARGUS_CONTEXT_PACKET_BUDGET_SECONDS=4"
-  "ARGUS_TITLE_AUTOGEN_ENABLED=true"
-  "ARGUS_TITLE_AUTOGEN_TIMEOUT_MS=250"
-  "ARGUS_READINESS_ASSET_TIMEOUT_SECONDS=25"
-  "ARGUS_OPS_TOKEN=<redacted-present>"
-  "DATABASE_URL=<redacted-present>"
-  "SUPABASE_URL=https://lgdhvepyrzbnscqssgqq.supabase.co"
-  "SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGh2ZXB5cnpibnNjcXNzZ3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NzkwOTksImV4cCI6MjA4ODI1NTA5OX0.mc7KjmJYuAp01Mj96gceGsAW2UPI2_HQsv0_kyWaQmo"
-  "SUPABASE_SERVICE_ROLE_KEY=<redacted-present>"
-  "SUPABASE_JWT_SECRET=<redacted-present>"
-  "OPENROUTER_API_KEY=<redacted-present>"
-  "ARGUS_UTILITY_MODEL=google/gemini-2.5-flash-lite"
-  "ARGUS_UTILITY_FALLBACK_MODEL=qwen/qwen3.5-9b"
-  "ARGUS_CHAT_MODEL=deepseek/deepseek-v4-flash"
-  "ARGUS_CHAT_FALLBACK_MODEL=qwen/qwen3.5-9b"
-  "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=30"
-  "ARGUS_STRUCTURED_MODEL=x-ai/grok-4.3"
-  "ARGUS_STRUCTURED_FALLBACK_MODEL=anthropic/claude-haiku-4.5"
-  "ARGUS_CONTEXT_MODEL=openai/gpt-oss-120b"
-  "ARGUS_CONTEXT_FALLBACK_MODEL=deepseek/deepseek-v4-flash"
-  "ALPACA_API_KEY=<redacted-present>"
-  "ALPACA_SECRET_KEY=<redacted-present>"
-  "ALPACA_PAPER_TRADING=true"
-  # Backend onboarding gate for the API service — keep in lockstep with the web service's
-  # NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED so onboarding stays off on the API too,
-  # not just the frontend (the gate in api/routers/agent.py reads this var).
-  "ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED=false"
-)
+RELEASE_PROFILE_TOOL="$SCRIPT_DIR/private-alpha-release-profile.py"
 
-ARGUS_RELEASE_WEB_ENV_EXPECTED=(
-  "NEXT_PUBLIC_APP_ENV=production"
-  "NEXT_PUBLIC_SUPABASE_URL=https://lgdhvepyrzbnscqssgqq.supabase.co"
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGh2ZXB5cnpibnNjcXNzZ3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NzkwOTksImV4cCI6MjA4ODI1NTA5OX0.mc7KjmJYuAp01Mj96gceGsAW2UPI2_HQsv0_kyWaQmo"
-  "NEXT_PUBLIC_POSTHOG_KEY=<missing-or-empty>"
-  "NEXT_PUBLIC_MOCK_AUTH=false"
-  "NEXT_PUBLIC_ENABLE_SPANISH=true"
-  "NEXT_PUBLIC_ARGUS_API_URL=$ARGUS_PRIVATE_LAUNCH_API_BASE_URL"
-  "NEXT_PUBLIC_STRATEGIES_ENABLED=false"
-  "NEXT_PUBLIC_COLLECTIONS_ENABLED=false"
-  "NEXT_PUBLIC_OMNISEARCH_ENABLED=true"
-  "NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED=false"
-  "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false"
-)
+release_profile_validate() {
+  python3 "$RELEASE_PROFILE_TOOL" validate
+}
+
+release_profile_hash() {
+  python3 "$RELEASE_PROFILE_TOOL" hash
+}
+
+release_profile_env_pairs() {
+  local surface="$1"
+  python3 "$RELEASE_PROFILE_TOOL" env-pairs "$surface"
+}
+
+release_profile_env_value() {
+  local surface="$1"
+  local key="$2"
+  python3 "$RELEASE_PROFILE_TOOL" env-value "$surface" "$key"
+}
+
+release_profile_required_present() {
+  local surface="$1"
+  python3 "$RELEASE_PROFILE_TOOL" required-present "$surface"
+}
+
+release_profile_allowed_keys() {
+  local surface="$1"
+  python3 "$RELEASE_PROFILE_TOOL" allowed-keys "$surface"
+}
 
 AUDIT_FAILURES=0
 AUDIT_FINGERPRINT_ROWS=()
@@ -430,6 +397,18 @@ audit_expected_value() {
   local expected="$4"
   local actual
 
+  if [ "$expected" = "<present>" ]; then
+    actual="$(render_env_raw_value "$env_json" "$key")"
+    record_audit_row "$service" "${key}=<present>"
+    if [ -n "$actual" ]; then
+      echo "ok ${service}:${key}=<present>"
+      return
+    fi
+    echo "drift ${service}:${key} expected=<present> actual=<missing-or-empty>"
+    record_audit_failure "$service"
+    return
+  fi
+
   actual="$(render_env_status_value "$env_json" "$key")"
   record_audit_row "$service" "${key}=${actual}"
   if [ "$actual" = "$expected" ]; then
@@ -457,28 +436,16 @@ audit_render_service_config() {
 workflow_render_env_value() {
   local key="$1"
   local workflow_database_url="${ARGUS_WORKFLOW_DATABASE_URL:-${SUPABASE_POSTGRES_TRANSACTION_POOLER_URL:-}}"
+  local profile_value=""
+
+  if profile_value="$(release_profile_env_value workflow "$key" 2>/dev/null)"; then
+    echo "$profile_value"
+    return
+  fi
 
   case "$key" in
     ARGUS_WORKFLOW_DATABASE_URL)
       echo "$workflow_database_url"
-      ;;
-    ARGUS_RENDER_WORKFLOW_PROOF_TASK)
-      echo "$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"
-      ;;
-    ARGUS_WORKFLOW_PROOF_PLAN)
-      echo "${ARGUS_WORKFLOW_PROOF_PLAN:-starter}"
-      ;;
-    POETRY_VERSION)
-      echo "$ARGUS_RENDER_POETRY_VERSION"
-      ;;
-    ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS)
-      echo "${ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS:-300}"
-      ;;
-    ARGUS_MARKET_DATA_PROVIDER_MODE)
-      echo "live_provider"
-      ;;
-    ENABLE_MARKET_DATA_CACHE)
-      echo "${ENABLE_MARKET_DATA_CACHE:-false}"
       ;;
     ALPACA_API_KEY)
       echo "${ALPACA_API_KEY:-}"
@@ -486,38 +453,8 @@ workflow_render_env_value() {
     ALPACA_SECRET_KEY)
       echo "${ALPACA_SECRET_KEY:-}"
       ;;
-    ALPACA_PAPER_TRADING)
-      echo "${ALPACA_PAPER_TRADING:-true}"
-      ;;
     OPENROUTER_API_KEY)
       echo "${OPENROUTER_API_KEY:-}"
-      ;;
-    ARGUS_UTILITY_MODEL)
-      echo "${ARGUS_UTILITY_MODEL:-google/gemini-2.5-flash-lite}"
-      ;;
-    ARGUS_UTILITY_FALLBACK_MODEL)
-      echo "${ARGUS_UTILITY_FALLBACK_MODEL:-qwen/qwen3.5-9b}"
-      ;;
-    ARGUS_CHAT_MODEL)
-      echo "${ARGUS_CHAT_MODEL:-deepseek/deepseek-v4-flash}"
-      ;;
-    ARGUS_CHAT_FALLBACK_MODEL)
-      echo "${ARGUS_CHAT_FALLBACK_MODEL:-qwen/qwen3.5-9b}"
-      ;;
-    ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS)
-      echo "${ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS:-30}"
-      ;;
-    ARGUS_STRUCTURED_MODEL)
-      echo "${ARGUS_STRUCTURED_MODEL:-x-ai/grok-4.3}"
-      ;;
-    ARGUS_STRUCTURED_FALLBACK_MODEL)
-      echo "${ARGUS_STRUCTURED_FALLBACK_MODEL:-anthropic/claude-haiku-4.5}"
-      ;;
-    ARGUS_CONTEXT_MODEL)
-      echo "${ARGUS_CONTEXT_MODEL:-openai/gpt-oss-120b}"
-      ;;
-    ARGUS_CONTEXT_FALLBACK_MODEL)
-      echo "${ARGUS_CONTEXT_FALLBACK_MODEL:-deepseek/deepseek-v4-flash}"
       ;;
     *)
       echo "Unsupported workflow env key: $key" >&2
@@ -529,11 +466,8 @@ workflow_render_env_value() {
 workflow_render_env_expected_status() {
   local key="$1"
   local value
-  # Secret keys are verified for presence on Render, not in the audit runner's
-  # local env. The read-only audit step (warmup) intentionally does not export
-  # workflow secrets like ALPACA_*/OPENROUTER_API_KEY, so expecting them locally
-  # would report false drift. Render redacts secret values, so the only signal
-  # we can assert is <redacted-present>.
+  # The read-only audit intentionally does not need workflow secrets in its
+  # local environment: Render is the source of the presence signal.
   if is_secret_render_env_key "$key"; then
     echo "<redacted-present>"
     return
@@ -590,6 +524,39 @@ audit_unexpected_render_env_keys() {
   done < <(render_env_keys "$env_json")
 }
 
+release_profile_expected_pairs() {
+  local surface="$1"
+  local mode="$2"
+  local pair key
+
+  while IFS= read -r pair; do
+    [ -n "$pair" ] || continue
+    key="${pair%%=*}"
+    if [ "$surface" = "api" ] && [ "$mode" != "real-workflow" ]; then
+      case "$key" in
+        ARGUS_BACKTEST_JOBS_SHADOW_ENABLED|ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED|ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED)
+          continue
+          ;;
+      esac
+    fi
+    printf '%s\n' "$pair"
+  done < <(release_profile_env_pairs "$surface")
+
+  while IFS= read -r key; do
+    [ -n "$key" ] || continue
+    if [ "$surface" = "api" ] && [ "$mode" != "real-workflow" ] && [ "$key" = "RENDER_API_KEY" ]; then
+      continue
+    fi
+    if is_secret_render_env_key "$key"; then
+      printf '%s=<redacted-present>\n' "$key"
+    else
+      printf '%s=<present>\n' "$key"
+    fi
+  done < <(release_profile_required_present "$surface")
+}
+
+# These are transient operational modes, not release profiles. The checked-in
+# profile remains the source of truth for every stable release setting.
 expected_api_mode_pairs() {
   local mode="$1"
   case "$mode" in
@@ -669,6 +636,13 @@ audit_release_config() {
   esac
 
   require_local_env RENDER_API_KEY
+  local profile_status
+  if ! profile_status="$(release_profile_validate)"; then
+    echo "release_profile_status=drift"
+    echo "release_profile_error=${profile_status:-validation_failed}"
+    return 1
+  fi
+  RELEASE_PROFILE_HASH="$(release_profile_hash)"
   AUDIT_FAILURES=0
   AUDIT_FINGERPRINT_ROWS=()
   WORKFLOW_AUDIT_FAILURES=0
@@ -678,15 +652,39 @@ audit_release_config() {
   local mode_pairs=()
   local mode_pair
   local workflow_pairs=()
+  local api_profile_pairs=()
+  local web_profile_pairs=()
+  local workflow_profile_pairs=()
+  local api_allowed_keys=()
+  local web_allowed_keys=()
+  local workflow_allowed_keys=()
   local audit_workflow_env=false
   while IFS= read -r mode_pair; do
     mode_pairs+=("$mode_pair")
   done < <(expected_api_mode_pairs "$expected_mode")
+  while IFS= read -r mode_pair; do
+    api_profile_pairs+=("$mode_pair")
+  done < <(release_profile_expected_pairs api "$expected_mode")
+  while IFS= read -r mode_pair; do
+    web_profile_pairs+=("$mode_pair")
+  done < <(release_profile_expected_pairs web "$expected_mode")
+  while IFS= read -r mode_pair; do
+    api_allowed_keys+=("$mode_pair")
+  done < <(release_profile_allowed_keys api)
+  while IFS= read -r mode_pair; do
+    web_allowed_keys+=("$mode_pair")
+  done < <(release_profile_allowed_keys web)
   if [ "$expected_mode" = "real-workflow" ]; then
     audit_workflow_env=true
     while IFS= read -r mode_pair; do
       workflow_pairs+=("$mode_pair")
     done < <(workflow_expected_env_pairs)
+    while IFS= read -r mode_pair; do
+      workflow_profile_pairs+=("$mode_pair")
+    done < <(release_profile_expected_pairs workflow "$expected_mode")
+    while IFS= read -r mode_pair; do
+      workflow_allowed_keys+=("$mode_pair")
+    done < <(release_profile_allowed_keys workflow)
   fi
   api_env_json="$(render_env_json "$API_SERVICE_ID")"
   web_env_json="$(render_env_json "$WEB_SERVICE_ID")"
@@ -698,20 +696,22 @@ audit_release_config() {
 
   echo "Argus release config audit"
   echo "expected_mode=$expected_mode"
+  echo "release_profile_status=ready"
+  echo "release_profile_hash=$RELEASE_PROFILE_HASH"
   audit_forbidden_render_env_keys "$api_env_json" "argus-api" "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
   audit_forbidden_render_env_keys "$web_env_json" "argus-app" "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
-  audit_unexpected_render_env_keys "$api_env_json" "argus-api" "${ARGUS_RENDER_API_ENV[@]}"
-  audit_unexpected_render_env_keys "$web_env_json" "argus-app" "${ARGUS_RENDER_WEB_ENV[@]}"
-  audit_render_service_config "$api_env_json" "argus-api" "${ARGUS_RELEASE_API_ENV_EXPECTED[@]}"
+  audit_unexpected_render_env_keys "$api_env_json" "argus-api" "${api_allowed_keys[@]}"
+  audit_unexpected_render_env_keys "$web_env_json" "argus-app" "${web_allowed_keys[@]}"
+  audit_render_service_config "$api_env_json" "argus-api" "${api_profile_pairs[@]}"
   audit_render_service_config "$api_env_json" "argus-api" "${mode_pairs[@]}"
-  audit_render_service_config "$web_env_json" "argus-app" "${ARGUS_RELEASE_WEB_ENV_EXPECTED[@]}"
+  audit_render_service_config "$web_env_json" "argus-app" "${web_profile_pairs[@]}"
   if [ "$audit_workflow_env" = "true" ]; then
     audit_forbidden_render_env_keys "$workflow_env_json" "argus-backtests" "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
     audit_unexpected_render_env_keys \
       "$workflow_env_json" \
       "argus-backtests" \
-      "${ARGUS_RENDER_WORKFLOW_PROOF_ENV[@]}" \
-      "${ARGUS_RENDER_WORKFLOW_RELEASE_ENV[@]}"
+      "${workflow_allowed_keys[@]}"
+    audit_render_service_config "$workflow_env_json" "argus-backtests" "${workflow_profile_pairs[@]}"
     audit_render_service_config "$workflow_env_json" "argus-backtests" "${workflow_pairs[@]}"
   fi
 
@@ -759,15 +759,20 @@ sync_api_proof_shadow_on() {
 
 sync_api_real_workflow_on() {
   require_local_env RENDER_API_KEY
-  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_SHADOW_ENABLED true
-  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED true
-  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED true
-  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_WORKFLOW_TASK "$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"
-  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_REAL_WORKFLOW_TASK "$ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT"
-  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT "${ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT:-1}"
-  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT "${ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT:-2}"
-  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT "${ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT:-5}"
-  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT "${ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT:-10}"
+  local key
+  for key in \
+    ARGUS_BACKTEST_JOBS_SHADOW_ENABLED \
+    ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED \
+    ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED \
+    ARGUS_BACKTEST_WORKFLOW_TASK \
+    ARGUS_BACKTEST_REAL_WORKFLOW_TASK \
+    ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT \
+    ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT \
+    ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT \
+    ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT
+  do
+    put_render_env "$API_SERVICE_ID" "$key" "$(release_profile_env_value api "$key")"
+  done
   put_render_env "$API_SERVICE_ID" RENDER_API_KEY "$RENDER_API_KEY"
 }
 

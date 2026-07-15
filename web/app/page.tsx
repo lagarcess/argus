@@ -6,7 +6,11 @@ import { Eye, EyeClosed } from "lucide-react";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { useTranslation } from "react-i18next";
 import { OnboardingGate } from "@/components/onboarding/OnboardingGate";
-import { loginWithEmail, signupWithEmail } from "@/lib/argus-api";
+import {
+  loginWithEmail,
+  normalizeApiLanguage,
+  signupWithEmail,
+} from "@/lib/argus-api";
 
 type AuthMode = "intro" | "signup" | "login";
 
@@ -17,7 +21,7 @@ function authModeFromLocation(): AuthMode {
 }
 
 export default function LandingPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const [authMode, setAuthMode] = useState<AuthMode>("intro");
@@ -68,6 +72,7 @@ export default function LandingPage() {
         await signupWithEmail({
           email,
           password,
+          language: normalizeApiLanguage(i18n.resolvedLanguage ?? i18n.language),
           display_name: displayName.trim() || null,
         });
       } else {

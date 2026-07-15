@@ -17,6 +17,7 @@ from argus.agent_runtime.resolution import mention_to_provenance
 from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
+from argus.api.chat import retry as chat_retry
 from argus.api.chat.actions import (
     chat_display_message,
     chat_request_message,
@@ -58,7 +59,6 @@ from argus.api.chat.recovery import (
     pending_strategy_metadata_fallback_context,
     runtime_checkpoint_values,
 )
-from argus.api.chat.retry import retry_last_turn_metadata
 from argus.api.chat.route_receipts import persist_route_receipts
 from argus.api.chat.runtime_worker import (
     runtime_worker_enabled,
@@ -83,6 +83,7 @@ from argus.api.message_store import (
 )
 from argus.api.naming import get_starter_prompts, resolve_language
 from argus.api.schemas import BacktestRun, ChatStreamRequest, StarterPromptsResponse, User
+from argus.domain.backtest_finalization import BacktestFinalizationError
 from argus.domain.supabase_gateway import QuotaExceededError
 from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
@@ -263,14 +264,6 @@ def fallback_private_alpha_save_response(language: str | None = None) -> str:
     )
 
     return _fallback_private_alpha_save_response(language=language)
-
-
-def result_breakdown_message(run: BacktestRun | None, *, language: str = "en") -> str:
-    from argus.api.chat.breakdown import (
-        result_breakdown_message as _result_breakdown_message,
-    )
-
-    return _result_breakdown_message(run, language=language)
 
 
 def result_breakdown_message_with_metadata(
@@ -467,11 +460,18 @@ async def chat_stream(
         )
 
     workflow: Any | None = None
+    retry_finalization_execution_identity: str | None = None
     try:
         workflow = api_state.get_agent_runtime_workflow(request)
         terminal_failure_metadata = latest_unresolved_terminal_runtime_failure_metadata(
             user_id=user.id,
             conversation_id=conversation.id,
+        )
+        retry_finalization_execution_identity = (
+            chat_retry.retryable_finalization_execution_identity(
+                terminal_failure_metadata,
+                request_message=request_message,
+            )
         )
         if terminal_failure_metadata is not None:
             await mark_terminal_runtime_failure_checkpoint(
@@ -494,7 +494,7 @@ async def chat_stream(
         persist_request_message()
         language = payload.language or conversation.language or current_user_profile.language
         assistant_text = recovery_message("runtime_failure", language=language)
-        retry_metadata = retry_last_turn_metadata(
+        retry_metadata = chat_retry.retry_last_turn_metadata(
             payload=payload,
             request_message=request_message,
         )
@@ -698,6 +698,7 @@ async def chat_stream(
     )
 
     async def events() -> AsyncIterator[str]:
+        active_finalization_execution_identity: str | None = None
         naming_language = (
             payload.language
             or conversation.language
@@ -1048,12 +1049,21 @@ async def chat_stream(
                 if result_card is not None:
                     from argus.api.chat.persistence import persist_runtime_backtest_run
 
+                    active_finalization_execution_identity = (
+                        chat_retry.backtest_finalization_execution_identity(
+                            backtest_job=backtest_job,
+                            retry_execution_identity=retry_finalization_execution_identity,
+                            idempotency_key=clean_idempotency_key,
+                            request_id=request.state.request_id,
+                        )
+                    )
                     run = persist_runtime_backtest_run(
                         user=user,
                         conversation=conversation,
                         result_card=result_card,
                         envelope=envelope,
                         quick_take=assistant_text,
+                        execution_identity=active_finalization_execution_identity,
                     )
                     persist_onboarding_update(
                         current_user_profile,
@@ -1339,6 +1349,12 @@ async def chat_stream(
             if not final_seen:
                 raise RuntimeError("agent_runtime_missing_final")
         except Exception as exc:
+            finalization_failed = isinstance(exc, BacktestFinalizationError)
+            failure_code = (
+                "finalization_failed"
+                if finalization_failed
+                else "agent_runtime_failure"
+            )
             runtime_diagnostics = _runtime_failure_diagnostics(exc)
             logger.exception(
                 "Agent runtime chat streaming failed",
@@ -1352,6 +1368,8 @@ async def chat_stream(
             failure_metadata: dict[str, Any] = {
                 "conversation_mode": "recovery",
                 "agent_runtime_stage_outcome": "agent_runtime_failure",
+                "failure_code": failure_code,
+                "retryable": finalization_failed,
                 "agent_runtime_turn": {
                     "status": "failed",
                     "terminal": True,
@@ -1361,14 +1379,19 @@ async def chat_stream(
             }
             if runtime_diagnostics is not None:
                 failure_metadata["runtime_diagnostics"] = runtime_diagnostics
-            retry_metadata = retry_last_turn_metadata(
+            if finalization_failed and active_finalization_execution_identity:
+                failure_metadata["backtest_finalization"] = {
+                    "execution_identity": active_finalization_execution_identity,
+                }
+            retry_metadata = chat_retry.retry_last_turn_metadata(
                 payload=payload,
                 request_message=request_message,
+                include_structured_action=finalization_failed,
             )
             recovery = recovery_state(
                 "runtime_failure",
                 language=runtime_user.language_preference,
-                retryable=retry_metadata is not None,
+                retryable=finalization_failed or retry_metadata is not None,
             )
             failure_metadata["recovery"] = recovery
             if retry_metadata is not None:
@@ -1397,7 +1420,7 @@ async def chat_stream(
             receipt_metadata = {
                 "request_id": request.state.request_id,
                 "source": "api_turn",
-                "stage_outcome": "agent_runtime_failure",
+                "stage_outcome": failure_code,
                 "conversation_mode": "recovery",
             }
             if runtime_diagnostics is not None:
@@ -1405,7 +1428,7 @@ async def chat_stream(
             yield sse_data(
                 {
                     "type": "error",
-                    "code": "agent_runtime_failure",
+                    "code": failure_code,
                     "message": assistant_text,
                     "message_id": assistant_message.id,
                     "recovery": recovery,

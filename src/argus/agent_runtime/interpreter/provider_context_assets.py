@@ -72,7 +72,28 @@ def response_with_provider_context_assets(
             asset_classes.add(asset_class)
 
     draft = response.candidate_strategy_draft.model_copy(deep=True)
-    draft.asset_universe = resolved_symbols
+    draft_assets = [
+        str(value).strip()
+        for value in draft.asset_universe
+        if str(value).strip()
+    ]
+    context_is_partial = len(resolved_symbols) < len(draft_assets)
+    preserved_fuller_draft = context_is_partial
+    if not context_is_partial:
+        draft.asset_universe = resolved_symbols
+    else:
+        draft_symbols = {value.upper() for value in draft_assets}
+        draft.asset_universe = [
+            *[symbol for symbol in resolved_symbols if symbol not in draft_symbols],
+            *draft_assets,
+        ]
+        ambiguous_fields.append(
+            _ambiguous_field_from_partial_context(
+                rows=candidate_rows,
+                resolved_symbols=resolved_symbols,
+                reason_code="asset_resolution_context_underfilled",
+            )
+        )
     if len(asset_classes) == 1:
         draft.asset_class = next(iter(asset_classes))
     elif len(asset_classes) > 1:
@@ -86,10 +107,25 @@ def response_with_provider_context_assets(
     if response.intent == "unsupported_or_out_of_scope":
         if not resolved_symbols:
             return response
+        draft.asset_universe = resolved_symbols
+        preserved_fuller_draft = False
         ambiguous_fields = []
-    if not ambiguous_fields and draft == response.candidate_strategy_draft:
+    if (
+        not ambiguous_fields
+        and not preserved_fuller_draft
+        and draft == response.candidate_strategy_draft
+    ):
         return response
     update: dict[str, Any] = {"candidate_strategy_draft": draft}
+    if preserved_fuller_draft:
+        update["reason_codes"] = list(
+            dict.fromkeys(
+                [
+                    *response.reason_codes,
+                    "provider_context_partial_preserved_fuller_draft",
+                ]
+            )
+        )
     if ambiguous_fields:
         update.update(
             {
@@ -102,6 +138,42 @@ def response_with_provider_context_assets(
             }
         )
     return response.model_copy(update=update)
+
+
+def response_with_grounded_partial_context(
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse:
+    if "provider_context_partial_preserved_fuller_draft" not in response.reason_codes:
+        return response
+    remaining_ambiguous_fields = [
+        field
+        for field in response.ambiguous_fields
+        if field.reason_code != "asset_resolution_context_underfilled"
+    ]
+    if len(remaining_ambiguous_fields) == len(response.ambiguous_fields):
+        return response
+    can_clear_clarification = (
+        not remaining_ambiguous_fields
+        and not response.missing_required_fields
+        and not response.unsupported_constraints
+        and response.assistant_response is None
+    )
+    return response.model_copy(
+        update={
+            "requires_clarification": (
+                False if can_clear_clarification else response.requires_clarification
+            ),
+            "ambiguous_fields": remaining_ambiguous_fields,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "provider_context_partial_grounded_by_current_message",
+                    ]
+                )
+            ),
+        }
+    )
 
 
 def resolved_asset_symbols_from_strategy_context(strategy: Any) -> list[str]:
@@ -286,6 +358,8 @@ def _provider_record_matches_symbol(record: dict[str, Any], symbol: str) -> bool
     candidates = {
         str(record.get("symbol") or "").strip().upper(),
         str(record.get("raw_symbol") or "").strip().upper(),
+        str(record.get("raw_text") or "").strip().upper(),
+        str(record.get("name") or "").strip().upper(),
     }
     return any(
         candidate and candidate.replace("/", "") == compact
@@ -304,6 +378,25 @@ def _ambiguous_field_from_context_row(row: dict[str, Any]) -> LLMAmbiguousField:
         raw_value=str(row.get("raw_text") or "").strip(),
         candidate_normalized_value=candidates or None,
         reason_code="asset_resolution_ambiguous",
+    )
+
+
+def _ambiguous_field_from_partial_context(
+    *,
+    rows: list[dict[str, Any]],
+    resolved_symbols: list[str],
+    reason_code: str,
+) -> LLMAmbiguousField:
+    raw_values = [
+        str(row.get("raw_text") or "").strip()
+        for row in rows
+        if str(row.get("raw_text") or "").strip()
+    ]
+    return LLMAmbiguousField(
+        field_name="asset_universe",
+        raw_value=", ".join(raw_values),
+        candidate_normalized_value=resolved_symbols or None,
+        reason_code=reason_code,
     )
 
 

@@ -247,17 +247,12 @@ def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
     )
 
     assert card is not None
-    assert card["date_range"] == {
-        "start": "2025-05-03",
-        "end": "2026-05-03",
-        "display": "past year (May 3, 2025 - May 3, 2026)",
-    }
-    period = next(row["value"] for row in card["rows"] if row["label"] == "Period")
-    assert period == "past year (May 3, 2025 - May 3, 2026)"
-    assert card["summary"] == (
-        "Ready to test GOOGL with an RSI threshold over past year, "
-        "May 3, 2025 - May 3, 2026."
-    )
+    assert card["date_range"]["start"] == "2025-05-03"
+    assert card["date_range"]["end"] == "2026-05-03"
+    assert card["date_range"]["display"] == "May 3, 2025 - May 3, 2026"
+    period = next(row for row in card["rows"] if row["key"] == "period")
+    assert period["labelKey"] == "chat.confirmation.rows.period"
+    assert period["value"] == card["date_range"]["display"]
     run_action = next(
         action for action in card["actions"] if action["type"] == "run_backtest"
     )
@@ -299,9 +294,13 @@ def test_runtime_confirmation_card_expands_compact_period_and_hides_indicator_ca
     )
 
     assert card is not None
-    rows_by_label = {row["label"]: row["value"] for row in card["rows"]}
-    assert rows_by_label["Period"] == "past year (May 3, 2025 - May 3, 2026)"
-    assert "Cadence" not in rows_by_label
+    rows_by_key = {row["key"]: row for row in card["rows"]}
+    assert card["date_range"]["start"] == "2025-05-03"
+    assert card["date_range"]["end"] == "2026-05-03"
+    assert card["date_range"]["display"] == "May 3, 2025 - May 3, 2026"
+    assert rows_by_key["period"]["labelKey"] == "chat.confirmation.rows.period"
+    assert rows_by_key["period"]["value"] == card["date_range"]["display"]
+    assert "cadence" not in rows_by_key
 
 
 def test_runtime_confirmation_card_simplifies_counted_one_year_period(
@@ -334,8 +333,12 @@ def test_runtime_confirmation_card_simplifies_counted_one_year_period(
     )
 
     assert card is not None
-    rows_by_label = {row["label"]: row["value"] for row in card["rows"]}
-    assert rows_by_label["Period"] == "past year (May 3, 2025 - May 3, 2026)"
+    rows_by_key = {row["key"]: row for row in card["rows"]}
+    assert card["date_range"]["start"] == "2025-05-03"
+    assert card["date_range"]["end"] == "2026-05-03"
+    assert card["date_range"]["display"] == "May 3, 2025 - May 3, 2026"
+    assert rows_by_key["period"]["labelKey"] == "chat.confirmation.rows.period"
+    assert rows_by_key["period"]["value"] == card["date_range"]["display"]
 
 
 def test_runtime_confirmation_card_formats_machine_date_tokens(
@@ -373,11 +376,25 @@ def test_runtime_confirmation_card_formats_machine_date_tokens(
     last_three_months = card_for("last_3_months")
     ytd = card_for("year_to_date")
 
-    last_rows = {row["label"]: row["value"] for row in last_three_months["rows"]}
-    ytd_rows = {row["label"]: row["value"] for row in ytd["rows"]}
-    assert last_rows["Strategy"] == "Dip Buying"
-    assert last_rows["Period"] == "past 3 months (February 3, 2026 - May 3, 2026)"
-    assert ytd_rows["Period"] == "year to date (January 1, 2026 - May 3, 2026)"
+    last_rows = {row["key"]: row for row in last_three_months["rows"]}
+    ytd_rows = {row["key"]: row for row in ytd["rows"]}
+    assert last_three_months["strategy_type"] == "indicator_threshold"
+    assert last_three_months["date_range"]["start"] == "2026-02-03"
+    assert last_three_months["date_range"]["end"] == "2026-05-03"
+    assert (
+        last_three_months["date_range"]["display"]
+        == "February 3, 2026 - May 3, 2026"
+    )
+    assert last_rows["period"]["labelKey"] == "chat.confirmation.rows.period"
+    assert (
+        last_rows["period"]["value"]
+        == last_three_months["date_range"]["display"]
+    )
+    assert ytd["date_range"]["start"] == "2026-01-01"
+    assert ytd["date_range"]["end"] == "2026-05-03"
+    assert ytd["date_range"]["display"] == "January 1, 2026 - May 3, 2026"
+    assert ytd_rows["period"]["labelKey"] == "chat.confirmation.rows.period"
+    assert ytd_rows["period"]["value"] == ytd["date_range"]["display"]
 
 
 def test_runtime_confirmation_card_formats_structured_date_range(

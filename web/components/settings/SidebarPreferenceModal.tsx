@@ -31,16 +31,16 @@ export default function SidebarPreferenceModal({
     <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
       <button
         className="absolute inset-0"
-        aria-label="Close sidebar preference modal"
+        aria-label={t("settings.sidebar.close")}
         onClick={onClose}
       />
       <div className="relative w-full max-w-sm bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden p-3 shadow-2xl">
         <div className="mb-3 px-1">
           <h3 className="text-[14px] font-semibold text-black/90 dark:text-white/90">
-            {t("settings.sidebar.title", "Sidebar Preference")}
+            {t("settings.sidebar.title")}
           </h3>
           <p className="text-[12px] text-black/50 dark:text-white/50">
-            {t("settings.sidebar.description", "Choose how the sidebar behaves.")}
+            {t("settings.sidebar.description")}
           </p>
         </div>
         
@@ -55,7 +55,7 @@ export default function SidebarPreferenceModal({
           >
             <Layout className="w-[18px] h-[18px]" />
             <span className="text-[12px] font-medium">
-              {t("settings.sidebar.expanded", "Expanded")}
+              {t("settings.sidebar.expanded")}
             </span>
           </button>
           
@@ -69,7 +69,7 @@ export default function SidebarPreferenceModal({
           >
             <LayoutPanelLeft className="w-[18px] h-[18px]" />
             <span className="text-[12px] font-medium">
-              {t("settings.sidebar.collapsed", "Icons Only")}
+              {t("settings.sidebar.collapsed")}
             </span>
           </button>
           
@@ -83,7 +83,7 @@ export default function SidebarPreferenceModal({
           >
             <MousePointer2 className="w-[18px] h-[18px]" />
             <span className="text-[12px] font-medium">
-              {t("settings.sidebar.hover", "On Hover")}
+              {t("settings.sidebar.hover")}
             </span>
           </button>
         </div>

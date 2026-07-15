@@ -17,8 +17,9 @@ from argus.api.schemas import (
     OnboardingState,
     User,
 )
+from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.market_data.assets import ResolvedAsset
-from argus.domain.store import utcnow
+from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
 from fastapi.testclient import TestClient
 
@@ -174,6 +175,76 @@ def test_gateway_auth_flows_use_separate_auth_client():
     service_client.auth.sign_in_with_password.assert_not_called()
 
 
+def test_gateway_signup_records_language_for_profile_bootstrap():
+    service_client = MagicMock()
+    auth_client = MagicMock()
+    signup_response = MagicMock()
+    signup_response.user = object()
+    signup_response.model_dump.return_value = {"user": {"id": "auth-user"}}
+    auth_client.auth.sign_up.return_value = signup_response
+    gateway = SupabaseGateway(client=service_client, auth_client=auth_client)
+
+    gateway.signup(
+        email="alpha@example.com",
+        password="password",
+        language="es-419",
+    )
+
+    auth_client.auth.sign_up.assert_called_once_with(
+        {
+            "email": "alpha@example.com",
+            "password": "password",
+            "options": {
+                "data": {
+                    "display_name": None,
+                    "username": None,
+                    "language": "es-419",
+                }
+            },
+        }
+    )
+
+
+def test_gateway_profile_bootstrap_derives_locale_from_signup_language():
+    service_client = MagicMock()
+    gateway = SupabaseGateway(client=service_client)
+    gateway.private_alpha_role_for_email = MagicMock(return_value="user")
+    gateway.get_user = MagicMock(return_value=None)
+    now = utcnow().isoformat()
+    service_client.table.return_value.insert.return_value.execute.return_value.data = [
+        {
+            "id": "00000000-0000-0000-0000-000000000009",
+            "email": "alpha@example.com",
+            "username": None,
+            "display_name": "Alpha",
+            "language": "es-419",
+            "locale": "es-419",
+            "theme": "dark",
+            "is_admin": False,
+            "onboarding": OnboardingState().model_dump(),
+            "created_at": now,
+            "updated_at": now,
+        }
+    ]
+
+    profile = gateway.get_or_create_profile_for_auth_user(
+        {
+            "id": "00000000-0000-0000-0000-000000000009",
+            "email": "alpha@example.com",
+            "user_metadata": {
+                "display_name": "Alpha",
+                "language": "es-419",
+            },
+        }
+    )
+
+    assert profile.language == "es-419"
+    assert profile.locale == "es-419"
+    persisted = service_client.table.return_value.insert.call_args.args[0]
+    assert persisted["language"] == "es-419"
+    assert persisted["locale"] == "es-419"
+
+
 def test_gateway_private_alpha_role_reads_active_allowlist_row():
     client_mock = MagicMock()
     query = MagicMock()
@@ -321,6 +392,7 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture
 def mock_gateway():
     gateway = MagicMock(spec=SupabaseGateway)
+    finalization_store = AlphaStore()
     gateway.get_user.return_value = _mock_profile()
     gateway.get_or_create_mock_user.return_value = _mock_profile()
     gateway.get_auth_user_from_token.return_value = {
@@ -330,6 +402,12 @@ def mock_gateway():
     gateway.private_alpha_email_allowed.return_value = True
     gateway.count_completed_runs.return_value = 1
     gateway.list_messages.return_value = []
+    gateway.get_latest_completed_run_for_conversation.return_value = None
+    gateway.finalize_backtest_completion.side_effect = (
+        lambda *, finalization: MemoryBacktestFinalizationGateway(
+            finalization_store
+        ).finalize_backtest_completion(finalization=finalization)
+    )
     gateway.get_evidence_capture_by_run.return_value = None
     gateway.create_backtest_evidence_capture.side_effect = (
         lambda *, user_id, captured: captured
@@ -426,7 +504,6 @@ def test_chat_stream_checks_daily_and_hourly_quotas(mock_gateway):
         updated_at=now,
     )
     mock_gateway.get_conversation.return_value = conversation
-    mock_gateway.create_backtest_run.side_effect = lambda *, user_id, run: run
     mock_gateway.create_message.side_effect = lambda **kwargs: Message(
         id="msg-1",
         conversation_id=kwargs["conversation_id"],
@@ -580,8 +657,11 @@ def test_delete_all_conversations_supabase_delegates_with_user_ownership(
     )
 
 
-def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock_gateway):
-    mock_gateway.create_backtest_run.side_effect = lambda *, user_id, run: run
+def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+):
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
 
     response = client.post(
         "/api/v1/backtests/run",
@@ -597,13 +677,72 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock
     assert run["config_snapshot"]["side"] == "long"
     assert run["config_snapshot"]["starting_capital"] == 1000
     assert run["config_snapshot"]["benchmark_symbol"] == "SPY"
-    assert "_execution_realism" not in run["config_snapshot"]
+    assert run["config_snapshot"]["_execution_realism"] == {
+        "enabled": False,
+        "fee_bps": 0.0,
+        "slippage_bps": 0.0,
+    }
+    assert "No fees/slippage" in run["conversation_result_card"]["assumptions"]
     assert run["conversation_result_card"]["assumptions"][-1] == "Benchmark: SPY"
     assert run["conversation_result_card"]["benchmark_note"] is None
-    mock_gateway.create_backtest_run.assert_called_once()
-    called_run = mock_gateway.create_backtest_run.call_args.kwargs["run"]
+    mock_gateway.finalize_backtest_completion.assert_called_once()
+    called_run = mock_gateway.finalize_backtest_completion.call_args.kwargs[
+        "finalization"
+    ].run
     assert isinstance(called_run, BacktestRun)
     assert called_run.config_snapshot["starting_capital"] == 1000
+    assert called_run.config_snapshot["_execution_realism"] == {
+        "enabled": False,
+        "fee_bps": 0.0,
+        "slippage_bps": 0.0,
+    }
+
+
+def test_run_backtest_supabase_kill_switch_restores_legacy_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+):
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={"template": "rsi_mean_reversion", "symbols": ["TSLA"]},
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "supabase-execution-realism-kill-switch",
+        },
+    )
+
+    assert response.status_code == 200
+    run = response.json()["run"]
+    assert "_execution_realism" not in run["config_snapshot"]
+    assert "No fees/slippage" in run["conversation_result_card"]["assumptions"]
+    mock_gateway.finalize_backtest_completion.assert_called_once()
+    called_run = mock_gateway.finalize_backtest_completion.call_args.kwargs[
+        "finalization"
+    ].run
+    assert isinstance(called_run, BacktestRun)
+    assert "_execution_realism" not in called_run.config_snapshot
+
+
+def test_run_backtest_finalization_failure_is_explicit_and_retryable(mock_gateway):
+    mock_gateway.finalize_backtest_completion.side_effect = RuntimeError(
+        "database unavailable"
+    )
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={"template": "rsi_mean_reversion", "symbols": ["TSLA"]},
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "supabase-finalization-failure",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "finalization_failed"
+    assert response.json()["context"] == {"retryable": True}
+    assert response.headers["Retry-After"] == "1"
 
 
 def test_run_backtest_rejects_unowned_parent_conversation(mock_gateway):
@@ -624,7 +763,7 @@ def test_run_backtest_rejects_unowned_parent_conversation(mock_gateway):
 
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
-    mock_gateway.create_backtest_run.assert_not_called()
+    mock_gateway.finalize_backtest_completion.assert_not_called()
     mock_gateway.get_conversation.assert_called_once_with(
         user_id="00000000-0000-0000-0000-000000000001",
         conversation_id="conversation-other",
@@ -657,7 +796,6 @@ def test_create_strategy_rejects_unowned_parent_conversation(mock_gateway):
 
 
 def test_get_backtest_supabase_reads_from_gateway(mock_gateway):
-    mock_gateway.create_backtest_run.side_effect = lambda *, user_id, run: run
     create = client.post(
         "/api/v1/backtests/run",
         json={"template": "rsi_mean_reversion", "symbols": ["AAPL"]},
@@ -695,7 +833,6 @@ def test_chat_stream_supabase_persists_backtest_run(mock_gateway):
         updated_at=now,
     )
     mock_gateway.get_conversation.return_value = conversation
-    mock_gateway.create_backtest_run.side_effect = lambda *, user_id, run: run
     mock_gateway.create_message.side_effect = lambda **kwargs: Message(
         id="msg-1",
         conversation_id=kwargs["conversation_id"],
@@ -713,14 +850,152 @@ def test_chat_stream_supabase_persists_backtest_run(mock_gateway):
     assert response.status_code == 200
     assert "event:" not in response.text
     assert response.text.count("data: [DONE]") == 1
-    mock_gateway.create_backtest_run.assert_called_once()
-    persisted_run = mock_gateway.create_backtest_run.call_args.kwargs["run"]
+    mock_gateway.finalize_backtest_completion.assert_called_once()
+    persisted_run = mock_gateway.finalize_backtest_completion.call_args.kwargs[
+        "finalization"
+    ].run
     final_payload = _final_payload(response.text)
     assert final_payload["message_id"] == "msg-1"
     assert final_payload["run"]["id"] == persisted_run.id
     assert final_payload["run"]["conversation_result_card"]["title"] == (
         "TSLA RSI Mean Reversion"
     )
+
+
+def test_chat_stream_finalization_failure_returns_retryable_error(mock_gateway):
+    now = utcnow()
+    conversation = Conversation(
+        id="conv-finalization-failure",
+        title="New conversation",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview=None,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.finalize_backtest_completion.side_effect = RuntimeError(
+        "database unavailable"
+    )
+    mock_gateway.create_message.side_effect = lambda **kwargs: Message(
+        id="msg-finalization-failure",
+        conversation_id=kwargs["conversation_id"],
+        role=kwargs["role"],  # type: ignore[arg-type]
+        content=kwargs["content"],
+        metadata=kwargs.get("metadata") or {},
+        created_at=utcnow(),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation.id,
+            "message": "Test TSLA dip idea",
+        },
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "chat-finalization-failure",
+        },
+    )
+
+    assert response.status_code == 200
+    error = next(
+        event for event in _stream_events(response.text) if event.get("type") == "error"
+    )
+    assert error["code"] == "finalization_failed"
+    assert error["recovery"]["retryable"] is True
+    assert not any(
+        event.get("type") == "final" for event in _stream_events(response.text)
+    )
+
+
+def test_chat_stream_finalization_retry_reuses_original_execution_identity(
+    mock_gateway,
+):
+    now = utcnow()
+    conversation = Conversation(
+        id="conv-finalization-retry",
+        title="New conversation",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview=None,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    persisted_messages: list[Message] = []
+
+    def create_message(**kwargs) -> Message:
+        message = Message(
+            id=f"msg-{len(persisted_messages) + 1}",
+            conversation_id=kwargs["conversation_id"],
+            role=kwargs["role"],
+            content=kwargs["content"],
+            metadata=kwargs.get("metadata") or {},
+            created_at=utcnow(),
+        )
+        persisted_messages.append(message)
+        return message
+
+    mock_gateway.create_message.side_effect = create_message
+    mock_gateway.list_messages.side_effect = lambda **_: list(persisted_messages)
+    finalization_store = AlphaStore()
+    finalization_calls = []
+
+    def commit_then_lose_first_response(*, finalization):
+        finalization_calls.append(finalization)
+        finalized = MemoryBacktestFinalizationGateway(
+            finalization_store
+        ).finalize_backtest_completion(finalization=finalization)
+        if len(finalization_calls) == 1:
+            raise RuntimeError("finalization response lost")
+        return finalized
+
+    mock_gateway.finalize_backtest_completion.side_effect = (
+        commit_then_lose_first_response
+    )
+    payload = {
+        "conversation_id": conversation.id,
+        "message": "Test TSLA dip idea",
+    }
+
+    first = client.post(
+        "/api/v1/chat/stream",
+        json=payload,
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "first-transport-attempt",
+        },
+    )
+    second = client.post(
+        "/api/v1/chat/stream",
+        json=payload,
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "retry-transport-attempt",
+        },
+    )
+
+    assert next(
+        event for event in _stream_events(first.text) if event.get("type") == "error"
+    )["code"] == "finalization_failed"
+    assert _final_payload(second.text)["run"]["id"] == next(
+        iter(finalization_store.backtest_runs)
+    )
+    assert len(finalization_calls) == 2
+    assert (
+        finalization_calls[1].execution_identity
+        == finalization_calls[0].execution_identity
+    )
+    assert finalization_calls[1].run.id == finalization_calls[0].run.id
+    assert len(finalization_store.backtest_runs) == 1
+    assert len(finalization_store.evidence_artifacts) == 1
 
 
 def test_chat_stream_supabase_rejects_memory_only_conversation(mock_gateway):
@@ -804,7 +1079,7 @@ def test_chat_stream_supabase_prompts_onboarding_before_running_backtest(mock_ga
         "assistant_response": token_events[0]["content"],
         "message_id": "msg-2",
     }
-    mock_gateway.create_backtest_run.assert_not_called()
+    mock_gateway.finalize_backtest_completion.assert_not_called()
 
 
 def test_chat_stream_supabase_does_not_persist_hidden_onboarding_messages(mock_gateway):
@@ -1146,6 +1421,51 @@ def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatc
         call[0] for call in mock_gateway.method_calls
     ]
     assert response.cookies.get("sb-auth-token") == "access-token-123"
+
+
+def test_signup_passes_selected_language_to_gateway(mock_gateway, monkeypatch):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.signup.return_value = {"user": {"id": "user-1"}}
+
+    response = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "alpha@example.com",
+            "password": "password123",
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+    mock_gateway.signup.assert_called_once_with(
+        email="alpha@example.com",
+        password="password123",
+        display_name=None,
+        username=None,
+        language="es-419",
+    )
+
+
+def test_signup_rejects_unsupported_language_before_provider_signup(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+
+    response = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "alpha@example.com",
+            "password": "password123",
+            "language": "fr-CA",
+        },
+    )
+
+    assert response.status_code == 422
+    mock_gateway.signup.assert_not_called()
 
 
 def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(

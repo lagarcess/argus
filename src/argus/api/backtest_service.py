@@ -191,6 +191,7 @@ def create_run_from_payload(
     conversation_id: str | None = None,
     persist_in_memory: bool = True,
     language: str | None = None,
+    run_id: str | None = None,
 ) -> BacktestRun:
     symbols = payload.get("symbols") or []
     if not symbols:
@@ -228,7 +229,7 @@ def create_run_from_payload(
         chart = None
     now = utcnow()
     run = BacktestRun(
-        id=api_state.store.new_id(),
+        id=run_id or api_state.store.new_id(),
         conversation_id=conversation_id or payload.get("conversation_id"),
         strategy_id=strategy_id or payload.get("strategy_id"),
         status="completed",

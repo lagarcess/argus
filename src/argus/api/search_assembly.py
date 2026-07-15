@@ -160,6 +160,11 @@ def scored_supabase_search_items(
 
 
 def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchItem]:
+    with api_state.store.backtest_finalization_lock:
+        return _scored_memory_search_items(user=user, query=query)
+
+
+def _scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchItem]:
     scored_items: list[ScoredSearchItem] = []
     for conversation in api_state.store.conversations.values():
         if not memory_object_visible(

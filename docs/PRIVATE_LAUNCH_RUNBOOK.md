@@ -8,6 +8,14 @@
 > `docs/release-manifests/TEMPLATE.md` for release gating.
 > For CI/CD promotion decisions, the decision memo is a later-context document, not part of this release gate.
 
+> [!NOTE]
+> The validated 2026-07-14 private-alpha checkpoint is recorded in
+> [`docs/release-manifests/2026-07-14-private-alpha-release-integrity.md`](release-manifests/2026-07-14-private-alpha-release-integrity.md)
+> and [#197's closure evidence](https://github.com/lagarcess/argus/issues/197#issuecomment-4965556704).
+> It validates the existing branch-deployed private-alpha Render surface; it did
+> not merge `main`, deploy production, enable automatic production deployment,
+> invite testers, or expose testers.
+
 This runbook is for the first trusted-user internet tests on Render.
 
 ## Launch URLs
@@ -72,8 +80,9 @@ For local founder/operator runs, `.github/canary-render.sh` also accepts
 `SUPABASE_SERVICE_ROLE_KEY` from the root `.env`. The `ARGUS_CANARY_*` names
 remain the preferred GitHub Actions secret names.
 
-7. Confirm the API is in real workflow tester mode. This mode keeps the API
-   lean and sends `Run backtest` through the durable Render Workflow job path:
+7. Confirm the API is in real-workflow private-alpha validation mode. This mode
+   keeps the API lean and sends `Run backtest` through the durable Render
+   Workflow job path:
 
 ```bash
 .github/render-env-sync.sh api-real-workflow-on
@@ -104,50 +113,36 @@ SHA/status check with `ARGUS_CANARY_SHA`.
 .github/warmup-render.sh --expect-mode real-workflow
 ```
 
-11. Run the strict English canary with privacy-safe release evidence:
+11. Run the authoritative Spanish release journey with privacy-safe evidence.
+This is the only release canary: it checks the exact deployed SHA, the real
+Render workflow, finalized evidence identity, explicit decision capture, reload
+hydration, Omnisearch provenance, and the deployed Spanish signup/login browser
+path. It uses `ARGUS_CANARY_*` credentials when set and otherwise the local
+`MOCK_USER_EMAIL` / `MOCK_USER_PASSWORD` aliases.
 
 ```bash
+cd web && bun install --frozen-lockfile && bunx playwright install chromium
+cd ..
 mkdir -p temp/release-evidence
 ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
-ARGUS_CANARY_LANGUAGE=en \
-ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-en.json \
-.github/canary-render.sh
-```
-
-12. Run the same strict canary in Spanish. Spanish readiness is a release criterion, not a one-off test:
-
-```bash
-ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
-ARGUS_CANARY_LANGUAGE=es-419 \
-ARGUS_CANARY_PROMPT='Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 con 10000 dolares' \
 ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json \
 .github/canary-render.sh
 ```
 
-13. Run the provider-path-sensitive canary. This guards live-provider workflow
-   drift (issue #124) by exercising a non-trivial same-asset-class symbol set on
-   `argus-backtests`, matching the CI provider-path leg:
-
-```bash
-ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
-ARGUS_CANARY_LANGUAGE=es-419 \
-ARGUS_CANARY_PROMPT='Prueba comprar y mantener SNDK, AMD, NVDA y GS con 1000 dólares desde el 24 de febrero de 2025 hasta el 5 de junio de 2026' \
-ARGUS_CANARY_FOCUSED_SYMBOL_PATH=SNDK,AMD,NVDA,GS \
-ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW=true \
-ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-provider-path.json \
-.github/canary-render.sh
-```
-
 If a canary fails after warmup passed, do not redeploy one-off fixes in a loop.
-Set `ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-failed-capture.json`
-or the matching English path, rerun the failing locale once to write a
-sanitized failed-capture artifact, then replay the captured payload locally
-before redeploying:
+Set `ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-failed-capture.json`,
+rerun it once to write a sanitized failed-capture artifact, then replay the
+captured payload locally before redeploying:
 
 ```bash
 poetry run python scripts/ops/canary_capture_replay.py \
   temp/release-evidence/canary-es-419-failed-capture.json
 ```
+
+If the exact candidate reaches the API but returns the normal interpreter
+recovery response, keep the failed capture and evidence. Record the safe HTTP
+status, route-receipt task/outcome summary, and environment fingerprint first;
+do not increase token budgets or switch models as a speculative fix.
 
 Use the replay to identify the macro-pattern and make one coherent fix.
 Docker is optional for this step unless the production release path moves to
@@ -161,14 +156,14 @@ cd web && bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium
 ```
 
 Only send the app URL to testers after API deploy-status, app deploy-status,
-local smoke, warmup, English canary, Spanish canary, provider-path canary, and
-the release manifest all pass against the intended candidate commit. If either
-deploy-status reports a different commit, deploy the candidate branch before
-continuing. If warmup fails, do not invite testers yet. Check Render service
-status and redeploy only if the service is stuck. If warmup passes but a canary
-fails, treat it as an Argus product-path regression and inspect the failed-capture
-replay, API logs, Supabase messages, backtest runs, and route receipts using the
-hashed labels and internal access controls from the canary evidence.
+local smoke, warmup, the authoritative Spanish release canary, and the release
+manifest all pass against the intended candidate commit. If either deploy-status
+reports a different commit, deploy the candidate branch before continuing. If
+warmup fails, do not invite testers yet. Check Render service status and redeploy
+only if the service is stuck. If warmup passes but the canary fails, treat it as
+an Argus product-path regression and inspect the failed-capture replay, API logs,
+Supabase messages, backtest runs, and route receipts using the hashed labels and
+internal access controls from the canary evidence.
 
 For the daily automated gate, configure GitHub repository secrets with the same
 canary variables above plus `RENDER_API_KEY` and `ARGUS_WORKFLOW_DATABASE_URL`,
@@ -176,16 +171,14 @@ then use the scheduled or manually dispatched `Private Alpha Canary` workflow.
 Set `ARGUS_WORKFLOW_DATABASE_URL` from the `.env`/`.env.example` mapping to
 `SUPABASE_POSTGRES_TRANSACTION_POOLER_URL`; do not use the session pooler for
 short-lived workflow tasks. That workflow runs the local smoke gate, warmup,
-English canary, Spanish canary, provider-path canary, and a full matrix check.
-The provider-path canary exists specifically to catch live-provider workflow
-drift like issue #124: it exercises a non-trivial same-asset-class symbol set on
-`argus-backtests`, while `release-config-audit --expect-mode real-workflow`
-proves the workflow env itself is using `live_provider`. Warmup then runs the
-deployed `workflow_proof` task and requires
+and the authoritative Spanish release journey. The real backtest in that journey
+is the live-provider drift check: it runs on `argus-backtests`, while
+`release-config-audit --expect-mode real-workflow` proves the workflow env itself
+is using `live_provider`. Warmup then runs the deployed `workflow_proof` task and requires
 `workflow_runtime_provider_mode=live_provider` and
 `workflow_runtime_proof=ready`, proving effective workflow runtime rather than
 only saved Render env vars. It uploads the `private-alpha-canary-evidence`
-artifact containing per-locale JSON evidence plus exit-code files, and it does
+artifact containing Spanish release evidence plus its exit-code file, and it does
 not deploy or configure analytics. Secrets are scoped to the operational steps
 that need them; install and artifact upload steps do not receive canary
 credentials or service-role keys.
@@ -239,7 +232,7 @@ Use explicit API modes instead of editing individual flags by hand:
 .github/render-env-sync.sh api-real-workflow-on
 ```
 
-`api-real-workflow-on` is the controlled private-alpha tester mode: `Run
+`api-real-workflow-on` is the controlled private-alpha validation mode: `Run
 backtest` creates a durable real job and the UI reads queued/running/succeeded/
 failed state from Supabase. `api-proof-shadow-on` is only for proof dispatch
 validation. `api-safe-off` is the emergency rollback mode that disables workflow
@@ -280,9 +273,11 @@ These are optional runtime knobs (not secrets). Defaults are safe for
 private-alpha launch; record any override in the release manifest.
 
 - `ARGUS_ENABLE_EXECUTION_REALISM` — models trading fees + slippage end to end.
-  Default OFF. Keep off for alpha: the founder deliberately disclaims cost
-  assumptions for the current PMF stage. When off, results carry the "No
-  fees/slippage" assumptions footer and the legacy cost path is byte-identical.
+  The capability is active by default, but modeled costs remain opt-in per
+  idea. Runs without stated fees or slippage stay idealized and retain the "No
+  fees/slippage" assumptions footer. Set the flag explicitly to
+  `false|0|off|no` only as a kill switch; that restores the pre-realism path
+  byte-for-byte. Record any kill-switch override in the release manifest.
 - `ARGUS_STRUCTURED_REASONING_EFFORT` / `ARGUS_CAPABILITY_REASONING_EFFORT` —
   per-tier OpenRouter reasoning-effort overrides for the structured
   interpretation and capability-conflict calls

@@ -4,12 +4,21 @@ import time
 import traceback
 from collections.abc import Callable, Mapping
 from contextlib import ExitStack, contextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from math import isfinite
 from typing import TYPE_CHECKING, Any, Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from argus.api.schemas import BacktestRun
+from argus.api.schemas import BacktestRun, EvidenceArtifact, Idea, IdeaVersion
+from argus.domain.backtest_finalization import (
+    BacktestFinalizationError,
+    BacktestFinalizationInput,
+    FinalizedBacktest,
+    PreparedBacktestFinalization,
+    finalize_backtest_completion,
+    stable_backtest_run_id,
+)
+from argus.domain.evidence import CapturedEvidence
 from argus.observability.cost_ledger import (
     normalize_cost_ledger_entry,
     persist_openrouter_cost_ledger_entries,
@@ -45,10 +54,14 @@ class BacktestJobGateway(Protocol):
         execution_metadata: dict[str, Any],
         started_at: str | None = None,
     ) -> dict[str, Any]:
-        """Transition a queued job to running."""
+        """Claim a queued or retryable-finalization job for one worker."""
 
-    def create_backtest_run(self, *, user_id: str, run: BacktestRun) -> Any:
-        """Persist the canonical completed run."""
+    def finalize_backtest_completion(
+        self,
+        *,
+        finalization: PreparedBacktestFinalization,
+    ) -> FinalizedBacktest:
+        """Commit or replay one complete backtest evidence tuple."""
 
     def link_backtest_job_result(
         self,
@@ -131,6 +144,13 @@ def run_backtest_job(
         raise WorkflowBacktestJobError(f"Backtest job {job_id} was not found.")
     _assert_real_job(row)
 
+    if row.get("status") == "succeeded" and row.get("result_run_id"):
+        return _already_succeeded_result(
+            row,
+            job_id=job_id,
+            workflow_run_id=workflow_run_id,
+        )
+
     user_id = _required_str(row, "user_id")
     conversation_id = _required_str(row, "conversation_id")
     request = _request_payload(row)
@@ -158,6 +178,8 @@ def run_backtest_job(
         timings.record_elapsed("dependency_or_tool_load", phase_started)
     else:
         tool = backtest_tool
+    finalization_committed = False
+    result_run_id: str | None = None
     try:
         phase_started = time.perf_counter()
         result = tool.run(request)
@@ -220,7 +242,15 @@ def run_backtest_job(
             conversation_id=conversation_id,
             result_card=result_card,
             envelope=envelope,
-            run_id_factory=run_id_factory,
+            run_id_factory=(
+                run_id_factory
+                or (
+                    lambda: stable_backtest_run_id(
+                        user_id,
+                        f"backtest_job:{job_id}",
+                    )
+                )
+            ),
         )
         if run is None:
             return _mark_failed(
@@ -236,9 +266,37 @@ def run_backtest_job(
             )
 
         phase_started = time.perf_counter()
-        created = gateway.create_backtest_run(user_id=user_id, run=run)
-        timings.record_elapsed("backtest_run_persist", phase_started)
-        result_run_id = _created_run_id(created, fallback=run.id)
+        try:
+            finalized = finalize_backtest_completion(
+                gateway,
+                BacktestFinalizationInput(
+                    user_id=user_id,
+                    execution_identity=f"backtest_job:{job_id}",
+                    run=run,
+                    result_card=dict(run.conversation_result_card),
+                    idea_id=str(uuid4()),
+                    idea_version_id=str(uuid4()),
+                    evidence_artifact_id=str(uuid4()),
+                    finalized_at=datetime.now(timezone.utc),
+                ),
+            )
+        except BacktestFinalizationError as exc:
+            timings.record_elapsed("backtest_finalization", phase_started)
+            return _mark_failed(
+                gateway,
+                row=running,
+                job_id=job_id,
+                user_id=user_id,
+                failure_code="finalization_failed",
+                failure_detail="execution_failed",
+                retryable=True,
+                workflow_run_id=workflow_run_id,
+                source_error=exc,
+                timings=timings,
+            )
+        timings.record_elapsed("backtest_finalization", phase_started)
+        finalization_committed = True
+        result_run_id = finalized.identity.run_id
         phase_started = time.perf_counter()
         _persist_result_readout_route_receipts(
             gateway,
@@ -297,18 +355,72 @@ def run_backtest_job(
             ),
         }
     except Exception as exc:
+        latest = gateway.fetch_job(job_id) or running
+        if (
+            finalization_committed
+            and result_run_id is not None
+            and latest.get("status") == "succeeded"
+            and latest.get("result_run_id") == result_run_id
+        ):
+            return _already_succeeded_result(
+                latest,
+                job_id=job_id,
+                workflow_run_id=workflow_run_id,
+            )
+        failure_code = (
+            "finalization_failed" if finalization_committed else "failed_internal"
+        )
         return _mark_failed(
             gateway,
-            row=gateway.fetch_job(job_id) or running,
+            row=latest,
             job_id=job_id,
             user_id=user_id,
-            failure_code="failed_internal",
+            failure_code=failure_code,
             failure_detail="execution_failed",
-            retryable=False,
+            retryable=finalization_committed,
             workflow_run_id=workflow_run_id,
             source_error=exc,
             timings=timings,
         )
+
+
+def _already_succeeded_result(
+    row: Mapping[str, Any],
+    *,
+    job_id: str,
+    workflow_run_id: str | None,
+) -> dict[str, Any]:
+    metadata = _job_metadata(row)
+    workflow_metadata = metadata.get(WORKFLOW_METADATA_KEY)
+    workflow_metadata = (
+        dict(workflow_metadata) if isinstance(workflow_metadata, dict) else {}
+    )
+    result_readout = workflow_metadata.get("result_readout")
+    return {
+        "job_id": str(row.get("id") or job_id),
+        "status": "succeeded",
+        "result_run_id": str(row["result_run_id"]),
+        "workflow_run_id": workflow_run_id,
+        **(
+            {"result_readout": result_readout}
+            if isinstance(result_readout, str) and result_readout.strip()
+            else {}
+        ),
+        "result_readout_source": workflow_metadata.get("result_readout_source"),
+        "result_readout_fallback_used": bool(
+            workflow_metadata.get("result_readout_fallback_used")
+        ),
+        **(
+            {
+                "result_readout_failure_mode": workflow_metadata[
+                    "result_readout_failure_mode"
+                ]
+            }
+            if workflow_metadata.get("result_readout_failure_mode")
+            else {}
+        ),
+        "execution_metadata": _json_safe(metadata),
+    }
 
 
 def _default_backtest_tool() -> BacktestTool:
@@ -434,9 +546,17 @@ def _result_readout_metadata(result_readout: "ResultReadout") -> dict[str, Any]:
 
 
 def _assert_real_job(row: Mapping[str, Any]) -> None:
-    if row.get("status") != "queued":
+    status = row.get("status")
+    retryable_finalization_failure = (
+        status == "failed"
+        and row.get("failure_code") == "finalization_failed"
+        and bool(row.get("retryable"))
+    )
+    if status not in {"queued", "running", "succeeded"} and not (
+        retryable_finalization_failure
+    ):
         raise WorkflowBacktestJobError(
-            f"run_backtest_job expected queued job, found {row.get('status')!r}."
+            f"run_backtest_job cannot execute job in status {status!r}."
         )
     payload = _launch_payload(row)
     if payload.get("kind") != REAL_BACKTEST_JOB_KIND:
@@ -664,17 +784,6 @@ def _mark_failed(
     }
 
 
-def _created_run_id(created: Any, *, fallback: str) -> str:
-    created_id = getattr(created, "id", None)
-    if isinstance(created_id, str) and created_id.strip():
-        return created_id
-    if isinstance(created, dict):
-        raw_id = created.get("id")
-        if isinstance(raw_id, str) and raw_id.strip():
-            return raw_id
-    return fallback
-
-
 def _required_str(row: Mapping[str, Any], key: str) -> str:
     value = row.get(key)
     if not isinstance(value, str) or not value.strip():
@@ -769,11 +878,23 @@ class PostgresBacktestJobGateway:
                     set status = 'running',
                         started_at = coalesce(started_at, %(started_at)s),
                         attempts = attempts + 1,
+                        result_run_id = null,
+                        finished_at = null,
+                        failure_code = null,
+                        failure_detail = null,
+                        retryable = false,
                         execution_metadata = %(execution_metadata)s,
                         updated_at = %(updated_at)s
                     where id = %(job_id)s
                       and user_id = %(user_id)s
-                      and status = 'queued'
+                      and (
+                        status = 'queued'
+                        or (
+                          status = 'failed'
+                          and failure_code = 'finalization_failed'
+                          and retryable = true
+                        )
+                      )
                     returning *
                     """,
                     {
@@ -787,7 +908,7 @@ class PostgresBacktestJobGateway:
                 row = cur.fetchone()
                 if row is None:
                     raise WorkflowBacktestJobError(
-                        f"Backtest job {job_id} was not queued or not found."
+                        f"Backtest job {job_id} cannot be started or retried."
                     )
         return _json_safe(row)
 
@@ -823,64 +944,56 @@ class PostgresBacktestJobGateway:
                     raise WorkflowBacktestJobError(f"Backtest job {job_id} not found.")
         return _json_safe(row)
 
-    def create_backtest_run(self, *, user_id: str, run: BacktestRun) -> dict[str, Any]:
+    def finalize_backtest_completion(
+        self,
+        *,
+        finalization: PreparedBacktestFinalization,
+    ) -> FinalizedBacktest:
         from psycopg.types.json import Jsonb
 
-        payload = run.model_dump(mode="json")
+        captured = finalization.captured
         with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    insert into public.backtest_runs (
-                      id,
-                      user_id,
-                      conversation_id,
-                      strategy_id,
-                      status,
-                      asset_class,
-                      symbols,
-                      allocation_method,
-                      benchmark_symbol,
-                      metrics,
-                      config_snapshot,
-                      conversation_result_card,
-                      chart,
-                      trades,
-                      created_at
+                    select *
+                    from public.finalize_backtest_completion(
+                      %(user_id)s::uuid,
+                      %(execution_identity)s::text,
+                      %(run)s::jsonb,
+                      %(idea)s::jsonb,
+                      %(idea_version)s::jsonb,
+                      %(evidence_artifact)s::jsonb
                     )
-                    values (
-                      %(id)s,
-                      %(user_id)s,
-                      %(conversation_id)s,
-                      %(strategy_id)s,
-                      %(status)s,
-                      %(asset_class)s,
-                      %(symbols)s,
-                      %(allocation_method)s,
-                      %(benchmark_symbol)s,
-                      %(metrics)s,
-                      %(config_snapshot)s,
-                      %(conversation_result_card)s,
-                      %(chart)s,
-                      %(trades)s,
-                      %(created_at)s
-                    )
-                    returning *
                     """,
                     {
-                        **payload,
-                        "user_id": user_id,
-                        "metrics": Jsonb(payload["metrics"]),
-                        "config_snapshot": Jsonb(payload["config_snapshot"]),
-                        "conversation_result_card": Jsonb(
-                            payload["conversation_result_card"]
+                        "user_id": finalization.user_id,
+                        "execution_identity": finalization.execution_identity,
+                        "run": Jsonb(finalization.run.model_dump(mode="json")),
+                        "idea": Jsonb(captured.idea.model_dump(mode="json")),
+                        "idea_version": Jsonb(
+                            captured.idea_version.model_dump(mode="json")
                         ),
-                        "chart": Jsonb(payload.get("chart")),
-                        "trades": Jsonb(payload.get("trades") or []),
+                        "evidence_artifact": Jsonb(
+                            captured.evidence_artifact.model_dump(mode="json")
+                        ),
                     },
                 )
                 row = cur.fetchone()
-        return _json_safe(row)
+        if row is None:
+            raise WorkflowBacktestJobError(
+                "Backtest finalization did not return durable artifact state."
+            )
+        return FinalizedBacktest(
+            run=BacktestRun.model_validate(row["run"]),
+            captured=CapturedEvidence(
+                idea=Idea.model_validate(row["idea"]),
+                idea_version=IdeaVersion.model_validate(row["idea_version"]),
+                evidence_artifact=EvidenceArtifact.model_validate(
+                    row["evidence_artifact"]
+                ),
+            ),
+        )
 
     def create_route_receipt(
         self,
@@ -1073,6 +1186,18 @@ class PostgresBacktestJobGateway:
                     set result_run_id = coalesce(result_run_id, %(result_run_id)s),
                         status = coalesce(%(status)s, status),
                         finished_at = coalesce(%(finished_at)s, finished_at),
+                        failure_code = case
+                          when %(status)s = 'succeeded' then null
+                          else failure_code
+                        end,
+                        failure_detail = case
+                          when %(status)s = 'succeeded' then null
+                          else failure_detail
+                        end,
+                        retryable = case
+                          when %(status)s = 'succeeded' then false
+                          else retryable
+                        end,
                         execution_metadata = %(execution_metadata)s,
                         updated_at = %(updated_at)s
                     where id = %(job_id)s
@@ -1113,6 +1238,7 @@ class PostgresBacktestJobGateway:
                     """
                     update public.backtest_jobs
                     set status = 'failed',
+                        result_run_id = null,
                         finished_at = coalesce(%(finished_at)s, finished_at),
                         failure_code = %(failure_code)s,
                         failure_detail = %(failure_detail)s,

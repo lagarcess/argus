@@ -17,7 +17,6 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "later-context document, not part of this release gate" in runbook
     assert ".github/local-smoke.sh --expected-sha" in runbook
     assert "ARGUS_CANARY_SHA=\"$(git rev-parse HEAD)\"" in runbook
-    assert "ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-en.json" in runbook
     assert (
         "ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json"
         in runbook
@@ -29,7 +28,7 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "scripts/ops/canary_capture_replay.py" in runbook
     assert "Docker is optional" in runbook
     assert "private-alpha-canary-evidence" in runbook
-    assert "Spanish readiness is a release criterion" in runbook
+    assert "authoritative Spanish release journey" in runbook
     assert "docs/release-manifests/TEMPLATE.md" in runbook
     assert "release manifest" in runbook
     assert "rollback target" in runbook
@@ -38,9 +37,32 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "workflow_env_status" in runbook
     assert "workflow_runtime_provider_mode=live_provider" in runbook
     assert "workflow_runtime_proof=ready" in runbook
-    assert "provider-path canary" in runbook
+    assert "deployed Spanish signup/login browser" in runbook
     assert "workflow-service proof" in runbook
     assert "approver" in runbook
+
+
+def test_execution_realism_contract_is_consistent_across_canon_and_release_docs() -> None:
+    for path in (
+        "docs/PRODUCT.md",
+        "docs/ARCHITECTURE.md",
+        "docs/API_CONTRACT.md",
+        "docs/PRIVATE_LAUNCH_RUNBOOK.md",
+        "docs/specs/private-alpha-next-roadmap.md",
+    ):
+        source = " ".join(_source(path).split())
+
+        assert "ARGUS_ENABLE_EXECUTION_REALISM" in source
+        assert "active by default" in source
+        assert "costs remain opt-in per idea" in source
+        assert "`false|0|off|no`" in source
+
+
+def test_api_contract_does_not_exclude_supported_execution_costs() -> None:
+    source = " ".join(_source("docs/API_CONTRACT.md").split())
+
+    assert "slippage, fees, order queue modeling" not in source
+    assert "Modeled fees and slippage are supported when a user opts in" in source
 
 
 def test_private_alpha_release_manifest_template_has_required_audit_fields() -> None:
@@ -59,19 +81,32 @@ def test_private_alpha_release_manifest_template_has_required_audit_fields() -> 
         "env_fingerprint",
         "workflow_task",
         "real_workflow_task",
-        "Provider-path canary",
         "Backtest service mode",
         "Workflow service proof",
         "Secret rotation / least-privilege owner",
         "Canary evidence",
         "Failed-capture replay",
-        "English canary",
-        "Spanish canary",
+        "Authoritative Spanish release canary",
+        "Release profile hash",
+        "Browser signup/login proof",
         "private-alpha-canary-evidence",
         "No raw conversation, user, run, or job ids",
         "sanitized replay inputs",
     ):
         assert expected in template
+
+
+def test_dated_release_manifest_distinguishes_workflow_tasks() -> None:
+    manifest = _source(
+        "docs/release-manifests/2026-07-14-private-alpha-release-integrity.md"
+    )
+
+    assert (
+        "- Workflow proof task: `argus-backtests/workflow_proof`" in manifest
+    )
+    assert (
+        "- Real workflow task: `argus-backtests/run_backtest_job`" in manifest
+    )
 
 
 def test_private_alpha_integration_doc_points_to_current_gate_and_later_memo() -> None:

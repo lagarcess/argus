@@ -59,6 +59,95 @@ def _final_payload(stream: str) -> dict[str, Any]:
     return payload
 
 
+def test_finalization_retry_metadata_preserves_structured_action() -> None:
+    from argus.api.chat.retry import retry_last_turn_metadata
+    from argus.api.schemas import ChatActionPayload, ChatStreamRequest
+
+    metadata = retry_last_turn_metadata(
+        payload=ChatStreamRequest(
+            conversation_id="conversation-1",
+            action=ChatActionPayload(
+                type="run_backtest",
+                label="Run backtest",
+                payload={"confirmation_id": "confirmation-1"},
+                presentation="confirmation",
+            ),
+        ),
+        request_message="run backtest",
+        include_structured_action=True,
+    )
+
+    assert metadata == {
+        "retry_last_turn": {
+            "message": "run backtest",
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "labelKey": None,
+                "payload": {"confirmation_id": "confirmation-1"},
+                "presentation": "confirmation",
+            },
+        }
+    }
+
+
+def test_finalization_retry_identity_requires_matching_failed_turn() -> None:
+    from argus.api.chat.retry import retryable_finalization_execution_identity
+
+    metadata = {
+        "failure_code": "finalization_failed",
+        "retry_last_turn": {"message": "run backtest"},
+        "backtest_finalization": {"execution_identity": "chat:original"},
+    }
+
+    assert (
+        retryable_finalization_execution_identity(
+            metadata,
+            request_message="run backtest",
+        )
+        == "chat:original"
+    )
+    assert (
+        retryable_finalization_execution_identity(
+            metadata,
+            request_message="different turn",
+        )
+        is None
+    )
+
+
+def test_finalization_identity_prefers_job_then_retry_then_request() -> None:
+    from argus.api.chat.retry import backtest_finalization_execution_identity
+
+    assert (
+        backtest_finalization_execution_identity(
+            backtest_job={"id": "job-1"},
+            retry_execution_identity="chat:original",
+            idempotency_key="idempotency-1",
+            request_id="request-1",
+        )
+        == "backtest_job:job-1"
+    )
+    assert (
+        backtest_finalization_execution_identity(
+            backtest_job=None,
+            retry_execution_identity="chat:original",
+            idempotency_key="idempotency-1",
+            request_id="request-1",
+        )
+        == "chat:original"
+    )
+    assert (
+        backtest_finalization_execution_identity(
+            backtest_job=None,
+            retry_execution_identity=None,
+            idempotency_key=None,
+            request_id="request-1",
+        )
+        == "/api/v1/chat/stream:request-1"
+    )
+
+
 @pytest.fixture(autouse=True)
 def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import state as api_state
@@ -539,7 +628,16 @@ def test_chat_stream_persists_provider_canonicalized_company_name_asset(
     assert "invalid_symbols" not in strategy.get("extra_parameters", {})
     assert confirmation_payload["launch_payload"]["symbol"] == "AAPL"
     assert confirmation_payload["launch_payload"]["symbols"] == ["AAPL"]
-    assert payload["confirmation"]["title"] == "AAPL: Comprar y mantener"
+    confirmation = payload["confirmation"]
+    assert confirmation["strategy_type"] == "buy_and_hold"
+    assert confirmation["asset_class"] == "equity"
+    strategy_row = next(
+        row for row in confirmation["rows"] if row["key"] == "strategy"
+    )
+    assert strategy_row["labelKey"] == "chat.confirmation.rows.strategy"
+    assets_row = next(row for row in confirmation["rows"] if row["key"] == "assets")
+    assert assets_row["labelKey"] == "chat.confirmation.rows.assets"
+    assert assets_row["value"] == "AAPL"
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"

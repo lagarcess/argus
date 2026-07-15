@@ -34,6 +34,7 @@ describe("Spanish UI Smoke Harness", () => {
     "chat.asset_class.equity",
     "chat.asset_class.crypto",
     "chat.asset_class.currency_pair",
+    "chat.strategy_type.buy_and_hold",
     "chat.cadence.daily",
     "chat.cadence.weekly",
     "chat.cadence.biweekly",
@@ -43,6 +44,12 @@ describe("Spanish UI Smoke Harness", () => {
     "settings.profile.title",
     "settings.profile.delete_account",
     "settings.app.language",
+    "settings.sidebar.title",
+    "settings.sidebar.description",
+    "settings.sidebar.expanded",
+    "settings.sidebar.collapsed",
+    "settings.sidebar.hover",
+    "settings.sidebar.close",
     "settings.logout",
     "settings.search_language",
     "settings.no_languages",
@@ -54,7 +61,19 @@ describe("Spanish UI Smoke Harness", () => {
     "onboarding.language.continue_in",
     "chat.result_followup.headings.general",
     "chat.result_followup.headings.next_experiment",
+    "chat.history.pinned",
   ];
+
+  const requiredSpanishStaticValues = {
+    "chat.strategy_type.buy_and_hold": "Comprar y mantener",
+    "chat.history.pinned": "Anclados",
+    "settings.sidebar.title": "Preferencia de barra lateral",
+    "settings.sidebar.description": "Elige cómo se comporta la barra lateral.",
+    "settings.sidebar.expanded": "Expandida",
+    "settings.sidebar.collapsed": "Solo iconos",
+    "settings.sidebar.hover": "Al pasar el cursor",
+    "settings.sidebar.close": "Cerrar modal de preferencias de la barra lateral",
+  };
 
   function readLocale(localePath: string) {
     expect(fs.existsSync(localePath)).toBe(true);
@@ -127,6 +146,14 @@ describe("Spanish UI Smoke Harness", () => {
     }
   });
 
+  test("required Spanish static UI values do not fall back to English", () => {
+    const es = readLocale(esLocalePath);
+
+    for (const [key, expectedValue] of Object.entries(requiredSpanishStaticValues)) {
+      expect(valueAtPath(es, key), `unexpected Spanish value for ${key}`).toBe(expectedValue);
+    }
+  });
+
   test("Source referencing verified keys", () => {
     // Basic checks to ensure source files still reference keys that exist in Spanish bundle
     const languageSource = fs.readFileSync(path.join(webRoot, "components/SettingsMenu.tsx"), "utf-8");
@@ -145,6 +172,30 @@ describe("Spanish UI Smoke Harness", () => {
     expect(confirmationSource).toContain("chat.confirmation.status.ready_to_run");
     expect(confirmationSource).toContain("chat.confirmation.rows.assets");
     expect(confirmationSource).toContain("chat.confirmation.actions.run_backtest");
+
+    const sidebarPreferenceSource = fs.readFileSync(
+      path.join(webRoot, "components/settings/SidebarPreferenceModal.tsx"),
+      "utf-8",
+    );
+    const sidebarSource = fs.readFileSync(
+      path.join(webRoot, "components/sidebar/ChatSidebar.tsx"),
+      "utf-8",
+    );
+
+    expect(sidebarPreferenceSource).toContain('aria-label={t("settings.sidebar.close")}');
+    for (const key of [
+      "settings.sidebar.title",
+      "settings.sidebar.description",
+      "settings.sidebar.expanded",
+      "settings.sidebar.collapsed",
+      "settings.sidebar.hover",
+    ]) {
+      expect(sidebarPreferenceSource).toContain(`t("${key}")`);
+      expect(sidebarPreferenceSource).not.toContain(`t("${key}",`);
+    }
+    expect(sidebarSource).toContain("isPinned: true");
+    expect(sidebarSource).toContain("{group.isPinned &&");
+    expect(sidebarSource).not.toContain('group.label === t("chat.history.pinned",');
   });
 
   test("Confirmation cards do not use translated display labels as state", () => {

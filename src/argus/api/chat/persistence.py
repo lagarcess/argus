@@ -13,6 +13,7 @@ from argus.api.chat.context_packets import (
 from argus.api.dependencies import dev_memory_fallback_enabled
 from argus.api.schemas import BacktestRun, Conversation, User
 from argus.domain import backtest_run_builder
+from argus.domain.backtest_finalization import stable_backtest_run_id
 from argus.domain.backtesting.config import classify_symbol, default_benchmark
 from argus.domain.store import utcnow
 
@@ -46,6 +47,7 @@ def build_runtime_backtest_run(
     breakdown: Any = None,
     classify_symbol_func: Any = classify_symbol,
     default_benchmark_func: Any = default_benchmark,
+    run_id: str | None = None,
 ) -> BacktestRun | None:
     del user_id
     result_card = _result_card_with_evidence_context(
@@ -57,7 +59,7 @@ def build_runtime_backtest_run(
         conversation_id=conversation_id,
         result_card=result_card,
         envelope=envelope,
-        run_id_factory=api_state.store.new_id,
+        run_id_factory=(lambda: run_id) if run_id is not None else api_state.store.new_id,
         now_func=utcnow,
         classify_symbol_func=classify_symbol_func,
         default_benchmark_func=default_benchmark_func,
@@ -74,7 +76,9 @@ def persist_runtime_backtest_run(
     breakdown: Any = None,
     classify_symbol_func: Any = classify_symbol,
     default_benchmark_func: Any = default_benchmark,
+    execution_identity: str,
 ) -> BacktestRun | None:
+    run_id = stable_backtest_run_id(user.id, execution_identity)
     run = build_runtime_backtest_run(
         user_id=user.id,
         conversation_id=conversation.id,
@@ -84,6 +88,7 @@ def persist_runtime_backtest_run(
         breakdown=breakdown,
         classify_symbol_func=classify_symbol_func,
         default_benchmark_func=default_benchmark_func,
+        run_id=run_id,
     )
     if run is None:
         return None
@@ -103,59 +108,38 @@ def persist_runtime_backtest_run(
         collection_status=context_collection_status,
     )
 
-    api_state.store.backtest_runs[run.id] = run
-    api_state.store.backtest_run_owners[run.id] = user.id
+    from argus.api.chat.evidence import finalize_completed_backtest
+
+    finalized = finalize_completed_backtest(
+        user_id=user.id,
+        conversation_id=conversation.id,
+        run=run,
+        execution_identity=execution_identity,
+    )
+    run = finalized.run
 
     if api_state.supabase_gateway is not None:
         try:
-            api_state.supabase_gateway.create_backtest_run(user_id=user.id, run=run)
+            persist_context_packet_records(
+                gateway=api_state.supabase_gateway,
+                user_id=user.id,
+                run=run,
+                packets=context_packets,
+            )
         except Exception as exc:
-            if not dev_memory_fallback_enabled():
-                raise
             logger.warning(
-                "Supabase backtest run write failed; using dev memory fallback",
+                "Context packet persistence failed; result card snapshot remains",
                 error=str(exc),
                 run_id=run.id,
             )
-        else:
-            try:
-                persist_context_packet_records(
-                    gateway=api_state.supabase_gateway,
-                    user_id=user.id,
-                    run=run,
-                    packets=context_packets,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Context packet persistence failed; result card snapshot remains",
-                    error=str(exc),
-                    run_id=run.id,
-                )
 
     if conversation.id in api_state.store.conversations:
         api_state.store.conversations[conversation.id] = conversation.model_copy(
             update={
-                "last_message_preview": result_card.get("title")
+                "last_message_preview": run.conversation_result_card.get("title")
                 or conversation.last_message_preview,
                 "updated_at": utcnow(),
             }
-        )
-
-    from argus.api.chat.evidence import auto_capture_completed_backtest
-
-    try:
-        auto_capture_completed_backtest(
-            user=user,
-            conversation=conversation,
-            run=run,
-        )
-    except Exception as exc:
-        if not dev_memory_fallback_enabled():
-            raise
-        logger.warning(
-            "Evidence auto-capture failed; result run remains persisted",
-            error=str(exc),
-            run_id=run.id,
         )
 
     return run

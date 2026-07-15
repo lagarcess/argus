@@ -158,7 +158,12 @@ esac
         # secrets (ALPACA_*/OPENROUTER_API_KEY) it audits.
         github_dir = tmp_path / ".github"
         github_dir.mkdir()
-        for name in ("render-env-sync.sh", "argus-env.sh"):
+        for name in (
+            "render-env-sync.sh",
+            "argus-env.sh",
+            "private-alpha-release-profile.py",
+            "private-alpha-release-profile.json",
+        ):
             copied = github_dir / name
             shutil.copy(ROOT / ".github" / name, copied)
             copied.chmod(0o755)
@@ -476,8 +481,7 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     assert "RENDER_API_KEY" not in workflow_env_section
     render_sync = _source(".github/render-env-sync.sh")
     assert "workflow_render_env_value()" in render_sync
-    assert "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS)" in render_sync
-    assert 'echo "${ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS:-300}"' in render_sync
+    assert 'release_profile_env_value workflow "$key"' in render_sync
     assert all(service["type"] != "workflow" for service in render_config["services"])
 
 
@@ -526,14 +530,13 @@ def test_render_env_sync_pushes_workflow_llm_readout_env() -> None:
         "ARGUS_CONTEXT_FALLBACK_MODEL",
     ):
         assert f"require_local_env {key}" in workflow_block
-        assert f"{key})" in source
+        assert 'release_profile_env_value workflow "$key"' in source
     assert 'for key in "${ARGUS_RENDER_WORKFLOW_PROOF_ENV[@]}"; do' in workflow_block
     assert (
         'put_render_env "$WORKFLOW_SERVICE_ID" "$key" '
         '"$(workflow_render_env_value "$key")"'
     ) in workflow_block
-    assert "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS)" in source
-    assert 'echo "${ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS:-30}"' in source
+    assert 'release_profile_env_value workflow "$key"' in source
     assert "ARGUS_WORKFLOW_DATABASE_URL" in source
     assert "require_local_env ALPACA_API_KEY" in source
     assert "require_local_env ALPACA_SECRET_KEY" in source
@@ -554,32 +557,23 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
     assert "--confirm" in source
     assert 'for key in "${ARGUS_RENDER_WORKFLOW_PROOF_ENV[@]}"; do' in source
     assert 'workflow_render_env_value "$key"' in source
-    for key in (
-        "ALPACA_API_KEY",
-        "ALPACA_SECRET_KEY",
-        "ARGUS_MARKET_DATA_PROVIDER_MODE",
-        "ENABLE_MARKET_DATA_CACHE",
-        "ALPACA_PAPER_TRADING",
-        "POETRY_VERSION",
-    ):
-        assert f"{key})" in source
+    for key in ("ALPACA_API_KEY", "ALPACA_SECRET_KEY"):
+        assert key in source
+    assert 'release_profile_env_value workflow "$key"' in source
     assert "workflow-runtime" in source
     assert "https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}" in source
     assert "render_workflow_json" in source
 
 
-def test_render_env_sync_workflow_proof_forces_live_provider_mode() -> None:
+def test_render_env_sync_workflow_proof_uses_the_profile_live_provider_mode() -> None:
     source = _source(".github/render-env-sync.sh")
 
     value_block = source.split("workflow_render_env_value() {", maxsplit=1)[1].split(
         "\n}",
         maxsplit=1,
     )[0]
-    assert "ARGUS_MARKET_DATA_PROVIDER_MODE)" in value_block
-    assert 'echo "live_provider"' in value_block
-    assert (
-        'echo "${ARGUS_MARKET_DATA_PROVIDER_MODE:-live_provider}"' not in value_block
-    )
+    assert 'release_profile_env_value workflow "$key"' in value_block
+    assert 'echo "${ARGUS_MARKET_DATA_PROVIDER_MODE:-live_provider}"' not in value_block
 
 
 def test_render_env_sync_prints_api_deploy_status_without_mutation() -> None:
@@ -715,17 +709,10 @@ def test_render_env_sync_separates_proof_and_real_api_modes() -> None:
         'put_render_env "$API_SERVICE_ID" RENDER_API_KEY "$RENDER_API_KEY"' in proof_block
     )
 
-    assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED true" in real_block
-    assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED true" in real_block
-    assert "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED true" in real_block
-    assert (
-        'ARGUS_BACKTEST_WORKFLOW_TASK "$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"'
-        in real_block
-    )
-    assert (
-        'ARGUS_BACKTEST_REAL_WORKFLOW_TASK "$ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT"'
-        in real_block
-    )
+    assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED" in real_block
+    assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED" in real_block
+    assert "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED" in real_block
+    assert 'release_profile_env_value api "$key"' in real_block
     assert (
         'put_render_env "$API_SERVICE_ID" RENDER_API_KEY "$RENDER_API_KEY"' in real_block
     )
@@ -738,8 +725,9 @@ def test_render_env_sync_can_audit_release_config_without_mutation() -> None:
     assert "--expect-mode <safe-off|proof-shadow|real-workflow>" in source
     assert "audit_release_config()" in source
     assert "audit_render_service_config" in source
-    assert "ARGUS_RENDER_API_ENV" in source
-    assert "ARGUS_RENDER_WEB_ENV" in source
+    assert "release_profile_env_pairs" in source
+    assert "release_profile_required_present" in source
+    assert "release_profile_allowed_keys" in source
     assert "ARGUS_RENDER_WORKFLOW_PROOF_ENV" in source
     assert "workflow_expected_env_pairs" in source
     assert "ARGUS_FORBIDDEN_LEGACY_ENV" in source
@@ -750,11 +738,6 @@ def test_render_env_sync_can_audit_release_config_without_mutation() -> None:
     assert "status=ready" in source
     assert "ARGUS_BACKTEST_WORKFLOW_TASK" in source
     assert "ARGUS_BACKTEST_REAL_WORKFLOW_TASK" in source
-    assert "NEXT_PUBLIC_COLLECTIONS_ENABLED=false" in source
-    assert "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false" in source
-    assert "ARGUS_CORS_ALLOW_ORIGINS" in source
-    assert "ARGUS_CHECKPOINTER_MODE=postgres" in source
-    assert "ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider" in source
     assert "<redacted-present>" in source
     assert "<missing-or-empty>" in source
 
@@ -774,7 +757,12 @@ def test_render_env_sync_audit_uses_large_render_env_page(
         tmp_path,
         api_env_json=_render_env_payload(
             "argus-api",
-            overrides={"RENDER_API_KEY": ""},
+            overrides={
+                "RENDER_API_KEY": "",
+                "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED": "false",
+                "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED": "false",
+                "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED": "false",
+            },
         ),
         web_env_json=_render_env_payload("argus-app"),
     )
@@ -815,7 +803,12 @@ def test_render_env_sync_skips_workflow_env_gate_outside_real_workflow_mode(
         expect_mode="safe-off",
         api_env_json=_render_env_payload(
             "argus-api",
-            overrides={"RENDER_API_KEY": ""},
+            overrides={
+                "RENDER_API_KEY": "",
+                "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED": "false",
+                "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED": "false",
+                "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED": "false",
+            },
         ),
         web_env_json=_render_env_payload("argus-app"),
         workflow_env_json=_workflow_env_payload(
@@ -1066,8 +1059,8 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     assert ".github/warmup-render.sh --expect-mode real-workflow" in before_sessions
     assert ".github/canary-render.sh" in before_sessions
     assert (
-        "API deploy-status, app deploy-status, local smoke, warmup, English "
-        "canary, Spanish canary, provider-path canary, and the release manifest"
+        "API deploy-status, app deploy-status, local smoke, warmup, the "
+        "authoritative Spanish release canary, and the release manifest"
         in normalized_before_sessions
     )
     assert "both scripts pass" not in before_sessions

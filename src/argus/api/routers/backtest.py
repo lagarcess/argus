@@ -13,6 +13,10 @@ from argus.api.schemas import (
     BacktestRunResponse,
     User,
 )
+from argus.domain.backtest_finalization import (
+    BacktestFinalizationError,
+    stable_backtest_run_id,
+)
 from argus.domain.supabase_gateway import QuotaExceededError
 
 router = APIRouter(prefix="/api/v1", tags=["backtests"])
@@ -110,17 +114,35 @@ def run_backtest(
     if not data.get("template"):
         data["template"] = "rsi_mean_reversion"
     from argus.api.backtest_service import create_run_from_payload
+    from argus.api.chat.evidence import finalize_completed_backtest
 
+    execution_identity = f"{endpoint}:{clean_idempotency_key}"
     run = create_run_from_payload(
         data,
         request,
         user=user,
         user_id=user.id,
-        persist_in_memory=api_state.supabase_gateway is None,
+        persist_in_memory=False,
         language=user.language,
+        run_id=stable_backtest_run_id(user.id, execution_identity),
     )
-    if api_state.supabase_gateway is not None:
-        run = api_state.supabase_gateway.create_backtest_run(user_id=user.id, run=run)
+    try:
+        run = finalize_completed_backtest(
+            user_id=user.id,
+            conversation_id=run.conversation_id,
+            run=run,
+            execution_identity=execution_identity,
+        ).run
+    except BacktestFinalizationError as exc:
+        raise problem(
+            request,
+            status_code=503,
+            code="finalization_failed",
+            title="Backtest Finalization Failed",
+            detail="The backtest finished, but its result could not be saved safely.",
+            context={"retryable": True},
+            headers={"Retry-After": "1"},
+        ) from exc
     api_state.store.idempotency[(user.id, endpoint, clean_idempotency_key)] = run
     return BacktestRunResponse(run=run)
 
@@ -183,7 +205,11 @@ def get_backtest_job(
 
     run = None
     result_run_id = job.get("result_run_id")
-    if isinstance(result_run_id, str) and result_run_id:
+    if (
+        job.get("status") == "succeeded"
+        and isinstance(result_run_id, str)
+        and result_run_id
+    ):
         run = api_state.supabase_gateway.get_backtest_run(
             user_id=user.id,
             run_id=result_run_id,

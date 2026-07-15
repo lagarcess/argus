@@ -7,16 +7,28 @@ from types import ModuleType
 from uuid import UUID, uuid4
 
 import pytest
+from argus.domain.backtest_finalization import (
+    BacktestFinalizationInput,
+    MemoryBacktestFinalizationGateway,
+    PreparedBacktestFinalization,
+    finalize_backtest_completion,
+    stable_backtest_run_id,
+)
+from argus.domain.store import AlphaStore, utcnow
 
 
 class FakeBacktestJobGateway:
     def __init__(self, row: dict[str, object]) -> None:
         self.row = dict(row)
         self.transitions: list[str] = []
-        self.created_runs: list[dict[str, object]] = []
         self.failed_updates: list[dict[str, object]] = []
         self.route_receipts: list[dict[str, object]] = []
         self.cost_ledger_entries: list[dict[str, object]] = []
+        self.finalization_store = AlphaStore()
+        self.finalization_calls: list[PreparedBacktestFinalization] = []
+        self.fail_finalization_after_commit_once = False
+        self.fail_result_link_once = False
+        self.fail_result_link_after_commit_once = False
 
     def fetch_job(self, job_id: str) -> dict[str, object] | None:
         if self.row["id"] != job_id:
@@ -37,14 +49,28 @@ class FakeBacktestJobGateway:
         self.row["status"] = "running"
         self.row["started_at"] = started_at
         self.row["attempts"] = int(self.row.get("attempts") or 0) + 1
+        self.row["result_run_id"] = None
+        self.row["finished_at"] = None
+        self.row["failure_code"] = None
+        self.row["failure_detail"] = None
+        self.row["retryable"] = False
         self.row["execution_metadata"] = execution_metadata
         return dict(self.row)
 
-    def create_backtest_run(self, *, user_id: str, run: object) -> object:
-        assert self.row["user_id"] == user_id
-        self.transitions.append("create_run")
-        self.created_runs.append({"user_id": user_id, "run": run})
-        return run
+    def finalize_backtest_completion(
+        self,
+        *,
+        finalization: PreparedBacktestFinalization,
+    ):
+        self.transitions.append("finalize")
+        self.finalization_calls.append(finalization)
+        finalized = MemoryBacktestFinalizationGateway(
+            self.finalization_store
+        ).finalize_backtest_completion(finalization=finalization)
+        if self.fail_finalization_after_commit_once:
+            self.fail_finalization_after_commit_once = False
+            raise RuntimeError("finalization response lost")
+        return finalized
 
     def merge_backtest_job_execution_metadata(
         self,
@@ -70,13 +96,22 @@ class FakeBacktestJobGateway:
         assert self.row["user_id"] == user_id
         assert self.row["id"] == job_id
         assert mark_succeeded is True
+        if self.fail_result_link_once:
+            self.fail_result_link_once = False
+            raise RuntimeError("job result link unavailable")
         self.transitions.append("succeeded")
         metadata = dict(self.row.get("execution_metadata") or {})
         metadata.update(execution_metadata or {})
         self.row["status"] = "succeeded"
         self.row["result_run_id"] = result_run_id
+        self.row["failure_code"] = None
+        self.row["failure_detail"] = None
+        self.row["retryable"] = False
         self.row["finished_at"] = datetime.now(timezone.utc).isoformat()
         self.row["execution_metadata"] = metadata
+        if self.fail_result_link_after_commit_once:
+            self.fail_result_link_after_commit_once = False
+            raise RuntimeError("job result link response lost")
         return dict(self.row)
 
     def mark_backtest_job_failed(
@@ -99,6 +134,7 @@ class FakeBacktestJobGateway:
         self.row["failure_code"] = failure_code
         self.row["failure_detail"] = failure_detail
         self.row["retryable"] = retryable
+        self.row["result_run_id"] = None
         self.row["finished_at"] = finished_at
         self.row["execution_metadata"] = metadata
         self.failed_updates.append(
@@ -311,6 +347,62 @@ def test_postgres_backtest_job_gateway_reuses_connection_in_context(
     assert connect_calls == 1
 
 
+def test_postgres_backtest_job_gateway_rejects_running_job_claim(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows.backtest_job import (
+        PostgresBacktestJobGateway,
+        WorkflowBacktestJobError,
+    )
+
+    captured: dict[str, str] = {}
+
+    class FakeCursor:
+        def __enter__(self) -> FakeCursor:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def execute(self, query: str, params: object = None) -> None:
+            del params
+            captured["query"] = " ".join(query.split())
+
+        def fetchone(self) -> dict[str, object] | None:
+            if "status in ('queued', 'running')" in captured["query"]:
+                return {"id": "job-1", "status": "running"}
+            return None
+
+    class FakeConnection:
+        def __enter__(self) -> FakeConnection:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def cursor(self) -> FakeCursor:
+            return FakeCursor()
+
+    monkeypatch.setattr(
+        PostgresBacktestJobGateway,
+        "_connect",
+        lambda _self: FakeConnection(),
+    )
+    gateway = PostgresBacktestJobGateway("postgres://example")
+
+    with pytest.raises(WorkflowBacktestJobError, match="cannot be started or retried"):
+        gateway.mark_backtest_job_running(
+            user_id="user-1",
+            job_id="job-1",
+            execution_metadata={"workflow_run_id": "overlap"},
+        )
+
+    assert "status = 'queued'" in captured["query"]
+    assert "status in ('queued', 'running')" not in captured["query"]
+    assert "status = 'failed'" in captured["query"]
+    assert "failure_code = 'finalization_failed'" in captured["query"]
+
+
 def test_postgres_backtest_job_gateway_appends_cost_ledger_entry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -403,6 +495,86 @@ def test_postgres_backtest_job_gateway_appends_cost_ledger_entry(
     assert params["occurred_at"] == "2026-07-02T18:00:00+00:00"
 
 
+def test_postgres_backtest_job_gateway_calls_shared_finalization_rpc(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.schemas import BacktestRun
+
+    from workflows.backtest_job import PostgresBacktestJobGateway
+
+    captured: dict[str, object] = {}
+    run = BacktestRun(
+        id="run-1",
+        conversation_id="conversation-1",
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 12.4}}},
+        config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
+        conversation_result_card={"title": "AAPL buy and hold", "actions": []},
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+
+    class FakeCursor:
+        def __enter__(self) -> FakeCursor:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def execute(self, query: str, params: object = None) -> None:
+            captured["query"] = query
+            captured["params"] = params
+
+        def fetchone(self) -> dict[str, object]:
+            params = captured["params"]
+            assert isinstance(params, dict)
+            return {
+                "run": params["run"].obj,
+                "idea": params["idea"].obj,
+                "idea_version": params["idea_version"].obj,
+                "evidence_artifact": params["evidence_artifact"].obj,
+            }
+
+    class FakeConnection:
+        def __enter__(self) -> FakeConnection:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def cursor(self) -> FakeCursor:
+            return FakeCursor()
+
+    monkeypatch.setattr(
+        PostgresBacktestJobGateway,
+        "_connect",
+        lambda _self: FakeConnection(),
+    )
+    gateway = PostgresBacktestJobGateway("postgres://example")
+    finalization = BacktestFinalizationInput(
+        user_id="user-1",
+        execution_identity="backtest_job:job-1",
+        run=run,
+        result_card=dict(run.conversation_result_card),
+        idea_id="idea-1",
+        idea_version_id="version-1",
+        evidence_artifact_id="artifact-1",
+        finalized_at=utcnow(),
+    )
+
+    finalized = finalize_backtest_completion(gateway, finalization)
+
+    assert "public.finalize_backtest_completion" in str(captured["query"])
+    assert finalized.identity.run_id == "run-1"
+    assert finalized.identity.evidence_artifact_id == "artifact-1"
+
+
 def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_run() -> (
     None
 ):
@@ -430,9 +602,9 @@ def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_ru
     assert result["job_id"] == job["id"]
     assert result["status"] == "succeeded"
     assert result["result_run_id"] == "run-workflow"
-    assert gateway.transitions == ["running", "create_run", "succeeded"]
+    assert gateway.transitions == ["running", "finalize", "succeeded"]
     assert tool.calls == [request]
-    created_run = gateway.created_runs[0]["run"]
+    created_run = gateway.finalization_store.backtest_runs["run-workflow"]
     assert created_run.id == "run-workflow"
     assert created_run.conversation_id == "conversation-1"
     assert created_run.status == "completed"
@@ -443,6 +615,10 @@ def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_ru
         == "run-workflow"
     )
     assert gateway.row["result_run_id"] == "run-workflow"
+    assert len(gateway.finalization_store.ideas) == 1
+    assert len(gateway.finalization_store.idea_versions) == 1
+    assert len(gateway.finalization_store.evidence_artifacts) == 1
+    assert created_run.conversation_result_card["evidence_artifact_id"]
     assert gateway.row["execution_metadata"]["existing"] == "kept"
     assert (
         gateway.row["execution_metadata"]["workflow_backtest"]["workflow_run_id"]
@@ -481,11 +657,174 @@ def test_run_backtest_job_persists_workflow_internal_timings_on_success() -> Non
         "job_fetch",
         "mark_running",
         "backtest_tool_run_total",
-        "backtest_run_persist",
+        "backtest_finalization",
         "result_readout_total",
         "link_result",
     ):
         assert timings[key] >= 0.0
+
+
+def test_run_backtest_job_finalization_failure_is_retryable_and_replay_safe() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    gateway.fail_finalization_after_commit_once = True
+    tool = FakeBacktestTool(_successful_tool_result())
+    expected_run_id = stable_backtest_run_id("user-1", f"backtest_job:{job['id']}")
+
+    first = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="first-attempt",
+    )
+
+    assert first == {
+        "job_id": job["id"],
+        "status": "failed",
+        "failure_code": "finalization_failed",
+        "failure_detail": "execution_failed",
+        "retryable": True,
+        "workflow_run_id": "first-attempt",
+        "execution_metadata": gateway.row["execution_metadata"],
+    }
+    assert gateway.row["result_run_id"] is None
+    assert len(gateway.finalization_store.backtest_runs) == 1
+    assert len(gateway.finalization_store.evidence_artifacts) == 1
+
+    second = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="retry-attempt",
+    )
+
+    assert second["status"] == "succeeded"
+    assert second["result_run_id"] == expected_run_id
+    assert len(gateway.finalization_store.backtest_runs) == 1
+    assert len(gateway.finalization_store.ideas) == 1
+    assert len(gateway.finalization_store.idea_versions) == 1
+    assert len(gateway.finalization_store.evidence_artifacts) == 1
+    assert len(gateway.finalization_calls) == 2
+
+
+def test_run_backtest_job_result_link_failure_retries_finalized_tuple() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    gateway.fail_result_link_once = True
+    tool = FakeBacktestTool(_successful_tool_result())
+    expected_run_id = stable_backtest_run_id("user-1", f"backtest_job:{job['id']}")
+
+    first = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="first-attempt",
+    )
+
+    assert first["status"] == "failed"
+    assert first["failure_code"] == "finalization_failed"
+    assert first["failure_detail"] == "execution_failed"
+    assert first["retryable"] is True
+    assert gateway.row["result_run_id"] is None
+    assert len(gateway.finalization_store.backtest_runs) == 1
+    assert len(gateway.finalization_store.evidence_artifacts) == 1
+
+    second = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="retry-attempt",
+    )
+
+    assert second["status"] == "succeeded"
+    assert second["result_run_id"] == expected_run_id
+    assert len(gateway.finalization_store.backtest_runs) == 1
+    assert len(gateway.finalization_store.ideas) == 1
+    assert len(gateway.finalization_store.idea_versions) == 1
+    assert len(gateway.finalization_store.evidence_artifacts) == 1
+    assert len(gateway.finalization_calls) == 2
+
+
+def test_run_backtest_job_reconciles_result_link_response_loss() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    gateway.fail_result_link_after_commit_once = True
+    tool = FakeBacktestTool(_successful_tool_result())
+    expected_run_id = stable_backtest_run_id("user-1", f"backtest_job:{job['id']}")
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="ambiguous-link-attempt",
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["result_run_id"] == expected_run_id
+    assert gateway.row["status"] == "succeeded"
+    assert gateway.row["result_run_id"] == expected_run_id
+    assert gateway.failed_updates == []
+    assert len(gateway.finalization_store.backtest_runs) == 1
+    assert len(gateway.finalization_store.evidence_artifacts) == 1
+    assert tool.calls == [_request_payload()]
+
+
+def test_run_backtest_job_replay_after_success_does_not_recompute() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(_successful_tool_result())
+
+    first = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="first-attempt",
+    )
+    transitions_after_success = list(gateway.transitions)
+    second = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="replayed-task",
+    )
+
+    assert second["status"] == "succeeded"
+    assert second["result_run_id"] == first["result_run_id"]
+    assert tool.calls == [_request_payload()]
+    assert gateway.transitions == transitions_after_success
+    assert len(gateway.finalization_calls) == 1
 
 
 def test_run_backtest_job_persists_backend_result_readout(
@@ -633,14 +972,16 @@ def test_run_backtest_job_uses_mainline_llm_quick_take_path(
 
     from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
 
+    model_takeaway = "AAPL beat SPY by 4.2 percentage points in this historical test."
+    model_tested_bullet = "Tested AAPL buy and hold over the requested window."
+    model_meaning_bullet = "The result is grounded in the completed backtest run."
+
     async def fake_quick_take_plan(**_: object) -> dict[str, object]:
         return {
             "relative_performance_claim": "beat_benchmark",
-            "takeaway": (
-                "AAPL beat SPY by 4.2 percentage points in this historical test."
-            ),
-            "tested_bullet": "Tested AAPL buy and hold over the requested window.",
-            "meaning_bullet": "The result is grounded in the completed backtest run.",
+            "takeaway": model_takeaway,
+            "tested_bullet": model_tested_bullet,
+            "meaning_bullet": model_meaning_bullet,
             "next_check_bullet": None,
             "assumption_bullet": None,
             "caveat_bullet": "Historical simulation only.",
@@ -677,11 +1018,14 @@ def test_run_backtest_job_uses_mainline_llm_quick_take_path(
         run_id_factory=lambda: "run-workflow",
     )
 
-    assert "The strategy returned 12.3% while SPY returned 8.1%" in result["result_readout"]
-    assert "outperformed by 4.2 percentage points" in result["result_readout"]
+    readout = result["result_readout"]
+    assert readout.splitlines()[0] == model_takeaway.rstrip(".")
+    assert f"- {model_tested_bullet.rstrip('.')}" in readout
+    assert f"- {model_meaning_bullet.rstrip('.')}" in readout
     metadata = gateway.row["execution_metadata"]["workflow_backtest"]
     assert metadata["result_readout_source"] == "llm_explain_stage"
     assert metadata["result_readout_fallback_used"] is False
+    assert "result_readout_failure_mode" not in metadata
 
 
 def test_run_backtest_job_marks_result_readout_fallback_provenance(
@@ -716,10 +1060,15 @@ def test_run_backtest_job_marks_result_readout_fallback_provenance(
         run_id_factory=lambda: "run-workflow",
     )
 
-    assert result["result_readout"].startswith("**Quick take**")
+    readout = result["result_readout"]
+    assert "12.3%" in readout
+    assert "SPY" in readout
+    assert "8.1%" in readout
+    assert "outperformed by 4.2 percentage points" in readout
     metadata = gateway.row["execution_metadata"]["workflow_backtest"]
     assert metadata["result_readout_source"] == "deterministic_fallback"
     assert metadata["result_readout_fallback_used"] is True
+    assert metadata["result_readout_failure_mode"] == "llm_unavailable_or_rejected"
 
 
 def test_run_backtest_job_marks_tool_failure_with_structured_metadata() -> None:
@@ -757,7 +1106,7 @@ def test_run_backtest_job_marks_tool_failure_with_structured_metadata() -> None:
     assert result["failure_detail"] == "market_data_issue"
     assert result["retryable"] is True
     assert gateway.transitions == ["running", "failed"]
-    assert gateway.created_runs == []
+    assert gateway.finalization_calls == []
     assert gateway.row["failure_code"] == "upstream_dependency_error"
     assert gateway.row["failure_detail"] == "market_data_issue"
     assert gateway.row["retryable"] is True

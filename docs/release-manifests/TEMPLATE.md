@@ -1,13 +1,19 @@
 # Private Alpha Release Manifest Template
 
-Use one manifest per promoted candidate. Fill this after the release gate passes
-and before sending tester links. Do not include raw conversation, user, run, or
-job ids; use the privacy-safe labels from canary evidence.
+Use one manifest per validated candidate checkpoint or promoted candidate. Fill
+this after the release gate passes and before sending tester links. A validated
+private-alpha checkpoint records technical evidence only; it does not itself
+authorize a `main` merge, production deployment, automatic production
+deployment, tester invitation, or tester exposure. Do not include raw
+conversation, user, run, or job ids; use the privacy-safe labels from canary
+evidence.
 
 ## Candidate
 
 - Candidate SHA:
 - Candidate branch:
+- Validation status:
+- Validation surface:
 - Promotion target: `main`
 - Release captain:
 - Approver:
@@ -27,6 +33,8 @@ job ids; use the privacy-safe labels from canary evidence.
 ## Environment Proof
 
 - Expected mode:
+- Release profile hash:
+- Effective locales and capabilities:
 - api_web_env_fingerprint:
 - workflow_env_fingerprint:
 - workflow_env_status:
@@ -55,20 +63,15 @@ job ids; use the privacy-safe labels from canary evidence.
 - Warmup command:
 - Warmup result:
 - Canary evidence artifact: `private-alpha-canary-evidence`
-- English canary:
+- Authoritative Spanish release canary:
   - JSON evidence:
+  - Exact candidate SHA verified:
+  - Finalized evidence/result labels:
+  - Decision-note label and reload hydration:
+  - Omnisearch source identity:
+  - Browser signup/login proof:
   - Failed-capture replay, if failed:
   - Exit status:
-- Spanish canary:
-  - JSON evidence:
-  - Failed-capture replay, if failed:
-  - Exit status:
-- Provider-path canary:
-  - JSON evidence:
-  - Focused symbol path:
-  - Failed-capture replay, if failed:
-  - Exit status:
-- Browser QA, if applicable:
 
 ## Release Decision
 
@@ -82,6 +85,8 @@ job ids; use the privacy-safe labels from canary evidence.
 
 - No raw conversation, user, run, or job ids.
 - Canary labels are stable hashes for audit correlation only.
+- The release profile contains no credentials, account ids, deploy ids, or
+  candidate SHA; record its hash with the candidate evidence instead.
 - Failed-capture artifacts are sanitized replay inputs, not raw transcripts.
 - Service-role credentials, cookies, prompts, and route receipt payloads are not
   copied into this manifest.

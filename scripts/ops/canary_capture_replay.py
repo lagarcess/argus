@@ -2,30 +2,24 @@ from __future__ import annotations
 
 import argparse
 import json
-import string
-import uuid
 from pathlib import Path
 from typing import Any
 
 from argus.agent_runtime.stages.explain import explain_stage
 from argus.agent_runtime.state.models import RunState
 
-SECRET_KEY_PARTS = ("password", "token", "secret", "service_role", "apikey", "email")
-ID_KEY_NAMES = {
-    "id",
-    "conversation_id",
-    "run_id",
-    "result_run_id",
-    "backtest_job_id",
-    "message_id",
-    "user_id",
-}
+if __package__:
+    from scripts.ops.canary_capture_sanitizer import assert_sanitized_capture
+else:
+    from canary_capture_sanitizer import (  # type: ignore[no-redef]
+        assert_sanitized_capture,
+    )
 
 
 def replay_capture(capture: dict[str, Any]) -> dict[str, Any]:
     """Replay the deterministic result-readout contract from a canary capture."""
 
-    _assert_sanitized(capture)
+    assert_sanitized_capture(capture)
     language = str(
         capture.get("language")
         or (capture.get("launch_payload") or {}).get("language")
@@ -80,50 +74,6 @@ def _final_response_payload(capture: dict[str, Any]) -> dict[str, Any]:
             response_payload["explanation_context"] = explanation_context
         return response_payload
     return {}
-
-
-def _assert_sanitized(value: Any, *, key: str = "") -> None:
-    if isinstance(value, dict):
-        for nested_key, nested_value in value.items():
-            key_text = str(nested_key)
-            lowered_key = key_text.lower()
-            if any(part in lowered_key for part in SECRET_KEY_PARTS):
-                if nested_value != "<redacted>":
-                    raise ValueError(f"secret-like field is not allowed: {key_text}")
-                continue
-            _assert_sanitized(nested_value, key=key_text)
-        return
-    if isinstance(value, list):
-        for nested in value:
-            _assert_sanitized(nested, key=key)
-        return
-    if isinstance(value, str):
-        if _is_uuid(value):
-            raise ValueError("raw UUID is not allowed in canary capture")
-        if key.lower() in ID_KEY_NAMES and value.strip():
-            if _is_hashed_label(key, value):
-                return
-            raise ValueError(f"raw id-like field is not allowed: {key}")
-
-
-def _is_uuid(value: str) -> bool:
-    try:
-        uuid.UUID(value.strip())
-    except (TypeError, ValueError):
-        return False
-    return True
-
-
-def _is_hashed_label(key: str, value: str) -> bool:
-    stripped = value.strip()
-    prefixes = ("uuid", key.lower())
-    for prefix in prefixes:
-        marker = f"{prefix}_"
-        if not stripped.startswith(marker):
-            continue
-        digest = stripped.removeprefix(marker)
-        return len(digest) == 12 and all(char in string.hexdigits for char in digest)
-    return False
 
 
 def _resolve_language(language: str) -> str:

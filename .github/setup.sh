@@ -3,6 +3,10 @@
 # Initializes Python (Poetry) backend and JavaScript (Bun) frontend
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
+
 echo "🔵 [Setup] Starting Argus development environment initialization..."
 
 # ============================================================================
@@ -12,6 +16,12 @@ echo "🔵 [Setup] Enforcing safe environment variables..."
 export ENVIRONMENT=DEV
 export DONT_WRITE_BYTECODE=1
 export PYTHONUNBUFFERED=1
+
+# ============================================================================
+# 1A. WORKTREE ENVIRONMENT FILES
+# ============================================================================
+echo "🔵 [Setup] Provisioning worktree environment files..."
+"$SCRIPT_DIR/setup-worktree-env.sh" "$REPO_ROOT"
 
 # ============================================================================
 # 2. PYTHON VERSION CHECK
@@ -135,7 +145,7 @@ else
 fi
 
 # Verify no secrets in .gitignore violations
-if git ls-files .env .env.local .env.*.local 2>/dev/null | grep -q .; then
+if git ls-files -- .env web/.env.local '.env.*.local' 'web/.env.*.local' 2>/dev/null | grep -q .; then
     echo "❌ [Setup] ERROR: Environment files are tracked in git!"
     echo "   Run: git rm --cached .env web/.env.local"
     exit 1
@@ -157,9 +167,8 @@ echo "🟢 [Setup] Argus environment is ready!"
 echo "🟢 ============================================================================"
 echo ""
 echo "Next steps:"
-echo "  1. Fill in .env (backend secrets)"
-echo "  2. Fill in web/.env.local (frontend config)"
-echo "  3. Choose your mode and start:"
+echo "  1. Confirm the environment-file validation above"
+echo "  2. Choose your mode and start:"
 echo "     Dev Mode:  .github/dev.sh (then: cd web && bun run dev)"
 echo "     QA Mode:   .github/qa.sh (then: cd web && bun run dev)"
 echo ""

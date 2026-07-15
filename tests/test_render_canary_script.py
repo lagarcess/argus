@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import stat
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -62,6 +63,15 @@ def test_canary_captures_warmup_mode_fingerprint_and_commit_evidence() -> None:
     assert "canary commit mismatch" in source
 
 
+def test_canary_records_the_validated_release_profile_hash() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert "private-alpha-release-profile.py" in source
+    assert "RELEASE_PROFILE_HASH" in source
+    assert '"release_profile_hash":' in source
+    assert 'fail_canary "release_profile" "release_profile_invalid"' in source
+
+
 def test_canary_requires_render_deploy_shas_to_match_candidate() -> None:
     source = _source(".github/canary-render.sh")
 
@@ -113,6 +123,17 @@ def test_canary_checks_reload_hydration_after_stream_failures() -> None:
     assert "assert_reload_hydration_payload false" in source
     assert 'handle_stream_failure "confirmation"' in source
     assert 'handle_stream_failure "run"' in source
+
+
+def test_canary_captures_safe_failure_fingerprint_before_interpreter_triage() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert "safe_http_status" in source
+    assert "capture_failure_route_receipts" in source
+    assert "canary_${stream_name}_http_status" in source
+    assert "route_receipt_failure_capture" in source
+    assert "last_stream_http_status" in source
+    assert "env_fingerprint" in source
 
 
 def test_canary_writes_privacy_safe_release_evidence() -> None:
@@ -188,6 +209,9 @@ def test_canary_can_write_manual_failed_capture_artifact() -> None:
     assert "route_receipt" in source
     assert "failure" in source
     assert "no_raw_ids" in source
+    assert "canary_capture_sanitizer" in source
+    assert "sanitized_payload = sanitize(payload)" in source
+    assert "assert_sanitized_capture(sanitized_payload)" in source
     assert "ARGUS_CANARY_CAPTURE_PATH" in source
     assert '"workflow_env_fingerprint": os.environ["CANARY_WORKFLOW_ENV_FINGERPRINT"]' in source
     assert '"workflow_env_status": os.environ["CANARY_WORKFLOW_ENV_STATUS"]' in source
@@ -244,11 +268,8 @@ def test_canary_loads_root_env_and_accepts_local_aliases() -> None:
 def test_canary_exercises_confirmation_and_run_backtest_action() -> None:
     source = _source(".github/canary-render.sh")
 
-    assert (
-        "Test an equal-weight AAPL and MSFT buy-and-hold strategy from January 1, "
-        "2025 through June 5, 2026 with 10,000 dollars"
-        in source
-    )
+    assert 'canary-value prompt' in source
+    assert 'fail_canary "release_profile" "canary_prompt_missing"' in source
     assert 'action.get("type") == "run_backtest"' in source
     assert "/api/v1/backtest-jobs" in source
     assert "conversation did not persist async backtest_job metadata" in source
@@ -258,13 +279,25 @@ def test_canary_exercises_confirmation_and_run_backtest_action() -> None:
     assert "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in source
 
 
-def test_canary_language_can_be_overridden_for_spanish_live_qa() -> None:
+def test_canary_language_is_bound_to_the_authoritative_spanish_profile() -> None:
     source = _source(".github/canary-render.sh")
 
-    assert 'LANGUAGE="${ARGUS_CANARY_LANGUAGE:-en}"' in source
+    assert 'LANGUAGE="${ARGUS_CANARY_LANGUAGE:-es-419}"' in source
     assert 'CANARY_LANGUAGE="$LANGUAGE"' in source
     assert '"language": os.environ["CANARY_LANGUAGE"]' in source
+    assert "canary language does not match the authoritative release profile" in source
     assert '"language": "en"' not in source
+
+
+def test_canary_runs_spanish_static_ui_regression_assertions() -> None:
+    workflow = _source(".github/workflows/private-alpha-canary.yml")
+
+    frontend_dependencies = workflow.index("Install frontend dependencies")
+    static_ui_assertions = workflow.index("Run Spanish static UI canary assertions")
+    local_smoke = workflow.index("Run local predeploy smoke")
+
+    assert frontend_dependencies < static_ui_assertions < local_smoke
+    assert "cd web && bun test __tests__/spanish-ui-smoke.test.ts" in workflow
 
 
 def test_canary_fails_async_jobs_that_use_result_readout_fallback() -> None:
@@ -285,6 +318,30 @@ def test_canary_requires_result_summary_route_receipt_for_completed_run() -> Non
     assert "run_id=eq.${RESULT_RUN_ID}" in source
     assert "did not find canary result_summary route_receipts" in source
     assert 'result_run_id = str(job.get("result_run_id") or "").strip()' in source
+
+
+def test_canary_requires_finalized_evidence_decision_reload_and_omnisearch_identity() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert "verify_finalized_evidence_identity" in source
+    assert "save_canary_decision" in source
+    assert "assert_decision_hydration" in source
+    assert "verify_omnisearch_source_identity" in source
+    assert "/api/v1/evidence-artifacts/${EVIDENCE_ARTIFACT_ID}/decision" in source
+    assert "/api/v1/search?q=AAPL&include_ledger_groups=true" in source
+    assert 'fail_canary "finalized_identity" "finalized_identity_failed"' in source
+    assert 'fail_canary "decision" "decision_capture_failed"' in source
+    assert 'fail_canary "omnisearch" "omnisearch_source_identity_failed"' in source
+
+
+def test_canary_queries_evidence_without_the_idea_only_decision_filter() -> None:
+    source = _source(".github/canary-render.sh")
+    omnisearch_body = source.split("verify_omnisearch_source_identity() {", maxsplit=1)[
+        1
+    ].split("\n}", maxsplit=1)[0]
+
+    assert "/api/v1/search?q=AAPL&include_ledger_groups=true" in omnisearch_body
+    assert "decision_state=$(python3" not in omnisearch_body
 
 
 def test_canary_uses_confirmation_card_run_action_payload() -> None:
@@ -318,21 +375,48 @@ def test_canary_asserts_focused_provider_path_symbols_when_configured() -> None:
     assert "assert_focused_symbol_path job_response" in source
 
 
-def test_canary_can_require_async_workflow_job_for_provider_path() -> None:
+def test_canary_requires_an_async_workflow_job_for_the_release_profile() -> None:
     source = _source(".github/canary-render.sh")
     workflow = _source(".github/workflows/private-alpha-canary.yml")
 
-    assert 'REQUIRE_ASYNC_WORKFLOW="${ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW:-false}"' in (
+    assert 'REQUIRE_ASYNC_WORKFLOW="${ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW:-true}"' in (
         source
     )
     assert 'if [ "$REQUIRE_ASYNC_WORKFLOW" = "true" ]; then' in source
     assert 'fail_canary "run_stream" "missing_async_workflow_job"' in source
-    assert "ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW=true" in workflow
-    provider_step = workflow.split(
-        "Run provider-path-sensitive Spanish canary",
-        maxsplit=1,
-    )[1]
-    assert "ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW=true" in provider_step
+    assert "Run authoritative Spanish release canary" in workflow
+    assert "ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW" not in workflow
+
+
+def test_canary_runs_the_profile_driven_browser_signup_and_login_proof() -> None:
+    source = _source(".github/canary-render.sh")
+    browser_source = _source(".github/canary-browser.sh")
+    browser_test_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
+    workflow = _source(".github/workflows/private-alpha-canary.yml")
+
+    assert "run_browser_canary" in source
+    assert 'fail_canary "browser" "spanish_signup_login_failed"' in source
+    assert "canary-browser.sh" in source
+    assert "static-key-values" in browser_source
+    assert "private-alpha-release-canary.spec.ts" in browser_source
+    assert "Install Chromium for the deployed browser canary" in workflow
+    assert "input[type=\"text\"]" in browser_test_source
+    assert 'input[type="email"]' in browser_test_source
+    assert 'input[type="password"]' in browser_test_source
+    assert "/api/v1/auth/signup" in browser_test_source
+    assert "signupResponse.request().postDataJSON()).toMatchObject({ language })" in (
+        browser_test_source
+    )
+    assert "signupResponse.status()).toBe(400)" in browser_test_source
+    assert browser_test_source.index("/api/v1/auth/signup") < browser_test_source.index(
+        'page.goto("/?auth=login"'
+    )
+
+
+def test_canary_browser_runner_is_executable() -> None:
+    mode = (ROOT / ".github/canary-browser.sh").stat().st_mode
+
+    assert mode & stat.S_IXUSR
 
 
 def test_canary_uses_temp_file_for_reload_messages_payload() -> None:

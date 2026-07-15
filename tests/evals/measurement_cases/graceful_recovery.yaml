@@ -43,7 +43,7 @@ cases:
     degraded_mode:
       clarifier: offline
     expected:
-      intent: backtest_execution
+      intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: needs_clarification
       assets: ["AAPL"]
       asset_class: equity

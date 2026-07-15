@@ -314,9 +314,10 @@ of the job.
 The simulation logic (Numba/Python) that calculates metrics and returns results.
 It remains domain code in the monorepo, but the production runtime boundary is
 the workflow execution plane. Execution realism (trading fees + slippage) is
-modeled in the engine behind `ARGUS_ENABLE_EXECUTION_REALISM` (default OFF); when
-the flag is inert the legacy cost path is preserved byte-identical, so evidence
-artifacts stay reproducible across the flag boundary.
+modeled in the engine behind `ARGUS_ENABLE_EXECUTION_REALISM`. The capability is
+active by default, while modeled costs remain opt-in per idea. An explicit
+`false|0|off|no` value is the kill switch and preserves the pre-realism cost path
+byte-identical, so evidence artifacts stay reproducible across the flag boundary.
 
 *Stateless systems should scale horizontally later.*
 
@@ -388,6 +389,12 @@ Argus does not have one canonical object. It has multiple first-class objects.
 - **Backtest Run**: Immutable simulation result.
 - **Collection**: User grouping of strategies.
 - **Asset**: Supported symbol/instrument metadata (includes `asset_class`).
+
+Authenticated profile language is product state, not browser state. Signup
+validates the selected language and creates the profile with its server-derived
+locale in the same server-owned path. Browser detection is only a logged-out
+hint; login and reload hydrate the authoritative profile before rendering the
+authenticated application.
 
 # 11. Conversation Model
 
@@ -570,11 +577,19 @@ Mapped internally to:
 9. Execution reducer applies long-only position state, cash, sizing, and policy
    constraints
 10. Engine computes metrics and chart markers from executed fills only
-11. Workflow persists immutable `backtest_runs`
-12. Workflow marks the job `succeeded` or `failed`
-13. Supabase Realtime notifies the browser of job status changes
-14. The chat UI hydrates result or failure state from durable Supabase records
-15. Run appears in history
+11. The shared typed finalizer idempotently commits the immutable run, Idea,
+    IdeaVersion, EvidenceArtifact, and enriched result-card identity as one
+    logical operation. Local/in-process execution uses this same boundary.
+12. Workflow marks the job `succeeded` only after finalization returns the
+    complete identity and links `result_run_id`; a recoverable finalization
+    failure uses the existing `failed` status with
+    `failure_code = finalization_failed` and `retryable = true`.
+13. Supabase Realtime notifies the browser of job status changes.
+14. The server reconciles a completed asynchronous job to its canonical
+    finalized result before the chat UI hydrates durable Supabase records. The
+    result, evidence, and decision identities therefore survive reload; reload,
+    history, and search cannot expose partial or client-reconstructed state.
+15. The finalized run appears in history.
 
 The execution ledger is the boundary between strategy logic and result
 presentation. Signals are diagnostics until they become order intents and fills.
@@ -674,6 +689,19 @@ Simple, scalable, and practical Alpha hosting.
 - **Backend**: Render Web Service (FastAPI).
 - **Database/Auth**: Supabase (Postgres + Auth).
 - **Backtest Execution**: Render Workflows for pay-per-run execution.
+
+Private-alpha release validation is governed by the founder-approved contract in
+`docs/specs/private-alpha-release-integrity-contract.md`. One checked-in
+machine-readable profile owns non-secret API, web, workflow, locale, capability,
+and canary expectations. Candidate SHA is a runtime input, not profile content.
+The profile is authoritative for desired release mode: release validation fails
+if `render.yaml`, live Render configuration, or effective API/web/workflow mode
+disagrees. Fast local memory/synthetic/mock-auth execution is useful development
+evidence but cannot substitute for production-parity Supabase/Postgres/real-auth/
+live-provider/Render-Workflow evidence.
+The release manifest records the profile hash, environment fingerprints,
+deployed service SHAs, and full real-user Spanish signup-to-evidence-to-decision-
+to-recall canary evidence for that same candidate.
 
 # 19. Failure Handling Standards
 

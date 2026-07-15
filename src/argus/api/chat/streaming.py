@@ -3,10 +3,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from loguru import logger
-
-from argus.api import state as api_state
-
 
 def sse_data(payload: dict[str, Any]) -> str:
     return f"data: {json.dumps(payload, separators=(',', ':'))}\n\n"
@@ -18,30 +14,6 @@ def sse_done() -> str:
 
 def sse_keepalive() -> str:
     return ": keepalive\n\n"
-
-
-def fetch_run_metrics(user_id: str, run_id: str) -> dict[str, Any] | None:
-    run = None
-    if api_state.supabase_gateway is not None:
-        try:
-            run = api_state.supabase_gateway.get_backtest_run(
-                user_id=user_id, run_id=run_id
-            )
-        except Exception as exc:
-            logger.warning(
-                "Failed to fetch run for result explanation",
-                error=str(exc),
-                run_id=run_id,
-            )
-    if run is None:
-        run = api_state.store.backtest_runs.get(run_id)
-    if run is None:
-        return None
-    return {
-        "aggregate": run.metrics.get("aggregate", {}),
-        "by_symbol": run.metrics.get("by_symbol", {}),
-        "config": run.config_snapshot,
-    }
 
 
 def assistant_copy_for_result(symbols: list[str], language: str) -> str:

@@ -21,6 +21,10 @@ from argus.context import (
     build_alpaca_news_packet,
     build_fred_macro_packet,
 )
+from argus.domain.backtest_finalization import (
+    MemoryBacktestFinalizationGateway,
+    PreparedBacktestFinalization,
+)
 from argus.domain.store import AlphaStore, utcnow
 from argus.llm.openrouter import OpenRouterRouteReceipt
 
@@ -265,15 +269,16 @@ def test_persist_runtime_backtest_run_attaches_immutable_context_packets(
             self.packets: list[dict[str, Any]] = []
             self.attachments: list[dict[str, Any]] = []
 
-        def create_backtest_run(
+        def finalize_backtest_completion(
             self,
             *,
-            user_id: str,
-            run: BacktestRun,
-        ) -> BacktestRun:
-            del user_id
-            self.runs.append(run)
-            return run
+            finalization: PreparedBacktestFinalization,
+        ):
+            finalized = MemoryBacktestFinalizationGateway(
+                api_state.store
+            ).finalize_backtest_completion(finalization=finalization)
+            self.runs.append(finalized.run)
+            return finalized
 
         def create_context_packet(
             self,
@@ -332,6 +337,7 @@ def test_persist_runtime_backtest_run_attaches_immutable_context_packets(
                 "feed": "iex",
             },
         },
+        execution_identity="backtest_job:context-packet-test",
     )
 
     assert run is not None

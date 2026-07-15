@@ -667,6 +667,381 @@ def test_company_name_basket_context_survives_underfilled_repair_to_confirmation
     }
 
 
+def test_partial_provider_context_confirms_after_current_message_grounding(
+    monkeypatch,
+) -> None:
+    import json
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.confirm import confirm_stage
+
+    assets = {
+        "TGT": ResolvedAssetStub("TGT", "equity", name="Target Corporation"),
+        "WMT": ResolvedAssetStub("WMT", "equity", name="Walmart Inc."),
+        "COST": ResolvedAssetStub(
+            "COST",
+            "equity",
+            name="Costco Wholesale Corporation",
+        ),
+    }
+    aliases = {
+        "target": "TGT",
+        "walmart": "WMT",
+        "costco": "COST",
+    }
+
+    def resolve_asset(symbol: str) -> ResolvedAssetStub:
+        raw = symbol.strip()
+        normalized = aliases.get(raw.casefold(), raw.upper())
+        if normalized not in assets:
+            raise ValueError("invalid_symbol")
+        return assets[normalized]
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_asset)
+
+    message = (
+        "try a plain hold test for target, walmart, and costco from jan 2024 "
+        "through dec 2024"
+    )
+    context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "target",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "TGT",
+                    "asset_class": "equity",
+                    "name": "Target Corporation",
+                    "confidence": 0.95,
+                }
+            ]
+        }
+    )
+    contract = build_default_capability_contract()
+
+    class PartialContextInterpreter:
+        async def ainvoke(self, request):
+            response = await interpreter_module._response_ready_for_runtime(
+                response=LLMInterpretationResponse(
+                    intent="strategy_drafting",
+                    task_relation="new_task",
+                    requires_clarification=False,
+                    user_goal_summary="User wants a plain hold test for retailers.",
+                    candidate_strategy_draft=LLMStrategyDraft(
+                        raw_user_phrasing=message,
+                        strategy_type="buy_and_hold",
+                        strategy_thesis=message,
+                        asset_universe=["walmart", "costco"],
+                        asset_class="equity",
+                        date_range={
+                            "start": "2024-01-01",
+                            "end": "2024-12-31",
+                        },
+                    ),
+                    semantic_turn_act="new_idea",
+                ),
+                preferred_model="test-model",
+                request=request,
+                asset_resolution_context=context,
+            )
+            return OpenRouterStructuredInterpreter(
+                contract=contract
+            )._to_runtime_interpretation(response, request=request)
+
+    interpret_result = interpret_stage(
+        state=RunState.new(
+            current_user_message=message,
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=None,
+        structured_interpreter=PartialContextInterpreter(),
+    )
+
+    assert interpret_result.outcome == "ready_for_confirmation"
+    assert interpret_result.decision is not None
+    strategy = interpret_result.decision.candidate_strategy_draft
+    confirm_state = RunState.new(
+        current_user_message=message,
+        recent_thread_history=[],
+    )
+    confirm_state.candidate_strategy_draft = strategy
+    confirm_result = confirm_stage(
+        state=confirm_state,
+        contract=contract,
+    )
+
+    assert strategy.asset_universe == ["TGT", "WMT", "COST"]
+    assert (
+        "provider_context_partial_preserved_fuller_draft"
+        in interpret_result.decision.reason_codes
+    )
+    assert (
+        "provider_context_partial_grounded_by_current_message"
+        in interpret_result.decision.reason_codes
+    )
+    assert interpret_result.decision.ambiguous_fields == []
+    assert confirm_result.outcome == "await_approval"
+    assert confirm_result.patch["confirmation_payload"]["validation"][
+        "executable"
+    ] is True
+
+
+@pytest.mark.parametrize("audit_available", [True, False])
+def test_partial_provider_context_seeds_omitted_grounded_asset_when_extras_fail_audit(
+    monkeypatch,
+    audit_available: bool,
+) -> None:
+    import asyncio
+    import json
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    assets = {
+        "TGT": ResolvedAssetStub("TGT", "equity", name="Target Corporation"),
+        "WMT": ResolvedAssetStub("WMT", "equity", name="Walmart Inc."),
+        "COST": ResolvedAssetStub(
+            "COST",
+            "equity",
+            name="Costco Wholesale Corporation",
+        ),
+        "BTC": ResolvedAssetStub("BTC", "crypto", name="Bitcoin"),
+    }
+    aliases = {
+        "target": "TGT",
+        "walmart": "WMT",
+        "costco": "COST",
+        "bitcoin": "BTC",
+    }
+
+    def resolve_asset(symbol: str) -> ResolvedAssetStub:
+        raw = symbol.strip()
+        normalized = aliases.get(raw.casefold(), raw.upper())
+        if normalized not in assets:
+            raise ValueError("invalid_symbol")
+        return assets[normalized]
+
+    async def audit_stub(**kwargs):
+        assert kwargs["schema_name"] == "AssetGroundingAudit"
+        if not audit_available:
+            raise RuntimeError("asset grounding audit unavailable")
+        return interpreter_module.AssetGroundingAudit(
+            grounded_symbols=[],
+            confidence=0.95,
+        )
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_asset)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "target",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "TGT",
+                    "asset_class": "equity",
+                    "name": "Target Corporation",
+                    "confidence": 0.95,
+                }
+            ]
+        }
+    )
+    message = "try a plain hold test for target from jan 2024 through dec 2024"
+    response = interpreter_module._normalize_response_for_runtime_context(
+        LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="User wants a plain hold test for Target.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=message,
+                strategy_type="buy_and_hold",
+                strategy_thesis=message,
+                asset_universe=["walmart", "costco", "bitcoin"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            ),
+            semantic_turn_act="new_idea",
+        ),
+        request=InterpretationRequest(
+            current_user_message=message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+        asset_resolution_context=context,
+    )
+
+    audited = asyncio.run(
+        interpreter_module._asset_grounding_audited_response(
+            response=response,
+            preferred_model="test-model",
+            request=InterpretationRequest(
+                current_user_message=message,
+                recent_thread_history=[],
+                latest_task_snapshot=None,
+                user=UserState(user_id="u1"),
+            ),
+        )
+    )
+
+    assert audited.requires_clarification is True
+    assert audited.candidate_strategy_draft.asset_universe == ["TGT"]
+    assert audited.candidate_strategy_draft.asset_class == "equity"
+    assert [field.reason_code for field in audited.ambiguous_fields] == [
+        "asset_resolution_context_underfilled"
+    ]
+
+
+def test_successful_asset_audit_clears_partial_context_ambiguity() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.llm_interpreter_types import LLMAmbiguousField
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants a plain hold test for three retailers.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["TGT", "WMT", "COST"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        ),
+        reason_codes=["provider_context_partial_preserved_fuller_draft"],
+        ambiguous_fields=[
+            LLMAmbiguousField(
+                field_name="asset_universe",
+                raw_value="target",
+                candidate_normalized_value=["TGT"],
+                reason_code="asset_resolution_context_underfilled",
+            )
+        ],
+        semantic_turn_act="new_idea",
+    )
+
+    audited = interpreter_module._response_without_ungrounded_symbols(
+        response=response,
+        grounded_symbols=["TGT", "WMT", "COST"],
+        reason_code="asset_grounding_audit_removed_unsubstantiated_symbols",
+    )
+
+    assert audited.requires_clarification is False
+    assert audited.candidate_strategy_draft.asset_universe == ["TGT", "WMT", "COST"]
+    assert audited.ambiguous_fields == []
+
+
+def test_partial_provider_context_seeds_symbol_and_defers_name_variation() -> None:
+    import json
+
+    from argus.agent_runtime.interpreter import provider_context_assets
+
+    context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "walmart",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "WMT",
+                    "asset_class": "equity",
+                    "name": "Walmart Inc.",
+                    "confidence": 0.95,
+                }
+            ]
+        }
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants a plain hold test for two retailers.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["Walmart Inc", "Costco Wholesale"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    normalized = provider_context_assets.response_with_provider_context_assets(
+        response,
+        asset_resolution_context=context,
+    )
+
+    assert normalized.candidate_strategy_draft.asset_universe == [
+        "WMT",
+        "Walmart Inc",
+        "Costco Wholesale",
+    ]
+    assert normalized.requires_clarification is True
+    assert [field.reason_code for field in normalized.ambiguous_fields] == [
+        "asset_resolution_context_underfilled"
+    ]
+    assert "provider_context_partial_preserved_fuller_draft" in (
+        normalized.reason_codes
+    )
+
+
+def test_unsupported_turn_with_partial_provider_context_drops_ungrounded_assets(
+) -> None:
+    import json
+
+    from argus.agent_runtime.interpreter import provider_context_assets
+
+    context = json.dumps(
+        {
+            "asset_resolution_candidates": [
+                {
+                    "raw_text": "target",
+                    "role": "traded_asset",
+                    "status": "resolved",
+                    "symbol": "TGT",
+                    "asset_class": "equity",
+                    "name": "Target Corporation",
+                    "confidence": 0.95,
+                }
+            ]
+        }
+    )
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User asked for unsupported logic on a retailer basket.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["TGT", "FAKE"],
+            asset_class="equity",
+        ),
+        semantic_turn_act="unsupported_request",
+    )
+
+    normalized = provider_context_assets.response_with_provider_context_assets(
+        response,
+        asset_resolution_context=context,
+        include_unsupported_request=True,
+    )
+
+    assert normalized.intent == "unsupported_or_out_of_scope"
+    assert normalized.candidate_strategy_draft.asset_universe == ["TGT"]
+    assert (
+        "provider_context_partial_preserved_fuller_draft"
+        not in normalized.reason_codes
+    )
+
+
 def test_provider_context_asset_class_survives_runtime_validation(monkeypatch) -> None:
     import json
 

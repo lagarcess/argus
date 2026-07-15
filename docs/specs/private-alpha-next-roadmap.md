@@ -7,10 +7,27 @@ contract). The Gate A/B loop landed through 2026-07-07: refine routing
 B3 measurement trio (eval harness #143, PostHog product events #144, append-only
 cost ledger #145). B4 retired the per-language copy tables — runtime prose and
 recovery copy now compose from typed facts/codes (#154, PRs #174-177). Execution
-realism (fees/slippage, #130/PR #178) merged flag-off, and a new interpreter
-cost/perf lane added prompt caching + per-tier reasoning controls (#156/#157,
-PR #172). Remaining P2 is the compounding loop's back half: linked versions
-(A1b) and comparison (A2), the highest-leverage PMF gate.
+realism (fees/slippage, #130/PR #178) is active by default with per-idea costs
+still opt-in and an explicit kill switch, and a new interpreter cost/perf lane
+added prompt caching + per-tier reasoning controls (#156/#157, PR #172).
+Remaining P2 is the compounding loop's back half: linked versions (A1b) and
+comparison (A2), the highest-leverage PMF gate.
+
+**Release-integrity checkpoint (#192) — COMPLETE.** [#193](https://github.com/lagarcess/argus/issues/193)
+approved the contract; [#194](https://github.com/lagarcess/argus/issues/194),
+[#195](https://github.com/lagarcess/argus/issues/195), and
+[#196](https://github.com/lagarcess/argus/issues/196) landed finalization,
+signup-language persistence, and Spanish static parity; [#197](https://github.com/lagarcess/argus/issues/197)
+landed the authoritative release profile and passed the exact-SHA Spanish
+real-user canary; [#198](https://github.com/lagarcess/argus/issues/198) records
+the as-built documentation and manifest. The validated runtime candidate is
+`373d1a12dd5f538a81150b20903f4f43db27c639`; its authoritative live evidence is
+the [#197 closure record](https://github.com/lagarcess/argus/issues/197#issuecomment-4965556704).
+This validates only the branch-deployed private-alpha Render surface—there was
+no `main` merge, production deployment, automatic production deployment,
+tester invitation, or tester exposure. It does not alter the current direction:
+A1b remains the next READY-BUILD spine slice, and A2 implementation remains
+BLOCKED(A1b).
 The 2026-07-08 burn-down pass landed the bulk of the interpret-surface cluster:
 PR #182 fixed #171 Sig1+Sig2, #160(B), and #150's behavior half (with the #179/
 #180 repro gates un-xfailed); PR #183 replaced the degraded-fallback English
@@ -472,8 +489,9 @@ DONE + landed on `codex/private-alpha-next`:
 - B4 language-gate retirement (#154, PRs #174-177): runtime prose composes from
   typed facts; degraded recovery copy and result chrome render from typed
   codes/keys; per-language copy tables retired, parity proven by eval.
-- C1 execution realism — fees/slippage (#130, PR #178): merged flag-off behind
-  `ARGUS_ENABLE_EXECUTION_REALISM`; legacy float path preserved when inert.
+- C1 execution realism — fees/slippage (#130, PR #178): active by default
+  behind `ARGUS_ENABLE_EXECUTION_REALISM`, with costs opt-in per idea and an
+  explicit `false|0|off|no` kill switch preserving the pre-realism path.
 - Interpreter cost/perf (#156/#157, PR #172): automatic stable-prefix prompt
   caching on structured-artifact calls + per-tier reasoning-effort env overrides
   (`ARGUS_STRUCTURED_REASONING_EFFORT`, `ARGUS_CAPABILITY_REASONING_EFFORT`).
@@ -591,11 +609,13 @@ LANES BY GATE (the board agents execute from):
 
 - **C1 Execution realism — fees/slippage (#130).** DONE — merged as PR #178 into
   `codex/private-alpha-next` (9 atomic commits). Fees + slippage model end to
-  end behind `ARGUS_ENABLE_EXECUTION_REALISM` (default OFF); the legacy float
-  cost path is preserved byte-identical when the flag is inert; cost-surface
-  fields recorded in API_CONTRACT and DATA_MODEL. Still OFF the critical path —
-  the founder deliberately disclaims assumptions for the PMF stage — but it is
-  now integration truth, not an async cherry-pick lane.
+  end behind `ARGUS_ENABLE_EXECUTION_REALISM`. The capability is active by
+  default, while modeled costs remain opt-in per idea, so runs without stated
+  fees or slippage stay idealized. An explicit `false|0|off|no` value is the
+  kill switch and restores the pre-realism path byte-for-byte. Cost-surface
+  fields are recorded in API_CONTRACT and DATA_MODEL. Modeled costs remain off
+  the required-idea path for the PMF stage, but the capability is integration
+  truth, not an async cherry-pick lane.
 
 **Gate D — memory controls and privacy:**
 
@@ -802,12 +822,14 @@ moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
 - PMF gate: users describe a decision Argus clarified; trust foundation for all
   later slices.
 
-##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, flag-off)
+##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, active by default)
 
 - Status: DONE (PR #178, 9 atomic commits). Fees + slippage model end to end
-  behind `ARGUS_ENABLE_EXECUTION_REALISM` (default OFF); legacy float cost path
-  preserved byte-identical when inert; cost-surface fields recorded in
-  API_CONTRACT and DATA_MODEL. The scope below is delivered, not pending.
+  behind `ARGUS_ENABLE_EXECUTION_REALISM`. The capability is active by default;
+  costs remain user opt-in per idea, and no-cost runs remain idealized. The
+  explicit `false|0|off|no` kill switch preserves the pre-realism path
+  byte-for-byte. Cost-surface fields are recorded in API_CONTRACT and
+  DATA_MODEL. The scope below is delivered, not pending.
 - Outcome: results carry assumptions a user can explain without founder help.
 - Scope: a `BacktestEngine` interface with the current engine as an adapter (no
   VectorBT/engine internals leaking into product objects); audit and surface
