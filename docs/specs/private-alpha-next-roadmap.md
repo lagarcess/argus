@@ -10,8 +10,10 @@ recovery copy now compose from typed facts/codes (#154, PRs #174-177). Execution
 realism (fees/slippage, #130/PR #178) is active by default with per-idea costs
 still opt-in and an explicit kill switch, and a new interpreter cost/perf lane
 added prompt caching + per-tier reasoning controls (#156/#157, PR #172).
-Remaining P2 is the compounding loop's back half: linked versions (A1b) and
-comparison (A2), the highest-leverage PMF gate.
+Remaining P2 is the compounding loop's back half: linked versions (A1b),
+comparison (A2), and bounded freshness on return (A4). A1b unlocks A2; A4 is the
+phase-last arc that completes the promise that Argus remembers, compares, and
+stays honest about staleness.
 
 **Release-integrity checkpoint (#192) — COMPLETE.** [#193](https://github.com/lagarcess/argus/issues/193)
 approved the contract; [#194](https://github.com/lagarcess/argus/issues/194),
@@ -261,9 +263,10 @@ slices below describe delivered scope, not pending work.
    - Define event schema for evidence capture, decision capture, recall,
      continuity mismatches, cost, and eval readiness.
    - Keep analytics measurement-only unless a later slice starts live reporting.
-   - Current P1 implements the non-emitting `argus_observability_event/v1`
-     envelope and privacy sanitizer; PostHog wiring, durable cost-ledger tables,
-     and eval-result persistence remain deferred.
+   - At P1 closure, the `argus_observability_event/v1` envelope and privacy
+     sanitizer existed without live reporting. B3 later delivered server-side
+     PostHog wiring and the append-only CostLedger. Durable eval-result
+     persistence remains deferred.
 
 ### Design-Only Until Later
 
@@ -272,15 +275,22 @@ slices below describe delivered scope, not pending work.
 - Public evidence excerpts.
 - Broker/export handoff.
 - Native mobile.
-- Research Lab / Perplexity-style deep research.
+- Broad Research Lab / deep-research product work. Bounded, source-backed event
+  context required by the later A4 freshness arc is not a general news feed or
+  a broad Research Lab implementation.
 
 ### P2 Board
 
 P2 thesis: P1 proved Argus can capture evidence. P2 makes that evidence
-trustworthy and comparable enough that the three founder-guided alpha users save
+trustworthy and comparable enough that five trusted alpha users can save
 decisions and come back. P2 is measured against the PMF gates in
 `docs/specs/private-alpha-next-decision-memo.md` section 15.8, not by feature
 count.
+
+The five-user PMF gate is currently unmeasurable: the production Render compute
+plan prevents users from completing internet-based Argus tests. Treat the gate
+as blocked on restored compute capacity, not as passed or failed product
+evidence.
 
 In scope for P2: capability honesty, backtest credibility (assumptions a user
 can explain), the comparison loop, graceful Spanish recovery, and the
@@ -413,10 +423,11 @@ End-to-end shape: messy idea -> canonical idea -> backtest/evidence artifact ->
 saved decision -> refine creates a linked version -> compare versions -> revisit
 later with context. This includes structured Argus product memory earlier in the
 plan than generic retrieval work: `Idea`, `IdeaVersion`, `EvidenceArtifact`,
-`DecisionNote`, user-confirmed `MemoryRecord`, and retrieval from those product
-objects are the contract. RAG, graph RAG, agentic RAG, Mem0, Zep, Graphiti, and
-similar tools are optional implementation leverage behind that contract, not the
-source of truth.
+`DecisionNote`, and retrieval from those product objects are the P2 contract.
+That durable artifact recall is sufficient for P2 "memory." A user-confirmed
+`MemoryRecord` or equivalent personalization layer remains post-PMF. RAG, graph
+RAG, agentic RAG, Mem0, Zep, Graphiti, and similar tools are optional later
+leverage behind an approved product contract, not the source of truth.
 
 **Gate B: trust, recovery, and measurement (runs alongside Gate A).**
 
@@ -430,9 +441,10 @@ continue this gate.
 **Gate C: evidence credibility (parallel, isolated).**
 
 Execution realism, fees/slippage, benchmark clarity, data assumptions, and the
-`BacktestEngine` boundary improve the trustworthiness of evidence artifacts. This
-work is async under issue #130 and must remain flag-safe and surgically replayed
-from any stale branch evidence; do not broad-merge an old engine branch.
+current launch adapter boundary improve the trustworthiness of evidence
+artifacts. The existing adapter is sufficient for P2. A formal multi-engine
+`BacktestEngine` interface is deferred until Slice M demonstrates a concrete
+second-engine need.
 
 **Gate D: memory controls and privacy (required for memory expansion).**
 
@@ -517,15 +529,23 @@ LANES BY GATE (the board agents execute from):
   the spine is unowned until this lane starts. Emit a new `IdeaVersion` linked
   to the prior idea on refine (P1 spine supports lineage). Split out of #141
   by founder scope decision 2026-07-01; this is the slice that UNBLOCKS
-  comparison (A2). Prefer starting it after PR #146 lands so only one lane at
-  a time sits on the interpret surface.
+  comparison (A2).
+  Founder boundary locked 2026-07-16: assets, date range, benchmark, strategy or
+  executable rules, cadence, capital, and modeled costs are material experiment
+  changes that create a new version; multiple edits before one confirmed run
+  collapse into one version; wording, explanations, retries, and abandoned
+  edits do not.
 
-- **A2 Comparison readout** (= P2.3 detail below). READY-SPEC (spec + founder
-  questions now); BUILD is BLOCKED(A1b) — needs clean linked versions to
-  compare. Stands on the BUILT P1 spine (each `IdeaVersion`/`EvidenceArtifact`
+- **A2 Comparison readout** (= P2.3 detail below). READY-SPEC (founder boundary
+  locked; specification may encode it); BUILD is BLOCKED(A1b) — needs clean
+  linked versions to compare. Stands on the BUILT P1 spine (each
+  `IdeaVersion`/`EvidenceArtifact`
   carries its metrics; a `compare_started` event is pre-registered in the
   observability envelope). "vs your last version" — return Δ, drawdown Δ, what
   changed; short, model-voiced. The differentiator from one-off output.
+  An updated date range is a material version change, so Argus compares the new
+  version's assumptions and performance with the prior version rather than
+  treating it as an unrelated run.
 
 - **A3 Idea Ledger portfolio view.** DONE — merged as PR #147 (`e9180c8`).
   Saved ideas browse inside Omnisearch grouped by decision state
@@ -539,7 +559,14 @@ LANES BY GATE (the board agents execute from):
   allowed. Freshness infra (`context/freshness.py`) exists for context packets,
   not saved ideas. Smallest version: saved ideas show "Last reviewed" + a
   re-run-on-fresh-data delta + "what changed since I saved this?". Phase LAST;
-  its own arc.
+  its own arc. When the canonical experiment is unchanged, a fresh rerun creates
+  new immutable evidence on the same version; a changed date range or other
+  material assumption creates a new version. The readout combines canonical
+  numeric deltas with cited news, earnings, corporate-action, regulatory, macro,
+  or other relevant event context. Mechanically verified corporate actions may
+  be stated as facts; other event relationships use cautious language such as
+  "coincided with" or "may have contributed." Argus must not claim unsupported
+  causation, provide financial advice, or recommend buying, selling, or holding.
 
 **Gate B — trust, recovery, measurement:**
 
@@ -561,7 +588,7 @@ LANES BY GATE (the board agents execute from):
   2026-07-08. Keep the `test_interpret_stage.py` basket assertions in the
   promotion gate.
 
-- **B3 Measurement wiring** (= P2.5 below). READY-BUILD, off-spine. One lane,
+- **B3 Measurement wiring** (= P2.5 below). DONE, off-spine. One lane delivered
   THREE atomic slices in this ORDER, each its own PR — never combined into one
   push:
   (1) **Eval harness** — MERGED (PR #143 at `e303aa3`, Fable-reviewed).
@@ -620,10 +647,10 @@ LANES BY GATE (the board agents execute from):
 **Gate D — memory controls and privacy:**
 
 - **D1 Memory controls spec** (inspect/edit/delete/reset/"why was this
-  used?"). READY-SPEC (spec + founder questions; extends the #137 Data
-  Controls surface). BUILD is BLOCKED(user-confirmed `MemoryRecord` landing in
-  the Gate A contract). No automatic broad personalization memory before these
-  controls exist.
+  used?"). POST-PMF READY-SPEC (extends the #137 Data Controls surface).
+  Personalization-memory implementation is not required for P2 and remains
+  blocked until PMF evidence justifies a user-confirmed `MemoryRecord` contract.
+  No automatic broad personalization memory before these controls exist.
 
 **Design-only lanes** (all READY for notes/mocks; no runtime, schema, or UI
 code): sanitized public excerpt design, voice-to-composer STT prototype, thin
@@ -751,8 +778,10 @@ nondeterministically — a tier/prompt concern tracked with #159, not spine
 logic). Integration stays a fast checkpoint; `main` is the heavyweight
 gate.
 
-"P2 done" = Argus **remembers, compares, and stays honest about staleness** — the memo's
-moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
+"P2 done" = Argus **remembers, compares, and stays honest about staleness** — the
+memo's moat, PMF-testable by one cohort of five trusted users (memo §15.8 gates).
+The cohort gate remains unmeasured while the Render compute-plan bottleneck
+prevents real internet-based testing.
 
 ##### P2.0 Spine guardrail gate (DONE — landed)
 
@@ -831,11 +860,12 @@ moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
   byte-for-byte. Cost-surface fields are recorded in API_CONTRACT and
   DATA_MODEL. The scope below is delivered, not pending.
 - Outcome: results carry assumptions a user can explain without founder help.
-- Scope: a `BacktestEngine` interface with the current engine as an adapter (no
-  VectorBT/engine internals leaking into product objects); audit and surface
-  fees, slippage, splits/dividends, missing-data behavior, benchmark
-  correctness, and drawdown/risk metrics into the EvidenceArtifact with
-  provenance and digest.
+- Scope: the current launch adapter is the sufficient P2 engine boundary (no
+  engine internals leaking into product objects); audit and surface fees,
+  slippage, splits/dividends, missing-data behavior, benchmark correctness, and
+  drawdown/risk metrics into the EvidenceArtifact with provenance and digest.
+  A formal multi-engine interface is deferred to Slice M and activates only
+  when a second validated engine or workflow proves a concrete need.
 - Forbidden surfaces: building a new quant engine; expanding metrics beyond the
   audited, trustworthy set.
 - PMF gate: users can explain artifact assumptions without founder help. Full
@@ -869,19 +899,19 @@ moat, PMF-testable by the 3 founder-guided users (memo §15.8 gates).
 - PMF gate: Spanish-preferring users complete the loop without founder help. Full
   spec authored at activation.
 
-##### P2.5 Measurement and eval harness
+##### P2.5 Measurement and eval harness (DONE)
 
-- Outcome: the loop is instrumented so founder-guided sessions produce PMF-gate
-  signal. Wire the P1 non-emitting `argus_observability_event/v1` envelope to
-  PostHog product events and an append-only first-party CostLedger; stand up a
-  portable eval harness over the locked categories (messy English/Spanish, UI/user
-  language mismatch, capability honesty, recovery, comparison, metric
-  correctness).
+- Outcome: the loop is instrumented so founder-guided sessions can produce
+  PMF-gate signal once testing capacity is restored. B3 wired the
+  `argus_observability_event/v1` envelope to PostHog product events, delivered
+  the append-only first-party CostLedger, and established a portable eval
+  harness over the locked built-surface categories.
 - Posture: analytics is measurement-only; privacy follows memo 15.5
   (`raw_alpha -> redacted_default -> metadata_only -> disabled`), never sending
   credentials, balances, holdings, audio, or route receipts to analytics.
-- Start instrumentation early, in parallel with P2.1-P2.3, so gates are
-  measurable as features land.
+- Add comparison, freshness, and other future-feature categories only when
+  those product lanes land; instrumentation must not pretend an unbuilt surface
+  exists.
 
 ##### Conversational edit contract (macro pattern) — DONE (landed `0fb32c1`)
 

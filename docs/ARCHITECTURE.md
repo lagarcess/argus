@@ -90,16 +90,18 @@ Contains:
 Mixed chronological feed of:
 
 - chats
-- strategies
-- collections
+- completed backtests
+- durable idea/evidence activity
 
 ### Strategies
 
-Saved executable ideas with at-a-glance metrics.
+Flagged saved-executable-idea surface. Hidden under private-alpha defaults;
+durable idea/evidence recall currently lives in Omnisearch.
 
 ### Collections
 
-Grouped strategies by user theme/topic.
+Flagged organizational model. Hidden and indefinitely deferred from the
+private-alpha UI.
 
 ### Settings
 
@@ -597,6 +599,12 @@ Long-only runs must ignore exit signals while flat and duplicate full-position
 entries while already long. Chart markers, trade counts, win-rate inputs, and
 user-facing trade explanations consume fills, not raw triggers.
 
+For the current Alpha architecture, `domain/engine_launch` is the sufficient
+engine adapter boundary. Product surfaces consume canonical run and evidence
+contracts rather than engine-native output. Do not add a formal multi-engine
+plugin interface until a second validated engine or workflow creates a concrete
+need; that abstraction belongs to the later engine-leverage experiment.
+
 # 14. Search Architecture
 
 ## Surface Search
@@ -624,7 +632,18 @@ Alpha search is implemented using **Postgres Full-Text Search (FTS)** + recency 
 Semantic retrieval (Vector embeddings) is deferred from Alpha.
 - Use SQL/Text search first.
 - Re-evaluate semantic search for Beta.
-- Do not add pgvector or embedding tables for the launch chat/backtest branch. Structured Supabase state, run metadata, and saved strategies are sufficient until Argus needs semantic recall across large histories.
+- Do not add pgvector or embedding tables for the launch chat/backtest branch.
+  Structured Supabase product records and run metadata are sufficient until
+  Argus needs semantic recall across large histories.
+
+## Structured Recall Versus Personalization Memory
+
+P2 continuity comes from owner-scoped `Idea`, `IdeaVersion`,
+`EvidenceArtifact`, `DecisionNote`, conversation, and run records in Supabase.
+That structured recall is not personalization memory. A future `MemoryRecord`
+or equivalent cross-conversation preference layer remains post-PMF and requires
+earned opt-in plus inspect/edit/delete/reset/disable/"why was this used?"
+controls before activation.
 
 # 15. Deletion / Archival Model
 

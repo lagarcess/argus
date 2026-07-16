@@ -928,6 +928,17 @@ Staleness triggers should include:
   relevant to the saved thesis;
 - the original thesis depended on a factual claim that may have changed.
 
+Freshness explanation standard:
+
+- canonical run and evidence deltas state what Argus can calculate directly;
+- mechanically verified corporate actions may be stated as facts;
+- news, earnings, regulatory, macro, analyst, or other event context must be
+  source-backed and time-bounded;
+- non-mechanical event relationships use cautious language such as "coincided
+  with" or "may have contributed" rather than claiming proven causation;
+- the readout remains informational and must not become financial advice or a
+  recommendation to buy, sell, or hold.
+
 The SOTA small version:
 
 - completed result artifacts are auto-captured into the idea model;
@@ -1972,15 +1983,20 @@ The engine is replaceable.
 
 Argus should not store engine-native output as the main product truth.
 
-### 10.2 Add a backtest engine abstraction
+### 10.2 Keep a canonical engine adapter boundary
 
-The ideal shape:
+The current launch adapter is sufficient while Argus has one validated engine.
+The product boundary remains:
 
 ```text
 BacktestEngine.run(spec: CanonicalBacktestSpec) -> EvidenceArtifactPayload
 ```
 
-Potential adapters:
+This is a conceptual contract, not a requirement to add a formal plugin
+interface before P2. Current engine-native output must stay behind the existing
+adapter and canonical run/evidence objects.
+
+Potential later adapters, only after a concrete second-engine need:
 
 - current Argus engine;
 - vectorbt validation adapter;
@@ -2272,6 +2288,11 @@ Output:
 - no execution integration until the evidence/memory loop proves retention.
 
 ## 12. Founder Decisions Still Needed
+
+Status note: the relevant object, memory, engine, PMF, and freshness questions
+below were resolved by the 2026-07-16 Founder Resolution Addendum in section 16.
+Keep this section as the original decision record, not as an active question
+queue.
 
 ### 12.1 Is Argus allowed to add new product objects before Alpha launch?
 
@@ -3036,13 +3057,19 @@ Legacy save-strategy salvage decision:
   not destroy it until the new lifecycle path is proven and a migration/removal
   decision is explicit.
 
-Spec-level questions for the next implementation documents, not remaining
-strategy blockers:
+Resolved version/evidence boundary:
 
-- Does IdeaVersion map one-to-one to a CanonicalBacktestSpec, or can it include
-  research-only evidence before a run exists?
-- Which fields are immutable once an EvidenceArtifact is produced?
-- Which fields can be refreshed later without creating a new IdeaVersion?
+- One `IdeaVersion` represents one material experiment definition.
+- Material changes to assets, date range, benchmark, strategy or executable
+  rules, cadence, capital, or modeled costs create a new version.
+- Multiple edits before one confirmed run collapse into one version; wording,
+  explanations, retries, and abandoned edits do not create versions.
+- A rerun on fresher data may attach new immutable evidence to the same version
+  only when the canonical experiment is unchanged.
+- An updated date range is material and creates a new version whose assumptions
+  and performance can be compared with the prior version.
+- Research-only evidence remains outside the A1b contract until the
+  freshness/research artifact type and ownership rules are separately specified.
 
 ### 15.2 Ledger UI, Recents, and Omnisearch
 
@@ -3136,6 +3163,9 @@ Reference:
 
 Argus posture:
 
+- Durable `Idea` / `IdeaVersion` / `EvidenceArtifact` / `DecisionNote` recall is
+  sufficient for the P2 product-memory promise and does not require
+  personalization memory.
 - Memory is off by default for early Alpha.
 - Argus may invite the user to enable memories only at earned, high-signal
   moments where it can name the exact future benefit.
@@ -3652,3 +3682,66 @@ Primary gates:
 
 These gates should be tracked before activating monetization, shipping native
 iOS, or prioritizing broker handoff.
+
+Use one cohort of five trusted users for the formal PMF readout. Do not treat a
+smaller founder-guided pilot as PMF closure. As of 2026-07-16 the gate is
+unmeasurable because the production Render compute plan prevents users from
+completing internet-based Argus tests; record no pass/fail conclusion until that
+capacity blocker is removed.
+
+## 16. Founder Resolution Addendum - 2026-07-16
+
+This addendum locks product boundaries before the next interim roadmap steer. It
+clarifies truth and completion semantics; it does not authorize implementation
+or preserve the current priority order after the founder publishes the next
+steer.
+
+### 16.1 P2 Memory Boundary
+
+Durable recall from `Idea`, `IdeaVersion`, `EvidenceArtifact`, and
+`DecisionNote` is sufficient for P2. Personalization memory, including a
+user-confirmed `MemoryRecord`, stays post-PMF and requires earned opt-in plus
+inspect/edit/delete/reset/disable/"why was this used?" controls.
+
+### 16.2 Version And Evidence Boundary
+
+- One material experiment definition maps to one immutable `IdeaVersion`.
+- Material changes include assets, date range, benchmark, strategy or
+  executable rules, cadence, capital, and modeled costs.
+- Multiple edits before one confirmed run collapse into one version.
+- Wording, explanations, retries, and abandoned edits do not create versions.
+- An unchanged canonical experiment rerun on fresher data creates new immutable
+  evidence on the same version.
+- An updated date range creates a new version. Argus should compare the new
+  version's performance and assumptions with the prior version and explain the
+  delta from canonical evidence.
+
+### 16.3 Freshness And Event Context
+
+The minimum freshness product shows when the idea was last reviewed, reruns the
+canonical experiment on fresh provider data, and explains numeric deltas.
+Freshness should also develop a bounded source-backed research path for relevant
+news, earnings, corporate actions, regulatory events, macro events, and other
+time-sensitive context.
+
+Mechanically verified corporate actions may be stated as facts. Other events
+must be presented as contextual associations using cautious language such as
+"coincided with" or "may have contributed." Argus must cite the context, expose
+freshness/uncertainty, avoid unsupported causation, remain informational, and
+never present the readout as financial advice or a recommendation to buy, sell,
+or hold.
+
+### 16.4 PMF Cohort And Current Blocker
+
+Use one cohort of five trusted users for the formal PMF gates in section 15.8.
+The current Render compute-plan bottleneck prevents users from completing
+internet-based Argus tests, so the PMF gate is unmeasured rather than passed or
+failed. Restore sufficient compute capacity before drawing product conclusions
+from those gates.
+
+### 16.5 Engine Boundary
+
+The current engine launch adapter is sufficient. Argus continues to own
+canonical run/evidence contracts and must not leak engine-native output into
+product objects. A formal multi-engine interface remains deferred until a
+second validated engine or workflow demonstrates a concrete user-facing need.

@@ -66,6 +66,11 @@ collections
 collection_strategies
 backtest_jobs
 backtest_runs
+ideas
+idea_versions
+evidence_artifacts
+decision_notes
+cost_ledger_entries
 feedback
 usage_counters
 ```
@@ -90,12 +95,19 @@ profiles
    │      ├── backtest_jobs
    │      └── backtest_runs
    │
+   ├── ideas
+   │      ├── idea_versions
+   │      │      └── evidence_artifacts
+   │      └── decision_notes
+   │
    ├── strategies
    │      ├── backtest_runs
    │      └── collection_strategies
    │
    ├── collections
    │      └── collection_strategies
+   │
+   ├── cost_ledger_entries
    │
    ├── usage_counters
    └── feedback
@@ -414,7 +426,19 @@ not leave orphaned evidence records.
 
 ### idea_versions
 
-Immutable snapshot of an idea at the point evidence was created.
+Immutable material experiment definition that evidence can reference.
+
+Version boundary:
+- One `IdeaVersion` represents one material experiment definition.
+- Material changes to the traded assets, date range, benchmark, strategy or
+  executable rules, cadence, capital, or modeled fees/slippage create a new
+  version linked to the same `Idea`.
+- Multiple edits before one confirmed run collapse into one new version.
+- Wording changes, explanations, retries, and abandoned edits do not create
+  versions.
+- An updated date range is a material change. Its new run/evidence belongs to a
+  new version so Argus can compare performance and assumptions with the prior
+  version.
 
 Fields:
 - `id`: `uuid` (Primary Key)
@@ -483,6 +507,17 @@ Payload rules:
 - Evidence search and recall require the source run's finalized identity. An
   incomplete finalization is not eligible for conversation reload, history, or
   Omnisearch, even if metric computation already finished.
+- A rerun on fresher provider data may create a new immutable
+  `EvidenceArtifact` on the same `IdeaVersion` only when the canonical experiment
+  definition is unchanged. The artifact must retain its own run identity,
+  data-through/freshness provenance, metrics, and timestamps.
+- Freshness comparison may use multiple evidence artifacts from the same
+  version or evidence from successive material versions. It must not overwrite
+  historical evidence.
+- Research/news context is not part of the implemented P1 table contract.
+  A later freshness/research slice may attach sanitized, source-backed context
+  only after its artifact type, source, timestamp, and ownership contract are
+  explicitly specified.
 
 ### decision_notes
 

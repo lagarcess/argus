@@ -2285,8 +2285,14 @@ Each approved product event sets `attributes.product_event` to the registered
 name above while preserving the envelope `event_type` taxonomy and
 `event_action` state model from memo 15.5.
 
+Implemented operational surface:
+- The append-only first-party `cost_ledger_entries` table is the server-owned
+  spend-attribution source. API chat turns, Render workflow result-readout
+  calls, and eval-harness judge calls may append entries through the existing
+  gateway. There is no frontend write/read API and no update, upsert, or delete
+  product path.
+
 Deferred surfaces:
-- Append-only provider cost ledger.
 - Durable eval run/case result persistence.
 - Product dashboards or feature decisions based on analytics.
 

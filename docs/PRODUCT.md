@@ -161,10 +161,12 @@ A new user can:
 
 ### Supporting Surfaces
 
-- Recents
-- Strategies
-- Collections
+- Recents/history
+- Omnisearch and Idea Ledger recall
 - Settings / Account
+
+Strategies and Collections remain valid flagged product objects, but they are
+not visible private-alpha surfaces.
 
 ---
 
@@ -196,8 +198,8 @@ Recents are a mixed chronological feed of recent user activity.
 Examples:
 
 - Recent chats
-- Recent strategies
-- Recent collections
+- Recent completed backtests
+- Prior idea/evidence activity reopened through Omnisearch
 
 Purpose:
 
@@ -260,7 +262,15 @@ state (promising, watching, rejected, revisit) with filter chips. Group order
 and counts are backend-owned; the frontend renders them without synthesizing
 its own groups.
 
+For P2, this durable `Idea` / `IdeaVersion` / `EvidenceArtifact` /
+`DecisionNote` recall is the product's "remembering" contract. It is distinct
+from personalization memory. Automatic or user-confirmed cross-conversation
+personalization memory remains post-PMF and must not be required for the P2
+idea/evidence/comparison loop.
+
 ## Surface Goals
+
+If the flagged Strategies surface is reactivated later, its goals are:
 
 - scan saved strategies quickly
 - compare ideas rapidly
@@ -296,11 +306,15 @@ Users should be able to manage their workspace cleanly.
 
 ## Strategies
 
+Hidden under private-alpha defaults.
+
 - rename
 - pin / unpin
 - delete
 
 ## Collections
+
+Hidden and indefinitely deferred from the private-alpha UI.
 
 - rename
 - pin / unpin
@@ -493,6 +507,19 @@ shows trades, markers, trade counts, and win-rate inputs after the execution
 layer has applied long-only position state, cash, sizing, and policy constraints.
 Ignored signals can be explained in breakdowns when useful, but they are not
 presented as real buys or sells.
+
+Freshness and "what changed" explanations must keep two evidence layers
+separate:
+
+- canonical run/evidence deltas state what the backtests and mechanically
+  verified corporate actions show;
+- source-backed news, earnings, regulatory, macro, or other event context may
+  explain what coincided with or may have contributed to a change.
+
+Argus must not present contextual correlation as proven causation. Context
+should carry sources and freshness, acknowledge uncertainty, and remain
+informational. It is not financial advice or a recommendation to buy, sell, or
+hold an asset.
 
 ---
 

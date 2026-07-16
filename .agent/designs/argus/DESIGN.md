@@ -214,7 +214,10 @@ _Design targets below are intentional for this system; if implementation keeps T
 
   - The frontend must **never fake these states with timers**. If no `stage_start` event has been received, show a neutral loading indicator only.
 - **Inline Results**: Backtest result cards appear directly in the flow of conversation.
-- **Minimal Actions**: Follow-up actions should be clear but few (e.g., "Save Strategy", "Add to Collection").
+- **Minimal Actions**: Follow-up actions should be clear but few. Under
+  private-alpha defaults, examples are "Explain result", "Refine idea", and
+  "Add decision". "Save Strategy" and "Add to Collection" must not appear while
+  their product flags are disabled.
 
 ## 12. Result Card Design
 
@@ -229,7 +232,9 @@ Result cards are the primary unit of "validation." They must be glanceable and h
 
 ## 13. Strategy Surface Design
 
-The strategies surface is for rapid comparison and organization.
+The strategies surface is a flagged future/reference surface for rapid
+comparison and organization. It is hidden under private-alpha defaults; current
+saved-idea recall and decision-state browsing live in Omnisearch/Idea Ledger.
 - **Expandable Cards**: Use a "glance-first" card that expands to show symbol-level rows.
 - **Glanceable Metrics**: Support user-selected metrics from supported presets (Configurable rows).
 - **Headline Hints**: Use simple text labels like "Best performer" or "Needs review" to guide the eye.
@@ -237,8 +242,14 @@ The strategies surface is for rapid comparison and organization.
 
 ## 14. Recents, Collections, and Search
 
-- **Recents Feed**: A mixed chronological feed (Chats, Strategies, Collections, Runs) that serves as the "Global Context."
-- **Collections**: Lightweight organizational theme groupings (e.g., "Crypto Dips", "Dividend Ideas"). Not for batch execution or aggregate performance in Alpha.
+- **Recents Feed**: A chronological continuity surface for chats and completed
+  runs. Do not advertise hidden Strategies or Collections as current
+  private-alpha destinations.
+- **Collections**: Lightweight organizational theme groupings remain a future
+  flagged model. They are hidden and indefinitely deferred from the
+  private-alpha UI.
+- **Idea Recall**: Omnisearch/Idea Ledger is the active artifact-recall surface
+  for Ideas, Evidence, Decisions, Backtests, and their source conversations.
 - **Fuzzy Search UI**: Global omni-search should support "Fuzzy Human Memory" with suggestion chips:
   - *Suggestions*: `Last week`, `Tesla ideas`, `Crypto`, `Pinned`, `Recent chats`.
 
