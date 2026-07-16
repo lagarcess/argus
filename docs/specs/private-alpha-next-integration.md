@@ -265,7 +265,7 @@ for bounded scout or janitor work:
 
 - Docs classification proposals: canon, active plan, historical evidence,
   archive candidate.
-- Dead-code candidate inventories outside `archive-v0.1/`.
+- Dead-code candidate inventories for active-tree code.
 - Large-file inventory with proposed extraction seams, without performing broad
   refactors.
 - Small test coverage additions around already-stable behavior.

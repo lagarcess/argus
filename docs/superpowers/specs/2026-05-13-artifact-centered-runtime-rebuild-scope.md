@@ -257,11 +257,12 @@ Explicitly out of scope for this rebuild:
 - Multi-timeframe rules.
 - Stop loss, trailing stop, take profit, partial exits.
 - Arbitrary formulas or user code.
-- Reviving archive-v0.1 builder UI.
+- Reviving the legacy v0.1 builder UI from Git history.
 
-## Archive-v0.1 Salvage Policy
+## Legacy v0.1 Salvage Policy
 
-Use archive-v0.1 only as reference material.
+Use the legacy v0.1 snapshot from Git history only as reference material
+(`544bf89`).
 
 Salvage concepts:
 
@@ -394,7 +395,6 @@ Current backend tests may require a stable `NUMBA_CACHE_DIR` because vectorbt im
 - Do not add regex NLU gates before the LLM.
 - Do not weaken PR 80/81 tests to make regressions pass.
 - Do not move chat hydration casually out of the protected flow.
-- Do not copy archive-v0.1 code wholesale.
+- Do not copy legacy v0.1 code from Git history wholesale.
 - Do not let visible UI state and backend artifact state disagree.
 - Do not claim support for indicators or strategies until deterministic validation proves execution is possible.
-
