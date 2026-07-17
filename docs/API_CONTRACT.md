@@ -376,27 +376,33 @@ The owner-scoped lookup is
 for the authenticated user. `confirmation_id` alone is not comparison input;
 the server performs this exact lookup:
 
-1. Load the immutable confirmed launch artifact owned by the authenticated
-   user. If it is missing or belongs to another user, return `404 not_found`.
-2. Recompute the expected `chat.run_backtest` identity from that artifact's
-   `conversation_id`, `confirmation_id`, and persisted full-width
-   `launch_payload_hash`.
-3. Read the owner-scoped reservation at
+1. Read the owner-scoped reservation at
    `(user_id, chat.run_backtest, confirmation_id)`. If none exists, return
    `404 not_found`.
-4. Compare its stored `identity_hash` to the recomputed value. A mismatch
+2. Load the immutable confirmed launch artifact through the chat job's required
+   `confirmation_message_id` link and verify the same `user_id` and
+   `conversation_id`. A missing link, missing artifact, or ownership mismatch is
+   inconsistent durable state: return safe `500 internal_error`; the client
+   must not replay the Run POST and may retry only this lookup.
+3. Recompute the expected `chat.run_backtest` identity from that artifact's
+   `conversation_id`, `confirmation_id`, and persisted full-width
+   `launch_payload_hash`.
+4. Compare the job's stored `identity_hash` to the recomputed value. A mismatch
    returns `409 idempotency_conflict` without returning job details; a match
    returns the existing job.
 
 Therefore:
 
 - `200` returns the current durable job and canonical Run when available.
-- `404 not_found` means no durable admission exists at lookup time. It is not a
-  business failure; the client may replay the original action once with the
-  same key and body. Atomic admission then returns the racing job or admits one
-  job, never both.
+- `404 not_found` means the owner-scoped reservation does not exist at lookup
+  time. It is not a business failure; the client may replay the original action
+  once with the same key and body. Atomic admission then returns the racing job
+  or admits one job, never both.
 - `409 idempotency_conflict` means the stable key was paired with different
   identity data. The client must stop automatic replay and show typed recovery.
+- `500 internal_error` means durable lookup or required confirmation-artifact
+  integrity failed. It does not prove absence or business failure; the client
+  must not replay the Run POST.
 
 A lost HTTP/SSE response is transport ambiguity. The client shows a typed
 checking/recoverable presentation while it reads durable truth; `checking` is
@@ -422,6 +428,13 @@ Acceptance occurs only after auth, request validation, quota, conversation
 ownership, and the durable user message plus lifecycle row succeed. The server
 preallocates one `turn_id` and uses it as the user `request_message_id`, so one
 accepted user message maps to one lifecycle identity.
+
+Every terminal assistant message for this ordinary turn persists immutable
+`metadata.agent_runtime_turn` with `turn_id`, the lifecycle `request_id`,
+`terminal = true`, and status `completed` or `recoverable_failed`. A
+recoverable-failure message also stores `failure_code` and `retryable`. This
+metadata is written with the terminal message before the lifecycle CAS, so it
+remains discoverable if that CAS is the interrupted operation.
 
 | State | Meaning | Transition owner |
 | --- | --- | --- |
@@ -456,20 +469,24 @@ next chat POST for that conversation and before returning
 for that conversation in deterministic `stale_since ASC, turn_id ASC` order;
 private alpha adds no background sweeper.
 
-For each locked row, the reconciler rechecks staleness and accepts only evidence
-tied to that `turn_id`: a durable terminal-runtime-failure record maps to
-`recoverable_failed`, while a durable terminal assistant message/artifact maps
-to `completed`. The comparison timestamp is the failure record's durable
-`created_at`, or the terminal assistant message's `created_at` (the linked
-artifact's `created_at` only when no terminal message exists). If both exist,
-the earlier comparison timestamp wins; an equal timestamp breaks toward
-`recoverable_failed`, preserving the terminal-failure guard.
-LangGraph/checkpointer state may locate and corroborate one of those durable
-records, but checkpoint status alone is not proof of a user-visible terminal
-outcome. Proof writes `reconciled` and the corresponding
-`reconciled_outcome`. With no qualifying proof, the row transitions directly
-to `abandoned`, sets `failure_code` to `turn_abandoned`, and adds retryable
-typed recovery.
+For each locked row, the reconciler rechecks staleness and queries immutable
+messages using this complete predicate: message `user_id` and `conversation_id`
+equal the lifecycle row; `role = assistant`;
+`metadata.agent_runtime_turn.turn_id = turn_id`;
+`metadata.agent_runtime_turn.request_id = request_id`; `terminal = true`; and
+status is `completed` or `recoverable_failed`. No message from another owner,
+conversation, request, or turn qualifies.
+
+Candidates are ordered by
+`created_at ASC, outcome_precedence ASC, id ASC`, where
+`outcome_precedence = 0` for `recoverable_failed` and `1` for `completed`; the
+first candidate wins and its id becomes `assistant_message_id`. This preserves
+the terminal-failure guard for equal timestamps. The winning message status
+becomes `reconciled_outcome`. LangGraph/checkpointer state may locate and
+corroborate one qualifying durable message, but checkpoint status alone is not
+proof of a user-visible terminal outcome. With no qualifying message, the row
+transitions directly to `abandoned`, sets `failure_code` to `turn_abandoned`,
+and adds retryable typed recovery.
 
 Message reads project the current row into
 `metadata.agent_runtime_turn` with `turn_id`, `status`, `terminal`,
@@ -2224,12 +2241,15 @@ searches another user's jobs or direct/manual keys.
 **Response:** the same `BacktestJobResponse` shape used by job-id lookup.
 
 **Error rules:**
-- `404 Not Found`: no durable admission exists for that action identity at read
-  time. This is not proof of business failure; an exact replay remains safe.
+- `404 Not Found`: the owner-scoped reservation does not exist for that action
+  identity at read time. This is not proof of business failure; one exact replay
+  remains safe.
 - `409 idempotency_conflict`: the owner-scoped reservation exists but its
   stored identity does not match the immutable confirmation artifact. No job
   details are returned and automatic replay must stop.
-- `500 Server Error`: durable persistence is unavailable in a non-dev path.
+- `500 internal_error`: durable persistence is unavailable or the existing job
+  lacks its required valid confirmation artifact. This is not replay-safe; the
+  client retries only the lookup.
 
 ## `GET /backtest-jobs/{id}`
 

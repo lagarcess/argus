@@ -49,6 +49,9 @@ def test_reliability_contract_locks_admission_and_run_reconciliation() -> None:
         "`Idempotency-Key` must equal `confirmation_id`",
         "`GET /api/v1/backtest-jobs/by-action/{confirmation_id}`",
         "`confirmation_id` alone is not comparison input",
+        "`404 not_found` means the owner-scoped reservation does not exist",
+        "`500 internal_error`",
+        "must not replay",
         "`queued` or `running`",
         "`failed`, `canceled`, or `expired`",
     ):
@@ -125,6 +128,17 @@ def test_reliability_contract_locks_openapi_authority_and_exclusions() -> None:
     ):
         assert exact_rule in authority
 
+    excluded_operations = {
+        line.removeprefix("- ").strip()
+        for line in authority.splitlines()
+        if line.startswith("- `")
+    }
+    assert excluded_operations == {
+        "`GET /health`",
+        "`GET /internal/readiness`",
+        "`POST /api/v1/dev/reset`",
+    }
+
 
 def test_reliability_contract_locks_durable_turn_lifecycle() -> None:
     contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
@@ -151,6 +165,18 @@ def test_reliability_contract_locks_durable_turn_lifecycle() -> None:
         "`chat.run_backtest` is excluded",
         "`stale_since = COALESCE(running_at, accepted_at)`",
         "`stale_since ASC, turn_id ASC`",
+        "`metadata.agent_runtime_turn.turn_id = turn_id`",
+        "`created_at ASC, outcome_precedence ASC, id ASC`",
+        "`accepted -> running`",
+        "`accepted|running -> completed`",
+        "`accepted|running -> recoverable_failed`",
+        "`accepted|running -> abandoned`",
+        "`accepted|running -> reconciled`",
+        "Chat request boundary transaction",
+        "Runtime worker before the first graph operation",
+        "Terminal message persistence/finalizer",
+        "Terminal failure guard/message store",
+        "Server reconciler",
         "`turn_abandoned`",
     ):
         assert exact_rule in lifecycle_rules
@@ -165,6 +191,8 @@ def test_reliability_contract_locks_durable_turn_lifecycle() -> None:
     for exact_rule in (
         "`authenticated` receives `SELECT` only",
         "`INSERT`, `UPDATE`, and `DELETE` are revoked from `anon` and `authenticated`",
+        "`confirmation_message_id` is required for `chat.run_backtest`",
+        "`metadata.agent_runtime_turn.turn_id`",
     ):
         assert exact_rule in " ".join(data_model.split())
 

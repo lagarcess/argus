@@ -232,6 +232,10 @@ Represents individual messages within a conversation.
 ### Notes
 - Messages are immutable in Alpha.
 - `metadata` stores token usage, model identifiers, latency, and tool execution traces.
+- Every terminal assistant message for an ordinary non-backtest chat turn stores
+  immutable `metadata.agent_runtime_turn.turn_id`, `request_id`, `terminal`, and
+  terminal `status`. These values match its `chat_turn_lifecycles` row and make
+  terminal evidence discoverable if the lifecycle CAS does not complete.
 - Message metadata may contain reloadable chat artifacts such as
   `pending_strategy`, `confirmation_card`, `confirmation_payload`,
   `result_card`, result identifiers, `chat_action`, `failed_action`,
@@ -315,12 +319,17 @@ remain immutable; message reads project the current lifecycle row into
 - The next chat POST and conversation-message read reconcile at most 20 stale
   rows for that conversation in `stale_since ASC, turn_id ASC` order. Private
   alpha does not add a background sweeper.
-- A durable terminal failure maps to reconciled `recoverable_failed`; a durable
-  terminal assistant artifact maps to reconciled `completed`. The earlier
-  durable evidence timestamp wins, with an equal timestamp breaking toward
-  failure. Checkpointer state may corroborate a referenced durable record but
-  cannot prove a terminal user-visible outcome alone. With no qualifying proof,
-  the row becomes `abandoned` with `failure_code = turn_abandoned`.
+- Qualifying terminal evidence is an immutable assistant message whose
+  `user_id`, `conversation_id`, `metadata.agent_runtime_turn.turn_id`, and
+  `metadata.agent_runtime_turn.request_id` match the lifecycle row, whose
+  terminal flag is true, and whose terminal status is `completed` or
+  `recoverable_failed`.
+- Candidates use `created_at ASC, outcome_precedence ASC, id ASC`, with failure
+  precedence 0 and completed precedence 1. The first candidate wins and becomes
+  `assistant_message_id`; its status becomes `reconciled_outcome`. Checkpointer
+  state may corroborate that message but cannot prove a terminal user-visible
+  outcome alone. With no qualifying message, the row becomes `abandoned` with
+  `failure_code = turn_abandoned`.
 
 ---
 
@@ -751,7 +760,8 @@ canonical immutable `backtest_runs` row and reference it through
 - `conversation_id`: `uuid` (Nullable only for direct `backtests.run` admission;
   otherwise references `conversations.id`)
 - `request_message_id`: `uuid` (Nullable, references `messages.id`)
-- `confirmation_message_id`: `uuid` (Nullable, references `messages.id`)
+- `confirmation_message_id`: `uuid` (Required for `chat.run_backtest`, null for
+  `backtests.run`; references the retained immutable confirmation `messages.id`)
 - `operation_scope`: `text` (`chat.run_backtest` or `backtests.run`)
 - `idempotency_key`: `text` (Required, 1-128 visible ASCII characters)
 - `identity_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
@@ -781,8 +791,11 @@ canonical immutable `backtest_runs` row and reference it through
 - **priority**: `normal` initially; future values may support admin or canary
   jobs.
 - A new `chat.run_backtest` row starts `queued` with `queued_at` set and
-  `started_at` null. A new `backtests.run` row starts `running` with
-  `queued_at` null and `started_at` set to the admission transaction timestamp.
+  `started_at` null. Its `confirmation_message_id` is non-null and the linked
+  message owns the confirmed `confirmation_id` and full `launch_payload_hash`
+  for the job record's lifetime. A new `backtests.run` row starts `running` with
+  `queued_at` and `confirmation_message_id` null and `started_at` set to the
+  admission transaction timestamp.
 
 ### Failure Semantics
 Job lifecycle status is separate from engine/runtime failure semantics.
@@ -818,6 +831,9 @@ Unknown failures default to `failed`, `failed_internal` semantics,
 - Chat Run actions use `confirmation_id` as `idempotency_key`. Direct jobs may
   omit `conversation_id` so the existing direct request shape remains
   compatible, but they remain owner-scoped by `user_id`.
+- `confirmation_message_id` is required for `chat.run_backtest` and the linked
+  immutable confirmation artifact is retained for the job record's lifetime;
+  direct `backtests.run` jobs keep this field null.
 - For chat jobs, the confirmation artifact's `launch_payload_hash` is exactly
   the persisted `payload_hash`, not a shortened confirmation fingerprint.
 - Direct admissions atomically start in `running` after both queued and running
