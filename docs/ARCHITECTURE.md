@@ -271,6 +271,7 @@ Canonical state store.
 - Onboarding state
 - Conversations
 - Messages
+- Durable chat-turn lifecycle records
 - Strategies
 - Collections
 - Backtest jobs
@@ -501,6 +502,27 @@ is proven by the eval harness, not hardcoded. See `docs/CONVERSATIONAL_RUNTIME.m
 - `latest_backtest_result_reference` — artifact pointer to last completed run
 
 Derived state (missing fields, pending needs, field provenance) is computed fresh each turn from `pending_strategy_summary`. It is never persisted.
+
+### Durable Chat-Turn Lifecycle Ownership
+
+Supabase owns the current durable lifecycle of every accepted non-backtest chat
+turn; LangGraph continues to own semantic runtime state through the checkpointer.
+The lifecycle record answers whether accepted work is still running or reached
+a durable terminal outcome. Chat turns admitted under `chat.run_backtest` use
+the durable `backtest_jobs` lifecycle instead, so the two records do not compete
+to own one execution. The chat-turn lifecycle does not store conversation
+meaning, route the graph, queue work, or replace messages.
+
+The chat request boundary durably creates `accepted` with the user message. The
+runtime worker moves it to `running`. Terminal assistant persistence owns
+`completed`, while the existing terminal-runtime-failure guard owns
+`recoverable_failed`. A server-side reconciler, invoked on the next chat POST
+and conversation-message read, owns stale `abandoned` or `reconciled` outcomes.
+SSE delivery and the frontend never own these transitions: a lost response is
+transport ambiguity until durable state proves otherwise. Exact transition and
+read semantics live in `docs/API_CONTRACT.md` under
+`contract-chat-turn-lifecycle`; the current-state persistence shape lives in
+`docs/DATA_MODEL.md` section 8.1.
 
 ### Conversation Artifact Continuity
 
