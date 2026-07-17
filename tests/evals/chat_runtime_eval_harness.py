@@ -11,6 +11,8 @@ from argus.agent_runtime.capabilities.contract import (
     CapabilityContract,
     build_default_capability_contract,
 )
+from argus.agent_runtime.graph.workflow import WorkflowStageOutcome
+from argus.agent_runtime.workflow_contract import WORKFLOW_NODE_NAMES
 from argus.domain.indicators import EXECUTABLE_INDICATORS
 from argus.llm.openrouter import OpenRouterRouteReceipt
 from argus.observability.cost_ledger import (
@@ -38,6 +40,7 @@ CANONICAL_SSE_EVENT_TYPES = {
     "final",
     "error",
 }
+WORKFLOW_STAGE_OUTCOMES = frozenset(outcome.value for outcome in WorkflowStageOutcome)
 
 
 @dataclass(frozen=True)
@@ -472,6 +475,13 @@ def _canonical_sse_failures(*, raw_sse: str | None, step_id: str) -> list[str]:
         if len(frame_lines) != 1:
             return [f"sse: {step_id} contains unframed canonical events"]
         line = frame_lines[0]
+        if line.startswith(":"):
+            continue
+        if line.startswith("retry:"):
+            retry_milliseconds = line.partition(":")[2].strip()
+            if not retry_milliseconds.isdigit():
+                return [f"sse: {step_id} contains an invalid retry control field"]
+            continue
         if not line.startswith("data: "):
             return [f"sse: {step_id} contains a non-data frame"]
         try:
@@ -518,10 +528,18 @@ def _canonical_sse_event_schema_failure(event: dict[str, Any]) -> str | None:
     event_type = str(event["type"])
     if event_type not in CANONICAL_SSE_EVENT_TYPES:
         return f"contains unknown event type {event_type!r}"
-    if event_type == "stage_start" and not _non_empty_string(event.get("stage")):
-        return "stage_start is missing a typed stage"
-    if event_type == "stage_outcome" and not _non_empty_string(event.get("outcome")):
-        return "stage_outcome is missing a typed outcome"
+    if event_type == "stage_start":
+        stage = event.get("stage")
+        if not _non_empty_string(stage):
+            return "stage_start is missing a typed stage"
+        if stage not in WORKFLOW_NODE_NAMES:
+            return f"stage_start has unknown stage {stage!r}"
+    if event_type == "stage_outcome":
+        outcome = event.get("outcome")
+        if not _non_empty_string(outcome):
+            return "stage_outcome is missing a typed outcome"
+        if outcome not in WORKFLOW_STAGE_OUTCOMES:
+            return f"stage_outcome has unknown outcome {outcome!r}"
     if event_type == "token" and not isinstance(event.get("content"), str):
         return "token is missing string content"
     if event_type == "title" and (
@@ -535,6 +553,10 @@ def _canonical_sse_event_schema_failure(event: dict[str, Any]) -> str | None:
             payload.get("stage_outcome")
         ):
             return "final is missing payload.stage_outcome"
+        if payload["stage_outcome"] not in WORKFLOW_STAGE_OUTCOMES:
+            return (
+                "final has unknown payload.stage_outcome " f"{payload['stage_outcome']!r}"
+            )
     if event_type == "error" and (
         not _non_empty_string(event.get("code"))
         or not _non_empty_string(event.get("message"))

@@ -396,6 +396,8 @@ def test_canonical_sse_requires_framed_stage_sequence() -> None:
 
     valid_stream = "\n\n".join(
         (
+            ": keepalive",
+            "retry: 3000",
             'data: {"type":"stage_start","stage":"interpret"}',
             'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
             'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
@@ -440,6 +442,21 @@ def test_canonical_sse_rejects_invalid_event_schemas_and_unknown_types() -> None
             'data: {"type":"bogus"}',
             'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
             'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
+        ),
+        (
+            'data: {"type":"stage_start","stage":"bogus"}',
+            'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
+            'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
+        ),
+        (
+            'data: {"type":"stage_start","stage":"interpret"}',
+            'data: {"type":"stage_outcome","outcome":"bogus"}',
+            'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
+        ),
+        (
+            'data: {"type":"stage_start","stage":"interpret"}',
+            'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
+            'data: {"type":"final","payload":{"stage_outcome":"bogus"}}',
         ),
     )
 
