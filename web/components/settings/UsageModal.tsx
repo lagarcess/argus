@@ -27,6 +27,9 @@ import {
 } from "@/lib/usage-allowance";
 import { dialogTabTarget } from "@/lib/dialog-focus";
 
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 type UsageModalProps = {
   locale: "en-US" | "es-419";
   onClose: () => void;
@@ -149,12 +152,13 @@ export default function UsageModal({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    const fallbackReturnFocus = returnFocusRef?.current ?? null;
+    const returnFocusRoot = returnFocusRef?.current ?? null;
+    const fallbackReturnFocus = returnFocusRoot?.matches(FOCUSABLE_SELECTOR)
+      ? returnFocusRoot
+      : returnFocusRoot?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
     const focusableElements = () =>
       Array.from(
-        dialog.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
+        dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
       );
 
     (focusableElements()[0] ?? dialog).focus();
@@ -187,9 +191,12 @@ export default function UsageModal({
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      const returnTarget = previousFocus?.isConnected
-        ? previousFocus
-        : fallbackReturnFocus;
+      const previousFocusIsPageRoot =
+        previousFocus === document.body || previousFocus === document.documentElement;
+      const returnTarget =
+        previousFocus?.isConnected && !previousFocusIsPageRoot
+          ? previousFocus
+          : fallbackReturnFocus;
       returnTarget?.focus();
     };
   }, [onClose, returnFocusRef]);
