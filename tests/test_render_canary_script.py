@@ -316,7 +316,22 @@ def test_browser_has_separate_intercepted_typed_error_recovery_proof() -> None:
     assert "page.route" in browser_source
     assert "route.fulfill" in browser_source
     assert '"Access-Control-Allow-Origin": new URL(page.url()).origin' in browser_source
-    assert 'route.request().method() === "OPTIONS"' in browser_source
+    assert (
+        '"authorization, content-type, idempotency-key, x-request-id"'
+        in browser_source
+    )
+    conversations_mock = browser_source.split(
+        'await page.route("**/api/v1/conversations"', 1
+    )[1].split('await page.route("**/api/v1/chat/stream"', 1)[0]
+    assert conversations_mock.index('route.request().method() === "OPTIONS"') < (
+        conversations_mock.index('route.request().method() !== "POST"')
+    )
+    chat_mock = browser_source.split(
+        'await page.route("**/api/v1/chat/stream"', 1
+    )[1].split('await page.getByTestId("chat-input")', 1)[0]
+    assert chat_mock.index('route.request().method() === "OPTIONS"') < (
+        chat_mock.index("route.request().postDataJSON()")
+    )
     assert 'type: "error"' in browser_source
     assert 'recovery_action: "retry_last_turn"' in browser_source
     assert 'label("common.retry")' in browser_source
