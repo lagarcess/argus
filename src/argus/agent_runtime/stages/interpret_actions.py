@@ -71,6 +71,11 @@ CONFIRMATION_EDIT_ACTION_FIELDS = {
     "adjust_assumptions": "assumption",
 }
 TRANSPORT_RESULT_ACTION_TYPES = {"show_breakdown", "save_strategy"}
+COVERAGE_RECOVERY_ACTION_FIELDS = {
+    "change_dates": "date_range",
+    "change_asset": "asset_universe",
+    "change_benchmark": "comparison_baseline",
+}
 
 RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS = 10.0
 
@@ -118,6 +123,14 @@ def structured_action_stage_result_if_applicable(
             require_requested_failed_action_id=True,
             language=language,
         )
+    coverage_recovery_result = _coverage_recovery_action_result(
+        state=state,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+        language=language,
+    )
+    if coverage_recovery_result is not None:
+        return coverage_recovery_result
     if action.presentation == "result":
         return result_action_stage_result_if_applicable(
             state=state,
@@ -209,6 +222,69 @@ def structured_action_stage_result_if_applicable(
             },
         )
     return None
+
+
+def _coverage_recovery_action_result(
+    *,
+    state: RunState,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+    language: str,
+) -> StageResult | None:
+    action = state.structured_action
+    if action is None or action.type != "select_response_option":
+        return None
+    response_intent = selected_thread_metadata.get("response_intent")
+    if not isinstance(response_intent, dict) or response_intent.get("kind") != (
+        "coverage_recovery"
+    ):
+        return None
+    option_id = action.payload.get("option_id")
+    replacement_values = action.payload.get("replacement_values")
+    if not isinstance(option_id, str) or not isinstance(replacement_values, dict):
+        return None
+    requested_field = replacement_values.get("requested_field")
+    expected_field = COVERAGE_RECOVERY_ACTION_FIELDS.get(option_id)
+    if requested_field != expected_field:
+        return None
+    options = response_intent.get("options")
+    if not isinstance(options, list) or not any(
+        isinstance(option, dict)
+        and option.get("id") == option_id
+        and option.get("replacement_values") == replacement_values
+        for option in options
+    ):
+        return None
+    pending = snapshot.pending_strategy_summary if snapshot is not None else None
+    if pending is None:
+        return None
+    semantic_need = {
+        "date_range": "period",
+        "asset_universe": "asset_target",
+        "comparison_baseline": "assumption",
+    }[requested_field]
+    return StageResult(
+        outcome="needs_clarification",
+        stage_patch={
+            "candidate_strategy_draft": pending.model_dump(mode="python"),
+            "assistant_prompt": None,
+            "requested_field": requested_field,
+            "missing_required_fields": [requested_field],
+            "optional_parameter_status": {},
+            "response_intent": {
+                "kind": "clarification",
+                "semantic_needs": [semantic_need],
+                "requested_fields": [requested_field],
+                "facts": {
+                    "strategy": pending.model_dump(mode="python"),
+                    "current_user_message": state.current_user_message,
+                    "structured_action": action.model_dump(mode="python"),
+                    "language": language,
+                },
+                "options": [],
+            },
+        },
+    )
 
 
 def _run_backtest_action_result(

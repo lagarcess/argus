@@ -3,7 +3,10 @@ import {
   failedActionRetryActionFromMetadata,
   retryLastTurnActionFromMetadata,
 } from "./chat-retry-actions";
-import { recoveryDisplayFromMetadata } from "./chat-recovery-display";
+import {
+  coverageRecoveryActionsFromMetadata,
+  recoveryDisplayFromMetadata,
+} from "./chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "./result-followup-heading";
 import type { ChatActionOption, Message } from "@/components/chat/types";
 
@@ -30,13 +33,17 @@ export function hydrateTextMessageFromApi(
   const retryActions = isAssistant
     ? retryActionsFromMetadata(metadata, message.id)
     : [];
+  const coverageActions = isAssistant
+    ? coverageRecoveryActionsFromMetadata(metadata)
+    : [];
+  const actions = [...coverageActions, ...retryActions];
 
   return {
     id: message.id,
     role: message.role === "user" ? "user" : "ai",
     kind: "text",
     content: message.content,
-    actions: isAssistant && retryActions.length > 0 ? retryActions : undefined,
+    actions: isAssistant && actions.length > 0 ? actions : undefined,
     contentPresentation: isAssistant
       ? runtimeFailureContentPresentation(metadata, options.contentPresentation)
       : undefined,

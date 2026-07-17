@@ -1,10 +1,15 @@
 import type { TFunction } from "i18next";
+import type { ChatActionOption } from "@/components/chat/types";
 
 export type RecoveryDisplay =
   | {
       kind: "recovery_code";
       code: string;
       values?: Record<string, string>;
+    }
+  | {
+      kind: "coverage_recovery";
+      code: string;
     }
   | {
       kind: "unsupported_recovery";
@@ -111,6 +116,9 @@ export function recoveryDisplayText(
   if (display.kind === "recovery_code") {
     return t(`chat.recovery.${display.code}`, recoveryCodeValues(display, t));
   }
+  if (display.kind === "coverage_recovery") {
+    return t(`chat.coverage_recovery.${display.code}`);
+  }
   if (display.kind === "unsupported_recovery") {
     const optionsText = joinLocalizedOptions(
       display.values.options.map((option) => optionDisplayText(option, t)),
@@ -190,6 +198,10 @@ function recoveryDisplayFromClarification(value: unknown): RecoveryDisplay | nul
   if (!clarification || !kind) {
     return null;
   }
+  if (kind === "coverage_recovery") {
+    const code = stringOrNull(clarification.reason_code);
+    return code ? { kind: "coverage_recovery", code } : null;
+  }
   if (kind === "unsupported_recovery") {
     return unsupportedRecoveryDisplayFromClarification(clarification);
   }
@@ -205,6 +217,51 @@ function recoveryDisplayFromClarification(value: unknown): RecoveryDisplay | nul
     semanticNeeds,
     values: strategyValues(payload?.strategy),
   };
+}
+
+export function coverageRecoveryActionsFromMetadata(
+  metadata: Record<string, unknown>,
+): ChatActionOption[] {
+  const clarification = recordOrNull(metadata.clarification);
+  if (stringOrNull(clarification?.kind) !== "coverage_recovery") {
+    return [];
+  }
+  const options = Array.isArray(clarification?.options)
+    ? clarification.options
+    : [];
+  const allowed = new Map([
+    ["change_dates", { field: "date_range", label: "Change dates" }],
+    ["change_asset", { field: "asset_universe", label: "Change asset" }],
+    [
+      "change_benchmark",
+      { field: "comparison_baseline", label: "Change benchmark" },
+    ],
+  ]);
+  return options.flatMap((rawOption): ChatActionOption[] => {
+    const option = recordOrNull(rawOption);
+    const id = stringOrNull(option?.id);
+    const definition = id ? allowed.get(id) : undefined;
+    const replacementValues = recordOrNull(option?.replacement_values);
+    if (
+      !id ||
+      !definition ||
+      stringOrNull(replacementValues?.requested_field) !== definition.field
+    ) {
+      return [];
+    }
+    return [
+      {
+        id: `coverage-${id.replaceAll("_", "-")}`,
+        label: definition.label,
+        labelKey: `chat.coverage_recovery.actions.${id}`,
+        type: "select_response_option",
+        payload: {
+          option_id: id,
+          replacement_values: { requested_field: definition.field },
+        },
+      },
+    ];
+  });
 }
 
 function unsupportedRecoveryDisplayFromClarification(

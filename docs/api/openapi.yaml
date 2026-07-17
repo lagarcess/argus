@@ -267,7 +267,7 @@ components:
   schemas:
     ChatClarification:
       type: object
-      description: Typed degraded clarification or unsupported-recovery sidecar for chat final payloads and assistant metadata.
+      description: Typed degraded clarification, coverage-recovery, or unsupported-recovery sidecar for chat final payloads and assistant metadata.
       required:
         - kind
         - reason_code
@@ -276,10 +276,11 @@ components:
         - options
       properties:
         kind:
-          enum: [clarification, unsupported_recovery]
+          type: string
+          enum: [clarification, coverage_recovery, unsupported_recovery]
         reason_code:
           type: string
-          examples: [missing_period, unsupported_strategy_logic]
+          examples: [missing_period, no_common_data_window, unsupported_strategy_logic]
         requested_field:
           type:
             - string

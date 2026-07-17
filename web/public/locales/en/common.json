@@ -295,6 +295,16 @@
       "unsupported_recovery_with_raw_value": "{{rawValue}} does not define when to buy or sell on its own. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?"
     },
+    "coverage_recovery": {
+      "no_common_data_window": "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
+      "insufficient_common_data": "The assets and benchmark share too little history for one trustworthy test. Change the dates, an asset, or the benchmark.",
+      "market_data_unavailable": "The shared history is not available for one trustworthy test right now. Change the dates, an asset, or the benchmark.",
+      "actions": {
+        "change_dates": "Change dates",
+        "change_asset": "Change asset",
+        "change_benchmark": "Change benchmark"
+      }
+    },
     "simplification_options": {
       "rsi_threshold": "Use a supported RSI threshold rule",
       "buy_and_hold": "Compare with buy and hold",

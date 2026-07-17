@@ -40,6 +40,23 @@ def typed_clarification_contract(
     if not isinstance(response_intent, dict):
         return None
     kind = response_intent.get("kind")
+    if kind == "coverage_recovery":
+        options = _typed_options(response_intent)
+        coverage = _coverage_facts(response_intent)
+        if not options or coverage is None:
+            return None
+        return {
+            "kind": "coverage_recovery",
+            "reason_code": coverage["code"],
+            "requested_field": None,
+            "requested_fields": _requested_fields(response_intent),
+            "semantic_needs": _semantic_needs(response_intent),
+            "payload": {
+                "strategy": _strategy_payload(response_intent, strategy),
+                "coverage": coverage,
+            },
+            "options": options,
+        }
     if kind == "unsupported_recovery":
         options = _typed_options(response_intent)
         if not options:
@@ -77,6 +94,19 @@ def typed_clarification_contract(
     }
 
 
+def _coverage_facts(response_intent: dict[str, Any]) -> dict[str, Any] | None:
+    facts = response_intent.get("facts")
+    if not isinstance(facts, dict):
+        return None
+    coverage = facts.get("coverage")
+    if not isinstance(coverage, dict):
+        return None
+    code = coverage.get("code")
+    if not isinstance(code, str) or not code:
+        return None
+    return dict(coverage)
+
+
 def intent_clarification_fallback(
     *,
     language: str | None,
@@ -85,6 +115,19 @@ def intent_clarification_fallback(
 ) -> str | None:
     if not isinstance(response_intent, dict):
         return None
+    if response_intent.get("kind") == "coverage_recovery":
+        coverage = _coverage_facts(response_intent)
+        code = coverage.get("code") if coverage is not None else None
+        _ = language
+        if code == "no_common_data_window":
+            return (
+                "Those assets and the benchmark do not share a usable data window. "
+                "Would you like to change the dates, an asset, or the benchmark?"
+            )
+        return (
+            "The shared data window is not sufficient for a trustworthy test. "
+            "Would you like to change the dates, an asset, or the benchmark?"
+        )
     if response_intent.get("kind") == "unsupported_recovery":
         return _unsupported_recovery_fallback(
             language=language,
@@ -164,7 +207,16 @@ def _typed_options(response_intent: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(option, dict):
             continue
         replacement_values = option.get("replacement_values")
-        option_id = simplification_option_kind(replacement_values) or f"option_{index}"
+        explicit_id = option.get("id")
+        option_id = (
+            simplification_option_kind(replacement_values)
+            or (
+                explicit_id.strip()
+                if isinstance(explicit_id, str) and explicit_id.strip()
+                else None
+            )
+            or f"option_{index}"
+        )
         if option_id in seen:
             continue
         seen.add(option_id)

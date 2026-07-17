@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  coverageRecoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
   recoveryDisplayText,
 } from "../lib/chat-recovery-display";
@@ -177,10 +178,88 @@ describe("chat recovery display", () => {
     );
   });
 
+  test("renders provider-neutral coverage recovery in English and Spanish", () => {
+    const metadata = {
+      clarification: {
+        kind: "coverage_recovery",
+        reason_code: "no_common_data_window",
+        requested_field: null,
+        requested_fields: [
+          "date_range",
+          "asset_universe",
+          "comparison_baseline",
+        ],
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          strategy: { asset_universe: ["AAPL"] },
+          coverage: {
+            code: "no_common_data_window",
+            benchmark_symbol: "SPY",
+          },
+        },
+        options: [
+          {
+            id: "change_dates",
+            replacement_values: { requested_field: "date_range" },
+          },
+          {
+            id: "change_asset",
+            replacement_values: { requested_field: "asset_universe" },
+          },
+          {
+            id: "change_benchmark",
+            replacement_values: { requested_field: "comparison_baseline" },
+          },
+        ],
+      },
+    };
+    const display = recoveryDisplayFromMetadata(metadata);
+
+    expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe(
+      "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
+    );
+    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
+      "Esos activos y la referencia no comparten un rango de datos utilizable para una prueba confiable. Cambia las fechas, un activo o la referencia.",
+    );
+    expect(coverageRecoveryActionsFromMetadata(metadata)).toEqual([
+      {
+        id: "coverage-change-dates",
+        label: "Change dates",
+        labelKey: "chat.coverage_recovery.actions.change_dates",
+        type: "select_response_option",
+        payload: {
+          option_id: "change_dates",
+          replacement_values: { requested_field: "date_range" },
+        },
+      },
+      {
+        id: "coverage-change-asset",
+        label: "Change asset",
+        labelKey: "chat.coverage_recovery.actions.change_asset",
+        type: "select_response_option",
+        payload: {
+          option_id: "change_asset",
+          replacement_values: { requested_field: "asset_universe" },
+        },
+      },
+      {
+        id: "coverage-change-benchmark",
+        label: "Change benchmark",
+        labelKey: "chat.coverage_recovery.actions.change_benchmark",
+        type: "select_response_option",
+        payload: {
+          option_id: "change_benchmark",
+          replacement_values: { requested_field: "comparison_baseline" },
+        },
+      },
+    ]);
+  });
+
   test("recovery locale keys stay in parity", () => {
     for (const namespace of [
       "chat.recovery",
       "chat.clarification",
+      "chat.coverage_recovery",
       "chat.simplification_options",
     ]) {
       const enKeys = flattenedKeys(

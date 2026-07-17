@@ -78,7 +78,10 @@ import {
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
-import { recoveryDisplayFromMetadata } from "@/lib/chat-recovery-display";
+import {
+  coverageRecoveryActionsFromMetadata,
+  recoveryDisplayFromMetadata,
+} from "@/lib/chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
 import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
@@ -1431,12 +1434,14 @@ export default function ChatInterface() {
             ? finalPayload.message_id
             : undefined;
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
+        const finalCoverageActions = coverageRecoveryActionsFromMetadata(finalPayload);
         const finalRetryActions = [
           failedActionRetryActionFromMetadata(finalPayload),
           retryLastTurnActionFromMetadata(finalPayload, {
             assistantMessageId: finalMessageId,
           }),
         ].filter((retryAction): retryAction is ChatActionOption => Boolean(retryAction));
+        const finalTextActions = [...finalCoverageActions, ...finalRetryActions];
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
         const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
         const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
@@ -1530,6 +1535,7 @@ export default function ChatInterface() {
           );
         } else if (finalText) {
           const finalFactHeadingKey = resultFactHeadingKeyFromMetadata(finalPayload);
+          setInputActions(finalCoverageActions);
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
@@ -1537,7 +1543,7 @@ export default function ChatInterface() {
                 mergeFinalTextMessage(m, {
                   assistantId,
                   finalText,
-                  finalActions: finalRetryActions,
+                  finalActions: finalTextActions,
                   recoveryDisplay: finalRecoveryDisplay,
                   contentPresentation:
                     action?.type === "show_breakdown"
@@ -1552,7 +1558,7 @@ export default function ChatInterface() {
                 role: "ai",
                 kind: "text",
                 content: finalText,
-                actions: finalRetryActions.length > 0 ? finalRetryActions : undefined,
+                actions: finalTextActions.length > 0 ? finalTextActions : undefined,
                 recoveryDisplay: finalRecoveryDisplay,
                 contentPresentation:
                   action?.type === "show_breakdown"
@@ -1569,7 +1575,7 @@ export default function ChatInterface() {
               return normalizeRetryActionHistory(
                 settleOpenConfirmationsAfterTextFinal(nextMessages, {
                   action,
-                  finalActions: finalRetryActions,
+                  finalActions: finalTextActions,
                   hasFailedAction: finalHasFailedAction,
                   stageOutcome: finalStageOutcome,
                 }),

@@ -395,8 +395,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("setShowOptions(false)");
     expect(chat).toContain("const finalRetryActions = [");
     expect(chat).toContain("failedActionRetryActionFromMetadata(finalPayload)");
+    expect(chat).toContain("const finalTextActions = [...finalCoverageActions, ...finalRetryActions]");
     expect(chat).toContain("mergeFinalTextMessage(m, {");
-    expect(chat).toContain("finalActions: finalRetryActions");
+    expect(chat).toContain("finalActions: finalTextActions");
   });
 
   test("result cards render a separate trust strip and compact assumption details", () => {

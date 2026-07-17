@@ -35,6 +35,39 @@ def test_chat_action_display_message_resolves_label_key_by_language() -> None:
     assert chat_display_message(payload, language="en") == "Explain result"
 
 
+
+@pytest.mark.parametrize(
+    ("language", "expected"),
+    [("en", "Change benchmark"), ("es-419", "Cambiar referencia")],
+)
+def test_coverage_recovery_action_uses_localized_typed_label(
+    language: str,
+    expected: str,
+) -> None:
+    from argus.api.chat.actions import chat_display_message, chat_request_message
+    from argus.api.schemas import ChatStreamRequest
+
+    payload = ChatStreamRequest.model_validate(
+        {
+            "conversation_id": "conversation-1",
+            "language": language,
+            "action": {
+                "type": "select_response_option",
+                "label": "Change benchmark",
+                "labelKey": "chat.coverage_recovery.actions.change_benchmark",
+                "payload": {
+                    "option_id": "change_benchmark",
+                    "replacement_values": {"requested_field": "comparison_baseline"},
+                },
+            },
+        }
+    )
+
+    assert chat_request_message(payload, language=language) == expected
+    assert chat_display_message(payload, language=language) == expected
+
+
+
 def _client() -> TestClient:
     client = TestClient(app)
     client.post("/api/v1/dev/reset")

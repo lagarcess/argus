@@ -11,6 +11,7 @@ from argus.agent_runtime.confirmation_artifacts import (
     confirmation_artifact_reference,
     new_confirmation_id,
 )
+from argus.agent_runtime.coverage_recovery import coverage_recovery_stage_patch
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState, StrategySummary
 from argus.agent_runtime.strategy_contract import (
@@ -228,9 +229,15 @@ def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
         }
         prepared = prepare_market_data(config)
     except MarketDataCoverageError as exc:
-        return _coverage_recovery(exc.code)
+        return coverage_recovery_stage_patch(
+            error_code=exc.code,
+            launch_payload=launch_payload,
+        )
     except ValueError as exc:
-        return _coverage_recovery(str(exc))
+        return coverage_recovery_stage_patch(
+            error_code=str(exc),
+            launch_payload=launch_payload,
+        )
 
     requested = prepared.requested_date_range.model_dump()
     effective = prepared.effective_date_range.model_dump()
@@ -252,38 +259,6 @@ def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "outcome": "ready_to_confirm",
         "launch_payload": adjusted_launch_payload,
-    }
-
-
-def _coverage_recovery(error_code: str) -> dict[str, Any]:
-    category = (
-        error_code
-        if error_code in {"no_common_data_window", "insufficient_common_data"}
-        else "market_data_unavailable"
-    )
-    explanation = (
-        "The selected assets and benchmark do not share a usable data window."
-        if category == "no_common_data_window"
-        else "The shared data window is not complete enough for a trustworthy test."
-    )
-    return {
-        "outcome": "needs_clarification",
-        "missing_required_fields": ["date_range"],
-        "requested_field": "date_range",
-        "assistant_prompt": None,
-        "optional_parameter_status": _with_unsupported_constraint(
-            {},
-            {
-                "category": category,
-                "raw_value": error_code,
-                "explanation": explanation,
-                "simplification_options": [
-                    {"label": "Use a shorter date range"},
-                    {"label": "Change an asset"},
-                    {"label": "Change the benchmark"},
-                ],
-            },
-        ),
     }
 
 

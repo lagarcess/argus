@@ -50,6 +50,9 @@ def test_real_backtest_tool_rejects_execution_without_coverage_approval(
 
     assert result["success"] is False
     assert result["error_type"] == "parameter_validation_error"
+    assert result["capability_context"]["failure_code"] == (
+        "approved_data_window_unavailable"
+    )
     assert result["capability_context"]["failure_detail"] == (
         "approved_data_window_unavailable"
     )

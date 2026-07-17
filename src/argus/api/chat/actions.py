@@ -36,6 +36,9 @@ _ACTION_LABELS = {
         "chat.result_card.refine_idea": "Refine idea",
         "chat.result_card.save": "Save",
         "common.retry": "Retry",
+        "chat.coverage_recovery.actions.change_dates": "Change dates",
+        "chat.coverage_recovery.actions.change_asset": "Change asset",
+        "chat.coverage_recovery.actions.change_benchmark": "Change benchmark",
     },
     "es-419": {
         "chat.confirmation.actions.run_backtest": "Ejecutar backtest",
@@ -47,6 +50,9 @@ _ACTION_LABELS = {
         "chat.result_card.refine_idea": "Ajustar idea",
         "chat.result_card.save": "Guardar",
         "common.retry": "Reintentar",
+        "chat.coverage_recovery.actions.change_dates": "Cambiar fechas",
+        "chat.coverage_recovery.actions.change_asset": "Cambiar activo",
+        "chat.coverage_recovery.actions.change_benchmark": "Cambiar referencia",
     },
 }
 
@@ -67,6 +73,15 @@ def chat_request_message(payload: ChatStreamRequest, *, language: str = "en") ->
     if payload.action is None:
         return payload.message or ""
     action_type = payload.action.type
+    if action_type == "select_response_option":
+        if payload.action.label_key:
+            localized = _localized_action_label(
+                payload.action.label_key,
+                language=language,
+            )
+            if localized:
+                return localized
+        return payload.action.label or payload.message or ""
     action_messages = {
         "run_backtest": "run backtest",
         "change_dates": "change dates",

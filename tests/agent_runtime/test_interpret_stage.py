@@ -7392,6 +7392,70 @@ def test_interpreter_unavailable_spanish_pending_strategy_applies_calendar_year_
     )
 
 
+
+@pytest.mark.parametrize(
+    ("option_id", "requested_field"),
+    [
+        ("change_dates", "date_range"),
+        ("change_asset", "asset_universe"),
+        ("change_benchmark", "comparison_baseline"),
+    ],
+)
+def test_coverage_recovery_action_requests_typed_field_without_llm_selection(
+    option_id: str,
+    requested_field: str,
+) -> None:
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=f"Choose {option_id}",
+            recent_thread_history=[],
+            action_context={
+                "type": "select_response_option",
+                "label": option_id,
+                "payload": {
+                    "option_id": option_id,
+                    "replacement_values": {"requested_field": requested_field},
+                },
+            },
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "coverage_recovery",
+                "semantic_needs": ["simplification_choice"],
+                "requested_fields": [
+                    "date_range",
+                    "asset_universe",
+                    "comparison_baseline",
+                ],
+                "options": [
+                    {
+                        "id": option_id,
+                        "replacement_values": {"requested_field": requested_field},
+                    }
+                ],
+            },
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.patch["requested_field"] == requested_field
+    assert result.patch["missing_required_fields"] == [requested_field]
+    assert result.patch["response_intent"]["kind"] == "clarification"
+    assert result.patch["optional_parameter_status"] == {}
+
+
+
 def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choice(
     monkeypatch,
 ) -> None:

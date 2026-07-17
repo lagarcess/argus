@@ -56,6 +56,7 @@ class RealBacktestTool:
             "retryable": error_type == "upstream_dependency_error",
             "capability_context": {
                 "execution_status": result.envelope.execution_status,
+                "failure_code": failure_reason,
                 "failure_detail": user_safe_failure_detail(
                     failure_reason=failure_reason,
                     failure_category=error_type,
@@ -88,9 +89,10 @@ def _validation_failure(failure_reason: str) -> dict[str, Any]:
         ),
         "retryable": False,
         "capability_context": {
+            "failure_code": failure_reason,
             "failure_detail": user_safe_failure_detail(
                 failure_reason=failure_reason,
                 failure_category="parameter_validation_error",
-            )
+            ),
         },
     }

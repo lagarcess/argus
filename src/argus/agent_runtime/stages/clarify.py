@@ -10,6 +10,10 @@ from argus.agent_runtime.clarification_contract import (
     offline_clarification_fallback,
     typed_clarification_contract,
 )
+from argus.agent_runtime.coverage_recovery import (
+    coverage_recovery_from_status,
+    coverage_recovery_options,
+)
 from argus.agent_runtime.llm_clarifier import ClarificationRequest
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
@@ -62,6 +66,7 @@ async def clarify_stage_async(
     language: str = "en",
     prefilled_assistant_prompt: str | None = None,
 ) -> StageResult:
+    coverage_recovery = coverage_recovery_from_status(state.optional_parameter_status)
     unsupported_constraints = _unsupported_constraints(state.optional_parameter_status)
     ambiguous_fields = _ambiguous_fields(state.optional_parameter_status)
     optional_parameter_choices = _optional_parameter_choices(
@@ -79,6 +84,52 @@ async def clarify_stage_async(
         requested_fields=requested_fields,
         unsupported_constraints=unsupported_constraints,
     )
+
+    if coverage_recovery is not None:
+        requested_fields = [
+            "date_range",
+            "asset_universe",
+            "comparison_baseline",
+        ]
+        options = coverage_recovery_options()
+        response_intent = _response_intent(
+            kind="coverage_recovery",
+            state=state,
+            semantic_needs=["simplification_choice"],
+            requested_fields=requested_fields,
+            facts={"coverage": coverage_recovery},
+            options=options,
+            language=language,
+        )
+        generated = await _generate_clarifying_question_result(
+            state=state,
+            response_intent=response_intent,
+            missing_required_fields=[],
+            ambiguous_fields=[],
+            unsupported_constraints=[],
+            optional_parameter_choices=[],
+            clarification_generator=clarification_generator,
+            language=language,
+        )
+        stage_patch: dict[str, object] = {
+            "assistant_prompt": generated.prompt,
+            "response_intent": response_intent,
+            "requested_field": None,
+            "requested_fields": requested_fields,
+            "missing_required_fields": [],
+        }
+        if generated.used_degraded_fallback:
+            stage_patch.update(
+                _clarification_sidecar_patch(
+                    state=state,
+                    response_intent=response_intent,
+                    requested_field=None,
+                )
+            )
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch=stage_patch,
+        )
 
     if unsupported_constraints:
         options = _simplification_options(unsupported_constraints)

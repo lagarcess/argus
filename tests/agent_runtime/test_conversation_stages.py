@@ -2182,9 +2182,157 @@ def test_confirm_stage_returns_typed_recovery_without_runnable_card_when_no_comm
 
     assert result.outcome == "needs_clarification"
     assert "confirmation_payload" not in result.patch
-    constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
-    assert constraint["category"] == "no_common_data_window"
-    assert constraint["raw_value"] == "no_common_data_window"
+    assert "unsupported_constraints" not in result.patch["optional_parameter_status"]
+    recovery = result.patch["optional_parameter_status"]["coverage_recovery"]
+    assert recovery == {
+        "code": "no_common_data_window",
+        "requested_date_range": {
+            "start": "2024-01-01",
+            "end": "2024-01-05",
+        },
+        "asset_universe": ["AAPL"],
+        "benchmark_symbol": "SPY",
+    }
+
+    clarify_state = state.model_copy(update=result.patch)
+    clarifier = RecordingClarifier(
+        "The shared history is not usable. Which part should we change?"
+    )
+    clarified = clarify_stage(
+        state=clarify_state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+        language="en",
+    )
+
+    assert clarified.outcome == "await_user_reply"
+    assert clarified.patch["assistant_prompt"] == (
+        "The shared history is not usable. Which part should we change?"
+    )
+    assert "clarification" not in clarified.patch
+    response_intent = clarified.patch["response_intent"]
+    assert response_intent["kind"] == "coverage_recovery"
+    assert response_intent["facts"]["coverage"] == recovery
+    assert response_intent["options"] == [
+        {
+            "id": "change_dates",
+            "replacement_values": {"requested_field": "date_range"},
+        },
+        {
+            "id": "change_asset",
+            "replacement_values": {"requested_field": "asset_universe"},
+        },
+        {
+            "id": "change_benchmark",
+            "replacement_values": {"requested_field": "comparison_baseline"},
+        },
+    ]
+    assert all("label" not in option for option in response_intent["options"])
+    assert clarifier.requests[0].unsupported_constraints == []
+
+
+def test_confirm_stage_returns_coverage_recovery_for_sparse_common_data(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain import market_data
+
+    def fake_fetch(symbol: str, **_: object) -> pd.DataFrame:  # noqa: ARG001
+        index = pd.to_datetime(["2024-01-01", "2024-01-10"], utc=True)
+        close = pd.Series([100.0, 101.0], index=index)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", fake_fetch)
+    state = RunState.new(
+        current_user_message="Hold AAPL from January 1 through January 10, 2024.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-10"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "needs_clarification"
+    assert "confirmation_payload" not in result.patch
+    assert result.patch["optional_parameter_status"]["coverage_recovery"]["code"] == (
+        "insufficient_common_data"
+    )
+
+
+def test_degraded_coverage_recovery_emits_typed_localizable_sidecar() -> None:
+    state = RunState.new(
+        current_user_message="Prueba AAPL en ese periodo.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    state.optional_parameter_status = {
+        "coverage_recovery": {
+            "code": "no_common_data_window",
+            "requested_date_range": {
+                "start": "2024-01-01",
+                "end": "2024-01-05",
+            },
+            "asset_universe": ["AAPL"],
+            "benchmark_symbol": "SPY",
+        }
+    }
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=None,
+        language="es-419",
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["clarification"] == {
+        "kind": "coverage_recovery",
+        "reason_code": "no_common_data_window",
+        "requested_field": None,
+        "requested_fields": [
+            "date_range",
+            "asset_universe",
+            "comparison_baseline",
+        ],
+        "semantic_needs": ["simplification_choice"],
+        "payload": {
+            "strategy": state.candidate_strategy_draft.model_dump(mode="python"),
+            "coverage": state.optional_parameter_status["coverage_recovery"],
+        },
+        "options": [
+            {
+                "id": "change_dates",
+                "replacement_values": {"requested_field": "date_range"},
+            },
+            {
+                "id": "change_asset",
+                "replacement_values": {"requested_field": "asset_universe"},
+            },
+            {
+                "id": "change_benchmark",
+                "replacement_values": {"requested_field": "comparison_baseline"},
+            },
+        ],
+    }
 
 
 def test_confirm_stage_revalidates_strategy_viability_after_window_adjustment(
