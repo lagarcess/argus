@@ -440,6 +440,92 @@ describe("chat artifact history", () => {
     expect(normalizedConfirmation.actions).toEqual([]);
   });
 
+  test("stream normalization marks a superseded running card updated when a fresh confirmation arrives", () => {
+    const [running] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "run_backtest",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Running",
+      },
+    ]);
+    const freshConfirmation: Message = {
+      ...confirmationMessage(),
+      id: "assistant-confirmation-fresh",
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_id: "confirm-aapl-fresh",
+        status: "ready_to_run",
+      },
+    };
+
+    const [previousCard, freshCard] = normalizeConfirmationHistory([
+      running,
+      freshConfirmation,
+    ]);
+
+    expect(previousCard.confirmation?.confirmation_state).toBe("superseded");
+    expect(previousCard.confirmation?.status).toBe("updated");
+    expect(previousCard.confirmation?.statusLabel).toBe("Updated");
+    expect(previousCard.confirmation?.actions).toEqual([]);
+    expect(previousCard.actions).toEqual([]);
+    expect(freshCard.confirmation?.confirmation_state).toBe("active");
+    expect(freshCard.confirmation?.status).toBe("ready_to_run");
+    expect(freshCard.confirmation?.statusLabel).toBe("Ready to run");
+    expect(freshCard.confirmation?.actions).toHaveLength(2);
+  });
+
+  test("normalization preserves the latest running confirmation when nothing supersedes it", () => {
+    const [running] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "run_backtest",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Running",
+      },
+    ]);
+
+    const [normalized] = normalizeConfirmationHistory([running]);
+
+    expect(normalized.confirmation?.confirmation_state).toBe("superseded");
+    expect(normalized.confirmation?.status).toBe("running");
+    expect(normalized.confirmation?.statusLabel).toBe("Running");
+  });
+
+  test("reload normalization clears a persisted request-sent label before activating a fresh confirmation", () => {
+    const persistedRequest: Message = {
+      ...confirmationMessage(),
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_state: "superseded",
+        status: "request_sent",
+        statusLabel: "Request sent",
+      },
+    };
+    const freshConfirmation: Message = {
+      ...confirmationMessage(),
+      id: "assistant-confirmation-fresh",
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_id: "confirm-aapl-fresh",
+        status: "ready_to_run",
+      },
+    };
+
+    const [previousCard, freshCard] = normalizeConfirmationHistory([
+      persistedRequest,
+      freshConfirmation,
+    ]);
+
+    expect(previousCard.confirmation?.confirmation_state).toBe("superseded");
+    expect(previousCard.confirmation?.status).toBe("updated");
+    expect(previousCard.confirmation?.statusLabel).toBe("Updated");
+    expect(previousCard.confirmation?.actions).toEqual([]);
+    expect(previousCard.actions).toEqual([]);
+    expect(freshCard.confirmation?.confirmation_state).toBe("active");
+    expect(freshCard.confirmation?.status).toBe("ready_to_run");
+    expect(freshCard.confirmation?.statusLabel).toBe("Ready to run");
+    expect(freshCard.confirmation?.actions).toHaveLength(2);
+  });
+
   test("normalization closes active run-complete confirmations with stale actions", () => {
     const activeComplete: Message = {
       ...confirmationMessage(),

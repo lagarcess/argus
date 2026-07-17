@@ -54,6 +54,7 @@ function completedRunConfirmationStatus(
   message: Message,
   index: number,
   lastResultIndex: number,
+  latestConfirmationArtifactIndex: number,
 ): StrategyConfirmationStatus {
   const status = message.confirmation
     ? confirmationStatusFromPayload(message.confirmation)
@@ -66,13 +67,15 @@ function completedRunConfirmationStatus(
   ) {
     return "run_complete";
   }
+  if (
+    index < latestConfirmationArtifactIndex &&
+    message.confirmation?.confirmation_state === "superseded" &&
+    status &&
+    IN_PROGRESS_RUN_STATUSES.has(status)
+  ) {
+    return "updated";
+  }
   return status ?? (index < lastResultIndex ? "run_complete" : "updated");
-}
-
-function completedRunConfirmationStatusLabel(message: Message, index: number, lastResultIndex: number) {
-  return confirmationStatusLabel(
-    completedRunConfirmationStatus(message, index, lastResultIndex),
-  );
 }
 
 export function confirmationActionEffectFromAction(
@@ -307,12 +310,24 @@ export function normalizeConfirmationHistory(messages: Message[]): Message[] {
         : latest,
     -1,
   );
+  const latestConfirmationArtifactIndex = messages.reduce(
+    (latest, message, index) =>
+      message.kind === "strategy_confirmation" && index > lastResultIndex
+        ? index
+        : latest,
+    -1,
+  );
   return messages.map((message, index) => {
     if (message.kind !== "strategy_confirmation" || !message.confirmation) {
       return message;
     }
     if (isTerminalConfirmation(message)) {
-      const status = completedRunConfirmationStatus(message, index, lastResultIndex);
+      const status = completedRunConfirmationStatus(
+        message,
+        index,
+        lastResultIndex,
+        latestConfirmationArtifactIndex,
+      );
       return {
         ...message,
         confirmation: {
