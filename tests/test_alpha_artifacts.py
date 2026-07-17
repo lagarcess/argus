@@ -40,6 +40,18 @@ def test_backtests_run_openapi_requires_idempotency_key() -> None:
     assert "required: true" in backtest_run_contract
 
 
+def test_logout_openapi_declares_browser_origin_rejection() -> None:
+    openapi = ROOT / "docs" / "api" / "openapi.yaml"
+
+    text = openapi.read_text(encoding="utf-8")
+    start = text.index("  /api/v1/auth/logout:")
+    end = text.index("  /api/v1/auth/session:")
+    logout_contract = text[start:end]
+
+    assert '"403":' in logout_contract
+    assert "untrusted browser origin" in logout_contract.lower()
+
+
 def test_supabase_migration_matches_alpha_data_model() -> None:
     migration = ROOT / "supabase" / "migrations" / "20260424000001_alpha_core.sql"
 

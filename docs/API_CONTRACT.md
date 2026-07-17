@@ -1051,6 +1051,9 @@ Clear Argus's mirrored cookies after the browser client has revoked its local
 or global Supabase session. This endpoint does not choose a revocation scope
 and must not be treated as a second session owner.
 
+An untrusted browser `Origin` returns the standard `403
+csrf_origin_rejected` problem response and does not clear cookies.
+
 **Response:**
 ```json
 {

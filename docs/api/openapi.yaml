@@ -21,6 +21,8 @@ paths:
       responses:
         "200":
           description: Session cleared.
+        "403":
+          description: Untrusted browser origin rejected.
   /api/v1/auth/session:
     get:
       responses:
