@@ -798,7 +798,7 @@ export default function ProfileMenu({
             </button>
             <button
               onClick={() => openModal("usage")}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              className="flex min-h-11 w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Activity className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.data.usage", "Usage")}

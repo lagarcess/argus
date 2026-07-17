@@ -8,13 +8,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import {
-  Clock3,
-  Loader2,
-  MessageSquareText,
-  RefreshCw,
-  X,
-} from "lucide-react";
+import { Clock3, Loader2, MessageSquareText, RefreshCw, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   getUsageAllowances,
@@ -71,7 +65,7 @@ function AllowanceCard({
     <section className="rounded-2xl border border-black/[0.06] bg-black/[0.025] p-4 dark:border-white/[0.08] dark:bg-white/[0.035]">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-black/55 shadow-sm dark:bg-white/[0.08] dark:text-white/65 dark:shadow-none">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-black/55 dark:bg-white/[0.08] dark:text-white/65">
             {icon}
           </span>
           <div>
@@ -157,9 +151,7 @@ export default function UsageModal({
       ? returnFocusRoot
       : returnFocusRoot?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
     const focusableElements = () =>
-      Array.from(
-        dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-      );
+      Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
 
     (focusableElements()[0] ?? dialog).focus();
 
@@ -192,7 +184,8 @@ export default function UsageModal({
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       const previousFocusIsPageRoot =
-        previousFocus === document.body || previousFocus === document.documentElement;
+        previousFocus === document.body ||
+        previousFocus === document.documentElement;
       const returnTarget =
         previousFocus?.isConnected && !previousFocusIsPageRoot
           ? previousFocus
@@ -249,7 +242,7 @@ export default function UsageModal({
           </div>
           <button
             onClick={onClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/[0.08] dark:hover:text-white"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/[0.08] dark:hover:text-white"
             aria-label={t("settings.data.usage_panel.close")}
           >
             <X className="h-4 w-4" />
@@ -273,7 +266,7 @@ export default function UsageModal({
               <button
                 type="button"
                 onClick={retry}
-                className="flex items-center gap-2 rounded-xl bg-black/[0.06] px-3.5 py-2 text-[12px] font-medium text-black/70 hover:bg-black/[0.09] dark:bg-white/[0.08] dark:text-white/70 dark:hover:bg-white/[0.12]"
+                className="flex min-h-11 items-center gap-2 rounded-xl bg-black/[0.06] px-3.5 py-2 text-[12px] font-medium text-black/70 hover:bg-black/[0.09] dark:bg-white/[0.08] dark:text-white/70 dark:hover:bg-white/[0.12]"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 {t("settings.data.usage_panel.retry")}

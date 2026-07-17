@@ -55,9 +55,7 @@ describe("private-alpha usage allowance", () => {
   });
 
   test("wraps keyboard focus inside the Usage dialog", async () => {
-    let dialogFocus:
-      | typeof import("@/lib/dialog-focus")
-      | undefined;
+    let dialogFocus: typeof import("@/lib/dialog-focus") | undefined;
     try {
       dialogFocus = await import("@/lib/dialog-focus");
     } catch {
@@ -73,9 +71,9 @@ describe("private-alpha usage allowance", () => {
 
     expect(dialogFocus.dialogTabTarget(focusable, last, false)).toBe(first);
     expect(dialogFocus.dialogTabTarget(focusable, first, true)).toBe(last);
-    expect(dialogFocus.dialogTabTarget(focusable, { id: "outside" }, false)).toBe(
-      first,
-    );
+    expect(
+      dialogFocus.dialogTabTarget(focusable, { id: "outside" }, false),
+    ).toBe(first);
     expect(dialogFocus.dialogTabTarget(focusable, middle, false)).toBeNull();
 
     const modal = readFileSync(
@@ -85,6 +83,26 @@ describe("private-alpha usage allowance", () => {
     expect(modal).toContain("dialogTabTarget");
     expect(modal).toContain('event.key === "Escape"');
     expect(modal).toContain("returnFocusRef");
+  });
+
+  test("uses flat styling and mobile-sized Usage controls", () => {
+    const profileMenu = readFileSync(
+      join(root, "components/sidebar/ProfileMenu.tsx"),
+      "utf-8",
+    );
+    const modal = readFileSync(
+      join(root, "components/settings/UsageModal.tsx"),
+      "utf-8",
+    );
+    const usageButton = profileMenu.slice(
+      profileMenu.indexOf('onClick={() => openModal("usage")}'),
+      profileMenu.indexOf('onClick={() => openModal("usage")}') + 350,
+    );
+
+    expect(modal).not.toContain("shadow-sm");
+    expect(modal).toContain("min-h-11 min-w-11");
+    expect(modal.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(usageButton).toContain("min-h-11");
   });
 
   test("localizes allowance labels and reserved simulation rules", () => {
