@@ -68,8 +68,8 @@ class NormalizedSearchEvidence:
     status: str
     search_calls: int | None
     sources: tuple[SearchSource, ...]
-    policy_effects: tuple[str, ...]
-    runnable_candidates: tuple[str, ...]
+    policy_effects: tuple[str, ...] | None
+    runnable_candidates: tuple[str, ...] | None
     fallback_code: str | None
     prior_result_context: dict[str, Any] | None
     timeout_ms: int
@@ -130,20 +130,16 @@ def normalize_case(
     if case.kind == "control":
         return _evidence(
             case=case,
-            status="not_invoked",
-            search_calls=0,
+            status="fixture_control",
+            search_calls=None,
             sources=(),
         )
     if "error" in case.payload:
         return _evidence(
             case=case,
-            status="outage",
+            status="fixture_outage",
             search_calls=_search_calls(case),
             sources=(),
-            fallback_code="search_unavailable_preserve_context",
-            prior_result_context=_mapping_or_none(
-                case.payload.get("prior_result_context")
-            ),
         )
     if case.provider == "perplexity_direct":
         sources = _perplexity_sources(case, rubric=rubric)
@@ -153,7 +149,7 @@ def normalize_case(
         raise ValueError(f"unsupported provider: {case.provider}")
     return _evidence(
         case=case,
-        status="succeeded",
+        status="fixture_response",
         search_calls=_search_calls(case),
         sources=sources,
     )
@@ -168,12 +164,14 @@ def evaluate_manifest(manifest: SearchEvalManifest) -> dict[str, Any]:
         )
         for case in manifest.cases
     ]
-    failed = sum(result["status"] == "failed" for result in results)
-    passed = sum(result["status"] == "passed" for result in results)
-    unproven = sum(result["status"] == "unproven" for result in results)
-    contract_failed = sum(bool(result["failed_contract_checks"]) for result in results)
-    contract_passed = len(results) - contract_failed
-    provider_comparison = {
+    fixture_failed = sum(bool(result["failed_fixture_checks"]) for result in results)
+    fixture_validated = len(results) - fixture_failed
+    empirical_failed = sum(bool(result["failed_empirical_checks"]) for result in results)
+    empirical_unproven = sum(
+        bool(result["unproven_empirical_checks"]) for result in results
+    )
+    empirical_passed = len(results) - empirical_failed - empirical_unproven
+    documented_provider_shapes = {
         provider_id: {
             "api_status": profile.api_status,
             "call_shape": profile.call_shape,
@@ -184,36 +182,6 @@ def evaluate_manifest(manifest: SearchEvalManifest) -> dict[str, Any]:
             "source_date_metadata": profile.source_date_metadata,
         }
         for provider_id, profile in manifest.providers.items()
-    }
-    criterion_comparison = {
-        "relevance": {
-            "perplexity_direct": "synthetic_contract_only",
-            "openrouter_web_search": "synthetic_contract_only",
-        },
-        "citation_integrity": {
-            "perplexity_direct": "raw_ranked_results_with_urls",
-            "openrouter_web_search": "standardized_url_annotations",
-        },
-        "freshness": {
-            "perplexity_direct": "source_dates_documented",
-            "openrouter_web_search": "source_dates_not_guaranteed",
-        },
-        "latency": {
-            "perplexity_direct": "real_measurement_missing",
-            "openrouter_web_search": "real_measurement_missing",
-        },
-        "cost": {
-            "perplexity_direct": "fixed_search_fee_no_token_cost",
-            "openrouter_web_search": "search_fee_plus_unresolved_llm_tokens",
-        },
-        "outage_behavior": {
-            "perplexity_direct": "runtime_evidence_missing",
-            "openrouter_web_search": "runtime_evidence_missing",
-        },
-        "injection_resistance": {
-            "perplexity_direct": "live_evidence_missing",
-            "openrouter_web_search": "live_evidence_missing",
-        },
     }
     remaining_gates = [
         "#241 typed asset discovery route integrated",
@@ -229,33 +197,49 @@ def evaluate_manifest(manifest: SearchEvalManifest) -> dict[str, Any]:
         "real provider latency evidence",
     ]
     return {
-        "schema_version": "argus-search-provider-evaluation/v1",
+        "schema_version": "argus-search-provider-evaluation/v2",
         "evidence_scope": manifest.evidence_scope,
         "live_calls_made": manifest.live_calls_made,
         "rubric_threshold_status": manifest.rubric.threshold_status,
-        "fixture_contract": {
+        "fixture_validation": {
             "interpretation": (
-                "contract checks validate only synthetic parser and policy "
-                "behavior; empirical checks remain null until a sanctioned "
-                "real-provider observation exists"
+                "Fixture checks validate authored case shape only. They do not "
+                "exercise Search routing, provider quality, runtime policy, or "
+                "outage recovery."
             ),
-            "contract_passed": contract_passed,
-            "contract_failed": contract_failed,
-            "passed": passed,
-            "failed": failed,
-            "unproven": unproven,
+            "validated_cases": fixture_validated,
+            "failed_cases": fixture_failed,
             "results": results,
         },
-        "provider_comparison": provider_comparison,
-        "criterion_comparison": criterion_comparison,
-        "preferred_next_probe": "perplexity_direct",
+        "empirical_evidence": {
+            "interpretation": (
+                "No independently captured provider or runtime observations "
+                "are present. Every empirical criterion remains unproven."
+            ),
+            "passed": empirical_passed,
+            "failed": empirical_failed,
+            "unproven": empirical_unproven,
+        },
+        "documentation_summary": {
+            "interpretation": (
+                "Official documentation describes API shapes and pricing only; "
+                "it is not an empirical provider comparison."
+            ),
+            "providers": documented_provider_shapes,
+        },
+        "next_probe_hypothesis": {
+            "provider": "perplexity_direct",
+            "basis": "official_documentation_only",
+            "status": "not_empirically_compared",
+        },
         "activation_ready": False,
         "recommendation": "defer",
+        "recommendation_basis": "missing_empirical_evidence",
         "recommendation_reason": (
-            "Offline fixtures prove the evaluation boundary, not real provider "
-            "quality or latency. Perplexity direct is the narrower next live "
-            "probe because its raw result schema documents source dates and a "
-            "fixed request fee without LLM token charges."
+            "No empirical provider comparison was performed. Perplexity direct "
+            "is only a documentation-based next-probe hypothesis because its "
+            "documented raw-result schema includes source dates and a fixed "
+            "request fee without LLM token charges."
         ),
         "remaining_gates": remaining_gates,
         "rollback_boundary": (
@@ -391,12 +375,10 @@ def _search_calls(case: SearchEvalCase) -> int | None:
             value = server_tool_use.get("web_search_requests")
             if value is not None:
                 return int(value)
-    if case.provider == "openrouter_web_search":
-        return None
-    return case.expected_search_calls
+    return None
 
 
-def _observed_cost(case: SearchEvalCase) -> float | None:
+def _reported_fixture_cost(case: SearchEvalCase) -> float | None:
     if case.provider != "openrouter_web_search":
         return case.cost_usd
     usage = case.payload.get("usage", {})
@@ -409,27 +391,52 @@ def _mapping_or_none(value: Any) -> dict[str, Any] | None:
     return dict(value) if isinstance(value, dict) else None
 
 
+def _string_tuple_or_none(value: Any) -> tuple[str, ...] | None:
+    if not isinstance(value, list):
+        return None
+    return tuple(str(item) for item in value)
+
+
 def _evidence(
     *,
     case: SearchEvalCase,
     status: str,
     search_calls: int | None,
     sources: tuple[SearchSource, ...],
-    fallback_code: str | None = None,
-    prior_result_context: dict[str, Any] | None = None,
 ) -> NormalizedSearchEvidence:
+    runtime_observation = _mapping_or_none(case.payload.get("runtime_observation"))
+    policy_effects = (
+        None
+        if runtime_observation is None
+        else _string_tuple_or_none(runtime_observation.get("policy_effects"))
+    )
+    runnable_candidates = (
+        None
+        if runtime_observation is None
+        else _string_tuple_or_none(runtime_observation.get("runnable_candidates"))
+    )
+    fallback_code = (
+        None
+        if runtime_observation is None or runtime_observation.get("fallback_code") is None
+        else str(runtime_observation["fallback_code"])
+    )
+    prior_result_context = (
+        None
+        if runtime_observation is None
+        else _mapping_or_none(runtime_observation.get("prior_result_context"))
+    )
     return NormalizedSearchEvidence(
         case_id=case.id,
         status=status,
         search_calls=search_calls,
         sources=sources,
-        policy_effects=(),
-        runnable_candidates=(),
+        policy_effects=policy_effects,
+        runnable_candidates=runnable_candidates,
         fallback_code=fallback_code,
         prior_result_context=prior_result_context,
         timeout_ms=case.timeout_ms,
         latency_ms=case.latency_ms,
-        cost_usd=_observed_cost(case),
+        cost_usd=_reported_fixture_cost(case),
         evidence_kind=case.evidence_kind,
     )
 
@@ -440,68 +447,86 @@ def _score_case(
     evidence: NormalizedSearchEvidence,
     rubric: SearchEvalRubric,
 ) -> dict[str, Any]:
-    contract_checks = _contract_checks(case, evidence=evidence, rubric=rubric)
-    empirical_checks = _empirical_checks(
-        evidence,
-        contract_checks=contract_checks,
-    )
-    contract_failures = sorted(
-        key for key, passed in contract_checks.items() if passed is False
+    fixture_checks = _fixture_checks(case, evidence=evidence, rubric=rubric)
+    empirical_checks = _empirical_checks(rubric=rubric)
+    fixture_failures = sorted(
+        key for key, passed in fixture_checks.items() if passed is False
     )
     empirical_failures = sorted(
         key for key, passed in empirical_checks.items() if passed is False
     )
     unproven = _unproven_checks(case, checks=empirical_checks)
-    failures = bool(contract_failures or empirical_failures)
-    status = "failed" if failures else "unproven" if unproven else "passed"
+    if fixture_failures:
+        status = "fixture_failed"
+    elif empirical_failures:
+        status = "empirical_failed"
+    else:
+        status = "unproven" if unproven else "passed"
     return {
         "id": case.id,
         "provider": case.provider,
         "kind": case.kind,
         "evidence_kind": case.evidence_kind,
         "status": status,
-        "failed_contract_checks": contract_failures,
+        "failed_fixture_checks": fixture_failures,
         "failed_empirical_checks": empirical_failures,
         "unproven_empirical_checks": unproven,
-        "contract_checks": contract_checks,
+        "fixture_checks": fixture_checks,
         "empirical_checks": empirical_checks,
-        "observed": {
-            "search_calls": evidence.search_calls,
+        "fixture_input": {
+            "expected_search_calls": case.expected_search_calls,
+            "declared_latency_ms": case.latency_ms,
+            "declared_cost_usd": case.cost_usd,
+            "evidence_kind_label": case.evidence_kind,
+        },
+        "normalized_fixture": {
+            "reported_search_calls": evidence.search_calls,
             "result_count": len(evidence.sources),
             "citation_count": len(evidence.sources),
             "source_dates_present": sum(
                 source.source_date is not None for source in evidence.sources
             ),
             "configured_timeout_ms": evidence.timeout_ms,
-            "latency_ms": evidence.latency_ms,
-            "cost_usd": evidence.cost_usd,
-            "evidence_kind": evidence.evidence_kind,
+            "reported_cost_usd": evidence.cost_usd,
+        },
+        "runtime_observation": {
+            "present": _mapping_or_none(case.payload.get("runtime_observation"))
+            is not None,
+            "policy_effects": (
+                None if evidence.policy_effects is None else list(evidence.policy_effects)
+            ),
+            "runnable_candidates": (
+                None
+                if evidence.runnable_candidates is None
+                else list(evidence.runnable_candidates)
+            ),
             "fallback_code": evidence.fallback_code,
-            "prior_result_context_present": (evidence.prior_result_context is not None),
+            "prior_result_context_present": evidence.prior_result_context is not None,
         },
     }
 
 
 def _empirical_checks(
-    evidence: NormalizedSearchEvidence,
     *,
-    contract_checks: dict[str, bool | None],
+    rubric: SearchEvalRubric,
 ) -> dict[str, bool | None]:
-    if evidence.evidence_kind != "real_provider_observation":
-        return {key: None for key in contract_checks}
-    return dict(contract_checks)
+    # This offline harness has no independent capture/provenance boundary. A
+    # fixture label or provider-shaped payload therefore cannot become empirical
+    # proof. A later sanctioned probe must ingest independently captured records
+    # through a separate validated boundary before any value here can be boolean.
+    return {key: None for key in rubric.criteria}
 
 
-def _contract_checks(
+def _fixture_checks(
     case: SearchEvalCase,
     *,
     evidence: NormalizedSearchEvidence,
     rubric: SearchEvalRubric,
 ) -> dict[str, bool | None]:
-    is_success_case = case.kind not in {"control", "outage"}
+    is_response_fixture = case.kind not in {"control", "outage"}
     urls = [source.url for source in evidence.sources]
-    citation_integrity = (
-        evidence.status == "succeeded"
+    citation_shape_well_formed = (
+        evidence.status == "fixture_response"
         and bool(evidence.sources)
         and len(urls) == len(set(urls))
         and all(
@@ -509,45 +534,60 @@ def _contract_checks(
             for source in evidence.sources
         )
     )
-    injection_resistance = (
-        not evidence.policy_effects
-        and not evidence.runnable_candidates
-        and all(source.trust == "untrusted" for source in evidence.sources)
+    declared_runtime_effects_safe = (
+        None
+        if evidence.policy_effects is None or evidence.runnable_candidates is None
+        else not evidence.policy_effects and not evidence.runnable_candidates
     )
     return {
-        "call_count": _call_count_check(case, evidence=evidence, rubric=rubric),
-        "result_count": len(evidence.sources) <= rubric.max_results,
-        "citation_integrity": citation_integrity if is_success_case else None,
-        "source_date_metadata": _source_date_metadata_check(
+        "expected_call_count_bounded": (
+            0 <= case.expected_search_calls <= rubric.max_search_calls
+        ),
+        "reported_fixture_call_count_matches_expected": (
+            _reported_fixture_call_count_matches_expected(
+                case,
+                evidence=evidence,
+                rubric=rubric,
+            )
+        ),
+        "result_shape_bounded": len(evidence.sources) <= rubric.max_results,
+        "citation_shape_well_formed": (
+            citation_shape_well_formed if is_response_fixture else None
+        ),
+        "source_date_field_shape": _source_date_field_shape(
             case,
             evidence=evidence,
         ),
-        "freshness": _freshness_check(case),
-        "relevance": (
-            _relevance_ratio(case.required_terms, evidence.sources)
+        "term_coverage_fixture": (
+            _term_coverage_ratio(case.required_terms, evidence.sources)
             >= rubric.min_relevance_ratio
-            if is_success_case
+            if is_response_fixture
             else None
         ),
-        "latency": (
-            None
-            if case.kind == "control"
-            else evidence.latency_ms is not None
-            and evidence.latency_ms <= rubric.max_latency_ms
-        ),
-        "timeout": (
+        "configured_timeout_bounded": (
             None
             if case.kind == "control"
             else 0 < evidence.timeout_ms <= rubric.timeout_ms
         ),
-        "cost": (
+        "declared_fixture_cost_within_provisional_bound": (
             None
             if case.kind in {"control", "outage"}
-            else evidence.cost_usd is not None
-            and evidence.cost_usd <= rubric.max_cost_usd
+            else case.cost_usd is not None and case.cost_usd <= rubric.max_cost_usd
         ),
-        "outage_behavior": _outage_behavior_check(case, evidence=evidence),
-        "injection_resistance": injection_resistance if is_success_case else None,
+        "sources_labeled_untrusted": (
+            all(source.trust == "untrusted" for source in evidence.sources)
+            if is_response_fixture
+            else None
+        ),
+        "declared_runtime_effects_safe": declared_runtime_effects_safe,
+        "outage_fixture_has_context_precondition": (
+            _outage_fixture_has_context_precondition(case)
+            if case.kind == "outage"
+            else None
+        ),
+        "control_declares_zero_search": (
+            case.expected_search_calls == 0 if case.kind == "control" else None
+        ),
     }
 
 
@@ -576,15 +616,15 @@ def _unproven_checks(
     return sorted(key for key in relevant if checks[key] is None)
 
 
-def _call_count_check(
+def _reported_fixture_call_count_matches_expected(
     case: SearchEvalCase,
     *,
     evidence: NormalizedSearchEvidence,
     rubric: SearchEvalRubric,
 ) -> bool | None:
     if evidence.search_calls is None:
-        # Missing usage evidence cannot prove that the provider respected the
-        # one-call policy.
+        # Missing reported usage stays unknown. The authored expectation is not
+        # substituted for an observation.
         return None
     return (
         evidence.search_calls == case.expected_search_calls
@@ -592,32 +632,16 @@ def _call_count_check(
     )
 
 
-def _outage_behavior_check(
-    case: SearchEvalCase,
-    *,
-    evidence: NormalizedSearchEvidence,
-) -> bool | None:
-    if case.kind != "outage":
-        return None
-    expected_context = _mapping_or_none(case.payload.get("prior_result_context"))
+def _outage_fixture_has_context_precondition(case: SearchEvalCase) -> bool:
+    # This checks only that the authored scenario contains the input context a
+    # future runtime outage test must preserve. It does not claim a fallback ran.
     return (
-        evidence.status == "outage"
-        and evidence.sources == ()
-        and evidence.fallback_code == "search_unavailable_preserve_context"
-        and expected_context is not None
-        and evidence.prior_result_context == expected_context
+        isinstance(case.payload.get("error"), dict)
+        and _mapping_or_none(case.payload.get("prior_result_context")) is not None
     )
 
 
-def _freshness_check(case: SearchEvalCase) -> bool | None:
-    if case.kind in {"control", "outage"}:
-        return None
-    # Source dates are metadata, not a freshness verdict. No maximum source-age
-    # threshold has been founder-approved, and retrieval time cannot substitute.
-    return None
-
-
-def _source_date_metadata_check(
+def _source_date_field_shape(
     case: SearchEvalCase,
     *,
     evidence: NormalizedSearchEvidence,
@@ -632,7 +656,7 @@ def _source_date_metadata_check(
     )
 
 
-def _relevance_ratio(
+def _term_coverage_ratio(
     required_terms: tuple[str, ...],
     sources: tuple[SearchSource, ...],
 ) -> float:

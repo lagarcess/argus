@@ -36,7 +36,9 @@ def test_manifest_is_bounded_provider_neutral_and_offline() -> None:
     assert manifest.rubric.max_search_calls == 1
     assert manifest.rubric.max_results == 5
     assert manifest.rubric.timeout_ms == 3000
-    assert manifest.evidence_scope == ("synthetic_provider_shaped_and_official_docs")
+    assert manifest.evidence_scope == (
+        "authored_synthetic_fixtures_and_official_documentation"
+    )
     assert manifest.live_calls_made == 0
     assert DEFAULT_MANIFEST_PATH.name == "search_provider_eval_manifest.json"
 
@@ -81,8 +83,9 @@ def test_provider_shapes_normalize_to_bounded_untrusted_sources() -> None:
     for case in manifest.cases:
         evidence = normalize_case(case, rubric=manifest.rubric)
         if evidence.search_calls is None:
-            assert case.provider == "openrouter_web_search"
+            assert case.provider != "openrouter_web_search" or "usage" not in case.payload
         else:
+            assert case.provider == "openrouter_web_search"
             assert evidence.search_calls <= manifest.rubric.max_search_calls
         assert len(evidence.sources) <= manifest.rubric.max_results
         assert all(source.trust == "untrusted" for source in evidence.sources)
@@ -90,7 +93,7 @@ def test_provider_shapes_normalize_to_bounded_untrusted_sources() -> None:
         assert all(source.retrieved_at for source in evidence.sources)
 
 
-def test_injected_source_content_cannot_change_eval_policy() -> None:
+def test_injection_fixtures_mark_sources_untrusted_without_claiming_policy() -> None:
     manifest = load_search_eval_manifest()
     injection_cases = [case for case in manifest.cases if case.kind == "injection"]
 
@@ -100,13 +103,13 @@ def test_injected_source_content_cannot_change_eval_policy() -> None:
     }
     for case in injection_cases:
         evidence = normalize_case(case, rubric=manifest.rubric)
-        assert evidence.status == "succeeded"
-        assert evidence.policy_effects == ()
-        assert evidence.runnable_candidates == ()
+        assert evidence.status == "fixture_response"
+        assert evidence.policy_effects is None
+        assert evidence.runnable_candidates is None
         assert all(source.trust == "untrusted" for source in evidence.sources)
 
 
-def test_real_provider_injection_observation_scores_policy_resistance() -> None:
+def test_relabeling_synthetic_fixture_does_not_create_empirical_evidence() -> None:
     manifest = load_search_eval_manifest()
     injection_case = next(
         case for case in manifest.cases if case.id == "perplexity_injection_source"
@@ -117,14 +120,112 @@ def test_real_provider_injection_observation_scores_policy_resistance() -> None:
     )
 
     result = evaluate_manifest(replace(manifest, cases=(observed_case,)))[
-        "fixture_contract"
+        "fixture_validation"
     ]["results"][0]
 
-    assert result["empirical_checks"]["injection_resistance"] is True
-    assert "injection_resistance" not in result["unproven_empirical_checks"]
+    assert all(value is None for value in result["empirical_checks"].values())
+    assert "injection_resistance" in result["unproven_empirical_checks"]
+    assert result["status"] == "unproven"
 
 
-def test_outage_cases_preserve_context_with_honest_fallback() -> None:
+def test_missing_runtime_observations_are_not_manufactured() -> None:
+    manifest = load_search_eval_manifest()
+    control_case = next(
+        case
+        for case in manifest.cases
+        if case.id == "direct_supported_backtest_zero_search"
+    )
+    injection_case = next(
+        case for case in manifest.cases if case.id == "perplexity_injection_source"
+    )
+    outage_case = next(case for case in manifest.cases if case.id == "perplexity_outage")
+
+    control_evidence = normalize_case(control_case, rubric=manifest.rubric)
+    injection_evidence = normalize_case(injection_case, rubric=manifest.rubric)
+    outage_evidence = normalize_case(outage_case, rubric=manifest.rubric)
+
+    assert control_evidence.search_calls is None
+    assert injection_evidence.policy_effects is None
+    assert injection_evidence.runnable_candidates is None
+    assert outage_evidence.fallback_code is None
+    assert outage_evidence.prior_result_context is None
+
+    partial_payload = deepcopy(injection_case.payload)
+    partial_payload["runtime_observation"] = {"policy_effects": []}
+    partial_case = replace(injection_case, payload=partial_payload)
+    partial_result = evaluate_manifest(replace(manifest, cases=(partial_case,)))[
+        "fixture_validation"
+    ]["results"][0]
+
+    assert partial_result["fixture_checks"]["declared_runtime_effects_safe"] is None
+    assert partial_result["empirical_checks"]["injection_resistance"] is None
+
+
+def test_declared_malicious_runtime_effects_are_retained_and_fail_closed() -> None:
+    manifest = load_search_eval_manifest()
+    injection_case = next(
+        case for case in manifest.cases if case.id == "perplexity_injection_source"
+    )
+    payload = deepcopy(injection_case.payload)
+    payload["runtime_observation"] = {
+        "policy_effects": ["policy_overridden"],
+        "runnable_candidates": ["UNVALIDATED"],
+    }
+    malicious_case = replace(injection_case, payload=payload)
+
+    evidence = normalize_case(malicious_case, rubric=manifest.rubric)
+    report = evaluate_manifest(replace(manifest, cases=(malicious_case,)))
+    result = report["fixture_validation"]["results"][0]
+
+    assert evidence.policy_effects == ("policy_overridden",)
+    assert evidence.runnable_candidates == ("UNVALIDATED",)
+    assert result["fixture_checks"]["declared_runtime_effects_safe"] is False
+    assert result["status"] == "fixture_failed"
+    assert all(value is None for value in result["empirical_checks"].values())
+    assert report["empirical_evidence"]["failed"] == 0
+    assert report["empirical_evidence"]["unproven"] == 1
+
+
+def test_controls_and_outages_are_fixture_scenarios_not_runtime_proof() -> None:
+    report = evaluate_manifest(load_search_eval_manifest())
+    results = report["fixture_validation"]["results"]
+    control_results = [result for result in results if result["kind"] == "control"]
+    outage_results = [result for result in results if result["kind"] == "outage"]
+
+    assert control_results
+    assert outage_results
+    assert all("observed" not in result for result in control_results + outage_results)
+    assert all(
+        result["fixture_checks"]["control_declares_zero_search"] is True
+        for result in control_results
+    )
+    assert all(
+        result["fixture_checks"]["outage_fixture_has_context_precondition"] is True
+        for result in outage_results
+    )
+    assert all(
+        result["empirical_checks"]["call_count"] is None for result in control_results
+    )
+    assert all(
+        result["empirical_checks"]["outage_behavior"] is None for result in outage_results
+    )
+
+
+def test_provider_selection_is_only_a_documentation_based_probe_hypothesis() -> None:
+    report = evaluate_manifest(load_search_eval_manifest())
+
+    assert "provider_comparison" not in report
+    assert "criterion_comparison" not in report
+    assert "preferred_next_probe" not in report
+    assert report["next_probe_hypothesis"] == {
+        "provider": "perplexity_direct",
+        "basis": "official_documentation_only",
+        "status": "not_empirically_compared",
+    }
+    assert report["recommendation_basis"] == "missing_empirical_evidence"
+
+
+def test_outage_fixtures_define_context_preconditions_without_claiming_fallback() -> None:
     manifest = load_search_eval_manifest()
     outage_cases = [case for case in manifest.cases if case.kind == "outage"]
 
@@ -134,10 +235,16 @@ def test_outage_cases_preserve_context_with_honest_fallback() -> None:
     }
     for case in outage_cases:
         evidence = normalize_case(case, rubric=manifest.rubric)
-        assert evidence.status == "outage"
+        result = evaluate_manifest(replace(manifest, cases=(case,)))[
+            "fixture_validation"
+        ]["results"][0]
+
+        assert evidence.status == "fixture_outage"
         assert evidence.sources == ()
-        assert evidence.fallback_code == "search_unavailable_preserve_context"
-        assert evidence.prior_result_context == case.payload["prior_result_context"]
+        assert evidence.fallback_code is None
+        assert evidence.prior_result_context is None
+        assert result["fixture_checks"]["outage_fixture_has_context_precondition"] is True
+        assert result["empirical_checks"]["outage_behavior"] is None
 
 
 def test_missing_or_conflicting_provider_evidence_is_not_fabricated() -> None:
@@ -163,7 +270,7 @@ def test_missing_or_conflicting_provider_evidence_is_not_fabricated() -> None:
     assert high_cost_evidence.cost_usd == 999
 
 
-def test_observed_openrouter_call_overage_fails_the_case() -> None:
+def test_reported_fixture_call_overage_fails_fixture_validation() -> None:
     manifest = load_search_eval_manifest()
     openrouter_case = next(
         case for case in manifest.cases if case.id == "openrouter_equity_category_en"
@@ -173,11 +280,13 @@ def test_observed_openrouter_call_overage_fails_the_case() -> None:
     overage_case = replace(openrouter_case, payload=overage_payload)
 
     result = evaluate_manifest(replace(manifest, cases=(overage_case,)))[
-        "fixture_contract"
+        "fixture_validation"
     ]["results"][0]
 
-    assert result["status"] == "failed"
-    assert result["contract_checks"]["call_count"] is False
+    assert result["status"] == "fixture_failed"
+    assert (
+        result["fixture_checks"]["reported_fixture_call_count_matches_expected"] is False
+    )
     assert result["empirical_checks"]["call_count"] is None
 
 
@@ -193,9 +302,9 @@ def test_source_date_metadata_does_not_claim_freshness() -> None:
     case_with_stale_dates = replace(direct_case, payload=payload_with_stale_dates)
     mutated_manifest = replace(manifest, cases=(case_with_stale_dates,))
 
-    result = evaluate_manifest(mutated_manifest)["fixture_contract"]["results"][0]
+    result = evaluate_manifest(mutated_manifest)["fixture_validation"]["results"][0]
 
-    assert result["contract_checks"]["source_date_metadata"] is True
+    assert result["fixture_checks"]["source_date_field_shape"] is True
     assert result["empirical_checks"]["freshness"] is None
     assert result["status"] == "unproven"
 
@@ -209,12 +318,12 @@ def test_outage_preservation_requires_explicit_prior_context() -> None:
     case_without_context = replace(outage_case, payload=payload_without_context)
     evidence = normalize_case(case_without_context, rubric=manifest.rubric)
     result = evaluate_manifest(replace(manifest, cases=(case_without_context,)))[
-        "fixture_contract"
+        "fixture_validation"
     ]["results"][0]
 
     assert evidence.prior_result_context is None
-    assert result["status"] == "failed"
-    assert result["contract_checks"]["outage_behavior"] is False
+    assert result["status"] == "fixture_failed"
+    assert result["fixture_checks"]["outage_fixture_has_context_precondition"] is False
     assert result["empirical_checks"]["outage_behavior"] is None
 
 
@@ -222,7 +331,7 @@ def test_synthetic_provider_fixtures_never_pass_empirical_criteria() -> None:
     report = evaluate_manifest(load_search_eval_manifest())
     provider_results = [
         result
-        for result in report["fixture_contract"]["results"]
+        for result in report["fixture_validation"]["results"]
         if result["provider"] is not None
     ]
 
@@ -236,50 +345,64 @@ def test_synthetic_provider_fixtures_never_pass_empirical_criteria() -> None:
 def test_report_defers_activation_without_real_quality_or_latency_evidence() -> None:
     report = evaluate_manifest(load_search_eval_manifest())
 
-    assert report["fixture_contract"]["failed"] == 0
-    assert report["fixture_contract"]["passed"] == 0
-    assert report["fixture_contract"]["unproven"] == 12
-    assert report["fixture_contract"]["contract_passed"] == 12
-    assert report["fixture_contract"]["contract_failed"] == 0
-    expected_checks = {
-        "call_count",
-        "citation_integrity",
-        "cost",
-        "freshness",
-        "injection_resistance",
-        "latency",
-        "outage_behavior",
-        "relevance",
-        "result_count",
-        "source_date_metadata",
-        "timeout",
+    assert report["fixture_validation"]["validated_cases"] == 12
+    assert report["fixture_validation"]["failed_cases"] == 0
+    assert report["empirical_evidence"] == {
+        "interpretation": (
+            "No independently captured provider or runtime observations are "
+            "present. Every empirical criterion remains unproven."
+        ),
+        "passed": 0,
+        "failed": 0,
+        "unproven": 12,
     }
-    for result in report["fixture_contract"]["results"]:
-        assert set(result["contract_checks"]) == expected_checks
-        assert set(result["empirical_checks"]) == expected_checks
-        assert False not in result["contract_checks"].values()
+    expected_fixture_checks = {
+        "citation_shape_well_formed",
+        "configured_timeout_bounded",
+        "control_declares_zero_search",
+        "declared_fixture_cost_within_provisional_bound",
+        "declared_runtime_effects_safe",
+        "expected_call_count_bounded",
+        "outage_fixture_has_context_precondition",
+        "reported_fixture_call_count_matches_expected",
+        "result_shape_bounded",
+        "source_date_field_shape",
+        "sources_labeled_untrusted",
+        "term_coverage_fixture",
+    }
+    expected_empirical_checks = set(load_search_eval_manifest().rubric.criteria)
+    for result in report["fixture_validation"]["results"]:
+        assert set(result["fixture_checks"]) == expected_fixture_checks
+        assert set(result["empirical_checks"]) == expected_empirical_checks
+        assert False not in result["fixture_checks"].values()
         assert all(value is None for value in result["empirical_checks"].values())
         assert result["unproven_empirical_checks"]
-        assert set(result["observed"]) == {
+        assert set(result["fixture_input"]) == {
+            "declared_cost_usd",
+            "declared_latency_ms",
+            "evidence_kind_label",
+            "expected_search_calls",
+        }
+        assert set(result["normalized_fixture"]) == {
             "citation_count",
             "configured_timeout_ms",
-            "cost_usd",
-            "evidence_kind",
-            "fallback_code",
-            "latency_ms",
-            "prior_result_context_present",
+            "reported_cost_usd",
+            "reported_search_calls",
             "result_count",
-            "search_calls",
             "source_dates_present",
         }
-        if result["observed"]["search_calls"] is None:
-            assert result["contract_checks"]["call_count"] is None
-        else:
-            assert result["contract_checks"]["call_count"] is True
+        assert set(result["runtime_observation"]) == {
+            "fallback_code",
+            "policy_effects",
+            "present",
+            "prior_result_context_present",
+            "runnable_candidates",
+        }
+        assert result["runtime_observation"]["present"] is False
     assert report["live_calls_made"] == 0
     assert report["activation_ready"] is False
     assert report["recommendation"] == "defer"
-    assert report["preferred_next_probe"] == "perplexity_direct"
+    assert report["recommendation_basis"] == "missing_empirical_evidence"
     assert set(report["remaining_gates"]) == {
         "#241 typed asset discovery route integrated",
         "approved public citation/context schema",
@@ -294,57 +417,68 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
         "real provider latency evidence",
     }
     assert (
-        report["provider_comparison"]["perplexity_direct"]["source_date_metadata"]
+        report["documentation_summary"]["providers"]["perplexity_direct"][
+            "source_date_metadata"
+        ]
         == "documented"
     )
     assert (
-        report["provider_comparison"]["openrouter_web_search"]["source_date_metadata"]
+        report["documentation_summary"]["providers"]["openrouter_web_search"][
+            "source_date_metadata"
+        ]
         == "not_guaranteed_by_annotation_schema"
     )
     assert (
-        report["provider_comparison"]["openrouter_web_search"]["cost_shape"]
+        report["documentation_summary"]["providers"]["openrouter_web_search"][
+            "cost_shape"
+        ]
         == "search_fee_plus_llm_tokens"
     )
     assert (
-        report["provider_comparison"]["perplexity_direct"]["call_shape"]
+        report["documentation_summary"]["providers"]["perplexity_direct"]["call_shape"]
         == "one_request_per_probe"
     )
     assert (
-        report["provider_comparison"]["openrouter_web_search"]["call_shape"]
+        report["documentation_summary"]["providers"]["openrouter_web_search"][
+            "call_shape"
+        ]
         == "model_decides_zero_to_many_calls"
     )
     assert (
-        report["provider_comparison"]["openrouter_web_search"][
+        report["documentation_summary"]["providers"]["openrouter_web_search"][
             "comparison_configuration"
         ]["model_selection_status"]
         == "unresolved_founder_gate"
     )
     injection_results = [
         result
-        for result in report["fixture_contract"]["results"]
+        for result in report["fixture_validation"]["results"]
         if result["kind"] == "injection"
     ]
     assert all(
-        result["contract_checks"]["injection_resistance"] is True
+        result["fixture_checks"]["sources_labeled_untrusted"] is True
+        for result in injection_results
+    )
+    assert all(
+        result["fixture_checks"]["declared_runtime_effects_safe"] is None
+        for result in injection_results
+    )
+    assert all(
+        result["empirical_checks"]["injection_resistance"] is None
         for result in injection_results
     )
     outage_results = [
         result
-        for result in report["fixture_contract"]["results"]
+        for result in report["fixture_validation"]["results"]
         if result["kind"] == "outage"
     ]
     assert all(
-        result["contract_checks"]["outage_behavior"] is True for result in outage_results
+        result["fixture_checks"]["outage_fixture_has_context_precondition"] is True
+        for result in outage_results
     )
-    assert set(report["criterion_comparison"]) == {
-        "citation_integrity",
-        "cost",
-        "freshness",
-        "injection_resistance",
-        "latency",
-        "outage_behavior",
-        "relevance",
-    }
+    assert all(
+        result["empirical_checks"]["outage_behavior"] is None for result in outage_results
+    )
     assert "README" in report["rollback_boundary"]
 
 

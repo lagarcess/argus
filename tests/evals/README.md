@@ -30,16 +30,22 @@ is safe to run anywhere.
 
 ## Search Provider Evaluation (Issue #244)
 
-Run the bounded Search provider contract with:
+Run the bounded Search fixture validator with:
 
 ```bash
 poetry run pytest tests/evals/test_search_provider_eval.py -q --no-cov
 ```
 
-This evaluation is also free. It replays clearly labeled synthetic
-provider-shaped Perplexity-direct and OpenRouter web-search fixtures against a
-shared rubric. It does not make network or provider calls and therefore cannot
-prove real relevance, citation quality, or latency.
+This evaluation is also free. It parses clearly labeled, authored synthetic
+Perplexity-direct and OpenRouter web-search fixtures and validates their shape.
+URL fields, query-term coverage, declared latency/cost, zero-Search scenarios,
+outage scenarios, and the normalizer-applied untrusted-source label are fixture
+contract behavior only. They do not prove provider relevance, citation quality,
+Search routing, runtime policy,
+outage recovery, latency, or cost. Changing an `evidence_kind` string cannot
+turn a fixture into empirical evidence; every empirical check stays unproven
+until a later sanctioned probe supplies independently captured provider and
+runtime provenance.
 
 Generate the non-versioned decision evidence with:
 
@@ -50,8 +56,10 @@ poetry run python -m tests.evals.search_provider_eval
 The report is written to
 `temp/issue-244-search-provider-evaluation.json`. It must recommend deferral
 until real provider evidence, issue #241 integration, and explicit founder
-activation exist. Any public citation/context schema also remains behind its
-separate API-contract approval gate.
+activation exist. Its Perplexity-direct next-probe entry is an official-
+documentation-based hypothesis, not an empirical provider comparison or
+selection. Any public citation/context schema also remains behind its separate
+API-contract approval gate.
 
 ## Live Run
 

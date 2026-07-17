@@ -1,6 +1,6 @@
 {
-  "schema_version": "argus-search-provider-eval-manifest/v1",
-  "evidence_scope": "synthetic_provider_shaped_and_official_docs",
+  "schema_version": "argus-search-provider-eval-manifest/v2",
+  "evidence_scope": "authored_synthetic_fixtures_and_official_documentation",
   "live_calls_made": 0,
   "official_sources": [
     "https://docs.perplexity.ai/docs/search/quickstart",
@@ -81,7 +81,7 @@
       "expected_search_calls": 0,
       "required_terms": [],
       "retrieved_at": "2026-07-16T00:00:00Z",
-      "evidence_kind": "routing_contract_only",
+      "evidence_kind": "authored_zero_search_fixture",
       "latency_ms": null,
       "cost_usd": null,
       "payload": {}
@@ -96,7 +96,7 @@
       "expected_search_calls": 0,
       "required_terms": [],
       "retrieved_at": "2026-07-16T00:00:00Z",
-      "evidence_kind": "routing_contract_only",
+      "evidence_kind": "authored_zero_search_fixture",
       "latency_ms": null,
       "cost_usd": null,
       "payload": {}
@@ -111,7 +111,7 @@
       "expected_search_calls": 1,
       "required_terms": ["data center", "cooling"],
       "retrieved_at": "2026-07-16T00:00:00Z",
-      "evidence_kind": "synthetic_provider_shaped",
+      "evidence_kind": "synthetic_provider_response_fixture",
       "latency_ms": 1400,
       "cost_usd": 0.005,
       "payload": {
@@ -143,7 +143,7 @@
       "expected_search_calls": 1,
       "required_terms": ["data center", "cooling"],
       "retrieved_at": "2026-07-16T00:00:00Z",
-      "evidence_kind": "synthetic_provider_shaped",
+      "evidence_kind": "synthetic_provider_response_fixture",
       "latency_ms": 2200,
       "cost_usd": 0.007,
       "payload": {
@@ -188,7 +188,7 @@
       "expected_search_calls": 1,
       "required_terms": ["MercadoLibre", "comercio electrónico"],
       "retrieved_at": "2026-07-16T00:00:00Z",
-      "evidence_kind": "synthetic_provider_shaped",
+      "evidence_kind": "synthetic_provider_response_fixture",
       "latency_ms": 1500,
       "cost_usd": 0.005,
       "payload": {
@@ -213,7 +213,7 @@
       "expected_search_calls": 1,
       "required_terms": ["MercadoLibre", "comercio electrónico"],
       "retrieved_at": "2026-07-16T00:00:00Z",
-      "evidence_kind": "synthetic_provider_shaped",
+      "evidence_kind": "synthetic_provider_response_fixture",
       "latency_ms": 2300,
       "cost_usd": 0.007,
       "payload": {
@@ -250,7 +250,7 @@
       "expected_search_calls": 1,
       "required_terms": ["proof-of-stake", "layer-one"],
       "retrieved_at": "2026-07-16T00:00:00Z",
-      "evidence_kind": "synthetic_provider_shaped",
+      "evidence_kind": "synthetic_provider_response_fixture",
       "latency_ms": 1300,
       "cost_usd": 0.005,
       "payload": {
@@ -275,7 +275,7 @@
       "expected_search_calls": 1,
       "required_terms": ["proof-of-stake", "layer-one"],
       "retrieved_at": "2026-07-16T00:00:00Z",
-      "evidence_kind": "synthetic_provider_shaped",
+      "evidence_kind": "synthetic_provider_response_fixture",
       "latency_ms": 2100,
       "cost_usd": 0.007,
       "payload": {
@@ -312,7 +312,7 @@
       "expected_search_calls": 1,
       "required_terms": ["semiconductor"],
       "retrieved_at": "2026-07-16T00:00:00Z",
-      "evidence_kind": "synthetic_provider_shaped",
+      "evidence_kind": "synthetic_provider_response_fixture",
       "latency_ms": 1200,
       "cost_usd": 0.005,
       "payload": {
@@ -338,7 +338,7 @@
       "expected_search_calls": 1,
       "required_terms": ["semiconductor"],
       "retrieved_at": "2026-07-16T00:00:00Z",
-      "evidence_kind": "synthetic_provider_shaped",
+      "evidence_kind": "synthetic_provider_response_fixture",
       "latency_ms": 2000,
       "cost_usd": 0.007,
       "payload": {
@@ -376,7 +376,7 @@
       "expected_search_calls": 1,
       "required_terms": [],
       "retrieved_at": "2026-07-16T00:00:00Z",
-      "evidence_kind": "synthetic_provider_shaped",
+      "evidence_kind": "synthetic_outage_scenario_fixture",
       "latency_ms": 3000,
       "cost_usd": 0.0,
       "payload": {
@@ -394,7 +394,7 @@
       "expected_search_calls": 1,
       "required_terms": [],
       "retrieved_at": "2026-07-16T00:00:00Z",
-      "evidence_kind": "synthetic_provider_shaped",
+      "evidence_kind": "synthetic_outage_scenario_fixture",
       "latency_ms": 3000,
       "cost_usd": 0.0,
       "payload": {
