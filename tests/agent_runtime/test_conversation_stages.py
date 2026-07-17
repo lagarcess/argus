@@ -2177,12 +2177,15 @@ def test_confirm_stage_returns_typed_recovery_without_runnable_card_when_no_comm
         capital_amount=10_000,
         date_range={"start": "2024-01-01", "end": "2024-01-05"},
     )
+    state.optional_parameter_status = {"fees": 0.001, "slippage": 0.0005}
 
     result = confirm_stage(state=state, contract=build_default_capability_contract())
 
     assert result.outcome == "needs_clarification"
     assert "confirmation_payload" not in result.patch
     assert "unsupported_constraints" not in result.patch["optional_parameter_status"]
+    assert result.patch["optional_parameter_status"]["fees"] == 0.001
+    assert result.patch["optional_parameter_status"]["slippage"] == 0.0005
     recovery = result.patch["optional_parameter_status"]["coverage_recovery"]
     assert recovery == {
         "code": "no_common_data_window",
@@ -2216,6 +2219,10 @@ def test_confirm_stage_returns_typed_recovery_without_runnable_card_when_no_comm
     assert clarification["options"] == response_intent["options"]
     assert response_intent["kind"] == "coverage_recovery"
     assert response_intent["facts"]["coverage"] == recovery
+    assert response_intent["facts"]["preserved_optional_parameter_status"] == {
+        "fees": 0.001,
+        "slippage": 0.0005,
+    }
     assert response_intent["options"] == [
         {
             "id": "change_dates",

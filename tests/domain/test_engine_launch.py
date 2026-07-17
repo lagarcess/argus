@@ -6,6 +6,7 @@ from typing import Any
 
 import pandas as pd
 import pytest
+from argus.domain.backtesting.coverage import _dataset_id
 from argus.domain.engine import _build_signals
 from argus.domain.engine_launch.adapter import (
     _provider_metadata,
@@ -79,21 +80,22 @@ def test_approved_launch_uses_one_prepared_dataset_for_metrics_and_chart(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: Counter[str] = Counter()
+    index = pd.to_datetime(["2024-01-03", "2024-01-04", "2024-01-05"], utc=True)
+    close = pd.Series([100.0, 101.0, 102.0], index=index)
+    bars = pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": 1_000.0,
+        },
+        index=index,
+    )
 
     def fake_fetch(symbol: str, **_: Any) -> pd.DataFrame:
         calls[symbol] += 1
-        index = pd.to_datetime(["2024-01-03", "2024-01-04", "2024-01-05"], utc=True)
-        close = pd.Series([100.0, 101.0, 102.0], index=index)
-        return pd.DataFrame(
-            {
-                "open": close,
-                "high": close + 1.0,
-                "low": close - 1.0,
-                "close": close,
-                "volume": 1_000.0,
-            },
-            index=index,
-        )
+        return bars.copy(deep=True)
 
     monkeypatch.setattr(
         "argus.domain.engine_launch.adapter.classify_symbol",
@@ -125,7 +127,7 @@ def test_approved_launch_uses_one_prepared_dataset_for_metrics_and_chart(
                 "start": "2024-01-03",
                 "end": "2024-01-05",
             },
-            "preflight_id": "sha256:preflight",
+            "preflight_id": _dataset_id({"AAPL": bars, "SPY": bars}),
         },
         entry_rule=None,
         exit_rule=None,
@@ -183,24 +185,25 @@ def test_approved_launch_reuses_canonical_benchmark_alias_without_duplicate_fetc
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: Counter[str] = Counter()
+    index = pd.to_datetime(
+        ["2024-01-03", "2024-01-04", "2024-01-05"],
+        utc=True,
+    )
+    close = pd.Series([100.0, 101.0, 102.0], index=index)
+    bars = pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": 1_000.0,
+        },
+        index=index,
+    )
 
     def fake_fetch(symbol: str, **_: Any) -> pd.DataFrame:
         calls[symbol] += 1
-        index = pd.to_datetime(
-            ["2024-01-03", "2024-01-04", "2024-01-05"],
-            utc=True,
-        )
-        close = pd.Series([100.0, 101.0, 102.0], index=index)
-        return pd.DataFrame(
-            {
-                "open": close,
-                "high": close + 1.0,
-                "low": close - 1.0,
-                "close": close,
-                "volume": 1_000.0,
-            },
-            index=index,
-        )
+        return bars.copy(deep=True)
 
     def classify_stub(symbol: str):
         canonical = "BTC" if symbol in {"BTC", "BTC/USD"} else symbol
@@ -240,7 +243,7 @@ def test_approved_launch_reuses_canonical_benchmark_alias_without_duplicate_fetc
                 "start": "2024-01-03",
                 "end": "2024-01-05",
             },
-            "preflight_id": "sha256:canonical-benchmark-preflight",
+            "preflight_id": _dataset_id({"ETH": bars, "BTC": bars}),
         },
         entry_rule=None,
         exit_rule=None,

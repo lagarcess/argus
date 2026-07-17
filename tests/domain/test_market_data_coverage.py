@@ -281,6 +281,57 @@ def test_approved_effective_window_cannot_silently_change_during_execution() -> 
     assert exc_info.value.code == "approved_data_window_unavailable"
 
 
+def test_approved_dataset_identity_cannot_silently_change_during_execution() -> None:
+    confirmed = _bars(
+        "2024-01-01",
+        "2024-01-02",
+        "2024-01-03",
+        "2024-01-04",
+        "2024-01-05",
+    )
+    config = _config("AAPL")
+    preflight = prepare_market_data(
+        config,
+        fetch_ohlcv_func=_fetcher({"AAPL": confirmed, "SPY": confirmed}),
+    ).coverage_payload()
+    preflight["preflight_id"] = preflight.pop("dataset_id")
+    revised = confirmed.copy(deep=True)
+    revised.loc[revised.index[-1], "close"] += 1.0
+
+    with pytest.raises(MarketDataCoverageError) as exc_info:
+        prepare_market_data(
+            config,
+            fetch_ohlcv_func=_fetcher({"AAPL": revised, "SPY": confirmed}),
+            approved_coverage=preflight,
+        )
+
+    assert exc_info.value.code == "approved_data_window_unavailable"
+
+
+def test_approved_dataset_identity_accepts_the_identical_execution_dataset() -> None:
+    confirmed = _bars(
+        "2024-01-01",
+        "2024-01-02",
+        "2024-01-03",
+        "2024-01-04",
+        "2024-01-05",
+    )
+    config = _config("AAPL")
+    preflight = prepare_market_data(
+        config,
+        fetch_ohlcv_func=_fetcher({"AAPL": confirmed, "SPY": confirmed}),
+    ).coverage_payload()
+    preflight["preflight_id"] = preflight.pop("dataset_id")
+
+    prepared = prepare_market_data(
+        config,
+        fetch_ohlcv_func=_fetcher({"AAPL": confirmed, "SPY": confirmed}),
+        approved_coverage=preflight,
+    )
+
+    assert prepared.dataset_id == preflight["preflight_id"]
+
+
 def test_metrics_and_chart_share_prepared_bars_without_refetch_or_edge_backfill() -> None:
     full = _bars(
         "2024-01-01",

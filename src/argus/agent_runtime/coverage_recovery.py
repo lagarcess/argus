@@ -12,6 +12,7 @@ COVERAGE_RECOVERY_CODES = {
     "market_data_unavailable",
 }
 APPROVED_WINDOW_DRIFT_CODE = "approved_data_window_unavailable"
+PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT = "preserved_optional_parameter_status"
 
 _COVERAGE_RECOVERY_OPTIONS: tuple[dict[str, Any], ...] = (
     {
@@ -43,6 +44,7 @@ def coverage_recovery_stage_patch(
     *,
     error_code: str,
     launch_payload: Mapping[str, Any],
+    optional_parameter_status: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     code = (
         error_code if error_code in COVERAGE_RECOVERY_CODES else "market_data_unavailable"
@@ -50,19 +52,19 @@ def coverage_recovery_stage_patch(
     requested_date_range = _structured_date_range(
         launch_payload.get("requested_date_range")
     ) or _structured_date_range(launch_payload.get("date_range"))
+    status = dict(optional_parameter_status or {})
+    status["coverage_recovery"] = {
+        "code": code,
+        "requested_date_range": requested_date_range,
+        "asset_universe": _symbols(launch_payload),
+        "benchmark_symbol": _clean_string(launch_payload.get("benchmark_symbol")),
+    }
     return {
         "outcome": "needs_clarification",
         "missing_required_fields": [],
         "requested_field": None,
         "assistant_prompt": None,
-        "optional_parameter_status": {
-            "coverage_recovery": {
-                "code": code,
-                "requested_date_range": requested_date_range,
-                "asset_universe": _symbols(launch_payload),
-                "benchmark_symbol": _clean_string(launch_payload.get("benchmark_symbol")),
-            }
-        },
+        "optional_parameter_status": status,
     }
 
 
@@ -83,6 +85,28 @@ def coverage_recovery_from_status(value: Any) -> dict[str, Any] | None:
         "asset_universe": _string_list(raw_recovery.get("asset_universe")),
         "benchmark_symbol": _clean_string(raw_recovery.get("benchmark_symbol")),
     }
+
+
+def optional_parameter_status_without_coverage_recovery(
+    value: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    status = dict(value or {})
+    status.pop("coverage_recovery", None)
+    return status
+
+
+def preserved_optional_parameter_status_from_response_intent(
+    value: Any,
+) -> dict[str, Any] | None:
+    if not isinstance(value, Mapping):
+        return None
+    facts = value.get("facts")
+    if not isinstance(facts, Mapping):
+        return None
+    preserved = facts.get(PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT)
+    if not isinstance(preserved, Mapping):
+        return None
+    return optional_parameter_status_without_coverage_recovery(preserved)
 
 
 def approved_window_reconfirmation_patch(

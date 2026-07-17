@@ -8,6 +8,11 @@ from argus.agent_runtime.artifacts.continuity import (
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.clarification_contract import offline_clarification_fallback
+from argus.agent_runtime.coverage_recovery import (
+    PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT,
+    optional_parameter_status_without_coverage_recovery,
+    preserved_optional_parameter_status_from_response_intent,
+)
 from argus.agent_runtime.recovery_messages import (
     recovery_message,
     recovery_state_stage_patch,
@@ -258,6 +263,14 @@ def _coverage_recovery_action_result(
     pending = snapshot.pending_strategy_summary if snapshot is not None else None
     if pending is None:
         return None
+    preserved_optional_parameter_status = (
+        preserved_optional_parameter_status_from_response_intent(response_intent) or {}
+    )
+    preserved_optional_parameter_status.update(
+        optional_parameter_status_without_coverage_recovery(
+            state.optional_parameter_status
+        )
+    )
     semantic_need = {
         "date_range": "period",
         "asset_universe": "asset_target",
@@ -270,7 +283,7 @@ def _coverage_recovery_action_result(
             "assistant_prompt": None,
             "requested_field": requested_field,
             "missing_required_fields": [requested_field],
-            "optional_parameter_status": {},
+            "optional_parameter_status": preserved_optional_parameter_status,
             "response_intent": {
                 "kind": "clarification",
                 "semantic_needs": [semantic_need],
@@ -280,6 +293,9 @@ def _coverage_recovery_action_result(
                     "current_user_message": state.current_user_message,
                     "structured_action": action.model_dump(mode="python"),
                     "language": language,
+                    PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT: (
+                        preserved_optional_parameter_status
+                    ),
                 },
                 "options": [],
             },

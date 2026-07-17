@@ -25,6 +25,9 @@ from argus.agent_runtime.capabilities.answers import (
     capability_fact_packet,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.coverage_recovery import (
+    preserved_optional_parameter_status_from_response_intent,
+)
 from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.interpreter import provider_context_assets
 from argus.agent_runtime.presentation_i18n import (
@@ -1018,6 +1021,25 @@ async def _stage_result_from_interpretation(
         decision=decision,
         values=optional_parameter_values,
     )
+    preserved_optional_parameter_status = (
+        preserved_optional_parameter_status_from_response_intent(
+            selected_thread_metadata.get("response_intent")
+        )
+    )
+    if preserved_optional_parameter_status is not None:
+        current_optional_parameter_status = optional_parameter_stage_patch.get(
+            "optional_parameter_status"
+        )
+        optional_parameter_stage_patch = {
+            "optional_parameter_status": {
+                **preserved_optional_parameter_status,
+                **(
+                    current_optional_parameter_status
+                    if isinstance(current_optional_parameter_status, dict)
+                    else {}
+                ),
+            }
+        }
     approval_result = _approval_stage_result_if_applicable(
         decision=decision,
         snapshot=snapshot,

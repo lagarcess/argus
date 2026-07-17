@@ -12,8 +12,10 @@ from argus.agent_runtime.clarification_contract import (
     typed_clarification_contract,
 )
 from argus.agent_runtime.coverage_recovery import (
+    PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT,
     coverage_recovery_from_status,
     coverage_recovery_options,
+    optional_parameter_status_without_coverage_recovery,
 )
 from argus.agent_runtime.llm_clarifier import ClarificationRequest
 from argus.agent_runtime.stages.interpret import StageResult
@@ -98,7 +100,14 @@ async def clarify_stage_async(
             state=state,
             semantic_needs=["simplification_choice"],
             requested_fields=requested_fields,
-            facts={"coverage": coverage_recovery},
+            facts={
+                "coverage": coverage_recovery,
+                PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT: (
+                    optional_parameter_status_without_coverage_recovery(
+                        state.optional_parameter_status
+                    )
+                ),
+            },
             options=options,
             language=language,
         )

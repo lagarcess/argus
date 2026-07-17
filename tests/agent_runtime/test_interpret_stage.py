@@ -7443,6 +7443,14 @@ def test_coverage_recovery_action_requests_typed_field_without_llm_selection(
                         "replacement_values": {"requested_field": requested_field},
                     }
                 ],
+                "facts": {
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "1h",
+                    }
+                },
             },
         },
         structured_interpreter=RecordingInterpreter(None),
@@ -7452,7 +7460,82 @@ def test_coverage_recovery_action_requests_typed_field_without_llm_selection(
     assert result.patch["requested_field"] == requested_field
     assert result.patch["missing_required_fields"] == [requested_field]
     assert result.patch["response_intent"]["kind"] == "clarification"
-    assert result.patch["optional_parameter_status"] == {}
+    assert result.patch["response_intent"]["facts"][
+        "preserved_optional_parameter_status"
+    ] == {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "1h",
+    }
+    assert result.patch["optional_parameter_status"] == {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "1h",
+    }
+
+
+def test_coverage_recovery_answer_restores_preserved_optional_parameters(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    preserved_status = {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "1h",
+    }
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Use MSFT instead",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "requested_field": "asset_universe",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "clarification",
+                "requested_fields": ["asset_universe"],
+                "facts": {
+                    "preserved_optional_parameter_status": preserved_status,
+                },
+            },
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User selected a replacement asset.",
+                candidate_strategy_draft=StrategySummary(
+                    asset_universe=["MSFT"],
+                    asset_class="equity",
+                ),
+                semantic_turn_act="answer_pending_need",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["MSFT"]
+    assert result.patch["optional_parameter_status"] == preserved_status
 
 
 

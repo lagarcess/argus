@@ -129,10 +129,12 @@ def prepare_market_data(
         start=pd.Timestamp(common_start).date().isoformat(),
         end=pd.Timestamp(common_end).date().isoformat(),
     )
+    dataset_id = _dataset_id(trimmed)
     _validate_approved_window(
         approved_coverage,
         requested=requested,
         effective=effective,
+        dataset_id=dataset_id,
     )
     outcome = "full_coverage" if effective == requested else "adjusted_coverage"
     observations = {symbol: len(frame) for symbol, frame in trimmed.items()}
@@ -140,7 +142,7 @@ def prepare_market_data(
         requested_date_range=requested,
         effective_date_range=effective,
         outcome=outcome,
-        dataset_id=_dataset_id(trimmed),
+        dataset_id=dataset_id,
         bars_by_symbol=trimmed,
         observations_by_symbol=observations,
     )
@@ -304,6 +306,7 @@ def _validate_approved_window(
     *,
     requested: CoverageDateRange,
     effective: CoverageDateRange,
+    dataset_id: str,
 ) -> None:
     if approved is None:
         return
@@ -314,9 +317,15 @@ def _validate_approved_window(
         approved_effective = CoverageDateRange.model_validate(
             approved["effective_date_range"]
         )
+        approved_preflight_id = approved["preflight_id"]
     except (KeyError, TypeError, ValueError) as exc:
         raise MarketDataCoverageError("approved_data_window_unavailable") from exc
-    if approved_requested != requested or approved_effective != effective:
+    if (
+        approved_requested != requested
+        or approved_effective != effective
+        or not isinstance(approved_preflight_id, str)
+        or approved_preflight_id != dataset_id
+    ):
         raise MarketDataCoverageError("approved_data_window_unavailable")
 
 

@@ -305,6 +305,7 @@ def prepare_run_from_payload(
             fetch_ohlcv_func=domain_engine.fetch_ohlcv,
         )
         config = apply_coverage_to_config(config, prepared_market_data)
+        validate_backtest_config(config)
     except ValueError as exc:
         raise_backtest_problem(request, str(exc))
     return PreparedBacktestExecution(

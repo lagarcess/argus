@@ -118,7 +118,10 @@ def confirm_stage(
             stage_patch=stage_patch,
         )
     launch_payload = validation_result["launch_payload"]
-    coverage_result = _coverage_preflight(launch_payload)
+    coverage_result = _coverage_preflight(
+        launch_payload,
+        optional_parameter_status=state.optional_parameter_status,
+    )
     if coverage_result["outcome"] != "ready_to_confirm":
         return StageResult(
             outcome="needs_clarification",
@@ -207,7 +210,11 @@ def _validated_launch_payload(
     }
 
 
-def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
+def _coverage_preflight(
+    launch_payload: dict[str, Any],
+    *,
+    optional_parameter_status: dict[str, Any],
+) -> dict[str, Any]:
     from argus.domain.backtesting.coverage import (
         MarketDataCoverageError,
         prepare_market_data,
@@ -224,6 +231,7 @@ def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
             return coverage_recovery_stage_patch(
                 error_code="market_data_unavailable",
                 launch_payload=launch_payload,
+                optional_parameter_status=optional_parameter_status,
             )
         if symbol_validation.outcome != "resolved":
             return _launch_validation_failure(
@@ -241,6 +249,7 @@ def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
             return coverage_recovery_stage_patch(
                 error_code="market_data_unavailable",
                 launch_payload=launch_payload,
+                optional_parameter_status=optional_parameter_status,
             )
         if (
             benchmark_validation.outcome != "resolved"
@@ -269,6 +278,7 @@ def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
         return coverage_recovery_stage_patch(
             error_code=exc.code,
             launch_payload=launch_payload,
+            optional_parameter_status=optional_parameter_status,
         )
     except ValueError as exc:
         return _launch_validation_failure(str(exc))
