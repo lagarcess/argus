@@ -862,6 +862,85 @@ def test_chat_stream_supabase_persists_backtest_run(mock_gateway):
     )
 
 
+def test_chat_stream_succeeds_when_cost_ledger_table_is_unavailable(
+    mock_gateway,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+    from argus.llm.openrouter import (
+        clear_openrouter_route_receipts,
+        record_openrouter_route_receipt,
+    )
+
+    async def runtime_events_with_receipt(**kwargs: Any):
+        record_openrouter_route_receipt(
+            task="interpretation",
+            model_name="unit-test-model",
+            mode="json_schema",
+            schema_name="LLMInterpretationResponse",
+            latency_ms=15,
+            outcome="succeeded",
+            token_usage={
+                "prompt_tokens": 20,
+                "completion_tokens": 10,
+                "total_tokens": 30,
+            },
+            usage_cost_usd=0.0005,
+        )
+        async for event in _runtime_success_events(**kwargs):
+            yield event
+
+    clear_openrouter_route_receipts()
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        runtime_events_with_receipt,
+    )
+    now = utcnow()
+    conversation = Conversation(
+        id="conv-ledger-unavailable",
+        title="New conversation",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview=None,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.create_message.side_effect = lambda **kwargs: Message(
+        id="msg-ledger-unavailable",
+        conversation_id=kwargs["conversation_id"],
+        role=kwargs["role"],  # type: ignore[arg-type]
+        content=kwargs["content"],
+        metadata=kwargs.get("metadata") or {},
+        created_at=utcnow(),
+    )
+    mock_gateway.create_route_receipt.return_value = {"id": "receipt-1"}
+    mock_gateway.create_cost_ledger_entry.side_effect = RuntimeError(
+        "PGRST205: cost_ledger_entries is unavailable"
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation.id,
+            "message": "Test TSLA dip idea",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.text.count("data: [DONE]") == 1
+    assert _final_payload(response.text)["run"]["status"] == "completed"
+    assert "PGRST205" not in response.text
+    assert "cost_ledger_entries" not in response.text
+    mock_gateway.create_route_receipt.assert_called_once()
+    mock_gateway.create_cost_ledger_entry.assert_called_once()
+
+
 def test_chat_stream_finalization_failure_returns_retryable_error(mock_gateway):
     now = utcnow()
     conversation = Conversation(
