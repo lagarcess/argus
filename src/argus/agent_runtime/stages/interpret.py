@@ -443,6 +443,7 @@ async def _stage_result_from_interpretation(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
+    is_new_idea_interpretation = interpretation.task_relation == "new_task"
     logger.debug(
         "Interpret stage post-LLM repair started",
         intent=interpretation.intent,
@@ -1026,7 +1027,10 @@ async def _stage_result_from_interpretation(
             selected_thread_metadata.get("response_intent")
         )
     )
-    if preserved_optional_parameter_status is not None:
+    if (
+        preserved_optional_parameter_status is not None
+        and not is_new_idea_interpretation
+    ):
         current_optional_parameter_status = optional_parameter_stage_patch.get(
             "optional_parameter_status"
         )

@@ -7538,6 +7538,75 @@ def test_coverage_recovery_answer_restores_preserved_optional_parameters(
     assert result.patch["optional_parameter_status"] == preserved_status
 
 
+def test_coverage_recovery_does_not_leak_optional_parameters_into_new_idea(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="New idea: buy and hold NVDA during 2025.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=prior),
+        selected_thread_metadata={
+            "requested_field": "asset_universe",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "clarification",
+                "requested_fields": ["asset_universe"],
+                "facts": {
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "1h",
+                    },
+                },
+            },
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="new_task",
+                requires_clarification=False,
+                user_goal_summary="User started a separate investing idea.",
+                candidate_strategy_draft=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold NVDA during 2025.",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                    date_range={"start": "2025-01-01", "end": "2025-12-31"},
+                ),
+                semantic_turn_act="new_idea",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["NVDA"]
+    optional_status = result.patch.get("optional_parameter_status", {})
+    assert "initial_capital" not in optional_status
+    assert "fees" not in optional_status
+    assert "slippage" not in optional_status
+    assert "timeframe" not in optional_status
+
+
 
 def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choice(
     monkeypatch,
