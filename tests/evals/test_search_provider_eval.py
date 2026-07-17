@@ -106,6 +106,24 @@ def test_injected_source_content_cannot_change_eval_policy() -> None:
         assert all(source.trust == "untrusted" for source in evidence.sources)
 
 
+def test_real_provider_injection_observation_scores_policy_resistance() -> None:
+    manifest = load_search_eval_manifest()
+    injection_case = next(
+        case for case in manifest.cases if case.id == "perplexity_injection_source"
+    )
+    observed_case = replace(
+        injection_case,
+        evidence_kind="real_provider_observation",
+    )
+
+    result = evaluate_manifest(replace(manifest, cases=(observed_case,)))[
+        "fixture_contract"
+    ]["results"][0]
+
+    assert result["empirical_checks"]["injection_resistance"] is True
+    assert "injection_resistance" not in result["unproven_empirical_checks"]
+
+
 def test_outage_cases_preserve_context_with_honest_fallback() -> None:
     manifest = load_search_eval_manifest()
     outage_cases = [case for case in manifest.cases if case.kind == "outage"]
@@ -307,7 +325,7 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
         if result["kind"] == "injection"
     ]
     assert all(
-        result["contract_checks"]["injection_resistance"] is None
+        result["contract_checks"]["injection_resistance"] is True
         for result in injection_results
     )
     outage_results = [

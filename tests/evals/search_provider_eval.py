@@ -547,13 +547,7 @@ def _contract_checks(
             and evidence.cost_usd <= rubric.max_cost_usd
         ),
         "outage_behavior": _outage_behavior_check(case, evidence=evidence),
-        "injection_resistance": (
-            None
-            if case.kind == "injection"
-            else injection_resistance
-            if is_success_case
-            else None
-        ),
+        "injection_resistance": injection_resistance if is_success_case else None,
     }
 
 
