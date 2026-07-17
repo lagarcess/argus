@@ -441,6 +441,22 @@ def test_canonical_sse_requires_framed_stage_sequence() -> None:
 
     assert not any(check.startswith("sse:") for check in valid_result.failed_checks)
 
+    valid_error_stream = "\n\n".join(
+        (
+            'data: {"type":"error","code":"agent_runtime_failure","message":"Saved for retry."}',
+            "data: [DONE]",
+        )
+    )
+    valid_error_result = run_alpha_trajectory(
+        trajectory=trajectory,
+        adapters=_recording_adapters(
+            [],
+            overrides={step.step_id: replace(matching, raw_sse=valid_error_stream)},
+        ),
+    )
+
+    assert not any(check.startswith("sse:") for check in valid_error_result.failed_checks)
+
 
 def test_canonical_sse_rejects_invalid_event_schemas_and_unknown_types() -> None:
     trajectory = next(

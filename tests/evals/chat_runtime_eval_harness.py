@@ -507,6 +507,8 @@ def _canonical_sse_failures(*, raw_sse: str | None, step_id: str) -> list[str]:
     terminal_index = terminal_indices[0]
     if terminal_index != len(event_types) - 1:
         return [f"sse: {step_id} emitted data after the typed terminal frame"]
+    if event_types == ["error"]:
+        return []
     if not event_types or event_types[0] != "stage_start":
         return [f"sse: {step_id} did not start with a stage_start frame"]
 
