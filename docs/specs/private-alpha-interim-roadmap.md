@@ -2,11 +2,14 @@
 
 Status: **ACTIVE — planning and dispatch source**
 
-Date: 2026-07-16  
-Planning baseline: `codex/private-alpha-next` at `2642b514225b61a852e7c6786de4d84d2ea96456`  
+Date: 2026-07-16
+
+Planning baseline: `codex/private-alpha-next` at `2642b514225b61a852e7c6786de4d84d2ea96456`
+
 Last promoted `main` checkpoint: functional promotion merge `5d1eec11`, with
 the [production-promotion record](https://github.com/lagarcess/argus/blob/main/docs/release-manifests/2026-07-14-main-production-promotion.md)
-completed on `main` at `217ead12`  
+completed on `main` at `217ead12`
+
 Scope: every open issue from #228 through #253; #213 is explicitly excluded
 
 This is the bounded pivot between the latest `main` promotion checkpoint and
