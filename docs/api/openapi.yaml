@@ -35,6 +35,28 @@ paths:
       responses:
         "200":
           description: Updated user profile and preferences.
+  /api/v1/me/usage:
+    get:
+      description: Return the authenticated user's current daily private-alpha allowance truth.
+      responses:
+        "200":
+          description: Backend-owned message and simulation limits, usage, remaining capacity, and reset time.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageAllowanceResponse"
+        "401":
+          description: Missing or invalid authentication.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Private-alpha access is unavailable for this identity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/conversations:
     get:
       responses:
@@ -549,6 +571,43 @@ components:
           type:
             - string
             - "null"
+    UsageAllowance:
+      type: object
+      required:
+        - limit
+        - used
+        - remaining
+        - period_end
+      properties:
+        limit:
+          type: integer
+          minimum: 0
+        used:
+          type: integer
+          minimum: 0
+        remaining:
+          type: integer
+          minimum: 0
+        period_end:
+          type: string
+          format: date-time
+    UsageAllowances:
+      type: object
+      required:
+        - messages
+        - backtests
+      properties:
+        messages:
+          $ref: "#/components/schemas/UsageAllowance"
+        backtests:
+          $ref: "#/components/schemas/UsageAllowance"
+    UsageAllowanceResponse:
+      type: object
+      required:
+        - allowances
+      properties:
+        allowances:
+          $ref: "#/components/schemas/UsageAllowances"
     Collection:
       type: object
       description: Lightweight organizational grouping of strategies.
