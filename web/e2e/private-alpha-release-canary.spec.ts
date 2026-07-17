@@ -430,19 +430,28 @@ test.describe.serial("private-alpha rendered release canary", () => {
     await expect(
       page.getByRole("button", { name: label("common.retry") }),
     ).toHaveCount(0);
+    await expect(
+      page.getByText(label("chat.backtest_job.queued_title"), { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText(label("chat.backtest_job.running_title"), { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText(label("chat.backtest_job.failed_title"), { exact: true }),
+    ).toHaveCount(0);
 
     await page
       .getByRole("button", { name: label("chat.new_chat") })
       .click();
     await expect
       .poll(
-        () => new URL(page.url()).searchParams.get("conversation"),
+        () => !new URL(page.url()).searchParams.has("conversation"),
         {
           message: "New chat did not leave the source conversation",
           timeout: 30_000,
         },
       )
-      .toBe(null);
+      .toBe(true);
     await expect
       .poll(
         () =>

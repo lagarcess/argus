@@ -272,6 +272,17 @@ def test_browser_proves_reload_and_omnisearch_source_identity() -> None:
     assert "Omnisearch did not reopen the canonical source conversation" in browser_source
 
 
+def test_new_chat_poll_keeps_private_conversation_id_out_of_failure_output() -> None:
+    browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
+    leave_source = browser_source.split('label("chat.new_chat")', 1)[1].split(
+        'label("common.search")', 1
+    )[0]
+
+    assert '!new URL(page.url()).searchParams.has("conversation")' in leave_source
+    assert 'searchParams.get("conversation")' not in leave_source
+    assert ".toBe(true)" in leave_source
+
+
 def test_reload_rejects_a_stale_retryable_failure_beside_the_completed_result() -> None:
     browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
     reload_source = browser_source.split("await page.reload()", 1)[1]
@@ -279,6 +290,20 @@ def test_reload_rejects_a_stale_retryable_failure_beside_the_completed_result() 
     assert 'label("chat.error_backtest")' in reload_source
     assert 'label("common.retry")' in reload_source
     assert "toHaveCount(0" in reload_source
+
+
+def test_reload_rejects_all_stale_backtest_job_cards() -> None:
+    browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
+    reload_source = browser_source.split("await page.reload()", 1)[1].split(
+        'label("chat.new_chat")', 1
+    )[0]
+
+    for label_key in (
+        "chat.backtest_job.queued_title",
+        "chat.backtest_job.running_title",
+        "chat.backtest_job.failed_title",
+    ):
+        assert f'label("{label_key}")' in reload_source
 
 
 def test_browser_has_separate_intercepted_typed_error_recovery_proof() -> None:
@@ -395,7 +420,7 @@ def test_canary_capture_builder_produces_a_replayable_artifact(tmp_path: Path) -
     )
     job_path.write_text("{}", encoding="utf-8")
     receipts_path.write_text(
-        json.dumps([{"task": "result_summary", "outcome": "success"}]),
+        json.dumps([{"task": "result_summary", "outcome": "succeeded"}]),
         encoding="utf-8",
     )
     env = os.environ.copy()
@@ -429,6 +454,13 @@ def test_canary_capture_builder_produces_a_replayable_artifact(tmp_path: Path) -
     assert result.returncode == 0, result.stderr
     capture = json.loads(capture_path.read_text(encoding="utf-8"))
     assert capture["final_response_payload"]["result"]["total_return"] == 0.1284
+    assert capture["route_receipt"]["receipts"] == [
+        {
+            "task": "result_summary",
+            "outcome": "succeeded",
+            "failure_mode": None,
+        }
+    ]
     assert replay_capture(capture)["quick_take"]
     assert stat.S_IMODE(capture_path.stat().st_mode) == 0o600
 
@@ -453,6 +485,17 @@ def test_browser_failure_recovers_replay_inputs_before_writing_capture() -> None
     assert "backtest_jobs?select=id,result_run_id" in recovery_body
     assert "conversation_id=eq.${CONVERSATION_ID}" in recovery_body
     assert "user_id=eq.${USER_ID}" in recovery_body
+    assert "route_receipts?select=task,outcome,failure_mode" in recovery_body
+    assert "order=created_at.desc" in recovery_body
+    assert "limit=20" in recovery_body
+    receipt_query = recovery_body.split("route_receipts?", 1)[1].split('"', 1)[0]
+    assert "conversation_id=eq.${CONVERSATION_ID}" in receipt_query
+    assert "user_id=eq.${USER_ID}" in receipt_query
+    assert "run_id" not in receipt_query
+    assert "id," not in receipt_query
+    receipt_probe = recovery_body.index("route_receipts?select=task,outcome,failure_mode")
+    read_only_login = recovery_body.index("login_for_read_only_api_postconditions")
+    assert receipt_probe < read_only_login
 
 
 def test_failed_browser_run_is_reported_as_failed_not_not_run() -> None:
@@ -474,6 +517,39 @@ def test_canary_writes_privacy_safe_failure_evidence() -> None:
     assert "write_canary_capture" in fail_body
     assert '"failure_stage":' in source
     assert '"failure_reason":' in source
+
+
+def test_canary_requires_writable_capture_destination_before_browser_spend() -> None:
+    source = _source(".github/canary-render.sh")
+    preflight_body = source.split("prepare_capture_destination() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+    main_body = source.split('if [ -z "$EMAIL" ]; then', 1)[1]
+
+    assert 'fail_canary "capture" "missing_capture_destination"' in preflight_body
+    assert 'fail_canary "capture" "capture_destination_not_writable"' in preflight_body
+    assert ': > "$CAPTURE_PATH"' in preflight_body
+    assert 'rm -f "$CAPTURE_PATH"' in preflight_body
+    assert main_body.index("prepare_capture_destination") < main_body.index(
+        "validate_release_evidence_contract"
+    )
+    assert main_body.index("prepare_capture_destination") < main_body.index(
+        "run_browser_canary"
+    )
+
+
+def test_capture_write_failure_is_explicit_in_human_safe_evidence() -> None:
+    source = _source(".github/canary-render.sh")
+    fail_body = source.split("fail_canary() {", 1)[1].split("\n}", 1)[0]
+
+    assert 'CANARY_CAPTURE_WRITE_STATUS="failed"' in fail_body
+    assert 'CANARY_CAPTURE_WRITE_FAILURE_REASON="capture_write_failed"' in fail_body
+    assert "canary_capture_write_status=" in fail_body
+    assert fail_body.index("write_canary_capture") < fail_body.index(
+        "write_canary_evidence"
+    )
+    assert '"capture_write_status":' in source
+    assert '"capture_write_failure_reason":' in source
 
 
 def test_canary_sanitizes_warmup_output_before_logging() -> None:
@@ -516,8 +592,22 @@ def test_workflow_runs_browser_canary_and_uploads_only_sanitized_artifacts() -> 
         "ARGUS_CANARY_CAPTURE_PATH=temp/canary-evidence/es-419-capture.json"
         in workflow
     )
-    assert "temp/canary-evidence/*" in workflow
+    assert "temp/canary-evidence/*" not in workflow
+    assert "temp/canary-evidence/es-419.json" in workflow
+    assert "temp/canary-evidence/es-419.exit" in workflow
+    assert "Upload failed canary capture" in workflow
+    failed_capture_upload = workflow.split("Upload failed canary capture", 1)[1]
+    assert "if: failure()" in failed_capture_upload
+    assert "temp/canary-evidence/es-419-capture.json" in failed_capture_upload
     assert "BROWSER_IDENTITY_HANDOFF" not in workflow
+
+
+def test_successful_canary_does_not_write_replay_capture() -> None:
+    source = _source(".github/canary-render.sh")
+    success_body = source.split('CANARY_STATUS="passed"', 1)[1]
+
+    assert "write_canary_evidence" in success_body
+    assert "write_canary_capture" not in success_body
 
 
 def test_browser_runner_is_profile_driven_and_executable() -> None:

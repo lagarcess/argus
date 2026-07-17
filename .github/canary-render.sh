@@ -114,6 +114,8 @@ RUN_ACTION_REQUEST_COUNT=""
 CANARY_STATUS="running"
 CANARY_FAILURE_STAGE=""
 CANARY_FAILURE_REASON=""
+CANARY_CAPTURE_WRITE_STATUS="not_attempted"
+CANARY_CAPTURE_WRITE_FAILURE_REASON=""
 
 privacy_safe_id_label() {
   local label_type="$1"
@@ -189,6 +191,8 @@ build_release_evidence_json() {
   CANARY_STATUS="$CANARY_STATUS" \
   CANARY_FAILURE_STAGE="$CANARY_FAILURE_STAGE" \
   CANARY_FAILURE_REASON="$CANARY_FAILURE_REASON" \
+  CANARY_CAPTURE_WRITE_STATUS="$CANARY_CAPTURE_WRITE_STATUS" \
+  CANARY_CAPTURE_WRITE_FAILURE_REASON="$CANARY_CAPTURE_WRITE_FAILURE_REASON" \
   CANARY_EXPECTED_MODE="$EXPECT_MODE" \
   CANARY_RELEASE_PROFILE_HASH="$RELEASE_PROFILE_HASH" \
   CANARY_ENV_FINGERPRINT="$ENV_FINGERPRINT" \
@@ -235,6 +239,10 @@ payload = {
     "status": os.environ["CANARY_STATUS"],
     "failure_stage": optional(os.environ["CANARY_FAILURE_STAGE"]),
     "failure_reason": optional(os.environ["CANARY_FAILURE_REASON"]),
+    "capture_write_status": os.environ["CANARY_CAPTURE_WRITE_STATUS"],
+    "capture_write_failure_reason": optional(
+        os.environ["CANARY_CAPTURE_WRITE_FAILURE_REASON"]
+    ),
     "expected_mode": os.environ["CANARY_EXPECTED_MODE"],
     "release_profile_hash": optional(os.environ["CANARY_RELEASE_PROFILE_HASH"]),
     "env_fingerprint": optional(os.environ["CANARY_ENV_FINGERPRINT"]),
@@ -314,7 +322,7 @@ write_canary_evidence() {
 
 write_canary_capture() {
   if [ -z "$CAPTURE_PATH" ]; then
-    return 0
+    return 1
   fi
 
   mkdir -p "$(dirname "$CAPTURE_PATH")"
@@ -421,18 +429,20 @@ def extract_message_artifacts(messages_payload: Any) -> dict[str, Any]:
 
 def receipt_summary(receipt_payload: Any) -> dict[str, Any]:
     if not isinstance(receipt_payload, list):
-        return {"status": "missing", "count": 0}
-    tasks = sorted(
+        return {"status": "missing", "count": 0, "receipts": []}
+    receipts = [
         {
-            str(row.get("task"))
-            for row in receipt_payload
-            if isinstance(row, dict) and row.get("task")
+            "task": row.get("task"),
+            "outcome": row.get("outcome"),
+            "failure_mode": row.get("failure_mode"),
         }
-    )
+        for row in receipt_payload
+        if isinstance(row, dict)
+    ]
     return {
-        "status": "present" if receipt_payload else "missing",
-        "count": len(receipt_payload),
-        "tasks": tasks,
+        "status": "present" if receipts else "missing",
+        "count": len(receipts),
+        "receipts": receipts,
     }
 
 
@@ -494,13 +504,36 @@ PY
   return "$exit_code"
 }
 
+prepare_capture_destination() {
+  if [ -z "$CAPTURE_PATH" ]; then
+    fail_canary "capture" "missing_capture_destination"
+  fi
+  if ! mkdir -p "$(dirname "$CAPTURE_PATH")" \
+    || ! (umask 077; : > "$CAPTURE_PATH") \
+    || ! chmod 600 "$CAPTURE_PATH"; then
+    fail_canary "capture" "capture_destination_not_writable"
+  fi
+  rm -f "$CAPTURE_PATH"
+  CANARY_CAPTURE_WRITE_STATUS="ready"
+}
+
 fail_canary() {
   CANARY_STATUS="failed"
   CANARY_FAILURE_STAGE="$1"
   CANARY_FAILURE_REASON="$2"
   echo "ERROR: canary failed at ${CANARY_FAILURE_STAGE}: ${CANARY_FAILURE_REASON}"
+  if write_canary_capture; then
+    CANARY_CAPTURE_WRITE_STATUS="written"
+    CANARY_CAPTURE_WRITE_FAILURE_REASON=""
+  else
+    CANARY_CAPTURE_WRITE_STATUS="failed"
+    CANARY_CAPTURE_WRITE_FAILURE_REASON="capture_write_failed"
+  fi
+  echo "canary_capture_write_status=$CANARY_CAPTURE_WRITE_STATUS"
+  if [ -n "$CANARY_CAPTURE_WRITE_FAILURE_REASON" ]; then
+    echo "canary_capture_write_failure_reason=$CANARY_CAPTURE_WRITE_FAILURE_REASON"
+  fi
   write_canary_evidence || true
-  write_canary_capture || true
   exit 1
 }
 
@@ -786,6 +819,10 @@ PY
   IDEA_LABEL="$(privacy_safe_id_label idea "$IDEA_ID")"
   IDEA_VERSION_LABEL="$(privacy_safe_id_label idea_version "$IDEA_VERSION_ID")"
 
+  supabase_get \
+    "${SUPABASE_URL}/rest/v1/route_receipts?select=task,outcome,failure_mode&conversation_id=eq.${CONVERSATION_ID}&user_id=eq.${USER_ID}&order=created_at.desc&limit=20" \
+    "$RECEIPT_ROWS" || true
+
   if ! login_for_read_only_api_postconditions; then
     return 0
   fi
@@ -848,11 +885,6 @@ PY
 )"
       RESULT_LABEL="$(privacy_safe_id_label backtest_run "$BACKTEST_RUN_ID")"
     fi
-  fi
-  if [ -n "$BACKTEST_RUN_ID" ]; then
-    supabase_get \
-      "${SUPABASE_URL}/rest/v1/route_receipts?select=id,user_id,conversation_id,run_id,task,outcome&conversation_id=eq.${CONVERSATION_ID}&run_id=eq.${BACKTEST_RUN_ID}" \
-      "$RECEIPT_ROWS" || true
   fi
   echo "canary_failed_browser_capture_inputs=collected"
 }
@@ -1182,6 +1214,7 @@ if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
   fail_canary "supabase_verifier" "missing_supabase_verifier_credentials"
 fi
 
+prepare_capture_destination
 validate_release_evidence_contract
 
 if ! run_browser_canary; then
@@ -1202,6 +1235,6 @@ if ! verify_canonical_postconditions; then
 fi
 
 CANARY_STATUS="passed"
+CANARY_CAPTURE_WRITE_STATUS="not_written_success"
 write_canary_evidence
-write_canary_capture
 echo "Canary passed: the rendered Spanish browser owned one real Golden Path and all canonical postconditions matched."
