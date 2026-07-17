@@ -158,7 +158,8 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
         "ARGUS_WORKFLOW_DATABASE_URL",
     }
     assert secret_steps["Run authoritative Spanish release canary"] == secret_names
-    assert secret_steps["Upload canary evidence"] == set()
+    assert secret_steps["Upload human-safe canary evidence"] == set()
+    assert secret_steps["Upload failed canary capture"] == set()
 
     for step in steps:
         if step["name"] in {
@@ -178,6 +179,19 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     uses_steps = "\n".join(str(step.get("uses", "")) for step in job["steps"])
 
     assert "mkdir -p temp/canary-evidence" in joined_steps
+    prepare_index = next(
+        index
+        for index, step in enumerate(job["steps"])
+        if step["name"] == "Prepare canary evidence directory"
+    )
+    warmup_index = next(
+        index
+        for index, step in enumerate(job["steps"])
+        if step["name"] == "Warm Render product path"
+    )
+    assert prepare_index < warmup_index
+    assert ": > temp/canary-evidence/es-419-capture.json" in joined_steps
+    assert "rm -f temp/canary-evidence/es-419-capture.json" in joined_steps
     assert (
         steps_by_name["Run authoritative Spanish release canary"][
             "continue-on-error"
@@ -194,11 +208,16 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     assert "for locale in en es-419 provider-path" not in joined_steps
     assert "Install Chromium for the deployed browser canary" in steps_by_name
     assert "actions/upload-artifact@v4" in uses_steps
-    assert "private-alpha-canary-evidence" in CANARY_WORKFLOW_PATH.read_text(
-        encoding="utf-8"
+    workflow_source = CANARY_WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "private-alpha-canary-evidence" in workflow_source
+    assert "temp/canary-evidence/*" not in workflow_source
+    assert steps_by_name["Upload human-safe canary evidence"]["with"]["path"] == (
+        "temp/canary-evidence/es-419.json\n"
+        "temp/canary-evidence/es-419.exit\n"
     )
-    assert "path: temp/canary-evidence/*\n" in CANARY_WORKFLOW_PATH.read_text(
-        encoding="utf-8"
+    assert steps_by_name["Upload failed canary capture"]["if"] == "failure()"
+    assert steps_by_name["Upload failed canary capture"]["with"]["path"] == (
+        "temp/canary-evidence/es-419-capture.json"
     )
 
 
