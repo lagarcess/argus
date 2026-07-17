@@ -25,9 +25,11 @@ const TERMINAL_UNSUCCESSFUL_JOB_STATUSES = new Set<BacktestJobStatus>([
   "canceled",
   "expired",
 ]);
-const IN_PROGRESS_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
+const JOB_SETTLEABLE_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
+  "ready_to_run",
   "running",
   "request_sent",
+  "updated",
 ]);
 
 export function backtestJobMessageFromApi(message: ApiMessage): Message | null {
@@ -135,16 +137,21 @@ function settleConfirmationLabelsForJob(
   job: BacktestJob,
 ): Message[] {
   const status = confirmationStatusForJob(job.status);
-  if (!status) {
+  const confirmationMessageId = job.confirmation_message_id?.trim();
+  if (!status || !confirmationMessageId) {
     return messages;
   }
   return messages.map((message) => {
-    if (message.kind !== "strategy_confirmation" || !message.confirmation) {
+    if (
+      message.kind !== "strategy_confirmation" ||
+      !message.confirmation ||
+      message.id !== confirmationMessageId
+    ) {
       return message;
     }
     if (
       message.confirmation.confirmation_state !== "superseded" ||
-      !IN_PROGRESS_CONFIRMATION_STATUSES.has(
+      !JOB_SETTLEABLE_CONFIRMATION_STATUSES.has(
         confirmationStatusFromPayload(message.confirmation),
       )
     ) {

@@ -440,7 +440,7 @@ describe("chat artifact history", () => {
     expect(normalizedConfirmation.actions).toEqual([]);
   });
 
-  test("stream normalization marks a superseded running card updated when a fresh confirmation arrives", () => {
+  test("stream normalization marks a superseded running card updated when no active job owns it", () => {
     const [running] = applyConfirmationActionEffects([confirmationMessage()], [
       {
         type: "run_backtest",
@@ -490,7 +490,7 @@ describe("chat artifact history", () => {
     expect(normalized.confirmation?.statusLabel).toBe("Running");
   });
 
-  test("reload normalization clears a persisted request-sent label before activating a fresh confirmation", () => {
+  test("reload normalization clears an unowned request-sent label before activating a fresh confirmation", () => {
     const persistedRequest: Message = {
       ...confirmationMessage(),
       confirmation: {
