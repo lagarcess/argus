@@ -21,11 +21,6 @@ from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
 )
 from argus.domain.backtesting.config import _execution_realism_feature_enabled
-from argus.domain.backtesting.coverage import (
-    MarketDataCoverageError,
-    prepare_market_data,
-)
-from argus.domain.engine import classify_symbol
 from argus.domain.engine_launch.display import format_data_through_label
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.engine_launch.strategies import validate_launch_supported
@@ -210,6 +205,12 @@ def _validated_launch_payload(
 
 
 def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
+    from argus.domain.backtesting.coverage import (
+        MarketDataCoverageError,
+        prepare_market_data,
+    )
+    from argus.domain.engine import classify_symbol
+
     try:
         request = LaunchBacktestRequest.model_validate(launch_payload)
         asset_class = request.asset_class or classify_symbol(request.symbol).asset_class

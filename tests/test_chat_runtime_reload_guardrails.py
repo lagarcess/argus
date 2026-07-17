@@ -1918,6 +1918,9 @@ def test_refine_strategy_action_preserves_completed_dca_fields_after_reload() ->
 def test_review_one_replay_preserves_result_artifact_through_date_patch(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv(
+        "ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture"
+    )
     from argus.agent_runtime import resolution as resolution_module
     from argus.agent_runtime.graph.workflow import build_workflow
     from argus.agent_runtime.stages.interpret_types import (
@@ -2859,6 +2862,9 @@ def test_plain_text_after_pending_edit_prompt_passes_requested_field_to_runtime(
 def test_confirmation_action_asset_edit_round_trips_through_api_metadata(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv(
+        "ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture"
+    )
     from argus.agent_runtime import resolution as resolution_module
     from argus.agent_runtime.graph.workflow import build_workflow
     from argus.agent_runtime.stages.interpret_types import (
