@@ -53,7 +53,7 @@ def default_benchmark(asset_class: AssetClass, symbols: list[str] | None = None)
 
 
 def _normalize_timeframe(timeframe: str | None) -> str:
-    return _config._normalize_timeframe(timeframe)
+    return _config.normalize_timeframe(timeframe)
 
 
 def _to_date(value: str | date | datetime) -> date:

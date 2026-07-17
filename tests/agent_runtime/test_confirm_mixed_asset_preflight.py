@@ -111,6 +111,52 @@ def test_confirm_rejects_cross_asset_benchmark_before_coverage_fetch(
     assert "confirmation_payload" not in result.patch
 
 
+def test_confirm_rejects_unsupported_timeframe_before_coverage_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coverage_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        coverage,
+        "prepare_market_data",
+        lambda config: coverage_calls.append(config),
+    )
+
+    state = RunState.new(
+        current_user_message="Buy and hold AAPL on five-minute bars.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        timeframe="5m",
+        capital_amount=1_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    state.optional_parameter_status = {"timeframe": "5m"}
+
+    result = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert coverage_calls == []
+    constraints = result.patch["optional_parameter_status"]["unsupported_constraints"]
+    constraint = constraints[-1]
+    assert result.patch["requested_field"] == "timeframe"
+    assert result.patch["missing_required_fields"] == ["timeframe"]
+    assert constraint["category"] == "unsupported_time_granularity"
+    assert constraint["raw_value"] == "5m"
+    assert [
+        option["replacement_values"] for option in constraint["simplification_options"]
+    ] == [{"timeframe": "1D"}, {"timeframe": "1h"}]
+    assert "coverage_recovery" not in result.patch["optional_parameter_status"]
+    assert "confirmation_payload" not in result.patch
+
+
 def test_confirm_maps_transient_benchmark_catalog_failure_to_provider_neutral_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

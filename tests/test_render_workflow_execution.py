@@ -1209,6 +1209,88 @@ def test_run_backtest_job_marks_tool_failure_with_structured_metadata() -> None:
     assert timings["backtest_tool_run_total"] >= 0.0
 
 
+def test_run_backtest_job_preserves_safe_coverage_drift_failure_code() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(
+        {
+            "success": False,
+            "payload": None,
+            "error_type": "parameter_validation_error",
+            "error_message": "Review the refreshed dates and approve again.",
+            "retryable": False,
+            "capability_context": {
+                "failure_code": "approved_data_window_unavailable",
+                "failure_detail": "approved_data_window_unavailable",
+            },
+        }
+    )
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="local-run",
+    )
+
+    assert result["status"] == "failed"
+    assert result["failure_code"] == "approved_data_window_unavailable"
+    assert gateway.row["failure_code"] == "approved_data_window_unavailable"
+    assert gateway.row["result_run_id"] is None
+    assert gateway.finalization_calls == []
+    assert (
+        gateway.row["execution_metadata"]["workflow_backtest"]["failure_category"]
+        == "parameter_validation_error"
+    )
+
+
+def test_run_backtest_job_rejects_untrusted_nested_failure_code() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(
+        {
+            "success": False,
+            "payload": None,
+            "error_type": "upstream_dependency_error",
+            "error_message": "Market data is temporarily unavailable.",
+            "retryable": True,
+            "capability_context": {
+                "failure_code": "internal_provider_secret_code",
+            },
+        }
+    )
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="local-run",
+    )
+
+    assert result["failure_code"] == "upstream_dependency_error"
+    assert gateway.row["failure_code"] == "upstream_dependency_error"
+    assert (
+        gateway.row["execution_metadata"]["workflow_backtest"]["failure_category"]
+        == "upstream_dependency_error"
+    )
+
+
 def test_run_backtest_job_tool_failure_preserves_collected_timings() -> None:
     from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
 

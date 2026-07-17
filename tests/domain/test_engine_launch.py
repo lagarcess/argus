@@ -18,6 +18,7 @@ from argus.domain.engine_launch.models import (
     LaunchExecutionEnvelope,
 )
 from argus.domain.engine_launch.results import user_safe_failure_message
+from argus.domain.engine_launch.strategies import validate_launch_supported
 
 
 def test_launch_request_supports_three_strategy_types() -> None:
@@ -74,6 +75,40 @@ def test_launch_request_supports_three_strategy_types() -> None:
     assert dca_request.strategy_type == "dca_accumulation"
     assert dca_request.cadence == "monthly"
     assert threshold_request.strategy_type == "indicator_threshold"
+
+
+@pytest.mark.parametrize(
+    "strategy_type",
+    [
+        "buy_and_hold",
+        "dca_accumulation",
+        "indicator_threshold",
+        "signal_strategy",
+    ],
+)
+def test_launch_validation_rejects_unsupported_timeframe_for_every_strategy(
+    strategy_type: str,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type=strategy_type,
+        symbol="AAPL",
+        symbols=["AAPL"],
+        asset_class="equity",
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=10_000.0,
+        position_size=None,
+        cadence="monthly" if strategy_type == "dca_accumulation" else None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    with pytest.raises(ValueError, match="unsupported_timeframe"):
+        validate_launch_supported(request)
 
 
 def test_approved_launch_uses_one_prepared_dataset_for_metrics_and_chart(

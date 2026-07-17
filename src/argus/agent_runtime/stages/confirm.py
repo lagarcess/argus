@@ -183,6 +183,7 @@ def _validated_launch_payload(
     state: RunState,
     confirmation_payload: dict[str, Any],
 ) -> dict[str, Any]:
+    launch_payload: dict[str, Any] = {}
     try:
         from argus.agent_runtime.stages.execute import _launch_payload
 
@@ -198,7 +199,10 @@ def _validated_launch_payload(
     except ValidationError as exc:
         return _launch_validation_failure(_validation_error_code(exc))
     except ValueError as exc:
-        return _launch_validation_failure(str(exc))
+        return _launch_validation_failure(
+            str(exc),
+            raw_value=launch_payload.get("timeframe"),
+        )
     except Exception:
         return _launch_validation_failure("missing_rule_group")
     return {
@@ -428,7 +432,40 @@ def _validation_error_code(exc: ValidationError) -> str:
     return "missing_rule_group"
 
 
-def _launch_validation_failure(error_code: str) -> dict[str, Any]:
+def _launch_validation_failure(
+    error_code: str,
+    *,
+    raw_value: Any | None = None,
+) -> dict[str, Any]:
+    if error_code == "unsupported_timeframe":
+        return {
+            "outcome": "needs_clarification",
+            "missing_required_fields": ["timeframe"],
+            "requested_field": "timeframe",
+            "assistant_prompt": None,
+            "optional_parameter_status": _with_unsupported_constraint(
+                {},
+                {
+                    "category": "unsupported_time_granularity",
+                    "raw_value": raw_value or error_code,
+                    "explanation": (
+                        "That bar size is not supported by the current backtest "
+                        "engine. Choose a supported timeframe to keep the rest of "
+                        "the strategy unchanged."
+                    ),
+                    "simplification_options": [
+                        {
+                            "label": "Retry with daily bars",
+                            "replacement_values": {"timeframe": "1D"},
+                        },
+                        {
+                            "label": "Retry with 1-hour bars",
+                            "replacement_values": {"timeframe": "1h"},
+                        },
+                    ],
+                },
+            ),
+        }
     if error_code == "future_end_date":
         return {
             "outcome": "needs_clarification",
