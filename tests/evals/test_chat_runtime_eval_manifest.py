@@ -182,6 +182,15 @@ def test_eval_harness_builds_judge_payload_from_runtime_capabilities() -> None:
     assert "Do not require exact wording" in messages[0]["content"]
     payload = json.loads(messages[1]["content"])
     assert payload["case"]["prompt"] == "buy and sell when it goes up"
+    assert payload["case"]["semantic_target"] == case.semantic_target
+    assert payload["case"]["hard_checks"] == list(case.hard_checks)
+    assert payload["case"]["semantic_steps"] == [
+        {
+            "step_id": case.steps[0].step_id,
+            "semantic_target": case.semantic_target,
+            "hard_checks": list(case.hard_checks),
+        }
+    ]
     assert payload["capability_context"]["executable_indicators"]
     assert payload["runtime_output"]["route_receipts"][0]["task"] == "interpretation"
 
@@ -205,6 +214,44 @@ def test_eval_cases_preserve_every_conversation_step() -> None:
         "switch the asset to NVDA",
         "same thing but Nvidia",
     )
+
+
+def test_judge_payload_includes_every_sanitized_semantic_step_in_order() -> None:
+    case = next(
+        item
+        for item in iter_eval_cases(priority="must_pass")
+        if item.scenario_id == "qa_02_draft_continuity"
+        and item.prompt == "Test buying and holding Apple over the past year."
+    )
+
+    messages = build_semantic_judge_messages(
+        case=case,
+        assistant_response="Sanitized assistant result.",
+        final_payload={"stage_outcome": "ready_for_confirmation"},
+        route_receipts=[],
+        capability_context={"contract_version": "test"},
+    )
+    payload = json.loads(messages[1]["content"])
+    semantic_steps = payload["case"]["semantic_steps"]
+
+    assert semantic_steps == [
+        {
+            "step_id": step.step_id,
+            "semantic_target": step.semantic_target,
+            "hard_checks": list(step.hard_checks),
+        }
+        for step in case.steps
+    ]
+    assert payload["case"]["semantic_target"] == case.steps[0].semantic_target
+    assert payload["case"]["hard_checks"] == list(case.steps[0].hard_checks)
+    assert all(
+        set(step_payload) == {"step_id", "semantic_target", "hard_checks"}
+        for step_payload in semantic_steps
+    )
+
+    serialized_case = json.dumps(payload["case"], sort_keys=True)
+    for step in case.steps[1:]:
+        assert all(prompt not in serialized_case for prompt in step.prompt_variants)
 
 
 def test_eval_case_iteration_emits_eval_readiness_product_event(monkeypatch) -> None:

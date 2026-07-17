@@ -883,6 +883,14 @@ def build_semantic_judge_messages(
             "prompt": case.prompt,
             "semantic_target": case.semantic_target,
             "hard_checks": list(case.hard_checks),
+            "semantic_steps": [
+                {
+                    "step_id": step.step_id,
+                    "semantic_target": step.semantic_target,
+                    "hard_checks": list(step.hard_checks),
+                }
+                for step in case.steps
+            ],
             "forbidden_outcomes": list(case.forbidden_outcomes),
             "judge_rubric": case.judge_rubric,
         },
@@ -898,11 +906,12 @@ def build_semantic_judge_messages(
             "role": "system",
             "content": (
                 "You are the Argus chat-runtime semantic evaluator. Judge whether "
-                "the turn satisfies the hard checks using the capability context "
-                "provided here. Do not require exact wording. Do not reward claims "
-                "that unsupported behavior is executable. Return compact JSON with "
-                "pass, failed_checks, forbidden_outcomes_seen, groundedness_notes, "
-                "and route_receipt_notes."
+                "the ordered semantic steps satisfy every target and hard check "
+                "using the capability context provided here. Do not require exact "
+                "wording. Do not reward claims that unsupported behavior is "
+                "executable. Return compact JSON with pass, failed_checks, "
+                "forbidden_outcomes_seen, groundedness_notes, and "
+                "route_receipt_notes."
             ),
         },
         {"role": "user", "content": json.dumps(payload, sort_keys=True)},
