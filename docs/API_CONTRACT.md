@@ -497,7 +497,7 @@ Ownership hardening:
     "asset_class": "equity",
     "symbols": ["NVDA", "BYD"],
     "timeframe": "1D",
-    "start_date": "2022-01-01",
+    "start_date": "2022-03-18",
     "end_date": "2024-12-31",
     "requested_date_range": {
       "start": "2022-01-01",
@@ -532,9 +532,9 @@ Ownership hardening:
     "evidence_artifact_id": "uuid",
     "evidence_lifecycle": "captured",
     "date_range": {
-      "start": "2022-01-01",
+      "start": "2022-03-18",
       "end": "2024-12-31",
-      "display": "January 1, 2022 to December 31, 2024"
+      "display": "March 18, 2022 to December 31, 2024"
     },
     "status_label": "Simulation Complete",
     "rows": [
@@ -620,12 +620,12 @@ Ownership hardening:
     "chart": {
       "kind": "portfolio_equity",
       "series": [
-        { "time": "2022-01-03", "value": 10000.0 },
-        { "time": "2022-01-04", "value": 10042.5 }
+        { "time": "2022-03-18", "value": 10000.0 },
+        { "time": "2022-03-21", "value": 10042.5 }
       ],
       "markers": [
         {
-          "time": "2022-01-03",
+          "time": "2022-03-18",
           "type": "entry",
           "label": "Buy NVDA, BYD",
           "symbols": ["NVDA", "BYD"]

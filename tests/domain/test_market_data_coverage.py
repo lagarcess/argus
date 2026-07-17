@@ -162,6 +162,40 @@ def test_multi_symbol_window_is_intersection_including_benchmark() -> None:
     )
 
 
+def test_effective_window_uses_observed_boundaries_for_every_series() -> None:
+    all_days = [f"2024-01-{day:02d}" for day in range(1, 21)]
+    strategy_days = [
+        day
+        for day in all_days
+        if day not in {"2024-01-03", "2024-01-18"}
+    ]
+    benchmark_days = [f"2024-01-{day:02d}" for day in range(3, 19)]
+
+    prepared = prepare_market_data(
+        {
+            **_config("AAPL", "MSFT"),
+            "end_date": "2024-01-20",
+        },
+        fetch_ohlcv_func=_fetcher(
+            {
+                "AAPL": _bars(*strategy_days),
+                "MSFT": _bars(*benchmark_days, base=200.0),
+                "SPY": _bars(*all_days, base=300.0),
+            }
+        ),
+    )
+
+    assert prepared.effective_date_range.model_dump() == {
+        "start": "2024-01-04",
+        "end": "2024-01-17",
+    }
+    assert all(
+        frame.index[0].date().isoformat() == "2024-01-04"
+        and frame.index[-1].date().isoformat() == "2024-01-17"
+        for frame in prepared.bars_by_symbol.values()
+    )
+
+
 def test_sparse_history_is_rejected_with_typed_recovery_code() -> None:
     full = _bars(
         "2024-01-01",
@@ -181,6 +215,22 @@ def test_sparse_history_is_rejected_with_typed_recovery_code() -> None:
                     "SPY": full,
                 }
             ),
+        )
+
+    assert exc_info.value.code == "insufficient_common_data"
+
+
+def test_uniformly_sparse_history_is_rejected_against_the_effective_window() -> None:
+    endpoints = _bars("2024-01-02", "2024-01-31")
+
+    with pytest.raises(MarketDataCoverageError) as exc_info:
+        prepare_market_data(
+            {
+                **_config("AAPL"),
+                "start_date": "2024-01-01",
+                "end_date": "2024-01-31",
+            },
+            fetch_ohlcv_func=_fetcher({"AAPL": endpoints, "SPY": endpoints}),
         )
 
     assert exc_info.value.code == "insufficient_common_data"

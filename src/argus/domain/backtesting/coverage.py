@@ -4,10 +4,19 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import date
+from math import ceil
 from typing import Any, Callable
 
 import pandas as pd
 from pydantic import BaseModel
+
+from argus.domain.market_data.capabilities import (
+    PROVIDER_TIMEFRAME_MINUTES,
+    expected_candle_count,
+)
+
+_MIN_OBSERVATION_COVERAGE = 0.8
+_EQUITY_SESSION_MINUTES = 390
 
 
 class CoverageDateRange(BaseModel):
@@ -89,10 +98,18 @@ def prepare_market_data(
         except (KeyError, TypeError, ValueError) as exc:
             raise MarketDataCoverageError("market_data_unavailable") from exc
 
-    common_start = max(frame.index[0] for frame in frames.values())
-    common_end = min(frame.index[-1] for frame in frames.values())
-    if common_start >= common_end:
+    common_observations: pd.DatetimeIndex | None = None
+    for frame in frames.values():
+        common_observations = (
+            frame.index
+            if common_observations is None
+            else common_observations.intersection(frame.index)
+        )
+    if common_observations is None or len(common_observations) < 2:
         raise MarketDataCoverageError("no_common_data_window")
+    common_observations = common_observations.unique().sort_values()
+    common_start = common_observations[0]
+    common_end = common_observations[-1]
 
     trimmed = {
         symbol: frame.loc[(frame.index >= common_start) & (frame.index <= common_end)]
@@ -100,7 +117,13 @@ def prepare_market_data(
     }
     if any(frame.empty for frame in trimmed.values()):
         raise MarketDataCoverageError("no_common_data_window")
-    _validate_observation_density(trimmed)
+    _validate_observation_density(
+        trimmed,
+        asset_class=str(config["asset_class"]),
+        timeframe=str(config["timeframe"]),
+        start_date=pd.Timestamp(common_start).date(),
+        end_date=pd.Timestamp(common_end).date(),
+    )
 
     effective = CoverageDateRange(
         start=pd.Timestamp(common_start).date().isoformat(),
@@ -194,18 +217,86 @@ def _clip_to_requested_window(
     return clipped
 
 
-def _validate_observation_density(frames: dict[str, pd.DataFrame]) -> None:
+def _validate_observation_density(
+    frames: dict[str, pd.DataFrame],
+    *,
+    asset_class: str,
+    timeframe: str,
+    start_date: date,
+    end_date: date,
+) -> None:
     target = pd.DatetimeIndex([])
     for frame in frames.values():
         target = target.union(frame.index)
     target = target.unique().sort_values()
     if len(target) < 2:
         raise MarketDataCoverageError("insufficient_common_data")
+    minimum_observations = _minimum_observations_for_window(
+        asset_class=asset_class,
+        timeframe=timeframe,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    if len(target) < minimum_observations:
+        raise MarketDataCoverageError("insufficient_common_data")
     minimum_ratio = 1.0 if len(target) <= 2 else 0.8
     for frame in frames.values():
         observed_ratio = float(frame.index.isin(target).sum()) / float(len(target))
         if observed_ratio < minimum_ratio:
             raise MarketDataCoverageError("insufficient_common_data")
+
+
+def _minimum_observations_for_window(
+    *,
+    asset_class: str,
+    timeframe: str,
+    start_date: date,
+    end_date: date,
+) -> int:
+    interval_minutes = PROVIDER_TIMEFRAME_MINUTES.get(_normalized_timeframe(timeframe))
+    if interval_minutes is None:
+        return 2
+    if asset_class == "equity":
+        session_days = len(pd.bdate_range(start=start_date, end=end_date))
+        observations_per_session = max(
+            1,
+            ceil(_EQUITY_SESSION_MINUTES / interval_minutes),
+        )
+        expected = session_days * observations_per_session
+        holiday_tolerant_expected = max(
+            2,
+            expected - observations_per_session,
+        )
+        return max(
+            2,
+            min(
+                holiday_tolerant_expected,
+                ceil(expected * _MIN_OBSERVATION_COVERAGE),
+            ),
+        )
+    else:
+        expected = expected_candle_count(
+            start_date=start_date,
+            end_date=end_date,
+            interval_minutes=interval_minutes,
+        )
+    return max(2, ceil(expected * _MIN_OBSERVATION_COVERAGE))
+
+
+def _normalized_timeframe(value: str) -> str:
+    normalized = value.strip().lower()
+    aliases = {
+        "1d": "1D",
+        "1day": "1D",
+        "daily": "1D",
+        "day": "1D",
+        "60m": "1h",
+        "120m": "2h",
+        "240m": "4h",
+        "360m": "6h",
+        "720m": "12h",
+    }
+    return aliases.get(normalized, normalized)
 
 
 def _validate_approved_window(

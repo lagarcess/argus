@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from argus.agent_runtime.artifacts import ArtifactPatch, apply_artifact_patch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.llm_clarifier import (
     ClarificationRequest,
@@ -2043,6 +2044,102 @@ def test_confirm_stage_reconciles_effective_window_before_approval(
     assert confirmation["validation"]["date_adjusted"] is True
 
 
+def test_confirm_stage_preserves_requested_window_after_non_date_edit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import confirm as confirm_module
+    from argus.agent_runtime.stages.execute import _launch_payload
+    from argus.domain import market_data
+
+    def fake_fetch(symbol: str, **_: object) -> pd.DataFrame:  # noqa: ARG001
+        index = pd.to_datetime(
+            ["2024-01-03", "2024-01-04", "2024-01-05"],
+            utc=True,
+        )
+        close = pd.Series([100.0, 101.0, 102.0], index=index)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(confirm_module, "_market_clock_for_strategy", lambda _: None)
+    first_state = RunState.new(
+        current_user_message="Hold AAPL from January 1 through January 5, 2024.",
+        recent_thread_history=[],
+    )
+    first_state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    first = confirm_stage(
+        state=first_state,
+        contract=build_default_capability_contract(),
+    )
+    edited = apply_artifact_patch(
+        StrategySummary.model_validate(first.patch["candidate_strategy_draft"]),
+        ArtifactPatch(source="user_patch", capital_amount=20_000),
+    )
+    second_state = RunState.new(
+        current_user_message="Use $20,000 instead.",
+        recent_thread_history=[],
+    )
+    second_state.candidate_strategy_draft = edited
+
+    second = confirm_stage(
+        state=second_state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert second.outcome == "await_approval"
+    confirmation = second.patch["confirmation_payload"]
+    assert confirmation["launch_payload"]["requested_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-01-05",
+    }
+    assert confirmation["launch_payload"]["date_range"] == {
+        "start": "2024-01-03",
+        "end": "2024-01-05",
+    }
+    second_state.confirmation_payload = confirmation
+    assert _launch_payload(second_state)["requested_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-01-05",
+    }
+
+    date_edited = apply_artifact_patch(
+        StrategySummary.model_validate(first.patch["candidate_strategy_draft"]),
+        ArtifactPatch(
+            source="user_patch",
+            date_range={"start": "2024-01-04", "end": "2024-01-05"},
+        ),
+    )
+    date_edit_state = RunState.new(
+        current_user_message="Use January 4 through January 5 instead.",
+        recent_thread_history=[],
+    )
+    date_edit_state.candidate_strategy_draft = date_edited
+
+    date_edit_result = confirm_stage(
+        state=date_edit_state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert date_edit_result.patch["confirmation_payload"]["launch_payload"][
+        "requested_date_range"
+    ] == {"start": "2024-01-04", "end": "2024-01-05"}
+
+
 def test_confirm_stage_returns_typed_recovery_without_runnable_card_when_no_common_data(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2088,6 +2185,61 @@ def test_confirm_stage_returns_typed_recovery_without_runnable_card_when_no_comm
     constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
     assert constraint["category"] == "no_common_data_window"
     assert constraint["raw_value"] == "no_common_data_window"
+
+
+def test_confirm_stage_revalidates_strategy_viability_after_window_adjustment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import confirm as confirm_module
+    from argus.domain import market_data
+
+    def fake_fetch(symbol: str, **_: object) -> pd.DataFrame:
+        days = (
+            [f"2024-01-{day:02d}" for day in range(22, 32)]
+            if symbol == "AAPL"
+            else [f"2024-01-{day:02d}" for day in range(1, 32)]
+        )
+        index = pd.to_datetime(days, utc=True)
+        close = pd.Series(range(100, 100 + len(index)), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(confirm_module, "_market_clock_for_strategy", lambda _: None)
+    state = RunState.new(
+        current_user_message="Test AAPL RSI during January 2024.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Test AAPL when RSI drops below 30.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-31"},
+        entry_logic="RSI drops below 30",
+        exit_logic="RSI rises above 55",
+        extra_parameters={
+            "indicator": "rsi",
+            "indicator_parameters": {"indicator": "rsi", "indicator_period": 14},
+        },
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "needs_clarification"
+    assert "confirmation_payload" not in result.patch
+    assert result.patch["requested_field"] == "date_range"
+    constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
+    assert constraint["category"] == "data_window_too_short_for_rule"
 
 
 def test_confirm_stage_preserves_explicit_benchmark_in_card_assumptions() -> None:

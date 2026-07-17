@@ -46,6 +46,7 @@ def confirm_stage(
     strategy = _strategy_with_explicit_date_intent(strategy)
     strategy = _strategy_without_incompatible_rule_fields(strategy)
     strategy = _strategy_with_latest_complete_data_adjustment(strategy)
+    strategy = _strategy_with_requested_date_range_for_preflight(strategy)
     logger.debug(
         "Confirm stage latest complete data adjustment checked",
         strategy_type=strategy.get("strategy_type"),
@@ -232,14 +233,22 @@ def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
     effective = prepared.effective_date_range.model_dump()
     coverage = prepared.coverage_payload()
     coverage["preflight_id"] = coverage.pop("dataset_id")
+    adjusted_launch_payload = {
+        **launch_payload,
+        "date_range": effective,
+        "requested_date_range": requested,
+        "coverage_preflight": coverage,
+    }
+    try:
+        adjusted_request = LaunchBacktestRequest.model_validate(adjusted_launch_payload)
+        validate_launch_supported(adjusted_request)
+    except ValidationError as exc:
+        return _launch_validation_failure(_validation_error_code(exc))
+    except ValueError as exc:
+        return _launch_validation_failure(str(exc))
     return {
         "outcome": "ready_to_confirm",
-        "launch_payload": {
-            **launch_payload,
-            "date_range": effective,
-            "requested_date_range": requested,
-            "coverage_preflight": coverage,
-        },
+        "launch_payload": adjusted_launch_payload,
     }
 
 
@@ -292,6 +301,41 @@ def _strategy_with_effective_date_range(
         "date_range": dict(effective),
         "extra_parameters": extra_parameters,
     }
+
+
+def _strategy_with_requested_date_range_for_preflight(
+    strategy: dict[str, Any],
+) -> dict[str, Any]:
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return strategy
+    requested = extra_parameters.get("requested_date_range")
+    effective = extra_parameters.get("effective_date_range")
+    current = strategy.get("date_range")
+    if not all(
+        _is_structured_date_range(value)
+        for value in (requested, effective, current)
+    ):
+        return strategy
+    artifact_patch = extra_parameters.get("artifact_patch")
+    changed_fields = (
+        artifact_patch.get("changed_fields")
+        if isinstance(artifact_patch, dict)
+        else []
+    )
+    if isinstance(changed_fields, list) and "date_range" in changed_fields:
+        return strategy
+    if current != effective:
+        return strategy
+    return {**strategy, "date_range": dict(requested)}
+
+
+def _is_structured_date_range(value: Any) -> bool:
+    return (
+        isinstance(value, dict)
+        and isinstance(value.get("start"), str)
+        and isinstance(value.get("end"), str)
+    )
 
 
 def _has_effective_window_adjustment(launch_payload: dict[str, Any]) -> bool:
