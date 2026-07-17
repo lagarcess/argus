@@ -1,7 +1,10 @@
 # Private Alpha Next Roadmap
 
-Status: P2.0 + P2.1 DONE (spine gate, capability registry, conversational edit
-contract). The Gate A/B loop landed through 2026-07-07: refine routing
+Status: **INTERIM PRIVATE-ALPHA PIVOT ACTIVE.** P2.0 + P2.1 remain done, but
+the remaining P2 compounding loop is paused while the bounded
+[Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) runs after the
+latest `main` promotion checkpoint. The Gate A/B loop landed through
+2026-07-07: refine routing
 (#141/PR #148), Idea Ledger portfolio browse (#147), latest-result fact answers
 (#140/PR #153), messy company-name asset preservation (#142/PR #146), and the
 B3 measurement trio (eval harness #143, PostHog product events #144, append-only
@@ -10,10 +13,30 @@ recovery copy now compose from typed facts/codes (#154, PRs #174-177). Execution
 realism (fees/slippage, #130/PR #178) is active by default with per-idea costs
 still opt-in and an explicit kill switch, and a new interpreter cost/perf lane
 added prompt caching + per-tier reasoning controls (#156/#157, PR #172).
-Remaining P2 is the compounding loop's back half: linked versions (A1b),
-comparison (A2), and bounded freshness on return (A4). A1b unlocks A2; A4 is the
-phase-last arc that completes the promise that Argus remembers, compares, and
-stays honest about staleness.
+After the interim exits, remaining P2 resumes with the compounding loop's back
+half: linked versions (A1b), comparison (A2), and bounded freshness on return
+(A4). A1b unlocks A2; A4 remains the phase-last arc that completes the promise
+that Argus remembers, compares, and stays honest about staleness.
+
+## Active Post-Promotion Pointer — 2026-07-16
+
+The Private Alpha Next runtime history was promoted to `main` by merge
+`5d1eec11`; the production-promotion documentation checkpoint completed on
+`main` at `217ead12`. The current integration planning baseline is
+`2642b514`, whose two post-promotion branch commits reconcile product truth and
+remove the legacy v0.1 archive; this pointer does not claim that baseline is the
+deployed SHA.
+
+The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is now the
+authoritative dispatch and sequencing source for open issues #228-#253, with
+#213 excluded by founder direction. It distinguishes hard blockers from
+shared-file serialization, provides the parallel waves, and links one
+agent-ready sub-spec per issue. A1b, A2, and A4 are paused—not cancelled—until
+the interim exit criteria are met and the founder resumes P2.
+
+Statements below that say “A1b is next” or describe `main` promotion as still
+pending are preserved as pre-promotion history. They do not override this
+active pointer.
 
 **Release-integrity checkpoint (#192) — COMPLETE.** [#193](https://github.com/lagarcess/argus/issues/193)
 approved the contract; [#194](https://github.com/lagarcess/argus/issues/194),
@@ -25,11 +48,11 @@ real-user canary; [#198](https://github.com/lagarcess/argus/issues/198) records
 the as-built documentation and manifest. The validated runtime candidate is
 `373d1a12dd5f538a81150b20903f4f43db27c639`; its authoritative live evidence is
 the [#197 closure record](https://github.com/lagarcess/argus/issues/197#issuecomment-4965556704).
-This validates only the branch-deployed private-alpha Render surface—there was
-no `main` merge, production deployment, automatic production deployment,
-tester invitation, or tester exposure. It does not alter the current direction:
-A1b remains the next READY-BUILD spine slice, and A2 implementation remains
-BLOCKED(A1b).
+At the time, this validated only the branch-deployed private-alpha Render
+surface—there was no `main` merge, production deployment, automatic production
+deployment, tester invitation, or tester exposure. The later `main` promotion
+is recorded by the active post-promotion pointer above. Tester exposure remains
+a separate founder decision.
 The 2026-07-08 burn-down pass landed the bulk of the interpret-surface cluster:
 PR #182 fixed #171 Sig1+Sig2, #160(B), and #150's behavior half (with the #179/
 #180 repro gates un-xfailed); PR #183 replaced the degraded-fallback English
@@ -58,7 +81,7 @@ deferred follow-up, not a gate.
 Execution runs off the P2 execution board below: point an agent at any READY
 lane. The interpret/edit spine has exactly one owner lane at a time (currently
 unowned; A1b is next in the spine chain).
-Date: 2026-07-09
+Historical board date: 2026-07-09
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
 
@@ -78,11 +101,12 @@ Every agent starts here:
 5. `docs/DATA_MODEL.md`
 6. `.agent/designs/argus/DESIGN.md`
 7. This roadmap
-8. `docs/specs/private-alpha-next-decision-memo.md`
-9. `docs/specs/private-alpha-ci-cd-sota.md`
-10. `docs/PRIVATE_LAUNCH_RUNBOOK.md`
-11. `docs/release-manifests/TEMPLATE.md`
-12. Supporting archived notes such as
+8. `docs/specs/private-alpha-interim-roadmap.md` when working on #228-#253
+9. `docs/specs/private-alpha-next-decision-memo.md`
+10. `docs/specs/private-alpha-ci-cd-sota.md`
+11. `docs/PRIVATE_LAUNCH_RUNBOOK.md`
+12. `docs/release-manifests/TEMPLATE.md`
+13. Supporting archived notes such as
     `docs/archive/private-alpha-performance-readiness-audit.md`, plus local
     memos such as `temp/bytebytego/bytebytego.md`
 
