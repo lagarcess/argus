@@ -25,6 +25,7 @@ export default function RecoveryPage() {
     if (exchangeStarted.current) return;
     exchangeStarted.current = true;
     const code = new URLSearchParams(window.location.search).get("code");
+    window.history.replaceState(null, "", "/auth/recovery");
     if (!code) {
       setState("invalid");
       return;
@@ -33,7 +34,6 @@ export default function RecoveryPage() {
       getAuthSecurityActions()
         .exchangeRecoveryCode(code)
         .then(() => {
-          window.history.replaceState(null, "", "/auth/recovery");
           setState("ready");
         })
         .catch(() => setState("invalid"));
@@ -59,11 +59,11 @@ export default function RecoveryPage() {
     } catch {
       setError(
         t(
-          "auth.recovery.reset_error",
-          "This recovery link is no longer valid. Request a new one.",
+          "auth.recovery.password_rejected",
+          "We couldn’t update the password. Check the requirements or request a new recovery link.",
         ),
       );
-      setState("invalid");
+      setState("ready");
     }
   };
 

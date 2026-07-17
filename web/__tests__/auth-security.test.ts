@@ -51,6 +51,14 @@ describe("account security actions", () => {
 
     expect(browserClient).toContain("detectSessionInUrl: false");
     expect(recoveryPage).toContain(".exchangeRecoveryCode(code)");
+    const codeRead = recoveryPage.indexOf('.get("code")');
+    const queryRemoved = recoveryPage.indexOf(
+      'window.history.replaceState(null, "", "/auth/recovery")',
+    );
+    const codeExchange = recoveryPage.indexOf(".exchangeRecoveryCode(code)");
+    expect(codeRead).toBeGreaterThan(-1);
+    expect(queryRemoved).toBeGreaterThan(codeRead);
+    expect(codeExchange).toBeGreaterThan(queryRemoved);
   });
 
   test("partial revoke-all outcomes stay honest and retryable in both password flows", () => {
@@ -69,6 +77,7 @@ describe("account security actions", () => {
     );
     expect(recoveryPage).toContain('result.revocation === "failed"');
     expect(recoveryPage).toContain('"auth.recovery.retry_revocation"');
+    expect(recoveryPage).toContain('"auth.recovery.password_rejected"');
   });
 
   test("ordinary logout clears Argus cookies even when local revocation fails", async () => {

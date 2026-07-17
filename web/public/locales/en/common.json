@@ -900,6 +900,7 @@
       "update_password": "Update password",
       "updating": "Updating...",
       "reset_error": "This recovery link is no longer valid. Request a new one.",
+      "password_rejected": "We couldn’t update the password. Check the requirements or request a new recovery link.",
       "password_updated": "Your password is updated.",
       "reset_complete": "Your password is updated. Sign in again on every browser.",
       "revocation_warning": "Argus could not confirm that every session was signed out. Retry before signing in again.",
