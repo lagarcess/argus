@@ -17,7 +17,7 @@ from argus.api.schemas import (
     UserResponse,
 )
 from argus.domain.store import utcnow
-from argus.domain.supabase_gateway import align_usage_period
+from argus.domain.usage_counter_reader import align_usage_period
 
 router = APIRouter(prefix="/api/v1", tags=["profile"])
 

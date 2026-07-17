@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -39,6 +39,7 @@ from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_ca
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
 from argus.domain.supabase_backtest_finalization import finalize_backtest
+from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
 from argus.observability.cost_ledger import normalize_cost_ledger_entry
 from supabase import Client, ClientOptions, create_client
 
@@ -60,19 +61,6 @@ _PROFILE_LOCALE_BY_LANGUAGE: dict[Language, Locale] = {
 
 def _now_iso() -> str:
     return utcnow().isoformat()
-
-
-def align_usage_period(dt: datetime, period: str) -> tuple[datetime, datetime]:
-    if period == "minute":
-        start = dt.replace(second=0, microsecond=0)
-        end = start + timedelta(minutes=1)
-    elif period == "hour":
-        start = dt.replace(minute=0, second=0, microsecond=0)
-        end = start + timedelta(hours=1)
-    else:  # day
-        start = dt.replace(hour=0, minute=0, second=0, microsecond=0)
-        end = start + timedelta(days=1)
-    return start, end
 
 
 def _row_one(result: Any) -> dict[str, Any] | None:
@@ -151,7 +139,7 @@ def _supabase_client_options() -> ClientOptions:
 
 
 @dataclass
-class SupabaseGateway:
+class SupabaseGateway(UsageCounterReader):
     client: Client
     auth_client: Client | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
@@ -1933,29 +1921,6 @@ class SupabaseGateway:
             resource=resource,
             limits=[(period, limit_count)],
         )
-
-    def list_current_usage_counters(
-        self,
-        *,
-        user_id: str,
-        resources: tuple[str, ...],
-        period: str,
-        at: datetime,
-    ) -> list[dict[str, Any]]:
-        if not resources:
-            return []
-        start, _ = align_usage_period(at, period)
-        result = (
-            self.client.table("usage_counters")
-            .select("resource,limit_count,used_count,period_end")
-            .eq("user_id", user_id)
-            .eq("period", period)
-            .eq("period_start", start.isoformat())
-            .in_("resource", list(resources))
-            .limit(len(resources))
-            .execute()
-        )
-        return list(result.data or [])
 
     def check_and_increment_usage_limits(
         self,
