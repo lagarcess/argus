@@ -159,7 +159,8 @@ def test_observed_openrouter_call_overage_fails_the_case() -> None:
     ]["results"][0]
 
     assert result["status"] == "failed"
-    assert result["checks"]["call_count"] is False
+    assert result["contract_checks"]["call_count"] is False
+    assert result["empirical_checks"]["call_count"] is None
 
 
 def test_source_date_metadata_does_not_claim_freshness() -> None:
@@ -176,8 +177,8 @@ def test_source_date_metadata_does_not_claim_freshness() -> None:
 
     result = evaluate_manifest(mutated_manifest)["fixture_contract"]["results"][0]
 
-    assert result["checks"]["freshness"] is None
-    assert result["checks"].get("source_date_metadata") is True
+    assert result["contract_checks"]["source_date_metadata"] is True
+    assert result["empirical_checks"]["freshness"] is None
     assert result["status"] == "unproven"
 
 
@@ -195,15 +196,33 @@ def test_outage_preservation_requires_explicit_prior_context() -> None:
 
     assert evidence.prior_result_context is None
     assert result["status"] == "failed"
-    assert result["checks"]["outage_behavior"] is False
+    assert result["contract_checks"]["outage_behavior"] is False
+    assert result["empirical_checks"]["outage_behavior"] is None
+
+
+def test_synthetic_provider_fixtures_never_pass_empirical_criteria() -> None:
+    report = evaluate_manifest(load_search_eval_manifest())
+    provider_results = [
+        result
+        for result in report["fixture_contract"]["results"]
+        if result["provider"] is not None
+    ]
+
+    assert all(result["status"] == "unproven" for result in provider_results)
+    assert all(
+        all(value is None for value in result["empirical_checks"].values())
+        for result in provider_results
+    )
 
 
 def test_report_defers_activation_without_real_quality_or_latency_evidence() -> None:
     report = evaluate_manifest(load_search_eval_manifest())
 
     assert report["fixture_contract"]["failed"] == 0
-    assert report["fixture_contract"]["passed"] == 3
-    assert report["fixture_contract"]["unproven"] == 9
+    assert report["fixture_contract"]["passed"] == 0
+    assert report["fixture_contract"]["unproven"] == 12
+    assert report["fixture_contract"]["contract_passed"] == 12
+    assert report["fixture_contract"]["contract_failed"] == 0
     expected_checks = {
         "call_count",
         "citation_integrity",
@@ -218,8 +237,11 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
         "timeout",
     }
     for result in report["fixture_contract"]["results"]:
-        assert set(result["checks"]) == expected_checks
-        assert False not in result["checks"].values()
+        assert set(result["contract_checks"]) == expected_checks
+        assert set(result["empirical_checks"]) == expected_checks
+        assert False not in result["contract_checks"].values()
+        assert all(value is None for value in result["empirical_checks"].values())
+        assert result["unproven_empirical_checks"]
         assert set(result["observed"]) == {
             "citation_count",
             "configured_timeout_ms",
@@ -233,9 +255,9 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
             "source_dates_present",
         }
         if result["observed"]["search_calls"] is None:
-            assert result["checks"]["call_count"] is None
+            assert result["contract_checks"]["call_count"] is None
         else:
-            assert result["checks"]["call_count"] is True
+            assert result["contract_checks"]["call_count"] is True
     assert report["live_calls_made"] == 0
     assert report["activation_ready"] is False
     assert report["recommendation"] == "defer"
@@ -282,14 +304,17 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
         if result["kind"] == "injection"
     ]
     assert all(
-        result["checks"]["injection_resistance"] is None for result in injection_results
+        result["contract_checks"]["injection_resistance"] is None
+        for result in injection_results
     )
     outage_results = [
         result
         for result in report["fixture_contract"]["results"]
         if result["kind"] == "outage"
     ]
-    assert all(result["checks"]["outage_behavior"] is True for result in outage_results)
+    assert all(
+        result["contract_checks"]["outage_behavior"] is True for result in outage_results
+    )
     assert set(report["criterion_comparison"]) == {
         "citation_integrity",
         "cost",

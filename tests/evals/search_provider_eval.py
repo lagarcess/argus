@@ -171,6 +171,8 @@ def evaluate_manifest(manifest: SearchEvalManifest) -> dict[str, Any]:
     failed = sum(result["status"] == "failed" for result in results)
     passed = sum(result["status"] == "passed" for result in results)
     unproven = sum(result["status"] == "unproven" for result in results)
+    contract_failed = sum(bool(result["failed_contract_checks"]) for result in results)
+    contract_passed = len(results) - contract_failed
     provider_comparison = {
         provider_id: {
             "api_status": profile.api_status,
@@ -230,10 +232,12 @@ def evaluate_manifest(manifest: SearchEvalManifest) -> dict[str, Any]:
         "rubric_threshold_status": manifest.rubric.threshold_status,
         "fixture_contract": {
             "interpretation": (
-                "passed checks validate synthetic parser and policy contracts; "
-                "unproven cases contain required null checks that need a "
-                "sanctioned live probe"
+                "contract checks validate only synthetic parser and policy "
+                "behavior; empirical checks remain null until a sanctioned "
+                "real-provider observation exists"
             ),
+            "contract_passed": contract_passed,
+            "contract_failed": contract_failed,
             "passed": passed,
             "failed": failed,
             "unproven": unproven,
@@ -433,9 +437,19 @@ def _score_case(
     evidence: NormalizedSearchEvidence,
     rubric: SearchEvalRubric,
 ) -> dict[str, Any]:
-    checks = _case_checks(case, evidence=evidence, rubric=rubric)
-    failures = sorted(key for key, passed in checks.items() if passed is False)
-    unproven = _unproven_checks(case, checks=checks)
+    contract_checks = _contract_checks(case, evidence=evidence, rubric=rubric)
+    empirical_checks = _empirical_checks(
+        evidence,
+        contract_checks=contract_checks,
+    )
+    contract_failures = sorted(
+        key for key, passed in contract_checks.items() if passed is False
+    )
+    empirical_failures = sorted(
+        key for key, passed in empirical_checks.items() if passed is False
+    )
+    unproven = _unproven_checks(case, checks=empirical_checks)
+    failures = bool(contract_failures or empirical_failures)
     status = "failed" if failures else "unproven" if unproven else "passed"
     return {
         "id": case.id,
@@ -443,9 +457,11 @@ def _score_case(
         "kind": case.kind,
         "evidence_kind": case.evidence_kind,
         "status": status,
-        "failed_checks": failures,
-        "unproven_checks": unproven,
-        "checks": checks,
+        "failed_contract_checks": contract_failures,
+        "failed_empirical_checks": empirical_failures,
+        "unproven_empirical_checks": unproven,
+        "contract_checks": contract_checks,
+        "empirical_checks": empirical_checks,
         "observed": {
             "search_calls": evidence.search_calls,
             "result_count": len(evidence.sources),
@@ -463,7 +479,17 @@ def _score_case(
     }
 
 
-def _case_checks(
+def _empirical_checks(
+    evidence: NormalizedSearchEvidence,
+    *,
+    contract_checks: dict[str, bool | None],
+) -> dict[str, bool | None]:
+    if evidence.evidence_kind != "real_provider_observation":
+        return {key: None for key in contract_checks}
+    return dict(contract_checks)
+
+
+def _contract_checks(
     case: SearchEvalCase,
     *,
     evidence: NormalizedSearchEvidence,
