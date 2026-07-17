@@ -505,11 +505,13 @@ Derived state (missing fields, pending needs, field provenance) is computed fres
 
 ### Durable Chat-Turn Lifecycle Ownership
 
-Supabase owns the current durable lifecycle of every accepted chat turn;
-LangGraph continues to own semantic runtime state through the checkpointer. The
-lifecycle record answers whether accepted work is still running or reached a
-durable terminal outcome. It does not store conversation meaning, route the
-graph, queue work, or replace messages.
+Supabase owns the current durable lifecycle of every accepted non-backtest chat
+turn; LangGraph continues to own semantic runtime state through the checkpointer.
+The lifecycle record answers whether accepted work is still running or reached
+a durable terminal outcome. Chat turns admitted under `chat.run_backtest` use
+the durable `backtest_jobs` lifecycle instead, so the two records do not compete
+to own one execution. The chat-turn lifecycle does not store conversation
+meaning, route the graph, queue work, or replace messages.
 
 The chat request boundary durably creates `accepted` with the user message. The
 runtime worker moves it to `running`. Terminal assistant persistence owns

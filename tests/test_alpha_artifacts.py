@@ -20,31 +20,39 @@ def test_reliability_contract_locks_admission_and_run_reconciliation() -> None:
         "contract-idempotency-admission",
         "contract-request-boundaries",
     )
+    admission_rules = " ".join(admission.split())
     for exact_rule in (
         "`(user_id, operation_scope, Idempotency-Key)`",
         "`chat.run_backtest`",
         "`backtests.run`",
+        "`launch_payload_hash` is the full persisted `payload_hash`",
+        "`sha256:` followed by 64 lowercase hexadecimal characters",
+        "List order is preserved",
+        "Per-user exhaustion is evaluated before global exhaustion",
+        "never creates a `queued` job",
         "`409 idempotency_conflict`",
         "`429` | `backtest_capacity_exceeded` | `15` seconds",
         "`503` | `backtest_capacity_exceeded` | `15` seconds",
         "`409 idempotency_in_progress`",
         "`Retry-After: 1`",
     ):
-        assert exact_rule in admission
+        assert exact_rule in admission_rules
 
     reconciliation = _markdown_section(
         contract,
         "contract-run-action-reconciliation",
         "contract-chat-turn-lifecycle",
     )
+    reconciliation_rules = " ".join(reconciliation.split())
     for exact_rule in (
         "`confirmation_id` is the Run action identity",
         "`Idempotency-Key` must equal `confirmation_id`",
         "`GET /api/v1/backtest-jobs/by-action/{confirmation_id}`",
+        "`confirmation_id` alone is not comparison input",
         "`queued` or `running`",
         "`failed`, `canceled`, or `expired`",
     ):
-        assert exact_rule in reconciliation
+        assert exact_rule in reconciliation_rules
 
 
 def test_reliability_contract_locks_chat_request_boundaries() -> None:
@@ -107,6 +115,7 @@ def test_reliability_contract_locks_durable_turn_lifecycle() -> None:
     lifecycle_start = contract.index('<a id="contract-chat-turn-lifecycle"></a>')
     lifecycle_end = contract.index("\n## Admin Bypass", lifecycle_start)
     lifecycle = contract[lifecycle_start:lifecycle_end]
+    lifecycle_rules = " ".join(lifecycle.split())
     for state in (
         "`accepted`",
         "`running`",
@@ -115,21 +124,30 @@ def test_reliability_contract_locks_durable_turn_lifecycle() -> None:
         "`abandoned`",
         "`reconciled`",
     ):
-        assert state in lifecycle
+        assert state in lifecycle_rules
     for exact_rule in (
         "`15 minutes`",
         "`20` stale rows",
-        "`completed | recoverable_failed | abandoned`",
+        "`completed | recoverable_failed`",
+        "`chat.run_backtest` is excluded",
+        "`stale_since = COALESCE(running_at, accepted_at)`",
+        "`stale_since ASC, turn_id ASC`",
         "`turn_abandoned`",
     ):
-        assert exact_rule in lifecycle
+        assert exact_rule in lifecycle_rules
+    assert "`completed | recoverable_failed | abandoned`" not in lifecycle_rules
 
     assert (
-        "Supabase owns the current durable lifecycle of every accepted chat turn"
-        in architecture
+        "Supabase owns the current durable lifecycle of every accepted non-backtest chat turn"
+        in " ".join(architecture.split())
     )
     assert "## 8.1 chat_turn_lifecycles" in data_model
     assert "`UNIQUE(user_id, operation_scope, idempotency_key)`" in data_model
+    for exact_rule in (
+        "`authenticated` receives `SELECT` only",
+        "`INSERT`, `UPDATE`, and `DELETE` are revoked from `anon` and `authenticated`",
+    ):
+        assert exact_rule in " ".join(data_model.split())
 
 
 def test_active_openapi_uses_alpha_contract_names() -> None:

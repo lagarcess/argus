@@ -169,13 +169,29 @@ Alpha supports server-side idempotency for expensive state-changing operations.
 - The unique reservation key is
   `(user_id, operation_scope, Idempotency-Key)`. The two approved operation
   scopes are `chat.run_backtest` and `backtests.run`.
-- `chat.run_backtest` identity is the canonical hash of `conversation_id`,
-  `confirmation_id`, and `launch_payload_hash`.
-- `backtests.run` identity is the canonical hash of nullable
-  `conversation_id`, nullable `strategy_id`, and the fully normalized inline or
-  saved-strategy backtest payload.
-- Canonical hashes use UTF-8 JSON with recursively sorted object keys, compact
-  separators, explicit nulls for the nullable identity fields, and SHA-256.
+- Before hashing, the launch request is validated and materialized as the full
+  `LaunchBacktestRequest` target shape: declared defaults and explicit nulls are
+  present; field aliases such as `_execution_realism` are used; dates are ISO
+  `YYYY-MM-DD` strings; symbols are trimmed, uppercased, and de-duplicated while
+  preserving first occurrence; and non-finite numbers are rejected. A saved
+  strategy request first loads the authenticated user's strategy snapshot and
+  applies request overrides, then materializes that same target shape. It is
+  not hashed as an unresolved `strategy_id` reference.
+- The canonical JSON serializer encodes UTF-8 with unescaped Unicode, sorts
+  object keys recursively, uses compact `,` and `:` separators, emits explicit
+  JSON nulls, serializes UUID values as lowercase hyphenated strings, and
+  rejects `NaN`/infinity. Validated target field types own JSON number
+  representation. List order is preserved; object-key sorting must not reorder
+  symbols, rules, or any other array.
+- `launch_payload_hash` is the full persisted `payload_hash`: `sha256:` followed by 64 lowercase hexadecimal characters computed from the canonical launch payload JSON. This is not the shortened display/confirmation fingerprint.
+- `chat.run_backtest` identity is the canonical hash of the exact object
+  `{"conversation_id": ..., "confirmation_id": ...,
+  "launch_payload_hash": ...}`.
+- `backtests.run` identity is the canonical hash of the exact object
+  `{"conversation_id": <uuid|null>, "strategy_id": <uuid|null>,
+  "normalized_payload": {...}}` using the materialized launch payload above.
+- Every canonical identity hash uses the same serializer and full-width
+  `sha256:` plus 64-lowercase-hex representation as `payload_hash`.
 - An exact replay is resolved before quota, capacity, or compute checks. It
   returns the same durable job/current status or the same completed Run and
   counts zero additional simulations.
@@ -194,9 +210,17 @@ database uniqueness boundary is
 #### Atomic admission and backpressure
 
 One database-owned operation performs exact-replay/collision resolution,
-per-user and global queued/running capacity checks, durable job creation, and
-the unique-simulation allowance charge. A count-then-insert sequence in the API
-is not conforming admission.
+unique-simulation allowance enforcement, per-user and global queued/running
+capacity checks, durable job creation, and the allowance charge. A
+count-then-insert sequence in the API is not conforming admission.
+
+The transaction uses this deterministic decision order: exact replay or
+identity collision first, unique-simulation allowance exhaustion second,
+per-user capacity third, and global capacity fourth; only then does it insert
+the job and charge the allowance together. Per-user exhaustion is evaluated
+before global exhaustion when both apply. Exact replay returns before every
+allowance or capacity check, while a collision returns before either boundary
+can disclose or mutate state.
 
 The private-alpha limits remain:
 
@@ -226,15 +250,21 @@ bypass:
 
 1. It must use the same database-owned reservation, capacity limits, identity
    collision rules, and unique-simulation charge as chat admission.
-2. It creates the durable job before synchronous execution begins. A direct job
-   may have `conversation_id = null`; ownership remains `user_id`.
-3. The direct process transitions that job through `running` and a durable
-   terminal state, then returns the canonical finalized Run on success.
-4. An exact replay of a succeeded direct job returns the same Run. An exact
-   replay while its job is queued or running returns
+2. Because this route cannot wait in the asynchronous queue, a new direct
+   admission must pass both the queued and running ceilings at both scopes,
+   then claim one running slot in the same transaction. This prevents the
+   compatibility path from jumping a saturated queue.
+3. The direct route atomically inserts a new job as `running`; a conforming
+   direct admission never creates a `queued` job. The durable row therefore
+   exists before synchronous execution begins. It may have
+   `conversation_id = null`; ownership remains `user_id`.
+4. The direct process transitions that job from `running` to a durable terminal
+   state, then returns the canonical finalized Run on success.
+5. An exact replay of a succeeded direct job returns the same Run. An exact
+   replay while its job is running returns
    `409 idempotency_in_progress`, includes `Retry-After: 1`, and identifies the
    owner-scoped job as `context.backtest_job_id` without starting work again.
-5. An exact replay of a durable failed, canceled, or expired direct job returns
+6. An exact replay of a durable failed, canceled, or expired direct job returns
    that same terminal RFC 9457 failure. A new execution requires a new key.
 
 <a id="contract-request-boundaries"></a>
@@ -343,7 +373,22 @@ therefore a new action identity.
 The owner-scoped lookup is
 `GET /api/v1/backtest-jobs/by-action/{confirmation_id}` and returns the existing
 `BacktestJobResponse`. It searches only `operation_scope = chat.run_backtest`
-for the authenticated user:
+for the authenticated user. `confirmation_id` alone is not comparison input;
+the server performs this exact lookup:
+
+1. Load the immutable confirmed launch artifact owned by the authenticated
+   user. If it is missing or belongs to another user, return `404 not_found`.
+2. Recompute the expected `chat.run_backtest` identity from that artifact's
+   `conversation_id`, `confirmation_id`, and persisted full-width
+   `launch_payload_hash`.
+3. Read the owner-scoped reservation at
+   `(user_id, chat.run_backtest, confirmation_id)`. If none exists, return
+   `404 not_found`.
+4. Compare its stored `identity_hash` to the recomputed value. A mismatch
+   returns `409 idempotency_conflict` without returning job details; a match
+   returns the existing job.
+
+Therefore:
 
 - `200` returns the current durable job and canonical Run when available.
 - `404 not_found` means no durable admission exists at lookup time. It is not a
@@ -364,9 +409,14 @@ response, or `404` lookup alone must never produce `could_not_run`.
 <a id="contract-chat-turn-lifecycle"></a>
 ### Durable ordinary chat-turn lifecycle
 
-Supabase owns one current lifecycle row for every accepted ordinary chat turn.
-This record is recovery truth, not a second queue, chat brain, transcript, or
-replacement for LangGraph checkpointer state.
+Supabase owns one current lifecycle row for every accepted non-backtest chat
+turn. Here, an ordinary turn is an accepted `POST /api/v1/chat/stream` request
+that is not admitted under `operation_scope = chat.run_backtest`; it includes
+message-only requests and all other supported structured chat actions.
+`chat.run_backtest` is excluded because `backtest_jobs` owns that action's
+durable execution and recovery state. This record is recovery truth, not a
+second queue, chat brain, transcript, or replacement for LangGraph checkpointer
+state.
 
 Acceptance occurs only after auth, request validation, quota, conversation
 ownership, and the durable user message plus lifecycle row succeed. The server
@@ -380,13 +430,14 @@ accepted user message maps to one lifecycle identity.
 | `completed` | Terminal assistant message/artifact is durable. Network delivery is irrelevant. | Terminal message persistence/finalizer |
 | `recoverable_failed` | Existing terminal runtime-failure owner persisted safe recovery and any retry metadata. | Terminal failure guard/message store |
 | `abandoned` | A stale accepted/running turn has no durable success or failure proof after the reconciliation window. | Server reconciler |
-| `reconciled` | The lifecycle write was missing, but durable evidence proves a terminal outcome. | Server reconciler |
+| `reconciled` | The normal terminal transition was missing, but durable evidence proves `completed` or `recoverable_failed`. | Server reconciler |
 
 Allowed transitions are `accepted -> running`, `accepted|running -> completed`,
 `accepted|running -> recoverable_failed`, `accepted|running -> abandoned`, and
 `accepted|running -> reconciled`. `reconciled` requires
 `reconciled_outcome` with the enum
-`completed | recoverable_failed | abandoned`. Completed, recoverable-failed,
+`completed | recoverable_failed`. No-proof recovery transitions directly to
+`abandoned`; `reconciled_outcome = abandoned` is invalid. Completed, recoverable-failed,
 abandoned, and reconciled rows are terminal. Repeating the same transition with
 the same message links/outcome is a no-op; a conflicting terminal transition is
 rejected. Late success must not supersede the existing terminal-runtime-failure
@@ -398,15 +449,27 @@ current row. SSE completion only reports already-durable state. Client
 disconnect/cancellation never marks a turn failed or abandoned by itself;
 process loss and incomplete terminal persistence belong to reconciliation.
 
-An `accepted` or `running` row becomes stale after `15 minutes`. Before the next
-chat POST for that conversation and before returning
-`GET /conversations/{id}/messages`, the server reconciles at most `20` stale rows
-for that conversation; private alpha adds no background sweeper. The reconciler
-checks, in order, a terminal assistant artifact/message, the existing terminal
-runtime-failure record, and LangGraph/checkpointer evidence. It writes
-`reconciled` with `reconciled_outcome` when proof exists; otherwise it writes
-`abandoned`, sets `failure_code` to `turn_abandoned`, and adds retryable typed
-recovery.
+An `accepted` or `running` row becomes stale after `15 minutes` according to the
+database clock and `stale_since = COALESCE(running_at, accepted_at)`. Before the
+next chat POST for that conversation and before returning
+`GET /conversations/{id}/messages`, the server selects at most `20` stale rows
+for that conversation in deterministic `stale_since ASC, turn_id ASC` order;
+private alpha adds no background sweeper.
+
+For each locked row, the reconciler rechecks staleness and accepts only evidence
+tied to that `turn_id`: a durable terminal-runtime-failure record maps to
+`recoverable_failed`, while a durable terminal assistant message/artifact maps
+to `completed`. The comparison timestamp is the failure record's durable
+`created_at`, or the terminal assistant message's `created_at` (the linked
+artifact's `created_at` only when no terminal message exists). If both exist,
+the earlier comparison timestamp wins; an equal timestamp breaks toward
+`recoverable_failed`, preserving the terminal-failure guard.
+LangGraph/checkpointer state may locate and corroborate one of those durable
+records, but checkpoint status alone is not proof of a user-visible terminal
+outcome. Proof writes `reconciled` and the corresponding
+`reconciled_outcome`. With no qualifying proof, the row transitions directly
+to `abandoned`, sets `failure_code` to `turn_abandoned`, and adds retryable
+typed recovery.
 
 Message reads project the current row into
 `metadata.agent_runtime_turn` with `turn_id`, `status`, `terminal`,
