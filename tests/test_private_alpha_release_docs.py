@@ -139,7 +139,7 @@ def test_eval_docs_document_mocked_first_test_tiers_and_agent_pointer() -> None:
     assert "## Test Tiers" in readme
     assert "**Mocked harness - every change (free, no API calls):**" in readme
     assert "poetry run pytest tests/evals/test_measurement_eval_harness.py" in readme
-    assert "Validates routing, state, and contract logic" in readme
+    assert "Validates routing, state, full conversation-step manifests" in readme
     assert "**Live eval - only the 3 sanctioned moments:**" in readme
     assert "Pre-merge on a PR that changes runtime behavior" in readme
     assert "Main promotion candidate" in readme
