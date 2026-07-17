@@ -139,6 +139,32 @@ def test_live_ticker_resolution_caches_exact_provider_lookup(
     assets.clear_asset_cache()
 
 
+def test_asset_universe_cache_refreshes_when_provider_mode_changes(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    assets.clear_asset_cache()
+    bitcoin = ResolvedAsset(
+        canonical_symbol="BTC",
+        asset_class="crypto",
+        name="Bitcoin / USD",
+        raw_symbol="BTC/USD",
+        provider="kraken",
+    )
+    monkeypatch.setattr(assets, "_load_assets_from_alpaca", lambda: {})
+    monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {"BTC": bitcoin})
+
+    assert assets.resolve_asset("BTC").provider == "kraken"
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+
+    spy = assets.resolve_asset("SPY")
+    assert spy.canonical_symbol == "SPY"
+    assert spy.provider == "synthetic_unit_fixture"
+
+    assets.clear_asset_cache()
+
+
 def test_live_asset_universe_loader_times_out_slow_provider_and_uses_fallback(
     monkeypatch,
 ) -> None:
