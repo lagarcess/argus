@@ -77,6 +77,43 @@ def test_reliability_contract_locks_admission_and_run_reconciliation() -> None:
     )
 
 
+def test_reliability_contract_locks_stale_direct_job_reconciliation() -> None:
+    contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+    data_model = (ROOT / "docs" / "DATA_MODEL.md").read_text(encoding="utf-8")
+
+    admission = _markdown_section(
+        contract,
+        "contract-idempotency-admission",
+        "contract-request-boundaries",
+    )
+    admission_rules = " ".join(admission.split())
+    for exact_rule in (
+        "`started_at + interval '15 minutes'`",
+        "`20` stale direct jobs",
+        "`started_at ASC, id ASC`",
+        "fully finalized Run/evidence tuple first",
+        "`direct_execution_abandoned`",
+        "`execution_interrupted`",
+        "same locked job row",
+        "returns `503` Problem Details",
+        "a new execution requires a new `Idempotency-Key`",
+        "release their running-capacity slot in the same transaction",
+        "must not create, attach, expose, or return a Run",
+    ):
+        assert exact_rule in admission_rules
+
+    data_model_rules = " ".join(data_model.split())
+    for exact_rule in (
+        "`status = failed`",
+        "`failure_code = direct_execution_abandoned`",
+        "`failure_detail = execution_interrupted`",
+        "`retryable = true`",
+        "fully finalized Run/evidence tuple",
+        "finalizer and stale reconciler serialize on the same locked job row",
+    ):
+        assert exact_rule in data_model_rules
+
+
 def test_reliability_contract_locks_chat_request_boundaries() -> None:
     contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
     bounds = _markdown_section(
@@ -195,6 +232,35 @@ def test_reliability_contract_locks_durable_turn_lifecycle() -> None:
         "`metadata.agent_runtime_turn.turn_id`",
     ):
         assert exact_rule in " ".join(data_model.split())
+
+
+def test_reliability_contract_locks_abandoned_turn_projection() -> None:
+    contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+    data_model = (ROOT / "docs" / "DATA_MODEL.md").read_text(encoding="utf-8")
+
+    lifecycle_start = contract.index('<a id="contract-chat-turn-lifecycle"></a>')
+    lifecycle_end = contract.index("\n## Admin Bypass", lifecycle_start)
+    lifecycle_rules = " ".join(contract[lifecycle_start:lifecycle_end].split())
+    for exact_rule in (
+        "the accepted user message whose `id = turn_id` owns the read projection",
+        '"status": "abandoned"',
+        '"failure_code": "turn_abandoned"',
+        '"code": "turn_abandoned"',
+        '"request_message_id": "<turn_id>"',
+        "exact persisted user-message content",
+        "immediately after its owning user message and before the next persisted message",
+        "No synthetic assistant message is inserted into the API response",
+        "no placeholder assistant message is persisted",
+    ):
+        assert exact_rule in lifecycle_rules
+
+    data_model_rules = " ".join(data_model.split())
+    for exact_rule in (
+        "`abandoned` requires `assistant_message_id = null`",
+        "read-time projection belongs to the accepted user message",
+        "does not create or persist an assistant message",
+    ):
+        assert exact_rule in data_model_rules
 
 
 def test_active_openapi_uses_alpha_contract_names() -> None:

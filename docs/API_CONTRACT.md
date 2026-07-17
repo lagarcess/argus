@@ -267,6 +267,54 @@ bypass:
 6. An exact replay of a durable failed, canceled, or expired direct job returns
    that same terminal RFC 9457 failure. A new execution requires a new key.
 
+#### Stale direct-job reconciliation
+
+A direct job is stale only while `status = running` and the database clock has
+reached `started_at + interval '15 minutes'`. The server-side database
+reconciliation operation owns recovery; the API process, frontend, and client
+elapsed time do not. Private alpha adds no background sweeper.
+
+Every `POST /api/v1/backtests/run` invokes that operation. It preserves the
+approved decision order by resolving identity first: a collision returns
+immediately; an exact replay locks and reconciles that owner-scoped row if it is
+stale before returning its current state. For a new identity with no existing
+reservation, the operation then locks and reconciles at most `20` stale direct
+jobs globally in deterministic `started_at ASC, id ASC` order before allowance
+and capacity checks. This bounded pass releases capacity stranded by another
+crashed API process without charging or admitting the new request.
+`GET /api/v1/backtest-jobs/{id}` performs the same reconciliation for the
+requested owner-scoped direct job before returning it. Each path rechecks
+`operation_scope = backtests.run`, `status = running`, and staleness after the
+row lock is acquired.
+
+For each stale row, the finalizer and reconciler serialize on the same locked
+job row and apply this evidence order:
+
+1. Resolve the stable job-derived Run identity and query the fully finalized
+   Run/evidence tuple first. `result_run_id` being null is not evidence that the
+   tuple is absent.
+2. If one complete owner-matching tuple exists, atomically link its Run, set
+   `status = succeeded`, set `finished_at`, clear failure fields, and set
+   `retryable = false`. Exact replay then returns the canonical
+   `200 {"run": ...}` response.
+3. If no fully finalized tuple exists, atomically set `status = failed`, use
+   failure code `direct_execution_abandoned`, failure detail
+   `execution_interrupted`, set `retryable = true`, and set `finished_at`.
+   Exact replay returns `503` Problem Details with
+   `code = direct_execution_abandoned`, `context.backtest_job_id`, and no
+   `Retry-After`; it never runs the old key again. Here `retryable = true` means
+   the user may intentionally start the request again after recovery, and a new
+   execution requires a new `Idempotency-Key`.
+
+Both terminal outcomes release their running-capacity slot in the same
+transaction before admission evaluates a new request. If the finalizer obtains
+the row lock first, it commits the complete tuple and `succeeded` transition
+before the reconciler can inspect it. If stale reconciliation obtains the lock
+first, its `failed` transition is terminal: a late process must not create,
+attach, expose, or return a Run, change the job to `succeeded`, or deliver its
+obsolete HTTP success. This lock order prevents an orphan public Run and keeps
+every replay deterministic.
+
 <a id="contract-request-boundaries"></a>
 ### Chat request-size and RFC 9457 ownership
 
@@ -493,6 +541,48 @@ Message reads project the current row into
 `reconciled_outcome`, `failure_code`, and `retryable` where applicable. The
 underlying immutable message is not rewritten. Frontends render that projection
 and do not infer lifecycle from prose or elapsed browser time.
+
+When a qualifying terminal assistant message exists, that linked assistant
+message owns the read projection. For `status = abandoned`, no such message
+exists and `assistant_message_id` remains null, so the accepted user message
+whose `id = turn_id` owns the read projection. The message API returns that
+persisted user message once and overlays this exact recovery metadata at read
+time without rewriting the stored row:
+
+```json
+{
+  "agent_runtime_turn": {
+    "turn_id": "<turn_id>",
+    "request_id": "<request_id>",
+    "status": "abandoned",
+    "terminal": true,
+    "reconciled_outcome": null,
+    "failure_code": "turn_abandoned",
+    "retryable": true
+  },
+  "recovery": {
+    "code": "turn_abandoned",
+    "retryable": true
+  },
+  "retry_last_turn": {
+    "request_message_id": "<turn_id>",
+    "message": "<exact persisted user-message content>"
+  }
+}
+```
+
+If the accepted user message has `metadata.chat_action`, the projection also
+copies that exact object to `retry_last_turn.action`; otherwise `action` is
+omitted. The stable retry action type is `retry_last_turn`, keyed by
+`request_message_id`, and clients must not derive it from display prose.
+
+The frontend renders one presentation-only recovery row immediately after its
+owning user message and before the next persisted message. It stays attached to
+that message across cursor pages; a page that does not contain the owning user
+message does not render an orphan recovery row. The recovery row is not an
+assistant bubble and has no message id. No synthetic assistant message is
+inserted into the API response, and no placeholder assistant message is
+persisted solely to represent abandonment.
 
 ## Admin Bypass
 
@@ -2253,8 +2343,9 @@ searches another user's jobs or direct/manual keys.
 
 ## `GET /backtest-jobs/{id}`
 
-Return one user-owned durable async backtest job and, once available, the
-canonical immutable run linked by `result_run_id`.
+Return one user-owned durable backtest job, whether workflow-backed or a direct
+compatibility job, and, once available, the canonical immutable run linked by
+`result_run_id`.
 
 This endpoint is the current private-alpha polling transport for durable job
 state and will remain the recovery fallback if Supabase Realtime is later added.

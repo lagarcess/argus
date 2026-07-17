@@ -292,6 +292,8 @@ remain immutable; message reads project the current lifecycle row into
 - `turn_id` makes lifecycle creation idempotent for the accepted user message.
 - `assistant_message_id` is unique when present so one terminal assistant
   message cannot settle two turns.
+- `abandoned` requires `assistant_message_id = null`; by definition no
+  qualifying terminal assistant message settled that turn.
 - Terminal statuses are `completed`, `recoverable_failed`, `abandoned`, and
   `reconciled`.
 
@@ -330,6 +332,12 @@ remain immutable; message reads project the current lifecycle row into
   state may corroborate that message but cannot prove a terminal user-visible
   outcome alone. With no qualifying message, the row becomes `abandoned` with
   `failure_code = turn_abandoned`.
+- For `abandoned`, the read-time projection belongs to the accepted user message
+  whose `id = turn_id`. It overlays terminal lifecycle, `turn_abandoned`
+  recovery, and typed `retry_last_turn` metadata without changing the immutable
+  message row. The frontend places the presentation-only recovery row directly
+  after that user message; the API does not create or persist an assistant
+  message for this projection.
 
 ---
 
@@ -820,6 +828,18 @@ Job lifecycle status is separate from engine/runtime failure semantics.
 Unknown failures default to `failed`, `failed_internal` semantics,
 `retryable=false`, and a safe generic user message until a new stable
 `failure_code` is intentionally added.
+
+A direct `backtests.run` row becomes stale when it remains `running` through
+`started_at + interval '15 minutes'`. Before new direct admission and before an
+owner-scoped direct-job read, the database-owned recovery path checks the stable
+job-derived identity for a fully finalized Run/evidence tuple. A complete tuple
+reconciles the job to `succeeded`. With no complete tuple, the same transaction
+sets `status = failed`, `failure_code = direct_execution_abandoned`,
+`failure_detail = execution_interrupted`, and `retryable = true`. Both terminal
+transitions release running capacity immediately. The finalizer and stale
+reconciler serialize on the same locked job row; after the stale failure wins,
+late finalization cannot create or attach a public Run or replace the terminal
+outcome.
 
 ### Notes
 - Jobs are idempotent at
