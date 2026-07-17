@@ -62,7 +62,7 @@ def _now_iso() -> str:
     return utcnow().isoformat()
 
 
-def _align_period(dt: datetime, period: str) -> tuple[datetime, datetime]:
+def align_usage_period(dt: datetime, period: str) -> tuple[datetime, datetime]:
     if period == "minute":
         start = dt.replace(second=0, microsecond=0)
         end = start + timedelta(minutes=1)
@@ -1934,6 +1934,29 @@ class SupabaseGateway:
             limits=[(period, limit_count)],
         )
 
+    def list_current_usage_counters(
+        self,
+        *,
+        user_id: str,
+        resources: tuple[str, ...],
+        period: str,
+        at: datetime,
+    ) -> list[dict[str, Any]]:
+        if not resources:
+            return []
+        start, _ = align_usage_period(at, period)
+        result = (
+            self.client.table("usage_counters")
+            .select("resource,limit_count,used_count,period_end")
+            .eq("user_id", user_id)
+            .eq("period", period)
+            .eq("period_start", start.isoformat())
+            .in_("resource", list(resources))
+            .limit(len(resources))
+            .execute()
+        )
+        return list(result.data or [])
+
     def check_and_increment_usage_limits(
         self,
         *,
@@ -1991,7 +2014,7 @@ class SupabaseGateway:
         limit_count: int,
         now: datetime,
     ) -> dict[str, Any]:
-        start, end = _align_period(now, period)
+        start, end = align_usage_period(now, period)
         start_iso = start.isoformat()
         end_iso = end.isoformat()
         for _ in range(5):
