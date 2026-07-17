@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -450,13 +451,19 @@ def _trajectory_compare(
 def _canonical_sse_failures(*, raw_sse: str | None, step_id: str) -> list[str]:
     if not raw_sse:
         return [f"sse: {step_id} expected canonical SSE frames, got no stream"]
-    lines = [line.strip() for line in raw_sse.splitlines() if line.strip()]
+    normalized = raw_sse.replace("\r\n", "\n").strip()
+    lines = [line.strip() for line in normalized.splitlines() if line.strip()]
     if any(line.startswith("event:") for line in lines):
         return [f"sse: {step_id} used legacy named event frames"]
-    if not lines or lines[-1] != "data: [DONE]":
+    frames = normalized.split("\n\n") if normalized else []
+    if not frames or frames[-1].strip() != "data: [DONE]":
         return [f"sse: {step_id} did not end with data: [DONE]"]
     decoded_events: list[dict[str, Any]] = []
-    for line in lines[:-1]:
+    for frame in frames[:-1]:
+        frame_lines = [line.strip() for line in frame.splitlines() if line.strip()]
+        if len(frame_lines) != 1:
+            return [f"sse: {step_id} contains unframed canonical events"]
+        line = frame_lines[0]
         if not line.startswith("data: "):
             return [f"sse: {step_id} contains a non-data frame"]
         try:
@@ -467,17 +474,32 @@ def _canonical_sse_failures(*, raw_sse: str | None, step_id: str) -> list[str]:
             return [f"sse: {step_id} contains an untyped data frame"]
         decoded_events.append(payload)
     event_types = [str(event["type"]) for event in decoded_events]
-    if not event_types or not any(
-        event_type in {"final", "error"} for event_type in event_types
-    ):
-        return [f"sse: {step_id} has no typed terminal frame"]
-    terminal_index = max(
+    terminal_indices = [
         index
         for index, event_type in enumerate(event_types)
         if event_type in {"final", "error"}
-    )
+    ]
+    if not terminal_indices:
+        return [f"sse: {step_id} has no typed terminal frame"]
+    if len(terminal_indices) != 1:
+        return [f"sse: {step_id} has multiple typed terminal frames"]
+    terminal_index = terminal_indices[0]
     if terminal_index != len(event_types) - 1:
         return [f"sse: {step_id} emitted data after the typed terminal frame"]
+    if not event_types or event_types[0] != "stage_start":
+        return [f"sse: {step_id} did not start with a stage_start frame"]
+
+    stage_started = False
+    stage_outcome_seen = False
+    for event_type in event_types[:terminal_index]:
+        if event_type == "stage_start":
+            stage_started = True
+        elif event_type == "stage_outcome":
+            if not stage_started:
+                return [f"sse: {step_id} emitted stage_outcome before stage_start"]
+            stage_outcome_seen = True
+    if event_types[terminal_index] == "final" and not stage_outcome_seen:
+        return [f"sse: {step_id} emitted final before a stage_outcome frame"]
     return []
 
 
@@ -492,24 +514,43 @@ def _route_budget_failures(
         failures.append(
             f"budget.calls: {step_id} expected at most {budget.max_calls}, got {len(receipts)}"
         )
-    total_cost = sum(_receipt_number(receipt, "usage_cost_usd") for receipt in receipts)
-    if budget.max_cost_usd is not None and total_cost > budget.max_cost_usd:
-        failures.append(
-            f"budget.cost: {step_id} expected at most {budget.max_cost_usd}, got {total_cost}"
-        )
-    total_latency = sum(_receipt_number(receipt, "latency_ms") for receipt in receipts)
-    if budget.max_latency_ms is not None and total_latency > budget.max_latency_ms:
-        failures.append(
-            f"budget.latency: {step_id} expected at most {budget.max_latency_ms}, got {total_latency}"
-        )
+    if budget.max_cost_usd is not None:
+        costs = [_receipt_number(receipt, "usage_cost_usd") for receipt in receipts]
+        if any(cost is None for cost in costs):
+            failures.append(
+                f"budget.cost: {step_id} contains missing or invalid usage_cost_usd"
+            )
+        else:
+            total_cost = sum(cost for cost in costs if cost is not None)
+            if total_cost > budget.max_cost_usd:
+                failures.append(
+                    f"budget.cost: {step_id} expected at most "
+                    f"{budget.max_cost_usd}, got {total_cost}"
+                )
+    if budget.max_latency_ms is not None:
+        latencies = [_receipt_number(receipt, "latency_ms") for receipt in receipts]
+        if any(latency is None for latency in latencies):
+            failures.append(
+                f"budget.latency: {step_id} contains missing or invalid latency_ms"
+            )
+        else:
+            total_latency = sum(latency for latency in latencies if latency is not None)
+            if total_latency > budget.max_latency_ms:
+                failures.append(
+                    f"budget.latency: {step_id} expected at most "
+                    f"{budget.max_latency_ms}, got {total_latency}"
+                )
     return failures
 
 
-def _receipt_number(receipt: dict[str, Any], key: str) -> float:
+def _receipt_number(receipt: dict[str, Any], key: str) -> float | None:
     value = receipt.get(key)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return 0.0
-    return float(value)
+        return None
+    number = float(value)
+    if not math.isfinite(number) or number < 0:
+        return None
+    return number
 
 
 def _trajectory_status(

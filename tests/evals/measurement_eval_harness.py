@@ -362,6 +362,17 @@ def scorecard_for_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def blocking_eval_results(
+    results: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return result states that must fail a sanctioned live evaluation gate."""
+    return [
+        result
+        for result in results
+        if result.get("status") in {"failed", "unexpected_pass"}
+    ]
+
+
 def write_scorecard(
     results: list[dict[str, Any]], *, output_dir: Path = SCORECARD_DIR
 ) -> Path:

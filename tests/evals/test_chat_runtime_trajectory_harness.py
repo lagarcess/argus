@@ -33,7 +33,7 @@ def _matching_observation(step: Any) -> StepObservation:
     raw_sse = None
     if expectation.canonical_sse:
         outcome = expectation.stage_outcome or "ready_to_respond"
-        raw_sse = "\n".join(
+        raw_sse = "\n\n".join(
             [
                 'data: {"type":"stage_start","stage":"interpret"}',
                 f'data: {{"type":"stage_outcome","outcome":"{outcome}"}}',
@@ -334,6 +334,93 @@ def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
     )
     assert sse_result.status == "failed"
     assert any(check.startswith("sse:") for check in sse_result.failed_checks)
+
+
+def test_canonical_sse_requires_framed_stage_sequence() -> None:
+    trajectory = next(
+        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
+    )
+    step = trajectory.steps[0]
+    matching = _matching_observation(step)
+
+    invalid_streams = (
+        # A terminal plus [DONE] is not the canonical stage lifecycle.
+        'data: {"type":"final","payload":{}}\n\ndata: [DONE]',
+        # SSE events must be separated by a blank line.
+        "\n".join(
+            (
+                'data: {"type":"stage_start","stage":"interpretation"}',
+                'data: {"type":"stage_outcome","stage":"interpretation"}',
+                'data: {"type":"final","payload":{}}',
+                "data: [DONE]",
+            )
+        ),
+        # Canonical stages cannot complete before they start.
+        "\n\n".join(
+            (
+                'data: {"type":"stage_outcome","stage":"interpretation"}',
+                'data: {"type":"stage_start","stage":"interpretation"}',
+                'data: {"type":"final","payload":{}}',
+                "data: [DONE]",
+            )
+        ),
+    )
+
+    for raw_sse in invalid_streams:
+        result = run_alpha_trajectory(
+            trajectory=trajectory,
+            adapters=_recording_adapters(
+                [],
+                overrides={step.step_id: replace(matching, raw_sse=raw_sse)},
+            ),
+        )
+
+        assert result.status == "failed"
+        assert any(check.startswith("sse:") for check in result.failed_checks)
+
+    valid_stream = "\n\n".join(
+        (
+            'data: {"type":"stage_start","stage":"interpretation"}',
+            'data: {"type":"stage_outcome","stage":"interpretation"}',
+            'data: {"type":"final","payload":{}}',
+            "data: [DONE]",
+        )
+    )
+    valid_result = run_alpha_trajectory(
+        trajectory=trajectory,
+        adapters=_recording_adapters(
+            [],
+            overrides={step.step_id: replace(matching, raw_sse=valid_stream)},
+        ),
+    )
+
+    assert not any(check.startswith("sse:") for check in valid_result.failed_checks)
+
+
+def test_route_budget_rejects_missing_or_invalid_measurements() -> None:
+    trajectory = next(
+        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
+    )
+    step = trajectory.steps[0]
+    malformed = replace(
+        _matching_observation(step),
+        route_receipts=(
+            {
+                "task": "interpretation",
+                "latency_ms": float("nan"),
+            },
+        ),
+    )
+
+    result = run_alpha_trajectory(
+        trajectory=trajectory,
+        adapters=_recording_adapters([], overrides={step.step_id: malformed}),
+    )
+
+    assert result.status == "failed"
+    prefixes = {check.split(":", 1)[0] for check in result.failed_checks}
+    assert "budget.cost" in prefixes
+    assert "budget.latency" in prefixes
 
 
 def test_trajectory_scorecard_is_privacy_safe_and_marks_unexpected_passes(

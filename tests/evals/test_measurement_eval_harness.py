@@ -364,3 +364,34 @@ def test_scorecard_reports_per_category_pass_rates() -> None:
         "pass_rate": 0.0,
     }
     assert scorecard["totals"]["unexpected_pass"] == 1
+
+
+def test_blocking_eval_results_include_failures_and_unexpected_passes() -> None:
+    results = [
+        {"trajectory_id": "passed", "status": "passed", "failed_checks": []},
+        {
+            "trajectory_id": "expected-failure",
+            "status": "expected_failed",
+            "failed_checks": ["artifact: missing"],
+        },
+        {
+            "trajectory_id": "failed",
+            "status": "failed",
+            "failed_checks": ["sse: invalid"],
+        },
+        {
+            "trajectory_id": "unexpected-pass",
+            "status": "unexpected_pass",
+            "expected_fail_issue": 251,
+            "failed_checks": [],
+        },
+    ]
+
+    blocking = harness.blocking_eval_results(results)
+
+    assert [result["trajectory_id"] for result in blocking] == [
+        "failed",
+        "unexpected-pass",
+    ]
+    assert blocking[1]["status"] == "unexpected_pass"
+    assert blocking[1]["expected_fail_issue"] == 251
