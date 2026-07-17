@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from argus.agent_runtime.capabilities.contract import (
     CapabilityContract,
@@ -18,6 +19,152 @@ from argus.observability.cost_ledger import (
 from argus.observability.product_events import capture_product_event
 
 MANIFEST_PATH = Path(__file__).with_name("chat_runtime_scenarios.json")
+ALPHA_TRAJECTORY_PATH = Path(__file__).with_name("alpha_session_trajectories.json")
+TRAJECTORY_SCORECARD_DIR = Path("temp/argus_eval_scorecards")
+TRAJECTORY_OPERATIONS = {
+    "stream",
+    "action",
+    "disconnect",
+    "reload",
+    "retry",
+    "persistence",
+}
+
+
+@dataclass(frozen=True)
+class RouteBudget:
+    max_calls: int | None = None
+    max_cost_usd: float | None = None
+    max_latency_ms: int | None = None
+
+    def as_dict(self) -> dict[str, int | float | None]:
+        return {
+            "max_calls": self.max_calls,
+            "max_cost_usd": self.max_cost_usd,
+            "max_latency_ms": self.max_latency_ms,
+        }
+
+
+@dataclass(frozen=True)
+class TrajectoryExpectation:
+    visible_response_category: str | None = None
+    stage_outcome: str | None = None
+    canonical_sse: bool | None = None
+    artifact_identity: str | None = None
+    action_identity: str | None = None
+    persistence_state: str | None = None
+    reload_state: str | None = None
+    recovery_code: str | None = None
+    route_budget: RouteBudget | None = None
+    typed_terminal: bool | None = None
+    checkpoints: dict[str, Any] = field(default_factory=dict)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "visible_response_category": self.visible_response_category,
+            "stage_outcome": self.stage_outcome,
+            "canonical_sse": self.canonical_sse,
+            "artifact_identity": self.artifact_identity,
+            "action_identity": self.action_identity,
+            "persistence_state": self.persistence_state,
+            "reload_state": self.reload_state,
+            "recovery_code": self.recovery_code,
+            "route_budget": (
+                None if self.route_budget is None else self.route_budget.as_dict()
+            ),
+            "typed_terminal": self.typed_terminal,
+            "checkpoints": dict(self.checkpoints),
+        }
+
+
+@dataclass(frozen=True)
+class TrajectoryExpectedFail:
+    issue: str
+    reason: str
+    allowed_failures: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class TrajectoryStep:
+    step_id: str
+    index: int
+    operation: str
+    request: dict[str, Any]
+    expectation: TrajectoryExpectation
+
+
+@dataclass(frozen=True)
+class AlphaTrajectory:
+    label: str
+    locale: str
+    purpose: str
+    tags: tuple[str, ...]
+    steps: tuple[TrajectoryStep, ...]
+    expected_fail: TrajectoryExpectedFail | None
+
+
+@dataclass(frozen=True)
+class StepObservation:
+    raw_sse: str | None = None
+    visible_response_category: str | None = None
+    stage_outcome: str | None = None
+    artifact_identity: str | None = None
+    action_identity: str | None = None
+    persistence_state: str | None = None
+    reload_state: str | None = None
+    recovery_code: str | None = None
+    route_receipts: tuple[dict[str, Any], ...] = ()
+    typed_terminal: bool | None = None
+    fingerprint: str | None = None
+    checkpoints: dict[str, Any] = field(default_factory=dict)
+    stale_action_executions: int = 0
+    accepted_orphan_turns_after_window: int = 0
+
+
+TrajectoryStepHandler = Callable[..., StepObservation]
+
+
+@dataclass(frozen=True)
+class TrajectoryAdapters:
+    stream: TrajectoryStepHandler
+    action: TrajectoryStepHandler
+    disconnect: TrajectoryStepHandler
+    reload: TrajectoryStepHandler
+    retry: TrajectoryStepHandler
+    persistence: TrajectoryStepHandler
+
+    def for_operation(self, operation: str) -> TrajectoryStepHandler:
+        if operation not in TRAJECTORY_OPERATIONS:
+            raise ValueError(f"unsupported trajectory operation: {operation}")
+        return getattr(self, operation)
+
+
+@dataclass(frozen=True)
+class TrajectoryStepResult:
+    step_id: str
+    operation: str
+    observation: StepObservation
+    failed_checks: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class TrajectoryResult:
+    label: str
+    locale: str
+    status: str
+    failed_checks: tuple[str, ...]
+    expected_fail: TrajectoryExpectedFail | None
+    step_results: tuple[TrajectoryStepResult, ...]
+
+
+@dataclass(frozen=True)
+class ChatRuntimeEvalStep:
+    step_id: str
+    actor: str
+    prompt_variants: tuple[str, ...]
+    action_type: str | None
+    semantic_target: str
+    hard_checks: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -26,6 +173,7 @@ class ChatRuntimeEvalCase:
     qa_id: str
     priority: str
     prompt: str
+    steps: tuple[ChatRuntimeEvalStep, ...]
     semantic_target: str
     hard_checks: tuple[str, ...]
     forbidden_outcomes: tuple[str, ...]
@@ -34,6 +182,409 @@ class ChatRuntimeEvalCase:
 
 def load_eval_manifest(path: Path = MANIFEST_PATH) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_alpha_trajectories(
+    path: Path = ALPHA_TRAJECTORY_PATH,
+) -> list[AlphaTrajectory]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    trajectories: list[AlphaTrajectory] = []
+    for raw_trajectory in payload["trajectories"]:
+        steps = tuple(
+            _trajectory_step_from_raw(
+                label=str(raw_trajectory["label"]),
+                index=index,
+                raw_step=raw_step,
+            )
+            for index, raw_step in enumerate(raw_trajectory["steps"], start=1)
+        )
+        expected_fail = raw_trajectory.get("expected_fail")
+        trajectories.append(
+            AlphaTrajectory(
+                label=str(raw_trajectory["label"]),
+                locale=str(raw_trajectory["locale"]),
+                purpose=str(raw_trajectory["purpose"]),
+                tags=tuple(str(tag) for tag in raw_trajectory.get("tags") or ()),
+                steps=steps,
+                expected_fail=(
+                    None
+                    if expected_fail is None
+                    else TrajectoryExpectedFail(
+                        issue=str(expected_fail["issue"]),
+                        reason=str(expected_fail["reason"]),
+                        allowed_failures=tuple(
+                            str(prefix)
+                            for prefix in expected_fail.get("allowed_failures") or ()
+                        ),
+                    )
+                ),
+            )
+        )
+    return trajectories
+
+
+def _trajectory_step_from_raw(
+    *,
+    label: str,
+    index: int,
+    raw_step: dict[str, Any],
+) -> TrajectoryStep:
+    operation = str(raw_step["operation"])
+    if operation not in TRAJECTORY_OPERATIONS:
+        raise ValueError(f"unsupported trajectory operation: {operation}")
+    raw_expectation = dict(raw_step.get("expect") or {})
+    raw_budget = raw_expectation.get("route_budget")
+    budget = (
+        None
+        if raw_budget is None
+        else RouteBudget(
+            max_calls=raw_budget.get("max_calls"),
+            max_cost_usd=raw_budget.get("max_cost_usd"),
+            max_latency_ms=raw_budget.get("max_latency_ms"),
+        )
+    )
+    return TrajectoryStep(
+        step_id=f"{label}:step:{index}",
+        index=index,
+        operation=operation,
+        request=dict(raw_step.get("request") or {}),
+        expectation=TrajectoryExpectation(
+            visible_response_category=raw_expectation.get("visible_response_category"),
+            stage_outcome=raw_expectation.get("stage_outcome"),
+            canonical_sse=raw_expectation.get("canonical_sse"),
+            artifact_identity=raw_expectation.get("artifact_identity"),
+            action_identity=raw_expectation.get("action_identity"),
+            persistence_state=raw_expectation.get("persistence_state"),
+            reload_state=raw_expectation.get("reload_state"),
+            recovery_code=raw_expectation.get("recovery_code"),
+            route_budget=budget,
+            typed_terminal=raw_expectation.get("typed_terminal"),
+            checkpoints=dict(raw_expectation.get("checkpoints") or {}),
+        ),
+    )
+
+
+def run_alpha_trajectory(
+    *,
+    trajectory: AlphaTrajectory,
+    adapters: TrajectoryAdapters,
+) -> TrajectoryResult:
+    step_results: list[TrajectoryStepResult] = []
+    failed_checks: list[str] = []
+    unterminated_fingerprints: set[str] = set()
+
+    for step in trajectory.steps:
+        handler = adapters.for_operation(step.operation)
+        observation = handler(
+            trajectory=trajectory,
+            step=step,
+            history=tuple(step_results),
+        )
+        if not isinstance(observation, StepObservation):
+            raise TypeError(
+                f"trajectory adapter for {step.operation} must return StepObservation"
+            )
+        step_failures = _trajectory_step_failures(
+            step=step,
+            observation=observation,
+            unterminated_fingerprints=unterminated_fingerprints,
+        )
+        step_results.append(
+            TrajectoryStepResult(
+                step_id=step.step_id,
+                operation=step.operation,
+                observation=observation,
+                failed_checks=tuple(step_failures),
+            )
+        )
+        failed_checks.extend(step_failures)
+
+    return TrajectoryResult(
+        label=trajectory.label,
+        locale=trajectory.locale,
+        status=_trajectory_status(
+            failed_checks,
+            expected_fail=trajectory.expected_fail,
+        ),
+        failed_checks=tuple(failed_checks),
+        expected_fail=trajectory.expected_fail,
+        step_results=tuple(step_results),
+    )
+
+
+def _trajectory_step_failures(
+    *,
+    step: TrajectoryStep,
+    observation: StepObservation,
+    unterminated_fingerprints: set[str],
+) -> list[str]:
+    expectation = step.expectation
+    failures: list[str] = []
+    _trajectory_compare(
+        "visible_response",
+        expectation.visible_response_category,
+        observation.visible_response_category,
+        step_id=step.step_id,
+        failures=failures,
+    )
+    _trajectory_compare(
+        "stage_outcome",
+        expectation.stage_outcome,
+        observation.stage_outcome,
+        step_id=step.step_id,
+        failures=failures,
+    )
+    _trajectory_compare(
+        "artifact_identity",
+        expectation.artifact_identity,
+        observation.artifact_identity,
+        step_id=step.step_id,
+        failures=failures,
+    )
+    _trajectory_compare(
+        "action_identity",
+        expectation.action_identity,
+        observation.action_identity,
+        step_id=step.step_id,
+        failures=failures,
+    )
+    _trajectory_compare(
+        "persistence",
+        expectation.persistence_state,
+        observation.persistence_state,
+        step_id=step.step_id,
+        failures=failures,
+    )
+    _trajectory_compare(
+        "reload",
+        expectation.reload_state,
+        observation.reload_state,
+        step_id=step.step_id,
+        failures=failures,
+    )
+    _trajectory_compare(
+        "recovery",
+        expectation.recovery_code,
+        observation.recovery_code,
+        step_id=step.step_id,
+        failures=failures,
+    )
+    _trajectory_compare(
+        "terminal",
+        expectation.typed_terminal,
+        observation.typed_terminal,
+        step_id=step.step_id,
+        failures=failures,
+    )
+
+    if expectation.canonical_sse is True:
+        failures.extend(
+            _canonical_sse_failures(
+                raw_sse=observation.raw_sse,
+                step_id=step.step_id,
+            )
+        )
+    if expectation.route_budget is not None:
+        failures.extend(
+            _route_budget_failures(
+                budget=expectation.route_budget,
+                receipts=observation.route_receipts,
+                step_id=step.step_id,
+            )
+        )
+    for checkpoint, expected_value in expectation.checkpoints.items():
+        actual_value = observation.checkpoints.get(checkpoint)
+        prefix = checkpoint.split(".", 1)[0]
+        _trajectory_compare(
+            prefix,
+            expected_value,
+            actual_value,
+            step_id=step.step_id,
+            detail=checkpoint,
+            failures=failures,
+        )
+
+    if observation.stale_action_executions != 0:
+        failures.append(
+            "stale_action: "
+            f"{step.step_id} executed {observation.stale_action_executions} stale action(s)"
+        )
+    if observation.accepted_orphan_turns_after_window != 0:
+        failures.append(
+            "orphan_turn: "
+            f"{step.step_id} retained {observation.accepted_orphan_turns_after_window} "
+            "accepted orphan turn(s) after the reconciliation window"
+        )
+
+    fingerprint = observation.fingerprint
+    if fingerprint:
+        if observation.typed_terminal is True:
+            unterminated_fingerprints.discard(fingerprint)
+        elif fingerprint in unterminated_fingerprints:
+            failures.append(
+                f"fingerprint: {step.step_id} repeated {fingerprint!r} without a typed terminal"
+            )
+        else:
+            unterminated_fingerprints.add(fingerprint)
+    return failures
+
+
+def _trajectory_compare(
+    prefix: str,
+    expected: Any,
+    actual: Any,
+    *,
+    step_id: str,
+    failures: list[str],
+    detail: str | None = None,
+) -> None:
+    if expected is None:
+        return
+    if actual != expected:
+        label = detail or prefix
+        failures.append(
+            f"{prefix}: {step_id} {label} expected {expected!r}, got {actual!r}"
+        )
+
+
+def _canonical_sse_failures(*, raw_sse: str | None, step_id: str) -> list[str]:
+    if not raw_sse:
+        return [f"sse: {step_id} expected canonical SSE frames, got no stream"]
+    lines = [line.strip() for line in raw_sse.splitlines() if line.strip()]
+    if any(line.startswith("event:") for line in lines):
+        return [f"sse: {step_id} used legacy named event frames"]
+    if not lines or lines[-1] != "data: [DONE]":
+        return [f"sse: {step_id} did not end with data: [DONE]"]
+    decoded_events: list[dict[str, Any]] = []
+    for line in lines[:-1]:
+        if not line.startswith("data: "):
+            return [f"sse: {step_id} contains a non-data frame"]
+        try:
+            payload = json.loads(line.removeprefix("data: "))
+        except json.JSONDecodeError:
+            return [f"sse: {step_id} contains invalid JSON data"]
+        if not isinstance(payload, dict) or not isinstance(payload.get("type"), str):
+            return [f"sse: {step_id} contains an untyped data frame"]
+        decoded_events.append(payload)
+    event_types = [str(event["type"]) for event in decoded_events]
+    if not event_types or not any(
+        event_type in {"final", "error"} for event_type in event_types
+    ):
+        return [f"sse: {step_id} has no typed terminal frame"]
+    terminal_index = max(
+        index
+        for index, event_type in enumerate(event_types)
+        if event_type in {"final", "error"}
+    )
+    if terminal_index != len(event_types) - 1:
+        return [f"sse: {step_id} emitted data after the typed terminal frame"]
+    return []
+
+
+def _route_budget_failures(
+    *,
+    budget: RouteBudget,
+    receipts: tuple[dict[str, Any], ...],
+    step_id: str,
+) -> list[str]:
+    failures: list[str] = []
+    if budget.max_calls is not None and len(receipts) > budget.max_calls:
+        failures.append(
+            f"budget.calls: {step_id} expected at most {budget.max_calls}, got {len(receipts)}"
+        )
+    total_cost = sum(_receipt_number(receipt, "usage_cost_usd") for receipt in receipts)
+    if budget.max_cost_usd is not None and total_cost > budget.max_cost_usd:
+        failures.append(
+            f"budget.cost: {step_id} expected at most {budget.max_cost_usd}, got {total_cost}"
+        )
+    total_latency = sum(_receipt_number(receipt, "latency_ms") for receipt in receipts)
+    if budget.max_latency_ms is not None and total_latency > budget.max_latency_ms:
+        failures.append(
+            f"budget.latency: {step_id} expected at most {budget.max_latency_ms}, got {total_latency}"
+        )
+    return failures
+
+
+def _receipt_number(receipt: dict[str, Any], key: str) -> float:
+    value = receipt.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0.0
+    return float(value)
+
+
+def _trajectory_status(
+    failed_checks: list[str],
+    *,
+    expected_fail: TrajectoryExpectedFail | None,
+) -> str:
+    if not failed_checks:
+        return "unexpected_pass" if expected_fail is not None else "passed"
+    if expected_fail is None or not expected_fail.allowed_failures:
+        return "failed"
+    if all(
+        any(check.startswith(prefix) for prefix in expected_fail.allowed_failures)
+        for check in failed_checks
+    ):
+        return "expected_failed"
+    return "failed"
+
+
+def trajectory_scorecard_for_results(
+    results: list[TrajectoryResult],
+) -> dict[str, Any]:
+    statuses = ("passed", "failed", "expected_failed", "unexpected_pass")
+    totals = {status: 0 for status in statuses}
+    safe_results: list[dict[str, Any]] = []
+    for result in results:
+        status = result.status if result.status in totals else "failed"
+        totals[status] += 1
+        expected_fail = result.expected_fail
+        safe_results.append(
+            {
+                "label": result.label,
+                "locale": result.locale,
+                "status": status,
+                "expected_fail_issue": (
+                    None if expected_fail is None else expected_fail.issue
+                ),
+                "allowed_failure_prefixes": (
+                    [] if expected_fail is None else list(expected_fail.allowed_failures)
+                ),
+                "failure_prefixes": _failure_prefixes(result.failed_checks),
+                "steps": [
+                    {
+                        "step_id": step_result.step_id,
+                        "operation": step_result.operation,
+                        "failure_prefixes": _failure_prefixes(step_result.failed_checks),
+                    }
+                    for step_result in result.step_results
+                ],
+            }
+        )
+    return {
+        "schema_version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "source_fixture": ALPHA_TRAJECTORY_PATH.name,
+        "totals": totals,
+        "results": safe_results,
+    }
+
+
+def write_trajectory_scorecard(
+    results: list[TrajectoryResult],
+    *,
+    output_dir: Path = TRAJECTORY_SCORECARD_DIR,
+) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    scorecard = trajectory_scorecard_for_results(results)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    path = output_dir / f"alpha-trajectory-scorecard-{stamp}.json"
+    path.write_text(json.dumps(scorecard, indent=2, sort_keys=True), encoding="utf-8")
+    return path
+
+
+def _failure_prefixes(failed_checks: tuple[str, ...]) -> list[str]:
+    return sorted({f"{check.partition(':')[0]}:" for check in failed_checks})
 
 
 def capability_context_payload(
@@ -91,16 +642,34 @@ def iter_eval_cases(
     for scenario in source["scenarios"]:
         if priority is not None and scenario["priority"] != priority:
             continue
-        first_step = scenario["conversation_steps"][0]
         for prompt in scenario["natural_prompt_variants"]:
+            steps = tuple(
+                ChatRuntimeEvalStep(
+                    step_id=f"{scenario['id']}:step:{index}",
+                    actor=str(raw_step["actor"]),
+                    prompt_variants=(
+                        (prompt,)
+                        if index == 1
+                        else tuple(str(item) for item in raw_step.get("variants") or ())
+                    ),
+                    action_type=raw_step.get("action_type"),
+                    semantic_target=str(raw_step["semantic_target"]),
+                    hard_checks=tuple(
+                        str(item) for item in raw_step.get("hard_checks") or ()
+                    ),
+                )
+                for index, raw_step in enumerate(scenario["conversation_steps"], start=1)
+            )
+            first_step = steps[0]
             cases.append(
                 ChatRuntimeEvalCase(
                     scenario_id=scenario["id"],
                     qa_id=scenario["qa_id"],
                     priority=scenario["priority"],
                     prompt=prompt,
-                    semantic_target=first_step["semantic_target"],
-                    hard_checks=tuple(first_step["hard_checks"]),
+                    steps=steps,
+                    semantic_target=first_step.semantic_target,
+                    hard_checks=first_step.hard_checks,
                     forbidden_outcomes=tuple(scenario["forbidden_outcomes"]),
                     judge_rubric=scenario["judge_rubric"],
                 )

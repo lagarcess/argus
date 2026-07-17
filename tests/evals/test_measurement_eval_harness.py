@@ -120,7 +120,7 @@ def test_expected_fail_only_masks_allowed_failure_prefixes() -> None:
         )
         == "failed"
     )
-    assert harness._result_status([], expected_fail=expected_fail) == "passed"
+    assert harness._result_status([], expected_fail=expected_fail) == "unexpected_pass"
 
 
 def test_date_range_expectations_compare_iso_interval_and_dict_equivalently() -> None:
@@ -338,6 +338,11 @@ def test_scorecard_reports_per_category_pass_rates() -> None:
             "category": "messy_spanish",
             "status": "expected_failed",
         },
+        {
+            "id": "case-d",
+            "category": "messy_spanish",
+            "status": "unexpected_pass",
+        },
     ]
 
     scorecard = scorecard_for_results(results)
@@ -346,6 +351,7 @@ def test_scorecard_reports_per_category_pass_rates() -> None:
         "passed": 1,
         "failed": 1,
         "expected_failed": 0,
+        "unexpected_pass": 0,
         "skipped": 0,
         "pass_rate": 0.5,
     }
@@ -353,6 +359,8 @@ def test_scorecard_reports_per_category_pass_rates() -> None:
         "passed": 0,
         "failed": 0,
         "expected_failed": 1,
+        "unexpected_pass": 1,
         "skipped": 0,
         "pass_rate": 0.0,
     }
+    assert scorecard["totals"]["unexpected_pass"] == 1

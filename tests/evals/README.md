@@ -7,9 +7,9 @@ assistant phrasing.
 ## Test Tiers
 
 - **Mocked harness - every change (free, no API calls):**
-  `poetry run pytest tests/evals/test_measurement_eval_harness.py`
-  Validates routing, state, and contract logic. This is the everyday inner-loop
-  check.
+  `poetry run pytest tests/evals/test_measurement_eval_harness.py tests/evals/test_chat_runtime_eval_manifest.py tests/evals/test_chat_runtime_trajectory_harness.py`
+  Validates routing, state, full conversation-step manifests, and the seven
+  session trajectories. This is the everyday inner-loop check.
 - **Live eval - only the 3 sanctioned moments:**
   1. Pre-merge on a PR that changes runtime behavior.
   2. Main promotion candidate.
@@ -22,7 +22,11 @@ assistant phrasing.
 Run the mocked harness checks with:
 
 ```bash
-poetry run pytest tests/evals/test_measurement_eval_harness.py -q
+poetry run pytest \
+  tests/evals/test_measurement_eval_harness.py \
+  tests/evals/test_chat_runtime_eval_manifest.py \
+  tests/evals/test_chat_runtime_trajectory_harness.py \
+  -q
 ```
 
 This run is free. It does not call the LLM, does not spend provider tokens, and
@@ -61,9 +65,13 @@ Live runs write JSON scorecards to:
 temp/argus_eval_scorecards/
 ```
 
-`temp/` is gitignored, so scorecards are local run artifacts. Each scorecard
-includes per-category totals and pass rates. Expected-fail cases never count as
-passes; they are reported separately so known broken behavior stays visible.
+`temp/` is gitignored, so scorecards are local run artifacts. Measurement
+scorecards include per-category totals and pass rates. Seven-session scorecards
+include stable trajectory labels, operation names, and failure prefixes only;
+they omit prompts, SSE payloads, route receipts, and runtime identifiers.
+
+Expected-fail cases never count as passes. They are reported separately so
+known broken behavior stays visible.
 
 ## Expected-Fail Cases
 
@@ -73,6 +81,24 @@ prefixes; any unrelated failure still fails the eval.
 
 The lane that fixes the tagged issue must flip the case to pass as part of that
 lane's acceptance. Expected-fail is a truthful baseline, not a permanent waiver.
+If a tagged case has no failures, its status is `unexpected_pass`, which also
+does not count as a pass. Remove the tag only after verifying the owning issue's
+full acceptance criteria.
+
+## Seven Alpha Session Trajectories
+
+`alpha_session_trajectories.json` is an append-only, sanitized fixture set with
+stable labels `alpha_session_01` through `alpha_session_07`. The typed adapter
+runner dispatches every user or action step through stream, action, disconnect,
+reload, retry, or persistence adapters. It checks canonical SSE, visible
+response category, stage outcome, artifact and action identity, persistence and
+reload state, typed recovery, route budgets, terminal fingerprints, stale
+actions, and orphan-turn reconciliation.
+
+Each trajectory currently carries one exact owning issue and a narrow set of
+allowed failure prefixes. Keep those tags until the corresponding runtime lane
+lands and the full trajectory passes. The mocked mechanics do not replace the
+sanctioned live gate, deployed exact-SHA browser proof, or founder approval.
 
 ## Categories
 

@@ -186,6 +186,27 @@ def test_eval_harness_builds_judge_payload_from_runtime_capabilities() -> None:
     assert payload["runtime_output"]["route_receipts"][0]["task"] == "interpretation"
 
 
+def test_eval_cases_preserve_every_conversation_step() -> None:
+    case = next(
+        item
+        for item in iter_eval_cases(priority="must_pass")
+        if item.scenario_id == "qa_02_draft_continuity"
+        and item.prompt == "Test buying and holding Apple over the past year."
+    )
+
+    assert [step.semantic_target for step in case.steps] == [
+        "create_buy_hold_aapl_last_year",
+        "patch_active_artifact_asset_only",
+        "patch_active_artifact_period_only",
+        "answer_from_visible_confirmation_artifact",
+    ]
+    assert case.steps[1].prompt_variants == (
+        "Actually make it Nvidia.",
+        "switch the asset to NVDA",
+        "same thing but Nvidia",
+    )
+
+
 def test_eval_case_iteration_emits_eval_readiness_product_event(monkeypatch) -> None:
     observed: list[dict[str, object]] = []
 

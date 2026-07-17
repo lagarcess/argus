@@ -1,0 +1,463 @@
+{
+  "version": 1,
+  "privacy": "sanitized_non_identifying",
+  "source": "private_alpha_recorded_qa_projection",
+  "trajectories": [
+    {
+      "label": "alpha_session_01",
+      "locale": "en",
+      "purpose": "Keep one canonical idea alive through an edit and reject an older card action.",
+      "tags": ["canonical_edit", "stale_action"],
+      "expected_fail": {
+        "issue": "#238",
+        "reason": "Atomic canonical edit ownership must land before this trajectory can close green.",
+        "allowed_failures": ["artifact_identity:", "action_identity:", "stale_action:"]
+      },
+      "steps": [
+        {
+          "operation": "stream",
+          "request": {"message": "Backtest holding AAPL for the past year."},
+          "expect": {
+            "visible_response_category": "confirmation",
+            "stage_outcome": "ready_for_confirmation",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_01:confirmation:1",
+            "action_identity": "alpha_session_01:confirmation:1:run_backtest",
+            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
+            "typed_terminal": true
+          }
+        },
+        {
+          "operation": "stream",
+          "request": {"message": "Use NVDA instead."},
+          "expect": {
+            "visible_response_category": "confirmation",
+            "stage_outcome": "ready_for_confirmation",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_01:confirmation:2",
+            "action_identity": "alpha_session_01:confirmation:2:run_backtest",
+            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
+            "typed_terminal": true,
+            "checkpoints": {"stale_action.active_artifact": "alpha_session_01:confirmation:2"}
+          }
+        },
+        {
+          "operation": "action",
+          "request": {"type": "run_backtest", "artifact": "alpha_session_01:confirmation:1"},
+          "expect": {
+            "visible_response_category": "typed_recovery",
+            "stage_outcome": "ready_to_respond",
+            "canonical_sse": true,
+            "recovery_code": "confirmation_action_stale_card",
+            "typed_terminal": true,
+            "checkpoints": {"stale_action.execution_count": 0}
+          }
+        },
+        {
+          "operation": "persistence",
+          "request": {"scope": "active_confirmation"},
+          "expect": {
+            "persistence_state": "alpha_session_01:confirmation:2",
+            "checkpoints": {"stale_action.persisted_execution_count": 0}
+          }
+        },
+        {
+          "operation": "reload",
+          "request": {"surface": "conversation"},
+          "expect": {
+            "reload_state": "alpha_session_01:confirmation:2",
+            "artifact_identity": "alpha_session_01:confirmation:2",
+            "action_identity": "alpha_session_01:confirmation:2:run_backtest"
+          }
+        }
+      ]
+    },
+    {
+      "label": "alpha_session_02",
+      "locale": "es-419",
+      "purpose": "End an ambiguous Spanish turn within one bounded route and preserve typed recovery.",
+      "tags": ["spanish", "turn_budget", "fingerprint"],
+      "expected_fail": {
+        "issue": "#239",
+        "reason": "The turn-wide deadline and semantic-loop terminal contract is owned by issue 239.",
+        "allowed_failures": ["budget.calls:", "budget.cost:", "budget.latency:", "fingerprint:", "terminal:"]
+      },
+      "steps": [
+        {
+          "operation": "stream",
+          "request": {"message": "Quiero probar una idea de impulso con BTC, pero no se que regla usar."},
+          "expect": {
+            "visible_response_category": "clarification",
+            "stage_outcome": "needs_clarification",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_02:draft:1",
+            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
+            "typed_terminal": true,
+            "checkpoints": {"terminal.response_language": "es-419"}
+          }
+        },
+        {
+          "operation": "retry",
+          "request": {"target": "alpha_session_02:draft:1"},
+          "expect": {
+            "visible_response_category": "typed_recovery",
+            "stage_outcome": "ready_to_respond",
+            "canonical_sse": true,
+            "recovery_code": "runtime_budget_exhausted",
+            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
+            "typed_terminal": true,
+            "checkpoints": {"terminal.retry_target": "alpha_session_02:draft:1"}
+          }
+        },
+        {
+          "operation": "persistence",
+          "request": {"scope": "latest_turn"},
+          "expect": {
+            "persistence_state": "typed_terminal",
+            "checkpoints": {"terminal.repeated_fingerprint_count": 0}
+          }
+        },
+        {
+          "operation": "reload",
+          "request": {"surface": "conversation"},
+          "expect": {
+            "reload_state": "typed_terminal",
+            "recovery_code": "runtime_budget_exhausted"
+          }
+        }
+      ]
+    },
+    {
+      "label": "alpha_session_03",
+      "locale": "en",
+      "purpose": "Route an unavailable discovery request to honest typed recovery without inventing Search.",
+      "tags": ["capability", "discovery", "search_paused"],
+      "expected_fail": {
+        "issue": "#241",
+        "reason": "Typed capability and discovery ownership must land before this route is authoritative.",
+        "allowed_failures": ["recovery:", "capability_route:"]
+      },
+      "steps": [
+        {
+          "operation": "stream",
+          "request": {"message": "Find a supported retail stock I can test with an RSI rule."},
+          "expect": {
+            "visible_response_category": "typed_recovery",
+            "stage_outcome": "needs_clarification",
+            "canonical_sse": true,
+            "recovery_code": "asset_discovery_unavailable",
+            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
+            "typed_terminal": true,
+            "checkpoints": {"capability_route": "discovery_unsupported"}
+          }
+        },
+        {
+          "operation": "action",
+          "request": {"type": "select_response_option", "option": "enter_known_symbol"},
+          "expect": {
+            "visible_response_category": "clarification",
+            "stage_outcome": "needs_clarification",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_03:draft:1",
+            "typed_terminal": true,
+            "checkpoints": {"capability_route": "request_asset_symbol"}
+          }
+        },
+        {
+          "operation": "persistence",
+          "request": {"scope": "clarification"},
+          "expect": {
+            "persistence_state": "alpha_session_03:draft:1",
+            "recovery_code": "asset_discovery_unavailable"
+          }
+        },
+        {
+          "operation": "reload",
+          "request": {"surface": "conversation"},
+          "expect": {
+            "reload_state": "alpha_session_03:draft:1",
+            "recovery_code": "asset_discovery_unavailable"
+          }
+        }
+      ]
+    },
+    {
+      "label": "alpha_session_04",
+      "locale": "en",
+      "purpose": "Retain requested retail history while approving one provider-supported effective window.",
+      "tags": ["retail", "requested_window", "effective_window"],
+      "expected_fail": {
+        "issue": "#251",
+        "reason": "Requested-versus-effective window truth is owned by issue 251.",
+        "allowed_failures": ["effective_window:", "artifact_identity:", "persistence:", "reload:"]
+      },
+      "steps": [
+        {
+          "operation": "stream",
+          "request": {"message": "Test investing 500 dollars monthly in CART from 2020 through the latest available date."},
+          "expect": {
+            "visible_response_category": "confirmation_with_correction",
+            "stage_outcome": "ready_for_confirmation",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_04:confirmation:1",
+            "action_identity": "alpha_session_04:confirmation:1:run_backtest",
+            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
+            "typed_terminal": true,
+            "checkpoints": {
+              "effective_window.requested_start": "2020-01-01",
+              "effective_window.source": "provider_supported_common_window",
+              "effective_window.visible_before_approval": true
+            }
+          }
+        },
+        {
+          "operation": "action",
+          "request": {"type": "run_backtest", "artifact": "alpha_session_04:confirmation:1"},
+          "expect": {
+            "visible_response_category": "job_accepted",
+            "stage_outcome": "ready_to_respond",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_04:job:1",
+            "action_identity": "alpha_session_04:confirmation:1:run_backtest",
+            "typed_terminal": true,
+            "checkpoints": {"effective_window.execution_matches_approval": true}
+          }
+        },
+        {
+          "operation": "persistence",
+          "request": {"scope": "requested_and_effective_window"},
+          "expect": {
+            "persistence_state": "requested_and_effective_window",
+            "checkpoints": {"effective_window.durable": true}
+          }
+        },
+        {
+          "operation": "reload",
+          "request": {"surface": "conversation"},
+          "expect": {
+            "reload_state": "alpha_session_04:job:1",
+            "artifact_identity": "alpha_session_04:job:1",
+            "checkpoints": {"effective_window.reload_matches_approval": true}
+          }
+        }
+      ]
+    },
+    {
+      "label": "alpha_session_05",
+      "locale": "en",
+      "purpose": "Reconcile an accepted Run after transport loss without inventing failure or duplicating execution.",
+      "tags": ["run_action", "disconnect", "reload_reconciliation"],
+      "expected_fail": {
+        "issue": "#242",
+        "reason": "Ambiguous Run reconciliation is owned by issue 242 after admission and polling land.",
+        "allowed_failures": ["reload:", "admission:"]
+      },
+      "steps": [
+        {
+          "operation": "stream",
+          "request": {"message": "Backtest holding TSLA for the past year."},
+          "expect": {
+            "visible_response_category": "confirmation",
+            "stage_outcome": "ready_for_confirmation",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_05:confirmation:1",
+            "action_identity": "alpha_session_05:confirmation:1:run_backtest",
+            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
+            "typed_terminal": true
+          }
+        },
+        {
+          "operation": "action",
+          "request": {"type": "run_backtest", "artifact": "alpha_session_05:confirmation:1"},
+          "expect": {
+            "visible_response_category": "job_accepted",
+            "stage_outcome": "ready_to_respond",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_05:job:1",
+            "typed_terminal": true,
+            "checkpoints": {"admission.identity": "alpha_session_05:job:1"}
+          }
+        },
+        {
+          "operation": "disconnect",
+          "request": {"after": "accepted_before_client_observed_final"},
+          "expect": {
+            "typed_terminal": false,
+            "checkpoints": {"reload.reconciliation.invented_failure_count": 0}
+          }
+        },
+        {
+          "operation": "reload",
+          "request": {"surface": "conversation_and_job"},
+          "expect": {
+            "reload_state": "alpha_session_05:job:1",
+            "artifact_identity": "alpha_session_05:job:1",
+            "checkpoints": {
+              "reload.reconciliation": "durable_lookup",
+              "admission.identity": "alpha_session_05:job:1"
+            }
+          }
+        },
+        {
+          "operation": "retry",
+          "request": {"target": "alpha_session_05:job:1"},
+          "expect": {
+            "visible_response_category": "durable_job_status",
+            "stage_outcome": "ready_to_respond",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_05:job:1",
+            "typed_terminal": true,
+            "checkpoints": {"admission.execution_count": 1}
+          }
+        },
+        {
+          "operation": "persistence",
+          "request": {"scope": "job_and_action_identity"},
+          "expect": {
+            "persistence_state": "alpha_session_05:job:1",
+            "checkpoints": {"admission.execution_count": 1}
+          }
+        }
+      ]
+    },
+    {
+      "label": "alpha_session_06",
+      "locale": "es-419",
+      "purpose": "Replay one Spanish Run admission with the same identity and consume one simulation.",
+      "tags": ["spanish", "atomic_admission", "idempotency"],
+      "expected_fail": {
+        "issue": "#230",
+        "reason": "Database-owned atomic admission and replay identity are owned by issue 230 after issue 229 approval.",
+        "allowed_failures": ["admission:", "persistence:"]
+      },
+      "steps": [
+        {
+          "operation": "stream",
+          "request": {"message": "Prueba comprar y mantener BTC durante el ultimo ano."},
+          "expect": {
+            "visible_response_category": "confirmation",
+            "stage_outcome": "ready_for_confirmation",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_06:confirmation:1",
+            "action_identity": "alpha_session_06:confirmation:1:run_backtest",
+            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
+            "typed_terminal": true
+          }
+        },
+        {
+          "operation": "action",
+          "request": {"type": "run_backtest", "artifact": "alpha_session_06:confirmation:1", "idempotency_label": "alpha_session_06:run:1"},
+          "expect": {
+            "visible_response_category": "job_accepted",
+            "stage_outcome": "ready_to_respond",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_06:job:1",
+            "typed_terminal": true,
+            "checkpoints": {
+              "admission.identity": "alpha_session_06:job:1",
+              "admission.allowance_count": 1
+            }
+          }
+        },
+        {
+          "operation": "retry",
+          "request": {"target": "alpha_session_06:run:1"},
+          "expect": {
+            "visible_response_category": "durable_job_status",
+            "stage_outcome": "ready_to_respond",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_06:job:1",
+            "typed_terminal": true,
+            "checkpoints": {
+              "admission.identity": "alpha_session_06:job:1",
+              "admission.execution_count": 1,
+              "admission.allowance_count": 1
+            }
+          }
+        },
+        {
+          "operation": "persistence",
+          "request": {"scope": "admission_identity"},
+          "expect": {
+            "persistence_state": "alpha_session_06:job:1",
+            "checkpoints": {"admission.execution_count": 1}
+          }
+        },
+        {
+          "operation": "reload",
+          "request": {"surface": "conversation_and_job"},
+          "expect": {
+            "reload_state": "alpha_session_06:job:1",
+            "artifact_identity": "alpha_session_06:job:1",
+            "checkpoints": {"admission.identity": "alpha_session_06:job:1"}
+          }
+        }
+      ]
+    },
+    {
+      "label": "alpha_session_07",
+      "locale": "en",
+      "purpose": "Reconcile a durably accepted turn after disconnect so no orphan stays accepted beyond the approved window.",
+      "tags": ["accepted_turn", "disconnect", "orphan_reconciliation"],
+      "expected_fail": {
+        "issue": "#240",
+        "reason": "Durable accepted-turn lifecycle and orphan reconciliation are owned by issue 240 after issue 229 approval.",
+        "allowed_failures": ["orphan_turn:", "reload:", "persistence:"]
+      },
+      "steps": [
+        {
+          "operation": "stream",
+          "request": {"message": "Change the active test to the last six months."},
+          "expect": {
+            "visible_response_category": "turn_accepted",
+            "stage_outcome": "ready_for_confirmation",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_07:turn:1",
+            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
+            "typed_terminal": true,
+            "checkpoints": {"orphan_turn.lifecycle": "accepted"}
+          }
+        },
+        {
+          "operation": "disconnect",
+          "request": {"after": "turn_accepted"},
+          "expect": {
+            "typed_terminal": false,
+            "checkpoints": {"orphan_turn.client_terminal_invented": false}
+          }
+        },
+        {
+          "operation": "persistence",
+          "request": {"scope": "accepted_turn_lifecycle"},
+          "expect": {
+            "persistence_state": "alpha_session_07:turn:1:accepted",
+            "checkpoints": {"orphan_turn.accepted_record_count": 1}
+          }
+        },
+        {
+          "operation": "reload",
+          "request": {"after": "approved_reconciliation_window"},
+          "expect": {
+            "reload_state": "alpha_session_07:turn:1:reconciled",
+            "artifact_identity": "alpha_session_07:turn:1",
+            "recovery_code": "accepted_turn_reconciled",
+            "checkpoints": {"orphan_turn.accepted_after_window": 0}
+          }
+        },
+        {
+          "operation": "retry",
+          "request": {"target": "alpha_session_07:turn:1"},
+          "expect": {
+            "visible_response_category": "typed_recovery",
+            "stage_outcome": "ready_to_respond",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_07:turn:1",
+            "recovery_code": "accepted_turn_reconciled",
+            "typed_terminal": true,
+            "checkpoints": {"orphan_turn.duplicate_turn_count": 0}
+          }
+        }
+      ]
+    }
+  ]
+}
