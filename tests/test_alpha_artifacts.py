@@ -54,6 +54,15 @@ def test_reliability_contract_locks_admission_and_run_reconciliation() -> None:
     ):
         assert exact_rule in reconciliation_rules
 
+    direct_start = contract.index("## `POST /backtests/run`")
+    direct_end = contract.index(
+        "## `GET /backtest-jobs/by-action/{confirmation_id}`",
+        direct_start,
+    )
+    direct_endpoint = " ".join(contract[direct_start:direct_end].split())
+    assert "a conforming direct job starts in `running`" in direct_endpoint
+    assert "queued/running job" not in direct_endpoint
+
 
 def test_reliability_contract_locks_chat_request_boundaries() -> None:
     contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")

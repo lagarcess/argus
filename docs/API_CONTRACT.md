@@ -997,9 +997,11 @@ commitment is represented by an explicit `DecisionNote`.
 
 ## Backtest Job
 
-Durable asynchronous execution state for a chat-confirmed backtest. A job is not
-the result truth; a successful job writes an immutable `backtest_runs` record and
-references it through `result_run_id`.
+Durable execution state for a chat-confirmed or admitted direct backtest. A job
+is not the result truth; a successful job writes an immutable `backtest_runs`
+record and references it through `result_run_id`. The example below is a chat
+job; direct jobs may have null `conversation_id` and `queued_at`, and start with
+`status = running` plus non-null `started_at`.
 
 ```json
 {
@@ -1046,6 +1048,8 @@ references it through `result_run_id`.
 - Chat jobs use the active `confirmation_id` as their idempotency key. Direct
   jobs use caller keys and may have a null conversation while retaining strict
   `user_id` ownership.
+- New chat jobs start `queued`. New direct jobs start `running`, never enter
+  `queued`, and set `started_at` in the atomic admission transaction.
 - Local/in-process and Render Workflow execution use the same typed backtest
   finalizer. A job becomes `succeeded` only after the immutable run, Idea,
   IdeaVersion, EvidenceArtifact, and enriched result-card identity have been
@@ -2121,6 +2125,8 @@ successful response shape. Before direct synchronous compute begins, it must
 use the same atomic durable admission, idempotency collision check, per-user and
 global capacity limits, and unique-simulation charge as chat-launched work. Its
 durable job owns running/terminal state and the stable finalized Run identity.
+After every queued and running ceiling passes, a conforming direct job starts in
+`running` within that admission transaction and never enters `queued`.
 
 **Request: Saved Strategy**
 ```json
@@ -2201,7 +2207,7 @@ durable job owns running/terminal state and the stable finalized Run identity.
 
 Exact replay behavior:
 - succeeded job: return the same `200 {"run": ...}` response;
-- queued/running job: return `409 idempotency_in_progress` with
+- running job: return `409 idempotency_in_progress` with
   `Retry-After: 1` and `context.backtest_job_id`;
 - failed/canceled/expired job: return the same terminal Problem Details;
 - same key with a different identity: return `409 idempotency_conflict`.
@@ -2217,6 +2223,9 @@ searches another user's jobs or direct/manual keys.
 **Error rules:**
 - `404 Not Found`: no durable admission exists for that action identity at read
   time. This is not proof of business failure; an exact replay remains safe.
+- `409 idempotency_conflict`: the owner-scoped reservation exists but its
+  stored identity does not match the immutable confirmation artifact. No job
+  details are returned and automatic replay must stop.
 - `500 Server Error`: durable persistence is unavailable in a non-dev path.
 
 ## `GET /backtest-jobs/{id}`
