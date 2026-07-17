@@ -1707,6 +1707,30 @@ describe("Argus Alpha frontend contract", () => {
     expect(signup).toContain('redirect("/?auth=signup")');
   });
 
+  test("account recovery and session controls expose localized dedicated surfaces", () => {
+    const landing = readFileSync(join(root, "app/page.tsx"), "utf-8");
+    const forgot = join(root, "app/auth/forgot-password/page.tsx");
+    const recovery = join(root, "app/auth/recovery/page.tsx");
+    const security = join(root, "app/account/security/page.tsx");
+    const recoveryRoute = join(root, "app/api/auth/recovery/route.ts");
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    expect(landing).toContain('/auth/forgot-password');
+    expect(existsSync(forgot)).toBe(true);
+    expect(existsSync(recovery)).toBe(true);
+    expect(existsSync(security)).toBe(true);
+    expect(existsSync(recoveryRoute)).toBe(true);
+    expect(en.auth.recovery.generic_sent).toBeTruthy();
+    expect(es.auth.recovery.generic_sent).toBeTruthy();
+    expect(en.account_security.sessions.sign_out_others).toBeTruthy();
+    expect(es.account_security.sessions.sign_out_others).toBeTruthy();
+  });
+
   test("landing onboarding continues into chat after completion", () => {
     const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
 

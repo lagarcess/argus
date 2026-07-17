@@ -123,4 +123,3 @@ export async function requestPasswordRecovery(email: string): Promise<void> {
     throw new Error("Recovery request failed.");
   }
 }
-
