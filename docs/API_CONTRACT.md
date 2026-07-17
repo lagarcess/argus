@@ -340,6 +340,11 @@ machine-readable fields alongside display labels:
   `crypto`, or `currency_pair`; clients may render this as muted trust metadata.
 - `date_range`: optional canonical `{ start, end, display }` range for cards
   whose period row is visually compacted from ISO fields.
+- `period_adjustment`: optional typed sidecar with
+  `code = effective_window_adjusted`, `requested_date_range`, and
+  `effective_date_range`. The frontend renders one localized, provider-neutral
+  assistant lead-in directly above the corrected card. Full-coverage cards omit
+  this field.
 - `display_facts`: optional canonical facts for localized card metadata, such as
   `timeframe`, `data_through`, `fees`, `slippage`, and `benchmark_symbol`.
   Clients should render these facts through locale-aware presentation code and
@@ -494,6 +499,24 @@ Ownership hardening:
     "timeframe": "1D",
     "start_date": "2022-01-01",
     "end_date": "2024-12-31",
+    "requested_date_range": {
+      "start": "2022-01-01",
+      "end": "2024-12-31"
+    },
+    "effective_date_range": {
+      "start": "2022-03-18",
+      "end": "2024-12-31"
+    },
+    "data_coverage": {
+      "schema_version": "market_data_coverage_v1",
+      "outcome": "adjusted_coverage",
+      "dataset_id": "sha256:...",
+      "observations_by_symbol": {
+        "NVDA": 700,
+        "BYD": 681,
+        "SPY": 700
+      }
+    },
     "side": "long",
     "starting_capital": 1000,
     "allocation_method": "equal_weight",
@@ -652,6 +675,20 @@ commitment is represented by an explicit `DecisionNote`.
 - `benchmark_treatment` is currently `same_modeled_costs`, meaning the benchmark comparison used the same modeled cost assumptions.
 
 **Reproducibility contract:**
+- Before a runnable confirmation or direct run exists, the backend fetches the
+  requested symbols and benchmark once to compute a viable common data window.
+  The requested window remains provenance; `start_date`, `end_date`, result
+  cards, metrics, benchmark comparison, and chart use the effective window.
+- If the common window is shorter, chat returns one corrected confirmation card
+  in the same turn. If there is no viable common window or coverage is too
+  sparse, chat returns typed recovery with no runnable card and direct execution
+  returns `422 no_common_data_window` or `422 insufficient_common_data`.
+- Execution must revalidate the approved effective window. A changed window is
+  rejected as `approved_data_window_unavailable`; it is never silently adjusted
+  after approval.
+- Metrics, benchmark alignment, chart construction, finalization, reload, and
+  evidence provenance share the same prepared execution dataset identity. Edge
+  gaps may not be backward-filled.
 - Direct `/backtests/run` records store the normalized engine config directly in
   `config_snapshot`.
 - Chat-launched runtime runs may also include
@@ -1816,6 +1853,11 @@ canonical `backtest_runs` row, and own the durable job's `result_run_id` link.
 - mixed asset requests rejected with **422**
 - unsupported templates/timeframes rejected with **422**
 - `starting_capital` outside range [1000, 100000000] rejected with **422**
+- Coverage preflight runs before quota admission. Rejected coverage consumes no
+  backtest allowance; successful admission accounting remains unchanged.
+- `config_snapshot.requested_date_range` records the submitted period, while
+  `config_snapshot.effective_date_range` records the common period actually
+  simulated. The response card and chart use the effective period.
 
 **Example 422: Mixed Asset Error**
 ```json

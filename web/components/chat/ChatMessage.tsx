@@ -17,6 +17,7 @@ import { recoveryDisplayText } from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
+import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
 
 type ChatMessageProps = {
   message: Message;
@@ -37,7 +38,7 @@ export default function ChatMessage({
   isStreaming,
   conversationId,
 }: ChatMessageProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isUser = message.role === "user";
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
   const [showOptions, setShowOptions] = useState(false);
@@ -198,6 +199,11 @@ export default function ChatMessage({
   const factHeadingLabel = message.resultFactHeadingKey
     ? t(`chat.result_followup.headings.${message.resultFactHeadingKey}`, "")
     : "";
+  const confirmationPeriodLeadIn = confirmationPeriodAdjustmentText(
+    message.confirmation?.period_adjustment,
+    (key, options) => t(key, options),
+    i18n.resolvedLanguage ?? i18n.language ?? "en",
+  );
 
   if (isUser && message.kind === "action") {
     return (
@@ -251,7 +257,12 @@ export default function ChatMessage({
               />
             </div>
           ) : message.kind === "strategy_confirmation" && message.confirmation ? (
-            <div className="w-full max-w-[min(100%,660px)]">
+            <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-3">
+              {confirmationPeriodLeadIn ? (
+                <p className="text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
+                  {confirmationPeriodLeadIn}
+                </p>
+              ) : null}
               <StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />
             </div>
           ) : message.contentPresentation === "result_breakdown" && displayContent.trim() ? (

@@ -798,10 +798,13 @@ def _retry_exhausted_message(records: list[dict[str, Any]]) -> str:
     last_record = records[-1]
     error_type = _as_optional_str(last_record.get("error_type"))
     if error_type:
-        return _fallback_prompt(
-            error_type=_runtime_failure_classification(error_type),
-            error_message=None,
-        ) or "Retry limit reached"
+        return (
+            _fallback_prompt(
+                error_type=_runtime_failure_classification(error_type),
+                error_message=None,
+            )
+            or "Retry limit reached"
+        )
     return "Retry limit reached"
 
 
@@ -825,7 +828,9 @@ def _normalize_launch_request_payload(payload: dict[str, Any]) -> dict[str, Any]
     return normalized
 
 
-def _strategy_parameters_from_launch_payload(parameters: dict[str, Any]) -> dict[str, Any]:
+def _strategy_parameters_from_launch_payload(
+    parameters: dict[str, Any],
+) -> dict[str, Any]:
     normalized = dict(parameters)
     for field_name in ("fees", "slippage"):
         value = normalized.get(field_name)
@@ -876,7 +881,10 @@ def _resolve_strategy_type(
     if explicit_strategy_type in {"buy_and_hold", "dca_accumulation"}:
         return explicit_strategy_type
     entry_rule = strategy_rule(strategy, "entry")
-    if isinstance(entry_rule, dict) and entry_rule.get("type") == "moving_average_crossover":
+    if (
+        isinstance(entry_rule, dict)
+        and entry_rule.get("type") == "moving_average_crossover"
+    ):
         return "signal_strategy"
     if executable_rule_spec_from_strategy(strategy) is not None:
         return "signal_strategy"
@@ -966,6 +974,12 @@ def _resolve_date_range(
     *,
     extra_parameters: Any = None,
 ) -> dict[str, str]:
+    if (
+        isinstance(value, dict)
+        and isinstance(value.get("start"), str)
+        and isinstance(value.get("end"), str)
+    ):
+        return resolve_executable_date_range(value).payload
     return resolve_executable_date_range(
         value,
         extra_parameters=extra_parameters if isinstance(extra_parameters, dict) else None,

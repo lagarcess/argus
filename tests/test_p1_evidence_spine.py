@@ -164,6 +164,42 @@ def test_completed_backtest_auto_captures_idea_version_and_evidence() -> None:
     assert run.conversation_result_card["idea_version_id"] == captured.idea_version.id
 
 
+def test_evidence_provenance_preserves_requested_and_effective_data_windows() -> None:
+    run = _run().model_copy(
+        update={
+            "config_snapshot": {
+                **_run().config_snapshot,
+                "requested_date_range": {
+                    "start": "2023-01-01",
+                    "end": "2026-06-19",
+                },
+                "effective_date_range": {
+                    "start": "2023-03-15",
+                    "end": "2026-06-18",
+                },
+                "data_coverage": {
+                    "schema_version": "market_data_coverage_v1",
+                    "dataset_id": "sha256:fixture",
+                },
+            }
+        }
+    )
+
+    captured = build_backtest_evidence_capture(
+        run=run,
+        idea_id="idea-window",
+        idea_version_id="version-window",
+        evidence_artifact_id="evidence-window",
+        now=utcnow(),
+    )
+
+    assert captured.evidence_artifact.payload["provenance"]["data_window"] == {
+        "requested": {"start": "2023-01-01", "end": "2026-06-19"},
+        "effective": {"start": "2023-03-15", "end": "2026-06-18"},
+        "dataset_id": "sha256:fixture",
+    }
+
+
 def test_memory_search_waits_for_complete_backtest_finalization(monkeypatch) -> None:
     from argus.api.search_assembly import scored_memory_search_items
 

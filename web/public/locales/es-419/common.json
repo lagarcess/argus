@@ -533,6 +533,7 @@
     "confirmation": {
       "asset_count": "{{count}} activos",
       "selected_asset": "Activo seleccionado",
+      "period_adjustment": "Ajusté el período de la prueba a {{period}} porque cada activo y la referencia necesitan un rango de datos compartido.",
       "status": {
         "ready_to_run": "Listo para ejecutar",
         "needs_change": "Necesita ajuste",

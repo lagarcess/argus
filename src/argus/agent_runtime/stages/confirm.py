@@ -21,6 +21,11 @@ from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
 )
 from argus.domain.backtesting.config import _execution_realism_feature_enabled
+from argus.domain.backtesting.coverage import (
+    MarketDataCoverageError,
+    prepare_market_data,
+)
+from argus.domain.engine import classify_symbol
 from argus.domain.engine_launch.display import format_data_through_label
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.engine_launch.strategies import validate_launch_supported
@@ -95,7 +100,7 @@ def confirm_stage(
             outcome="needs_clarification",
             stage_patch=unsupported_assumption,
         )
-    confirmation_payload = {
+    confirmation_payload: dict[str, Any] = {
         "strategy": strategy,
         "optional_parameters": optional_parameters,
     }
@@ -111,12 +116,27 @@ def confirm_stage(
             if key not in {"outcome", "launch_payload"}
         }
         return StageResult(
-            outcome=str(validation_result["outcome"]),
+            outcome="needs_clarification",
             stage_patch=stage_patch,
         )
     launch_payload = validation_result["launch_payload"]
+    coverage_result = _coverage_preflight(launch_payload)
+    if coverage_result["outcome"] != "ready_to_confirm":
+        return StageResult(
+            outcome="needs_clarification",
+            stage_patch={
+                key: value
+                for key, value in coverage_result.items()
+                if key not in {"outcome", "launch_payload"}
+            },
+        )
+    launch_payload = dict(coverage_result["launch_payload"])
     canonical_strategy = _strategy_with_launch_benchmark(
         strategy,
+        launch_payload=launch_payload,
+    )
+    canonical_strategy = _strategy_with_effective_date_range(
+        canonical_strategy,
         launch_payload=launch_payload,
     )
     card_assumptions = _visible_card_assumptions(
@@ -134,7 +154,10 @@ def confirm_stage(
     confirmation_payload["validation"] = {
         "status": "ready_to_run",
         "executable": True,
-        "date_adjusted": _has_data_availability_adjustment(strategy_with_assumptions),
+        "date_adjusted": (
+            _has_data_availability_adjustment(strategy_with_assumptions)
+            or _has_effective_window_adjustment(launch_payload)
+        ),
     }
     confirmation_reference = confirmation_artifact_reference(
         confirmation_id=confirmation_id,
@@ -184,6 +207,95 @@ def _validated_launch_payload(
         "requested_field": None,
         "assistant_prompt": None,
     }
+
+
+def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        request = LaunchBacktestRequest.model_validate(launch_payload)
+        asset_class = request.asset_class or classify_symbol(request.symbol).asset_class
+        config = {
+            "asset_class": asset_class,
+            "symbols": list(request.symbols),
+            "timeframe": request.timeframe,
+            "start_date": request.date_range.start,
+            "end_date": request.date_range.end,
+            "benchmark_symbol": request.benchmark_symbol,
+        }
+        prepared = prepare_market_data(config)
+    except MarketDataCoverageError as exc:
+        return _coverage_recovery(exc.code)
+    except ValueError as exc:
+        return _coverage_recovery(str(exc))
+
+    requested = prepared.requested_date_range.model_dump()
+    effective = prepared.effective_date_range.model_dump()
+    coverage = prepared.coverage_payload()
+    coverage["preflight_id"] = coverage.pop("dataset_id")
+    return {
+        "outcome": "ready_to_confirm",
+        "launch_payload": {
+            **launch_payload,
+            "date_range": effective,
+            "requested_date_range": requested,
+            "coverage_preflight": coverage,
+        },
+    }
+
+
+def _coverage_recovery(error_code: str) -> dict[str, Any]:
+    category = (
+        error_code
+        if error_code in {"no_common_data_window", "insufficient_common_data"}
+        else "market_data_unavailable"
+    )
+    explanation = (
+        "The selected assets and benchmark do not share a usable data window."
+        if category == "no_common_data_window"
+        else "The shared data window is not complete enough for a trustworthy test."
+    )
+    return {
+        "outcome": "needs_clarification",
+        "missing_required_fields": ["date_range"],
+        "requested_field": "date_range",
+        "assistant_prompt": None,
+        "optional_parameter_status": _with_unsupported_constraint(
+            {},
+            {
+                "category": category,
+                "raw_value": error_code,
+                "explanation": explanation,
+                "simplification_options": [
+                    {"label": "Use a shorter date range"},
+                    {"label": "Change an asset"},
+                    {"label": "Change the benchmark"},
+                ],
+            },
+        ),
+    }
+
+
+def _strategy_with_effective_date_range(
+    strategy: dict[str, Any],
+    *,
+    launch_payload: dict[str, Any],
+) -> dict[str, Any]:
+    effective = launch_payload.get("date_range")
+    requested = launch_payload.get("requested_date_range")
+    if not isinstance(effective, dict) or not isinstance(requested, dict):
+        return strategy
+    extra_parameters = dict(strategy.get("extra_parameters") or {})
+    extra_parameters["requested_date_range"] = dict(requested)
+    extra_parameters["effective_date_range"] = dict(effective)
+    return {
+        **strategy,
+        "date_range": dict(effective),
+        "extra_parameters": extra_parameters,
+    }
+
+
+def _has_effective_window_adjustment(launch_payload: dict[str, Any]) -> bool:
+    coverage = launch_payload.get("coverage_preflight")
+    return isinstance(coverage, dict) and coverage.get("outcome") == ("adjusted_coverage")
 
 
 def _confirmation_payload_language(confirmation_payload: dict[str, Any]) -> str:
@@ -486,7 +598,9 @@ def _market_clock_for_strategy(asset_class: str) -> Any:
     try:
         logger.debug("Confirm stage market clock fetch started", asset_class=asset_class)
         clock = fetch_alpaca_market_clock()
-        logger.debug("Confirm stage market clock fetch completed", asset_class=asset_class)
+        logger.debug(
+            "Confirm stage market clock fetch completed", asset_class=asset_class
+        )
         return clock
     except Exception:
         logger.opt(exception=True).debug(

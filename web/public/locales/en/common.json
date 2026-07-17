@@ -533,6 +533,7 @@
     "confirmation": {
       "asset_count": "{{count}} assets",
       "selected_asset": "Selected asset",
+      "period_adjustment": "I adjusted the test period to {{period}} because every asset and the benchmark need a shared data window.",
       "status": {
         "ready_to_run": "Ready to run",
         "needs_change": "Needs change",

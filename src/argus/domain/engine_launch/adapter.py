@@ -12,6 +12,11 @@ from argus.domain.backtesting.config import (
     _execution_realism_feature_enabled,
     _normalize_execution_realism,
 )
+from argus.domain.backtesting.coverage import (
+    PreparedMarketData,
+    apply_coverage_to_config,
+    prepare_market_data,
+)
 from argus.domain.engine import (
     build_result_card,
     build_result_chart,
@@ -76,29 +81,37 @@ def run_launch_backtest(
         )
 
     try:
+        prepared_market_data = _prepared_market_data_for_request(
+            request,
+            recorder=recorder,
+        )
         if request.strategy_type == "dca_accumulation":
             result = _run_dca_accumulation(
                 request,
                 language=language,
                 recorder=recorder,
+                prepared_market_data=prepared_market_data,
             )
         elif request.strategy_type == "signal_strategy":
             result = _run_signal_strategy(
                 request,
                 language=language,
                 recorder=recorder,
+                prepared_market_data=prepared_market_data,
             )
         elif request.strategy_type == "indicator_threshold":
             result = _run_indicator_threshold(
                 request,
                 language=language,
                 recorder=recorder,
+                prepared_market_data=prepared_market_data,
             )
         else:
             result = _run_buy_and_hold(
                 request,
                 language=language,
                 recorder=recorder,
+                prepared_market_data=prepared_market_data,
             )
     except ValueError as exc:
         failure_reason = str(exc)
@@ -153,13 +166,19 @@ class _LaunchTimingRecorder:
         finally:
             self.record_elapsed("provider_fetch_total", started)
 
-    def compute_alpha_metrics(self, config: dict[str, Any]) -> dict[str, Any]:
+    def compute_alpha_metrics(
+        self,
+        config: dict[str, Any],
+        *,
+        prepared_market_data: PreparedMarketData | None = None,
+    ) -> dict[str, Any]:
         started = time.perf_counter()
         try:
             return compute_alpha_metrics(
                 config,
                 fetch_ohlcv_func=self.fetch_ohlcv,
                 fetch_price_series_func=self.fetch_price_series,
+                prepared_market_data=prepared_market_data,
             )
         finally:
             self.record_elapsed("engine_compute_total", started)
@@ -189,9 +208,15 @@ def _run_indicator_threshold(
     *,
     language: str,
     recorder: _LaunchTimingRecorder,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> LaunchExecutionAdapterResult:
     symbols, asset_class = _resolve_request_symbols(request)
-    initial_price = _initial_price(request, asset_class=asset_class, recorder=recorder)
+    initial_price = _initial_price(
+        request,
+        asset_class=asset_class,
+        recorder=recorder,
+        prepared_market_data=prepared_market_data,
+    )
     starting_capital = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -204,14 +229,19 @@ def _run_indicator_threshold(
         starting_capital=starting_capital,
         indicator_parameters=indicator_parameters,
     )
+    config = _with_prepared_coverage(config, prepared_market_data)
     validate_backtest_config(config)
 
-    metrics = recorder.compute_alpha_metrics(config)
+    metrics = recorder.compute_alpha_metrics(
+        config,
+        prepared_market_data=prepared_market_data,
+    )
     result_card = _build_launch_result_card(
         config,
         metrics,
         language=language,
         recorder=recorder,
+        prepared_market_data=prepared_market_data,
     )
     benchmark_metrics = build_benchmark_metrics(
         request=request,
@@ -244,6 +274,7 @@ def _run_indicator_threshold(
             "exit_threshold": indicator_parameters["exit_threshold"],
             "rule_spec": indicator_parameters["rule_spec"],
             "engine_config": dict(config),
+            **_coverage_resolved_parameters(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -284,9 +315,15 @@ def _run_signal_strategy(
     *,
     language: str,
     recorder: _LaunchTimingRecorder,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> LaunchExecutionAdapterResult:
     symbols, asset_class = _resolve_request_symbols(request)
-    initial_price = _initial_price(request, asset_class=asset_class, recorder=recorder)
+    initial_price = _initial_price(
+        request,
+        asset_class=asset_class,
+        recorder=recorder,
+        prepared_market_data=prepared_market_data,
+    )
     starting_capital = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -299,14 +336,19 @@ def _run_signal_strategy(
         starting_capital=starting_capital,
         rule_spec=rule_spec,
     )
+    config = _with_prepared_coverage(config, prepared_market_data)
     validate_backtest_config(config)
 
-    metrics = recorder.compute_alpha_metrics(config)
+    metrics = recorder.compute_alpha_metrics(
+        config,
+        prepared_market_data=prepared_market_data,
+    )
     result_card = _build_launch_result_card(
         config,
         metrics,
         language=language,
         recorder=recorder,
+        prepared_market_data=prepared_market_data,
     )
     benchmark_metrics = build_benchmark_metrics(
         request=request,
@@ -336,6 +378,7 @@ def _run_signal_strategy(
             "template": config["template"],
             "rule_spec": rule_spec,
             "engine_config": dict(config),
+            **_coverage_resolved_parameters(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -373,9 +416,15 @@ def _run_dca_accumulation(
     *,
     language: str,
     recorder: _LaunchTimingRecorder,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> LaunchExecutionAdapterResult:
     symbols, asset_class = _resolve_request_symbols(request)
-    initial_price = _initial_price(request, asset_class=asset_class, recorder=recorder)
+    initial_price = _initial_price(
+        request,
+        asset_class=asset_class,
+        recorder=recorder,
+        prepared_market_data=prepared_market_data,
+    )
     recurring_allocation = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -388,14 +437,19 @@ def _run_dca_accumulation(
         recurring_contribution=recurring_allocation,
         cadence=cadence,
     )
+    config = _with_prepared_coverage(config, prepared_market_data)
     _validate_launch_config(config)
 
-    metrics = recorder.compute_alpha_metrics(config)
+    metrics = recorder.compute_alpha_metrics(
+        config,
+        prepared_market_data=prepared_market_data,
+    )
     result_card = _build_launch_result_card(
         config,
         metrics,
         language=language,
         recorder=recorder,
+        prepared_market_data=prepared_market_data,
     )
     benchmark_metrics = build_benchmark_metrics(
         request=request,
@@ -424,6 +478,7 @@ def _run_dca_accumulation(
             "position_size": request.position_size,
             "cadence": cadence,
             "engine_config": dict(config),
+            **_coverage_resolved_parameters(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -453,9 +508,15 @@ def _run_buy_and_hold(
     *,
     language: str,
     recorder: _LaunchTimingRecorder,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> LaunchExecutionAdapterResult:
     symbols, asset_class = _resolve_request_symbols(request)
-    initial_price = _initial_price(request, asset_class=asset_class, recorder=recorder)
+    initial_price = _initial_price(
+        request,
+        asset_class=asset_class,
+        recorder=recorder,
+        prepared_market_data=prepared_market_data,
+    )
     starting_capital = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -466,14 +527,19 @@ def _run_buy_and_hold(
         symbols=symbols,
         starting_capital=starting_capital,
     )
+    config = _with_prepared_coverage(config, prepared_market_data)
     validate_backtest_config(config)
 
-    metrics = recorder.compute_alpha_metrics(config)
+    metrics = recorder.compute_alpha_metrics(
+        config,
+        prepared_market_data=prepared_market_data,
+    )
     result_card = _build_launch_result_card(
         config,
         metrics,
         language=language,
         recorder=recorder,
+        prepared_market_data=prepared_market_data,
     )
     benchmark_metrics = build_benchmark_metrics(
         request=request,
@@ -500,6 +566,7 @@ def _run_buy_and_hold(
             "position_size": request.position_size,
             "cadence": request.cadence,
             "engine_config": dict(config),
+            **_coverage_resolved_parameters(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -606,15 +673,20 @@ def _build_launch_result_card(
     *,
     language: str,
     recorder: _LaunchTimingRecorder | None = None,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     try:
         if recorder is None:
-            chart = build_result_chart(config)
+            chart = build_result_chart(
+                config,
+                prepared_market_data=prepared_market_data,
+            )
         else:
             chart = build_result_chart(
                 config,
                 fetch_ohlcv_func=recorder.fetch_ohlcv,
+                prepared_market_data=prepared_market_data,
             )
     except Exception as exc:
         logger.warning("Result chart build failed", error=str(exc))
@@ -746,22 +818,79 @@ def _initial_price(
     *,
     asset_class: str,
     recorder: _LaunchTimingRecorder,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> float | None:
     if request.sizing_mode != "position_size":
         return None
     if len(request.symbols) > 1:
         raise ValueError("unsupported_multi_symbol_position_size")
 
-    series = recorder.fetch_price_series(
-        symbol=request.symbol,
-        asset_class=asset_class,
-        start_date=date.fromisoformat(request.date_range.start),
-        end_date=date.fromisoformat(request.date_range.end),
-        timeframe=request.timeframe,
-    )
+    if prepared_market_data is None:
+        series = recorder.fetch_price_series(
+            symbol=request.symbol,
+            asset_class=asset_class,
+            start_date=date.fromisoformat(request.date_range.start),
+            end_date=date.fromisoformat(request.date_range.end),
+            timeframe=request.timeframe,
+        )
+    else:
+        resolved_symbols, _ = _resolve_request_symbols(request)
+        series = prepared_market_data.price_series_for(resolved_symbols[0])
     if series.empty:
         raise ValueError("market_data_unavailable")
     return float(series.iloc[0])
+
+
+def _prepared_market_data_for_request(
+    request: LaunchBacktestRequest,
+    *,
+    recorder: _LaunchTimingRecorder,
+) -> PreparedMarketData | None:
+    if request.coverage_preflight is None:
+        return None
+    symbols, asset_class = _resolve_request_symbols(request)
+    config = {
+        "asset_class": asset_class,
+        "symbols": symbols,
+        "timeframe": request.timeframe,
+        "start_date": request.date_range.start,
+        "end_date": request.date_range.end,
+        "requested_date_range": request.requested_date_range.model_dump()
+        if request.requested_date_range is not None
+        else request.date_range.model_dump(),
+        "benchmark_symbol": request.benchmark_symbol,
+    }
+    return prepare_market_data(
+        config,
+        fetch_ohlcv_func=recorder.fetch_ohlcv,
+        approved_coverage=request.coverage_preflight.model_dump(),
+    )
+
+
+def _with_prepared_coverage(
+    config: dict[str, Any],
+    prepared_market_data: PreparedMarketData | None,
+) -> dict[str, Any]:
+    if prepared_market_data is None:
+        return config
+    return apply_coverage_to_config(config, prepared_market_data)
+
+
+def _coverage_resolved_parameters(config: dict[str, Any]) -> dict[str, Any]:
+    requested = config.get("requested_date_range")
+    effective = config.get("effective_date_range")
+    coverage = config.get("data_coverage")
+    if (
+        not isinstance(requested, dict)
+        or not isinstance(effective, dict)
+        or not isinstance(coverage, dict)
+    ):
+        return {}
+    return {
+        "requested_date_range": dict(requested),
+        "effective_date_range": dict(effective),
+        "data_coverage": dict(coverage),
+    }
 
 
 def _resolve_request_symbols(request: LaunchBacktestRequest) -> tuple[list[str], str]:
@@ -832,8 +961,15 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "unsupported_rule_operator",
         "provider_timeframe_unavailable",
     }
-    if error_code in {"market_data_unavailable", "benchmark_data_unavailable"}:
+    if error_code in {
+        "market_data_unavailable",
+        "benchmark_data_unavailable",
+        "no_common_data_window",
+        "insufficient_common_data",
+    }:
         return "upstream_dependency_error", "failed_upstream"
+    if error_code == "approved_data_window_unavailable":
+        return "parameter_validation_error", "blocked_invalid_input"
     if error_code in invalid_inputs or error_code.startswith(
         "invalid_execution_realism_"
     ):

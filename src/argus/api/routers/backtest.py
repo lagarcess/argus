@@ -34,28 +34,9 @@ def run_backtest(
         request=request,
         idempotency_key=idempotency_key,
     )
-    cached = api_state.store.idempotency.get(
-        (user.id, endpoint, clean_idempotency_key)
-    )
+    cached = api_state.store.idempotency.get((user.id, endpoint, clean_idempotency_key))
     if cached:
         return BacktestRunResponse(run=cached)
-
-    if api_state.supabase_gateway is not None:
-        try:
-            api_state.supabase_gateway.check_and_increment_usage_limits(
-                user_id=user.id,
-                resource="backtest_runs",
-                limits=[("day", 50), ("hour", 10)],
-            )
-        except QuotaExceededError as exc:
-            raise problem(
-                request,
-                status_code=429,
-                code="too_many_requests",
-                title="Quota Exceeded",
-                detail=str(exc),
-                headers={"Retry-After": "60"},
-            ) from exc
 
     if payload.conversation_id:
         conversation = None
@@ -113,8 +94,29 @@ def run_backtest(
         }
     if not data.get("template"):
         data["template"] = "rsi_mean_reversion"
-    from argus.api.backtest_service import create_run_from_payload
+    from argus.api.backtest_service import (
+        create_run_from_payload,
+        prepare_run_from_payload,
+    )
     from argus.api.chat.evidence import finalize_completed_backtest
+
+    prepared_execution = prepare_run_from_payload(data, request)
+    if api_state.supabase_gateway is not None:
+        try:
+            api_state.supabase_gateway.check_and_increment_usage_limits(
+                user_id=user.id,
+                resource="backtest_runs",
+                limits=[("day", 50), ("hour", 10)],
+            )
+        except QuotaExceededError as exc:
+            raise problem(
+                request,
+                status_code=429,
+                code="too_many_requests",
+                title="Quota Exceeded",
+                detail=str(exc),
+                headers={"Retry-After": "60"},
+            ) from exc
 
     execution_identity = f"{endpoint}:{clean_idempotency_key}"
     run = create_run_from_payload(
@@ -125,6 +127,7 @@ def run_backtest(
         persist_in_memory=False,
         language=user.language,
         run_id=stable_backtest_run_id(user.id, execution_identity),
+        prepared_execution=prepared_execution,
     )
     try:
         run = finalize_completed_backtest(

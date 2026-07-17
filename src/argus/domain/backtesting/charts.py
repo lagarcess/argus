@@ -8,6 +8,7 @@ import pandas as pd
 import vectorbt as vbt
 
 from argus.domain.backtesting.config import _vbt_freq
+from argus.domain.backtesting.coverage import PreparedMarketData
 from argus.domain.backtesting.execution import (
     ExecutionEvent,
     _build_long_only_execution_ledger,
@@ -24,6 +25,7 @@ def build_result_chart(
     *,
     fetch_ohlcv_func=fetch_ohlcv,
     build_signals_func=_build_signals,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> dict[str, Any]:
     """Build a compact aggregate equity curve for result-card display."""
 
@@ -36,13 +38,16 @@ def build_result_chart(
     events: dict[str, dict[str, set[str]]] = {}
 
     for symbol in config["symbols"]:
-        bars = fetch_ohlcv_func(
-            symbol=symbol,
-            asset_class=config["asset_class"],
-            start_date=start,
-            end_date=end,
-            timeframe=config["timeframe"],
-        )
+        if prepared_market_data is None:
+            bars = fetch_ohlcv_func(
+                symbol=symbol,
+                asset_class=config["asset_class"],
+                start_date=start,
+                end_date=end,
+                timeframe=config["timeframe"],
+            )
+        else:
+            bars = prepared_market_data.bars_for(symbol)
         close = bars["close"].astype(float)
         entries, exits = build_signals_func(config, bars)
         execution_events = _build_long_only_execution_ledger(
@@ -78,9 +83,10 @@ def build_result_chart(
             events, symbol=symbol, execution_events=execution_events
         )
 
-    aggregate_equity = (
-        pd.concat(symbol_equity_curves, axis=1).ffill().bfill().sum(axis=1).dropna()
+    aligned_equity = (
+        pd.concat(symbol_equity_curves, axis=1).sort_index().ffill().dropna(how="any")
     )
+    aggregate_equity = aligned_equity.sum(axis=1)
     series = [
         {"time": _chart_time_key(ts), "value": round(float(value), 2)}
         for ts, value in aggregate_equity.items()

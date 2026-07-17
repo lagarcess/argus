@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+import pandas as pd
 import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.llm_clarifier import (
@@ -65,9 +66,7 @@ def test_clarify_confirmation_action_period_uses_llm_voice_in_spanish() -> None:
         date_range={"start": "2025-06-14", "end": "2026-06-12"},
         capital_amount=100000,
     )
-    clarifier = RecordingClarifier(
-        "Claro. ¿Qué nuevo rango quieres usar para AAPL?"
-    )
+    clarifier = RecordingClarifier("Claro. ¿Qué nuevo rango quieres usar para AAPL?")
 
     result = clarify_stage(
         state=state,
@@ -585,7 +584,9 @@ def test_clarify_spanish_unsupported_recovery_fallback_uses_structured_options()
     }
 
 
-def test_clarify_uses_generator_for_dca_cap_recovery_after_execution_fields_are_known() -> None:
+def test_clarify_uses_generator_for_dca_cap_recovery_after_execution_fields_are_known() -> (
+    None
+):
     state = RunState.new(
         current_user_message=(
             "what if I bought $125 of BTC every two weeks from 2022 through "
@@ -752,9 +753,7 @@ def test_rule_clarification_preserves_known_asset_context() -> None:
     assert result.outcome == "await_user_reply"
     assert result.patch["assistant_prompt"] == clarifier.question
     assert clarifier.requests[0].candidate_strategy_draft.asset_universe == ["NVDA"]
-    assert clarifier.requests[0].response_intent["semantic_needs"] == [
-        "rule_definition"
-    ]
+    assert clarifier.requests[0].response_intent["semantic_needs"] == ["rule_definition"]
 
 
 def test_multi_field_signal_clarification_uses_plain_language() -> None:
@@ -787,7 +786,9 @@ def test_multi_field_signal_clarification_uses_plain_language() -> None:
 
 
 def test_confirmation_action_assumption_uses_llm_voice_in_spanish() -> None:
-    state = RunState.new(current_user_message="Ajustar supuestos", recent_thread_history=[])
+    state = RunState.new(
+        current_user_message="Ajustar supuestos", recent_thread_history=[]
+    )
     state.intent = "strategy_drafting"
     state.requested_field = "assumption"
     state.missing_required_fields = ["assumption"]
@@ -874,7 +875,9 @@ def test_clarification_renderer_collapses_adjacent_duplicate_sentences() -> None
     assert rendered == "I can keep the runnable version. Which direction should I use?"
 
 
-def test_clarification_renderer_collapses_duplicates_after_direct_question_append() -> None:
+def test_clarification_renderer_collapses_duplicates_after_direct_question_append() -> (
+    None
+):
     repeated = (
         "ATR 14 is a volatility indicator, but I need an explicit entry or exit "
         "rule to run a test."
@@ -912,7 +915,9 @@ def test_clarification_renderer_collapses_duplicates_after_direct_question_appen
     )
 
 
-def test_clarification_renderer_collapses_repeated_context_block_before_question() -> None:
+def test_clarification_renderer_collapses_repeated_context_block_before_question() -> (
+    None
+):
     first = (
         "El ATR 14 es un indicador de volatilidad que aún no podemos ejecutar "
         "como regla de entrada o salida."
@@ -1965,10 +1970,124 @@ def test_confirm_stage_still_builds_confirmation_card() -> None:
     assert result.patch["confirmation_payload"]["strategy"]["entry_logic"] == (
         "RSI drops below 30"
     )
-    assert "$1,000 starting capital" in result.patch["candidate_strategy_draft"][
-        "assumptions"
-    ]
+    assert (
+        "$1,000 starting capital"
+        in result.patch["candidate_strategy_draft"]["assumptions"]
+    )
     assert "1D bars" in result.patch["candidate_strategy_draft"]["assumptions"]
+
+
+def test_confirm_stage_reconciles_effective_window_before_approval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain import market_data
+
+    def fake_fetch(symbol: str, **_: object) -> pd.DataFrame:
+        days = (
+            ["2024-01-03", "2024-01-04", "2024-01-05"]
+            if symbol == "AAPL"
+            else [
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-04",
+                "2024-01-05",
+            ]
+        )
+        index = pd.to_datetime(days, utc=True)
+        close = pd.Series(range(100, 100 + len(index)), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", fake_fetch)
+    state = RunState.new(
+        current_user_message="Hold AAPL from January 1 through January 5, 2024.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_approval"
+    confirmation = result.patch["confirmation_payload"]
+    assert confirmation["strategy"]["date_range"] == {
+        "start": "2024-01-03",
+        "end": "2024-01-05",
+    }
+    assert confirmation["launch_payload"]["requested_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-01-05",
+    }
+    assert confirmation["launch_payload"]["date_range"] == {
+        "start": "2024-01-03",
+        "end": "2024-01-05",
+    }
+    assert confirmation["launch_payload"]["coverage_preflight"]["outcome"] == (
+        "adjusted_coverage"
+    )
+    assert confirmation["validation"]["date_adjusted"] is True
+
+
+def test_confirm_stage_returns_typed_recovery_without_runnable_card_when_no_common_data(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain import market_data
+
+    def fake_fetch(symbol: str, **_: object) -> pd.DataFrame:
+        days = (
+            ["2024-01-01", "2024-01-02"]
+            if symbol == "AAPL"
+            else ["2024-01-04", "2024-01-05"]
+        )
+        index = pd.to_datetime(days, utc=True)
+        close = pd.Series(range(100, 100 + len(index)), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", fake_fetch)
+    state = RunState.new(
+        current_user_message="Hold AAPL from January 1 through January 5, 2024.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "needs_clarification"
+    assert "confirmation_payload" not in result.patch
+    constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
+    assert constraint["category"] == "no_common_data_window"
+    assert constraint["raw_value"] == "no_common_data_window"
 
 
 def test_confirm_stage_preserves_explicit_benchmark_in_card_assumptions() -> None:
@@ -2373,14 +2492,11 @@ def test_confirm_stage_uses_product_language_for_data_window_limits() -> None:
     assert result.outcome == "needs_clarification"
     assert result.patch["assistant_prompt"] is None
     assert result.patch["requested_field"] == "date_range"
-    constraint = result.patch["optional_parameter_status"][
-        "unsupported_constraints"
-    ][0]
+    constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
     assert constraint["category"] == "data_window_unavailable"
     assert "provider" not in constraint["explanation"].lower()
     assert any(
-        "2016" in option["label"]
-        for option in constraint["simplification_options"]
+        "2016" in option["label"] for option in constraint["simplification_options"]
     )
 
 
@@ -2563,8 +2679,7 @@ def test_confirm_stage_keeps_date_edit_visible_card_and_launch_payload_in_sync()
                 "end": "2026-04-14",
                 "confidence": 1.0,
                 "evidence": (
-                    "change the period to show march 2 of 2025 "
-                    "until april 14 of 2026"
+                    "change the period to show march 2 of 2025 " "until april 14 of 2026"
                 ),
             },
             "field_provenance": {"date_range": "explicit_user"},
@@ -2775,9 +2890,7 @@ def test_confirm_stage_blocks_unsupported_nonzero_fee_assumption(
     assert result.outcome == "needs_clarification"
     assert result.patch["requested_field"] == "fees"
     assert result.patch["assistant_prompt"] is None
-    constraint = result.patch["optional_parameter_status"][
-        "unsupported_constraints"
-    ][0]
+    constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
     assert constraint["category"] == "unsupported_execution_assumption"
     assert constraint["raw_value"] == "custom trading fees"
 
@@ -2852,7 +2965,9 @@ def test_confirm_stage_clarifies_non_executable_signal_rule_before_date() -> Non
     assert result.patch["missing_required_fields"] == ["entry_logic"]
 
 
-def test_confirm_stage_blocks_canonical_signal_window_when_window_cannot_cover_warmup() -> None:
+def test_confirm_stage_blocks_canonical_signal_window_when_window_cannot_cover_warmup() -> (
+    None
+):
     state = RunState.new(
         current_user_message=(
             "Test SPY when the 50-day SMA crosses above the 200-day SMA last month."
@@ -2892,9 +3007,7 @@ def test_confirm_stage_blocks_canonical_signal_window_when_window_cannot_cover_w
     assert result.outcome == "needs_clarification"
     assert result.patch["assistant_prompt"] is None
     assert result.patch["requested_field"] == "date_range"
-    constraint = result.patch["optional_parameter_status"][
-        "unsupported_constraints"
-    ][0]
+    constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
     assert constraint["category"] == "data_window_too_short_for_rule"
     assert any(
         option["label"] == "Use a longer date range"

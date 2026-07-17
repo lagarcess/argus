@@ -118,6 +118,14 @@ def build_backtest_run_from_result(
     engine_config = resolved_parameters_dict.get("engine_config")
     if isinstance(engine_config, dict):
         config_snapshot["engine_config"] = deepcopy(engine_config)
+    for field_name in (
+        "requested_date_range",
+        "effective_date_range",
+        "data_coverage",
+    ):
+        value = resolved_parameters_dict.get(field_name)
+        if isinstance(value, dict):
+            config_snapshot[field_name] = deepcopy(value)
     if isinstance(provider_metadata, dict):
         config_snapshot["provider_metadata"] = deepcopy(provider_metadata)
     enriched_result_card = enrich_result_card_actions(
