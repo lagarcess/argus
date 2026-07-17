@@ -242,6 +242,9 @@ Represents individual messages within a conversation.
   `retry_last_turn`, `recovery`, and `clarification`. These fields hydrate the
   transcript, action affordances, and localized degraded-fallback UI; they do
   not make free-form transcript text the source of truth for strategy state.
+  A typed `clarification.prompt_source` distinguishes exact LLM-authored prose
+  (`llm_generated`) from frontend-localized deterministic fallback
+  (`degraded_fallback`); structured options remain reloadable in both cases.
 - When a turn follows an artifact-backed setup, the runtime must reconstruct the
   working draft from canonical artifact state before applying the new user
   message as a patch. Canonical artifact state comes from, in order of

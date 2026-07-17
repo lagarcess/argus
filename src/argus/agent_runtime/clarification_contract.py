@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from argus.agent_runtime.recovery_messages import recovery_message
 from argus.agent_runtime.simplification_option_contract import simplification_option_kind
@@ -10,6 +10,8 @@ OFFLINE_CLARIFICATION_FALLBACK = recovery_message(
     "clarification_generation_unavailable",
     language="en",
 )
+
+ClarificationPromptSource = Literal["llm_generated", "degraded_fallback"]
 
 
 def offline_clarification_fallback(
@@ -36,6 +38,7 @@ def typed_clarification_contract(
     response_intent: dict[str, Any] | None,
     requested_field: str | None = None,
     strategy: StrategySummary | dict[str, Any] | None = None,
+    prompt_source: ClarificationPromptSource = "degraded_fallback",
 ) -> dict[str, Any] | None:
     if not isinstance(response_intent, dict):
         return None
@@ -48,6 +51,7 @@ def typed_clarification_contract(
         return {
             "kind": "coverage_recovery",
             "reason_code": coverage["code"],
+            "prompt_source": prompt_source,
             "requested_field": None,
             "requested_fields": _requested_fields(response_intent),
             "semantic_needs": _semantic_needs(response_intent),
@@ -65,6 +69,7 @@ def typed_clarification_contract(
         return {
             "kind": "unsupported_recovery",
             "reason_code": _unsupported_reason_code(response_intent),
+            "prompt_source": prompt_source,
             "requested_field": requested_field or "unsupported_constraints",
             "requested_fields": _requested_fields(response_intent)
             or ["unsupported_constraints"],
@@ -86,6 +91,7 @@ def typed_clarification_contract(
             requested_field=requested,
             semantic_needs=semantic_needs,
         ),
+        "prompt_source": prompt_source,
         "requested_field": requested,
         "requested_fields": requested_fields,
         "semantic_needs": semantic_needs,

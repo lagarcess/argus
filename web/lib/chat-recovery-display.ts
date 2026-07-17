@@ -198,6 +198,10 @@ function recoveryDisplayFromClarification(value: unknown): RecoveryDisplay | nul
   if (!clarification || !kind) {
     return null;
   }
+  const promptSource = stringOrNull(clarification.prompt_source);
+  if (promptSource && promptSource !== "degraded_fallback") {
+    return null;
+  }
   if (kind === "coverage_recovery") {
     const code = stringOrNull(clarification.reason_code);
     return code ? { kind: "coverage_recovery", code } : null;

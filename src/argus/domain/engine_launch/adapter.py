@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import date
 from math import isfinite
-from typing import Any
+from typing import Any, Literal
 
 from loguru import logger
 
@@ -58,6 +58,14 @@ class LaunchExecutionAdapterResult:
     result_card: dict[str, Any] | None = None
     explanation_context: dict[str, Any] | None = None
     timings_ms: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class RequestSymbolValidationResult:
+    outcome: Literal["resolved", "conflict", "invalid", "unavailable"]
+    symbols: tuple[str, ...] = ()
+    asset_class: str | None = None
+    error_code: str | None = None
 
 
 def run_launch_backtest(
@@ -893,18 +901,87 @@ def _coverage_resolved_parameters(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _resolve_request_symbols(request: LaunchBacktestRequest) -> tuple[list[str], str]:
-    assets = [classify_symbol(symbol) for symbol in request.symbols]
-    if not assets:
-        raise ValueError("invalid_symbol_count")
+def validate_request_symbols(
+    request: LaunchBacktestRequest,
+) -> RequestSymbolValidationResult:
+    """Resolve every requested symbol and classify validation failures."""
+    resolved_symbols: list[str] = []
+    resolved_asset_classes: list[str] = []
+    has_unresolved_symbol = False
+
+    for symbol in request.symbols:
+        try:
+            asset = classify_symbol(symbol)
+        except ValueError as exc:
+            error_code = str(exc)
+            if error_code == "asset_universe_unavailable":
+                return RequestSymbolValidationResult(
+                    outcome="unavailable",
+                    error_code=error_code,
+                )
+            if error_code == "invalid_symbol":
+                has_unresolved_symbol = True
+                resolved_symbols.append(symbol)
+                continue
+            if error_code == "asset_class_conflict":
+                return RequestSymbolValidationResult(
+                    outcome="conflict",
+                    error_code=error_code,
+                )
+            return RequestSymbolValidationResult(
+                outcome="invalid",
+                error_code=error_code,
+            )
+        resolved_symbols.append(asset.symbol)
+        resolved_asset_classes.append(asset.asset_class)
+
+    if not resolved_symbols:
+        return RequestSymbolValidationResult(
+            outcome="invalid",
+            error_code="invalid_symbol_count",
+        )
+
     if request.asset_class is not None:
-        if any(asset.asset_class != request.asset_class for asset in assets):
-            raise ValueError("asset_class_conflict")
-        return [asset.symbol for asset in assets], request.asset_class
-    asset_class = assets[0].asset_class
-    if any(asset.asset_class != asset_class for asset in assets):
-        raise ValueError("asset_class_conflict")
-    return [asset.symbol for asset in assets], asset_class
+        if any(
+            asset_class != request.asset_class
+            for asset_class in resolved_asset_classes
+        ):
+            return RequestSymbolValidationResult(
+                outcome="conflict",
+                error_code="asset_class_conflict",
+            )
+        # The declared class is sufficient for unresolved symbols' same-asset
+        # check; coverage remains the authority on their data availability.
+        return RequestSymbolValidationResult(
+            outcome="resolved",
+            symbols=tuple(resolved_symbols),
+            asset_class=request.asset_class,
+        )
+
+    if has_unresolved_symbol or not resolved_asset_classes:
+        return RequestSymbolValidationResult(
+            outcome="invalid",
+            error_code="invalid_symbol",
+        )
+
+    asset_class = resolved_asset_classes[0]
+    if any(value != asset_class for value in resolved_asset_classes):
+        return RequestSymbolValidationResult(
+            outcome="conflict",
+            error_code="asset_class_conflict",
+        )
+    return RequestSymbolValidationResult(
+        outcome="resolved",
+        symbols=tuple(resolved_symbols),
+        asset_class=asset_class,
+    )
+
+
+def _resolve_request_symbols(request: LaunchBacktestRequest) -> tuple[list[str], str]:
+    validation = validate_request_symbols(request)
+    if validation.outcome != "resolved" or validation.asset_class is None:
+        raise ValueError(validation.error_code or "invalid_symbol")
+    return list(validation.symbols), validation.asset_class
 
 
 def _blocked_result(

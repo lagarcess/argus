@@ -123,4 +123,60 @@ describe("chat message hydration", () => {
       "chat.coverage_recovery.actions.change_benchmark",
     ]);
   });
+
+  test("preserves persisted LLM coverage voice while hydrating all typed actions", () => {
+    const exactLlmPrompt =
+      "AAPL and SPY do not share enough history for one trustworthy test. Which part should we change?";
+    const message = hydrateTextMessageFromApi(
+      apiMessage({
+        id: "assistant-coverage-llm",
+        content: exactLlmPrompt,
+        metadata: {
+          clarification: {
+            kind: "coverage_recovery",
+            reason_code: "no_common_data_window",
+            prompt_source: "llm_generated",
+            requested_field: null,
+            requested_fields: [
+              "date_range",
+              "asset_universe",
+              "comparison_baseline",
+            ],
+            semantic_needs: ["simplification_choice"],
+            payload: {
+              strategy: { asset_universe: ["AAPL"] },
+              coverage: {
+                code: "no_common_data_window",
+                benchmark_symbol: "SPY",
+              },
+            },
+            options: [
+              {
+                id: "change_dates",
+                replacement_values: { requested_field: "date_range" },
+              },
+              {
+                id: "change_asset",
+                replacement_values: { requested_field: "asset_universe" },
+              },
+              {
+                id: "change_benchmark",
+                replacement_values: {
+                  requested_field: "comparison_baseline",
+                },
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    expect(message.content).toBe(exactLlmPrompt);
+    expect(message.recoveryDisplay).toBeNull();
+    expect(message.actions?.map((action) => action.labelKey)).toEqual([
+      "chat.coverage_recovery.actions.change_dates",
+      "chat.coverage_recovery.actions.change_asset",
+      "chat.coverage_recovery.actions.change_benchmark",
+    ]);
+  });
 });

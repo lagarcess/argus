@@ -2209,8 +2209,11 @@ def test_confirm_stage_returns_typed_recovery_without_runnable_card_when_no_comm
     assert clarified.patch["assistant_prompt"] == (
         "The shared history is not usable. Which part should we change?"
     )
-    assert "clarification" not in clarified.patch
     response_intent = clarified.patch["response_intent"]
+    clarification = clarified.patch["clarification"]
+    assert clarification["kind"] == "coverage_recovery"
+    assert clarification["prompt_source"] == "llm_generated"
+    assert clarification["options"] == response_intent["options"]
     assert response_intent["kind"] == "coverage_recovery"
     assert response_intent["facts"]["coverage"] == recovery
     assert response_intent["options"] == [
@@ -2307,6 +2310,7 @@ def test_degraded_coverage_recovery_emits_typed_localizable_sidecar() -> None:
     assert result.patch["clarification"] == {
         "kind": "coverage_recovery",
         "reason_code": "no_common_data_window",
+        "prompt_source": "degraded_fallback",
         "requested_field": None,
         "requested_fields": [
             "date_range",

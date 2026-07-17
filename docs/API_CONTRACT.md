@@ -1977,14 +1977,15 @@ stable `code`, `retryable`, and optional `params`. User-facing recovery copy is
 presentation only; clients must render retry affordances and localized recovery
 copy from structured metadata, not by matching assistant prose.
 
-When the clarification/composer path is degraded, the final payload and
-persisted assistant message metadata may also include `clarification`. This is
-the typed contract for localized fallback clarification UI. The backend remains
-the source of truth for the reason, requested field, strategy payload, and
-structured option payloads; frontend clients render localized strings from
-static i18n bundles using those typed fields. `assistant_prompt` or
-`assistant_response` may still carry compatibility English text for older
-clients, but new clients should prefer `clarification` when present.
+The final payload and persisted assistant message metadata may also include
+`clarification`. This typed contract carries the reason, requested field,
+strategy payload, structured option payloads, and `prompt_source` provenance.
+`prompt_source = llm_generated` means `assistant_prompt` or
+`assistant_response` owns the exact user-visible prose; clients keep that text
+while hydrating actions from `clarification`. `prompt_source =
+degraded_fallback` means clients render localized deterministic copy from
+static i18n bundles using the typed fields. Legacy sidecars without
+`prompt_source` are treated as degraded fallback for reload compatibility.
 
 Recoverable streaming error frames may also include the same structured fields
 so live clients can render retry controls immediately, before reload hydration:
@@ -2018,6 +2019,7 @@ Example degraded clarification payload:
     "clarification": {
       "kind": "clarification",
       "reason_code": "missing_period",
+      "prompt_source": "degraded_fallback",
       "requested_field": "date_range",
       "requested_fields": ["date_range"],
       "semantic_needs": ["period"],
@@ -2040,6 +2042,7 @@ Example unsupported-recovery clarification payload:
   "clarification": {
     "kind": "unsupported_recovery",
     "reason_code": "unsupported_strategy_logic",
+    "prompt_source": "degraded_fallback",
     "requested_field": "unsupported_constraints",
     "requested_fields": ["unsupported_constraints"],
     "semantic_needs": ["simplification_choice"],

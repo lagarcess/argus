@@ -7,6 +7,7 @@ from typing import Protocol
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.clarification_contract import (
+    ClarificationPromptSource,
     offline_clarification_fallback,
     typed_clarification_contract,
 )
@@ -118,14 +119,18 @@ async def clarify_stage_async(
             "requested_fields": requested_fields,
             "missing_required_fields": [],
         }
-        if generated.used_degraded_fallback:
-            stage_patch.update(
-                _clarification_sidecar_patch(
-                    state=state,
-                    response_intent=response_intent,
-                    requested_field=None,
-                )
+        stage_patch.update(
+            _clarification_sidecar_patch(
+                state=state,
+                response_intent=response_intent,
+                requested_field=None,
+                prompt_source=(
+                    "degraded_fallback"
+                    if generated.used_degraded_fallback
+                    else "llm_generated"
+                ),
             )
+        )
         return StageResult(
             outcome="await_user_reply",
             stage_patch=stage_patch,
@@ -165,6 +170,7 @@ async def clarify_stage_async(
                     state=state,
                     response_intent=response_intent,
                     requested_field=state.requested_field or "unsupported_constraints",
+                    prompt_source="degraded_fallback",
                 )
             )
         return StageResult(
@@ -208,6 +214,7 @@ async def clarify_stage_async(
                     state=state,
                     response_intent=response_intent,
                     requested_field=requested_field,
+                    prompt_source="degraded_fallback",
                 )
             )
         return StageResult(
@@ -246,6 +253,7 @@ async def clarify_stage_async(
                     state=state,
                     response_intent=response_intent,
                     requested_field=requested_field,
+                    prompt_source="degraded_fallback",
                 )
             )
         return StageResult(
@@ -414,11 +422,13 @@ def _clarification_sidecar_patch(
     state: RunState,
     response_intent: dict[str, object],
     requested_field: str | None,
+    prompt_source: ClarificationPromptSource,
 ) -> dict[str, object]:
     clarification = typed_clarification_contract(
         response_intent=response_intent,
         requested_field=requested_field,
         strategy=state.candidate_strategy_draft,
+        prompt_source=prompt_source,
     )
     return {"clarification": clarification} if clarification is not None else {}
 

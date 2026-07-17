@@ -87,6 +87,7 @@ describe("chat recovery display", () => {
       clarification: {
         kind: "clarification",
         reason_code: "missing_period",
+        prompt_source: "degraded_fallback",
         requested_field: "date_range",
         semantic_needs: ["period"],
         payload: {
@@ -148,6 +149,7 @@ describe("chat recovery display", () => {
       clarification: {
         kind: "unsupported_recovery",
         reason_code: "unsupported_strategy_logic",
+        prompt_source: "degraded_fallback",
         requested_field: "unsupported_constraints",
         semantic_needs: ["simplification_choice"],
         payload: {
@@ -183,6 +185,7 @@ describe("chat recovery display", () => {
       clarification: {
         kind: "coverage_recovery",
         reason_code: "no_common_data_window",
+        prompt_source: "degraded_fallback",
         requested_field: null,
         requested_fields: [
           "date_range",

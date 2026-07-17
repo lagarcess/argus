@@ -212,15 +212,28 @@ def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
         MarketDataCoverageError,
         prepare_market_data,
     )
-    from argus.domain.engine import classify_symbol
+    from argus.domain.engine_launch.adapter import validate_request_symbols
 
     try:
         request = LaunchBacktestRequest.model_validate(launch_payload)
-        asset_class = request.asset_class or classify_symbol(request.symbol).asset_class
+        symbol_validation = validate_request_symbols(request)
+        if symbol_validation.outcome == "unavailable":
+            return coverage_recovery_stage_patch(
+                error_code="market_data_unavailable",
+                launch_payload=launch_payload,
+            )
+        if symbol_validation.outcome != "resolved":
+            return _launch_validation_failure(
+                symbol_validation.error_code or "invalid_symbol"
+            )
+        symbols = list(symbol_validation.symbols)
+        asset_class = symbol_validation.asset_class
+        if asset_class is None:
+            return _launch_validation_failure("invalid_asset_class")
         requested_range = request.requested_date_range or request.date_range
         config = {
             "asset_class": asset_class,
-            "symbols": list(request.symbols),
+            "symbols": symbols,
             "timeframe": request.timeframe,
             "start_date": request.date_range.start,
             "end_date": request.date_range.end,
@@ -234,10 +247,7 @@ def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
             launch_payload=launch_payload,
         )
     except ValueError as exc:
-        return coverage_recovery_stage_patch(
-            error_code=str(exc),
-            launch_payload=launch_payload,
-        )
+        return _launch_validation_failure(str(exc))
 
     requested = prepared.requested_date_range.model_dump()
     effective = prepared.effective_date_range.model_dump()

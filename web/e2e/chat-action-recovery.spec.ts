@@ -4,6 +4,9 @@ const CONVERSATION_ID = "conv-actions";
 const RUN_ID = "run-actions";
 const CONFIRMATION_ID = "confirm-actions";
 const CREATED_AT = "2026-06-16T12:00:00Z";
+const COVERAGE_RECOVERY_REQUEST = "Test AAPL coverage recovery";
+const COVERAGE_RECOVERY_PROMPT =
+  "AAPL and SPY do not share enough history for one trustworthy test. Which part should we change?";
 
 type StreamRequest = {
   conversation_id: string;
@@ -525,11 +528,79 @@ async function mockChatApi(
       ]);
     }
 
+    if (body.message === COVERAGE_RECOVERY_REQUEST) {
+      const clarification = {
+        kind: "coverage_recovery",
+        reason_code: "no_common_data_window",
+        prompt_source: "llm_generated",
+        requested_field: null,
+        requested_fields: [
+          "date_range",
+          "asset_universe",
+          "comparison_baseline",
+        ],
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          strategy: {
+            strategy_type: "buy_and_hold",
+            asset_universe: ["AAPL"],
+            asset_class: "equity",
+          },
+          coverage: {
+            code: "no_common_data_window",
+            benchmark_symbol: "SPY",
+          },
+        },
+        options: [
+          {
+            id: "change_dates",
+            replacement_values: { requested_field: "date_range" },
+          },
+          {
+            id: "change_asset",
+            replacement_values: { requested_field: "asset_universe" },
+          },
+          {
+            id: "change_benchmark",
+            replacement_values: { requested_field: "comparison_baseline" },
+          },
+        ],
+      };
+      messages.splice(
+        0,
+        messages.length,
+        persistedUserMessage("msg-user-coverage-recovery", body.message),
+        persistedAssistantMessage(
+          "msg-coverage-recovery",
+          COVERAGE_RECOVERY_PROMPT,
+          { clarification },
+        ),
+      );
+      return fulfillSse(route, [
+        { type: "stage_start", stage: "clarify" },
+        {
+          type: "token",
+          content: COVERAGE_RECOVERY_PROMPT,
+        },
+        {
+          type: "final",
+          payload: {
+            stage_outcome: "await_user_reply",
+            assistant_prompt: COVERAGE_RECOVERY_PROMPT,
+            clarification,
+            message_id: "msg-coverage-recovery",
+          },
+        },
+        "[DONE]",
+      ]);
+    }
+
     if (body.message === "Prueba comprar y mantener AAPL") {
       const compatibilityPrompt = "What date window should I use for AAPL?";
       const clarification = {
         kind: "clarification",
         reason_code: "missing_period",
+        prompt_source: "degraded_fallback",
         requested_field: "date_range",
         requested_fields: ["date_range"],
         semantic_needs: ["period"],
@@ -951,6 +1022,36 @@ test("Spanish degraded clarification renders from typed sidecar", async ({ page 
   await expect(
     page.getByText("What date window should I use for AAPL?"),
   ).toHaveCount(0);
+});
+
+test("successful LLM coverage recovery preserves exact voice and actions after reload", async ({
+  page,
+}) => {
+  await mockChatApi(page);
+
+  await page.goto("/chat", { waitUntil: "networkidle" });
+  await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId("chat-input").fill(COVERAGE_RECOVERY_REQUEST);
+  await page.getByTestId("chat-send").click();
+
+  const expectCoverageRecovery = async () => {
+    await expect(page.getByText(COVERAGE_RECOVERY_PROMPT, { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(
+        "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
+        { exact: true },
+      ),
+    ).toHaveCount(0);
+    for (const label of ["Change dates", "Change asset", "Change benchmark"]) {
+      await expect(
+        page.getByRole("button", { name: label, exact: true }).first(),
+      ).toBeVisible();
+    }
+  };
+
+  await expectCoverageRecovery();
+  await page.reload({ waitUntil: "networkidle" });
+  await expectCoverageRecovery();
 });
 
 test("retry action recovers a failed stream without duplicating user input", async ({ page }) => {
