@@ -151,10 +151,23 @@ def test_asset_universe_cache_refreshes_when_provider_mode_changes(
         raw_symbol="BTC/USD",
         provider="kraken",
     )
+    live_spy = ResolvedAsset(
+        canonical_symbol="SPY",
+        asset_class="equity",
+        name="SPDR S&P 500 ETF Trust",
+        raw_symbol="SPY",
+        provider="alpaca",
+    )
     monkeypatch.setattr(assets, "_load_assets_from_alpaca", lambda: {})
     monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {"BTC": bitcoin})
+    monkeypatch.setattr(
+        assets,
+        "_load_asset_from_alpaca_symbol",
+        lambda symbol: live_spy,
+    )
 
-    assert assets.resolve_asset("BTC").provider == "kraken"
+    assert assets.search_assets("btc")[0].provider == "kraken"
+    assert assets.resolve_asset("SPY").provider == "alpaca"
 
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
 
