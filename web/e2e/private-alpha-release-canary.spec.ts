@@ -431,6 +431,31 @@ test.describe.serial("private-alpha rendered release canary", () => {
       page.getByRole("button", { name: label("common.retry") }),
     ).toHaveCount(0);
 
+    await page
+      .getByRole("button", { name: label("chat.new_chat") })
+      .click();
+    await expect
+      .poll(
+        () => new URL(page.url()).searchParams.get("conversation"),
+        {
+          message: "New chat did not leave the source conversation",
+          timeout: 30_000,
+        },
+      )
+      .toBe(null);
+    await expect
+      .poll(
+        () =>
+          page
+            .getByText(label("chat.simulation_complete"), { exact: true })
+            .count(),
+        {
+          message: "Source result remained visible before Omnisearch reopening",
+          timeout: 30_000,
+        },
+      )
+      .toBe(0);
+
     await page.getByRole("button", { name: label("common.search") }).click();
     const searchResponsePromise = page.waitForResponse((response) => {
       try {

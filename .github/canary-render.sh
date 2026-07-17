@@ -628,6 +628,7 @@ validate_release_evidence_contract() {
 run_browser_canary() {
   if ! ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF="$BROWSER_IDENTITY_HANDOFF" \
     "$SCRIPT_DIR/canary-browser.sh"; then
+    BROWSER_CANARY_STATUS="failed"
     return 1
   fi
   BROWSER_CANARY_STATUS="passed"
@@ -791,10 +792,62 @@ PY
   curl -fsS -b "$COOKIE_JAR" \
     "${API_URL}/api/v1/conversations/${CONVERSATION_ID}/messages" \
     > "$API_MESSAGES_RESPONSE" || true
+  if [ -z "$BACKTEST_JOB_ID" ]; then
+    local recovered_job=""
+    local attempt
+    for attempt in 1 2 3 4 5; do
+      if supabase_get \
+        "${SUPABASE_URL}/rest/v1/backtest_jobs?select=id,result_run_id&conversation_id=eq.${CONVERSATION_ID}&user_id=eq.${USER_ID}&order=created_at.desc&limit=2" \
+        "$JOB_ROWS"; then
+        recovered_job="$(python3 - "$JOB_ROWS" <<'PY' || true
+import json
+import pathlib
+import sys
+
+rows = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+if not isinstance(rows, list) or len(rows) != 1:
+    raise SystemExit(1)
+job = rows[0]
+job_id = job.get("id")
+run_id = job.get("result_run_id")
+if not isinstance(job_id, str) or not job_id:
+    raise SystemExit(1)
+print(f"{job_id}|{run_id if isinstance(run_id, str) and run_id else '-'}")
+PY
+)"
+      fi
+      if [ -n "$recovered_job" ]; then
+        IFS='|' read -r BACKTEST_JOB_ID BACKTEST_RUN_ID <<< "$recovered_job"
+        [ "$BACKTEST_RUN_ID" = "-" ] && BACKTEST_RUN_ID=""
+        BACKTEST_JOB_LABEL="$(privacy_safe_id_label backtest_job "$BACKTEST_JOB_ID")"
+        RESULT_LABEL="$(privacy_safe_id_label backtest_run "$BACKTEST_RUN_ID")"
+        break
+      fi
+      sleep 1
+    done
+  fi
   if [ -n "$BACKTEST_JOB_ID" ]; then
     curl -fsS -b "$COOKIE_JAR" \
       "${API_URL}/api/v1/backtest-jobs/${BACKTEST_JOB_ID}" \
       > "$API_JOB_RESPONSE" || true
+    if [ -z "$BACKTEST_RUN_ID" ] && [ -s "$API_JOB_RESPONSE" ]; then
+      BACKTEST_RUN_ID="$(python3 - "$API_JOB_RESPONSE" <<'PY' || true
+import json
+import pathlib
+import sys
+
+payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+job = payload.get("job") if isinstance(payload, dict) else None
+run = payload.get("run") if isinstance(payload, dict) else None
+run_id = job.get("result_run_id") if isinstance(job, dict) else None
+if not isinstance(run_id, str) or not run_id:
+    run_id = run.get("id") if isinstance(run, dict) else None
+if isinstance(run_id, str) and run_id:
+    print(run_id)
+PY
+)"
+      RESULT_LABEL="$(privacy_safe_id_label backtest_run "$BACKTEST_RUN_ID")"
+    fi
   fi
   if [ -n "$BACKTEST_RUN_ID" ]; then
     supabase_get \

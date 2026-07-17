@@ -258,6 +258,12 @@ def test_browser_proves_reload_and_omnisearch_source_identity() -> None:
     browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
 
     assert "await page.reload()" in browser_source
+    leave_source = browser_source.index('label("chat.new_chat")')
+    open_search = browser_source.index('label("common.search")')
+    click_evidence = browser_source.index('label("command_palette.type.evidence")')
+    assert leave_source < open_search < click_evidence
+    assert "New chat did not leave the source conversation" in browser_source
+    assert "Source result remained visible before Omnisearch reopening" in browser_source
     assert 'url.pathname.endsWith("/api/v1/search")' in browser_source
     assert "item.id === evidenceArtifactId" in browser_source
     assert "item.conversation_id === conversationId" in browser_source
@@ -444,6 +450,16 @@ def test_browser_failure_recovers_replay_inputs_before_writing_capture() -> None
     assert "API_MESSAGES_RESPONSE" in recovery_body
     assert "API_JOB_RESPONSE" in recovery_body
     assert "RECEIPT_ROWS" in recovery_body
+    assert "backtest_jobs?select=id,result_run_id" in recovery_body
+    assert "conversation_id=eq.${CONVERSATION_ID}" in recovery_body
+    assert "user_id=eq.${USER_ID}" in recovery_body
+
+
+def test_failed_browser_run_is_reported_as_failed_not_not_run() -> None:
+    source = _source(".github/canary-render.sh")
+    runner_body = source.split("run_browser_canary() {", 1)[1].split("\n}", 1)[0]
+
+    assert 'BROWSER_CANARY_STATUS="failed"' in runner_body
 
 
 def test_canary_writes_privacy_safe_failure_evidence() -> None:

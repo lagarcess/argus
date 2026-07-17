@@ -131,6 +131,7 @@
       "common.retry",
       "common.search",
       "chat.history.pinned",
+      "chat.new_chat",
       "chat.confirmation.status.ready_to_run",
       "chat.confirmation.actions.run_backtest",
       "chat.simulation_complete",

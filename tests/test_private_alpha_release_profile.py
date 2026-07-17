@@ -34,6 +34,7 @@ def test_release_profile_is_non_secret_and_defines_real_workflow_canary() -> Non
     assert profile["workflow"]["real_task"] == "argus-backtests/run_backtest_job"
     assert profile["locales"]["supported"] == ["en", "es-419"]
     assert "chat.history.pinned" in profile["locales"]["required_static_keys"]
+    assert "chat.new_chat" in profile["locales"]["required_static_keys"]
     assert profile["capabilities"]["omnisearch"] is True
     assert profile["canary"]["language"] == "es-419"
     assert "AAPL" in profile["canary"]["prompt"]
