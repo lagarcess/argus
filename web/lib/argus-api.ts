@@ -706,16 +706,41 @@ export async function loginWithEmail(payload: {
   return response;
 }
 
-export async function logoutFromApi() {
-  try {
-    return await apiFetch<{ success: boolean }>("/auth/logout", {
-      method: "POST",
-    });
-  } finally {
-    await getSupabaseClient()
-      ?.auth.signOut()
-      .catch(() => null);
+export async function clearArgusSessionCookies() {
+  return apiFetch<{ success: boolean }>("/auth/logout", {
+    method: "POST",
+  });
+}
+
+export async function synchronizeCurrentBrowserLogout<T>(
+  auth: {
+    signOut: (options: {
+      scope: "local";
+    }) => Promise<{ error: unknown | null }>;
+  },
+  clearCookies: () => Promise<T>,
+): Promise<T> {
+  const [revocation, cookieSync] = await Promise.allSettled([
+    auth.signOut({ scope: "local" }),
+    clearCookies(),
+  ]);
+  if (cookieSync.status === "rejected") throw cookieSync.reason;
+  if (revocation.status === "rejected") throw revocation.reason;
+  if (revocation.value.error) {
+    throw revocation.value.error instanceof Error
+      ? revocation.value.error
+      : new Error("Authentication request failed.");
   }
+  return cookieSync.value;
+}
+
+export async function logoutFromApi() {
+  const supabase = getSupabaseClient();
+  if (!supabase) return clearArgusSessionCookies();
+  return synchronizeCurrentBrowserLogout(
+    { signOut: (options) => supabase.auth.signOut(options) },
+    clearArgusSessionCookies,
+  );
 }
 
 export async function createConversation(language?: string | null) {
