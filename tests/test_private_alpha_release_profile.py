@@ -37,6 +37,11 @@ def test_release_profile_is_non_secret_and_defines_real_workflow_canary() -> Non
     assert profile["capabilities"]["omnisearch"] is True
     assert profile["canary"]["language"] == "es-419"
     assert "AAPL" in profile["canary"]["prompt"]
+    assert profile["canary"]["search_query"] == "AAPL"
+    assert profile["canary"]["decision_note"]
+    assert "browser_owned_golden_path" in profile["canary"]["required_steps"]
+    assert "private_identity_handoff" in profile["canary"]["required_steps"]
+    assert "deterministic_intercepted_recovery" in profile["canary"]["required_steps"]
     assert "candidate_sha" not in serialized
     assert "eyjhb" not in serialized
     assert "bearer " not in serialized
@@ -79,6 +84,16 @@ def test_profile_utility_resolves_required_spanish_static_key_values() -> None:
     values = json.loads(result.stdout)
     assert values["chat.history.pinned"]
     assert values["chat.result_card.add_decision"]
+    assert values["chat.confirmation.actions.run_backtest"]
+    assert values["chat.result_card.save_decision"]
+    assert values["command_palette.search_placeholder"]
+
+
+def test_profile_utility_exposes_browser_journey_inputs() -> None:
+    for field in ("prompt", "decision_state", "decision_note", "search_query"):
+        result = _profile_utility("canary-value", field)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip()
 
 
 def test_render_blueprint_matches_the_authoritative_nonsecret_profile() -> None:

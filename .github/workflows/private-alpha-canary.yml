@@ -103,7 +103,7 @@ jobs:
       - name: Prepare canary evidence directory
         run: mkdir -p temp/canary-evidence
 
-      - name: Run authoritative Spanish release canary
+      - name: Run authoritative rendered Spanish release canary
         continue-on-error: true
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}

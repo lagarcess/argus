@@ -1,7 +1,8 @@
 #!/bin/bash
-# Authenticated golden-path canary for the private-alpha Render deployment.
+# Browser-owned Golden Path canary for the private-alpha Render deployment.
 
 set -euo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -17,8 +18,6 @@ EMAIL="${ARGUS_CANARY_EMAIL:-${MOCK_USER_EMAIL:-}}"
 PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"
 SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-${SUPABASE_URL:-${SUPABASE_PROJECT_URL:-}}}"
 SUPABASE_SERVICE_ROLE_KEY="${ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}"
-TIMEOUT_SECONDS="${ARGUS_CANARY_TIMEOUT_SECONDS:-240}"
-POLL_SLEEP_SECONDS="${ARGUS_CANARY_POLL_SLEEP_SECONDS:-5}"
 LANGUAGE="${ARGUS_CANARY_LANGUAGE:-es-419}"
 EXPECT_MODE="${ARGUS_CANARY_EXPECT_MODE:-${ARGUS_WARMUP_EXPECT_MODE:-real-workflow}}"
 EVIDENCE_PATH="${ARGUS_CANARY_EVIDENCE_PATH:-}"
@@ -26,17 +25,94 @@ CAPTURE_PATH="${ARGUS_CANARY_CAPTURE_PATH:-}"
 CANDIDATE_SHA="${ARGUS_CANARY_SHA:-${GITHUB_SHA:-}}"
 CHECKED_OUT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
 FOCUSED_SYMBOL_PATH="${ARGUS_CANARY_FOCUSED_SYMBOL_PATH:-}"
-REQUIRE_ASYNC_WORKFLOW="${ARGUS_CANARY_REQUIRE_ASYNC_WORKFLOW:-true}"
 RELEASE_PROFILE_TOOL="$SCRIPT_DIR/private-alpha-release-profile.py"
 PROMPT="$(python3 "$RELEASE_PROFILE_TOOL" canary-value prompt 2>/dev/null || true)"
+DECISION_STATE="$(python3 "$RELEASE_PROFILE_TOOL" canary-value decision_state 2>/dev/null || true)"
+SEARCH_QUERY="$(python3 "$RELEASE_PROFILE_TOOL" canary-value search_query 2>/dev/null || true)"
 
 if [ -z "$CHECKED_OUT_SHA" ]; then
   CHECKED_OUT_SHA="unknown"
 fi
-
 if [ -z "$CANDIDATE_SHA" ]; then
   CANDIDATE_SHA="$CHECKED_OUT_SHA"
 fi
+
+BROWSER_IDENTITY_HANDOFF="$(mktemp)"
+COOKIE_JAR="$(mktemp)"
+API_JOB_RESPONSE="$(mktemp)"
+API_MESSAGES_RESPONSE="$(mktemp)"
+API_SEARCH_RESPONSE="$(mktemp)"
+CONVERSATION_ROWS="$(mktemp)"
+JOB_ROWS="$(mktemp)"
+RUN_ROWS="$(mktemp)"
+EVIDENCE_ROWS="$(mktemp)"
+DECISION_ROWS="$(mktemp)"
+IDEA_ROWS="$(mktemp)"
+IDEA_VERSION_ROWS="$(mktemp)"
+RECEIPT_ROWS="$(mktemp)"
+chmod 600 "$BROWSER_IDENTITY_HANDOFF"
+
+cleanup() {
+  rm -f "$BROWSER_IDENTITY_HANDOFF"
+  rm -f \
+    "$COOKIE_JAR" \
+    "$API_JOB_RESPONSE" \
+    "$API_MESSAGES_RESPONSE" \
+    "$API_SEARCH_RESPONSE" \
+    "$CONVERSATION_ROWS" \
+    "$JOB_ROWS" \
+    "$RUN_ROWS" \
+    "$EVIDENCE_ROWS" \
+    "$DECISION_ROWS" \
+    "$IDEA_ROWS" \
+    "$IDEA_VERSION_ROWS" \
+    "$RECEIPT_ROWS"
+}
+trap cleanup EXIT
+
+WARMUP_OUTPUT=""
+API_DEPLOY_STATUS_OUTPUT=""
+WEB_DEPLOY_STATUS_OUTPUT=""
+WORKFLOW_VERSION_STATUS_OUTPUT=""
+ENV_FINGERPRINT=""
+RELEASE_PROFILE_HASH=""
+WORKFLOW_ENV_FINGERPRINT=""
+WORKFLOW_ENV_STATUS=""
+WORKFLOW_RUNTIME_PROVIDER_MODE=""
+WORKFLOW_RUNTIME_PROOF=""
+WORKFLOW_TASK=""
+REAL_WORKFLOW_TASK=""
+API_DEPLOY_SHA=""
+WEB_DEPLOY_SHA=""
+API_DEPLOY_STATUS=""
+WEB_DEPLOY_STATUS=""
+WORKFLOW_VERSION_COMMIT=""
+WORKFLOW_VERSION_ID=""
+WORKFLOW_VERSION_STATUS=""
+WORKFLOW_EXPECTED_VERSION_ID=""
+USER_ID=""
+CONVERSATION_ID=""
+BACKTEST_JOB_ID=""
+BACKTEST_RUN_ID=""
+EVIDENCE_ARTIFACT_ID=""
+DECISION_NOTE_ID=""
+IDEA_ID=""
+IDEA_VERSION_ID=""
+CONVERSATION_LABEL=""
+BACKTEST_JOB_LABEL=""
+RESULT_LABEL=""
+EVIDENCE_ARTIFACT_LABEL=""
+DECISION_NOTE_LABEL=""
+IDEA_LABEL=""
+IDEA_VERSION_LABEL=""
+BROWSER_CANARY_STATUS="not_run"
+BROWSER_CONSOLE_ERROR_COUNT=""
+BROWSER_PAGE_ERROR_COUNT=""
+BROWSER_BLOCKING_OVERLAY_PRESENT=""
+RUN_ACTION_REQUEST_COUNT=""
+CANARY_STATUS="running"
+CANARY_FAILURE_STAGE=""
+CANARY_FAILURE_REASON=""
 
 privacy_safe_id_label() {
   local label_type="$1"
@@ -57,41 +133,6 @@ print(f"{prefix}_{label}")
 PY
 }
 
-print_safe_job_response() {
-  python3 - "$JOB_RESPONSE" <<'PY'
-import json
-import pathlib
-import sys
-
-try:
-    payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
-except Exception:
-    print("job response summary unavailable")
-    raise SystemExit(0)
-
-job = payload.get("job") if isinstance(payload, dict) else None
-summary = {}
-if isinstance(job, dict):
-    status = job.get("status")
-    if status:
-        summary["job_status"] = status
-    failure_code = job.get("failure_code")
-    if failure_code:
-        summary["failure_code"] = failure_code
-source = payload.get("result_readout_source") if isinstance(payload, dict) else None
-fallback_used = payload.get("result_readout_fallback_used") if isinstance(payload, dict) else None
-if source:
-    summary["result_readout_source"] = source
-if fallback_used is not None:
-    summary["result_readout_fallback_used"] = fallback_used
-print(json.dumps(summary or {"job_response": "present"}, sort_keys=True))
-PY
-}
-
-WARMUP_OUTPUT=""
-API_DEPLOY_STATUS_OUTPUT=""
-WEB_DEPLOY_STATUS_OUTPUT=""
-WORKFLOW_VERSION_STATUS_OUTPUT=""
 print_sanitized_warmup_output() {
   CANARY_WARMUP_OUTPUT="$WARMUP_OUTPUT" python3 - <<'PY'
 import json
@@ -132,14 +173,6 @@ for line in os.environ["CANARY_WARMUP_OUTPUT"].splitlines():
 PY
 }
 
-run_warmup_probe() {
-  if ! WARMUP_OUTPUT="$(.github/warmup-render.sh --expect-mode "$EXPECT_MODE")"; then
-    print_sanitized_warmup_output
-    fail_canary "warmup" "warmup_probe_failed"
-  fi
-  print_sanitized_warmup_output
-}
-
 extract_warmup_value() {
   local key="$1"
   awk -F= -v key="$key" '$1 == key { print substr($0, length(key) + 2); found=1; exit } END { if (!found) exit 1 }' <<< "$WARMUP_OUTPUT"
@@ -149,6 +182,147 @@ extract_status_value() {
   local status="$1"
   local key="$2"
   awk -F= -v key="$key" '$1 == key { print substr($0, length(key) + 2); found=1; exit } END { if (!found) exit 1 }' <<< "$status"
+}
+
+build_release_evidence_json() {
+  CANARY_STATUS="$CANARY_STATUS" \
+  CANARY_FAILURE_STAGE="$CANARY_FAILURE_STAGE" \
+  CANARY_FAILURE_REASON="$CANARY_FAILURE_REASON" \
+  CANARY_EXPECTED_MODE="$EXPECT_MODE" \
+  CANARY_RELEASE_PROFILE_HASH="$RELEASE_PROFILE_HASH" \
+  CANARY_ENV_FINGERPRINT="$ENV_FINGERPRINT" \
+  CANARY_WORKFLOW_ENV_FINGERPRINT="$WORKFLOW_ENV_FINGERPRINT" \
+  CANARY_WORKFLOW_ENV_STATUS="$WORKFLOW_ENV_STATUS" \
+  CANARY_WORKFLOW_RUNTIME_PROVIDER_MODE="$WORKFLOW_RUNTIME_PROVIDER_MODE" \
+  CANARY_WORKFLOW_RUNTIME_PROOF="$WORKFLOW_RUNTIME_PROOF" \
+  CANARY_WORKFLOW_TASK="$WORKFLOW_TASK" \
+  CANARY_REAL_WORKFLOW_TASK="$REAL_WORKFLOW_TASK" \
+  CANARY_API_DEPLOY_SHA="$API_DEPLOY_SHA" \
+  CANARY_WEB_DEPLOY_SHA="$WEB_DEPLOY_SHA" \
+  CANARY_API_DEPLOY_STATUS="$API_DEPLOY_STATUS" \
+  CANARY_WEB_DEPLOY_STATUS="$WEB_DEPLOY_STATUS" \
+  CANARY_WORKFLOW_VERSION_COMMIT="$WORKFLOW_VERSION_COMMIT" \
+  CANARY_WORKFLOW_VERSION_ID="$WORKFLOW_VERSION_ID" \
+  CANARY_WORKFLOW_VERSION_STATUS="$WORKFLOW_VERSION_STATUS" \
+  CANARY_EXPECTED_SHA="$CANDIDATE_SHA" \
+  CANARY_CHECKED_OUT_SHA="$CHECKED_OUT_SHA" \
+  CANARY_LANGUAGE="$LANGUAGE" \
+  CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \
+  CANARY_CONVERSATION_LABEL="$CONVERSATION_LABEL" \
+  CANARY_BACKTEST_JOB_LABEL="$BACKTEST_JOB_LABEL" \
+  CANARY_RESULT_LABEL="$RESULT_LABEL" \
+  CANARY_EVIDENCE_ARTIFACT_LABEL="$EVIDENCE_ARTIFACT_LABEL" \
+  CANARY_DECISION_NOTE_LABEL="$DECISION_NOTE_LABEL" \
+  CANARY_IDEA_LABEL="$IDEA_LABEL" \
+  CANARY_IDEA_VERSION_LABEL="$IDEA_VERSION_LABEL" \
+  CANARY_BROWSER_STATUS="$BROWSER_CANARY_STATUS" \
+  CANARY_RUN_ACTION_REQUEST_COUNT="$RUN_ACTION_REQUEST_COUNT" \
+  CANARY_BROWSER_CONSOLE_ERROR_COUNT="$BROWSER_CONSOLE_ERROR_COUNT" \
+  CANARY_BROWSER_PAGE_ERROR_COUNT="$BROWSER_PAGE_ERROR_COUNT" \
+  CANARY_BROWSER_BLOCKING_OVERLAY_PRESENT="$BROWSER_BLOCKING_OVERLAY_PRESENT" \
+  python3 - <<'PY'
+import json
+import os
+
+def optional(value: str):
+    return value or None
+
+def optional_int(value: str):
+    return int(value) if value else None
+
+payload = {
+    "status": os.environ["CANARY_STATUS"],
+    "failure_stage": optional(os.environ["CANARY_FAILURE_STAGE"]),
+    "failure_reason": optional(os.environ["CANARY_FAILURE_REASON"]),
+    "expected_mode": os.environ["CANARY_EXPECTED_MODE"],
+    "release_profile_hash": optional(os.environ["CANARY_RELEASE_PROFILE_HASH"]),
+    "env_fingerprint": optional(os.environ["CANARY_ENV_FINGERPRINT"]),
+    "workflow_env_fingerprint": optional(os.environ["CANARY_WORKFLOW_ENV_FINGERPRINT"]),
+    "workflow_env_status": optional(os.environ["CANARY_WORKFLOW_ENV_STATUS"]),
+    "workflow_runtime_provider_mode": optional(os.environ["CANARY_WORKFLOW_RUNTIME_PROVIDER_MODE"]),
+    "workflow_runtime_proof": optional(os.environ["CANARY_WORKFLOW_RUNTIME_PROOF"]),
+    "workflow_task": optional(os.environ["CANARY_WORKFLOW_TASK"]),
+    "real_workflow_task": optional(os.environ["CANARY_REAL_WORKFLOW_TASK"]),
+    "api_deploy_sha": optional(os.environ["CANARY_API_DEPLOY_SHA"]),
+    "web_deploy_sha": optional(os.environ["CANARY_WEB_DEPLOY_SHA"]),
+    "api_deploy_status": optional(os.environ["CANARY_API_DEPLOY_STATUS"]),
+    "web_deploy_status": optional(os.environ["CANARY_WEB_DEPLOY_STATUS"]),
+    "workflow_version_commit": optional(os.environ["CANARY_WORKFLOW_VERSION_COMMIT"]),
+    "workflow_version_id": optional(os.environ["CANARY_WORKFLOW_VERSION_ID"]),
+    "workflow_version_status": optional(os.environ["CANARY_WORKFLOW_VERSION_STATUS"]),
+    "candidate_sha": os.environ["CANARY_EXPECTED_SHA"],
+    "checked_out_sha": os.environ["CANARY_CHECKED_OUT_SHA"],
+    "language": os.environ["CANARY_LANGUAGE"],
+    "focused_symbol_path": optional(os.environ["CANARY_FOCUSED_SYMBOL_PATH"]),
+    "conversation_label": optional(os.environ["CANARY_CONVERSATION_LABEL"]),
+    "backtest_job_label": optional(os.environ["CANARY_BACKTEST_JOB_LABEL"]),
+    "result_label": optional(os.environ["CANARY_RESULT_LABEL"]),
+    "evidence_artifact_label": optional(os.environ["CANARY_EVIDENCE_ARTIFACT_LABEL"]),
+    "decision_note_label": optional(os.environ["CANARY_DECISION_NOTE_LABEL"]),
+    "idea_label": optional(os.environ["CANARY_IDEA_LABEL"]),
+    "idea_version_label": optional(os.environ["CANARY_IDEA_VERSION_LABEL"]),
+    "browser_status": os.environ["CANARY_BROWSER_STATUS"],
+    "run_action_request_count": optional_int(os.environ["CANARY_RUN_ACTION_REQUEST_COUNT"]),
+    "browser_console_error_count": optional_int(os.environ["CANARY_BROWSER_CONSOLE_ERROR_COUNT"]),
+    "browser_page_error_count": optional_int(os.environ["CANARY_BROWSER_PAGE_ERROR_COUNT"]),
+    "browser_blocking_overlay_present": (
+        os.environ["CANARY_BROWSER_BLOCKING_OVERLAY_PRESENT"] == "true"
+        if os.environ["CANARY_BROWSER_BLOCKING_OVERLAY_PRESENT"]
+        else None
+    ),
+    "privacy": "no_raw_ids; labels are sha256 prefixes",
+}
+print(json.dumps(payload, sort_keys=True))
+PY
+}
+
+write_json_artifact() {
+  local destination="$1"
+  local artifact_kind="$2"
+  if [ -z "$destination" ]; then
+    return 0
+  fi
+  mkdir -p "$(dirname "$destination")"
+  local evidence_json
+  evidence_json="$(build_release_evidence_json)"
+  CANARY_DESTINATION="$destination" \
+  CANARY_ARTIFACT_KIND="$artifact_kind" \
+  CANARY_EVIDENCE_JSON="$evidence_json" \
+  CANARY_RAW_IDS="$USER_ID|$CONVERSATION_ID|$BACKTEST_JOB_ID|$BACKTEST_RUN_ID|$EVIDENCE_ARTIFACT_ID|$DECISION_NOTE_ID|$IDEA_ID|$IDEA_VERSION_ID" \
+  python3 - <<'PY'
+import json
+import os
+import pathlib
+
+payload = json.loads(os.environ["CANARY_EVIDENCE_JSON"])
+payload["artifact_kind"] = os.environ["CANARY_ARTIFACT_KIND"]
+encoded = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+for raw_id in os.environ["CANARY_RAW_IDS"].split("|"):
+    if raw_id and raw_id in encoded:
+        raise SystemExit("privacy-safe canary artifact contained a raw private identifier")
+path = pathlib.Path(os.environ["CANARY_DESTINATION"])
+path.write_text(encoded, encoding="utf-8")
+path.chmod(0o600)
+print(f"canary_{os.environ['CANARY_ARTIFACT_KIND']}_path={path}")
+PY
+}
+
+write_canary_evidence() {
+  write_json_artifact "$EVIDENCE_PATH" "evidence"
+}
+
+write_canary_capture() {
+  write_json_artifact "$CAPTURE_PATH" "capture"
+}
+
+fail_canary() {
+  CANARY_STATUS="failed"
+  CANARY_FAILURE_STAGE="$1"
+  CANARY_FAILURE_REASON="$2"
+  echo "ERROR: canary failed at ${CANARY_FAILURE_STAGE}: ${CANARY_FAILURE_REASON}"
+  write_canary_evidence || true
+  write_canary_capture || true
+  exit 1
 }
 
 run_deploy_status_probe() {
@@ -171,44 +345,25 @@ run_deploy_status_probe() {
   WORKFLOW_VERSION_COMMIT="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" commit || true)"
   WORKFLOW_EXPECTED_VERSION_ID="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" expected_workflow_version_id || true)"
 
-  if [ -z "$API_DEPLOY_SHA" ] || [ "$API_DEPLOY_SHA" = "<missing>" ]; then
-    fail_canary "deploy_status" "api_deploy_sha_missing"
-  fi
-  if [ -z "$WEB_DEPLOY_SHA" ] || [ "$WEB_DEPLOY_SHA" = "<missing>" ]; then
-    fail_canary "deploy_status" "web_deploy_sha_missing"
-  fi
-  if [ -z "$WORKFLOW_VERSION_ID" ] || [ "$WORKFLOW_VERSION_ID" = "<missing>" ]; then
-    fail_canary "deploy_status" "workflow_version_id_missing"
-  fi
-  if [ -z "$WORKFLOW_VERSION_COMMIT" ] || [ "$WORKFLOW_VERSION_COMMIT" = "<missing>" ]; then
-    fail_canary "deploy_status" "workflow_version_commit_missing"
-  fi
   if [ "$API_DEPLOY_STATUS" != "live" ]; then
-    echo "ERROR: argus-api latest deploy is not live."
     fail_canary "deploy_status" "api_deploy_not_live"
   fi
   if [ "$WEB_DEPLOY_STATUS" != "live" ]; then
-    echo "ERROR: argus-app latest deploy is not live."
     fail_canary "deploy_status" "web_deploy_not_live"
   fi
   if [ "$API_DEPLOY_SHA" != "$CANDIDATE_SHA" ]; then
-    echo "ERROR: argus-api deploy SHA does not match candidate SHA."
     fail_canary "deploy_status" "api_deploy_sha_mismatch"
   fi
   if [ "$WEB_DEPLOY_SHA" != "$CANDIDATE_SHA" ]; then
-    echo "ERROR: argus-app deploy SHA does not match candidate SHA."
     fail_canary "deploy_status" "web_deploy_sha_mismatch"
   fi
   if [ "$WORKFLOW_VERSION_STATUS" != "ready" ]; then
-    echo "ERROR: argus-backtests latest workflow version is not ready."
     fail_canary "deploy_status" "workflow_version_not_ready"
   fi
   if [ "$WORKFLOW_VERSION_COMMIT" != "$CANDIDATE_SHA" ]; then
-    echo "ERROR: argus-backtests workflow release commit does not match candidate SHA."
     fail_canary "deploy_status" "workflow_version_commit_mismatch"
   fi
-  if [ "$WORKFLOW_EXPECTED_VERSION_ID" != "$WORKFLOW_VERSION_ID" ]; then
-    echo "ERROR: argus-backtests workflow version id does not match release proof."
+  if [ -z "$WORKFLOW_VERSION_ID" ] || [ "$WORKFLOW_EXPECTED_VERSION_ID" != "$WORKFLOW_VERSION_ID" ]; then
     fail_canary "deploy_status" "workflow_version_id_mismatch"
   fi
 
@@ -221,24 +376,29 @@ run_deploy_status_probe() {
   echo "canary_workflow_version_id=$WORKFLOW_VERSION_ID"
 }
 
+run_warmup_probe() {
+  if ! WARMUP_OUTPUT="$(.github/warmup-render.sh --expect-mode "$EXPECT_MODE")"; then
+    print_sanitized_warmup_output
+    fail_canary "warmup" "warmup_probe_failed"
+  fi
+  print_sanitized_warmup_output
+}
+
 validate_release_evidence_contract() {
   if ! python3 "$RELEASE_PROFILE_TOOL" validate >/dev/null; then
-    echo "ERROR: checked-in release profile is invalid."
     fail_canary "release_profile" "release_profile_invalid"
   fi
   RELEASE_PROFILE_HASH="$(python3 "$RELEASE_PROFILE_TOOL" hash)"
   local profile_language
   profile_language="$(python3 "$RELEASE_PROFILE_TOOL" canary-value language)"
   if [ "$LANGUAGE" != "$profile_language" ]; then
-    echo "ERROR: canary language does not match the authoritative release profile."
     fail_canary "release_profile" "canary_language_mismatch"
   fi
-  if [ -z "$PROMPT" ]; then
-    echo "ERROR: release profile did not provide a canary prompt."
-    fail_canary "release_profile" "canary_prompt_missing"
+  if [ -z "$PROMPT" ] || [ -z "$DECISION_STATE" ] || [ -z "$SEARCH_QUERY" ]; then
+    fail_canary "release_profile" "browser_journey_input_missing"
   fi
   if [ "$CANDIDATE_SHA" != "unknown" ] && [ "$CHECKED_OUT_SHA" != "unknown" ] && [ "$CANDIDATE_SHA" != "$CHECKED_OUT_SHA" ]; then
-    echo "ERROR: canary commit mismatch: expected ${CANDIDATE_SHA}, checked out ${CHECKED_OUT_SHA}"
+    echo "ERROR: canary commit mismatch"
     fail_canary "commit" "canary_commit_mismatch"
   fi
 
@@ -252,50 +412,25 @@ validate_release_evidence_contract() {
   WORKFLOW_RUNTIME_PROOF="$(extract_warmup_value workflow_runtime_proof || true)"
   WORKFLOW_TASK="$(extract_warmup_value workflow_task || true)"
   REAL_WORKFLOW_TASK="$(extract_warmup_value real_workflow_task || true)"
-  WARMUP_RELEASE_PROFILE_STATUS="$(extract_warmup_value release_profile_status || true)"
-  WARMUP_RELEASE_PROFILE_HASH="$(extract_warmup_value release_profile_hash || true)"
+  local warmup_profile_status
+  local warmup_profile_hash
+  warmup_profile_status="$(extract_warmup_value release_profile_status || true)"
+  warmup_profile_hash="$(extract_warmup_value release_profile_hash || true)"
 
-  if [ "$WARMUP_RELEASE_PROFILE_STATUS" != "ready" ]; then
-    echo "ERROR: release config audit did not validate the release profile."
-    fail_canary "release_profile" "release_profile_not_ready"
-  fi
-  if [ "$WARMUP_RELEASE_PROFILE_HASH" != "$RELEASE_PROFILE_HASH" ]; then
-    echo "ERROR: deployed release profile hash does not match the candidate checkout."
+  if [ "$warmup_profile_status" != "ready" ] || [ "$warmup_profile_hash" != "$RELEASE_PROFILE_HASH" ]; then
     fail_canary "release_profile" "release_profile_hash_mismatch"
   fi
-
   if [[ ! "$ENV_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]; then
-    echo "ERROR: release config audit did not emit a valid env_fingerprint."
     fail_canary "warmup" "missing_env_fingerprint"
   fi
-  if [ "$EXPECT_MODE" = "real-workflow" ]; then
-    if [[ ! "$WORKFLOW_ENV_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]; then
-      echo "ERROR: release config audit did not emit a valid workflow_env_fingerprint."
-      fail_canary "warmup" "missing_workflow_env_fingerprint"
-    fi
-    if [ "$WORKFLOW_ENV_STATUS" != "ready" ]; then
-      echo "ERROR: release config audit did not report workflow_env_status=ready."
-      fail_canary "warmup" "workflow_env_drift"
-    fi
-  elif [ "$WORKFLOW_ENV_STATUS" = "drift" ]; then
-    echo "ERROR: release config audit reported workflow_env_status=drift for $EXPECT_MODE."
+  if [[ ! "$WORKFLOW_ENV_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]] || [ "$WORKFLOW_ENV_STATUS" != "ready" ]; then
     fail_canary "warmup" "workflow_env_drift"
   fi
-  if [ -z "$WORKFLOW_TASK" ]; then
-    echo "ERROR: release config audit did not emit workflow_task."
-    fail_canary "warmup" "missing_workflow_task"
-  fi
-  if [ -z "$REAL_WORKFLOW_TASK" ]; then
-    echo "ERROR: release config audit did not emit real_workflow_task."
-    fail_canary "warmup" "missing_real_workflow_task"
-  fi
-  if [ "$EXPECT_MODE" = "real-workflow" ] && [ "$WORKFLOW_RUNTIME_PROVIDER_MODE" != "live_provider" ]; then
-    echo "ERROR: release runtime proof did not confirm live_provider."
-    fail_canary "warmup" "workflow_runtime_provider_mode_mismatch"
-  fi
-  if [ "$EXPECT_MODE" = "real-workflow" ] && [ "$WORKFLOW_RUNTIME_PROOF" != "ready" ]; then
-    echo "ERROR: release runtime proof did not report ready."
+  if [ "$WORKFLOW_RUNTIME_PROVIDER_MODE" != "live_provider" ] || [ "$WORKFLOW_RUNTIME_PROOF" != "ready" ]; then
     fail_canary "warmup" "workflow_runtime_proof_missing"
+  fi
+  if [ -z "$WORKFLOW_TASK" ] || [ -z "$REAL_WORKFLOW_TASK" ]; then
+    fail_canary "warmup" "workflow_task_missing"
   fi
 
   echo "canary_expected_mode=$EXPECT_MODE"
@@ -309,1332 +444,455 @@ validate_release_evidence_contract() {
   echo "canary_real_workflow_task=$REAL_WORKFLOW_TASK"
   echo "canary_expected_sha=$CANDIDATE_SHA"
   echo "canary_checked_out_sha=$CHECKED_OUT_SHA"
-  echo "canary_language=$LANGUAGE"
-  if [ -n "$FOCUSED_SYMBOL_PATH" ]; then
-    echo "canary_focused_symbol_path=$FOCUSED_SYMBOL_PATH"
-  fi
-}
-
-build_release_evidence_json() {
-  CANARY_EXPECTED_MODE="$EXPECT_MODE" \
-  CANARY_RELEASE_PROFILE_HASH="$RELEASE_PROFILE_HASH" \
-  CANARY_ENV_FINGERPRINT="$ENV_FINGERPRINT" \
-  CANARY_WORKFLOW_ENV_FINGERPRINT="$WORKFLOW_ENV_FINGERPRINT" \
-  CANARY_WORKFLOW_ENV_STATUS="$WORKFLOW_ENV_STATUS" \
-  CANARY_WORKFLOW_RUNTIME_PROVIDER_MODE="$WORKFLOW_RUNTIME_PROVIDER_MODE" \
-  CANARY_WORKFLOW_RUNTIME_PROOF="$WORKFLOW_RUNTIME_PROOF" \
-  CANARY_WORKFLOW_TASK="$WORKFLOW_TASK" \
-  CANARY_REAL_WORKFLOW_TASK="$REAL_WORKFLOW_TASK" \
-  CANARY_API_DEPLOY_SHA="$API_DEPLOY_SHA" \
-  CANARY_WEB_DEPLOY_SHA="$WEB_DEPLOY_SHA" \
-  CANARY_API_DEPLOY_STATUS="$API_DEPLOY_STATUS" \
-  CANARY_WEB_DEPLOY_STATUS="$WEB_DEPLOY_STATUS" \
-  CANARY_WORKFLOW_VERSION_COMMIT="$WORKFLOW_VERSION_COMMIT" \
-  CANARY_WORKFLOW_VERSION_ID="$WORKFLOW_VERSION_ID" \
-  CANARY_WORKFLOW_VERSION_STATUS="$WORKFLOW_VERSION_STATUS" \
-  CANARY_EXPECTED_SHA="$CANDIDATE_SHA" \
-  CANARY_CHECKED_OUT_SHA="$CHECKED_OUT_SHA" \
-  CANARY_LANGUAGE="$LANGUAGE" \
-  CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \
-  CANARY_EVIDENCE_ARTIFACT_LABEL="$EVIDENCE_ARTIFACT_LABEL" \
-  CANARY_DECISION_NOTE_LABEL="$DECISION_NOTE_LABEL" \
-  CANARY_IDEA_LABEL="$IDEA_LABEL" \
-  CANARY_IDEA_VERSION_LABEL="$IDEA_VERSION_LABEL" \
-  CANARY_BROWSER_STATUS="$BROWSER_CANARY_STATUS" \
-  CANARY_LAST_STREAM_HTTP_STATUS="$LAST_STREAM_HTTP_STATUS" \
-  python3 - <<'PY'
-import json
-import os
-
-payload = {
-    "expected_mode": os.environ["CANARY_EXPECTED_MODE"],
-    "release_profile_hash": os.environ["CANARY_RELEASE_PROFILE_HASH"],
-    "env_fingerprint": os.environ["CANARY_ENV_FINGERPRINT"],
-    "workflow_env_fingerprint": os.environ["CANARY_WORKFLOW_ENV_FINGERPRINT"],
-    "workflow_env_status": os.environ["CANARY_WORKFLOW_ENV_STATUS"],
-    "workflow_runtime_provider_mode": os.environ["CANARY_WORKFLOW_RUNTIME_PROVIDER_MODE"],
-    "workflow_runtime_proof": os.environ["CANARY_WORKFLOW_RUNTIME_PROOF"],
-    "workflow_task": os.environ["CANARY_WORKFLOW_TASK"],
-    "real_workflow_task": os.environ["CANARY_REAL_WORKFLOW_TASK"],
-    "api_deploy_sha": os.environ["CANARY_API_DEPLOY_SHA"] or None,
-    "web_deploy_sha": os.environ["CANARY_WEB_DEPLOY_SHA"] or None,
-    "api_deploy_status": os.environ["CANARY_API_DEPLOY_STATUS"] or None,
-    "web_deploy_status": os.environ["CANARY_WEB_DEPLOY_STATUS"] or None,
-    "workflow_version_commit": os.environ["CANARY_WORKFLOW_VERSION_COMMIT"] or None,
-    "workflow_version_id": os.environ["CANARY_WORKFLOW_VERSION_ID"] or None,
-    "workflow_version_status": os.environ["CANARY_WORKFLOW_VERSION_STATUS"] or None,
-    "candidate_sha": os.environ["CANARY_EXPECTED_SHA"],
-    "checked_out_sha": os.environ["CANARY_CHECKED_OUT_SHA"],
-    "language": os.environ["CANARY_LANGUAGE"],
-    "focused_symbol_path": os.environ["CANARY_FOCUSED_SYMBOL_PATH"] or None,
-    "evidence_artifact_label": os.environ["CANARY_EVIDENCE_ARTIFACT_LABEL"] or None,
-    "decision_note_label": os.environ["CANARY_DECISION_NOTE_LABEL"] or None,
-    "idea_label": os.environ["CANARY_IDEA_LABEL"] or None,
-    "idea_version_label": os.environ["CANARY_IDEA_VERSION_LABEL"] or None,
-    "browser_status": os.environ["CANARY_BROWSER_STATUS"],
-    "last_stream_http_status": os.environ["CANARY_LAST_STREAM_HTTP_STATUS"] or None,
-}
-print(json.dumps(payload, sort_keys=True))
-PY
-}
-
-write_canary_evidence() {
-  if [ -z "$EVIDENCE_PATH" ]; then
-    return 0
-  fi
-
-  mkdir -p "$(dirname "$EVIDENCE_PATH")"
-  local release_evidence_json
-  release_evidence_json="$(build_release_evidence_json)"
-  CANARY_EVIDENCE_PATH="$EVIDENCE_PATH" \
-  CANARY_STATUS="$CANARY_STATUS" \
-  CANARY_FAILURE_STAGE="$CANARY_FAILURE_STAGE" \
-  CANARY_FAILURE_REASON="$CANARY_FAILURE_REASON" \
-  CANARY_RELEASE_EVIDENCE_JSON="$release_evidence_json" \
-  CANARY_CONVERSATION_LABEL="$CONVERSATION_LABEL" \
-  CANARY_BACKTEST_JOB_LABEL="$BACKTEST_JOB_LABEL" \
-  CANARY_RESULT_LABEL="$RESULT_LABEL" \
-  CANARY_RESULT_KIND="$RESULT_KIND" \
-  CANARY_EVIDENCE_ARTIFACT_LABEL="$EVIDENCE_ARTIFACT_LABEL" \
-  CANARY_DECISION_NOTE_LABEL="$DECISION_NOTE_LABEL" \
-  CANARY_IDEA_LABEL="$IDEA_LABEL" \
-  CANARY_IDEA_VERSION_LABEL="$IDEA_VERSION_LABEL" \
-  python3 - <<'PY'
-import json
-import os
-import pathlib
-
-path = pathlib.Path(os.environ["CANARY_EVIDENCE_PATH"])
-release = json.loads(os.environ["CANARY_RELEASE_EVIDENCE_JSON"])
-payload = {
-    "status": os.environ["CANARY_STATUS"],
-    "failure_stage": os.environ["CANARY_FAILURE_STAGE"] or None,
-    "failure_reason": os.environ["CANARY_FAILURE_REASON"] or None,
-    "conversation_label": os.environ["CANARY_CONVERSATION_LABEL"],
-    "backtest_job_label": os.environ["CANARY_BACKTEST_JOB_LABEL"] or None,
-    "result_label": os.environ["CANARY_RESULT_LABEL"] or None,
-    "result_kind": os.environ["CANARY_RESULT_KIND"] or None,
-    "evidence_artifact_label": os.environ["CANARY_EVIDENCE_ARTIFACT_LABEL"] or None,
-    "decision_note_label": os.environ["CANARY_DECISION_NOTE_LABEL"] or None,
-    "idea_label": os.environ["CANARY_IDEA_LABEL"] or None,
-    "idea_version_label": os.environ["CANARY_IDEA_VERSION_LABEL"] or None,
-    "privacy": "no_raw_ids; labels are sha256 prefixes",
-}
-payload.update(release)
-path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-print(f"canary_evidence_path={path}")
-PY
-}
-
-write_canary_capture() {
-  if [ -z "$CAPTURE_PATH" ]; then
-    return 0
-  fi
-
-  mkdir -p "$(dirname "$CAPTURE_PATH")"
-  local temp_messages=""
-  local temp_receipts=""
-  if [ -n "${MESSAGES_JSON:-}" ]; then
-    temp_messages="$(mktemp)"
-    printf '%s' "$MESSAGES_JSON" > "$temp_messages"
-  fi
-  if [ -n "${RECEIPT_ROWS:-}" ]; then
-    temp_receipts="$(mktemp)"
-    printf '%s' "$RECEIPT_ROWS" > "$temp_receipts"
-  fi
-
-  local exit_code=0
-  local release_evidence_json
-  release_evidence_json="$(build_release_evidence_json)"
-  CANARY_CAPTURE_PATH="$CAPTURE_PATH" \
-  CANARY_STATUS="$CANARY_STATUS" \
-  CANARY_FAILURE_STAGE="$CANARY_FAILURE_STAGE" \
-  CANARY_FAILURE_REASON="$CANARY_FAILURE_REASON" \
-  CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \
-  CANARY_RELEASE_EVIDENCE_JSON="$release_evidence_json" \
-  CANARY_PROMPT="$PROMPT" \
-  CANARY_RUN_ACTION="${RUN_ACTION:-}" \
-  CANARY_CONVERSATION_LABEL="$CONVERSATION_LABEL" \
-  CANARY_BACKTEST_JOB_LABEL="$BACKTEST_JOB_LABEL" \
-  CANARY_RESULT_LABEL="$RESULT_LABEL" \
-  CANARY_RESULT_KIND="$RESULT_KIND" \
-  CANARY_MESSAGES_FILE="$temp_messages" \
-  CANARY_JOB_RESPONSE_FILE="${JOB_RESPONSE:-}" \
-  CANARY_RECEIPT_ROWS_FILE="$temp_receipts" \
-  python3 - <<'PY' || exit_code=$?
-import json
-import os
-import pathlib
-from typing import Any
-
-from scripts.ops.canary_capture_sanitizer import (
-    assert_sanitized_capture,
-    sanitize_capture_value as sanitize,
-)
-
-
-def read_json_file(path: str) -> Any:
-    if not path:
-        return None
-    file_path = pathlib.Path(path)
-    if not file_path.exists() or file_path.stat().st_size == 0:
-        return None
-    try:
-        return json.loads(file_path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
-
-
-def first_dict(*values: Any) -> dict[str, Any] | None:
-    for value in values:
-        if isinstance(value, dict):
-            return value
-    return None
-
-
-def extract_message_artifacts(messages_payload: Any) -> dict[str, Any]:
-    artifacts: dict[str, Any] = {
-        "message_artifacts": [],
-        "result_card": None,
-        "explanation_context": None,
-        "final_response_payload": None,
-        "confirmation_payload": None,
-    }
-    if not isinstance(messages_payload, dict):
-        return artifacts
-    items = messages_payload.get("items")
-    if not isinstance(items, list):
-        return artifacts
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
-        final_response_payload = metadata.get("final_response_payload")
-        artifacts["message_artifacts"].append(
-            {
-                "role": item.get("role"),
-                "metadata_keys": sorted(str(key) for key in metadata.keys()),
-                "has_result_card": isinstance(metadata.get("result_card"), dict)
-                or isinstance(metadata.get("conversation_result_card"), dict),
-                "has_backtest_job": isinstance(metadata.get("backtest_job"), dict),
-            }
-        )
-        if artifacts["result_card"] is None:
-            artifacts["result_card"] = first_dict(
-                metadata.get("result_card"),
-                metadata.get("conversation_result_card"),
-                (final_response_payload or {}).get("result_card")
-                if isinstance(final_response_payload, dict)
-                else None,
-            )
-        if artifacts["explanation_context"] is None:
-            artifacts["explanation_context"] = first_dict(
-                metadata.get("explanation_context"),
-                (final_response_payload or {}).get("explanation_context")
-                if isinstance(final_response_payload, dict)
-                else None,
-            )
-        if artifacts["final_response_payload"] is None and isinstance(
-            final_response_payload, dict
-        ):
-            artifacts["final_response_payload"] = final_response_payload
-        if artifacts["confirmation_payload"] is None:
-            artifacts["confirmation_payload"] = first_dict(
-                metadata.get("confirmation_payload"),
-                metadata.get("confirmation"),
-            )
-    return artifacts
-
-
-def receipt_summary(receipt_payload: Any) -> dict[str, Any]:
-    if not isinstance(receipt_payload, list):
-        return {"status": "missing", "count": 0}
-    tasks = sorted(
-        {
-            str(row.get("task"))
-            for row in receipt_payload
-            if isinstance(row, dict) and row.get("task")
-        }
-    )
-    return {
-        "status": "present" if receipt_payload else "missing",
-        "count": len(receipt_payload),
-        "tasks": tasks,
-    }
-
-
-messages_payload = read_json_file(os.environ["CANARY_MESSAGES_FILE"])
-message_artifacts = extract_message_artifacts(messages_payload)
-job_response = read_json_file(os.environ["CANARY_JOB_RESPONSE_FILE"])
-receipt_payload = read_json_file(os.environ["CANARY_RECEIPT_ROWS_FILE"])
-release = json.loads(os.environ["CANARY_RELEASE_EVIDENCE_JSON"])
-run_action = None
-if os.environ["CANARY_RUN_ACTION"]:
-    try:
-        run_action = json.loads(os.environ["CANARY_RUN_ACTION"])
-    except json.JSONDecodeError:
-        run_action = None
-
-launch_payload = {
-    "language": release["language"],
-    "message": os.environ["CANARY_PROMPT"],
-    "focused_symbol_path": os.environ["CANARY_FOCUSED_SYMBOL_PATH"] or None,
-    "action": run_action,
-    "confirmation_payload": message_artifacts.get("confirmation_payload"),
-}
-if isinstance(run_action, dict) and not launch_payload["confirmation_payload"]:
-    payload = run_action.get("payload")
-    if isinstance(payload, dict):
-        launch_payload["confirmation_payload"] = payload
-
-payload = {
-    "schema_version": 1,
-    "status": os.environ["CANARY_STATUS"],
-    "failure": {
-        "stage": os.environ["CANARY_FAILURE_STAGE"] or None,
-        "reason": os.environ["CANARY_FAILURE_REASON"] or None,
-        "status": os.environ["CANARY_STATUS"],
-    },
-    "release": release,
-    "labels": {
-        "conversation": os.environ["CANARY_CONVERSATION_LABEL"] or None,
-        "backtest_job": os.environ["CANARY_BACKTEST_JOB_LABEL"] or None,
-        "result": os.environ["CANARY_RESULT_LABEL"] or None,
-        "result_kind": os.environ["CANARY_RESULT_KIND"] or None,
-    },
-    "launch_payload": launch_payload,
-    "result_card": message_artifacts.get("result_card"),
-    "explanation_context": message_artifacts.get("explanation_context"),
-    "final_response_payload": message_artifacts.get("final_response_payload"),
-    "message_artifacts": message_artifacts.get("message_artifacts", []),
-    "job_response": job_response,
-    "route_receipt": receipt_summary(receipt_payload),
-    "privacy": "no_raw_ids; labels are sha256 prefixes; secrets redacted",
-}
-
-path = pathlib.Path(os.environ["CANARY_CAPTURE_PATH"])
-sanitized_payload = sanitize(payload)
-assert_sanitized_capture(sanitized_payload)
-path.write_text(
-    json.dumps(sanitized_payload, indent=2, sort_keys=True) + "\n",
-    encoding="utf-8",
-)
-print(f"canary_capture_path={path}")
-PY
-  rm -f "$temp_messages" "$temp_receipts"
-  return "$exit_code"
-}
-
-fail_canary() {
-  CANARY_STATUS="failed"
-  CANARY_FAILURE_STAGE="$1"
-  CANARY_FAILURE_REASON="$2"
-  if ! write_canary_evidence; then
-    echo "ERROR: failed to write canary evidence."
-  fi
-  if ! write_canary_capture; then
-    echo "ERROR: failed to write canary capture."
-  fi
-  exit 1
-}
-
-fetch_conversation_messages() {
-  curl -fsS -b "$COOKIE_JAR" \
-    "${API_URL}/api/v1/conversations/${CONVERSATION_ID}/messages"
-}
-
-safe_http_status() {
-  local headers_file="$1"
-  awk '/^HTTP\// { status=$2; sub(/\r$/, "", status) } END { if (status ~ /^[0-9][0-9][0-9]$/) print status; else print "<unavailable>" }' "$headers_file"
-}
-
-capture_failure_route_receipts() {
-  if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$CONVERSATION_ID" ]; then
-    return 0
-  fi
-  if ! RECEIPT_ROWS="$(
-    curl -fsS \
-      -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-      -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-      "${SUPABASE_URL}/rest/v1/route_receipts?select=id,task,outcome,failure_mode&conversation_id=eq.${CONVERSATION_ID}&order=created_at.desc&limit=20"
-  )"; then
-    RECEIPT_ROWS="[]"
-    echo "route_receipt_failure_capture=unavailable"
-    return 0
-  fi
-  echo "route_receipt_failure_capture=present"
-}
-
-assert_reload_hydration_payload() {
-  local require_success_messages="$1"
-  local temp_messages
-  temp_messages="$(mktemp)"
-  printf '%s' "$MESSAGES_JSON" > "$temp_messages"
-  local exit_code=0
-  CANARY_JOB_ID="$BACKTEST_JOB_ID" \
-  CANARY_REQUIRE_SUCCESS_MESSAGES="$require_success_messages" \
-  python3 - "$temp_messages" <<'PY' || exit_code=$?
-import json
-import os
-import pathlib
-import sys
-
-payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
-items = payload.get("items", [])
-require_success_messages = os.environ.get("CANARY_REQUIRE_SUCCESS_MESSAGES") == "true"
-
-if require_success_messages:
-    roles = [item.get("role") for item in items]
-    if roles.count("user") < 1 or roles.count("assistant") < 2:
-        raise SystemExit("conversation did not persist expected user and assistant messages")
-    job_id = os.environ.get("CANARY_JOB_ID", "")
-    if job_id:
-        for item in items:
-            metadata = item.get("metadata") or {}
-            job = metadata.get("backtest_job")
-            if isinstance(job, dict) and job.get("id") == job_id:
-                break
-        else:
-            raise SystemExit("conversation did not persist async backtest_job metadata")
-
-def _has_authoritative_result(metadata: dict) -> bool:
-    if not isinstance(metadata, dict):
-        return False
-    if isinstance(metadata.get("backtest_job"), dict):
-        return True
-    for key in ("backtest_run", "result_card", "conversation_result_card"):
-        if isinstance(metadata.get(key), dict):
-            return True
-    return bool(metadata.get("result_run_id") or metadata.get("latest_run_id"))
-
-def assert_no_reload_contradiction(hydrated_items: list[dict]) -> None:
-    authoritative_result_seen = any(
-        item.get("role") == "assistant"
-        and _has_authoritative_result(item.get("metadata") or {})
-        for item in hydrated_items
-    )
-    if not authoritative_result_seen:
-        return
-
-    stale_retryable_failure_seen = False
-    for item in hydrated_items:
-        if item.get("role") != "assistant":
-            continue
-        metadata = item.get("metadata") or {}
-        recovery = metadata.get("recovery")
-        retryable_recovery = isinstance(recovery, dict) and recovery.get("retryable") is True
-        retry_action = "retry_last_turn" in metadata
-        runtime_failure = (
-            metadata.get("conversation_mode") == "recovery"
-            or metadata.get("agent_runtime_stage_outcome") == "agent_runtime_failure"
-        )
-        superseded = metadata.get("agent_runtime_failure_superseded") is True
-        if (retryable_recovery or retry_action or runtime_failure) and not superseded:
-            stale_retryable_failure_seen = True
-            break
-
-    if stale_retryable_failure_seen:
-        raise SystemExit(
-            "reload hydration contradiction: retryable failure persisted beside authoritative result"
-        )
-
-assert_no_reload_contradiction(items)
-PY
-  rm -f "$temp_messages"
-  return "$exit_code"
-}
-
-verify_finalized_evidence_identity() {
-  if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-    echo "ERROR: Supabase verifier credentials are required for finalized evidence validation."
-    return 1
-  fi
-
-  local run_rows evidence_rows idea_rows version_rows
-  if ! run_rows="$(
-    curl -fsS \
-      -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-      -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-      "${SUPABASE_URL}/rest/v1/backtest_runs?select=id,conversation_id,status,conversation_result_card&id=eq.${BACKTEST_RUN_ID}&limit=1"
-  )"; then
-    echo "ERROR: finalized identity verifier could not load the completed run."
-    return 1
-  fi
-  if ! evidence_rows="$(
-    curl -fsS \
-      -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-      -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-      "${SUPABASE_URL}/rest/v1/evidence_artifacts?select=id,idea_id,idea_version_id,source_conversation_id,source_run_id,artifact_type,lifecycle&source_run_id=eq.${BACKTEST_RUN_ID}&limit=1"
-  )"; then
-    echo "ERROR: finalized identity verifier could not load evidence artifacts."
-    return 1
-  fi
-
-  if ! CANARY_CONVERSATION_ID="$CONVERSATION_ID" CANARY_RUN_ID="$BACKTEST_RUN_ID" \
-    python3 - "$run_rows" "$evidence_rows" > "$FINALIZATION_IDENTITY" <<'PY'
-import json
-import os
-import sys
-
-runs = json.loads(sys.argv[1])
-artifacts = json.loads(sys.argv[2])
-conversation_id = os.environ["CANARY_CONVERSATION_ID"]
-run_id = os.environ["CANARY_RUN_ID"]
-if len(runs) != 1:
-    raise SystemExit("expected exactly one completed canary run")
-if len(artifacts) != 1:
-    raise SystemExit("expected exactly one evidence artifact for the canary run")
-
-run = runs[0]
-artifact = artifacts[0]
-card = run.get("conversation_result_card")
-if run.get("id") != run_id or run.get("conversation_id") != conversation_id:
-    raise SystemExit("completed run identity does not match the canary conversation")
-if run.get("status") != "completed":
-    raise SystemExit("completed run row is not finalized")
-if not isinstance(card, dict):
-    raise SystemExit("completed run does not have a result card")
-for key in ("idea_id", "idea_version_id", "evidence_artifact_id"):
-    if not isinstance(card.get(key), str) or not card[key]:
-        raise SystemExit(f"result card is missing {key}")
-if card.get("artifact_type") != "backtest" or card.get("evidence_lifecycle") != "captured":
-    raise SystemExit("result card does not represent captured backtest evidence")
-if artifact.get("id") != card["evidence_artifact_id"]:
-    raise SystemExit("result card evidence artifact id does not match durable evidence")
-if artifact.get("idea_id") != card["idea_id"] or artifact.get("idea_version_id") != card["idea_version_id"]:
-    raise SystemExit("result card idea identity does not match durable evidence")
-if artifact.get("source_run_id") != run_id or artifact.get("source_conversation_id") != conversation_id:
-    raise SystemExit("evidence provenance does not point to the finalized canary run")
-if artifact.get("artifact_type") != "backtest" or artifact.get("lifecycle") != "captured":
-    raise SystemExit("evidence artifact is not captured backtest evidence")
-
-print(json.dumps({
-    "evidence_artifact_id": artifact["id"],
-    "idea_id": artifact["idea_id"],
-    "idea_version_id": artifact["idea_version_id"],
-}, sort_keys=True))
-PY
-  then
-    return 1
-  fi
-
-  EVIDENCE_ARTIFACT_ID="$(python3 - "$FINALIZATION_IDENTITY" <<'PY'
-import json
-import pathlib
-import sys
-print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["evidence_artifact_id"])
-PY
-)"
-  IDEA_ID="$(python3 - "$FINALIZATION_IDENTITY" <<'PY'
-import json
-import pathlib
-import sys
-print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["idea_id"])
-PY
-)"
-  IDEA_VERSION_ID="$(python3 - "$FINALIZATION_IDENTITY" <<'PY'
-import json
-import pathlib
-import sys
-print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["idea_version_id"])
-PY
-)"
-
-  if ! idea_rows="$(
-    curl -fsS \
-      -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-      -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-      "${SUPABASE_URL}/rest/v1/ideas?select=id,active_version_id,lifecycle&id=eq.${IDEA_ID}&limit=1"
-  )"; then
-    return 1
-  fi
-  if ! version_rows="$(
-    curl -fsS \
-      -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-      -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-      "${SUPABASE_URL}/rest/v1/idea_versions?select=id,idea_id,source_conversation_id,source_run_id,lifecycle&id=eq.${IDEA_VERSION_ID}&limit=1"
-  )"; then
-    return 1
-  fi
-  if ! CANARY_CONVERSATION_ID="$CONVERSATION_ID" CANARY_RUN_ID="$BACKTEST_RUN_ID" \
-    CANARY_IDEA_ID="$IDEA_ID" CANARY_IDEA_VERSION_ID="$IDEA_VERSION_ID" \
-    python3 - "$idea_rows" "$version_rows" <<'PY'
-import json
-import os
-import sys
-
-ideas = json.loads(sys.argv[1])
-versions = json.loads(sys.argv[2])
-if len(ideas) != 1 or len(versions) != 1:
-    raise SystemExit("expected exactly one finalized idea and idea version")
-idea = ideas[0]
-version = versions[0]
-if idea.get("id") != os.environ["CANARY_IDEA_ID"]:
-    raise SystemExit("durable idea id does not match evidence identity")
-if idea.get("active_version_id") != os.environ["CANARY_IDEA_VERSION_ID"]:
-    raise SystemExit("durable idea active version does not match evidence identity")
-if idea.get("lifecycle") != "captured":
-    raise SystemExit("durable idea has an unexpected pre-decision lifecycle")
-if version.get("id") != os.environ["CANARY_IDEA_VERSION_ID"] or version.get("idea_id") != os.environ["CANARY_IDEA_ID"]:
-    raise SystemExit("durable idea version identity does not match evidence identity")
-if version.get("source_run_id") != os.environ["CANARY_RUN_ID"] or version.get("source_conversation_id") != os.environ["CANARY_CONVERSATION_ID"]:
-    raise SystemExit("idea version provenance does not point to the canary run")
-if version.get("lifecycle") != "captured":
-    raise SystemExit("durable idea version has an unexpected pre-decision lifecycle")
-PY
-  then
-    return 1
-  fi
-
-  EVIDENCE_ARTIFACT_LABEL="$(privacy_safe_id_label evidence_artifact "$EVIDENCE_ARTIFACT_ID")"
-  IDEA_LABEL="$(privacy_safe_id_label idea "$IDEA_ID")"
-  IDEA_VERSION_LABEL="$(privacy_safe_id_label idea_version "$IDEA_VERSION_ID")"
-  echo "OK: finalized evidence identity $EVIDENCE_ARTIFACT_LABEL"
-}
-
-save_canary_decision() {
-  local decision_state decision_body
-  if ! decision_state="$(python3 "$RELEASE_PROFILE_TOOL" canary-value decision_state)"; then
-    return 1
-  fi
-  decision_body="$(
-    CANARY_DECISION_STATE="$decision_state" python3 - <<'PY'
-import json
-import os
-
-print(json.dumps({
-    "decision_state": os.environ["CANARY_DECISION_STATE"],
-    "note": "Private-alpha release canary decision hydration check.",
-}))
-PY
-  )"
-  if ! curl -fsS \
-    -b "$COOKIE_JAR" \
-    -H "Content-Type: application/json" \
-    -d "$decision_body" \
-    "${API_URL}/api/v1/evidence-artifacts/${EVIDENCE_ARTIFACT_ID}/decision" > "$DECISION_RESPONSE"; then
-    return 1
-  fi
-  if ! CANARY_EVIDENCE_ARTIFACT_ID="$EVIDENCE_ARTIFACT_ID" CANARY_IDEA_ID="$IDEA_ID" \
-    CANARY_IDEA_VERSION_ID="$IDEA_VERSION_ID" CANARY_DECISION_STATE="$decision_state" \
-    python3 - "$DECISION_RESPONSE" > "$DECISION_IDENTITY" <<'PY'
-import json
-import os
-import pathlib
-import sys
-
-payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
-decision = payload.get("decision")
-artifact = payload.get("evidence_artifact")
-if not isinstance(decision, dict) or not isinstance(artifact, dict):
-    raise SystemExit("decision capture response is missing durable identity")
-for key, expected in {
-    "evidence_artifact_id": os.environ["CANARY_EVIDENCE_ARTIFACT_ID"],
-    "idea_id": os.environ["CANARY_IDEA_ID"],
-    "idea_version_id": os.environ["CANARY_IDEA_VERSION_ID"],
-    "decision_state": os.environ["CANARY_DECISION_STATE"],
-}.items():
-    if decision.get(key) != expected:
-        raise SystemExit(f"decision capture response {key} does not match finalized identity")
-if not isinstance(decision.get("id"), str) or not decision["id"]:
-    raise SystemExit("decision capture response is missing decision id")
-if artifact.get("id") != os.environ["CANARY_EVIDENCE_ARTIFACT_ID"]:
-    raise SystemExit("decision capture response artifact id does not match finalized identity")
-if artifact.get("idea_id") != os.environ["CANARY_IDEA_ID"] or artifact.get("idea_version_id") != os.environ["CANARY_IDEA_VERSION_ID"]:
-    raise SystemExit("decision capture response artifact idea identity does not match")
-if artifact.get("lifecycle") != "decided":
-    raise SystemExit("decision capture did not move evidence artifact to decided")
-print(json.dumps({"decision_note_id": decision["id"], "decision_state": decision["decision_state"]}, sort_keys=True))
-PY
-  then
-    return 1
-  fi
-  DECISION_NOTE_ID="$(python3 - "$DECISION_IDENTITY" <<'PY'
-import json
-import pathlib
-import sys
-print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["decision_note_id"])
-PY
-)"
-  DECISION_NOTE_LABEL="$(privacy_safe_id_label decision_note "$DECISION_NOTE_ID")"
-  echo "OK: saved canary decision $DECISION_NOTE_LABEL"
-}
-
-assert_decision_hydration() {
-  local temp_messages exit_code=0
-  temp_messages="$(mktemp)"
-  printf '%s' "$MESSAGES_JSON" > "$temp_messages"
-  CANARY_EVIDENCE_ARTIFACT_ID="$EVIDENCE_ARTIFACT_ID" \
-  CANARY_DECISION_NOTE_ID="$DECISION_NOTE_ID" \
-  CANARY_DECISION_STATE="$(python3 "$RELEASE_PROFILE_TOOL" canary-value decision_state)" \
-  python3 - "$temp_messages" <<'PY' || exit_code=$?
-import json
-import os
-import pathlib
-import sys
-
-items = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("items", [])
-for item in items:
-    metadata = item.get("metadata") or {}
-    card = metadata.get("result_card")
-    if not isinstance(card, dict):
-        continue
-    if card.get("evidence_artifact_id") != os.environ["CANARY_EVIDENCE_ARTIFACT_ID"]:
-        continue
-    if card.get("decision_note_id") != os.environ["CANARY_DECISION_NOTE_ID"]:
-        continue
-    if card.get("decision_state") != os.environ["CANARY_DECISION_STATE"]:
-        continue
-    break
-else:
-    raise SystemExit("reload did not hydrate the saved decision on the authoritative result card")
-PY
-  rm -f "$temp_messages"
-  return "$exit_code"
-}
-
-verify_omnisearch_source_identity() {
-  if ! curl -fsS \
-    -b "$COOKIE_JAR" \
-    "${API_URL}/api/v1/search?q=AAPL&include_ledger_groups=true" > "$SEARCH_RESPONSE"; then
-    return 1
-  fi
-  CANARY_EVIDENCE_ARTIFACT_ID="$EVIDENCE_ARTIFACT_ID" \
-  CANARY_CONVERSATION_ID="$CONVERSATION_ID" \
-  CANARY_DECISION_STATE="$(python3 "$RELEASE_PROFILE_TOOL" canary-value decision_state)" \
-  python3 - "$SEARCH_RESPONSE" <<'PY'
-import json
-import os
-import pathlib
-import sys
-
-payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
-items = payload.get("items")
-groups = payload.get("ledger_groups")
-if not isinstance(items, list) or not isinstance(groups, list):
-    raise SystemExit("Omnisearch response is missing typed items or ledger groups")
-for item in items:
-    if item.get("type") != "evidence" or item.get("id") != os.environ["CANARY_EVIDENCE_ARTIFACT_ID"]:
-        continue
-    if item.get("conversation_id") != os.environ["CANARY_CONVERSATION_ID"]:
-        raise SystemExit("Omnisearch evidence source conversation does not match the canary")
-    if item.get("lifecycle") != "decided":
-        raise SystemExit("Omnisearch evidence lifecycle does not reflect the saved decision")
-    break
-else:
-    raise SystemExit("Omnisearch did not return the finalized canary evidence artifact")
-
-for group in groups:
-    if group.get("decision_state") == os.environ["CANARY_DECISION_STATE"]:
-        if not isinstance(group.get("count"), int) or group["count"] < 1:
-            raise SystemExit("Omnisearch ledger group did not include the saved decision")
-        break
-else:
-    raise SystemExit("Omnisearch ledger groups omitted the saved decision state")
-PY
 }
 
 run_browser_canary() {
-  if ! "$SCRIPT_DIR/canary-browser.sh"; then
+  if ! ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF="$BROWSER_IDENTITY_HANDOFF" \
+    "$SCRIPT_DIR/canary-browser.sh"; then
     return 1
   fi
   BROWSER_CANARY_STATUS="passed"
 }
 
-handle_stream_failure() {
-  local stream_name="$1"
-  local headers_file="$2"
-  LAST_STREAM_HTTP_STATUS="$(safe_http_status "$headers_file")"
-  echo "canary_${stream_name}_http_status=$LAST_STREAM_HTTP_STATUS"
-  capture_failure_route_receipts
-  echo "ERROR: ${stream_name} stream failed; checking reload hydration after stream failure."
-  if MESSAGES_JSON="$(fetch_conversation_messages)"; then
-    if ! assert_reload_hydration_payload false; then
-      fail_canary "${stream_name}_stream" "stream_failure_reload_contradiction"
-    fi
-  else
-    echo "ERROR: unable to fetch conversation messages after ${stream_name} stream failure."
+verify_browser_identity_handoff() {
+  local values
+  if ! values="$(python3 - "$BROWSER_IDENTITY_HANDOFF" <<'PY'
+import json
+import pathlib
+import stat
+import sys
+
+path = pathlib.Path(sys.argv[1])
+if not path.is_file() or not path.read_text(encoding="utf-8").strip():
+    raise SystemExit("browser-owned identity handoff is missing")
+if stat.S_IMODE(path.stat().st_mode) & 0o077:
+    raise SystemExit("browser-owned identity handoff permissions are not private")
+try:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+except json.JSONDecodeError as exc:
+    raise SystemExit("browser-owned identity handoff is invalid") from exc
+if payload.get("schema_version") != 1 or payload.get("source") != "playwright":
+    raise SystemExit("browser-owned identity handoff contract is invalid")
+
+keys = (
+    "user_id",
+    "conversation_id",
+    "backtest_job_id",
+    "backtest_run_id",
+    "evidence_artifact_id",
+    "decision_note_id",
+    "idea_id",
+    "idea_version_id",
+)
+values = []
+for key in keys:
+    value = payload.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise SystemExit("browser-owned identity handoff omitted a required identity")
+    values.append(value)
+if payload.get("decision_state") not in {"watching", "promising", "rejected", "revisit_later"}:
+    raise SystemExit("browser-owned identity handoff omitted the decision state")
+if payload.get("run_action_request_count") != 1:
+    raise SystemExit("browser-owned journey did not submit exactly one Run action")
+assertions = payload.get("assertions")
+if not isinstance(assertions, dict):
+    raise SystemExit("browser-owned identity handoff omitted assertion evidence")
+if assertions.get("result_rendered_once") is not True:
+    raise SystemExit("browser-owned journey did not render exactly one completed result")
+if assertions.get("reload_hydrated") is not True or assertions.get("omnisearch_reopened_source") is not True:
+    raise SystemExit("browser-owned journey did not prove continuity")
+if assertions.get("console_error_count") != 0 or assertions.get("page_error_count") != 0:
+    raise SystemExit("browser-owned journey reported browser errors")
+if assertions.get("blocking_overlay_present") is not False:
+    raise SystemExit("browser-owned journey reported a blocking overlay")
+values.extend(
+    [
+        payload["decision_state"],
+        str(payload["run_action_request_count"]),
+        str(assertions["console_error_count"]),
+        str(assertions["page_error_count"]),
+        str(assertions["blocking_overlay_present"]).lower(),
+    ]
+)
+print("\t".join(values))
+PY
+  )"; then
+    return 1
   fi
-  fail_canary "${stream_name}_stream" "stream_transport_failed"
+
+  IFS=$'\t' read -r \
+    USER_ID \
+    CONVERSATION_ID \
+    BACKTEST_JOB_ID \
+    BACKTEST_RUN_ID \
+    EVIDENCE_ARTIFACT_ID \
+    DECISION_NOTE_ID \
+    IDEA_ID \
+    IDEA_VERSION_ID \
+    CAPTURED_DECISION_STATE \
+    RUN_ACTION_REQUEST_COUNT \
+    BROWSER_CONSOLE_ERROR_COUNT \
+    BROWSER_PAGE_ERROR_COUNT \
+    BROWSER_BLOCKING_OVERLAY_PRESENT <<< "$values"
+
+  if [ "$CAPTURED_DECISION_STATE" != "$DECISION_STATE" ]; then
+    return 1
+  fi
+  CONVERSATION_LABEL="$(privacy_safe_id_label conversation "$CONVERSATION_ID")"
+  BACKTEST_JOB_LABEL="$(privacy_safe_id_label backtest_job "$BACKTEST_JOB_ID")"
+  RESULT_LABEL="$(privacy_safe_id_label backtest_run "$BACKTEST_RUN_ID")"
+  EVIDENCE_ARTIFACT_LABEL="$(privacy_safe_id_label evidence_artifact "$EVIDENCE_ARTIFACT_ID")"
+  DECISION_NOTE_LABEL="$(privacy_safe_id_label decision_note "$DECISION_NOTE_ID")"
+  IDEA_LABEL="$(privacy_safe_id_label idea "$IDEA_ID")"
+  IDEA_VERSION_LABEL="$(privacy_safe_id_label idea_version "$IDEA_VERSION_ID")"
+  echo "canary_browser_identity_handoff=verified"
+  echo "canary_conversation=$CONVERSATION_LABEL"
+  echo "canary_backtest_job=$BACKTEST_JOB_LABEL"
+  echo "canary_result=$RESULT_LABEL"
 }
 
-assert_focused_symbol_path() {
-  local source_name="$1"
-  local json_file="${2:-}"
+login_for_read_only_api_postconditions() {
+  local login_body
+  login_body="$(CANARY_EMAIL="$EMAIL" CANARY_PASSWORD="$PASSWORD" python3 - <<'PY'
+import json
+import os
+print(json.dumps({"email": os.environ["CANARY_EMAIL"], "password": os.environ["CANARY_PASSWORD"]}))
+PY
+  )"
+  curl -fsS \
+    -c "$COOKIE_JAR" \
+    -H "Content-Type: application/json" \
+    -d "$login_body" \
+    "${API_URL}/api/v1/auth/login" >/dev/null
+}
 
-  if [ -z "$FOCUSED_SYMBOL_PATH" ]; then
-    return 0
-  fi
+verify_api_postconditions() {
+  local encoded_search_query
+  encoded_search_query="$(CANARY_SEARCH_QUERY="$SEARCH_QUERY" python3 - <<'PY'
+import os
+import urllib.parse
+print(urllib.parse.quote(os.environ["CANARY_SEARCH_QUERY"], safe=""))
+PY
+  )"
+  curl -fsS -b "$COOKIE_JAR" \
+    "${API_URL}/api/v1/backtest-jobs/${BACKTEST_JOB_ID}" > "$API_JOB_RESPONSE"
+  curl -fsS -b "$COOKIE_JAR" \
+    "${API_URL}/api/v1/conversations/${CONVERSATION_ID}/messages" > "$API_MESSAGES_RESPONSE"
+  curl -fsS -b "$COOKIE_JAR" \
+    "${API_URL}/api/v1/search?q=${encoded_search_query}&include_ledger_groups=true" > "$API_SEARCH_RESPONSE"
 
-  local exit_code=0
+  CANARY_JOB_FILE="$API_JOB_RESPONSE" \
+  CANARY_MESSAGES_FILE="$API_MESSAGES_RESPONSE" \
+  CANARY_SEARCH_FILE="$API_SEARCH_RESPONSE" \
+  CANARY_CONVERSATION_ID="$CONVERSATION_ID" \
+  CANARY_JOB_ID="$BACKTEST_JOB_ID" \
+  CANARY_RUN_ID="$BACKTEST_RUN_ID" \
+  CANARY_EVIDENCE_ID="$EVIDENCE_ARTIFACT_ID" \
+  CANARY_DECISION_ID="$DECISION_NOTE_ID" \
+  CANARY_DECISION_STATE="$DECISION_STATE" \
+  CANARY_IDEA_ID="$IDEA_ID" \
+  CANARY_IDEA_VERSION_ID="$IDEA_VERSION_ID" \
   CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \
-  CANARY_RUN_ACTION="$RUN_ACTION" \
-  CANARY_JSON_FILE="$json_file" \
-  CANARY_SOURCE_NAME="$source_name" \
-  python3 - <<'PY' || exit_code=$?
+  python3 - <<'PY'
 import json
 import os
 import pathlib
-from typing import Any
 
-expected = {
+def load(name: str):
+    return json.loads(pathlib.Path(os.environ[name]).read_text(encoding="utf-8"))
+
+job_payload = load("CANARY_JOB_FILE")
+job = job_payload.get("job")
+run = job_payload.get("run")
+if not isinstance(job, dict) or not isinstance(run, dict):
+    raise SystemExit("read-only job API omitted finalized records")
+if (
+    job.get("id") != os.environ["CANARY_JOB_ID"]
+    or job.get("conversation_id") != os.environ["CANARY_CONVERSATION_ID"]
+    or job.get("status") != "succeeded"
+    or job.get("result_run_id") != os.environ["CANARY_RUN_ID"]
+    or run.get("id") != os.environ["CANARY_RUN_ID"]
+    or run.get("conversation_id") != os.environ["CANARY_CONVERSATION_ID"]
+    or run.get("status") != "completed"
+):
+    raise SystemExit("read-only job API identity did not match browser capture")
+card = run.get("conversation_result_card")
+if not isinstance(card, dict):
+    raise SystemExit("read-only job API omitted the result card")
+expected_card = {
+    "evidence_artifact_id": os.environ["CANARY_EVIDENCE_ID"],
+    "decision_note_id": os.environ["CANARY_DECISION_ID"],
+    "decision_state": os.environ["CANARY_DECISION_STATE"],
+    "idea_id": os.environ["CANARY_IDEA_ID"],
+    "idea_version_id": os.environ["CANARY_IDEA_VERSION_ID"],
+}
+if any(card.get(key) != value for key, value in expected_card.items()):
+    raise SystemExit("read-only job API result card identity is incomplete")
+
+expected_symbols = {
     symbol.strip().upper()
     for symbol in os.environ["CANARY_FOCUSED_SYMBOL_PATH"].split(",")
     if symbol.strip()
 }
-actual: set[str] = set()
-
-SYMBOL_COLLECTION_KEYS = {
-    "asset_universe",
-    "asset_symbols",
-    "assets",
-    "symbols",
-    "tickers",
+actual_symbols = {
+    str(symbol).strip().upper()
+    for symbol in run.get("symbols", [])
+    if isinstance(symbol, str) and symbol.strip()
 }
-SYMBOL_VALUE_KEYS = {"symbol", "ticker"}
+if expected_symbols and not expected_symbols.issubset(actual_symbols):
+    raise SystemExit("read-only job API focused symbol path is incomplete")
 
+messages = load("CANARY_MESSAGES_FILE")
+items = messages.get("items") if isinstance(messages, dict) else None
+if not isinstance(items, list) or len(items) < 2:
+    raise SystemExit("read-only messages API omitted Golden Path history")
+encoded_messages = json.dumps(items, sort_keys=True)
+for required_identity in (
+    os.environ["CANARY_RUN_ID"],
+    os.environ["CANARY_EVIDENCE_ID"],
+    os.environ["CANARY_DECISION_ID"],
+):
+    if required_identity not in encoded_messages:
+        raise SystemExit("read-only messages API omitted canonical result continuity")
 
-def add_symbol(value: Any) -> None:
-    if not isinstance(value, str):
-        return
-    symbol = value.strip().upper()
-    if symbol:
-        actual.add(symbol)
-
-
-def collect_symbol_collection(value: Any) -> None:
-    if isinstance(value, list):
-        for item in value:
-            if isinstance(item, dict):
-                for key in SYMBOL_VALUE_KEYS:
-                    add_symbol(item.get(key))
-            else:
-                add_symbol(item)
-        return
-    if isinstance(value, dict):
-        for key in SYMBOL_VALUE_KEYS:
-            add_symbol(value.get(key))
-
-
-def collect_canonical_symbols(value: Any) -> None:
-    if isinstance(value, dict):
-        for key, item in value.items():
-            normalized_key = str(key).lower()
-            if normalized_key in SYMBOL_COLLECTION_KEYS:
-                collect_symbol_collection(item)
-                continue
-            if normalized_key in SYMBOL_VALUE_KEYS:
-                add_symbol(item)
-                continue
-            collect_canonical_symbols(item)
-        return
-    if isinstance(value, list):
-        for item in value:
-            collect_canonical_symbols(item)
-
-
-source_name = os.environ["CANARY_SOURCE_NAME"]
-if source_name == "run_action":
-    try:
-        collect_canonical_symbols(json.loads(os.environ["CANARY_RUN_ACTION"]))
-    except json.JSONDecodeError:
-        pass
-
-json_file = os.environ.get("CANARY_JSON_FILE", "")
-if json_file:
-    path = pathlib.Path(json_file)
-    if path.exists() and path.stat().st_size > 0:
-        try:
-            collect_canonical_symbols(json.loads(path.read_text(encoding="utf-8")))
-        except Exception:
-            pass
-
-missing = sorted(expected - actual)
-if missing:
-    raise SystemExit(
-        f"{source_name} focused symbol path missing expected symbols: "
-        f"expected={sorted(expected)} actual={sorted(actual)}"
-    )
+search = load("CANARY_SEARCH_FILE")
+search_items = search.get("items") if isinstance(search, dict) else None
+if not isinstance(search_items, list):
+    raise SystemExit("read-only Omnisearch API omitted items")
+for item in search_items:
+    if not isinstance(item, dict):
+        continue
+    if item.get("type") == "evidence" and item.get("id") == os.environ["CANARY_EVIDENCE_ID"]:
+        if (
+            item.get("conversation_id") != os.environ["CANARY_CONVERSATION_ID"]
+            or item.get("lifecycle") != "decided"
+        ):
+            raise SystemExit("read-only Omnisearch API returned contradictory evidence")
+        break
+else:
+    raise SystemExit("read-only Omnisearch API omitted browser-created evidence")
+ledger_groups = search.get("ledger_groups")
+if not isinstance(ledger_groups, list) or not any(
+    isinstance(group, dict)
+    and group.get("decision_state") == os.environ["CANARY_DECISION_STATE"]
+    and isinstance(group.get("count"), int)
+    and group["count"] >= 1
+    for group in ledger_groups
+):
+    raise SystemExit("read-only Omnisearch API omitted the saved decision group")
 PY
-  if [ "$exit_code" -ne 0 ]; then
-    fail_canary "$source_name" "focused_symbol_path_mismatch"
-  fi
 }
 
-COOKIE_JAR="$(mktemp)"
-CONFIRMATION_STREAM="$(mktemp)"
-CONFIRMATION_HEADERS="$(mktemp)"
-CONFIRMATION_PAYLOAD="$(mktemp)"
-RUN_STREAM="$(mktemp)"
-RUN_HEADERS="$(mktemp)"
-JOB_RESPONSE="$(mktemp)"
-DECISION_RESPONSE="$(mktemp)"
-FINALIZATION_IDENTITY="$(mktemp)"
-DECISION_IDENTITY="$(mktemp)"
-SEARCH_RESPONSE="$(mktemp)"
-trap 'rm -f "$COOKIE_JAR" "$CONFIRMATION_STREAM" "$CONFIRMATION_HEADERS" "$CONFIRMATION_PAYLOAD" "$RUN_STREAM" "$RUN_HEADERS" "$JOB_RESPONSE" "$DECISION_RESPONSE" "$FINALIZATION_IDENTITY" "$DECISION_IDENTITY" "$SEARCH_RESPONSE"' EXIT
+supabase_get() {
+  local url="$1"
+  local output_path="$2"
+  curl -fsS \
+    -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+    -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+    "$url" > "$output_path"
+}
 
-ENV_FINGERPRINT=""
-RELEASE_PROFILE_HASH=""
-WARMUP_RELEASE_PROFILE_STATUS=""
-WARMUP_RELEASE_PROFILE_HASH=""
-WORKFLOW_ENV_FINGERPRINT=""
-WORKFLOW_ENV_STATUS=""
-WORKFLOW_RUNTIME_PROVIDER_MODE=""
-WORKFLOW_RUNTIME_PROOF=""
-WORKFLOW_TASK=""
-REAL_WORKFLOW_TASK=""
-API_DEPLOY_SHA=""
-WEB_DEPLOY_SHA=""
-API_DEPLOY_STATUS=""
-WEB_DEPLOY_STATUS=""
-WORKFLOW_VERSION_COMMIT=""
-WORKFLOW_VERSION_ID=""
-WORKFLOW_VERSION_STATUS=""
-WORKFLOW_EXPECTED_VERSION_ID=""
-CONVERSATION_LABEL=""
-BACKTEST_JOB_LABEL=""
-RESULT_LABEL=""
-RESULT_KIND=""
-BACKTEST_RUN_ID=""
-RESULT_RUN_ID=""
-EVIDENCE_ARTIFACT_ID=""
-DECISION_NOTE_ID=""
-IDEA_ID=""
-IDEA_VERSION_ID=""
-EVIDENCE_ARTIFACT_LABEL=""
-DECISION_NOTE_LABEL=""
-IDEA_LABEL=""
-IDEA_VERSION_LABEL=""
-BROWSER_CANARY_STATUS="not_run"
-LAST_STREAM_HTTP_STATUS=""
-MESSAGES_JSON=""
-RECEIPT_ROWS="[]"
-CANARY_STATUS="running"
-CANARY_FAILURE_STAGE=""
-CANARY_FAILURE_REASON=""
+verify_canonical_postconditions() {
+  supabase_get \
+    "${SUPABASE_URL}/rest/v1/conversations?select=id,user_id&id=eq.${CONVERSATION_ID}" \
+    "$CONVERSATION_ROWS"
+  supabase_get \
+    "${SUPABASE_URL}/rest/v1/backtest_jobs?select=id,user_id,conversation_id,status,result_run_id,execution_metadata&conversation_id=eq.${CONVERSATION_ID}" \
+    "$JOB_ROWS"
+  supabase_get \
+    "${SUPABASE_URL}/rest/v1/backtest_runs?select=id,user_id,conversation_id,status,conversation_result_card&conversation_id=eq.${CONVERSATION_ID}" \
+    "$RUN_ROWS"
+  supabase_get \
+    "${SUPABASE_URL}/rest/v1/evidence_artifacts?select=id,user_id,idea_id,idea_version_id,source_conversation_id,source_run_id,artifact_type,lifecycle&id=eq.${EVIDENCE_ARTIFACT_ID}" \
+    "$EVIDENCE_ROWS"
+  supabase_get \
+    "${SUPABASE_URL}/rest/v1/decision_notes?select=id,user_id,evidence_artifact_id,idea_id,idea_version_id,source_conversation_id,decision_state&id=eq.${DECISION_NOTE_ID}" \
+    "$DECISION_ROWS"
+  supabase_get \
+    "${SUPABASE_URL}/rest/v1/ideas?select=id,user_id,source_conversation_id,active_version_id,lifecycle&id=eq.${IDEA_ID}" \
+    "$IDEA_ROWS"
+  supabase_get \
+    "${SUPABASE_URL}/rest/v1/idea_versions?select=id,user_id,idea_id,source_conversation_id,source_run_id,lifecycle&id=eq.${IDEA_VERSION_ID}" \
+    "$IDEA_VERSION_ROWS"
+  supabase_get \
+    "${SUPABASE_URL}/rest/v1/route_receipts?select=id,user_id,conversation_id,run_id,task,outcome&conversation_id=eq.${CONVERSATION_ID}&run_id=eq.${BACKTEST_RUN_ID}&task=eq.result_summary" \
+    "$RECEIPT_ROWS"
+
+  CANARY_CONVERSATION_ROWS="$CONVERSATION_ROWS" \
+  CANARY_JOB_ROWS="$JOB_ROWS" \
+  CANARY_RUN_ROWS="$RUN_ROWS" \
+  CANARY_EVIDENCE_ROWS="$EVIDENCE_ROWS" \
+  CANARY_DECISION_ROWS="$DECISION_ROWS" \
+  CANARY_IDEA_ROWS="$IDEA_ROWS" \
+  CANARY_IDEA_VERSION_ROWS="$IDEA_VERSION_ROWS" \
+  CANARY_RECEIPT_ROWS="$RECEIPT_ROWS" \
+  CANARY_USER_ID="$USER_ID" \
+  CANARY_CONVERSATION_ID="$CONVERSATION_ID" \
+  CANARY_JOB_ID="$BACKTEST_JOB_ID" \
+  CANARY_RUN_ID="$BACKTEST_RUN_ID" \
+  CANARY_EVIDENCE_ID="$EVIDENCE_ARTIFACT_ID" \
+  CANARY_DECISION_ID="$DECISION_NOTE_ID" \
+  CANARY_DECISION_STATE="$DECISION_STATE" \
+  CANARY_IDEA_ID="$IDEA_ID" \
+  CANARY_IDEA_VERSION_ID="$IDEA_VERSION_ID" \
+  python3 - <<'PY'
+import json
+import os
+import pathlib
+
+def rows(name: str):
+    value = json.loads(pathlib.Path(os.environ[name]).read_text(encoding="utf-8"))
+    if not isinstance(value, list):
+        raise SystemExit("Supabase postcondition response was not a row list")
+    return value
+
+conversation_rows = rows("CANARY_CONVERSATION_ROWS")
+job_rows = rows("CANARY_JOB_ROWS")
+run_rows = rows("CANARY_RUN_ROWS")
+evidence_rows = rows("CANARY_EVIDENCE_ROWS")
+decision_rows = rows("CANARY_DECISION_ROWS")
+idea_rows = rows("CANARY_IDEA_ROWS")
+idea_version_rows = rows("CANARY_IDEA_VERSION_ROWS")
+receipt_rows = rows("CANARY_RECEIPT_ROWS")
+
+if len(job_rows) != 1:
+    raise SystemExit("expected exactly one canary backtest_job")
+if len(run_rows) != 1:
+    raise SystemExit("expected exactly one canary backtest_run")
+for name, value in (
+    ("conversation", conversation_rows),
+    ("evidence", evidence_rows),
+    ("decision", decision_rows),
+    ("idea", idea_rows),
+    ("idea version", idea_version_rows),
+):
+    if len(value) != 1:
+        raise SystemExit(f"expected exactly one canonical {name} row")
+
+user_id = os.environ["CANARY_USER_ID"]
+all_owned_rows = (
+    conversation_rows
+    + job_rows
+    + run_rows
+    + evidence_rows
+    + decision_rows
+    + idea_rows
+    + idea_version_rows
+    + receipt_rows
+)
+if any(row.get("user_id") != user_id for row in all_owned_rows):
+    raise SystemExit("canonical postcondition ownership mismatch")
+
+conversation = conversation_rows[0]
+job = job_rows[0]
+run = run_rows[0]
+evidence = evidence_rows[0]
+decision = decision_rows[0]
+idea = idea_rows[0]
+idea_version = idea_version_rows[0]
+if conversation.get("id") != os.environ["CANARY_CONVERSATION_ID"]:
+    raise SystemExit("canonical conversation identity mismatch")
+if (
+    job.get("id") != os.environ["CANARY_JOB_ID"]
+    or job.get("conversation_id") != os.environ["CANARY_CONVERSATION_ID"]
+    or job.get("status") != "succeeded"
+    or job.get("result_run_id") != os.environ["CANARY_RUN_ID"]
+):
+    raise SystemExit("canonical job finalization mismatch")
+workflow_metadata = (job.get("execution_metadata") or {}).get("workflow_backtest")
+if not isinstance(workflow_metadata, dict):
+    raise SystemExit("canonical job omitted workflow execution metadata")
+if (
+    workflow_metadata.get("result_readout_source") != "llm_explain_stage"
+    or workflow_metadata.get("result_readout_fallback_used") is not False
+):
+    raise SystemExit("canonical job did not preserve LLM result voice")
+if (
+    run.get("id") != os.environ["CANARY_RUN_ID"]
+    or run.get("conversation_id") != os.environ["CANARY_CONVERSATION_ID"]
+    or run.get("status") != "completed"
+):
+    raise SystemExit("canonical run finalization mismatch")
+card = run.get("conversation_result_card")
+if not isinstance(card, dict):
+    raise SystemExit("canonical run omitted result card")
+expected_card = {
+    "idea_id": os.environ["CANARY_IDEA_ID"],
+    "idea_version_id": os.environ["CANARY_IDEA_VERSION_ID"],
+    "evidence_artifact_id": os.environ["CANARY_EVIDENCE_ID"],
+    "decision_note_id": os.environ["CANARY_DECISION_ID"],
+    "decision_state": os.environ["CANARY_DECISION_STATE"],
+}
+if any(card.get(key) != value for key, value in expected_card.items()):
+    raise SystemExit("canonical result card identity mismatch")
+if (
+    evidence.get("id") != os.environ["CANARY_EVIDENCE_ID"]
+    or evidence.get("idea_id") != os.environ["CANARY_IDEA_ID"]
+    or evidence.get("idea_version_id") != os.environ["CANARY_IDEA_VERSION_ID"]
+    or evidence.get("source_conversation_id") != os.environ["CANARY_CONVERSATION_ID"]
+    or evidence.get("source_run_id") != os.environ["CANARY_RUN_ID"]
+    or evidence.get("artifact_type") != "backtest"
+    or evidence.get("lifecycle") != "decided"
+):
+    raise SystemExit("canonical evidence identity mismatch")
+if (
+    decision.get("id") != os.environ["CANARY_DECISION_ID"]
+    or decision.get("evidence_artifact_id") != os.environ["CANARY_EVIDENCE_ID"]
+    or decision.get("idea_id") != os.environ["CANARY_IDEA_ID"]
+    or decision.get("idea_version_id") != os.environ["CANARY_IDEA_VERSION_ID"]
+    or decision.get("source_conversation_id") != os.environ["CANARY_CONVERSATION_ID"]
+    or decision.get("decision_state") != os.environ["CANARY_DECISION_STATE"]
+):
+    raise SystemExit("canonical decision identity mismatch")
+if (
+    idea.get("id") != os.environ["CANARY_IDEA_ID"]
+    or idea.get("source_conversation_id") != os.environ["CANARY_CONVERSATION_ID"]
+    or idea.get("active_version_id") != os.environ["CANARY_IDEA_VERSION_ID"]
+    or idea.get("lifecycle") != "decided"
+):
+    raise SystemExit("canonical idea identity mismatch")
+if (
+    idea_version.get("id") != os.environ["CANARY_IDEA_VERSION_ID"]
+    or idea_version.get("idea_id") != os.environ["CANARY_IDEA_ID"]
+    or idea_version.get("source_conversation_id") != os.environ["CANARY_CONVERSATION_ID"]
+    or idea_version.get("source_run_id") != os.environ["CANARY_RUN_ID"]
+    or idea_version.get("lifecycle") != "decided"
+):
+    raise SystemExit("canonical idea version identity mismatch")
+if not any(row.get("task") == "result_summary" for row in receipt_rows):
+    raise SystemExit("canonical result_summary route receipt is missing")
+PY
+}
 
 if [ -z "$EMAIL" ]; then
-  echo "ARGUS_CANARY_EMAIL or MOCK_USER_EMAIL is required."
   fail_canary "auth" "missing_canary_email"
 fi
-
 if [ -z "$PASSWORD" ]; then
-  echo "ARGUS_CANARY_PASSWORD or MOCK_USER_PASSWORD is required."
   fail_canary "auth" "missing_canary_password"
+fi
+if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+  fail_canary "supabase_verifier" "missing_supabase_verifier_credentials"
 fi
 
 validate_release_evidence_contract
 
-LOGIN_BODY="$(
-  CANARY_EMAIL="$EMAIL" CANARY_PASSWORD="$PASSWORD" python3 - <<'PY'
-import json
-import os
-
-print(json.dumps({
-    "email": os.environ["CANARY_EMAIL"],
-    "password": os.environ["CANARY_PASSWORD"],
-}))
-PY
-)"
-
-echo "Logging in canary user"
-if ! curl -fsS \
-  -c "$COOKIE_JAR" \
-  -H "Content-Type: application/json" \
-  -d "$LOGIN_BODY" \
-  "${API_URL}/api/v1/auth/login" >/dev/null; then
-  fail_canary "auth" "login_failed"
-fi
-
-if ! CONVERSATION_ID="$(
-  curl -fsS \
-    -b "$COOKIE_JAR" \
-    -H "Content-Type: application/json" \
-    -d "{}" \
-    "${API_URL}/api/v1/conversations" |
-  python3 -c 'import json,sys; print(json.load(sys.stdin)["conversation"]["id"])'
-)"; then
-  fail_canary "conversation" "conversation_create_failed"
-fi
-CONVERSATION_LABEL="$(privacy_safe_id_label conversation "$CONVERSATION_ID")"
-
-CHAT_BODY="$(
-  CONVERSATION_ID="$CONVERSATION_ID" PROMPT="$PROMPT" CANARY_LANGUAGE="$LANGUAGE" python3 - <<'PY'
-import json
-import os
-
-print(json.dumps({
-    "conversation_id": os.environ["CONVERSATION_ID"],
-    "message": os.environ["PROMPT"],
-    "language": os.environ["CANARY_LANGUAGE"],
-}))
-PY
-)"
-
-echo "Created canary conversation: $CONVERSATION_LABEL"
-if ! curl -fsS -N \
-  --max-time "$TIMEOUT_SECONDS" \
-  -D "$CONFIRMATION_HEADERS" \
-  -b "$COOKIE_JAR" \
-  -H "Content-Type: application/json" \
-  -d "$CHAT_BODY" \
-  "${API_URL}/api/v1/chat/stream" > "$CONFIRMATION_STREAM"; then
-  handle_stream_failure "confirmation" "$CONFIRMATION_HEADERS"
-fi
-
-if ! RUN_ACTION="$(
-CANARY_CONFIRMATION_PAYLOAD_FILE="$CONFIRMATION_PAYLOAD" \
-python3 - "$CONFIRMATION_STREAM" <<'PY'
-import json
-import os
-import pathlib
-import sys
-
-stream = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
-events = []
-for part in stream.split("\n\n"):
-    for line in part.splitlines():
-        if line.startswith("data: "):
-            raw = line.removeprefix("data: ").strip()
-            if raw and raw != "[DONE]":
-                events.append(json.loads(raw))
-if "data: [DONE]" not in stream:
-    raise SystemExit("confirmation stream did not finish")
-if any(event.get("type") == "error" for event in events):
-    raise SystemExit("confirmation stream returned error")
-
-confirmations = []
-final_payloads = []
-for event in events:
-    if event.get("type") != "final":
-        continue
-    payload = event.get("payload", {})
-    if not isinstance(payload, dict):
-        continue
-    final_payloads.append(payload)
-    for key in ("confirmation", "confirmation_card"):
-        value = payload.get(key)
-        if isinstance(value, dict):
-            confirmations.append(value)
-    final_response_payload = payload.get("final_response_payload")
-    if isinstance(final_response_payload, dict):
-        for key in ("confirmation", "confirmation_card"):
-            value = final_response_payload.get(key)
-            if isinstance(value, dict):
-                confirmations.append(value)
-
-if not confirmations:
-    raise SystemExit("confirmation stream did not return a confirmation")
-
-payload_file = pathlib.Path(os.environ["CANARY_CONFIRMATION_PAYLOAD_FILE"])
-payload_file.write_text(
-    json.dumps(final_payloads[-1] if final_payloads else {}, sort_keys=True),
-    encoding="utf-8",
-)
-
-for confirmation in confirmations:
-    for action in confirmation.get("actions") or []:
-        if isinstance(action, dict) and action.get("type") == "run_backtest":
-            print(json.dumps(action, sort_keys=True))
-            raise SystemExit(0)
-
-raise SystemExit("confirmation stream did not include run_backtest action")
-PY
-)"; then
-  fail_canary "confirmation_stream" "confirmation_contract_failed"
-fi
-assert_focused_symbol_path confirmation_payload "$CONFIRMATION_PAYLOAD"
-
-RUN_BODY="$(
-  CONVERSATION_ID="$CONVERSATION_ID" RUN_ACTION="$RUN_ACTION" CANARY_LANGUAGE="$LANGUAGE" python3 - <<'PY'
-import json
-import os
-
-print(json.dumps({
-    "conversation_id": os.environ["CONVERSATION_ID"],
-    "action": json.loads(os.environ["RUN_ACTION"]),
-    "language": os.environ["CANARY_LANGUAGE"],
-}))
-PY
-)"
-
-if ! curl -fsS -N \
-  --max-time "$TIMEOUT_SECONDS" \
-  -D "$RUN_HEADERS" \
-  -b "$COOKIE_JAR" \
-  -H "Content-Type: application/json" \
-  -d "$RUN_BODY" \
-  "${API_URL}/api/v1/chat/stream" > "$RUN_STREAM"; then
-  handle_stream_failure "run" "$RUN_HEADERS"
-fi
-
-if ! RUN_RESULT="$(
-  python3 - "$RUN_STREAM" <<'PY'
-import json
-import pathlib
-import sys
-
-stream = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
-events = []
-for part in stream.split("\n\n"):
-    for line in part.splitlines():
-        if line.startswith("data: "):
-            raw = line.removeprefix("data: ").strip()
-            if raw and raw != "[DONE]":
-                events.append(json.loads(raw))
-if "data: [DONE]" not in stream:
-    raise SystemExit("run stream did not finish")
-if any(event.get("type") == "error" for event in events):
-    raise SystemExit("run stream returned error")
-finals = [event.get("payload", {}) for event in events if event.get("type") == "final"]
-if not finals:
-    raise SystemExit("run stream did not return final payload")
-for payload in finals:
-    job = payload.get("backtest_job")
-    if not isinstance(job, dict):
-        final_response_payload = payload.get("final_response_payload")
-        if isinstance(final_response_payload, dict):
-            job = final_response_payload.get("backtest_job")
-    if isinstance(job, dict) and job.get("id"):
-        print(f"job:{job['id']}")
-        raise SystemExit(0)
-for payload in finals:
-    run = payload.get("run")
-    if isinstance(run, dict) and run.get("id"):
-        print(f"run:{run['id']}")
-        raise SystemExit(0)
-raise SystemExit("run stream returned neither backtest_job nor backtest_run")
-PY
-)"; then
-  fail_canary "run_stream" "run_contract_failed"
-fi
-
-BACKTEST_JOB_ID=""
-poll_backtest_job() {
-  local job_id="$1"
-  local poll_deadline=$((SECONDS + TIMEOUT_SECONDS))
-  local poll_result
-  local job_label
-  job_label="$(privacy_safe_id_label backtest_job "$job_id")"
-
-  echo "Polling backtest job: $job_label"
-  while true; do
-    if ! curl -fsS \
-      -b "$COOKIE_JAR" \
-      "${API_URL}/api/v1/backtest-jobs/${job_id}" > "$JOB_RESPONSE"; then
-      fail_canary "backtest_job" "backtest_job_fetch_failed"
-    fi
-    if ! poll_result="$(
-      python3 - "$JOB_RESPONSE" <<'PY'
-import json
-import pathlib
-import sys
-
-payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
-job = payload.get("job")
-if not isinstance(job, dict):
-    raise SystemExit("job status response did not include job")
-status = str(job.get("status") or "")
-if status == "succeeded":
-    run = payload.get("run")
-    if not isinstance(run, dict) or not run.get("id"):
-        raise SystemExit("backtest job succeeded without linked run")
-    source = payload.get("result_readout_source")
-    fallback_used = payload.get("result_readout_fallback_used")
-    if source != "llm_explain_stage" or fallback_used is not False:
-        raise SystemExit(
-            "backtest job did not preserve LLM result readout voice: "
-            f"source={source!r} fallback_used={fallback_used!r}"
-        )
-    print(f"succeeded:{run['id']}")
-elif status in {"failed", "canceled", "expired"}:
-    print(f"terminal:{status}")
-else:
-    print(f"pending:{status or 'unknown'}")
-PY
-    )"; then
-      fail_canary "backtest_job" "backtest_job_parse_failed"
-    fi
-    case "$poll_result" in
-      succeeded:*)
-        BACKTEST_RUN_ID="${poll_result#succeeded:}"
-        RESULT_LABEL="$(privacy_safe_id_label backtest_run "$BACKTEST_RUN_ID")"
-        echo "OK: backtest job completed with run $RESULT_LABEL"
-        return 0
-        ;;
-      terminal:*)
-        echo "ERROR: backtest job ended unsuccessfully: $poll_result"
-        print_safe_job_response
-        fail_canary "backtest_job" "backtest_job_terminal"
-        ;;
-      pending:*)
-        if [ "$SECONDS" -ge "$poll_deadline" ]; then
-          echo "ERROR: backtest job did not complete within ${TIMEOUT_SECONDS}s"
-          print_safe_job_response
-          fail_canary "backtest_job" "backtest_job_timeout"
-        fi
-        echo "  waiting for backtest job... ${poll_result#pending:}"
-        sleep "$POLL_SLEEP_SECONDS"
-        ;;
-      *)
-        echo "ERROR: unknown backtest job poll result: $poll_result"
-        print_safe_job_response
-        fail_canary "backtest_job" "backtest_job_unknown_poll_result"
-        ;;
-    esac
-  done
-}
-
-case "$RUN_RESULT" in
-  job:*)
-    BACKTEST_JOB_ID="${RUN_RESULT#job:}"
-    BACKTEST_JOB_LABEL="$(privacy_safe_id_label backtest_job "$BACKTEST_JOB_ID")"
-    RESULT_KIND="backtest_job"
-    poll_backtest_job "$BACKTEST_JOB_ID"
-    assert_focused_symbol_path job_response "$JOB_RESPONSE"
-    ;;
-  run:*)
-    if [ "$REQUIRE_ASYNC_WORKFLOW" = "true" ]; then
-      fail_canary "run_stream" "missing_async_workflow_job"
-    fi
-    BACKTEST_RUN_ID="${RUN_RESULT#run:}"
-    RESULT_KIND="backtest_run"
-    RESULT_LABEL="$(privacy_safe_id_label backtest_run "$BACKTEST_RUN_ID")"
-    echo "OK: run stream returned immediate run $RESULT_LABEL"
-    ;;
-  *)
-    echo "ERROR: unknown run stream result: $RUN_RESULT"
-    fail_canary "run_stream" "unknown_run_stream_result"
-    ;;
-esac
-
-if ! MESSAGES_JSON="$(fetch_conversation_messages)"; then
-  fail_canary "reload_hydration" "message_fetch_failed"
-fi
-if ! assert_reload_hydration_payload true; then
-  fail_canary "reload_hydration" "reload_hydration_contract_failed"
-fi
-
-if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-  fail_canary "supabase_verifier" "missing_supabase_verifier_credentials"
-fi
-if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-  if ! BACKTEST_ROWS="$(
-    curl -fsS \
-      -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-      -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-      "${SUPABASE_URL}/rest/v1/backtest_runs?select=id&conversation_id=eq.${CONVERSATION_ID}&limit=1"
-  )"; then
-    fail_canary "supabase_verifier" "backtest_rows_fetch_failed"
-  fi
-  JOB_ROWS="[]"
-  if [ -n "$BACKTEST_JOB_ID" ]; then
-    if ! JOB_ROWS="$(
-      curl -fsS \
-        -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-        -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-        "${SUPABASE_URL}/rest/v1/backtest_jobs?select=id,status,result_run_id,execution_metadata&id=eq.${BACKTEST_JOB_ID}&limit=1"
-    )"; then
-      fail_canary "supabase_verifier" "job_rows_fetch_failed"
-    fi
-  fi
-  RESULT_RUN_ID="$(
-    python3 - "$JOB_ROWS" "$BACKTEST_JOB_ID" "$BACKTEST_RUN_ID" <<'PY'
-import json
-import sys
-
-job_rows = json.loads(sys.argv[1])
-job_id = sys.argv[2]
-run_id = sys.argv[3]
-if job_id and job_rows:
-    print(str(job_rows[0].get("result_run_id") or "").strip())
-else:
-    print(run_id)
-PY
-  )"
-  RECEIPT_ROWS="[]"
-  if [ -n "$RESULT_RUN_ID" ]; then
-    if ! RECEIPT_ROWS="$(
-      curl -fsS \
-        -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-        -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-        "${SUPABASE_URL}/rest/v1/route_receipts?select=id,task&conversation_id=eq.${CONVERSATION_ID}&run_id=eq.${RESULT_RUN_ID}&task=eq.result_summary&limit=1"
-    )"; then
-      fail_canary "supabase_verifier" "receipt_rows_fetch_failed"
-    fi
-  fi
-  if ! python3 - "$BACKTEST_ROWS" "$RECEIPT_ROWS" "$JOB_ROWS" "$BACKTEST_JOB_ID" "$RESULT_RUN_ID" <<'PY'
-import json
-import sys
-
-backtest_rows = json.loads(sys.argv[1])
-receipt_rows = json.loads(sys.argv[2])
-job_rows = json.loads(sys.argv[3])
-job_id = sys.argv[4]
-expected_result_run_id = sys.argv[5]
-if not backtest_rows:
-    raise SystemExit("Supabase verifier did not find canary backtest_run")
-if job_id and not job_rows:
-    raise SystemExit("Supabase verifier did not find canary backtest_job")
-if job_id:
-    job = job_rows[0]
-    result_run_id = str(job.get("result_run_id") or "").strip()
-    if not result_run_id:
-        raise SystemExit("Supabase verifier found canary backtest_job without result_run_id")
-    if result_run_id != expected_result_run_id:
-        raise SystemExit("Supabase verifier result_run_id changed during verification")
-    execution_metadata = job.get("execution_metadata")
-    if not isinstance(execution_metadata, dict):
-        raise SystemExit("Supabase verifier found canary backtest_job without execution_metadata")
-    workflow_metadata = execution_metadata.get("workflow_backtest")
-    if not isinstance(workflow_metadata, dict):
-        raise SystemExit(
-            "Supabase verifier found canary backtest_job without workflow_backtest metadata"
-        )
-    source = workflow_metadata.get("result_readout_source")
-    fallback_used = workflow_metadata.get("result_readout_fallback_used")
-    if source != "llm_explain_stage" or fallback_used is not False:
-        raise SystemExit(
-            "Supabase verifier found non-LLM result readout voice: "
-            f"source={source!r} fallback_used={fallback_used!r}"
-        )
-    if not receipt_rows:
-        raise SystemExit(
-            "Supabase verifier did not find canary result_summary route_receipts"
-        )
-PY
-  then
-    fail_canary "supabase_verifier" "supabase_verifier_failed"
-  fi
-else
-  fail_canary "supabase_verifier" "missing_supabase_verifier_credentials"
-fi
-
-if ! verify_finalized_evidence_identity; then
-  fail_canary "finalized_identity" "finalized_identity_failed"
-fi
-
-if ! save_canary_decision; then
-  fail_canary "decision" "decision_capture_failed"
-fi
-
-if ! MESSAGES_JSON="$(fetch_conversation_messages)"; then
-  fail_canary "decision_reload_hydration" "message_fetch_failed"
-fi
-if ! assert_reload_hydration_payload true || ! assert_decision_hydration; then
-  fail_canary "decision_reload_hydration" "decision_reload_hydration_failed"
-fi
-
-if ! verify_omnisearch_source_identity; then
-  fail_canary "omnisearch" "omnisearch_source_identity_failed"
-fi
-
 if ! run_browser_canary; then
-  fail_canary "browser" "spanish_signup_login_failed"
+  fail_canary "browser" "rendered_golden_path_failed"
+fi
+if ! verify_browser_identity_handoff; then
+  fail_canary "browser_identity" "private_identity_handoff_failed"
+fi
+if ! login_for_read_only_api_postconditions; then
+  fail_canary "api_postconditions" "read_only_login_failed"
+fi
+if ! verify_api_postconditions; then
+  fail_canary "api_postconditions" "canonical_api_postconditions_failed"
+fi
+if ! verify_canonical_postconditions; then
+  fail_canary "supabase_postconditions" "canonical_supabase_postconditions_failed"
 fi
 
 CANARY_STATUS="passed"
 write_canary_evidence
-
-echo "Canary passed: Spanish profile, real workflow, finalized evidence, saved decision, reload hydration, and Omnisearch identity are present."
+write_canary_capture
+echo "Canary passed: the rendered Spanish browser owned one real Golden Path and all canonical postconditions matched."

@@ -128,8 +128,22 @@
       "landing.sign_up_email",
       "auth.signup.submit",
       "auth.login.submit",
+      "common.retry",
+      "common.search",
       "chat.history.pinned",
+      "chat.confirmation.status.ready_to_run",
+      "chat.confirmation.actions.run_backtest",
+      "chat.simulation_complete",
+      "chat.backtest_job.queued_title",
+      "chat.backtest_job.running_title",
+      "chat.backtest_job.failed_title",
       "chat.result_card.add_decision",
+      "chat.result_card.save_decision",
+      "chat.result_card.decision_note_placeholder",
+      "chat.result_card.decision_states.promising",
+      "chat.error_backtest",
+      "command_palette.search_placeholder",
+      "command_palette.type.evidence",
       "command_palette.ledger.decision_filters"
     ]
   },
@@ -138,15 +152,22 @@
     "locale": "es-419",
     "prompt": "Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 con 10000 dolares",
     "decision_state": "promising",
+    "decision_note": "Canario de navegador 233: evidencia renderizada verificada.",
+    "search_query": "AAPL",
     "required_steps": [
-      "signup_login",
+      "login",
       "profile_hydration",
+      "browser_owned_golden_path",
       "real_workflow_backtest",
+      "single_run_admission",
       "finalized_identity",
       "decision_note",
       "reload_hydration",
       "omnisearch_source_identity",
-      "spanish_static_ui"
+      "spanish_static_ui",
+      "private_identity_handoff",
+      "deterministic_intercepted_recovery",
+      "clean_browser_console"
     ]
   }
 }
