@@ -16,6 +16,8 @@
  *   transcript and scroll entry.
  * - Abort reduces wasted work, while the monotonic navigation generation is
  *   the correctness guard when a loader ignores AbortSignal.
+ * - Leaving the conversation surface calls `cancelActiveNavigation()` so a
+ *   late keyed load cannot commit onto New Chat; cached snapshots remain.
  * - Set `maxEntries` to `0` to disable transcript retention while keeping the
  *   latest-navigation guard active.
  *
@@ -96,6 +98,7 @@ type CacheEntry<TSnapshot> = {
   snapshot?: TSnapshot;
   loadedAt?: number;
   scrollTop?: number;
+  snapshotEstimatedBytes: number;
   estimatedBytes: number;
 };
 
@@ -218,6 +221,15 @@ export class TranscriptSessionCache<TSnapshot> {
     };
   }
 
+  cancelActiveNavigation(): void {
+    if (!this.activeNavigation) {
+      return;
+    }
+    this.abortLoad(this.activeNavigation.key);
+    this.activeNavigation = null;
+    this.navigationGeneration += 1;
+  }
+
   readSnapshot(identity: TranscriptCacheIdentity): CachedTranscript<TSnapshot> | null {
     const resolved = this.resolveIdentity(identity);
     return this.readSnapshotByKey(this.cacheKey(resolved));
@@ -232,10 +244,12 @@ export class TranscriptSessionCache<TSnapshot> {
     const scrollTop = Number.isFinite(input.scrollTop)
       ? Math.max(0, input.scrollTop)
       : 0;
+    const snapshotEstimatedBytes = existing?.snapshotEstimatedBytes ?? 0;
     this.writeEntry(key, {
       ...existing,
       scrollTop,
-      estimatedBytes: this.entryBytes(existing?.snapshot, scrollTop),
+      snapshotEstimatedBytes,
+      estimatedBytes: this.entryBytes(snapshotEstimatedBytes, scrollTop),
     });
   }
 
@@ -369,20 +383,28 @@ export class TranscriptSessionCache<TSnapshot> {
 
   private rememberSnapshot(key: string, snapshot: TSnapshot): void {
     const existing = this.entries.get(key);
+    const snapshotEstimatedBytes = this.estimatedSnapshotBytes(snapshot);
     this.writeEntry(key, {
       ...existing,
       snapshot,
       loadedAt: this.now(),
-      estimatedBytes: this.entryBytes(snapshot, existing?.scrollTop),
+      snapshotEstimatedBytes,
+      estimatedBytes: this.entryBytes(
+        snapshotEstimatedBytes,
+        existing?.scrollTop,
+      ),
     });
   }
 
-  private entryBytes(snapshot: TSnapshot | undefined, scrollTop?: number): number {
-    const rawSnapshotBytes = snapshot === undefined ? 0 : this.estimateBytes(snapshot);
-    const snapshotBytes = Number.isFinite(rawSnapshotBytes)
+  private estimatedSnapshotBytes(snapshot: TSnapshot): number {
+    const rawSnapshotBytes = this.estimateBytes(snapshot);
+    return Number.isFinite(rawSnapshotBytes)
       ? Math.max(0, rawSnapshotBytes)
       : this.maxEstimatedBytes + 1;
-    return snapshotBytes + (scrollTop === undefined ? 0 : 8);
+  }
+
+  private entryBytes(snapshotEstimatedBytes: number, scrollTop?: number): number {
+    return snapshotEstimatedBytes + (scrollTop === undefined ? 0 : 8);
   }
 
   private writeEntry(key: string, entry: CacheEntry<TSnapshot>): void {

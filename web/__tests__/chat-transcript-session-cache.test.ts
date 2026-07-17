@@ -130,6 +130,63 @@ describe("chat transcript session cache", () => {
     });
   });
 
+  test("cancels a delayed refresh when leaving chat without discarding cached data", async () => {
+    let now = 0;
+    const cache = new TranscriptSessionCache<Snapshot>({ now: () => now });
+    await seed(cache, "user-1", "conversation-a");
+    now = TRANSCRIPT_CACHE_POLICY.freshForMs + 1;
+    const delayedA = deferred<Snapshot>();
+    const states: TranscriptNavigationState<Snapshot>[] = [];
+    const observed: { signal?: AbortSignal } = {};
+
+    const navigation = cache.navigate({
+      userId: "user-1",
+      conversationId: "conversation-a",
+      load: (signal) => {
+        observed.signal = signal;
+        return delayedA.promise;
+      },
+      onState: (state) => states.push(state),
+    });
+    cache.cancelActiveNavigation();
+
+    expect(observed.signal?.aborted).toBe(true);
+    delayedA.resolve(snapshot("conversation-a", "late-network"));
+    await navigation.completion;
+
+    expect(states).toEqual([
+      {
+        phase: "refreshing",
+        source: "stale_cache",
+        snapshot: snapshot("conversation-a"),
+      },
+    ]);
+    expect(
+      cache.readSnapshot({ userId: "user-1", conversationId: "conversation-a" })
+        ?.snapshot,
+    ).toEqual(snapshot("conversation-a"));
+  });
+
+  test("suppresses a delayed load error after leaving the conversation surface", async () => {
+    const cache = new TranscriptSessionCache<Snapshot>();
+    const delayedA = deferred<Snapshot>();
+    const states: TranscriptNavigationState<Snapshot>[] = [];
+
+    const navigation = cache.navigate({
+      userId: "user-1",
+      conversationId: "conversation-a",
+      load: () => delayedA.promise,
+      onState: (state) => states.push(state),
+    });
+    cache.cancelActiveNavigation();
+    delayedA.reject(new Error("late A failure"));
+    await navigation.completion;
+
+    expect(states).toEqual([
+      { phase: "loading", source: "cache_miss", snapshot: null },
+    ]);
+  });
+
   test("starts a new request when revisiting a key whose prior request was aborted", async () => {
     const cache = new TranscriptSessionCache<Snapshot>();
     const firstA = deferred<Snapshot>();
@@ -364,6 +421,33 @@ describe("chat transcript session cache", () => {
     expect(
       cache.readSnapshot({ userId: "user-1", conversationId: "conversation-b" }),
     ).not.toBeNull();
+  });
+
+  test("updates scroll metadata without re-estimating the transcript", async () => {
+    let estimateCount = 0;
+    const cache = new TranscriptSessionCache<Snapshot>({
+      estimateBytes: () => {
+        estimateCount += 1;
+        return 100;
+      },
+    });
+    await seed(cache, "user-1", "conversation-a");
+
+    cache.rememberScroll({
+      userId: "user-1",
+      conversationId: "conversation-a",
+      scrollTop: 120,
+    });
+    cache.rememberScroll({
+      userId: "user-1",
+      conversationId: "conversation-a",
+      scrollTop: 240,
+    });
+
+    expect(estimateCount).toBe(1);
+    expect(
+      cache.readScroll({ userId: "user-1", conversationId: "conversation-a" }),
+    ).toBe(240);
   });
 
   test("clears transcripts scroll state and pending work on user change and logout", async () => {
