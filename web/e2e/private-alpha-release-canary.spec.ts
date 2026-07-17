@@ -52,7 +52,10 @@ function isApiResponse(response: Response, suffix: string, method: string): bool
   }
 }
 
-async function loginThroughRenderedUi(page: Page): Promise<string> {
+async function loginThroughRenderedUi(
+  page: Page,
+  verifySignup = false,
+): Promise<string> {
   const canaryEmail = requireConfig(email, "email");
   const canaryPassword = requireConfig(password, "password");
   const canaryLanguage = requireConfig(language, "language");
@@ -60,6 +63,33 @@ async function loginThroughRenderedUi(page: Page): Promise<string> {
   await page.addInitScript((nextLanguage) => {
     window.localStorage.setItem("i18nextLng", nextLanguage);
   }, canaryLanguage);
+
+  if (verifySignup) {
+    await page.goto("/?auth=signup", { waitUntil: "networkidle" });
+    await expect(page.locator("html")).toHaveAttribute("lang", canaryLanguage);
+    await expect(
+      page.getByRole("button", { name: label("auth.signup.submit") }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: label("landing.sign_up_email") }),
+    ).toHaveCount(0);
+
+    const signupResponsePromise = page.waitForResponse((response) =>
+      isApiResponse(response, "/auth/signup", "POST"),
+    );
+    await page.locator('input[type="text"]').fill("Argus Release Canary");
+    await page.locator('input[type="email"]').fill(canaryEmail);
+    await page.locator('input[type="password"]').fill(canaryPassword);
+    await page
+      .getByRole("button", { name: label("auth.signup.submit") })
+      .click();
+    const signupResponse = await signupResponsePromise;
+    expect(signupResponse.request().postDataJSON()).toMatchObject({
+      language: canaryLanguage,
+    });
+    expect(signupResponse.status()).toBe(400);
+    await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
+  }
 
   await page.goto("/?auth=login", { waitUntil: "networkidle" });
   await expect(page.locator("html")).toHaveAttribute("lang", canaryLanguage);
@@ -135,6 +165,68 @@ function successfulJobCapture(page: Page) {
 }
 
 test.describe.serial("private-alpha rendered release canary", () => {
+  test("deterministic/intercepted recovery is not deployed backend proof", async ({ page }) => {
+    test.setTimeout(90_000);
+    const retryPrompt = "Provocar recuperación tipada sin ejecutar un backtest";
+    const fakeConversationId = "00000000-0000-4000-8000-000000000233";
+    const fakeAssistantId = "00000000-0000-4000-8000-000000000234";
+    let interceptedRunRequests = 0;
+
+    await loginThroughRenderedUi(page, true);
+    await page.route("**/api/v1/conversations", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          conversation: {
+            id: fakeConversationId,
+            title: "Recuperación determinista",
+            title_source: "default",
+            pinned: false,
+            archived: false,
+            created_at: "2026-07-16T00:00:00Z",
+            updated_at: "2026-07-16T00:00:00Z",
+            language: "es-419",
+          },
+        }),
+      });
+    });
+    await page.route("**/api/v1/chat/stream", async (route) => {
+      const body = route.request().postDataJSON() as JsonRecord;
+      const action = body.action;
+      if (action && record(action, "intercepted chat action").type === "run_backtest") {
+        interceptedRunRequests += 1;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `data: ${JSON.stringify({
+          type: "error",
+          code: "deterministic_canary_error",
+          message: label("chat.error_backtest"),
+          message_id: fakeAssistantId,
+          recovery_action: "retry_last_turn",
+          retry_last_turn: { message: retryPrompt },
+          recovery: {
+            code: "runtime_failure",
+            retryable: true,
+            language: "es-419",
+          },
+        })}\n\n`,
+      });
+    });
+
+    await page.getByTestId("chat-input").fill(retryPrompt);
+    await page.getByTestId("chat-send").click();
+    await expect(page.getByText(label("chat.error_backtest"), { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: label("common.retry") })).toBeVisible();
+    expect(interceptedRunRequests).toBe(0);
+  });
+
   test("browser owns the Spanish Golden Path and exports private identities", async ({ page }) => {
     test.setTimeout(480_000);
     const canaryPrompt = requireConfig(prompt, "prompt");
@@ -296,6 +388,12 @@ test.describe.serial("private-alpha rendered release canary", () => {
         exact: true,
       }),
     ).toBeVisible();
+    await expect(
+      page.getByText(label("chat.error_backtest"), { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: label("common.retry") }),
+    ).toHaveCount(0);
 
     await page.getByRole("button", { name: label("common.search") }).click();
     const searchResponsePromise = page.waitForResponse((response) => {
@@ -380,65 +478,4 @@ test.describe.serial("private-alpha rendered release canary", () => {
     await chmod(handoffPath, 0o600);
   });
 
-  test("deterministic/intercepted recovery is not deployed backend proof", async ({ page }) => {
-    test.setTimeout(90_000);
-    const retryPrompt = "Provocar recuperación tipada sin ejecutar un backtest";
-    const fakeConversationId = "00000000-0000-4000-8000-000000000233";
-    const fakeAssistantId = "00000000-0000-4000-8000-000000000234";
-    let interceptedRunRequests = 0;
-
-    await loginThroughRenderedUi(page);
-    await page.route("**/api/v1/conversations", async (route) => {
-      if (route.request().method() !== "POST") {
-        await route.fallback();
-        return;
-      }
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          conversation: {
-            id: fakeConversationId,
-            title: "Recuperación determinista",
-            title_source: "default",
-            pinned: false,
-            archived: false,
-            created_at: "2026-07-16T00:00:00Z",
-            updated_at: "2026-07-16T00:00:00Z",
-            language: "es-419",
-          },
-        }),
-      });
-    });
-    await page.route("**/api/v1/chat/stream", async (route) => {
-      const body = route.request().postDataJSON() as JsonRecord;
-      const action = body.action;
-      if (action && record(action, "intercepted chat action").type === "run_backtest") {
-        interceptedRunRequests += 1;
-      }
-      await route.fulfill({
-        status: 200,
-        contentType: "text/event-stream",
-        body: `data: ${JSON.stringify({
-          type: "error",
-          code: "deterministic_canary_error",
-          message: label("chat.error_backtest"),
-          message_id: fakeAssistantId,
-          recovery_action: "retry_last_turn",
-          retry_last_turn: { message: retryPrompt },
-          recovery: {
-            code: "runtime_failure",
-            retryable: true,
-            language: "es-419",
-          },
-        })}\n\n`,
-      });
-    });
-
-    await page.getByTestId("chat-input").fill(retryPrompt);
-    await page.getByTestId("chat-send").click();
-    await expect(page.getByText(label("chat.error_backtest"), { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: label("common.retry") })).toBeVisible();
-    expect(interceptedRunRequests).toBe(0);
-  });
 });

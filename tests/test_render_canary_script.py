@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import json
+import os
 import stat
+import subprocess
+import sys
 from pathlib import Path
+
+from scripts.ops.canary_capture_replay import replay_capture
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -81,6 +87,17 @@ def test_canary_language_and_inputs_are_profile_owned() -> None:
     assert 'ARGUS_CANARY_BROWSER_DECISION_STATE="$CANARY_DECISION_STATE"' in runner_source
     assert 'ARGUS_CANARY_BROWSER_DECISION_NOTE="$CANARY_DECISION_NOTE"' in runner_source
     assert 'ARGUS_CANARY_BROWSER_SEARCH_QUERY="$CANARY_SEARCH_QUERY"' in runner_source
+
+
+def test_browser_preserves_the_spanish_signup_and_login_release_gate() -> None:
+    browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
+
+    assert 'page.goto("/?auth=signup"' in browser_source
+    assert 'isApiResponse(response, "/auth/signup", "POST")' in browser_source
+    assert "toMatchObject({" in browser_source
+    assert "language: canaryLanguage" in browser_source
+    assert "expect(signupResponse.status()).toBe(400)" in browser_source
+    assert 'page.goto("/?auth=login"' in browser_source
 
 
 def test_rendered_browser_owns_the_authoritative_golden_path() -> None:
@@ -223,6 +240,15 @@ def test_browser_proves_reload_and_omnisearch_source_identity() -> None:
     assert "Omnisearch did not reopen the canonical source conversation" in browser_source
 
 
+def test_reload_rejects_a_stale_retryable_failure_beside_the_completed_result() -> None:
+    browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
+    reload_source = browser_source.split("await page.reload()", 1)[1]
+
+    assert 'label("chat.error_backtest")' in reload_source
+    assert 'label("common.retry")' in reload_source
+    assert "toHaveCount(0" in reload_source
+
+
 def test_browser_has_separate_intercepted_typed_error_recovery_proof() -> None:
     browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
 
@@ -236,6 +262,19 @@ def test_browser_has_separate_intercepted_typed_error_recovery_proof() -> None:
     assert 'recovery_action: "retry_last_turn"' in browser_source
     assert 'label("common.retry")' in browser_source
     assert "expect(interceptedRunRequests).toBe(0)" in browser_source
+
+
+def test_no_spend_recovery_runs_before_the_charged_golden_path() -> None:
+    browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
+
+    recovery_test = browser_source.index(
+        'test("deterministic/intercepted recovery is not deployed backend proof"'
+    )
+    charged_test = browser_source.index(
+        'test("browser owns the Spanish Golden Path and exports private identities"'
+    )
+
+    assert recovery_test < charged_test
 
 
 def test_browser_canary_requires_clean_console_and_no_blocking_overlay() -> None:
@@ -267,6 +306,99 @@ def test_canary_writes_only_privacy_safe_human_evidence() -> None:
         "CANARY_USER_ID"
         not in source.split("build_release_evidence_json() {", 1)[1].split("\n}", 1)[0]
     )
+
+
+def test_canary_capture_remains_sanitized_and_replay_compatible() -> None:
+    source = _source(".github/canary-render.sh")
+    capture_body = source.split("write_canary_capture() {", 1)[1].split(
+        "\nfail_canary() {", 1
+    )[0]
+
+    assert "scripts.ops.canary_capture_sanitizer" in capture_body
+    assert "assert_sanitized_capture" in capture_body
+    assert 'CANARY_MESSAGES_FILE="$API_MESSAGES_RESPONSE"' in capture_body
+    assert '"launch_payload": launch_payload' in capture_body
+    assert '"final_response_payload": message_artifacts.get("final_response_payload")' in (
+        capture_body
+    )
+    assert '"route_receipt": receipt_summary(receipt_payload)' in capture_body
+
+
+def test_canary_capture_builder_produces_a_replayable_artifact(tmp_path: Path) -> None:
+    source = _source(".github/canary-render.sh")
+    capture_body = source.split("write_canary_capture() {", 1)[1].split(
+        "\nfail_canary() {", 1
+    )[0]
+    python_source = capture_body.split("python3 - <<'PY' || exit_code=$?", 1)[1].split(
+        "\nPY", 1
+    )[0]
+    capture_path = tmp_path / "capture.json"
+    messages_path = tmp_path / "messages.json"
+    job_path = tmp_path / "job.json"
+    receipts_path = tmp_path / "receipts.json"
+    messages_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "role": "assistant",
+                        "metadata": {
+                            "final_response_payload": {
+                                "result": {
+                                    "total_return": 0.1284,
+                                    "benchmark_return": 0.2614,
+                                },
+                                "explanation_context": {"benchmark_symbol": "SPY"},
+                            },
+                            "result_card": {
+                                "title": "AAPL + MSFT",
+                                "benchmark_symbol": "SPY",
+                            },
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    job_path.write_text("{}", encoding="utf-8")
+    receipts_path.write_text(
+        json.dumps([{"task": "result_summary", "outcome": "success"}]),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "CANARY_CAPTURE_PATH": str(capture_path),
+            "CANARY_STATUS": "failed",
+            "CANARY_FAILURE_STAGE": "browser",
+            "CANARY_FAILURE_REASON": "rendered_golden_path_failed",
+            "CANARY_FOCUSED_SYMBOL_PATH": "AAPL,MSFT",
+            "CANARY_RELEASE_EVIDENCE_JSON": json.dumps({"language": "es-419"}),
+            "CANARY_PROMPT": "Prueba AAPL y MSFT",
+            "CANARY_CONVERSATION_LABEL": "conversation_abcdef123456",
+            "CANARY_BACKTEST_JOB_LABEL": "backtest_job_abcdef123456",
+            "CANARY_RESULT_LABEL": "backtest_run_abcdef123456",
+            "CANARY_MESSAGES_FILE": str(messages_path),
+            "CANARY_JOB_RESPONSE_FILE": str(job_path),
+            "CANARY_RECEIPT_ROWS_FILE": str(receipts_path),
+        }
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", python_source],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    capture = json.loads(capture_path.read_text(encoding="utf-8"))
+    assert capture["final_response_payload"]["result"]["total_return"] == 0.1284
+    assert replay_capture(capture)["quick_take"]
+    assert stat.S_IMODE(capture_path.stat().st_mode) == 0o600
 
 
 def test_canary_writes_privacy_safe_failure_evidence() -> None:

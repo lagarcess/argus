@@ -155,7 +155,7 @@
     "decision_note": "Canario de navegador 233: evidencia renderizada verificada.",
     "search_query": "AAPL",
     "required_steps": [
-      "login",
+      "signup_login",
       "profile_hydration",
       "browser_owned_golden_path",
       "real_workflow_backtest",

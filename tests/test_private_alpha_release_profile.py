@@ -39,6 +39,7 @@ def test_release_profile_is_non_secret_and_defines_real_workflow_canary() -> Non
     assert "AAPL" in profile["canary"]["prompt"]
     assert profile["canary"]["search_query"] == "AAPL"
     assert profile["canary"]["decision_note"]
+    assert "signup_login" in profile["canary"]["required_steps"]
     assert "browser_owned_golden_path" in profile["canary"]["required_steps"]
     assert "private_identity_handoff" in profile["canary"]["required_steps"]
     assert "deterministic_intercepted_recovery" in profile["canary"]["required_steps"]

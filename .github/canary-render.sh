@@ -312,7 +312,185 @@ write_canary_evidence() {
 }
 
 write_canary_capture() {
-  write_json_artifact "$CAPTURE_PATH" "capture"
+  if [ -z "$CAPTURE_PATH" ]; then
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$CAPTURE_PATH")"
+  local exit_code=0
+  local release_evidence_json
+  release_evidence_json="$(build_release_evidence_json)"
+  CANARY_CAPTURE_PATH="$CAPTURE_PATH" \
+  CANARY_STATUS="$CANARY_STATUS" \
+  CANARY_FAILURE_STAGE="$CANARY_FAILURE_STAGE" \
+  CANARY_FAILURE_REASON="$CANARY_FAILURE_REASON" \
+  CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \
+  CANARY_RELEASE_EVIDENCE_JSON="$release_evidence_json" \
+  CANARY_PROMPT="$PROMPT" \
+  CANARY_CONVERSATION_LABEL="$CONVERSATION_LABEL" \
+  CANARY_BACKTEST_JOB_LABEL="$BACKTEST_JOB_LABEL" \
+  CANARY_RESULT_LABEL="$RESULT_LABEL" \
+  CANARY_MESSAGES_FILE="$API_MESSAGES_RESPONSE" \
+  CANARY_JOB_RESPONSE_FILE="$API_JOB_RESPONSE" \
+  CANARY_RECEIPT_ROWS_FILE="$RECEIPT_ROWS" \
+  python3 - <<'PY' || exit_code=$?
+import json
+import os
+import pathlib
+from typing import Any
+
+from scripts.ops.canary_capture_sanitizer import (
+    assert_sanitized_capture,
+    sanitize_capture_value as sanitize,
+)
+
+
+def read_json_file(path: str) -> Any:
+    if not path:
+        return None
+    file_path = pathlib.Path(path)
+    if not file_path.exists() or file_path.stat().st_size == 0:
+        return None
+    try:
+        return json.loads(file_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def first_dict(*values: Any) -> dict[str, Any] | None:
+    for value in values:
+        if isinstance(value, dict):
+            return value
+    return None
+
+
+def extract_message_artifacts(messages_payload: Any) -> dict[str, Any]:
+    artifacts: dict[str, Any] = {
+        "message_artifacts": [],
+        "result_card": None,
+        "explanation_context": None,
+        "final_response_payload": None,
+        "confirmation_payload": None,
+    }
+    if not isinstance(messages_payload, dict):
+        return artifacts
+    items = messages_payload.get("items")
+    if not isinstance(items, list):
+        return artifacts
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+        final_response_payload = metadata.get("final_response_payload")
+        artifacts["message_artifacts"].append(
+            {
+                "role": item.get("role"),
+                "metadata_keys": sorted(str(key) for key in metadata.keys()),
+                "has_result_card": isinstance(metadata.get("result_card"), dict)
+                or isinstance(metadata.get("conversation_result_card"), dict),
+                "has_backtest_job": isinstance(metadata.get("backtest_job"), dict),
+            }
+        )
+        if artifacts["result_card"] is None:
+            artifacts["result_card"] = first_dict(
+                metadata.get("result_card"),
+                metadata.get("conversation_result_card"),
+                (final_response_payload or {}).get("result_card")
+                if isinstance(final_response_payload, dict)
+                else None,
+            )
+        if artifacts["explanation_context"] is None:
+            artifacts["explanation_context"] = first_dict(
+                metadata.get("explanation_context"),
+                (final_response_payload or {}).get("explanation_context")
+                if isinstance(final_response_payload, dict)
+                else None,
+            )
+        if artifacts["final_response_payload"] is None and isinstance(
+            final_response_payload, dict
+        ):
+            artifacts["final_response_payload"] = final_response_payload
+        if artifacts["confirmation_payload"] is None:
+            artifacts["confirmation_payload"] = first_dict(
+                metadata.get("confirmation_payload"),
+                metadata.get("confirmation"),
+            )
+    return artifacts
+
+
+def receipt_summary(receipt_payload: Any) -> dict[str, Any]:
+    if not isinstance(receipt_payload, list):
+        return {"status": "missing", "count": 0}
+    tasks = sorted(
+        {
+            str(row.get("task"))
+            for row in receipt_payload
+            if isinstance(row, dict) and row.get("task")
+        }
+    )
+    return {
+        "status": "present" if receipt_payload else "missing",
+        "count": len(receipt_payload),
+        "tasks": tasks,
+    }
+
+
+messages_payload = read_json_file(os.environ["CANARY_MESSAGES_FILE"])
+message_artifacts = extract_message_artifacts(messages_payload)
+job_response = read_json_file(os.environ["CANARY_JOB_RESPONSE_FILE"])
+receipt_payload = read_json_file(os.environ["CANARY_RECEIPT_ROWS_FILE"])
+release = json.loads(os.environ["CANARY_RELEASE_EVIDENCE_JSON"])
+final_response_payload = message_artifacts.get("final_response_payload")
+job_run = job_response.get("run") if isinstance(job_response, dict) else None
+result = first_dict(
+    final_response_payload.get("result")
+    if isinstance(final_response_payload, dict)
+    else None,
+    job_run,
+)
+launch_payload = {
+    "language": release["language"],
+    "message": os.environ["CANARY_PROMPT"],
+    "focused_symbol_path": os.environ["CANARY_FOCUSED_SYMBOL_PATH"] or None,
+    "confirmation_payload": message_artifacts.get("confirmation_payload"),
+}
+payload = {
+    "schema_version": 1,
+    "artifact_kind": "capture",
+    "status": os.environ["CANARY_STATUS"],
+    "failure": {
+        "stage": os.environ["CANARY_FAILURE_STAGE"] or None,
+        "reason": os.environ["CANARY_FAILURE_REASON"] or None,
+        "status": os.environ["CANARY_STATUS"],
+    },
+    "release": release,
+    "labels": {
+        "conversation": os.environ["CANARY_CONVERSATION_LABEL"] or None,
+        "backtest_job": os.environ["CANARY_BACKTEST_JOB_LABEL"] or None,
+        "result": os.environ["CANARY_RESULT_LABEL"] or None,
+    },
+    "launch_payload": launch_payload,
+    "result": result,
+    "result_card": message_artifacts.get("result_card"),
+    "explanation_context": message_artifacts.get("explanation_context"),
+    "final_response_payload": message_artifacts.get("final_response_payload"),
+    "message_artifacts": message_artifacts.get("message_artifacts", []),
+    "job_response": job_response,
+    "route_receipt": receipt_summary(receipt_payload),
+    "privacy": "no_raw_ids; labels are sha256 prefixes; secrets redacted",
+}
+
+path = pathlib.Path(os.environ["CANARY_CAPTURE_PATH"])
+sanitized_payload = sanitize(payload)
+assert_sanitized_capture(sanitized_payload)
+path.write_text(
+    json.dumps(sanitized_payload, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
+path.chmod(0o600)
+print(f"canary_capture_path={path}")
+PY
+  return "$exit_code"
 }
 
 fail_canary() {
