@@ -47,6 +47,7 @@ def get_me(user: User = Depends(current_user)) -> UserResponse:  # noqa: B008
 
 @router.get("/me/usage", response_model=UsageAllowanceResponse)
 def get_me_usage(
+    request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> UsageAllowanceResponse:
     now = datetime.now(timezone.utc)
@@ -64,7 +65,18 @@ def get_me_usage(
             )
         except Exception as exc:
             if not dev_memory_fallback_enabled():
-                raise
+                logger.error(
+                    "Supabase usage read failed",
+                    error=str(exc),
+                    user_id=user.id,
+                )
+                raise problem(
+                    request,
+                    status_code=500,
+                    code="usage_read_failed",
+                    title="Usage Read Failed",
+                    detail="Current allowance information is unavailable.",
+                ) from exc
             logger.warning(
                 "Supabase usage read failed; using dev zero-state fallback",
                 error=str(exc),

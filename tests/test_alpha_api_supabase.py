@@ -618,6 +618,37 @@ def test_me_usage_requires_authentication(mock_gateway, monkeypatch):
     mock_gateway.list_current_usage_counters.assert_not_called()
 
 
+def test_me_usage_returns_problem_details_when_durable_truth_is_unavailable(
+    mock_gateway,
+    monkeypatch,
+):
+    mock_gateway.list_current_usage_counters.side_effect = RuntimeError(
+        "supabase unavailable"
+    )
+    monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
+    failure_client = TestClient(app, raise_server_exceptions=False)
+
+    response = failure_client.get(
+        "/api/v1/me/usage",
+        headers={
+            "Authorization": "Bearer test-token",
+            "X-Request-Id": "usage-read-failure",
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json() == {
+        "type": "https://api.argus.app/problems/usage-read-failed",
+        "title": "Usage Read Failed",
+        "status": 500,
+        "detail": "Current allowance information is unavailable.",
+        "code": "usage_read_failed",
+        "request_id": "usage-read-failure",
+    }
+    assert response.headers["X-Request-Id"] == "usage-read-failure"
+
+
 def test_patch_me_supabase_merges_onboarding_and_persists(mock_gateway):
     before = _mock_profile(stage="language_selection")
     mock_gateway.get_user.return_value = before
