@@ -443,7 +443,7 @@ async def _stage_result_from_interpretation(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
-    is_new_idea_interpretation = interpretation.task_relation == "new_task"
+    is_new_idea_interpretation = interpretation.semantic_turn_act == "new_idea"
     logger.debug(
         "Interpret stage post-LLM repair started",
         intent=interpretation.intent,

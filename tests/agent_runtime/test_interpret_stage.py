@@ -7476,8 +7476,10 @@ def test_coverage_recovery_action_requests_typed_field_without_llm_selection(
     }
 
 
+@pytest.mark.parametrize("task_relation", ["continue", "new_task"])
 def test_coverage_recovery_answer_restores_preserved_optional_parameters(
     monkeypatch,
+    task_relation: str,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -7521,7 +7523,7 @@ def test_coverage_recovery_answer_restores_preserved_optional_parameters(
         structured_interpreter=RecordingInterpreter(
             StructuredInterpretation(
                 intent="backtest_execution",
-                task_relation="continue",
+                task_relation=task_relation,
                 requires_clarification=False,
                 user_goal_summary="User selected a replacement asset.",
                 candidate_strategy_draft=StrategySummary(
@@ -7538,8 +7540,10 @@ def test_coverage_recovery_answer_restores_preserved_optional_parameters(
     assert result.patch["optional_parameter_status"] == preserved_status
 
 
+@pytest.mark.parametrize("task_relation", ["new_task", "continue"])
 def test_coverage_recovery_does_not_leak_optional_parameters_into_new_idea(
     monkeypatch,
+    task_relation: str,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -7582,7 +7586,7 @@ def test_coverage_recovery_does_not_leak_optional_parameters_into_new_idea(
         structured_interpreter=RecordingInterpreter(
             StructuredInterpretation(
                 intent="backtest_execution",
-                task_relation="new_task",
+                task_relation=task_relation,
                 requires_clarification=False,
                 user_goal_summary="User started a separate investing idea.",
                 candidate_strategy_draft=StrategySummary(
