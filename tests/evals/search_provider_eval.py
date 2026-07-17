@@ -67,6 +67,7 @@ class NormalizedSearchEvidence:
     case_id: str
     status: str
     search_calls: int | None
+    raw_result_count: int
     sources: tuple[SearchSource, ...]
     policy_effects: tuple[str, ...] | None
     runnable_candidates: tuple[str, ...] | None
@@ -387,6 +388,16 @@ def _reported_fixture_cost(case: SearchEvalCase) -> float | None:
     return float(usage["cost"])
 
 
+def _reported_fixture_result_count(case: SearchEvalCase) -> int:
+    if case.provider == "perplexity_direct":
+        results = case.payload.get("results", [])
+        return len(results) if isinstance(results, list) else 0
+    if case.provider == "openrouter_web_search":
+        annotations = _openrouter_message(case.payload).get("annotations", [])
+        return len(annotations) if isinstance(annotations, list) else 0
+    return 0
+
+
 def _mapping_or_none(value: Any) -> dict[str, Any] | None:
     return dict(value) if isinstance(value, dict) else None
 
@@ -429,6 +440,7 @@ def _evidence(
         case_id=case.id,
         status=status,
         search_calls=search_calls,
+        raw_result_count=_reported_fixture_result_count(case),
         sources=sources,
         policy_effects=policy_effects,
         runnable_candidates=runnable_candidates,
@@ -481,6 +493,7 @@ def _score_case(
         },
         "normalized_fixture": {
             "reported_search_calls": evidence.search_calls,
+            "raw_result_count": evidence.raw_result_count,
             "result_count": len(evidence.sources),
             "citation_count": len(evidence.sources),
             "source_dates_present": sum(
@@ -550,7 +563,7 @@ def _fixture_checks(
                 rubric=rubric,
             )
         ),
-        "result_shape_bounded": len(evidence.sources) <= rubric.max_results,
+        "result_shape_bounded": evidence.raw_result_count <= rubric.max_results,
         "citation_shape_well_formed": (
             citation_shape_well_formed if is_response_fixture else None
         ),

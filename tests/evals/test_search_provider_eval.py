@@ -299,6 +299,54 @@ def test_reported_fixture_call_overage_fails_fixture_validation() -> None:
     assert result["empirical_checks"]["call_count"] is None
 
 
+def test_over_limit_raw_provider_results_fail_before_normalized_truncation() -> None:
+    manifest = load_search_eval_manifest()
+    provider_cases = {
+        provider: next(
+            case
+            for case in manifest.cases
+            if case.provider == provider and case.kind == "category_discovery"
+        )
+        for provider in ("perplexity_direct", "openrouter_web_search")
+    }
+
+    for provider, provider_case in provider_cases.items():
+        payload = deepcopy(provider_case.payload)
+        if provider == "perplexity_direct":
+            template = payload["results"][0]
+            payload["results"] = [
+                {**template, "url": f"https://example.test/result-{index}"}
+                for index in range(manifest.rubric.max_results + 1)
+            ]
+        else:
+            annotations = payload["choices"][0]["message"]["annotations"]
+            template = annotations[0]
+            payload["choices"][0]["message"]["annotations"] = [
+                {
+                    **template,
+                    "url_citation": {
+                        **template["url_citation"],
+                        "url": f"https://example.test/result-{index}",
+                    },
+                }
+                for index in range(manifest.rubric.max_results + 1)
+            ]
+
+        result = evaluate_manifest(
+            replace(manifest, cases=(replace(provider_case, payload=payload),))
+        )["fixture_validation"]["results"][0]
+
+        assert result["status"] == "fixture_failed"
+        assert result["fixture_checks"]["result_shape_bounded"] is False
+        assert result["normalized_fixture"]["raw_result_count"] == (
+            manifest.rubric.max_results + 1
+        )
+        assert result["normalized_fixture"]["result_count"] == (
+            manifest.rubric.max_results
+        )
+        assert result["empirical_checks"]["result_count"] is None
+
+
 def test_missing_or_excessive_declared_latency_fails_fixture_validation() -> None:
     manifest = load_search_eval_manifest()
     provider_case = next(
@@ -416,6 +464,7 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
         assert set(result["normalized_fixture"]) == {
             "citation_count",
             "configured_timeout_ms",
+            "raw_result_count",
             "reported_cost_usd",
             "reported_search_calls",
             "result_count",
