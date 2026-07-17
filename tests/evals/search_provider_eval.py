@@ -574,6 +574,11 @@ def _fixture_checks(
             if case.kind in {"control", "outage"}
             else case.cost_usd is not None and case.cost_usd <= rubric.max_cost_usd
         ),
+        "reported_fixture_cost_matches_declared": (
+            _reported_fixture_cost_matches_declared(case, evidence=evidence)
+            if case.kind not in {"control", "outage"}
+            else None
+        ),
         "sources_labeled_untrusted": (
             all(source.trust == "untrusted" for source in evidence.sources)
             if is_response_fixture
@@ -630,6 +635,16 @@ def _reported_fixture_call_count_matches_expected(
         evidence.search_calls == case.expected_search_calls
         and evidence.search_calls <= rubric.max_search_calls
     )
+
+
+def _reported_fixture_cost_matches_declared(
+    case: SearchEvalCase,
+    *,
+    evidence: NormalizedSearchEvidence,
+) -> bool | None:
+    if case.cost_usd is None or evidence.cost_usd is None:
+        return None
+    return abs(evidence.cost_usd - case.cost_usd) <= 1e-12
 
 
 def _outage_fixture_has_context_precondition(case: SearchEvalCase) -> bool:

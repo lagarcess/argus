@@ -268,6 +268,15 @@ def test_missing_or_conflicting_provider_evidence_is_not_fabricated() -> None:
     high_cost_case = replace(openrouter_case, payload=high_cost_payload)
     high_cost_evidence = normalize_case(high_cost_case, rubric=manifest.rubric)
     assert high_cost_evidence.cost_usd == 999
+    high_cost_result = evaluate_manifest(replace(manifest, cases=(high_cost_case,)))[
+        "fixture_validation"
+    ]["results"][0]
+    assert high_cost_result["status"] == "fixture_failed"
+    assert (
+        high_cost_result["fixture_checks"]["reported_fixture_cost_matches_declared"]
+        is False
+    )
+    assert high_cost_result["empirical_checks"]["cost"] is None
 
 
 def test_reported_fixture_call_overage_fails_fixture_validation() -> None:
@@ -365,6 +374,7 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
         "expected_call_count_bounded",
         "outage_fixture_has_context_precondition",
         "reported_fixture_call_count_matches_expected",
+        "reported_fixture_cost_matches_declared",
         "result_shape_bounded",
         "source_date_field_shape",
         "sources_labeled_untrusted",
