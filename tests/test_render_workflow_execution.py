@@ -965,6 +965,94 @@ def test_run_backtest_job_persists_result_summary_route_receipts(
     assert ledger_entry["cost_amount"] == 0.0009
 
 
+def test_run_backtest_job_succeeds_when_cost_ledger_table_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.result_readout import ResultReadout
+    from argus.llm.openrouter import (
+        clear_openrouter_route_receipts,
+        record_openrouter_route_receipt,
+    )
+    from argus.observability import cost_ledger as cost_ledger_module
+
+    from workflows import backtest_job as workflow_module
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    class UnavailableCostLedgerGateway(FakeBacktestJobGateway):
+        def create_cost_ledger_entry(
+            self,
+            *,
+            entry: dict[str, object],
+        ) -> dict[str, object]:
+            del entry
+            raise RuntimeError("PGRST205: cost_ledger_entries is unavailable")
+
+    class WarningCapture:
+        def __init__(self) -> None:
+            self.records: list[tuple[str, dict[str, object]]] = []
+
+        def warning(self, message: str, **context: object) -> None:
+            self.records.append((message, context))
+
+    clear_openrouter_route_receipts()
+
+    def fake_result_readout(**_: object) -> ResultReadout:
+        record_openrouter_route_receipt(
+            task="result_summary",
+            model_name="unit-test-model",
+            mode="json_schema",
+            schema_name="QuickTakeDraft",
+            latency_ms=42,
+            outcome="succeeded",
+            token_usage={
+                "prompt_tokens": 21,
+                "completion_tokens": 9,
+                "total_tokens": 30,
+            },
+            usage_cost_usd=0.0009,
+        )
+        return ResultReadout(
+            text="**Quick take**\n\nAAPL beat SPY in this test.",
+            source="llm_explain_stage",
+            fallback_used=False,
+        )
+
+    warning_capture = WarningCapture()
+    monkeypatch.setattr(cost_ledger_module, "logger", warning_capture)
+    monkeypatch.setattr(
+        workflow_module,
+        "result_readout_with_metadata_from_backtest_payload",
+        fake_result_readout,
+    )
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = UnavailableCostLedgerGateway(job)
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=FakeBacktestTool(_successful_tool_result()),
+        workflow_run_id="local-run",
+        run_id_factory=lambda: "run-workflow",
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["result_run_id"] == "run-workflow"
+    assert gateway.transitions == ["running", "finalize", "succeeded"]
+    assert len(gateway.route_receipts) == 1
+    assert gateway.cost_ledger_entries == []
+    assert len(warning_capture.records) == 1
+    message, context = warning_capture.records[0]
+    assert message == "Cost ledger persistence failed; continuing without spend row"
+    assert context["failure_classification"] == "telemetry_only"
+    assert context["source"] == "render_workflow"
+
+
 def test_run_backtest_job_uses_mainline_llm_quick_take_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

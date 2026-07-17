@@ -142,6 +142,7 @@ def persist_openrouter_cost_ledger_entries(
                 feature_area=feature_area,
                 llm_task=receipt.task,
                 correlation_id=resolved_correlation_id,
+                failure_classification="telemetry_only",
             )
 
 
