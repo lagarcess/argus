@@ -704,6 +704,7 @@ async def chat_stream(
         def schedule_artifact_naming(
             *,
             assistant_message: str | None,
+            assistant_metadata: dict[str, Any] | None = None,
             current_run: BacktestRun | None = None,
             saved_strategy_id: str | None = None,
             message_id: str | None = None,
@@ -717,6 +718,7 @@ async def chat_stream(
                     saved_strategy_id=saved_strategy_id,
                     user_message=display_message,
                     assistant_message=assistant_message,
+                    assistant_metadata=assistant_metadata,
                     message_id=message_id,
                     run_id=current_run.id if current_run is not None else None,
                 )
@@ -1330,6 +1332,7 @@ async def chat_stream(
                 )
                 schedule_artifact_naming(
                     assistant_message=persisted_text,
+                    assistant_metadata=metadata,
                     current_run=result_action_run or run,
                     saved_strategy_id=saved_strategy_id_for_naming,
                     message_id=(

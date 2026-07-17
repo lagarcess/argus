@@ -13,7 +13,10 @@ import { postFeedback } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
-import { recoveryDisplayText } from "@/lib/chat-recovery-display";
+import {
+  recoveryDisplayCopyText,
+  recoveryDisplayText,
+} from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
@@ -117,6 +120,12 @@ export default function ChatMessage({
   };
 
   const getCopyText = () => {
+    if (!isUser) {
+      const localizedRecovery = recoveryDisplayCopyText(message.recoveryDisplay, t);
+      if (localizedRecovery) {
+        return normalizeCopyText(localizedRecovery);
+      }
+    }
     if (message.copyText) {
       return normalizeCopyText(message.copyText);
     }

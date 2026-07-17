@@ -2389,6 +2389,89 @@ def test_confirm_stage_returns_typed_recovery_without_runnable_card_when_no_comm
     assert clarifier.requests[0].unsupported_constraints == []
 
 
+def test_confirm_stage_fails_closed_when_live_equity_calendar_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import confirm as confirm_module
+    from argus.domain.engine_launch import adapter
+    from argus.domain.market_data import capabilities, provider
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    dates = [
+        "2024-12-24",
+        "2024-12-26",
+        "2024-12-27",
+        "2024-12-30",
+        "2024-12-31",
+        "2025-01-02",
+    ]
+    index = pd.to_datetime(dates, utc=True)
+    close = pd.Series(range(100, 106), index=index, dtype=float)
+    bars = pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": 1_000.0,
+        },
+        index=index,
+    )
+    calendar_calls = 0
+
+    def unavailable_calendar(**_: object):
+        nonlocal calendar_calls
+        calendar_calls += 1
+        raise ValueError("calendar unavailable")
+
+    monkeypatch.setattr(provider, "_fetch_bars_with_ttl", lambda **_: bars.copy())
+    monkeypatch.setattr(
+        capabilities,
+        "fetch_alpaca_market_calendar",
+        unavailable_calendar,
+    )
+    monkeypatch.setattr(confirm_module, "_market_clock_for_strategy", lambda _: None)
+    monkeypatch.setattr(
+        adapter,
+        "validate_request_symbols",
+        lambda _: adapter.RequestSymbolValidationResult(
+            outcome="resolved",
+            symbols=("AAPL",),
+            asset_class="equity",
+        ),
+    )
+    monkeypatch.setattr(
+        adapter,
+        "validate_request_benchmark",
+        lambda *_, **__: adapter.BenchmarkSymbolValidationResult(
+            outcome="resolved",
+            benchmark_symbol="SPY",
+            asset_class="equity",
+        ),
+    )
+    state = RunState.new(
+        current_user_message="Hold AAPL across the 2024 year-end holidays.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": dates[0], "end": dates[-1]},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "needs_clarification"
+    assert "confirmation_payload" not in result.patch
+    assert result.patch["optional_parameter_status"]["coverage_recovery"]["code"] == (
+        "market_data_unavailable"
+    )
+    assert calendar_calls == 1
+
+
 def test_confirm_stage_returns_coverage_recovery_for_sparse_common_data(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

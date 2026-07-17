@@ -223,3 +223,31 @@ revoke all on function public.append_conversation_message(
 grant execute on function public.append_conversation_message(
   uuid, uuid, uuid, text, text, jsonb, timestamptz, text, uuid, jsonb, text, jsonb
 ) to service_role;
+
+-- Backfill legacy degraded clarification previews. These rows predate
+-- prompt_source provenance, so their English compatibility content may have
+-- replaced a safe preview. Keep message content durable for reload, but clear
+-- only a preview that still mirrors the latest degraded message. A later safe
+-- append will repopulate it. Do not touch updated_at or reorder the conversation.
+with latest_messages as (
+  select distinct on (m.conversation_id)
+    m.conversation_id,
+    m.role,
+    m.content,
+    m.metadata
+  from public.messages as m
+  order by m.conversation_id, m.created_at desc, m.id desc
+)
+update public.conversations as c
+set last_message_preview = null
+from latest_messages as latest
+where latest.conversation_id = c.id
+  and latest.role = 'assistant'
+  and jsonb_typeof(latest.metadata -> 'clarification') = 'object'
+  and (
+    latest.metadata -> 'clarification' ->> 'prompt_source'
+  ) is distinct from 'llm_generated'
+  and c.last_message_preview = left(
+    regexp_replace(btrim(latest.content), '\s+', ' ', 'g'),
+    180
+  );

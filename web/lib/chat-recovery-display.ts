@@ -164,6 +164,14 @@ export function recoveryDisplayText(
   return t(`chat.recovery.${statusKey}`, artifactActionValues(display));
 }
 
+export function recoveryDisplayCopyText(
+  display: RecoveryDisplay | null | undefined,
+  t: TFunction,
+): string | null {
+  const localized = recoveryDisplayText(display, t).trim();
+  return localized || null;
+}
+
 function recoveryCodeValues(
   display: Extract<RecoveryDisplay, { kind: "recovery_code" }>,
   t: TFunction,

@@ -221,6 +221,7 @@ def test_approved_launch_uses_one_prepared_dataset_for_metrics_and_chart(
 def test_approved_launch_uses_one_calendar_for_a_complete_holiday_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     dates = [
         "2024-12-24",
         "2024-12-26",
@@ -270,9 +271,8 @@ def test_approved_launch_uses_one_calendar_for_a_complete_holiday_window(
         lambda **_: bars.copy(deep=True),
     )
     monkeypatch.setattr(
-        "argus.domain.engine_launch.adapter.fetch_alpaca_market_calendar",
-        fake_calendar,
-        raising=False,
+        "argus.domain.engine_launch.adapter._market_calendar_for_preflight",
+        lambda: fake_calendar,
     )
     request = LaunchBacktestRequest(
         strategy_type="buy_and_hold",
@@ -303,6 +303,106 @@ def test_approved_launch_uses_one_calendar_for_a_complete_holiday_window(
 
     assert result.envelope.execution_status == "succeeded"
     assert calendar_calls == [(date(2024, 12, 24), date(2025, 1, 2))]
+
+
+def test_approved_launch_fails_upstream_when_live_calendar_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dates = [
+        "2024-12-24",
+        "2024-12-26",
+        "2024-12-27",
+        "2024-12-30",
+        "2024-12-31",
+        "2025-01-02",
+    ]
+    index = pd.to_datetime(dates, utc=True)
+    close = pd.Series(range(100, 106), index=index, dtype=float)
+    bars = pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": 1_000.0,
+        },
+        index=index,
+    )
+    requested = {"start": dates[0], "end": dates[-1]}
+    calendar_calls = 0
+    artifact_calls: Counter[str] = Counter()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.fetch_ohlcv",
+        lambda **_: bars.copy(deep=True),
+    )
+
+    def unavailable_calendar(**_: object) -> tuple[EquityMarketSession, ...]:
+        nonlocal calendar_calls
+        calendar_calls += 1
+        raise ValueError("provider-specific calendar failure")
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter._market_calendar_for_preflight",
+        lambda: unavailable_calendar,
+        raising=False,
+    )
+
+    def unexpected_artifact_call(kind: str):
+        def fail(*_: object, **__: object):
+            artifact_calls[kind] += 1
+            raise AssertionError(f"{kind} must not run after calendar failure")
+
+        return fail
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        unexpected_artifact_call("metrics"),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_chart",
+        unexpected_artifact_call("chart"),
+    )
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="AAPL",
+        symbols=["AAPL"],
+        asset_class="equity",
+        timeframe="1D",
+        date_range=requested,
+        requested_date_range=requested,
+        coverage_preflight={
+            "outcome": "full_coverage",
+            "requested_date_range": requested,
+            "effective_date_range": requested,
+            "preflight_id": _dataset_id({"AAPL": bars, "SPY": bars}),
+        },
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=10_000,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "failed_upstream"
+    assert result.envelope.failure_reason == "market_data_unavailable"
+    assert result.result_card is None
+    assert calendar_calls == 1
+    assert artifact_calls == Counter()
 
 
 def test_approved_launch_reuses_canonical_benchmark_alias_without_duplicate_fetch(

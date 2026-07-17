@@ -4,13 +4,14 @@ import hashlib
 import json
 import os
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from math import ceil
 from typing import Any, Callable, Sequence
 
 import pandas as pd
 from pydantic import BaseModel
 
+from argus.domain.market_data import fetch_ohlcv as _DEFAULT_FETCH_OHLC
 from argus.domain.market_data.capabilities import (
     PROVIDER_TIMEFRAME_MINUTES,
     EquityMarketSession,
@@ -75,11 +76,12 @@ def prepare_market_data(
     fetch_market_calendar_func: FetchMarketCalendar | None = None,
     approved_coverage: dict[str, Any] | None = None,
 ) -> PreparedMarketData:
-    uses_default_market_data_provider = fetch_ohlcv_func is None
+    uses_default_market_data_provider = fetch_ohlcv_func is _DEFAULT_FETCH_OHLC
     if fetch_ohlcv_func is None:
         from argus.domain.market_data import fetch_ohlcv
 
         fetch_ohlcv_func = fetch_ohlcv
+        uses_default_market_data_provider = fetch_ohlcv_func is _DEFAULT_FETCH_OHLC
 
     requested = _requested_date_range(config)
     fetch_start = date.fromisoformat(str(config["start_date"]))
@@ -321,13 +323,13 @@ def _equity_market_sessions_for_window(
 ) -> tuple[EquityMarketSession, ...] | None:
     if asset_class != "equity":
         return None
+    provider_mode = (
+        os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider"
+    ).strip().lower()
+    if provider_mode == "synthetic_unit_fixture":
+        return None
     fetch_calendar = fetch_market_calendar_func
-    provider_mode = os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "").strip().lower()
-    if (
-        fetch_calendar is None
-        and uses_default_market_data_provider
-        and provider_mode != "synthetic_unit_fixture"
-    ):
+    if fetch_calendar is None and uses_default_market_data_provider:
         from argus.domain.market_data.capabilities import fetch_alpaca_market_calendar
 
         fetch_calendar = fetch_alpaca_market_calendar
@@ -337,9 +339,25 @@ def _equity_market_sessions_for_window(
         sessions = tuple(
             fetch_calendar(start_date=start_date, end_date=end_date)
         )
-    except (TypeError, ValueError):
-        return None
-    return sessions or None
+        session_dates = [session.session_date for session in sessions]
+        if (
+            not sessions
+            or any(not isinstance(session, EquityMarketSession) for session in sessions)
+            or len(set(session_dates)) != len(session_dates)
+            or any(
+                not isinstance(session.session_date, date)
+                or not isinstance(session.opens_at, datetime)
+                or not isinstance(session.closes_at, datetime)
+                or session.session_date < start_date
+                or session.session_date > end_date
+                or session.closes_at <= session.opens_at
+                for session in sessions
+            )
+        ):
+            raise ValueError("market_calendar_unavailable")
+    except Exception as exc:
+        raise MarketDataCoverageError("market_data_unavailable") from exc
+    return sessions
 
 
 def _calendar_expected_equity_observations(

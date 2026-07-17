@@ -251,7 +251,10 @@ def test_uniformly_sparse_history_is_rejected_against_the_effective_window() -> 
     assert exc_info.value.code == "insufficient_common_data"
 
 
-def test_complete_equity_history_across_market_holidays_is_accepted() -> None:
+def test_complete_equity_history_across_market_holidays_is_accepted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     market_sessions = _bars(
         "2024-12-24",
         "2024-12-26",
@@ -282,7 +285,10 @@ def test_complete_equity_history_across_market_holidays_is_accepted() -> None:
     assert prepared.observations_by_symbol == {"AAPL": 6, "SPY": 6}
 
 
-def test_genuinely_sparse_equity_history_across_holidays_is_rejected() -> None:
+def test_genuinely_sparse_equity_history_across_holidays_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     sparse = _bars("2024-12-24", "2024-12-27", "2025-01-02")
     sessions = (
         _market_session("2024-12-24", closes_at="13:00"),
@@ -307,7 +313,10 @@ def test_genuinely_sparse_equity_history_across_holidays_is_rejected() -> None:
     assert exc_info.value.code == "insufficient_common_data"
 
 
-def test_early_close_reduces_expected_intraday_equity_observations() -> None:
+def test_early_close_reduces_expected_intraday_equity_observations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     intraday = _bars(
         "2024-11-27T09:30:00-05:00",
         "2024-11-27T10:30:00-05:00",
@@ -340,27 +349,81 @@ def test_early_close_reduces_expected_intraday_equity_observations() -> None:
     assert prepared.observations_by_symbol == {"AAPL": 11, "SPY": 11}
 
 
-def test_calendar_failure_falls_back_without_exposing_provider_details() -> None:
-    full = _bars("2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05")
+@pytest.mark.parametrize("calendar_failure", ["unavailable", "empty", "malformed"])
+def test_live_calendar_failure_is_provider_neutral_and_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    calendar_failure: str,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    full = _bars(
+        "2024-12-24",
+        "2024-12-26",
+        "2024-12-27",
+        "2024-12-30",
+        "2024-12-31",
+        "2025-01-02",
+    )
     calls = 0
 
-    def unavailable_calendar(**_: object) -> tuple[()]:
+    def failed_calendar(**_: object) -> tuple[EquityMarketSession, ...]:
         nonlocal calls
         calls += 1
-        raise ValueError("provider-specific calendar failure")
+        if calendar_failure == "unavailable":
+            raise ValueError("provider-specific calendar failure")
+        if calendar_failure == "empty":
+            return ()
+        return (
+            _market_session(
+                "2024-12-24",
+                opens_at="16:00",
+                closes_at="09:30",
+            ),
+        )
+
+    with pytest.raises(MarketDataCoverageError) as exc_info:
+        prepare_market_data(
+            {
+                **_config("AAPL"),
+                "start_date": "2024-12-24",
+                "end_date": "2025-01-02",
+            },
+            fetch_ohlcv_func=_fetcher({"AAPL": full, "SPY": full}),
+            fetch_market_calendar_func=failed_calendar,
+        )
+
+    assert exc_info.value.code == "market_data_unavailable"
+    assert calls == 1
+
+
+@pytest.mark.parametrize(
+    ("asset_class", "symbol", "benchmark_symbol"),
+    [
+        ("crypto", "ETH", "BTC"),
+        ("currency_pair", "EURUSD", "GBPUSD"),
+    ],
+)
+def test_continuous_markets_never_request_the_equity_calendar(
+    asset_class: str,
+    symbol: str,
+    benchmark_symbol: str,
+) -> None:
+    full = _bars("2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05")
 
     prepared = prepare_market_data(
         {
-            **_config("AAPL"),
+            **_config(symbol),
+            "asset_class": asset_class,
+            "benchmark_symbol": benchmark_symbol,
             "start_date": "2024-01-02",
             "end_date": "2024-01-05",
         },
-        fetch_ohlcv_func=_fetcher({"AAPL": full, "SPY": full}),
-        fetch_market_calendar_func=unavailable_calendar,
+        fetch_ohlcv_func=_fetcher({symbol: full, benchmark_symbol: full}),
+        fetch_market_calendar_func=lambda **_: (_ for _ in ()).throw(
+            AssertionError("continuous markets must not request an equity calendar")
+        ),
     )
 
     assert prepared.outcome == "full_coverage"
-    assert calls == 1
 
 
 def test_no_common_window_is_rejected_before_a_runnable_artifact_exists() -> None:
