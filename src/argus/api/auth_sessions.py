@@ -10,7 +10,9 @@ import jwt
 from loguru import logger
 from psycopg_pool import ConnectionPool
 
-_AUTH_SESSION_CONNECTION_TIMEOUT_SECONDS = 2.0
+_AUTH_SESSION_CONNECT_TIMEOUT_SECONDS = 2
+_AUTH_SESSION_ACQUIRE_TIMEOUT_SECONDS = 2.0
+_AUTH_SESSION_STATEMENT_TIMEOUT_MS = 2_000
 _AUTH_SESSION_POOL_SIZE = 5
 
 
@@ -29,7 +31,7 @@ class AuthSessionVerifier:
         session_id, auth_user_id = identity
 
         with self.pool.connection(
-            timeout=_AUTH_SESSION_CONNECTION_TIMEOUT_SECONDS
+            timeout=_AUTH_SESSION_ACQUIRE_TIMEOUT_SECONDS
         ) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -82,11 +84,15 @@ def _session_identity(*, token: str, user_id: str) -> tuple[UUID, UUID] | None:
 def _auth_session_verifier(database_url: str) -> AuthSessionVerifier:
     pool = ConnectionPool(
         conninfo=database_url,
-        kwargs={"autocommit": True},
+        kwargs={
+            "autocommit": True,
+            "connect_timeout": _AUTH_SESSION_CONNECT_TIMEOUT_SECONDS,
+            "options": f"-c statement_timeout={_AUTH_SESSION_STATEMENT_TIMEOUT_MS}",
+        },
         min_size=0,
         max_size=_AUTH_SESSION_POOL_SIZE,
         open=True,
-        timeout=_AUTH_SESSION_CONNECTION_TIMEOUT_SECONDS,
+        timeout=_AUTH_SESSION_ACQUIRE_TIMEOUT_SECONDS,
         name="argus-auth-sessions",
     )
     atexit.register(pool.close)

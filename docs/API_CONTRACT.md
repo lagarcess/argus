@@ -180,6 +180,7 @@ Errors follow RFC 9457 Problem Details.
 - **409 Conflict**: State conflict
 - **422 Unprocessable**: Valid JSON but invalid domain request
 - **429 Too Many Requests**: Rate limit exceeded
+- **503 Service Unavailable**: A required fail-closed dependency is temporarily unavailable
 - **500 Server Error**: Unexpected failure
 
 **Example 422 Problem Details:**
@@ -909,6 +910,12 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   verifies that its `session_id` still exists for that user in Supabase Auth.
   A missing or revoked session is unauthorized, including when an otherwise
   unexpired token remains in an Argus `HttpOnly` cookie.
+- If Argus cannot complete the bounded `auth.sessions` verification because its
+  database connection, pool acquisition, or statement times out, every
+  authenticated endpoint fails closed with `503
+  auth_session_verification_unavailable`. Clients must keep the user on the
+  current surface and offer retry; they must not reinterpret this transient
+  failure as `401` or redirect to login.
 
 **Account recovery:**
 - `POST /api/auth/recovery` is a same-origin web route, not an Argus
@@ -921,10 +928,13 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   ```json
   { "accepted": true }
   ```
-  The accepted status is `202`. Malformed JSON returns `400`; an unapproved
-  browser origin returns `403`; missing production origin configuration returns
-  `503`; and a local rate-limit returns `429` with `Retry-After`. These failures
-  do not vary based on account existence.
+  The accepted status is `202`. Malformed JSON returns `400`; a declared or
+  streamed request body larger than 4,096 bytes returns `413 Payload Too Large`;
+  a request whose media type is not `application/json` returns
+  `415 Unsupported Media Type`; an unapproved browser origin returns `403`;
+  missing production origin configuration returns `503`; and a local rate-limit
+  returns `429` with `Retry-After`. These failures do not vary based on account
+  existence.
 - The recovery destination is the fixed `/auth/recovery` path on the configured
   Argus app origin. The request must not accept a client-supplied redirect URL;
   production uses one exact configured origin while local development allows

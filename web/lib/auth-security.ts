@@ -22,6 +22,19 @@ export type SessionActionResult = {
 
 type ClearArgusCookies = () => Promise<void>;
 
+export function accountSecurityLoadFailureAction(
+  error: unknown,
+): "redirect_to_login" | "retry" {
+  const status =
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    typeof error.status === "number"
+      ? error.status
+      : null;
+  return status === 401 || status === 403 ? "redirect_to_login" : "retry";
+}
+
 function throwOnAuthError(error: unknown | null): void {
   if (!error) return;
   throw error instanceof Error ? error : new Error("Authentication request failed.");

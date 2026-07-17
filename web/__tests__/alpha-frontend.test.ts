@@ -1729,6 +1729,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(es.auth.recovery.generic_sent).toBeTruthy();
     expect(en.account_security.sessions.sign_out_others).toBeTruthy();
     expect(es.account_security.sessions.sign_out_others).toBeTruthy();
+    expect(en.common.confirm).toBe("Confirm");
+    expect(es.common.confirm).toBe("Confirmar");
+    expect(en.account_security.session_check_unavailable).toBeTruthy();
+    expect(es.account_security.session_check_unavailable).toBeTruthy();
   });
 
   test("landing onboarding continues into chat after completion", () => {
@@ -1776,7 +1780,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).not.toContain('window.location.href = "/login"');
   });
 
-  test("ordinary logout stays put and reports a revocation failure", () => {
+  test("ordinary logout leaves only after provider revocation and clears private state", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -1787,8 +1791,10 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(logoutHandler).toContain("settings.logout_error");
-    expect(logoutHandler).not.toContain("finally");
-    expect(logoutHandler.indexOf("await logoutFromApi()"))
+    expect(logoutHandler).toContain('result.revocation === "failed"');
+    expect(logoutHandler).toContain("resetToEmptyChatSurface()");
+    expect(logoutHandler).toContain("setHistoryItems([])");
+    expect(logoutHandler.indexOf("resetToEmptyChatSurface()"))
       .toBeLessThan(logoutHandler.indexOf('window.location.href = "/"'));
   });
 

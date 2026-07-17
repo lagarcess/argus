@@ -1,22 +1,31 @@
 "use client";
 
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
+  accountSecurityLoadFailureAction,
   getAuthSecurityActions,
   type SessionActionResult,
 } from "@/lib/auth-security";
 import { getMe } from "@/lib/argus-api";
 
 type Confirmation = "others" | "all" | null;
+type AuthCheckState = "checking" | "ready" | "unavailable";
 
 export default function AccountSecurityPage() {
   const { t } = useTranslation();
   const authChecked = useRef(false);
-  const [ready, setReady] = useState(false);
+  const [authCheckState, setAuthCheckState] =
+    useState<AuthCheckState>("checking");
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -27,13 +36,24 @@ export default function AccountSecurityPage() {
   const [error, setError] = useState<string | null>(null);
   const [freshLogin, setFreshLogin] = useState(false);
 
+  const checkSession = useCallback(() => {
+    setAuthCheckState("checking");
+    getMe()
+      .then(() => setAuthCheckState("ready"))
+      .catch((loadError: unknown) => {
+        if (accountSecurityLoadFailureAction(loadError) === "redirect_to_login") {
+          window.location.replace("/?auth=login");
+          return;
+        }
+        setAuthCheckState("unavailable");
+      });
+  }, []);
+
   useEffect(() => {
     if (authChecked.current) return;
     authChecked.current = true;
-    getMe()
-      .then(() => setReady(true))
-      .catch(() => window.location.replace("/?auth=login"));
-  }, []);
+    checkSession();
+  }, [checkSession]);
 
   const applyResult = (
     result: SessionActionResult,
@@ -140,10 +160,28 @@ export default function AccountSecurityPage() {
     }
   };
 
-  if (!ready) {
+  if (authCheckState !== "ready") {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center text-sm text-black/55 dark:text-white/55">
-        {t("account_security.loading", "Checking your session...")}
+      <main className="flex min-h-[100dvh] items-center justify-center px-6 text-sm text-black/55 dark:text-white/55">
+        {authCheckState === "checking" ? (
+          t("account_security.loading", "Checking your session...")
+        ) : (
+          <div className="max-w-sm text-center">
+            <p role="alert">
+              {t(
+                "account_security.session_check_unavailable",
+                "Argus couldn’t verify your session right now. Try again.",
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={checkSession}
+              className="mt-4 rounded-full bg-black px-5 py-3 font-medium text-white dark:bg-white dark:text-black"
+            >
+              {t("account_security.retry", "Retry")}
+            </button>
+          </div>
+        )}
       </main>
     );
   }

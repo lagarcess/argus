@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  accountSecurityLoadFailureAction,
   createAuthSecurityActions,
   type AuthSecurityPort,
 } from "../lib/auth-security";
@@ -80,27 +81,74 @@ describe("account security actions", () => {
     expect(recoveryPage).toContain('"auth.recovery.password_rejected"');
   });
 
-  test("ordinary logout clears Argus cookies even when local revocation fails", async () => {
+  test("ordinary logout keeps provider failure retryable while still clearing Argus cookies", async () => {
     const scopes: string[] = [];
     let cookieClears = 0;
 
-    expect(
-      synchronizeCurrentBrowserLogout(
-        {
-          async signOut({ scope }) {
-            scopes.push(scope);
-            return { error: new Error("provider unavailable") };
-          },
-        },
-        async () => {
-          cookieClears += 1;
-          return { success: true };
-        },
-      ),
-    ).rejects.toThrow();
+    const result = await synchronizeCurrentBrowserLogout(
+      async () => {
+        scopes.push("local");
+        return { error: new Error("provider unavailable") };
+      },
+      async () => {
+        cookieClears += 1;
+        return { success: true };
+      },
+    );
 
     expect(scopes).toEqual(["local"]);
     expect(cookieClears).toBe(1);
+    expect(result).toEqual({
+      revocation: "failed",
+      cookieSync: "cleared",
+    });
+  });
+
+  test("ordinary logout reports cookie failure after provider revocation succeeds", async () => {
+    const result = await synchronizeCurrentBrowserLogout(
+      async () => ({ error: null }),
+      async () => {
+        throw new Error("cookie bridge unavailable");
+      },
+    );
+
+    expect(result).toEqual({
+      revocation: "complete",
+      cookieSync: "failed",
+    });
+  });
+
+  test("ordinary logout still starts cookie cleanup when auth lookup throws", async () => {
+    let cookieClears = 0;
+
+    const result = await synchronizeCurrentBrowserLogout(
+      async () => {
+        throw new Error("Supabase client unavailable");
+      },
+      async () => {
+        cookieClears += 1;
+        return { success: true };
+      },
+    );
+
+    expect(cookieClears).toBe(1);
+    expect(result).toEqual({
+      revocation: "failed",
+      cookieSync: "cleared",
+    });
+  });
+
+  test("account security redirects only auth failures and retries unavailable checks", () => {
+    expect(accountSecurityLoadFailureAction({ status: 401 })).toBe(
+      "redirect_to_login",
+    );
+    expect(accountSecurityLoadFailureAction({ status: 403 })).toBe(
+      "redirect_to_login",
+    );
+    expect(accountSecurityLoadFailureAction({ status: 503 })).toBe("retry");
+    expect(accountSecurityLoadFailureAction(new Error("network unavailable"))).toBe(
+      "retry",
+    );
   });
 
   test("normal password change proves the current password and requires a fresh login", async () => {
@@ -268,6 +316,14 @@ describe("recovery request safety", () => {
         environment: "production",
       }),
     ).toBeNull();
+    expect(
+      recoveryRedirectTarget({
+        requestUrl: "http://app.argus.example/api/auth/recovery",
+        requestOrigin: "http://app.argus.example",
+        configuredAppOrigin: "http://app.argus.example",
+        environment: "production",
+      }),
+    ).toBeNull();
   });
 
   test("production recovery reports missing origin configuration as unavailable", async () => {
@@ -284,6 +340,10 @@ describe("recovery request safety", () => {
         configuredAppOrigin: undefined,
         environment: "production",
         limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+        globalLimiter: new RecoveryAttemptLimiter({
+          limit: 100,
+          windowMs: 60_000,
+        }),
         async sendRecovery() {
           throw new Error("must not send without a configured origin");
         },
@@ -333,19 +393,48 @@ describe("recovery request safety", () => {
       limit: 5,
       windowMs: 60_000,
       now: () => 1_000,
+      maxTrackedKeys: 64,
     });
 
-    for (let index = 0; index < 3_000; index += 1) {
-      limiter.retryAfterMs([
-        `email:person-${index}@example.com`,
-        `ip:192.0.2.${index}`,
-      ]);
+    for (let index = 0; index < 32; index += 1) {
+      expect(
+        limiter.retryAfterMs([
+          `email:person-${index}@example.com`,
+          `ip:192.0.2.${index}`,
+        ]),
+      ).toBe(0);
     }
+    expect(
+      limiter.retryAfterMs([
+        "email:capacity@example.com",
+        "ip:198.51.100.1",
+      ]),
+    ).toBeGreaterThan(0);
 
     const attempts = (
       limiter as unknown as { attempts: Map<string, number[]> }
     ).attempts;
-    expect(attempts.size).toBeLessThanOrEqual(2_048);
+    expect(attempts.size).toBe(64);
+  });
+
+  test("key churn never evicts an actively blocked recovery victim", () => {
+    const limiter = new RecoveryAttemptLimiter({
+      limit: 2,
+      windowMs: 60_000,
+      now: () => 1_000,
+      maxTrackedKeys: 4,
+    });
+    const victimKeys = ["email:victim@example.com", "ip:192.0.2.1"];
+
+    expect(limiter.retryAfterMs(victimKeys)).toBe(0);
+    expect(limiter.retryAfterMs(victimKeys)).toBe(0);
+    expect(
+      limiter.retryAfterMs(["email:filler@example.com", "ip:192.0.2.2"]),
+    ).toBe(0);
+    expect(
+      limiter.retryAfterMs(["email:churn@example.com", "ip:192.0.2.3"]),
+    ).toBeGreaterThan(0);
+    expect(limiter.retryAfterMs(victimKeys)).toBeGreaterThan(0);
   });
 
   test("rate limiting globally removes expired one-off keys", () => {
@@ -385,6 +474,10 @@ describe("recovery request safety", () => {
       configuredAppOrigin: "https://app.argus.example",
       environment: "production",
       limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+      globalLimiter: new RecoveryAttemptLimiter({
+        limit: 100,
+        windowMs: 60_000,
+      }),
       sendRecovery,
     });
 
@@ -422,6 +515,10 @@ describe("recovery request safety", () => {
         configuredAppOrigin: "https://app.argus.example",
         environment: "production",
         limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+        globalLimiter: new RecoveryAttemptLimiter({
+          limit: 100,
+          windowMs: 60_000,
+        }),
         async sendRecovery(_email, redirectTo) {
           destination = redirectTo;
         },
@@ -430,5 +527,265 @@ describe("recovery request safety", () => {
 
     expect(response.status).toBe(202);
     expect(destination).toBe("https://app.argus.example/auth/recovery");
+  });
+
+  test("recovery rejects null and malformed origins before provider work", async () => {
+    for (const origin of ["null", "not-an-origin"]) {
+      let providerCalls = 0;
+      const response = await handleRecoveryRequest(
+        new Request("https://app.argus.example/api/auth/recovery", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Origin: origin },
+          body: JSON.stringify({ email: "person@example.com" }),
+        }),
+        {
+          configuredAppOrigin: "https://app.argus.example",
+          environment: "production",
+          limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+          globalLimiter: new RecoveryAttemptLimiter({ limit: 100, windowMs: 60_000 }),
+          async sendRecovery() {
+            providerCalls += 1;
+          },
+        },
+      );
+
+      expect(response.status).toBe(403);
+      expect(providerCalls).toBe(0);
+    }
+  });
+
+  test("recovery rejects non-json and oversized bodies before provider work", async () => {
+    const cases: Array<{ request: Request; status: number }> = [
+      {
+        request: new Request("https://app.argus.example/api/auth/recovery", {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain",
+            Origin: "https://app.argus.example",
+          },
+          body: JSON.stringify({ email: "person@example.com" }),
+        }),
+        status: 415,
+      },
+      {
+        request: new Request("https://app.argus.example/api/auth/recovery", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://app.argus.example",
+          },
+          body: JSON.stringify({ padding: "x".repeat(5_000) }),
+        }),
+        status: 413,
+      },
+    ];
+    for (const { request, status } of cases) {
+      let providerCalls = 0;
+      const response = await handleRecoveryRequest(request, {
+        configuredAppOrigin: "https://app.argus.example",
+        environment: "production",
+        limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+        globalLimiter: new RecoveryAttemptLimiter({ limit: 100, windowMs: 60_000 }),
+        async sendRecovery() {
+          providerCalls += 1;
+        },
+      });
+
+      expect(response.status).toBe(status);
+      expect(providerCalls).toBe(0);
+    }
+  });
+
+  test("recovery rejects non-object JSON before provider work", async () => {
+    let providerCalls = 0;
+    const response = await handleRecoveryRequest(
+      new Request("https://app.argus.example/api/auth/recovery", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://app.argus.example",
+        },
+        body: "null",
+      }),
+      {
+        configuredAppOrigin: "https://app.argus.example",
+        environment: "production",
+        limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+        globalLimiter: new RecoveryAttemptLimiter({ limit: 100, windowMs: 60_000 }),
+        async sendRecovery() {
+          providerCalls += 1;
+        },
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(providerCalls).toBe(0);
+  });
+
+  test("recovery bounds email and client-address inputs before provider work", async () => {
+    const cases: Array<{ request: Request; status: number }> = [
+      {
+        request: new Request("https://app.argus.example/api/auth/recovery", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://app.argus.example",
+          },
+          body: JSON.stringify({ email: `${"x".repeat(243)}@example.com` }),
+        }),
+        status: 202,
+      },
+      {
+        request: new Request("https://app.argus.example/api/auth/recovery", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://app.argus.example",
+            "X-Forwarded-For": "not-an-ip-address",
+          },
+          body: JSON.stringify({ email: "person@example.com" }),
+        }),
+        status: 400,
+      },
+    ];
+    for (const { request, status } of cases) {
+      let providerCalls = 0;
+      const response = await handleRecoveryRequest(request, {
+        configuredAppOrigin: "https://app.argus.example",
+        environment: "production",
+        limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+        globalLimiter: new RecoveryAttemptLimiter({ limit: 100, windowMs: 60_000 }),
+        async sendRecovery() {
+          providerCalls += 1;
+        },
+      });
+
+      expect(response.status).toBe(status);
+      expect(providerCalls).toBe(0);
+    }
+  });
+
+  test("recovery global abuse budget fails closed with retry guidance", async () => {
+    let providerCalls = 0;
+    const globalLimiter = new RecoveryAttemptLimiter({
+      limit: 1,
+      windowMs: 60_000,
+      now: () => 1_000,
+    });
+    const dependencies = {
+      configuredAppOrigin: "https://app.argus.example",
+      environment: "production",
+      limiter: new RecoveryAttemptLimiter({
+        limit: 5,
+        windowMs: 60_000,
+        now: () => 1_000,
+      }),
+      globalLimiter,
+      async sendRecovery() {
+        providerCalls += 1;
+      },
+    };
+    const request = (email: string) =>
+      new Request("https://app.argus.example/api/auth/recovery", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://app.argus.example",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+    expect((await handleRecoveryRequest(request("one@example.com"), dependencies)).status).toBe(202);
+    const blocked = await handleRecoveryRequest(
+      request("two@example.com"),
+      dependencies,
+    );
+
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("Retry-After")).toBe("60");
+    expect(await blocked.json()).toEqual({ accepted: false });
+    expect(providerCalls).toBe(1);
+  });
+
+  test("invalid recovery emails do not consume the provider-wide budget", async () => {
+    let providerCalls = 0;
+    const dependencies = {
+      configuredAppOrigin: "https://app.argus.example",
+      environment: "production",
+      limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+      globalLimiter: new RecoveryAttemptLimiter({ limit: 1, windowMs: 60_000 }),
+      async sendRecovery() {
+        providerCalls += 1;
+      },
+    };
+    const request = (email: string, address: string) =>
+      new Request("https://app.argus.example/api/auth/recovery", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://app.argus.example",
+          "X-Forwarded-For": address,
+        },
+        body: JSON.stringify({ email }),
+      });
+
+    expect(
+      (await handleRecoveryRequest(request("not-an-email", "192.0.2.10"), dependencies))
+        .status,
+    ).toBe(202);
+    expect(
+      (await handleRecoveryRequest(request("valid@example.com", "192.0.2.11"), dependencies))
+        .status,
+    ).toBe(202);
+    expect(providerCalls).toBe(1);
+  });
+
+  test("locally blocked recovery attempts do not consume the provider-wide budget", async () => {
+    let providerCalls = 0;
+    const dependencies = {
+      configuredAppOrigin: "https://app.argus.example",
+      environment: "production",
+      limiter: new RecoveryAttemptLimiter({ limit: 1, windowMs: 60_000 }),
+      globalLimiter: new RecoveryAttemptLimiter({ limit: 2, windowMs: 60_000 }),
+      async sendRecovery() {
+        providerCalls += 1;
+      },
+    };
+    const request = (email: string, address: string) =>
+      new Request("https://app.argus.example/api/auth/recovery", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://app.argus.example",
+          "X-Forwarded-For": address,
+        },
+        body: JSON.stringify({ email }),
+      });
+
+    expect(
+      (await handleRecoveryRequest(request("one@example.com", "192.0.2.20"), dependencies))
+        .status,
+    ).toBe(202);
+    expect(
+      (await handleRecoveryRequest(request("one@example.com", "192.0.2.20"), dependencies))
+        .status,
+    ).toBe(429);
+    expect(
+      (await handleRecoveryRequest(request("two@example.com", "192.0.2.21"), dependencies))
+        .status,
+    ).toBe(202);
+    expect(providerCalls).toBe(2);
+  });
+
+  test("account security confirmation labels are localized in English and Spanish", () => {
+    const en = JSON.parse(
+      readFileSync(join(import.meta.dir, "../public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(import.meta.dir, "../public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    expect(en.common.confirm).toBe("Confirm");
+    expect(es.common.confirm).toBe("Confirmar");
   });
 });

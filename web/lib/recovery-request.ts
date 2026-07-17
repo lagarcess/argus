@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 const LOCAL_RECOVERY_ORIGINS = new Set([
   "http://localhost:3000",
   "http://127.0.0.1:3000",
@@ -5,16 +7,44 @@ const LOCAL_RECOVERY_ORIGINS = new Set([
   "http://127.0.0.1:3001",
 ]);
 const MAX_TRACKED_RECOVERY_KEYS = 2_048;
+const MAX_RECOVERY_BODY_BYTES = 4_096;
+const MAX_RECOVERY_EMAIL_LENGTH = 254;
+const MAX_CLIENT_ADDRESS_LENGTH = 45;
 
 function exactOrigin(value: string | undefined): string | null {
   if (!value) return null;
   try {
     const parsed = new URL(value);
-    if (parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
+    if (
+      !["http:", "https:"].includes(parsed.protocol) ||
+      parsed.username ||
+      parsed.password ||
+      parsed.pathname !== "/" ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      return null;
+    }
     return parsed.origin;
   } catch {
     return null;
   }
+}
+
+function configuredRecoveryOrigin(
+  value: string | undefined,
+  environment: string | undefined,
+): string | null {
+  const origin = exactOrigin(value);
+  if (!origin) return null;
+  const protocol = new URL(origin).protocol;
+  if (environment === "production") {
+    return protocol === "https:" ? origin : null;
+  }
+  if (protocol === "http:" && !LOCAL_RECOVERY_ORIGINS.has(origin)) {
+    return null;
+  }
+  return origin;
 }
 
 export function recoveryRedirectTarget({
@@ -29,15 +59,24 @@ export function recoveryRedirectTarget({
   environment: string | undefined;
 }): string | null {
   const requestUrlOrigin = exactOrigin(new URL(requestUrl).origin);
-  const browserOrigin = requestOrigin ? exactOrigin(requestOrigin) : null;
-  const configuredOrigin = exactOrigin(configuredAppOrigin);
+  const browserOrigin =
+    requestOrigin === null ? null : exactOrigin(requestOrigin ?? undefined);
+  const configuredOrigin = configuredRecoveryOrigin(
+    configuredAppOrigin,
+    environment,
+  );
   const isDevelopment = environment !== "production";
   const allowedOrigins = new Set<string>();
   if (configuredOrigin) allowedOrigins.add(configuredOrigin);
   if (isDevelopment) {
     LOCAL_RECOVERY_ORIGINS.forEach((origin) => allowedOrigins.add(origin));
   }
-  if (browserOrigin && !allowedOrigins.has(browserOrigin)) return null;
+  if (
+    requestOrigin !== null &&
+    (!browserOrigin || !allowedOrigins.has(browserOrigin))
+  ) {
+    return null;
+  }
 
   const redirectOrigin =
     configuredOrigin ??
@@ -55,6 +94,7 @@ export class RecoveryAttemptLimiter {
       limit: number;
       windowMs: number;
       now?: () => number;
+      maxTrackedKeys?: number;
     },
   ) {}
 
@@ -71,18 +111,11 @@ export class RecoveryAttemptLimiter {
     }
   }
 
-  private enforceCapacity(): void {
-    while (this.attempts.size > MAX_TRACKED_RECOVERY_KEYS) {
-      const oldestKey = this.attempts.keys().next().value;
-      if (oldestKey === undefined) return;
-      this.attempts.delete(oldestKey);
-    }
-  }
-
   retryAfterMs(keys: string[]): number {
     const now = this.options.now?.() ?? Date.now();
     this.compact(now);
-    const recentByKey = keys.map((key) => {
+    const uniqueKeys = [...new Set(keys)];
+    const recentByKey = uniqueKeys.map((key) => {
       const recent = this.attempts.get(key) ?? [];
       return { key, recent };
     });
@@ -91,12 +124,19 @@ export class RecoveryAttemptLimiter {
       return Math.max(longest, this.options.windowMs - (now - recent[0]));
     }, 0);
     if (retryAfter > 0) return retryAfter;
+    const maxTrackedKeys = Math.max(
+      1,
+      Math.floor(this.options.maxTrackedKeys ?? MAX_TRACKED_RECOVERY_KEYS),
+    );
+    const unseenKeyCount = recentByKey.filter(
+      ({ key }) => !this.attempts.has(key),
+    ).length;
+    if (this.attempts.size + unseenKeyCount > maxTrackedKeys) {
+      return this.options.windowMs;
+    }
     recentByKey.forEach(({ key, recent }) => {
-      // Reinsertion makes the bounded map evict the least-recently-used keys.
-      this.attempts.delete(key);
       this.attempts.set(key, [...recent, now]);
     });
-    this.enforceCapacity();
     return 0;
   }
 }
@@ -105,6 +145,7 @@ type RecoveryRequestDependencies = {
   configuredAppOrigin: string | undefined;
   environment: string | undefined;
   limiter: RecoveryAttemptLimiter;
+  globalLimiter: RecoveryAttemptLimiter;
   sendRecovery: (email: string, redirectTo: string) => Promise<void>;
 };
 
@@ -124,12 +165,67 @@ function jsonResponse(
   });
 }
 
-function clientAddress(request: Request): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",", 1)[0]?.trim() ||
-    request.headers.get("x-real-ip")?.trim() ||
-    "unknown"
-  );
+function clientAddress(request: Request): string | null {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  const realIp = request.headers.get("x-real-ip");
+  const value = forwardedFor?.split(",", 1)[0]?.trim() || realIp?.trim();
+  if (!value) return "unknown";
+  if (value.length > MAX_CLIENT_ADDRESS_LENGTH || isIP(value) === 0) {
+    return null;
+  }
+  return value;
+}
+
+async function readRecoveryBody(
+  request: Request,
+): Promise<{ body: { email?: unknown } } | { status: 400 | 413 | 415 }> {
+  const contentType = request.headers
+    .get("content-type")
+    ?.split(";", 1)[0]
+    ?.trim()
+    .toLowerCase();
+  if (contentType !== "application/json") return { status: 415 };
+
+  const declaredLength = request.headers.get("content-length");
+  if (declaredLength) {
+    const parsedLength = Number(declaredLength);
+    if (!Number.isFinite(parsedLength) || parsedLength < 0) {
+      return { status: 400 };
+    }
+    if (parsedLength > MAX_RECOVERY_BODY_BYTES) return { status: 413 };
+  }
+  if (!request.body) return { status: 400 };
+
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let byteLength = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      byteLength += value.byteLength;
+      if (byteLength > MAX_RECOVERY_BODY_BYTES) {
+        void reader.cancel().catch(() => undefined);
+        return { status: 413 };
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    const body: unknown = JSON.parse(text);
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return { status: 400 };
+    }
+    return { body: body as { email?: unknown } };
+  } catch {
+    return { status: 400 };
+  }
+}
+
+function rateLimitResponse(retryAfterMs: number): Response {
+  return jsonResponse({ accepted: false }, 429, {
+    "Retry-After": String(Math.max(1, Math.ceil(retryAfterMs / 1_000))),
+  });
 }
 
 export async function handleRecoveryRequest(
@@ -138,7 +234,10 @@ export async function handleRecoveryRequest(
 ): Promise<Response> {
   if (
     dependencies.environment === "production" &&
-    !exactOrigin(dependencies.configuredAppOrigin)
+    !configuredRecoveryOrigin(
+      dependencies.configuredAppOrigin,
+      dependencies.environment,
+    )
   ) {
     return jsonResponse({ accepted: false }, 503);
   }
@@ -150,30 +249,36 @@ export async function handleRecoveryRequest(
     environment: dependencies.environment,
   });
   if (!redirectTo) {
-    return jsonResponse({ accepted: false }, requestOrigin ? 403 : 503);
+    return jsonResponse(
+      { accepted: false },
+      requestOrigin !== null ? 403 : 503,
+    );
   }
 
-  let body: { email?: unknown };
-  try {
-    body = (await request.json()) as { email?: unknown };
-  } catch {
-    return jsonResponse({ accepted: false }, 400);
+  const bodyResult = await readRecoveryBody(request);
+  if ("status" in bodyResult) {
+    return jsonResponse({ accepted: false }, bodyResult.status);
   }
+  const { body } = bodyResult;
+  const address = clientAddress(request);
+  if (!address) return jsonResponse({ accepted: false }, 400);
+
   const email =
     typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  if (!/^\S+@\S+\.\S+$/.test(email)) {
+  if (
+    email.length > MAX_RECOVERY_EMAIL_LENGTH ||
+    !/^\S+@\S+\.\S+$/.test(email)
+  ) {
     return jsonResponse({ accepted: true }, 202);
   }
 
   const retryAfterMs = dependencies.limiter.retryAfterMs([
     `email:${email}`,
-    `ip:${clientAddress(request)}`,
+    `ip:${address}`,
   ]);
-  if (retryAfterMs > 0) {
-    return jsonResponse({ accepted: false }, 429, {
-      "Retry-After": String(Math.max(1, Math.ceil(retryAfterMs / 1_000))),
-    });
-  }
+  if (retryAfterMs > 0) return rateLimitResponse(retryAfterMs);
+  const globalRetryAfterMs = dependencies.globalLimiter.retryAfterMs(["global"]);
+  if (globalRetryAfterMs > 0) return rateLimitResponse(globalRetryAfterMs);
 
   try {
     await dependencies.sendRecovery(email, redirectTo);

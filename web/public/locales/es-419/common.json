@@ -20,6 +20,7 @@
     "retry": "Reintentar",
     "error_occurred": "Ha ocurrido un error",
     "save": "Guardar",
+    "confirm": "Confirmar",
     "cancel": "Cancelar",
     "done": "Listo",
     "search": "Buscar",
@@ -918,6 +919,8 @@
     "description": "Cambia tu contraseña o elige exactamente qué sesiones cerrar.",
     "back": "Volver a Argus",
     "loading": "Verificando tu sesión...",
+    "session_check_unavailable": "Argus no pudo verificar tu sesión en este momento. Inténtalo de nuevo.",
+    "retry": "Reintentar",
     "cookie_sync_warning": "Las sesiones fueron revocadas, pero no se pudo confirmar la limpieza local de cookies.",
     "password": {
       "title": "Cambiar contraseña",

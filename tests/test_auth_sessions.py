@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from typing import Any
 from uuid import UUID, uuid4
 
 import jwt
+import pytest
 
 
 class _FakeCursor:
@@ -90,3 +92,58 @@ def test_auth_session_verifier_rejects_missing_or_mismatched_claims() -> None:
         token=_token(session_id=uuid4(), user_id=uuid4()),
         user_id=str(user_id),
     )
+
+
+def test_auth_session_pool_bounds_connect_acquire_and_statement_timeouts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import auth_sessions
+
+    captured: dict[str, Any] = {}
+
+    class _Pool:
+        def __init__(self, **kwargs: Any) -> None:
+            captured.update(kwargs)
+
+        def close(self) -> None:
+            return None
+
+    auth_sessions._auth_session_verifier.cache_clear()
+    monkeypatch.setattr(auth_sessions, "ConnectionPool", _Pool)
+
+    auth_sessions._auth_session_verifier("postgresql://auth-pool/argus")
+
+    assert captured["timeout"] == auth_sessions._AUTH_SESSION_ACQUIRE_TIMEOUT_SECONDS
+    assert captured["kwargs"]["connect_timeout"] == (
+        auth_sessions._AUTH_SESSION_CONNECT_TIMEOUT_SECONDS
+    )
+    assert (
+        f"statement_timeout={auth_sessions._AUTH_SESSION_STATEMENT_TIMEOUT_MS}"
+        in captured["kwargs"]["options"]
+    )
+    auth_sessions._auth_session_verifier.cache_clear()
+
+
+def test_auth_session_timeout_maps_to_verification_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import auth_sessions
+
+    class _TimeoutPool:
+        def connection(self, *, timeout: float):
+            assert timeout == auth_sessions._AUTH_SESSION_ACQUIRE_TIMEOUT_SECONDS
+            raise TimeoutError("pool acquisition timed out")
+
+    monkeypatch.setattr(
+        auth_sessions,
+        "_auth_session_verifier",
+        lambda _database_url: auth_sessions.AuthSessionVerifier(_TimeoutPool()),
+    )
+    user_id = uuid4()
+
+    with pytest.raises(auth_sessions.AuthSessionVerificationUnavailable):
+        auth_sessions.auth_session_is_active(
+            database_url="postgresql://auth-pool/argus",
+            token=_token(session_id=uuid4(), user_id=user_id),
+            user_id=str(user_id),
+        )

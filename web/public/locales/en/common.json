@@ -20,6 +20,7 @@
     "retry": "Retry",
     "error_occurred": "An error occurred",
     "save": "Save",
+    "confirm": "Confirm",
     "cancel": "Cancel",
     "done": "Done",
     "search": "Search",
@@ -918,6 +919,8 @@
     "description": "Change your password or choose exactly which sessions to sign out.",
     "back": "Back to Argus",
     "loading": "Checking your session...",
+    "session_check_unavailable": "Argus couldn’t verify your session right now. Try again.",
+    "retry": "Retry",
     "cookie_sync_warning": "Sessions were revoked, but local cookie cleanup could not be confirmed.",
     "password": {
       "title": "Change password",

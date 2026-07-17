@@ -707,38 +707,40 @@ export async function loginWithEmail(payload: {
 }
 
 export async function clearArgusSessionCookies() {
-  return apiFetch<{ success: boolean }>("/auth/logout", {
+  return unauthenticatedApiFetch<{ success: boolean }>("/auth/logout", {
     method: "POST",
   });
 }
 
+export type CurrentBrowserLogoutResult = {
+  revocation: "complete" | "failed";
+  cookieSync: "cleared" | "failed";
+};
+
 export async function synchronizeCurrentBrowserLogout<T>(
-  auth: {
-    signOut: (options: {
-      scope: "local";
-    }) => Promise<{ error: unknown | null }>;
-  },
+  revokeCurrentSession: () => Promise<{ error: unknown | null }>,
   clearCookies: () => Promise<T>,
-): Promise<T> {
+): Promise<CurrentBrowserLogoutResult> {
   const [revocation, cookieSync] = await Promise.allSettled([
-    auth.signOut({ scope: "local" }),
-    clearCookies(),
+    Promise.resolve().then(revokeCurrentSession),
+    Promise.resolve().then(clearCookies),
   ]);
-  if (cookieSync.status === "rejected") throw cookieSync.reason;
-  if (revocation.status === "rejected") throw revocation.reason;
-  if (revocation.value.error) {
-    throw revocation.value.error instanceof Error
-      ? revocation.value.error
-      : new Error("Authentication request failed.");
-  }
-  return cookieSync.value;
+  return {
+    revocation:
+      revocation.status === "fulfilled" && !revocation.value.error
+        ? "complete"
+        : "failed",
+    cookieSync: cookieSync.status === "fulfilled" ? "cleared" : "failed",
+  };
 }
 
 export async function logoutFromApi() {
-  const supabase = getSupabaseClient();
-  if (!supabase) return clearArgusSessionCookies();
   return synchronizeCurrentBrowserLogout(
-    { signOut: (options) => supabase.auth.signOut(options) },
+    async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return { error: null };
+      return supabase.auth.signOut({ scope: "local" });
+    },
     clearArgusSessionCookies,
   );
 }
