@@ -569,6 +569,12 @@ def _fixture_checks(
             if case.kind == "control"
             else 0 < evidence.timeout_ms <= rubric.timeout_ms
         ),
+        "declared_fixture_latency_within_provisional_bound": (
+            None
+            if case.kind == "control"
+            else case.latency_ms is not None
+            and 0 <= case.latency_ms <= rubric.max_latency_ms
+        ),
         "declared_fixture_cost_within_provisional_bound": (
             None
             if case.kind in {"control", "outage"}

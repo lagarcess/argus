@@ -299,6 +299,25 @@ def test_reported_fixture_call_overage_fails_fixture_validation() -> None:
     assert result["empirical_checks"]["call_count"] is None
 
 
+def test_missing_or_excessive_declared_latency_fails_fixture_validation() -> None:
+    manifest = load_search_eval_manifest()
+    provider_case = next(
+        case for case in manifest.cases if case.id == "perplexity_equity_category_en"
+    )
+
+    for latency_ms in (None, manifest.rubric.max_latency_ms + 1):
+        result = evaluate_manifest(
+            replace(manifest, cases=(replace(provider_case, latency_ms=latency_ms),))
+        )["fixture_validation"]["results"][0]
+
+        assert result["status"] == "fixture_failed"
+        assert (
+            result["fixture_checks"]["declared_fixture_latency_within_provisional_bound"]
+            is False
+        )
+        assert result["empirical_checks"]["latency"] is None
+
+
 def test_source_date_metadata_does_not_claim_freshness() -> None:
     manifest = load_search_eval_manifest()
     direct_case = next(
@@ -370,6 +389,7 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
         "configured_timeout_bounded",
         "control_declares_zero_search",
         "declared_fixture_cost_within_provisional_bound",
+        "declared_fixture_latency_within_provisional_bound",
         "declared_runtime_effects_safe",
         "expected_call_count_bounded",
         "outage_fixture_has_context_precondition",
