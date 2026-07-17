@@ -51,6 +51,7 @@ from argus.domain.engine_launch.strategies import (
     validate_launch_supported,
 )
 from argus.domain.market_data import fetch_ohlcv, fetch_price_series
+from argus.domain.market_data.capabilities import fetch_alpaca_market_calendar
 
 
 @dataclass(frozen=True)
@@ -889,6 +890,7 @@ def _prepared_market_data_for_request(
         return prepare_market_data(
             config,
             fetch_ohlcv_func=recorder.fetch_ohlcv,
+            fetch_market_calendar_func=fetch_alpaca_market_calendar,
             approved_coverage=request.coverage_preflight.model_dump(),
         )
     except MarketDataCoverageError as exc:

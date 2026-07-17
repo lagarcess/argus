@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from argus.agent_runtime.recovery_messages import recovery_message
 from argus.api.chat.recovery import (
+    RuntimeFallbackContext,
     _metadata_invalidates_confirmation,
     _recent_messages_for_conversation,
     _run_by_id_for_user,
     latest_completed_run_for_conversation,
+    pending_strategy_metadata_fallback_context_from_message,
+)
+from argus.api.message_store import (
+    claim_response_option_action,
+    owned_conversation_message,
 )
 from argus.api.schemas import BacktestRun, ChatStreamRequest, Message, User
 
@@ -71,6 +78,13 @@ _ACTION_TYPE_LABEL_KEYS = {
     "save_strategy": "chat.result_card.save",
     "retry_failed_action": "common.retry",
 }
+
+
+@dataclass(frozen=True)
+class ValidatedResponseOptionSource:
+    assistant_id: str
+    runtime_fallback: RuntimeFallbackContext
+    request_message: Message
 
 
 def chat_request_message(payload: ChatStreamRequest, *, language: str = "en") -> str:
@@ -164,6 +178,121 @@ def is_cancel_confirmation_action(payload: ChatStreamRequest) -> bool:
 
 def is_result_action(payload: ChatStreamRequest) -> bool:
     return payload.action is not None and payload.action.type in RESULT_ACTION_TYPES
+
+
+def is_response_option_action(payload: ChatStreamRequest) -> bool:
+    return payload.action is not None and payload.action.type == "select_response_option"
+
+
+def persisted_chat_action(payload: ChatStreamRequest) -> dict[str, Any] | None:
+    if payload.action is None:
+        return None
+    action = payload.action.model_dump(mode="python")
+    if payload.action.type != "select_response_option":
+        return action
+    action["payload"] = {
+        key: payload.action.payload[key]
+        for key in ("option_id", "replacement_values")
+        if key in payload.action.payload
+    }
+    return action
+
+
+def validated_response_option_source(
+    *,
+    payload: ChatStreamRequest,
+    user_id: str,
+    conversation_id: str,
+    request_message: Message,
+) -> ValidatedResponseOptionSource | None:
+    if not is_response_option_action(payload) or payload.action is None:
+        return None
+    source_assistant_id = _clean_action_payload_id(
+        payload.action.payload.get("source_assistant_id")
+    )
+    if source_assistant_id is None:
+        return None
+    option_id = payload.action.payload.get("option_id")
+    replacement_values = payload.action.payload.get("replacement_values")
+    if not isinstance(option_id, str) or not isinstance(replacement_values, dict):
+        return None
+    source_message = owned_conversation_message(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=source_assistant_id,
+    )
+    if source_message is None or not isinstance(source_message.metadata, dict):
+        return None
+    if (
+        _response_option_source_context(
+            source_message,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            request_message=request_message,
+        )
+        is None
+    ):
+        return None
+    claim = claim_response_option_action(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        source_assistant_id=source_assistant_id,
+        option_id=option_id,
+        replacement_values=replacement_values,
+        request_message=request_message,
+        expected_source_metadata=source_message.metadata,
+    )
+    if claim is None:
+        return None
+    source_context = _response_option_source_context(
+        claim.source_message,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_message=claim.request_message,
+    )
+    return source_context
+
+
+def _response_option_source_context(
+    source_message: Message,
+    *,
+    user_id: str,
+    conversation_id: str,
+    request_message: Message,
+) -> ValidatedResponseOptionSource | None:
+    fallback = pending_strategy_metadata_fallback_context_from_message(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        source_message=source_message,
+    )
+    if (
+        fallback is None
+        or fallback.latest_task_snapshot is None
+        or fallback.selected_thread_metadata is None
+    ):
+        return None
+    selected_thread_metadata = {
+        **fallback.selected_thread_metadata,
+        "fallback_source": "validated_response_option_source",
+        "validated_source_assistant_id": source_message.id,
+    }
+    return ValidatedResponseOptionSource(
+        assistant_id=source_message.id,
+        runtime_fallback=RuntimeFallbackContext(
+            latest_task_snapshot=fallback.latest_task_snapshot,
+            selected_thread_metadata=selected_thread_metadata,
+            artifact_references=fallback.artifact_references,
+            confirmation_payload=fallback.confirmation_payload,
+        ),
+        request_message=request_message,
+    )
+
+
+def _clean_action_payload_id(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned or None
 
 
 def pending_confirmation_exists(*, user_id: str, conversation_id: str) -> bool:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import warnings
 from collections import Counter
+from datetime import date, datetime
 from typing import Any
 
 import pandas as pd
@@ -19,6 +20,7 @@ from argus.domain.engine_launch.models import (
 )
 from argus.domain.engine_launch.results import user_safe_failure_message
 from argus.domain.engine_launch.strategies import validate_launch_supported
+from argus.domain.market_data.capabilities import EquityMarketSession
 
 
 def test_launch_request_supports_three_strategy_types() -> None:
@@ -214,6 +216,93 @@ def test_approved_launch_uses_one_prepared_dataset_for_metrics_and_chart(
         "start": "2024-01-03",
         "end": "2024-01-05",
     }
+
+
+def test_approved_launch_uses_one_calendar_for_a_complete_holiday_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dates = [
+        "2024-12-24",
+        "2024-12-26",
+        "2024-12-27",
+        "2024-12-30",
+        "2024-12-31",
+        "2025-01-02",
+    ]
+    index = pd.to_datetime(dates, utc=True)
+    close = pd.Series(range(100, 106), index=index, dtype=float)
+    bars = pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": 1_000.0,
+        },
+        index=index,
+    )
+    calendar_calls: list[tuple[date, date]] = []
+
+    def fake_calendar(*, start_date: date, end_date: date):
+        calendar_calls.append((start_date, end_date))
+        return tuple(
+            EquityMarketSession(
+                provider="alpaca",
+                session_date=date.fromisoformat(day),
+                opens_at=datetime.fromisoformat(f"{day}T09:30:00-05:00"),
+                closes_at=datetime.fromisoformat(
+                    f"{day}T{'13:00' if day == '2024-12-24' else '16:00'}:00-05:00"
+                ),
+            )
+            for day in dates
+        )
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.fetch_ohlcv",
+        lambda **_: bars.copy(deep=True),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.fetch_alpaca_market_calendar",
+        fake_calendar,
+        raising=False,
+    )
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="AAPL",
+        symbols=["AAPL"],
+        asset_class="equity",
+        timeframe="1D",
+        date_range={"start": dates[0], "end": dates[-1]},
+        requested_date_range={"start": dates[0], "end": dates[-1]},
+        coverage_preflight={
+            "outcome": "full_coverage",
+            "requested_date_range": {"start": dates[0], "end": dates[-1]},
+            "effective_date_range": {"start": dates[0], "end": dates[-1]},
+            "preflight_id": _dataset_id({"AAPL": bars, "SPY": bars}),
+        },
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=10_000,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    assert calendar_calls == [(date(2024, 12, 24), date(2025, 1, 2))]
 
 
 def test_approved_launch_reuses_canonical_benchmark_alias_without_duplicate_fetch(

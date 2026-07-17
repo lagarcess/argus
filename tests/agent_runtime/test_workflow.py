@@ -24,6 +24,9 @@ from argus.agent_runtime.stages.interpret import (
     StageResult,
     StructuredInterpretation,
 )
+from argus.agent_runtime.stages.interpret_actions import (
+    structured_action_stage_result_if_applicable,
+)
 from argus.agent_runtime.stages.next_step import next_step_stage
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -63,6 +66,54 @@ class UnexpectedInterpreter:
     async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
         del request
         raise AssertionError("typed recovery action must not call the interpreter")
+
+
+def test_response_option_rejects_an_unvalidated_source_marker_before_mutation() -> None:
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["NVDA"],
+        asset_class="equity",
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    state = RunState.new(
+        current_user_message="Retry with daily bars",
+        recent_thread_history=[],
+        action_context={
+            "type": "select_response_option",
+            "payload": {
+                "source_assistant_id": "assistant-old",
+                "validated_source_assistant_id": "assistant-old",
+                "option_id": "option_0",
+                "replacement_values": {"timeframe": "1D"},
+            },
+        },
+    )
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "facts": {
+            "unsupported_constraints": [
+                {
+                    "category": "unsupported_time_granularity",
+                    "raw_value": "5m",
+                }
+            ]
+        },
+        "options": [{"id": "option_0", "replacement_values": {"timeframe": "1D"}}],
+    }
+
+    result = structured_action_stage_result_if_applicable(
+        state=state,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-current",
+            "response_intent": response_intent,
+        },
+    )
+
+    assert result is not None
+    assert result.outcome == "ready_to_respond"
+    assert result.patch["candidate_strategy_draft"]["timeframe"] == "5m"
 
 
 def test_task_snapshot_clears_failed_action_after_new_confirmation() -> None:
@@ -1034,6 +1085,8 @@ async def test_timeframe_recovery_action_rehydrates_assumptions_and_strategy(
             "type": "select_response_option",
             "label": "Retry with daily bars",
             "payload": {
+                "source_assistant_id": "assistant-timeframe-recovery",
+                "validated_source_assistant_id": "assistant-timeframe-recovery",
                 "option_id": action_option["id"],
                 "replacement_values": action_option["replacement_values"],
             },
@@ -1042,6 +1095,7 @@ async def test_timeframe_recovery_action_rehydrates_assumptions_and_strategy(
             pending_strategy_summary=pending,
         ),
         fallback_selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-timeframe-recovery",
             "last_stage_outcome": "await_user_reply",
             "requested_field": "timeframe",
             "response_intent": response_intent,
@@ -1058,6 +1112,80 @@ async def test_timeframe_recovery_action_rehydrates_assumptions_and_strategy(
     assert confirmation["optional_parameters"]["fees"]["value"] == 0.001
     assert confirmation["optional_parameters"]["slippage"]["value"] == 0.0005
     assert result["pending_strategy"]["strategy"]["timeframe"] == "1D"
+
+
+@pytest.mark.asyncio
+async def test_coverage_recovery_keeps_source_identity_out_of_clarification_context() -> (
+    None
+):
+    from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
+
+    source_assistant_id = "00000000-0000-0000-0000-000000000202"
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    response_intent = {
+        "kind": "coverage_recovery",
+        "semantic_needs": ["simplification_choice"],
+        "requested_fields": [
+            "date_range",
+            "asset_universe",
+            "comparison_baseline",
+        ],
+        "facts": {},
+        "options": [
+            {
+                "id": "change_asset",
+                "replacement_values": {"requested_field": "asset_universe"},
+            }
+        ],
+    }
+    clarifier = RecordingClarifier("Which asset should I use instead?")
+    workflow = build_workflow(
+        structured_interpreter=UnexpectedInterpreter(),
+        clarification_generator=clarifier,
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id="thread-coverage-recovery-identity",
+        message="Change asset",
+        action_context={
+            "type": "select_response_option",
+            "payload": {
+                "source_assistant_id": source_assistant_id,
+                "validated_source_assistant_id": source_assistant_id,
+                "option_id": "change_asset",
+                "replacement_values": {"requested_field": "asset_universe"},
+            },
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={
+            "validated_source_assistant_id": source_assistant_id,
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": response_intent,
+        },
+    )
+
+    assert result["stage_outcome"] == "await_user_reply"
+    assert clarifier.requests
+    request = clarifier.requests[0]
+    assert source_assistant_id not in repr(request.response_intent)
+    openrouter_messages = OpenRouterClarificationGenerator()._messages(request)
+    assert source_assistant_id not in repr(
+        [message.content for message in openrouter_messages]
+    )
+    assert source_assistant_id not in repr(
+        result["pending_strategy"]["response_intent"]
+    )
 
 
 @pytest.mark.asyncio

@@ -10,6 +10,8 @@ const COVERAGE_RECOVERY_PROMPT =
 const TIMEFRAME_RECOVERY_REQUEST = "Test AAPL with five-minute bars";
 const DEGRADED_TIMEFRAME_RECOVERY_REQUEST =
   "Test AAPL with five-minute bars while clarification is unavailable";
+const STALE_AAPL_TIMEFRAME_REQUEST = "Test AAPL with stale five-minute bars";
+const CURRENT_NVDA_TIMEFRAME_REQUEST = "Test NVDA with current five-minute bars";
 const TIMEFRAME_RECOVERY_PROMPTS = {
   en: "Five-minute bars are not supported. Choose daily or one-hour bars.",
   "es-419":
@@ -294,6 +296,46 @@ function persistedAssistantMessage(
     created_at: CREATED_AT,
     metadata,
   };
+}
+
+function persistedTimeframeRecovery(
+  id: string,
+  symbol: string,
+): ApiMessage {
+  return persistedAssistantMessage(
+    id,
+    `${symbol} needs a supported timeframe.`,
+    {
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "unsupported_time_granularity",
+        prompt_source: "llm_generated",
+        requested_field: "timeframe",
+        requested_fields: ["timeframe"],
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          strategy: {
+            strategy_type: "buy_and_hold",
+            asset_universe: [symbol],
+            asset_class: "equity",
+          },
+          raw_value: "5m",
+        },
+        options: [
+          {
+            id: "option_0",
+            compatibility_label: "Retry with daily bars",
+            replacement_values: { timeframe: "1D" },
+          },
+          {
+            id: "option_1",
+            compatibility_label: "Retry with 1-hour bars",
+            replacement_values: { timeframe: "1h" },
+          },
+        ],
+      },
+    },
+  );
 }
 
 async function mockChatApi(
@@ -609,6 +651,34 @@ async function mockChatApi(
     }
 
     if (
+      body.message === STALE_AAPL_TIMEFRAME_REQUEST ||
+      body.message === CURRENT_NVDA_TIMEFRAME_REQUEST
+    ) {
+      const symbol =
+        body.message === CURRENT_NVDA_TIMEFRAME_REQUEST ? "NVDA" : "AAPL";
+      const suffix = symbol.toLowerCase();
+      const recovery = persistedTimeframeRecovery(`msg-${suffix}-recovery`, symbol);
+      messages.push(
+        persistedUserMessage(`msg-user-${suffix}-recovery`, body.message),
+        recovery,
+      );
+      return fulfillSse(route, [
+        { type: "stage_start", stage: "clarify" },
+        { type: "token", content: recovery.content },
+        {
+          type: "final",
+          payload: {
+            stage_outcome: "await_user_reply",
+            assistant_prompt: recovery.content,
+            clarification: recovery.metadata?.clarification,
+            message_id: recovery.id,
+          },
+        },
+        "[DONE]",
+      ]);
+    }
+
+    if (
       body.message === TIMEFRAME_RECOVERY_REQUEST ||
       body.message === DEGRADED_TIMEFRAME_RECOVERY_REQUEST
     ) {
@@ -786,8 +856,36 @@ async function mockChatApi(
       JSON.stringify(body.action.payload?.replacement_values) ===
         JSON.stringify({ timeframe: "1D" })
     ) {
+      const activeRecovery = [...messages].reverse().find((message) => {
+        const clarification = message.metadata?.clarification;
+        return (
+          typeof clarification === "object" &&
+          clarification !== null &&
+          !Array.isArray(clarification) &&
+          "kind" in clarification &&
+          clarification.kind === "unsupported_recovery"
+        );
+      });
+      if (
+        !activeRecovery ||
+        body.action.payload.source_assistant_id !== activeRecovery.id
+      ) {
+        return route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({
+            code: "artifact_action_invalid_state",
+            detail: "That action is no longer attached to the current state.",
+          }),
+        });
+      }
+      const activeClarification = activeRecovery.metadata?.clarification as
+        | { payload?: { strategy?: { asset_universe?: string[] } } }
+        | undefined;
+      const activeSymbol =
+        activeClarification?.payload?.strategy?.asset_universe?.[0] ?? "AAPL";
       const correctedCard = {
-        ...confirmationCard(DEFAULT_DATE_RANGE, "AAPL", 10000),
+        ...confirmationCard(DEFAULT_DATE_RANGE, activeSymbol, 10000),
         assumptions: [
           "$10,000 starting capital",
           "Daily bars",
@@ -1254,6 +1352,7 @@ for (const testCase of [
     expect(selection?.type).toBe("select_response_option");
     expect(selection?.labelKey).toBe("chat.clarification.timeframe_actions.daily");
     expect(selection?.payload).toEqual({
+      source_assistant_id: "msg-timeframe-recovery",
       option_id: "option_0",
       replacement_values: { timeframe: "1D" },
     });
@@ -1266,6 +1365,49 @@ for (const testCase of [
     await expect(page.getByText("0.05% slippage", { exact: true })).toBeVisible();
   });
 }
+
+test("reload keeps response options bound to their recovery message", async ({
+  page,
+}) => {
+  const api = await mockChatApi(page);
+  await page.goto("/chat", { waitUntil: "networkidle" });
+  await page.getByTestId("chat-input").fill(STALE_AAPL_TIMEFRAME_REQUEST);
+  await page.getByTestId("chat-send").click();
+  await expect(page.getByText("AAPL needs a supported timeframe.")).toBeVisible();
+  await page.getByTestId("chat-input").fill(CURRENT_NVDA_TIMEFRAME_REQUEST);
+  await page.getByTestId("chat-send").click();
+  await expect(page.getByText("NVDA needs a supported timeframe.")).toBeVisible();
+  await page.reload({ waitUntil: "networkidle" });
+
+  const dailyActions = page.getByRole("button", {
+    name: "Retry with daily bars",
+    exact: true,
+  });
+  await expect(dailyActions).toHaveCount(3);
+  await dailyActions.first().click();
+  await expect.poll(() => api.streamRequests.length).toBe(3);
+  expect(api.streamRequests[2]?.action?.payload?.source_assistant_id).toBe(
+    "msg-aapl-recovery",
+  );
+  await expect(page.getByRole("heading", { name: "Buy and Hold" })).toHaveCount(0);
+
+  await page.reload({ waitUntil: "networkidle" });
+  await page
+    .getByRole("button", {
+      name: "Retry with daily bars",
+      exact: true,
+    })
+    .nth(1)
+    .click();
+  await expect.poll(() => api.streamRequests.length).toBe(4);
+  expect(api.streamRequests.at(-1)?.action?.payload).toEqual({
+    source_assistant_id: "msg-nvda-recovery",
+    option_id: "option_0",
+    replacement_values: { timeframe: "1D" },
+  });
+  await expect(page.getByText("NVDA", { exact: true })).toBeVisible();
+  await expect(page.getByText("Daily bars", { exact: true })).toBeVisible();
+});
 
 test("retry action recovers a failed stream without duplicating user input", async ({ page }) => {
   const api = await mockChatApi(page);

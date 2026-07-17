@@ -23,6 +23,7 @@ from argus.domain.engine import (
     normalize_backtest_config,
     validate_backtest_config,
 )
+from argus.domain.market_data.capabilities import fetch_alpaca_market_calendar
 from argus.domain.store import utcnow
 
 
@@ -303,6 +304,7 @@ def prepare_run_from_payload(
         prepared_market_data = prepare_market_data(
             config,
             fetch_ohlcv_func=domain_engine.fetch_ohlcv,
+            fetch_market_calendar_func=fetch_alpaca_market_calendar,
         )
         config = apply_coverage_to_config(config, prepared_market_data)
         validate_backtest_config(config)

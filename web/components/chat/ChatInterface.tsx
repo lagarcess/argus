@@ -1435,9 +1435,12 @@ export default function ChatInterface() {
             ? finalPayload.message_id
             : undefined;
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
-        const finalCoverageActions = coverageRecoveryActionsFromMetadata(finalPayload);
-        const finalUnsupportedTimeframeActions =
-          unsupportedTimeframeActionsFromMetadata(finalPayload);
+        const finalCoverageActions = finalMessageId
+          ? coverageRecoveryActionsFromMetadata(finalPayload, finalMessageId)
+          : [];
+        const finalUnsupportedTimeframeActions = finalMessageId
+          ? unsupportedTimeframeActionsFromMetadata(finalPayload, finalMessageId)
+          : [];
         const finalRetryActions = [
           failedActionRetryActionFromMetadata(finalPayload),
           retryLastTurnActionFromMetadata(finalPayload, {

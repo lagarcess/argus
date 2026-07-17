@@ -297,6 +297,17 @@ def test_backtests_run_openapi_requires_idempotency_key() -> None:
     assert "required: true" in backtest_run_contract
 
 
+def test_chat_stream_openapi_declares_stale_action_problem_response() -> None:
+    text = (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
+    start = text.index("  /api/v1/chat/stream:")
+    end = text.index("  /api/v1/strategies:", start)
+    chat_stream_contract = text[start:end]
+
+    assert '"409":' in chat_stream_contract
+    assert "application/json:" in chat_stream_contract
+    assert "#/components/schemas/Error" in chat_stream_contract
+
+
 def test_supabase_migration_matches_alpha_data_model() -> None:
     migration = ROOT / "supabase" / "migrations" / "20260424000001_alpha_core.sql"
 

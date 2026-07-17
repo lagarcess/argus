@@ -63,6 +63,57 @@ class MarketClockSnapshot:
     phase: str | None = None
 
 
+@dataclass(frozen=True)
+class EquityMarketSession:
+    provider: str
+    session_date: date
+    opens_at: datetime
+    closes_at: datetime
+
+
+def fetch_alpaca_market_calendar(
+    *,
+    start_date: date,
+    end_date: date,
+) -> tuple[EquityMarketSession, ...]:
+    provider_mode = (
+        os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider"
+    ).strip().lower()
+    if provider_mode == "synthetic_unit_fixture":
+        raise ValueError("market_calendar_unavailable")
+
+    from alpaca.trading.client import TradingClient
+    from alpaca.trading.requests import GetCalendarRequest
+
+    key = (os.getenv("ALPACA_API_KEY") or "").strip()
+    secret = (os.getenv("ALPACA_SECRET_KEY") or "").strip()
+    if not key or not secret:
+        raise ValueError("market_calendar_unavailable")
+    paper = (os.getenv("ALPACA_PAPER_TRADING") or "true").strip().lower() != "false"
+    try:
+        calendar = TradingClient(
+            api_key=key,
+            secret_key=secret,
+            paper=paper,
+        ).get_calendar(GetCalendarRequest(start=start_date, end=end_date))
+        if not isinstance(calendar, list):
+            raise ValueError("market_calendar_unavailable")
+        sessions = tuple(
+            EquityMarketSession(
+                provider="alpaca",
+                session_date=session.date,
+                opens_at=session.open,
+                closes_at=session.close,
+            )
+            for session in calendar
+        )
+    except Exception as exc:
+        raise ValueError("market_calendar_unavailable") from exc
+    if any(session.closes_at <= session.opens_at for session in sessions):
+        raise ValueError("market_calendar_unavailable")
+    return sessions
+
+
 def fetch_alpaca_market_clock() -> MarketClockSnapshot:
     from alpaca.trading.client import TradingClient
 

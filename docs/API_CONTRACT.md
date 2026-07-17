@@ -1777,9 +1777,24 @@ Soft delete conversation.
   hidden saved-strategy object when the Strategies surface is disabled.
 - `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose. Assistant message metadata must record `result_breakdown_source`, `result_breakdown_fallback_used`, and, when applicable, `result_breakdown_failure_mode` so optional Explain-result fallback does not masquerade as the normal LLM path.
 - `select_response_option` is valid only for typed response-intent options. Its
-  payload must identify the selected option through `option_index` or
-  `replacement_values`. Labels are display text only and must not drive runtime
-  selection.
+  payload must include the durable assistant `message_id` that presented the
+  option as `source_assistant_id`, plus the exact `option_id` and
+  `replacement_values` from that message's typed clarification metadata. Labels
+  are display text only and must not drive runtime selection. Before persisting
+  the action request or invoking LangGraph, the backend recovers the canonical
+  pending-strategy context from that exact source. It then uses one serialized
+  append/admit transaction to verify that the source belongs to the user and
+  conversation, is still latest by `(created_at DESC, id DESC)`, has the same
+  validated metadata snapshot, and contains the exact selected option. That
+  transaction inserts the preallocated user request exactly once and assigns a
+  timestamp strictly newer than the conversation's current latest message.
+  Missing, malformed, foreign, mismatched, or superseded sources fail with `409
+  artifact_action_invalid_state`; no request message is persisted and LangGraph
+  is not invoked. Replaying the same accepted request id is a no-op, even after
+  later messages exist, provided the immediately preceding source still matches.
+  A valid action reaches LangGraph with the pending strategy and continuity
+  artifacts recovered from that exact source message, not from a newer
+  checkpoint draft.
 
 ### Conversation Artifact Continuity Contract
 
@@ -1986,6 +2001,11 @@ while hydrating actions from `clarification`. `prompt_source =
 degraded_fallback` means clients render localized deterministic copy from
 static i18n bundles using the typed fields. Legacy sidecars without
 `prompt_source` are treated as degraded fallback for reload compatibility.
+The persisted `content` on a degraded fallback remains compatibility transport
+for reload and non-upgraded clients; it is excluded from later interpreter and
+clarifier history and from `last_message_preview` (therefore Recents and
+conversation search). Exact `llm_generated` prose remains eligible for both
+model history and preview surfaces.
 
 Recoverable streaming error frames may also include the same structured fields
 so live clients can render retry controls immediately, before reload hydration:

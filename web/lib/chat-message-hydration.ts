@@ -35,10 +35,10 @@ export function hydrateTextMessageFromApi(
     ? retryActionsFromMetadata(metadata, message.id)
     : [];
   const coverageActions = isAssistant
-    ? coverageRecoveryActionsFromMetadata(metadata)
+    ? coverageRecoveryActionsFromMetadata(metadata, message.id)
     : [];
   const unsupportedTimeframeActions = isAssistant
-    ? unsupportedTimeframeActionsFromMetadata(metadata)
+    ? unsupportedTimeframeActionsFromMetadata(metadata, message.id)
     : [];
   const actions = [
     ...coverageActions,

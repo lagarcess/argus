@@ -241,7 +241,11 @@ function recoveryDisplayFromClarification(value: unknown): RecoveryDisplay | nul
 
 export function coverageRecoveryActionsFromMetadata(
   metadata: Record<string, unknown>,
+  sourceAssistantId: string,
 ): ChatActionOption[] {
+  if (!stringOrNull(sourceAssistantId)) {
+    return [];
+  }
   const clarification = recordOrNull(metadata.clarification);
   if (stringOrNull(clarification?.kind) !== "coverage_recovery") {
     return [];
@@ -276,6 +280,7 @@ export function coverageRecoveryActionsFromMetadata(
         labelKey: `chat.coverage_recovery.actions.${id}`,
         type: "select_response_option",
         payload: {
+          source_assistant_id: sourceAssistantId,
           option_id: id,
           replacement_values: { requested_field: definition.field },
         },
@@ -286,7 +291,11 @@ export function coverageRecoveryActionsFromMetadata(
 
 export function unsupportedTimeframeActionsFromMetadata(
   metadata: Record<string, unknown>,
+  sourceAssistantId: string,
 ): ChatActionOption[] {
+  if (!stringOrNull(sourceAssistantId)) {
+    return [];
+  }
   const clarification = recordOrNull(metadata.clarification);
   if (
     stringOrNull(clarification?.kind) !== "unsupported_recovery" ||
@@ -336,6 +345,7 @@ export function unsupportedTimeframeActionsFromMetadata(
         labelKey: allowed.labelKey,
         type: "select_response_option",
         payload: {
+          source_assistant_id: sourceAssistantId,
           option_id: optionId,
           replacement_values: { timeframe },
         },

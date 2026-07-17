@@ -121,6 +121,29 @@ def structured_action_stage_result_if_applicable(
     action = state.structured_action
     if action is None:
         return None
+    if action.type == "select_response_option" and not (
+        _response_option_source_is_server_validated(
+            action_payload=action.payload,
+            selected_thread_metadata=selected_thread_metadata,
+        )
+    ):
+        pending = snapshot.pending_strategy_summary if snapshot is not None else None
+        return StageResult(
+            outcome="ready_to_respond",
+            stage_patch={
+                "candidate_strategy_draft": (
+                    pending.model_dump(mode="python")
+                    if pending is not None
+                    else StrategySummary().model_dump(mode="python")
+                ),
+                "assistant_response": recovery_message(
+                    "artifact_action_invalid_state",
+                    language=language,
+                ),
+                "requested_field": None,
+                "missing_required_fields": [],
+            },
+        )
     if action.type == "retry_failed_action":
         return _retry_failed_action_stage_result(
             decision=_retry_failed_action_decision(state=state),
@@ -237,6 +260,24 @@ def structured_action_stage_result_if_applicable(
     return None
 
 
+def _response_option_source_is_server_validated(
+    *,
+    action_payload: dict[str, Any],
+    selected_thread_metadata: dict[str, Any],
+) -> bool:
+    source_assistant_id = action_payload.get("source_assistant_id")
+    validated_action_source_id = action_payload.get("validated_source_assistant_id")
+    validated_metadata_source_id = selected_thread_metadata.get(
+        "validated_source_assistant_id"
+    )
+    return (
+        isinstance(source_assistant_id, str)
+        and bool(source_assistant_id)
+        and source_assistant_id == validated_action_source_id
+        and source_assistant_id == validated_metadata_source_id
+    )
+
+
 def _coverage_recovery_action_result(
     *,
     state: RunState,
@@ -299,7 +340,13 @@ def _coverage_recovery_action_result(
                 "facts": {
                     "strategy": pending.model_dump(mode="python"),
                     "current_user_message": state.current_user_message,
-                    "structured_action": action.model_dump(mode="python"),
+                    "structured_action": {
+                        "type": action.type,
+                        "payload": {
+                            "option_id": option_id,
+                            "replacement_values": replacement_values,
+                        },
+                    },
                     "language": language,
                     PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT: (
                         preserved_optional_parameter_status

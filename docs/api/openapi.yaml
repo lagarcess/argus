@@ -76,6 +76,15 @@ paths:
             text/event-stream:
               schema:
                 type: string
+        "409":
+          description: >
+            The selected response option is missing, mismatched, foreign to the
+            owner or conversation, or no longer attached to the latest active
+            assistant message.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/strategies:
     get:
       responses:

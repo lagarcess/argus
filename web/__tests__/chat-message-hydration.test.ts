@@ -215,9 +215,29 @@ describe("chat message hydration", () => {
 
     expect(message.content).toBe(exactLlmPrompt);
     expect(message.recoveryDisplay).toBeNull();
-    expect(message.actions?.map((action) => action.labelKey)).toEqual([
-      "chat.clarification.timeframe_actions.daily",
-      "chat.clarification.timeframe_actions.hour_1",
+    expect(message.actions).toEqual([
+      {
+        id: "unsupported-timeframe-option-0",
+        label: "Retry with daily bars",
+        labelKey: "chat.clarification.timeframe_actions.daily",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-timeframe-llm",
+          option_id: "option_0",
+          replacement_values: { timeframe: "1D" },
+        },
+      },
+      {
+        id: "unsupported-timeframe-option-1",
+        label: "Retry with 1-hour bars",
+        labelKey: "chat.clarification.timeframe_actions.hour_1",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-timeframe-llm",
+          option_id: "option_1",
+          replacement_values: { timeframe: "1h" },
+        },
+      },
     ]);
   });
 });

@@ -259,13 +259,16 @@ describe("chat recovery display", () => {
     expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
       "Esos activos y la referencia no comparten un rango de datos utilizable para una prueba confiable. Cambia las fechas, un activo o la referencia.",
     );
-    expect(coverageRecoveryActionsFromMetadata(metadata)).toEqual([
+    expect(
+      coverageRecoveryActionsFromMetadata(metadata, "assistant-coverage"),
+    ).toEqual([
       {
         id: "coverage-change-dates",
         label: "Change dates",
         labelKey: "chat.coverage_recovery.actions.change_dates",
         type: "select_response_option",
         payload: {
+          source_assistant_id: "assistant-coverage",
           option_id: "change_dates",
           replacement_values: { requested_field: "date_range" },
         },
@@ -276,6 +279,7 @@ describe("chat recovery display", () => {
         labelKey: "chat.coverage_recovery.actions.change_asset",
         type: "select_response_option",
         payload: {
+          source_assistant_id: "assistant-coverage",
           option_id: "change_asset",
           replacement_values: { requested_field: "asset_universe" },
         },
@@ -286,6 +290,7 @@ describe("chat recovery display", () => {
         labelKey: "chat.coverage_recovery.actions.change_benchmark",
         type: "select_response_option",
         payload: {
+          source_assistant_id: "assistant-coverage",
           option_id: "change_benchmark",
           replacement_values: { requested_field: "comparison_baseline" },
         },
@@ -323,13 +328,16 @@ describe("chat recovery display", () => {
       },
     };
 
-    expect(unsupportedTimeframeActionsFromMetadata(metadata)).toEqual([
+    expect(
+      unsupportedTimeframeActionsFromMetadata(metadata, "assistant-timeframe"),
+    ).toEqual([
       {
         id: "unsupported-timeframe-option-0",
         label: "Retry with daily bars",
         labelKey: "chat.clarification.timeframe_actions.daily",
         type: "select_response_option",
         payload: {
+          source_assistant_id: "assistant-timeframe",
           option_id: "option_0",
           replacement_values: { timeframe: "1D" },
         },
@@ -340,6 +348,7 @@ describe("chat recovery display", () => {
         labelKey: "chat.clarification.timeframe_actions.hour_1",
         type: "select_response_option",
         payload: {
+          source_assistant_id: "assistant-timeframe",
           option_id: "option_1",
           replacement_values: { timeframe: "1h" },
         },

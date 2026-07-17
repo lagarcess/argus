@@ -7405,6 +7405,7 @@ def test_coverage_recovery_action_requests_typed_field_without_llm_selection(
     option_id: str,
     requested_field: str,
 ) -> None:
+    source_assistant_id = "00000000-0000-0000-0000-000000000101"
     pending = StrategySummary(
         strategy_type="buy_and_hold",
         asset_universe=["AAPL"],
@@ -7420,6 +7421,8 @@ def test_coverage_recovery_action_requests_typed_field_without_llm_selection(
                 "type": "select_response_option",
                 "label": option_id,
                 "payload": {
+                    "source_assistant_id": source_assistant_id,
+                    "validated_source_assistant_id": source_assistant_id,
                     "option_id": option_id,
                     "replacement_values": {"requested_field": requested_field},
                 },
@@ -7428,6 +7431,7 @@ def test_coverage_recovery_action_requests_typed_field_without_llm_selection(
         user=UserState(user_id="u1"),
         latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
         selected_thread_metadata={
+            "validated_source_assistant_id": source_assistant_id,
             "last_stage_outcome": "await_user_reply",
             "response_intent": {
                 "kind": "coverage_recovery",
@@ -7460,6 +7464,14 @@ def test_coverage_recovery_action_requests_typed_field_without_llm_selection(
     assert result.patch["requested_field"] == requested_field
     assert result.patch["missing_required_fields"] == [requested_field]
     assert result.patch["response_intent"]["kind"] == "clarification"
+    assert result.patch["response_intent"]["facts"]["structured_action"] == {
+        "type": "select_response_option",
+        "payload": {
+            "option_id": option_id,
+            "replacement_values": {"requested_field": requested_field},
+        },
+    }
+    assert source_assistant_id not in repr(result.patch["response_intent"])
     assert result.patch["response_intent"]["facts"][
         "preserved_optional_parameter_status"
     ] == {
@@ -7503,6 +7515,8 @@ def test_unsupported_timeframe_action_preserves_assumptions_and_reconfirms(
                 "type": "select_response_option",
                 "label": f"Use {timeframe} bars",
                 "payload": {
+                    "source_assistant_id": "assistant-recovery",
+                    "validated_source_assistant_id": "assistant-recovery",
                     "option_id": option_id,
                     "replacement_values": {"timeframe": timeframe},
                 },
@@ -7511,6 +7525,7 @@ def test_unsupported_timeframe_action_preserves_assumptions_and_reconfirms(
         user=UserState(user_id="u1"),
         latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
         selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-recovery",
             "last_stage_outcome": "await_user_reply",
             "response_intent": {
                 "kind": "unsupported_recovery",
@@ -7841,6 +7856,8 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choi
                 "type": "select_response_option",
                 "label": "Compare with buy and hold",
                 "payload": {
+                    "source_assistant_id": "assistant-recovery",
+                    "validated_source_assistant_id": "assistant-recovery",
                     "replacement_values": {"strategy_type": "buy_and_hold"},
                 },
             },
@@ -7848,6 +7865,7 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choi
         user=UserState(user_id="u1"),
         latest_task_snapshot=snapshot,
         selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-recovery",
             "last_stage_outcome": "await_user_reply",
             "response_intent": {
                 "kind": "unsupported_recovery",
@@ -7945,6 +7963,8 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_selection(
                 "type": "select_response_option",
                 "label": message,
                 "payload": {
+                    "source_assistant_id": "assistant-recovery",
+                    "validated_source_assistant_id": "assistant-recovery",
                     "replacement_values": typed_selection,
                 },
             },
@@ -7952,6 +7972,7 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_selection(
         user=UserState(user_id="u1", language_preference="es-419"),
         latest_task_snapshot=snapshot,
         selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-recovery",
             "last_stage_outcome": "await_user_reply",
             "response_intent": {
                 "kind": "unsupported_recovery",

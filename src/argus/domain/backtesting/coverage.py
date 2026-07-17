@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass
 from datetime import date
 from math import ceil
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 import pandas as pd
 from pydantic import BaseModel
 
 from argus.domain.market_data.capabilities import (
     PROVIDER_TIMEFRAME_MINUTES,
+    EquityMarketSession,
     expected_candle_count,
 )
 
@@ -63,12 +65,17 @@ class PreparedMarketData:
 FetchOhlcv = Callable[..., pd.DataFrame]
 
 
+FetchMarketCalendar = Callable[..., Sequence[EquityMarketSession]]
+
+
 def prepare_market_data(
     config: dict[str, Any],
     *,
     fetch_ohlcv_func: FetchOhlcv | None = None,
+    fetch_market_calendar_func: FetchMarketCalendar | None = None,
     approved_coverage: dict[str, Any] | None = None,
 ) -> PreparedMarketData:
+    uses_default_market_data_provider = fetch_ohlcv_func is None
     if fetch_ohlcv_func is None:
         from argus.domain.market_data import fetch_ohlcv
 
@@ -117,12 +124,20 @@ def prepare_market_data(
     }
     if any(frame.empty for frame in trimmed.values()):
         raise MarketDataCoverageError("no_common_data_window")
+    equity_market_sessions = _equity_market_sessions_for_window(
+        asset_class=str(config["asset_class"]),
+        start_date=pd.Timestamp(common_start).date(),
+        end_date=pd.Timestamp(common_end).date(),
+        fetch_market_calendar_func=fetch_market_calendar_func,
+        uses_default_market_data_provider=uses_default_market_data_provider,
+    )
     _validate_observation_density(
         trimmed,
         asset_class=str(config["asset_class"]),
         timeframe=str(config["timeframe"]),
         start_date=pd.Timestamp(common_start).date(),
         end_date=pd.Timestamp(common_end).date(),
+        equity_market_sessions=equity_market_sessions,
     )
 
     effective = CoverageDateRange(
@@ -226,6 +241,7 @@ def _validate_observation_density(
     timeframe: str,
     start_date: date,
     end_date: date,
+    equity_market_sessions: Sequence[EquityMarketSession] | None = None,
 ) -> None:
     target = pd.DatetimeIndex([])
     for frame in frames.values():
@@ -238,6 +254,7 @@ def _validate_observation_density(
         timeframe=timeframe,
         start_date=start_date,
         end_date=end_date,
+        equity_market_sessions=equity_market_sessions,
     )
     if len(target) < minimum_observations:
         raise MarketDataCoverageError("insufficient_common_data")
@@ -254,11 +271,20 @@ def _minimum_observations_for_window(
     timeframe: str,
     start_date: date,
     end_date: date,
+    equity_market_sessions: Sequence[EquityMarketSession] | None = None,
 ) -> int:
     interval_minutes = PROVIDER_TIMEFRAME_MINUTES.get(_normalized_timeframe(timeframe))
     if interval_minutes is None:
         return 2
     if asset_class == "equity":
+        calendar_expected = _calendar_expected_equity_observations(
+            sessions=equity_market_sessions,
+            start_date=start_date,
+            end_date=end_date,
+            interval_minutes=interval_minutes,
+        )
+        if calendar_expected is not None:
+            return max(2, ceil(calendar_expected * _MIN_OBSERVATION_COVERAGE))
         session_days = len(pd.bdate_range(start=start_date, end=end_date))
         observations_per_session = max(
             1,
@@ -283,6 +309,70 @@ def _minimum_observations_for_window(
             interval_minutes=interval_minutes,
         )
     return max(2, ceil(expected * _MIN_OBSERVATION_COVERAGE))
+
+
+def _equity_market_sessions_for_window(
+    *,
+    asset_class: str,
+    start_date: date,
+    end_date: date,
+    fetch_market_calendar_func: FetchMarketCalendar | None,
+    uses_default_market_data_provider: bool,
+) -> tuple[EquityMarketSession, ...] | None:
+    if asset_class != "equity":
+        return None
+    fetch_calendar = fetch_market_calendar_func
+    provider_mode = os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "").strip().lower()
+    if (
+        fetch_calendar is None
+        and uses_default_market_data_provider
+        and provider_mode != "synthetic_unit_fixture"
+    ):
+        from argus.domain.market_data.capabilities import fetch_alpaca_market_calendar
+
+        fetch_calendar = fetch_alpaca_market_calendar
+    if fetch_calendar is None:
+        return None
+    try:
+        sessions = tuple(
+            fetch_calendar(start_date=start_date, end_date=end_date)
+        )
+    except (TypeError, ValueError):
+        return None
+    return sessions or None
+
+
+def _calendar_expected_equity_observations(
+    *,
+    sessions: Sequence[EquityMarketSession] | None,
+    start_date: date,
+    end_date: date,
+    interval_minutes: int,
+) -> int | None:
+    if sessions is None:
+        return None
+    unique_sessions: dict[date, EquityMarketSession] = {}
+    try:
+        for session in sessions:
+            if start_date <= session.session_date <= end_date:
+                if session.closes_at <= session.opens_at:
+                    return None
+                unique_sessions[session.session_date] = session
+    except (AttributeError, TypeError):
+        return None
+    if not unique_sessions:
+        return None
+    return sum(
+        max(
+            1,
+            ceil(
+                (session.closes_at - session.opens_at).total_seconds()
+                / 60
+                / interval_minutes
+            ),
+        )
+        for session in unique_sessions.values()
+    )
 
 
 def _normalized_timeframe(value: str) -> str:
