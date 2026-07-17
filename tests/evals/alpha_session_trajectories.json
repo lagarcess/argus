@@ -407,6 +407,19 @@
       "steps": [
         {
           "operation": "stream",
+          "request": {"message": "Backtest holding MSFT for the past year."},
+          "expect": {
+            "visible_response_category": "confirmation",
+            "stage_outcome": "ready_for_confirmation",
+            "canonical_sse": true,
+            "artifact_identity": "alpha_session_07:confirmation:1",
+            "action_identity": "alpha_session_07:confirmation:1:run_backtest",
+            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
+            "typed_terminal": true
+          }
+        },
+        {
+          "operation": "stream",
           "request": {"message": "Change the active test to the last six months."},
           "expect": {
             "visible_response_category": "turn_accepted",

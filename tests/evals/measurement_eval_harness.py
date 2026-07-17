@@ -373,6 +373,15 @@ def blocking_eval_results(
     ]
 
 
+def expected_fail_issue_for_result(result: dict[str, Any]) -> str | None:
+    """Return the exact expected-fail owner from a serialized eval result."""
+    expected_fail = result.get("expected_fail")
+    if not isinstance(expected_fail, dict):
+        return None
+    issue = expected_fail.get("issue")
+    return issue if isinstance(issue, str) and issue else None
+
+
 def write_scorecard(
     results: list[dict[str, Any]], *, output_dir: Path = SCORECARD_DIR
 ) -> Path:

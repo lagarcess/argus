@@ -30,6 +30,14 @@ TRAJECTORY_OPERATIONS = {
     "retry",
     "persistence",
 }
+CANONICAL_SSE_EVENT_TYPES = {
+    "stage_start",
+    "token",
+    "stage_outcome",
+    "title",
+    "final",
+    "error",
+}
 
 
 @dataclass(frozen=True)
@@ -472,6 +480,9 @@ def _canonical_sse_failures(*, raw_sse: str | None, step_id: str) -> list[str]:
             return [f"sse: {step_id} contains invalid JSON data"]
         if not isinstance(payload, dict) or not isinstance(payload.get("type"), str):
             return [f"sse: {step_id} contains an untyped data frame"]
+        schema_failure = _canonical_sse_event_schema_failure(payload)
+        if schema_failure is not None:
+            return [f"sse: {step_id} {schema_failure}"]
         decoded_events.append(payload)
     event_types = [str(event["type"]) for event in decoded_events]
     terminal_indices = [
@@ -503,6 +514,39 @@ def _canonical_sse_failures(*, raw_sse: str | None, step_id: str) -> list[str]:
     return []
 
 
+def _canonical_sse_event_schema_failure(event: dict[str, Any]) -> str | None:
+    event_type = str(event["type"])
+    if event_type not in CANONICAL_SSE_EVENT_TYPES:
+        return f"contains unknown event type {event_type!r}"
+    if event_type == "stage_start" and not _non_empty_string(event.get("stage")):
+        return "stage_start is missing a typed stage"
+    if event_type == "stage_outcome" and not _non_empty_string(event.get("outcome")):
+        return "stage_outcome is missing a typed outcome"
+    if event_type == "token" and not isinstance(event.get("content"), str):
+        return "token is missing string content"
+    if event_type == "title" and (
+        not _non_empty_string(event.get("conversation_id"))
+        or not _non_empty_string(event.get("title"))
+    ):
+        return "title is missing conversation_id or title"
+    if event_type == "final":
+        payload = event.get("payload")
+        if not isinstance(payload, dict) or not _non_empty_string(
+            payload.get("stage_outcome")
+        ):
+            return "final is missing payload.stage_outcome"
+    if event_type == "error" and (
+        not _non_empty_string(event.get("code"))
+        or not _non_empty_string(event.get("message"))
+    ):
+        return "error is missing code or message"
+    return None
+
+
+def _non_empty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
 def _route_budget_failures(
     *,
     budget: RouteBudget,
@@ -510,6 +554,8 @@ def _route_budget_failures(
     step_id: str,
 ) -> list[str]:
     failures: list[str] = []
+    if not receipts:
+        failures.append(f"budget.calls: {step_id} has no route-receipt evidence")
     if budget.max_calls is not None and len(receipts) > budget.max_calls:
         failures.append(
             f"budget.calls: {step_id} expected at most {budget.max_calls}, got {len(receipts)}"

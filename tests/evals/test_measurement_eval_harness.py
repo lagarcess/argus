@@ -382,7 +382,11 @@ def test_blocking_eval_results_include_failures_and_unexpected_passes() -> None:
         {
             "trajectory_id": "unexpected-pass",
             "status": "unexpected_pass",
-            "expected_fail_issue": 251,
+            "expected_fail": {
+                "issue": "#251",
+                "reason": "owner acceptance is pending",
+                "allowed_failures": ["effective_window:"],
+            },
             "failed_checks": [],
         },
     ]
@@ -394,4 +398,4 @@ def test_blocking_eval_results_include_failures_and_unexpected_passes() -> None:
         "unexpected-pass",
     ]
     assert blocking[1]["status"] == "unexpected_pass"
-    assert blocking[1]["expected_fail_issue"] == 251
+    assert harness.expected_fail_issue_for_result(blocking[1]) == "#251"

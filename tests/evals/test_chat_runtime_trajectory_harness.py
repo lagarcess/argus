@@ -150,6 +150,22 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
     assert "retail" in data_window.tags
     assert "effective_window:" in data_window.expected_fail.allowed_failures
 
+    orphan_reconciliation = next(
+        trajectory
+        for trajectory in trajectories
+        if trajectory.expected_fail.issue == "#240"
+    )
+    assert orphan_reconciliation.steps[0].request == {
+        "message": "Backtest holding MSFT for the past year."
+    }
+    assert (
+        orphan_reconciliation.steps[0].expectation.artifact_identity
+        == "alpha_session_07:confirmation:1"
+    )
+    assert orphan_reconciliation.steps[1].request == {
+        "message": "Change the active test to the last six months."
+    }
+
     assert (
         re.search(
             r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\b",
@@ -380,9 +396,9 @@ def test_canonical_sse_requires_framed_stage_sequence() -> None:
 
     valid_stream = "\n\n".join(
         (
-            'data: {"type":"stage_start","stage":"interpretation"}',
-            'data: {"type":"stage_outcome","stage":"interpretation"}',
-            'data: {"type":"final","payload":{}}',
+            'data: {"type":"stage_start","stage":"interpret"}',
+            'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
+            'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
             "data: [DONE]",
         )
     )
@@ -395,6 +411,50 @@ def test_canonical_sse_requires_framed_stage_sequence() -> None:
     )
 
     assert not any(check.startswith("sse:") for check in valid_result.failed_checks)
+
+
+def test_canonical_sse_rejects_invalid_event_schemas_and_unknown_types() -> None:
+    trajectory = next(
+        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
+    )
+    step = trajectory.steps[0]
+    matching = _matching_observation(step)
+    invalid_events = (
+        (
+            'data: {"type":"stage_start"}',
+            'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
+            'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
+        ),
+        (
+            'data: {"type":"stage_start","stage":"interpret"}',
+            'data: {"type":"stage_outcome"}',
+            'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
+        ),
+        (
+            'data: {"type":"stage_start","stage":"interpret"}',
+            'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
+            'data: {"type":"final","payload":{}}',
+        ),
+        (
+            'data: {"type":"stage_start","stage":"interpret"}',
+            'data: {"type":"bogus"}',
+            'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
+            'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
+        ),
+    )
+
+    for event_frames in invalid_events:
+        raw_sse = "\n\n".join((*event_frames, "data: [DONE]"))
+        result = run_alpha_trajectory(
+            trajectory=trajectory,
+            adapters=_recording_adapters(
+                [],
+                overrides={step.step_id: replace(matching, raw_sse=raw_sse)},
+            ),
+        )
+
+        assert result.status == "failed"
+        assert any(check.startswith("sse:") for check in result.failed_checks)
 
 
 def test_route_budget_rejects_missing_or_invalid_measurements() -> None:
@@ -421,6 +481,21 @@ def test_route_budget_rejects_missing_or_invalid_measurements() -> None:
     prefixes = {check.split(":", 1)[0] for check in result.failed_checks}
     assert "budget.cost" in prefixes
     assert "budget.latency" in prefixes
+
+    missing_result = run_alpha_trajectory(
+        trajectory=trajectory,
+        adapters=_recording_adapters(
+            [],
+            overrides={
+                step.step_id: replace(_matching_observation(step), route_receipts=())
+            },
+        ),
+    )
+
+    assert missing_result.status == "failed"
+    assert any(
+        check.startswith("budget.calls:") for check in missing_result.failed_checks
+    )
 
 
 def test_trajectory_scorecard_is_privacy_safe_and_marks_unexpected_passes(

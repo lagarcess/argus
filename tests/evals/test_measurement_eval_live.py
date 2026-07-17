@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 from tests.evals.measurement_eval_harness import (
     blocking_eval_results,
+    expected_fail_issue_for_result,
     load_eval_cases,
     run_eval_case,
     write_scorecard,
@@ -31,7 +32,7 @@ def test_measurement_live_eval_suite_writes_scorecard() -> None:
             "id": result["id"],
             "category": result["category"],
             "status": result["status"],
-            "expected_fail_issue": result.get("expected_fail_issue"),
+            "expected_fail_issue": expected_fail_issue_for_result(result),
             "failed_checks": result["failed_checks"],
         }
         for result in blocking_eval_results(results)
