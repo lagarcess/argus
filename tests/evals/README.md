@@ -28,6 +28,39 @@ poetry run pytest tests/evals/test_measurement_eval_harness.py -q
 This run is free. It does not call the LLM, does not spend provider tokens, and
 is safe to run anywhere.
 
+## Search Provider Evaluation (Issue #244)
+
+Run the bounded Search fixture validator with:
+
+```bash
+poetry run pytest tests/evals/test_search_provider_eval.py -q --no-cov
+```
+
+This evaluation is also free. It parses clearly labeled, authored synthetic
+Perplexity-direct and OpenRouter web-search fixtures and validates their shape.
+URL fields, query-term coverage, declared latency/cost, zero-Search scenarios,
+outage scenarios, and the normalizer-applied untrusted-source label are fixture
+contract behavior only. They do not prove provider relevance, citation quality,
+Search routing, runtime policy,
+outage recovery, latency, or cost. Changing an `evidence_kind` string cannot
+turn a fixture into empirical evidence; every empirical check stays unproven
+until a later sanctioned probe supplies independently captured provider and
+runtime provenance.
+
+Generate the non-versioned decision evidence with:
+
+```bash
+poetry run python -m tests.evals.search_provider_eval
+```
+
+The report is written to
+`temp/issue-244-search-provider-evaluation.json`. It must recommend deferral
+until real provider evidence, issue #241 integration, and explicit founder
+activation exist. Its Perplexity-direct next-probe entry is an official-
+documentation-based hypothesis, not an empirical provider comparison or
+selection. Any public citation/context schema also remains behind its separate
+API-contract approval gate.
+
 ## Live Run
 
 Run the live harness with:
