@@ -739,6 +739,102 @@ def test_execute_stage_routes_approved_window_drift_to_fresh_preflight() -> None
     )
 
 
+@pytest.mark.parametrize(
+    "coverage_failure",
+    ["no_common_data_window", "insufficient_common_data"],
+)
+def test_real_execution_routes_approved_coverage_loss_to_fresh_preflight(
+    monkeypatch: pytest.MonkeyPatch,
+    coverage_failure: str,
+) -> None:
+    import pandas as pd
+    from argus.domain.engine_launch import adapter
+
+    def disjoint_provider_frame(symbol: str, **_: object) -> pd.DataFrame:
+        if coverage_failure == "insufficient_common_data":
+            days = ["2024-01-01"]
+        else:
+            days = (
+                ["2024-01-01", "2024-01-02"]
+                if symbol == "AAPL"
+                else ["2024-01-04", "2024-01-05"]
+            )
+        index = pd.to_datetime(days, utc=True)
+        close = pd.Series(
+            [100.0 + offset for offset in range(len(days))],
+            index=index,
+        )
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(
+        adapter,
+        "classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(adapter, "fetch_ohlcv", disjoint_provider_frame)
+    requested = {"start": "2024-01-01", "end": "2024-01-05"}
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range=requested,
+        capital_amount=1_000,
+        comparison_baseline="SPY",
+        extra_parameters={
+            "requested_date_range": requested,
+            "effective_date_range": requested,
+        },
+    )
+    state.confirmation_payload = {
+        "strategy": state.candidate_strategy_draft.model_dump(mode="python"),
+        "optional_parameters": {},
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "AAPL",
+            "symbols": ["AAPL"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": requested,
+            "requested_date_range": requested,
+            "coverage_preflight": {
+                "outcome": "full_coverage",
+                "requested_date_range": requested,
+                "effective_date_range": requested,
+                "preflight_id": "sha256:approved-window",
+            },
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1_000,
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+        },
+        "validation": {"status": "ready_to_run", "executable": True},
+    }
+
+    result = execute_stage(state=state, tool=RealBacktestTool(), max_retries=1)
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.patch["confirmation_payload"] is None
+    assert result.patch["candidate_strategy_draft"]["date_range"] == requested
+    assert result.patch["artifact_references"] == []
+    assert "latest_failed_action_reference" not in result.patch
+    assert "final_response_payload" not in result.patch
+
+
 def test_approved_window_drift_falls_back_to_typed_coverage_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

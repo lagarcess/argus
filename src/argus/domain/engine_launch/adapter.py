@@ -13,6 +13,7 @@ from argus.domain.backtesting.config import (
     _normalize_execution_realism,
 )
 from argus.domain.backtesting.coverage import (
+    MarketDataCoverageError,
     PreparedMarketData,
     apply_coverage_to_config,
     prepare_market_data,
@@ -868,11 +869,16 @@ def _prepared_market_data_for_request(
         else request.date_range.model_dump(),
         "benchmark_symbol": request.benchmark_symbol,
     }
-    return prepare_market_data(
-        config,
-        fetch_ohlcv_func=recorder.fetch_ohlcv,
-        approved_coverage=request.coverage_preflight.model_dump(),
-    )
+    try:
+        return prepare_market_data(
+            config,
+            fetch_ohlcv_func=recorder.fetch_ohlcv,
+            approved_coverage=request.coverage_preflight.model_dump(),
+        )
+    except MarketDataCoverageError as exc:
+        if exc.code in {"no_common_data_window", "insufficient_common_data"}:
+            raise MarketDataCoverageError("approved_data_window_unavailable") from exc
+        raise
 
 
 def _with_prepared_coverage(

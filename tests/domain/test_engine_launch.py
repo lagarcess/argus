@@ -179,6 +179,54 @@ def test_approved_launch_uses_one_prepared_dataset_for_metrics_and_chart(
     }
 
 
+def test_approved_launch_preserves_transient_market_data_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested = {"start": "2024-01-01", "end": "2024-01-05"}
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="AAPL",
+        symbols=["AAPL"],
+        asset_class="equity",
+        timeframe="1D",
+        date_range=requested,
+        requested_date_range=requested,
+        coverage_preflight={
+            "outcome": "full_coverage",
+            "requested_date_range": requested,
+            "effective_date_range": requested,
+            "preflight_id": "sha256:approved-window",
+        },
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=10_000,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.fetch_ohlcv",
+        lambda **_: (_ for _ in ()).throw(ValueError("provider timeout")),
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "failed_upstream"
+    assert result.envelope.failure_category == "upstream_dependency_error"
+    assert result.envelope.failure_reason == "market_data_unavailable"
+
+
 @pytest.mark.parametrize(
     "failure_category",
     [
