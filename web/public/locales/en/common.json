@@ -738,6 +738,7 @@
       "feedback": "General feedback"
     },
     "logout": "Log out",
+    "logout_error": "We couldn’t sign out this browser. Try again.",
     "dev": {
       "reset_onboarding": "Reset onboarding (dev)"
     },

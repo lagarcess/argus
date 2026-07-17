@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   createAuthSecurityActions,
@@ -37,6 +39,20 @@ function authPort(options?: {
 }
 
 describe("account security actions", () => {
+  test("the recovery page is the only owner of the PKCE code exchange", () => {
+    const browserClient = readFileSync(
+      join(import.meta.dir, "../lib/supabase-client.ts"),
+      "utf-8",
+    );
+    const recoveryPage = readFileSync(
+      join(import.meta.dir, "../app/auth/recovery/page.tsx"),
+      "utf-8",
+    );
+
+    expect(browserClient).toContain("detectSessionInUrl: false");
+    expect(recoveryPage).toContain(".exchangeRecoveryCode(code)");
+  });
+
   test("ordinary logout clears Argus cookies even when local revocation fails", async () => {
     const scopes: string[] = [];
     let cookieClears = 0;
@@ -219,6 +235,49 @@ describe("recovery request safety", () => {
     expect(limiter.retryAfterMs(["email:user@example.com", "ip:127.0.0.3"])).toBe(1_000);
     now = 2_001;
     expect(limiter.retryAfterMs(["email:user@example.com", "ip:127.0.0.3"])).toBe(0);
+  });
+
+  test("rate limiting bounds active unique-key churn", () => {
+    const limiter = new RecoveryAttemptLimiter({
+      limit: 5,
+      windowMs: 60_000,
+      now: () => 1_000,
+    });
+
+    for (let index = 0; index < 3_000; index += 1) {
+      limiter.retryAfterMs([
+        `email:person-${index}@example.com`,
+        `ip:192.0.2.${index}`,
+      ]);
+    }
+
+    const attempts = (
+      limiter as unknown as { attempts: Map<string, number[]> }
+    ).attempts;
+    expect(attempts.size).toBeLessThanOrEqual(2_048);
+  });
+
+  test("rate limiting globally removes expired one-off keys", () => {
+    let now = 1_000;
+    const limiter = new RecoveryAttemptLimiter({
+      limit: 5,
+      windowMs: 1_000,
+      now: () => now,
+    });
+
+    for (let index = 0; index < 100; index += 1) {
+      limiter.retryAfterMs([
+        `email:person-${index}@example.com`,
+        `ip:198.51.100.${index}`,
+      ]);
+    }
+    now = 2_001;
+    limiter.retryAfterMs(["email:current@example.com", "ip:203.0.113.1"]);
+
+    const attempts = (
+      limiter as unknown as { attempts: Map<string, number[]> }
+    ).attempts;
+    expect(attempts.size).toBe(2);
   });
 
   test("provider success and failure return the same enumeration-safe response", async () => {

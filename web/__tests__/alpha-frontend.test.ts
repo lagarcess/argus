@@ -1776,6 +1776,22 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).not.toContain('window.location.href = "/login"');
   });
 
+  test("ordinary logout stays put and reports a revocation failure", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const logoutHandler = chat.slice(
+      chat.indexOf("const handleLogout = async () =>"),
+      chat.indexOf("const handleCancelConfirmationAction"),
+    );
+
+    expect(logoutHandler).toContain("settings.logout_error");
+    expect(logoutHandler).not.toContain("finally");
+    expect(logoutHandler.indexOf("await logoutFromApi()"))
+      .toBeLessThan(logoutHandler.indexOf('window.location.href = "/"'));
+  });
+
   test("onboarding api error keeps the argus wordmark centered", () => {
     const gate = readFileSync(
       join(root, "components/onboarding/OnboardingGate.tsx"),

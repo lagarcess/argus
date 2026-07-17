@@ -4,6 +4,7 @@ const LOCAL_RECOVERY_ORIGINS = new Set([
   "http://localhost:3001",
   "http://127.0.0.1:3001",
 ]);
+const MAX_TRACKED_RECOVERY_KEYS = 2_048;
 
 function exactOrigin(value: string | undefined): string | null {
   if (!value) return null;
@@ -57,13 +58,32 @@ export class RecoveryAttemptLimiter {
     },
   ) {}
 
-  retryAfterMs(keys: string[]): number {
-    const now = this.options.now?.() ?? Date.now();
-    const recentByKey = keys.map((key) => {
-      const recent = (this.attempts.get(key) ?? []).filter(
+  private compact(now: number): void {
+    for (const [key, attempts] of this.attempts.entries()) {
+      const recent = attempts.filter(
         (attempt) => now - attempt < this.options.windowMs,
       );
-      this.attempts.set(key, recent);
+      if (recent.length === 0) {
+        this.attempts.delete(key);
+      } else if (recent.length !== attempts.length) {
+        this.attempts.set(key, recent);
+      }
+    }
+  }
+
+  private enforceCapacity(): void {
+    while (this.attempts.size > MAX_TRACKED_RECOVERY_KEYS) {
+      const oldestKey = this.attempts.keys().next().value;
+      if (oldestKey === undefined) return;
+      this.attempts.delete(oldestKey);
+    }
+  }
+
+  retryAfterMs(keys: string[]): number {
+    const now = this.options.now?.() ?? Date.now();
+    this.compact(now);
+    const recentByKey = keys.map((key) => {
+      const recent = this.attempts.get(key) ?? [];
       return { key, recent };
     });
     const retryAfter = recentByKey.reduce((longest, { recent }) => {
@@ -72,13 +92,11 @@ export class RecoveryAttemptLimiter {
     }, 0);
     if (retryAfter > 0) return retryAfter;
     recentByKey.forEach(({ key, recent }) => {
+      // Reinsertion makes the bounded map evict the least-recently-used keys.
+      this.attempts.delete(key);
       this.attempts.set(key, [...recent, now]);
     });
-    if (this.attempts.size > 2_048) {
-      for (const [key, attempts] of this.attempts.entries()) {
-        if (attempts.length === 0) this.attempts.delete(key);
-      }
-    }
+    this.enforceCapacity();
     return 0;
   }
 }

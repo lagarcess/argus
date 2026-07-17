@@ -1838,10 +1838,14 @@ export default function ChatInterface() {
   const handleLogout = async () => {
     try {
       await logoutFromApi();
-    } catch {
-      // Even if the network is unavailable, leave the authenticated surface.
-    } finally {
       window.location.href = "/";
+    } catch {
+      showToast(
+        t(
+          "settings.logout_error",
+          "We couldn’t sign out this browser. Try again.",
+        ),
+      );
     }
   };
 

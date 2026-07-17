@@ -738,6 +738,7 @@
       "feedback": "Comentarios generales"
     },
     "logout": "Cerrar sesión",
+    "logout_error": "No pudimos cerrar la sesión en este navegador. Inténtalo de nuevo.",
     "dev": {
       "reset_onboarding": "Restablecer onboarding (dev)"
     },

@@ -22,6 +22,12 @@ export function getSupabaseClient(): SupabaseClient | null {
     );
   }
 
-  cachedClient = createBrowserClient(supabaseUrl, supabaseAnonKey);
+  cachedClient = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      // The recovery page explicitly exchanges the one-time PKCE code so it can
+      // distinguish valid, expired, and reused recovery links.
+      detectSessionInUrl: false,
+    },
+  });
   return cachedClient;
 }
