@@ -493,6 +493,30 @@ def test_usage_limits_check_all_windows_before_incrementing() -> None:
     table.update.assert_not_called()
 
 
+def test_usage_limit_precheck_rejects_without_mutating_counter() -> None:
+    client = MagicMock()
+    table = MagicMock()
+    client.table.return_value = table
+    table.select.return_value = table
+    table.eq.return_value = table
+    table.limit.return_value = table
+    table.execute.side_effect = [
+        SimpleNamespace(data=[{"id": "day-counter", "used_count": 1}]),
+        SimpleNamespace(data=[{"id": "hour-counter", "used_count": 10}]),
+    ]
+    gateway = SupabaseGateway(client=client)
+
+    with pytest.raises(QuotaExceededError, match="backtest_runs \\(hour\\)"):
+        gateway.check_usage_limits(
+            user_id="user-1",
+            resource="backtest_runs",
+            limits=[("day", 50), ("hour", 10)],
+        )
+
+    table.insert.assert_not_called()
+    table.update.assert_not_called()
+
+
 class _BacktestJobClient:
     def __init__(self, existing_jobs: list[dict[str, Any]] | None = None) -> None:
         self.existing_jobs = existing_jobs or []

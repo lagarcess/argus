@@ -448,8 +448,17 @@ def mock_gateway():
         yield gateway
 
 
-def test_run_backtest_quota_exceeded(mock_gateway):
-    mock_gateway.check_and_increment_usage_limits.side_effect = QuotaExceededError(
+def test_run_backtest_quota_exceeded_before_provider_preflight(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+) -> None:
+    from argus.api import backtest_service
+
+    provider_preflight = MagicMock(
+        side_effect=AssertionError("provider preflight must not run over quota")
+    )
+    monkeypatch.setattr(backtest_service, "prepare_market_data", provider_preflight)
+    mock_gateway.check_usage_limits.side_effect = QuotaExceededError(
         "Quota exceeded for backtest_runs (day)"
     )
 
@@ -466,6 +475,9 @@ def test_run_backtest_quota_exceeded(mock_gateway):
     assert data["code"] == "too_many_requests"
     assert "Quota exceeded for backtest_runs" in data["detail"]
     assert response.headers.get("Retry-After") == "60"
+    provider_preflight.assert_not_called()
+    mock_gateway.check_usage_limits.assert_called_once()
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
 
 
 def test_run_backtest_coverage_rejection_does_not_consume_allowance(

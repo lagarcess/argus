@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import os
-import threading
 import time
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -39,19 +38,26 @@ from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_ca
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
 from argus.domain.supabase_backtest_finalization import finalize_backtest
+from argus.domain.usage_limits import (
+    USAGE_COUNTER_LOCK as _USAGE_COUNTER_LOCK,
+)
+from argus.domain.usage_limits import (
+    QuotaExceededError,
+)
+from argus.domain.usage_limits import (
+    align_usage_period as _align_period,
+)
+from argus.domain.usage_limits import (
+    check_usage_limits as _check_usage_limits,
+)
 from argus.observability.cost_ledger import normalize_cost_ledger_entry
 from supabase import Client, ClientOptions, create_client
-
-
-class QuotaExceededError(Exception):
-    pass
 
 
 class DecisionCaptureIntegrityError(RuntimeError):
     """Raised when the decision RPC does not return the committed object spine."""
 
 
-_USAGE_COUNTER_LOCK = threading.Lock()
 _PROFILE_LOCALE_BY_LANGUAGE: dict[Language, Locale] = {
     "en": "en-US",
     "es-419": "es-419",
@@ -60,19 +66,6 @@ _PROFILE_LOCALE_BY_LANGUAGE: dict[Language, Locale] = {
 
 def _now_iso() -> str:
     return utcnow().isoformat()
-
-
-def _align_period(dt: datetime, period: str) -> tuple[datetime, datetime]:
-    if period == "minute":
-        start = dt.replace(second=0, microsecond=0)
-        end = start + timedelta(minutes=1)
-    elif period == "hour":
-        start = dt.replace(minute=0, second=0, microsecond=0)
-        end = start + timedelta(hours=1)
-    else:  # day
-        start = dt.replace(hour=0, minute=0, second=0, microsecond=0)
-        end = start + timedelta(days=1)
-    return start, end
 
 
 def _row_one(result: Any) -> dict[str, Any] | None:
@@ -157,6 +150,7 @@ class SupabaseGateway:
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
     mock_user_password: str | None = os.getenv("MOCK_USER_PASSWORD")
     _cached_mock_user: User | None = None
+    check_usage_limits = _check_usage_limits
 
     @classmethod
     def from_env(cls) -> SupabaseGateway:

@@ -100,6 +100,23 @@ def run_backtest(
     )
     from argus.api.chat.evidence import finalize_completed_backtest
 
+    if api_state.supabase_gateway is not None:
+        try:
+            api_state.supabase_gateway.check_usage_limits(
+                user_id=user.id,
+                resource="backtest_runs",
+                limits=[("day", 50), ("hour", 10)],
+            )
+        except QuotaExceededError as exc:
+            raise problem(
+                request,
+                status_code=429,
+                code="too_many_requests",
+                title="Quota Exceeded",
+                detail=str(exc),
+                headers={"Retry-After": "60"},
+            ) from exc
+
     prepared_execution = prepare_run_from_payload(data, request)
     if api_state.supabase_gateway is not None:
         try:

@@ -1855,8 +1855,9 @@ canonical `backtest_runs` row, and own the durable job's `result_run_id` link.
 - mixed asset requests rejected with **422**
 - unsupported templates/timeframes rejected with **422**
 - `starting_capital` outside range [1000, 100000000] rejected with **422**
-- Coverage preflight runs before quota admission. Rejected coverage consumes no
-  backtest allowance; successful admission accounting remains unchanged.
+- A non-consuming quota exhaustion check runs before provider-backed coverage
+  preflight. Coverage rejection consumes no backtest allowance; the definitive
+  admission check and increment run only after coverage succeeds.
 - `config_snapshot.requested_date_range` records the submitted period, while
   `config_snapshot.effective_date_range` records the common period actually
   simulated. The response card and chart use the effective period.
