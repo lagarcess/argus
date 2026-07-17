@@ -315,6 +315,8 @@ def test_browser_has_separate_intercepted_typed_error_recovery_proof() -> None:
     )
     assert "page.route" in browser_source
     assert "route.fulfill" in browser_source
+    assert '"Access-Control-Allow-Origin": new URL(page.url()).origin' in browser_source
+    assert 'route.request().method() === "OPTIONS"' in browser_source
     assert 'type: "error"' in browser_source
     assert 'recovery_action: "retry_last_turn"' in browser_source
     assert 'label("common.retry")' in browser_source

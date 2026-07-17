@@ -186,7 +186,18 @@ test.describe.serial("private-alpha rendered release canary", () => {
     let interceptedRunRequests = 0;
 
     await loginThroughRenderedUi(page, true);
+    const mockedCorsHeaders = {
+      "Access-Control-Allow-Credentials": "true",
+      "Access-Control-Allow-Headers": "authorization, content-type, x-request-id",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Origin": new URL(page.url()).origin,
+      Vary: "Origin",
+    };
     await page.route("**/api/v1/conversations", async (route) => {
+      if (route.request().method() === "OPTIONS") {
+        await route.fulfill({ status: 204, headers: mockedCorsHeaders });
+        return;
+      }
       if (route.request().method() !== "POST") {
         await route.fallback();
         return;
@@ -194,6 +205,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
+        headers: mockedCorsHeaders,
         body: JSON.stringify({
           conversation: {
             id: fakeConversationId,
@@ -209,6 +221,10 @@ test.describe.serial("private-alpha rendered release canary", () => {
       });
     });
     await page.route("**/api/v1/chat/stream", async (route) => {
+      if (route.request().method() === "OPTIONS") {
+        await route.fulfill({ status: 204, headers: mockedCorsHeaders });
+        return;
+      }
       const body = route.request().postDataJSON() as JsonRecord;
       const action = body.action;
       if (action && record(action, "intercepted chat action").type === "run_backtest") {
@@ -217,6 +233,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
       await route.fulfill({
         status: 200,
         contentType: "text/event-stream",
+        headers: mockedCorsHeaders,
         body: `data: ${JSON.stringify({
           type: "error",
           code: "deterministic_canary_error",
