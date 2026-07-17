@@ -2414,6 +2414,18 @@ def test_confirm_stage_marks_daily_today_endpoint_as_latest_complete_data(
         "start": "2026-01-01",
         "end": "2026-06-02",
     }
+    assert launch_payload["requested_date_range"] == {
+        "start": "2026-01-01",
+        "end": "2026-06-03",
+    }
+    assert launch_payload["coverage_preflight"]["requested_date_range"] == {
+        "start": "2026-01-01",
+        "end": "2026-06-03",
+    }
+    assert launch_payload["coverage_preflight"]["effective_date_range"] == {
+        "start": "2026-01-01",
+        "end": "2026-06-02",
+    }
     assert "Through Jun 2" in strategy["assumptions"]
     adjustment = strategy["extra_parameters"]["data_availability_adjustment"]
     assert adjustment == {

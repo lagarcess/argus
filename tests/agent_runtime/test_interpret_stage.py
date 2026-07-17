@@ -305,6 +305,11 @@ def test_interpreter_unavailable_spanish_atr_routes_to_unsupported_recovery(
 
 def validated_confirmation_payload(strategy: StrategySummary) -> dict[str, Any]:
     symbol = strategy.asset_universe[0] if strategy.asset_universe else "SPY"
+    date_range = (
+        strategy.date_range
+        if isinstance(strategy.date_range, dict)
+        else {"start": "2025-05-14", "end": "2026-05-14"}
+    )
     return {
         "strategy": strategy.model_dump(mode="python"),
         "optional_parameters": {},
@@ -313,11 +318,14 @@ def validated_confirmation_payload(strategy: StrategySummary) -> dict[str, Any]:
             "symbol": symbol,
             "symbols": list(strategy.asset_universe),
             "timeframe": "1D",
-            "date_range": (
-                strategy.date_range
-                if isinstance(strategy.date_range, dict)
-                else {"start": "2025-05-14", "end": "2026-05-14"}
-            ),
+            "date_range": date_range,
+            "requested_date_range": date_range,
+            "coverage_preflight": {
+                "outcome": "full_coverage",
+                "requested_date_range": date_range,
+                "effective_date_range": date_range,
+                "preflight_id": "sha256:test-coverage",
+            },
             "entry_rule": None,
             "exit_rule": None,
             "sizing_mode": "capital_amount",
@@ -2476,6 +2484,47 @@ def test_structured_confirmation_action_uses_snapshot_payload_when_turn_payload_
 
     assert result.outcome == "approved_for_execution"
     assert result.patch["confirmation_payload"]["launch_payload"]["symbol"] == "TSLA"
+
+
+def test_structured_confirmation_action_reconfirms_legacy_payload_without_coverage(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Tesla.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=1000,
+    )
+    legacy_payload = validated_confirmation_payload(pending)
+    legacy_payload["launch_payload"].pop("requested_date_range")
+    legacy_payload["launch_payload"].pop("coverage_preflight")
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.structured_action = StructuredActionContext(
+        type="run_backtest",
+        label="Run backtest",
+        presentation="confirmation",
+    )
+    state.confirmation_payload = legacy_payload
+
+    result = interpret_stage(
+        state=state,
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        structured_interpreter=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["TSLA"]
 
 
 def test_selected_asset_mention_provenance_keeps_equity_symbol_binding(

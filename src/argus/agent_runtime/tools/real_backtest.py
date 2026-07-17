@@ -17,22 +17,10 @@ class RealBacktestTool:
             request = LaunchBacktestRequest.model_validate(payload)
         except ValidationError as exc:
             failure_reason = _first_validation_code(exc)
-            return {
-                "success": False,
-                "payload": None,
-                "error_type": "parameter_validation_error",
-                "error_message": user_safe_failure_message(
-                    failure_reason=failure_reason,
-                    failure_category="parameter_validation_error",
-                ),
-                "retryable": False,
-                "capability_context": {
-                    "failure_detail": user_safe_failure_detail(
-                        failure_reason=failure_reason,
-                        failure_category="parameter_validation_error",
-                    )
-                },
-            }
+            return _validation_failure(failure_reason)
+
+        if request.coverage_preflight is None:
+            return _validation_failure("approved_data_window_unavailable")
 
         result = run_launch_backtest(request, language=request.language)
         envelope = result.envelope.model_dump(mode="python")
@@ -87,3 +75,22 @@ def _first_validation_code(exc: ValidationError) -> str:
     if message.startswith(prefix):
         return message[len(prefix) :]
     return message
+
+
+def _validation_failure(failure_reason: str) -> dict[str, Any]:
+    return {
+        "success": False,
+        "payload": None,
+        "error_type": "parameter_validation_error",
+        "error_message": user_safe_failure_message(
+            failure_reason=failure_reason,
+            failure_category="parameter_validation_error",
+        ),
+        "retryable": False,
+        "capability_context": {
+            "failure_detail": user_safe_failure_detail(
+                failure_reason=failure_reason,
+                failure_category="parameter_validation_error",
+            )
+        },
+    }

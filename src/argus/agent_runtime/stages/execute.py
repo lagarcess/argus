@@ -336,6 +336,9 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         ),
         "language": language,
     }
+    requested_date_range = _requested_date_range_from_strategy(strategy)
+    if requested_date_range is not None:
+        payload["requested_date_range"] = requested_date_range
     execution_realism = _resolve_execution_realism(strategy, optional_parameters)
     if execution_realism is not None:
         payload["_execution_realism"] = execution_realism
@@ -984,6 +987,22 @@ def _resolve_date_range(
         value,
         extra_parameters=extra_parameters if isinstance(extra_parameters, dict) else None,
     ).payload
+
+
+def _requested_date_range_from_strategy(
+    strategy: dict[str, Any],
+) -> dict[str, str] | None:
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return None
+    requested = extra_parameters.get("requested_date_range")
+    if not (
+        isinstance(requested, dict)
+        and isinstance(requested.get("start"), str)
+        and isinstance(requested.get("end"), str)
+    ):
+        return None
+    return resolve_executable_date_range(requested).payload
 
 
 def _resolve_entry_rule(

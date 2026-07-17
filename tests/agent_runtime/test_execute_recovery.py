@@ -24,6 +24,19 @@ from argus.domain.engine_launch.models import LaunchExecutionEnvelope
 from langgraph.checkpoint.memory import MemorySaver
 
 
+def _coverage_approval(start: str, end: str) -> dict[str, object]:
+    date_range = {"start": start, "end": end}
+    return {
+        "requested_date_range": date_range,
+        "coverage_preflight": {
+            "outcome": "full_coverage",
+            "requested_date_range": date_range,
+            "effective_date_range": date_range,
+            "preflight_id": "sha256:test-coverage",
+        },
+    }
+
+
 def _assert_value_absent(value: object, forbidden: str) -> None:
     if isinstance(value, dict):
         for key, nested in value.items():
@@ -586,6 +599,7 @@ def test_real_backtest_tool_maps_failure_codes_to_user_safe_messages(
             "parameters": {},
             "risk_rules": [],
             "benchmark_symbol": "SPY",
+            **_coverage_approval("2025-01-01", "2025-12-31"),
         }
     )
 
@@ -702,6 +716,18 @@ def test_execute_stage_uses_real_backtest_tool_payload(
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
             "initial_capital": {"value": 1000.0, "source": "default"},
+        },
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "TSLA",
+            "symbols": ["TSLA"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1000.0,
+            "benchmark_symbol": "SPY",
+            **_coverage_approval("2025-01-01", "2025-12-31"),
         },
     }
 
@@ -844,6 +870,18 @@ def test_execute_stage_passes_language_to_real_backtest_tool(
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
             "initial_capital": {"value": 1000.0, "source": "default"},
+        },
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "TSLA",
+            "symbols": ["TSLA"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1000.0,
+            "benchmark_symbol": "SPY",
+            **_coverage_approval("2025-01-01", "2025-12-31"),
         },
     }
 
@@ -994,6 +1032,18 @@ def test_execute_stage_preserves_multi_symbol_launch_payload(
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
             "initial_capital": {"value": 1000.0, "source": "default"},
+        },
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "SBUX",
+            "symbols": ["SBUX", "CMG"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+            "sizing_mode": "capital_amount",
+            "capital_amount": 100000.0,
+            "benchmark_symbol": "SPY",
+            **_coverage_approval("2025-01-01", "2025-12-31"),
         },
     }
 

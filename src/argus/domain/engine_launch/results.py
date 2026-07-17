@@ -63,6 +63,10 @@ USER_SAFE_FAILURE_MESSAGES = {
         "That end date is later than the latest date Argus can backtest. Choose "
         "an end date up to today and I will keep the strategy intact."
     ),
+    "approved_data_window_unavailable": (
+        "That confirmation needs its data window checked again before it can run. "
+        "Review the refreshed dates and approve the new card."
+    ),
 }
 
 
@@ -80,6 +84,7 @@ USER_SAFE_FAILURE_DETAILS = {
     "invalid_date_range": "invalid_date_window",
     "invalid_chronological_date_range": "invalid_date_window",
     "future_end_date": "future_date_window",
+    "approved_data_window_unavailable": "approved_data_window_unavailable",
     "capital_amount_required": "invalid_parameter",
     "position_size_required": "invalid_parameter",
     "capital_amount_not_applicable": "invalid_parameter",

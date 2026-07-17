@@ -44,6 +44,7 @@ def confirm_stage(
     strategy = _strategy_payload(state.candidate_strategy_draft)
     strategy = _strategy_with_runtime_language(strategy, language=language)
     strategy = _strategy_with_explicit_date_intent(strategy)
+    strategy = _strategy_with_requested_date_range_provenance(strategy)
     strategy = _strategy_without_incompatible_rule_fields(strategy)
     strategy = _strategy_with_latest_complete_data_adjustment(strategy)
     strategy = _strategy_with_requested_date_range_for_preflight(strategy)
@@ -215,12 +216,14 @@ def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
     try:
         request = LaunchBacktestRequest.model_validate(launch_payload)
         asset_class = request.asset_class or classify_symbol(request.symbol).asset_class
+        requested_range = request.requested_date_range or request.date_range
         config = {
             "asset_class": asset_class,
             "symbols": list(request.symbols),
             "timeframe": request.timeframe,
             "start_date": request.date_range.start,
             "end_date": request.date_range.end,
+            "requested_date_range": requested_range.model_dump(),
             "benchmark_symbol": request.benchmark_symbol,
         }
         prepared = prepare_market_data(config)
@@ -328,6 +331,44 @@ def _strategy_with_requested_date_range_for_preflight(
     if current != effective:
         return strategy
     return {**strategy, "date_range": dict(requested)}
+
+
+def _strategy_with_requested_date_range_provenance(
+    strategy: dict[str, Any],
+) -> dict[str, Any]:
+    extra_parameters = dict(strategy.get("extra_parameters") or {})
+    artifact_patch = extra_parameters.get("artifact_patch")
+    changed_fields = (
+        artifact_patch.get("changed_fields")
+        if isinstance(artifact_patch, dict)
+        else []
+    )
+    date_was_edited = isinstance(changed_fields, list) and (
+        "date_range" in changed_fields
+    )
+    current = strategy.get("date_range")
+    requested = extra_parameters.get("requested_date_range")
+    effective = extra_parameters.get("effective_date_range")
+    preserve_existing = (
+        not date_was_edited
+        and _is_structured_date_range(requested)
+        and _is_structured_date_range(effective)
+        and current == effective
+    )
+    if not preserve_existing:
+        try:
+            resolved = resolve_executable_date_range(
+                current,
+                extra_parameters=extra_parameters,
+                today=_today(),
+            )
+        except (TypeError, ValueError):
+            return strategy
+        requested = resolved.payload
+    extra_parameters["requested_date_range"] = dict(requested)
+    if date_was_edited:
+        extra_parameters.pop("effective_date_range", None)
+    return {**strategy, "extra_parameters": extra_parameters}
 
 
 def _is_structured_date_range(value: Any) -> bool:

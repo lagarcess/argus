@@ -686,6 +686,8 @@ commitment is represented by an explicit `DecisionNote`.
 - Execution must revalidate the approved effective window. A changed window is
   rejected as `approved_data_window_unavailable`; it is never silently adjusted
   after approval.
+- Persisted legacy confirmations without a validated coverage preflight are not
+  executable. They return to preflight and require approval of a fresh card.
 - Metrics, benchmark alignment, chart construction, finalization, reload, and
   evidence provenance share the same prepared execution dataset identity. Edge
   gaps may not be backward-filled.
