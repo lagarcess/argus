@@ -13,6 +13,8 @@ from argus.domain.engine_launch.adapter import (
     _provider_metadata,
     _resolve_request_symbols,
     run_launch_backtest,
+    validate_request_benchmark,
+    validate_request_symbols,
 )
 from argus.domain.engine_launch.models import (
     LaunchBacktestRequest,
@@ -20,6 +22,7 @@ from argus.domain.engine_launch.models import (
 )
 from argus.domain.engine_launch.results import user_safe_failure_message
 from argus.domain.engine_launch.strategies import validate_launch_supported
+from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.market_data.capabilities import EquityMarketSession
 
 
@@ -808,6 +811,104 @@ def test_launch_request_explicit_asset_class_rejects_provider_class_conflict(
 
     with pytest.raises(ValueError, match="asset_class_conflict"):
         _resolve_request_symbols(request)
+
+
+def test_declared_crypto_class_disambiguates_equity_ticker_collision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.engine_launch import adapter
+
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="ETH",
+        symbols=["ETH"],
+        asset_class="crypto",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-03-31"},
+        sizing_mode="capital_amount",
+        capital_amount=1_000.0,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="BTC",
+    )
+    monkeypatch.setattr(
+        adapter,
+        "classify_symbol",
+        lambda _: type(
+            "SymbolAsset",
+            (),
+            {"symbol": "ETH", "canonical_symbol": "ETH", "asset_class": "equity"},
+        )(),
+    )
+    monkeypatch.setattr(
+        adapter,
+        "search_assets",
+        lambda *_args, **_kwargs: [
+            ResolvedAsset(
+                canonical_symbol="ETH",
+                asset_class="crypto",
+                name="Ethereum / US Dollar",
+                raw_symbol="ETH/USD",
+                provider="alpaca",
+            )
+        ],
+        raising=False,
+    )
+
+    result = validate_request_symbols(request)
+
+    assert result.outcome == "resolved"
+    assert result.symbols == ("ETH",)
+    assert result.asset_class == "crypto"
+
+
+def test_crypto_benchmark_disambiguates_equity_ticker_collision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.engine_launch import adapter
+
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="ETH",
+        symbols=["ETH"],
+        asset_class="crypto",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-03-31"},
+        sizing_mode="capital_amount",
+        capital_amount=1_000.0,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="BTC",
+    )
+    monkeypatch.setattr(
+        adapter,
+        "classify_symbol",
+        lambda _: type(
+            "SymbolAsset",
+            (),
+            {"symbol": "BTC", "canonical_symbol": "BTC", "asset_class": "equity"},
+        )(),
+    )
+    monkeypatch.setattr(
+        adapter,
+        "search_assets",
+        lambda *_args, **_kwargs: [
+            ResolvedAsset(
+                canonical_symbol="BTC",
+                asset_class="crypto",
+                name="Bitcoin / US Dollar",
+                raw_symbol="BTC/USD",
+                provider="alpaca",
+            )
+        ],
+        raising=False,
+    )
+
+    result = validate_request_benchmark(request, asset_class="crypto")
+
+    assert result.outcome == "resolved"
+    assert result.benchmark_symbol == "BTC"
+    assert result.asset_class == "crypto"
 
 
 def test_buy_and_hold_adapter_returns_envelope_card_and_context(

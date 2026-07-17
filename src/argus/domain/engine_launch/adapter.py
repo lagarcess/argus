@@ -50,7 +50,7 @@ from argus.domain.engine_launch.strategies import (
     rule_spec_from_request,
     validate_launch_supported,
 )
-from argus.domain.market_data import fetch_ohlcv, fetch_price_series
+from argus.domain.market_data import fetch_ohlcv, fetch_price_series, search_assets
 from argus.domain.market_data.capabilities import fetch_alpaca_market_calendar
 
 _DEFAULT_FETCH_OHLC = fetch_ohlcv
@@ -964,8 +964,29 @@ def validate_request_symbols(
                 outcome="invalid",
                 error_code=error_code,
             )
-        resolved_symbols.append(asset.symbol)
-        resolved_asset_classes.append(asset.asset_class)
+        resolved_symbol = asset.symbol
+        resolved_asset_class = asset.asset_class
+        if (
+            request.asset_class is not None
+            and resolved_asset_class != request.asset_class
+        ):
+            try:
+                provider_symbol = _provider_symbol_for_declared_asset_class(
+                    symbol,
+                    asset_class=request.asset_class,
+                )
+            except ValueError as exc:
+                if str(exc) == "asset_universe_unavailable":
+                    return RequestSymbolValidationResult(
+                        outcome="unavailable",
+                        error_code=str(exc),
+                    )
+                provider_symbol = None
+            if provider_symbol is not None:
+                resolved_symbol = provider_symbol
+                resolved_asset_class = request.asset_class
+        resolved_symbols.append(resolved_symbol)
+        resolved_asset_classes.append(resolved_asset_class)
 
     if not resolved_symbols:
         return RequestSymbolValidationResult(
@@ -1038,16 +1059,51 @@ def validate_request_benchmark(
             ),
         )
 
-    if benchmark.asset_class != asset_class:
+    benchmark_symbol = benchmark.symbol
+    benchmark_asset_class = benchmark.asset_class
+    if benchmark_asset_class != asset_class:
+        try:
+            provider_symbol = _provider_symbol_for_declared_asset_class(
+                request.benchmark_symbol,
+                asset_class=asset_class,
+            )
+        except ValueError as exc:
+            if str(exc) == "asset_universe_unavailable":
+                return BenchmarkSymbolValidationResult(
+                    outcome="unavailable",
+                    error_code=str(exc),
+                )
+            provider_symbol = None
+        if provider_symbol is not None:
+            benchmark_symbol = provider_symbol
+            benchmark_asset_class = asset_class
+    if benchmark_asset_class != asset_class:
         return BenchmarkSymbolValidationResult(
             outcome="conflict",
             error_code="invalid_benchmark_symbol",
         )
     return BenchmarkSymbolValidationResult(
         outcome="resolved",
-        benchmark_symbol=benchmark.symbol,
-        asset_class=benchmark.asset_class,
+        benchmark_symbol=benchmark_symbol,
+        asset_class=benchmark_asset_class,
     )
+
+
+def _provider_symbol_for_declared_asset_class(
+    symbol: str,
+    *,
+    asset_class: str,
+) -> str | None:
+    normalized_symbol = symbol.strip().upper()
+    matches = {
+        asset.canonical_symbol
+        for asset in search_assets(symbol, limit=12)
+        if asset.asset_class == asset_class
+        and asset.canonical_symbol.strip().upper() == normalized_symbol
+    }
+    if len(matches) != 1:
+        return None
+    return next(iter(matches))
 
 
 def _resolve_request_benchmark(
