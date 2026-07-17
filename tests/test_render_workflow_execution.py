@@ -1272,6 +1272,7 @@ def test_run_backtest_job_rejects_untrusted_nested_failure_code() -> None:
             "retryable": True,
             "capability_context": {
                 "failure_code": "internal_provider_secret_code",
+                "failure_detail": "alpaca_provider_internal_timeout_bucket_17",
             },
         }
     )
@@ -1284,7 +1285,9 @@ def test_run_backtest_job_rejects_untrusted_nested_failure_code() -> None:
     )
 
     assert result["failure_code"] == "upstream_dependency_error"
+    assert result["failure_detail"] == "temporary_dependency_issue"
     assert gateway.row["failure_code"] == "upstream_dependency_error"
+    assert gateway.row["failure_detail"] == "temporary_dependency_issue"
     assert (
         gateway.row["execution_metadata"]["workflow_backtest"]["failure_category"]
         == "upstream_dependency_error"

@@ -6,6 +6,7 @@ import {
   coverageRecoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
   recoveryDisplayText,
+  unsupportedTimeframeActionsFromMetadata,
 } from "../lib/chat-recovery-display";
 
 const root = join(import.meta.dir, "..");
@@ -256,6 +257,77 @@ describe("chat recovery display", () => {
         },
       },
     ]);
+  });
+
+  test("hydrates only safe typed unsupported-timeframe actions", () => {
+    const metadata = {
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "unsupported_time_granularity",
+        prompt_source: "llm_generated",
+        requested_field: "timeframe",
+        requested_fields: ["timeframe"],
+        semantic_needs: ["simplification_choice"],
+        payload: { raw_value: "5m", strategy: { asset_universe: ["AAPL"] } },
+        options: [
+          {
+            id: "option_0",
+            compatibility_label: "Retry with daily bars",
+            replacement_values: { timeframe: "1D" },
+          },
+          {
+            id: "option_1",
+            compatibility_label: "Retry with 1-hour bars",
+            replacement_values: { timeframe: "1h" },
+          },
+          {
+            id: "option_unsafe",
+            compatibility_label: "Unsafe",
+            replacement_values: { timeframe: "5m", provider: "internal" },
+          },
+        ],
+      },
+    };
+
+    expect(unsupportedTimeframeActionsFromMetadata(metadata)).toEqual([
+      {
+        id: "unsupported-timeframe-option-0",
+        label: "Retry with daily bars",
+        labelKey: "chat.clarification.timeframe_actions.daily",
+        type: "select_response_option",
+        payload: {
+          option_id: "option_0",
+          replacement_values: { timeframe: "1D" },
+        },
+      },
+      {
+        id: "unsupported-timeframe-option-1",
+        label: "Retry with 1-hour bars",
+        labelKey: "chat.clarification.timeframe_actions.hour_1",
+        type: "select_response_option",
+        payload: {
+          option_id: "option_1",
+          replacement_values: { timeframe: "1h" },
+        },
+      },
+    ]);
+    expect(
+      recoveryDisplayFromMetadata({
+        ...metadata,
+        response_intent: {
+          kind: "unsupported_recovery",
+          options: metadata.clarification.options,
+          facts: {
+            unsupported_constraints: [
+              {
+                category: "unsupported_time_granularity",
+                raw_value: "5m",
+              },
+            ],
+          },
+        },
+      }),
+    ).toBeNull();
   });
 
   test("recovery locale keys stay in parity", () => {

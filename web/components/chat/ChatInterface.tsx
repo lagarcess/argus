@@ -81,6 +81,7 @@ import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import {
   coverageRecoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
+  unsupportedTimeframeActionsFromMetadata,
 } from "@/lib/chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
@@ -1435,13 +1436,19 @@ export default function ChatInterface() {
             : undefined;
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
         const finalCoverageActions = coverageRecoveryActionsFromMetadata(finalPayload);
+        const finalUnsupportedTimeframeActions =
+          unsupportedTimeframeActionsFromMetadata(finalPayload);
         const finalRetryActions = [
           failedActionRetryActionFromMetadata(finalPayload),
           retryLastTurnActionFromMetadata(finalPayload, {
             assistantMessageId: finalMessageId,
           }),
         ].filter((retryAction): retryAction is ChatActionOption => Boolean(retryAction));
-        const finalTextActions = [...finalCoverageActions, ...finalRetryActions];
+        const finalTextActions = [
+          ...finalCoverageActions,
+          ...finalUnsupportedTimeframeActions,
+          ...finalRetryActions,
+        ];
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
         const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
         const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
@@ -1535,7 +1542,10 @@ export default function ChatInterface() {
           );
         } else if (finalText) {
           const finalFactHeadingKey = resultFactHeadingKeyFromMetadata(finalPayload);
-          setInputActions(finalCoverageActions);
+          setInputActions([
+            ...finalCoverageActions,
+            ...finalUnsupportedTimeframeActions,
+          ]);
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(

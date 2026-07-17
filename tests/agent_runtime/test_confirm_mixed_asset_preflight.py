@@ -135,7 +135,12 @@ def test_confirm_rejects_unsupported_timeframe_before_coverage_fetch(
         capital_amount=1_000,
         date_range={"start": "2024-01-01", "end": "2024-01-05"},
     )
-    state.optional_parameter_status = {"timeframe": "5m"}
+    state.optional_parameter_status = {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "5m",
+    }
 
     result = confirm_stage(
         state=state,
@@ -153,6 +158,13 @@ def test_confirm_rejects_unsupported_timeframe_before_coverage_fetch(
     assert [
         option["replacement_values"] for option in constraint["simplification_options"]
     ] == [{"timeframe": "1D"}, {"timeframe": "1h"}]
+    assert result.patch["optional_parameter_status"] == {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "5m",
+        "unsupported_constraints": [constraint],
+    }
     assert "coverage_recovery" not in result.patch["optional_parameter_status"]
     assert "confirmation_payload" not in result.patch
 

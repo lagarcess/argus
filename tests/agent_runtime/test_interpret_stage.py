@@ -7476,6 +7476,85 @@ def test_coverage_recovery_action_requests_typed_field_without_llm_selection(
     }
 
 
+@pytest.mark.parametrize("timeframe", ["1D", "1h"])
+def test_unsupported_timeframe_action_preserves_assumptions_and_reconfirms(
+    timeframe: str,
+) -> None:
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        capital_amount=5_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    option_id = "option_0" if timeframe == "1D" else "option_1"
+    options = [
+        {"id": "option_0", "replacement_values": {"timeframe": "1D"}},
+        {"id": "option_1", "replacement_values": {"timeframe": "1h"}},
+    ]
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=f"Use {timeframe} bars",
+            recent_thread_history=[],
+            action_context={
+                "type": "select_response_option",
+                "label": f"Use {timeframe} bars",
+                "payload": {
+                    "option_id": option_id,
+                    "replacement_values": {"timeframe": timeframe},
+                },
+            },
+        ).model_copy(
+            update={
+                "optional_parameter_status": {
+                    "initial_capital": 5_000,
+                    "fees": 0.001,
+                    "slippage": 0.0005,
+                    "timeframe": "5m",
+                    "unsupported_constraints": [
+                        {
+                            "category": "unsupported_time_granularity",
+                            "raw_value": "5m",
+                            "explanation": "Choose a supported timeframe.",
+                            "simplification_options": options,
+                        }
+                    ],
+                }
+            }
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "unsupported_recovery",
+                "semantic_needs": ["simplification_choice"],
+                "requested_fields": ["timeframe"],
+                "facts": {
+                    "unsupported_constraints": [
+                        {"category": "unsupported_time_granularity"}
+                    ]
+                },
+                "options": options,
+            },
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.patch["candidate_strategy_draft"] == pending.model_dump(mode="python")
+    assert result.patch["optional_parameter_status"] == {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": timeframe,
+    }
+    assert result.patch["requested_field"] is None
+    assert result.patch["missing_required_fields"] == []
+
+
 @pytest.mark.parametrize("task_relation", ["continue", "new_task"])
 def test_coverage_recovery_answer_restores_preserved_optional_parameters(
     monkeypatch,

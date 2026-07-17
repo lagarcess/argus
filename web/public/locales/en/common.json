@@ -293,7 +293,11 @@
       "unsupported_recovery": "That rule does not define when to buy or sell on its own. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_for_asset": "That rule does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_with_raw_value": "{{rawValue}} does not define when to buy or sell on its own. Which supported direction should I use: {{options}}?",
-      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?"
+      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?",
+      "timeframe_actions": {
+        "daily": "Retry with daily bars",
+        "hour_1": "Retry with 1-hour bars"
+      }
     },
     "coverage_recovery": {
       "no_common_data_window": "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",

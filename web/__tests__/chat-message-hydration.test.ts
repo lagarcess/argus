@@ -179,4 +179,45 @@ describe("chat message hydration", () => {
       "chat.coverage_recovery.actions.change_benchmark",
     ]);
   });
+
+  test("preserves LLM timeframe voice while hydrating safe correction actions", () => {
+    const exactLlmPrompt =
+      "Five-minute bars are not supported. Choose daily or one-hour bars.";
+    const message = hydrateTextMessageFromApi(
+      apiMessage({
+        id: "assistant-timeframe-llm",
+        content: exactLlmPrompt,
+        metadata: {
+          clarification: {
+            kind: "unsupported_recovery",
+            reason_code: "unsupported_time_granularity",
+            prompt_source: "llm_generated",
+            requested_field: "timeframe",
+            requested_fields: ["timeframe"],
+            semantic_needs: ["simplification_choice"],
+            payload: { raw_value: "5m" },
+            options: [
+              {
+                id: "option_0",
+                compatibility_label: "Retry with daily bars",
+                replacement_values: { timeframe: "1D" },
+              },
+              {
+                id: "option_1",
+                compatibility_label: "Retry with 1-hour bars",
+                replacement_values: { timeframe: "1h" },
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    expect(message.content).toBe(exactLlmPrompt);
+    expect(message.recoveryDisplay).toBeNull();
+    expect(message.actions?.map((action) => action.labelKey)).toEqual([
+      "chat.clarification.timeframe_actions.daily",
+      "chat.clarification.timeframe_actions.hour_1",
+    ]);
+  });
 });

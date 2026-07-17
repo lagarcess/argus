@@ -39,6 +39,8 @@ _ACTION_LABELS = {
         "chat.coverage_recovery.actions.change_dates": "Change dates",
         "chat.coverage_recovery.actions.change_asset": "Change asset",
         "chat.coverage_recovery.actions.change_benchmark": "Change benchmark",
+        "chat.clarification.timeframe_actions.daily": "Retry with daily bars",
+        "chat.clarification.timeframe_actions.hour_1": "Retry with 1-hour bars",
     },
     "es-419": {
         "chat.confirmation.actions.run_backtest": "Ejecutar backtest",
@@ -53,6 +55,8 @@ _ACTION_LABELS = {
         "chat.coverage_recovery.actions.change_dates": "Cambiar fechas",
         "chat.coverage_recovery.actions.change_asset": "Cambiar activo",
         "chat.coverage_recovery.actions.change_benchmark": "Cambiar referencia",
+        "chat.clarification.timeframe_actions.daily": "Usar barras diarias",
+        "chat.clarification.timeframe_actions.hour_1": "Usar barras de 1 hora",
     },
 }
 

@@ -151,6 +151,7 @@ async def clarify_stage_async(
             kind="unsupported_recovery",
             state=state,
             semantic_needs=["simplification_choice"],
+            requested_fields=([state.requested_field] if state.requested_field else []),
             facts={"unsupported_constraints": unsupported_constraints},
             options=options,
             language=language,
@@ -173,15 +174,18 @@ async def clarify_stage_async(
             "unsupported_constraints": unsupported_constraints,
             "simplification_options": options,
         }
-        if generated.used_degraded_fallback:
-            stage_patch.update(
-                _clarification_sidecar_patch(
-                    state=state,
-                    response_intent=response_intent,
-                    requested_field=state.requested_field or "unsupported_constraints",
-                    prompt_source="degraded_fallback",
-                )
+        stage_patch.update(
+            _clarification_sidecar_patch(
+                state=state,
+                response_intent=response_intent,
+                requested_field=state.requested_field or "unsupported_constraints",
+                prompt_source=(
+                    "degraded_fallback"
+                    if generated.used_degraded_fallback
+                    else "llm_generated"
+                ),
             )
+        )
         return StageResult(
             outcome="await_user_reply",
             stage_patch=stage_patch,

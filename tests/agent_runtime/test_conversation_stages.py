@@ -852,6 +852,75 @@ def test_clarify_unsupported_recovery_uses_generator_over_prefilled_copy() -> No
     )
 
 
+def test_clarify_unsupported_timeframe_persists_typed_actions_with_llm_voice() -> None:
+    state = RunState.new(
+        current_user_message="Use five-minute bars.",
+        recent_thread_history=[],
+    )
+    state.intent = "unsupported_or_out_of_scope"
+    state.requested_field = "timeframe"
+    state.missing_required_fields = ["timeframe"]
+    state.optional_parameter_status = {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "5m",
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_time_granularity",
+                "raw_value": "5m",
+                "explanation": "Choose a supported timeframe.",
+                "simplification_options": [
+                    {
+                        "label": "Retry with daily bars",
+                        "replacement_values": {"timeframe": "1D"},
+                    },
+                    {
+                        "label": "Retry with 1-hour bars",
+                        "replacement_values": {"timeframe": "1h"},
+                    },
+                ],
+            }
+        ],
+    }
+    clarifier = RecordingClarifier(
+        "Five-minute bars are not supported. Choose daily or one-hour bars."
+    )
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == clarifier.question
+    assert result.patch["clarification"] == {
+        "kind": "unsupported_recovery",
+        "reason_code": "unsupported_time_granularity",
+        "prompt_source": "llm_generated",
+        "requested_field": "timeframe",
+        "requested_fields": ["timeframe"],
+        "semantic_needs": ["simplification_choice"],
+        "payload": {
+            "strategy": state.candidate_strategy_draft.model_dump(mode="python"),
+            "raw_value": "5m",
+        },
+        "options": [
+            {
+                "id": "option_0",
+                "replacement_values": {"timeframe": "1D"},
+                "compatibility_label": "Retry with daily bars",
+            },
+            {
+                "id": "option_1",
+                "replacement_values": {"timeframe": "1h"},
+                "compatibility_label": "Retry with 1-hour bars",
+            },
+        ],
+    }
+
+
 def test_clarification_renderer_collapses_adjacent_duplicate_sentences() -> None:
     request = ClarificationRequest(
         current_user_message="Use the supported version.",

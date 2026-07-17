@@ -116,6 +116,18 @@ def is_user_safe_failure_code(value: str | None) -> bool:
     return code in USER_SAFE_FAILURE_MESSAGES or code in USER_SAFE_FAILURE_DETAILS
 
 
+def is_user_safe_failure_detail(value: str | None) -> bool:
+    detail = str(value or "").strip()
+    return detail in {
+        *USER_SAFE_FAILURE_DETAILS.values(),
+        "missing_required_input",
+        "unsupported_capability",
+        "invalid_parameter",
+        "temporary_dependency_issue",
+        "execution_failed",
+    }
+
+
 def build_success_envelope(
     *,
     resolved_strategy: dict[str, Any],

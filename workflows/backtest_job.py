@@ -704,7 +704,10 @@ def _mark_failed_from_tool_result(
     capability_context = result.get("capability_context")
     failure_detail = None
     if isinstance(capability_context, dict):
-        from argus.domain.engine_launch.results import is_user_safe_failure_code
+        from argus.domain.engine_launch.results import (
+            is_user_safe_failure_code,
+            is_user_safe_failure_detail,
+        )
 
         raw_failure_code = capability_context.get("failure_code")
         if isinstance(raw_failure_code, str) and is_user_safe_failure_code(
@@ -712,7 +715,9 @@ def _mark_failed_from_tool_result(
         ):
             failure_code = raw_failure_code.strip()
         raw_failure_detail = capability_context.get("failure_detail")
-        if isinstance(raw_failure_detail, str) and raw_failure_detail.strip():
+        if isinstance(raw_failure_detail, str) and is_user_safe_failure_detail(
+            raw_failure_detail
+        ):
             failure_detail = raw_failure_detail.strip()
     from argus.domain.engine_launch.results import user_safe_failure_detail
 

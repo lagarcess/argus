@@ -69,6 +69,7 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 from argus.agent_runtime.strategy_requirements import missing_required_fields_for_strategy
+from argus.domain.backtesting.config import normalize_timeframe
 
 CONFIRMATION_EDIT_ACTION_FIELDS = {
     "change_asset": "asset_universe",
@@ -136,6 +137,13 @@ def structured_action_stage_result_if_applicable(
     )
     if coverage_recovery_result is not None:
         return coverage_recovery_result
+    unsupported_timeframe_result = _unsupported_timeframe_action_result(
+        state=state,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    if unsupported_timeframe_result is not None:
+        return unsupported_timeframe_result
     if action.presentation == "result":
         return result_action_stage_result_if_applicable(
             state=state,
@@ -299,6 +307,82 @@ def _coverage_recovery_action_result(
                 },
                 "options": [],
             },
+        },
+    )
+
+
+def _unsupported_timeframe_action_result(
+    *,
+    state: RunState,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+) -> StageResult | None:
+    action = state.structured_action
+    if action is None or action.type != "select_response_option":
+        return None
+    response_intent = selected_thread_metadata.get("response_intent")
+    if not isinstance(response_intent, dict) or response_intent.get("kind") != (
+        "unsupported_recovery"
+    ):
+        return None
+    facts = response_intent.get("facts")
+    constraints = (
+        facts.get("unsupported_constraints") if isinstance(facts, dict) else None
+    )
+    if not isinstance(constraints, list) or not any(
+        isinstance(constraint, dict)
+        and constraint.get("category") == "unsupported_time_granularity"
+        for constraint in constraints
+    ):
+        return None
+    option_id = action.payload.get("option_id")
+    replacement_values = action.payload.get("replacement_values")
+    if not isinstance(option_id, str) or not isinstance(replacement_values, dict):
+        return None
+    if set(replacement_values) != {"timeframe"}:
+        return None
+    raw_timeframe = replacement_values.get("timeframe")
+    if not isinstance(raw_timeframe, str):
+        return None
+    try:
+        timeframe = normalize_timeframe(raw_timeframe)
+    except ValueError:
+        return None
+    options = response_intent.get("options")
+    if not isinstance(options, list) or not any(
+        isinstance(option, dict)
+        and option.get("id") == option_id
+        and option.get("replacement_values") == replacement_values
+        for option in options
+    ):
+        return None
+    pending = snapshot.pending_strategy_summary if snapshot is not None else None
+    if pending is None:
+        return None
+
+    optional_parameter_status = dict(state.optional_parameter_status)
+    raw_constraints = optional_parameter_status.pop("unsupported_constraints", [])
+    remaining_constraints = [
+        constraint
+        for constraint in raw_constraints
+        if not (
+            isinstance(constraint, dict)
+            and constraint.get("category") == "unsupported_time_granularity"
+        )
+    ]
+    if remaining_constraints:
+        optional_parameter_status["unsupported_constraints"] = remaining_constraints
+    optional_parameter_status["timeframe"] = timeframe
+    return StageResult(
+        outcome=(
+            "needs_clarification" if remaining_constraints else "ready_for_confirmation"
+        ),
+        stage_patch={
+            "candidate_strategy_draft": pending.model_dump(mode="python"),
+            "assistant_prompt": None,
+            "requested_field": None,
+            "missing_required_fields": [],
+            "optional_parameter_status": optional_parameter_status,
         },
     )
 

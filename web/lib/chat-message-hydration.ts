@@ -6,6 +6,7 @@ import {
 import {
   coverageRecoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
+  unsupportedTimeframeActionsFromMetadata,
 } from "./chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "./result-followup-heading";
 import type { ChatActionOption, Message } from "@/components/chat/types";
@@ -36,7 +37,14 @@ export function hydrateTextMessageFromApi(
   const coverageActions = isAssistant
     ? coverageRecoveryActionsFromMetadata(metadata)
     : [];
-  const actions = [...coverageActions, ...retryActions];
+  const unsupportedTimeframeActions = isAssistant
+    ? unsupportedTimeframeActionsFromMetadata(metadata)
+    : [];
+  const actions = [
+    ...coverageActions,
+    ...unsupportedTimeframeActions,
+    ...retryActions,
+  ];
 
   return {
     id: message.id,

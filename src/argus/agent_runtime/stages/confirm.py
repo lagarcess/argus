@@ -202,6 +202,7 @@ def _validated_launch_payload(
         return _launch_validation_failure(
             str(exc),
             raw_value=launch_payload.get("timeframe"),
+            optional_parameter_status=state.optional_parameter_status,
         )
     except Exception:
         return _launch_validation_failure("missing_rule_group")
@@ -436,6 +437,7 @@ def _launch_validation_failure(
     error_code: str,
     *,
     raw_value: Any | None = None,
+    optional_parameter_status: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if error_code == "unsupported_timeframe":
         return {
@@ -444,7 +446,7 @@ def _launch_validation_failure(
             "requested_field": "timeframe",
             "assistant_prompt": None,
             "optional_parameter_status": _with_unsupported_constraint(
-                {},
+                dict(optional_parameter_status or {}),
                 {
                     "category": "unsupported_time_granularity",
                     "raw_value": raw_value or error_code,

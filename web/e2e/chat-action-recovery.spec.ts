@@ -7,6 +7,12 @@ const CREATED_AT = "2026-06-16T12:00:00Z";
 const COVERAGE_RECOVERY_REQUEST = "Test AAPL coverage recovery";
 const COVERAGE_RECOVERY_PROMPT =
   "AAPL and SPY do not share enough history for one trustworthy test. Which part should we change?";
+const TIMEFRAME_RECOVERY_REQUEST = "Test AAPL with five-minute bars";
+const TIMEFRAME_RECOVERY_PROMPTS = {
+  en: "Five-minute bars are not supported. Choose daily or one-hour bars.",
+  "es-419":
+    "Las barras de cinco minutos no son compatibles. Elige barras diarias o de una hora.",
+} as const;
 
 type StreamRequest = {
   conversation_id: string;
@@ -595,6 +601,85 @@ async function mockChatApi(
       ]);
     }
 
+    if (body.message === TIMEFRAME_RECOVERY_REQUEST) {
+      const prompt = TIMEFRAME_RECOVERY_PROMPTS[language];
+      const responseIntent = {
+        kind: "unsupported_recovery",
+        semantic_needs: ["simplification_choice"],
+        requested_fields: ["timeframe"],
+        facts: {
+          unsupported_constraints: [
+            {
+              category: "unsupported_time_granularity",
+              raw_value: "5m",
+            },
+          ],
+        },
+        options: [
+          {
+            id: "option_0",
+            replacement_values: { timeframe: "1D" },
+          },
+          {
+            id: "option_1",
+            replacement_values: { timeframe: "1h" },
+          },
+        ],
+      };
+      const clarification = {
+        kind: "unsupported_recovery",
+        reason_code: "unsupported_time_granularity",
+        prompt_source: "llm_generated",
+        requested_field: "timeframe",
+        requested_fields: ["timeframe"],
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          strategy: {
+            strategy_type: "buy_and_hold",
+            asset_universe: ["AAPL"],
+            asset_class: "equity",
+          },
+          raw_value: "5m",
+        },
+        options: [
+          {
+            id: "option_0",
+            compatibility_label: "Retry with daily bars",
+            replacement_values: { timeframe: "1D" },
+          },
+          {
+            id: "option_1",
+            compatibility_label: "Retry with 1-hour bars",
+            replacement_values: { timeframe: "1h" },
+          },
+        ],
+      };
+      messages.splice(
+        0,
+        messages.length,
+        persistedUserMessage("msg-user-timeframe-recovery", body.message),
+        persistedAssistantMessage("msg-timeframe-recovery", prompt, {
+          response_intent: responseIntent,
+          clarification,
+        }),
+      );
+      return fulfillSse(route, [
+        { type: "stage_start", stage: "clarify" },
+        { type: "token", content: prompt },
+        {
+          type: "final",
+          payload: {
+            stage_outcome: "await_user_reply",
+            assistant_prompt: prompt,
+            response_intent: responseIntent,
+            clarification,
+            message_id: "msg-timeframe-recovery",
+          },
+        },
+        "[DONE]",
+      ]);
+    }
+
     if (body.message === "Prueba comprar y mantener AAPL") {
       const compatibilityPrompt = "What date window should I use for AAPL?";
       const clarification = {
@@ -676,6 +761,43 @@ async function mockChatApi(
               activeInitialCapital,
             ),
             message_id: "msg-result",
+          },
+        },
+        "[DONE]",
+      ]);
+    }
+
+    if (
+      body.action?.type === "select_response_option" &&
+      body.action.payload?.option_id === "option_0" &&
+      JSON.stringify(body.action.payload?.replacement_values) ===
+        JSON.stringify({ timeframe: "1D" })
+    ) {
+      const correctedCard = {
+        ...confirmationCard(DEFAULT_DATE_RANGE, "AAPL", 10000),
+        assumptions: [
+          "$10,000 starting capital",
+          "Daily bars",
+          "0.10% fees",
+          "0.05% slippage",
+        ],
+      };
+      messages.push(
+        persistedUserMessage("msg-user-timeframe-daily", body.message ?? "", {
+          chat_action: body.action,
+        }),
+        persistedAssistantMessage("msg-timeframe-confirmation", "", {
+          confirmation_card: correctedCard,
+        }),
+      );
+      return fulfillSse(route, [
+        { type: "stage_start", stage: "confirm" },
+        {
+          type: "final",
+          payload: {
+            stage_outcome: "ready_for_confirmation",
+            confirmation: correctedCard,
+            message_id: "msg-timeframe-confirmation",
           },
         },
         "[DONE]",
@@ -1053,6 +1175,66 @@ test("successful LLM coverage recovery preserves exact voice and actions after r
   await page.reload({ waitUntil: "networkidle" });
   await expectCoverageRecovery();
 });
+
+for (const testCase of [
+  {
+    language: "en" as const,
+    prompt: TIMEFRAME_RECOVERY_PROMPTS.en,
+    dailyLabel: "Retry with daily bars",
+  },
+  {
+    language: "es-419" as const,
+    prompt: TIMEFRAME_RECOVERY_PROMPTS["es-419"],
+    dailyLabel: "Usar barras diarias",
+  },
+]) {
+  test(`successful LLM timeframe recovery preserves assumptions and actions after reload (${testCase.language})`, async ({
+    page,
+  }) => {
+    const api = await mockChatApi(page, { language: testCase.language });
+
+    await page.goto("/chat", { waitUntil: "networkidle" });
+    await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("chat-input").fill(TIMEFRAME_RECOVERY_REQUEST);
+    await page.getByTestId("chat-send").click();
+
+    const expectTimeframeRecovery = async () => {
+      await expect(page.getByText(testCase.prompt, { exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: testCase.dailyLabel, exact: true }).first(),
+      ).toBeVisible();
+    };
+
+    await expectTimeframeRecovery();
+    await page.reload({ waitUntil: "networkidle" });
+    await expectTimeframeRecovery();
+
+    await page
+      .getByRole("button", { name: testCase.dailyLabel, exact: true })
+      .first()
+      .click();
+    await expect(page.getByRole("button", { name: /backtest/i }).first()).toBeVisible();
+    await expect(page.getByText("$10,000", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Daily bars", { exact: true })).toBeVisible();
+    await expect(page.getByText("0.10% fees", { exact: true })).toBeVisible();
+    await expect(page.getByText("0.05% slippage", { exact: true })).toBeVisible();
+
+    const selection = api.streamRequests.at(-1)?.action;
+    expect(selection?.type).toBe("select_response_option");
+    expect(selection?.labelKey).toBe("chat.clarification.timeframe_actions.daily");
+    expect(selection?.payload).toEqual({
+      option_id: "option_0",
+      replacement_values: { timeframe: "1D" },
+    });
+
+    await page.reload({ waitUntil: "networkidle" });
+    await expect(page.getByText(testCase.prompt, { exact: true })).toBeVisible();
+    await expect(page.getByText("$10,000", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Daily bars", { exact: true })).toBeVisible();
+    await expect(page.getByText("0.10% fees", { exact: true })).toBeVisible();
+    await expect(page.getByText("0.05% slippage", { exact: true })).toBeVisible();
+  });
+}
 
 test("retry action recovers a failed stream without duplicating user input", async ({ page }) => {
   const api = await mockChatApi(page);

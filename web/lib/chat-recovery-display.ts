@@ -56,9 +56,16 @@ function stringArrayOrNull(value: unknown): string[] | null {
 export function recoveryDisplayFromMetadata(
   metadata: Record<string, unknown>,
 ): RecoveryDisplay | null {
+  const recoveryState = recoveryDisplayFromRecoveryState(metadata.recovery);
+  if (recoveryState) {
+    return recoveryState;
+  }
+  const clarification = recordOrNull(metadata.clarification);
+  if (stringOrNull(clarification?.prompt_source) === "llm_generated") {
+    return null;
+  }
   return (
-    recoveryDisplayFromRecoveryState(metadata.recovery) ??
-    recoveryDisplayFromClarification(metadata.clarification) ??
+    recoveryDisplayFromClarification(clarification) ??
     recoveryDisplayFromResponseIntent(metadata.response_intent) ??
     recoveryDisplayFromResponseIntent(
       recordOrNull(metadata.pending_strategy)?.response_intent,
@@ -262,6 +269,66 @@ export function coverageRecoveryActionsFromMetadata(
         payload: {
           option_id: id,
           replacement_values: { requested_field: definition.field },
+        },
+      },
+    ];
+  });
+}
+
+export function unsupportedTimeframeActionsFromMetadata(
+  metadata: Record<string, unknown>,
+): ChatActionOption[] {
+  const clarification = recordOrNull(metadata.clarification);
+  if (
+    stringOrNull(clarification?.kind) !== "unsupported_recovery" ||
+    stringOrNull(clarification?.reason_code) !== "unsupported_time_granularity"
+  ) {
+    return [];
+  }
+  const options = Array.isArray(clarification?.options)
+    ? clarification.options
+    : [];
+  const allowedTimeframes = new Map([
+    [
+      "1D",
+      {
+        label: "Retry with daily bars",
+        labelKey: "chat.clarification.timeframe_actions.daily",
+      },
+    ],
+    [
+      "1h",
+      {
+        label: "Retry with 1-hour bars",
+        labelKey: "chat.clarification.timeframe_actions.hour_1",
+      },
+    ],
+  ]);
+  return options.flatMap((rawOption): ChatActionOption[] => {
+    const option = recordOrNull(rawOption);
+    const optionId = stringOrNull(option?.id);
+    const replacementValues = recordOrNull(option?.replacement_values);
+    if (
+      !optionId ||
+      !replacementValues ||
+      Object.keys(replacementValues).length !== 1
+    ) {
+      return [];
+    }
+    const timeframe = stringOrNull(replacementValues.timeframe);
+    const allowed = timeframe ? allowedTimeframes.get(timeframe) : undefined;
+    if (!timeframe || !allowed) {
+      return [];
+    }
+    return [
+      {
+        id: `unsupported-timeframe-${optionId.replaceAll("_", "-")}`,
+        label: stringOrNull(option?.compatibility_label) ?? allowed.label,
+        labelKey: allowed.labelKey,
+        type: "select_response_option",
+        payload: {
+          option_id: optionId,
+          replacement_values: { timeframe },
         },
       },
     ];
