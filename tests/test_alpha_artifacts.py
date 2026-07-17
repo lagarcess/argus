@@ -63,6 +63,16 @@ def test_reliability_contract_locks_admission_and_run_reconciliation() -> None:
     assert "a conforming direct job starts in `running`" in direct_endpoint
     assert "queued/running job" not in direct_endpoint
 
+    contract_rules = " ".join(contract.split())
+    assert "A runnable confirmation card must include `confirmation_id`" in contract_rules
+    assert (
+        "`run_backtest` actions must include `payload.confirmation_id`" in contract_rules
+    )
+    assert (
+        "`run_backtest` actions may include `payload.confirmation_id`"
+        not in contract_rules
+    )
+
 
 def test_reliability_contract_locks_chat_request_boundaries() -> None:
     contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")

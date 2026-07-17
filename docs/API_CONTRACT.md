@@ -656,10 +656,10 @@ after reload. Action chip requests and
 persisted `chat_action` metadata should preserve `label` plus `labelKey` so
 localized transcript chips survive reload. Clients use these fields to hydrate
 cards and actions after reload. Runtime execution still validates against the
-LangGraph checkpoint
-first. A confirmation card may include `confirmation_id` and
-`confirmation_state`; only the latest active confirmation can execute, and older
-cards are transcript history. Confirmation cards should include stable
+LangGraph checkpoint first. A runnable confirmation card must include
+`confirmation_id` and `confirmation_state`; only the latest active confirmation
+can execute. Older legacy cards without that identity are transcript history
+and cannot execute. Confirmation cards should include stable
 machine-readable fields alongside display labels:
 
 - `status`: stable confirmation status code such as `ready_to_run`, `running`,
@@ -1613,7 +1613,10 @@ Soft delete conversation.
 `action` payloads are structured product operations, not plain user text.
 
 - `run_backtest` is valid only when the latest runtime state or safe metadata fallback contains a pending strategy that has already been shown as a confirmation card.
-- `run_backtest` actions may include `payload.confirmation_id`; if supplied, the backend must reject stale ids instead of executing an older draft.
+- `run_backtest` actions must include `payload.confirmation_id`; the backend
+  rejects a missing id with `422 validation_error` and rejects a stale or
+  header-mismatched id with `409 idempotency_conflict` instead of executing an
+  older draft, as defined by `contract-run-action-reconciliation`.
 - `change_asset`, `change_dates`, and `adjust_assumptions` patch the active pending strategy by asking for the replacement field while preserving all other known fields.
 - Missing-field answers patch only the requested field and must preserve prior known fields from the pending strategy.
 - Confirmation eligibility requires semantic conservation: explicit date, asset, cadence, and money-role constraints from the user must survive interpretation, normalization, and default application.
