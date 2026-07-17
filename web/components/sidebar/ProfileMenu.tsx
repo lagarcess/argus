@@ -525,6 +525,7 @@ export default function ProfileMenu({
           normalizeEnabledLanguage(i18n.resolvedLanguage),
         )}
         onClose={() => setActiveModal(null)}
+        returnFocusRef={anchorRef}
       />
     );
   }

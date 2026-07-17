@@ -1,8 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
-  Activity,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import {
   Clock3,
   Loader2,
   MessageSquareText,
@@ -19,10 +25,12 @@ import {
   classifyAllowance,
   formatAllowancePeriodEnd,
 } from "@/lib/usage-allowance";
+import { dialogTabTarget } from "@/lib/dialog-focus";
 
 type UsageModalProps = {
   locale: "en-US" | "es-419";
   onClose: () => void;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 };
 
 type AllowanceCardProps = {
@@ -117,8 +125,13 @@ function AllowanceCard({
   );
 }
 
-export default function UsageModal({ locale, onClose }: UsageModalProps) {
+export default function UsageModal({
+  locale,
+  onClose,
+  returnFocusRef,
+}: UsageModalProps) {
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [usage, setUsage] = useState<UsageAllowanceResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -127,6 +140,59 @@ export default function UsageModal({ locale, onClose }: UsageModalProps) {
   const retry = useCallback(() => {
     setRequestVersion((current) => current + 1);
   }, []);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const fallbackReturnFocus = returnFocusRef?.current ?? null;
+    const focusableElements = () =>
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+
+    (focusableElements()[0] ?? dialog).focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = focusableElements();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const target = dialogTabTarget(
+        focusable,
+        document.activeElement as HTMLElement | null,
+        event.shiftKey,
+      );
+      if (target) {
+        event.preventDefault();
+        target.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      const returnTarget = previousFocus?.isConnected
+        ? previousFocus
+        : fallbackReturnFocus;
+      returnTarget?.focus();
+    };
+  }, [onClose, returnFocusRef]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -155,6 +221,8 @@ export default function UsageModal({ locale, onClose }: UsageModalProps) {
         onClick={onClose}
       />
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-[20px] border border-black/5 bg-white dark:border-white/10 dark:bg-[#1b1d20]"
         role="dialog"
         aria-modal="true"
@@ -212,18 +280,6 @@ export default function UsageModal({ locale, onClose }: UsageModalProps) {
                 label={t("settings.data.usage_panel.messages")}
                 locale={locale}
                 rules={t("settings.data.usage_panel.message_rule")}
-              />
-              <AllowanceCard
-                allowance={usage.allowances.backtests}
-                icon={<Activity className="h-4 w-4" />}
-                label={t("settings.data.usage_panel.simulations")}
-                locale={locale}
-                rules={
-                  <div className="space-y-1.5">
-                    <p>{t("settings.data.usage_panel.simulation_rule")}</p>
-                    <p>{t("settings.data.usage_panel.simulation_zero_rule")}</p>
-                  </div>
-                }
               />
             </div>
           )}

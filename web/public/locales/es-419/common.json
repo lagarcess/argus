@@ -724,7 +724,7 @@
       "usage": "Uso",
       "usage_panel": {
         "title": "Uso",
-        "description": "Tu uso actual de alfa privada.",
+        "description": "Tu cupo actual de mensajes. El uso de simulaciones no está disponible temporalmente.",
         "messages": "Mensajes",
         "simulations": "Simulaciones",
         "used_of_limit": "{{used}} de {{limit}} usados",

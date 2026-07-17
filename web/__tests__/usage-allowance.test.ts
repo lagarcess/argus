@@ -32,7 +32,7 @@ describe("private-alpha usage allowance", () => {
     );
   });
 
-  test("wires the authenticated API response directly into the Usage modal", () => {
+  test("shows message truth without presenting pre-admission simulation counts", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const profileMenu = readFileSync(
       join(root, "components/sidebar/ProfileMenu.tsx"),
@@ -48,10 +48,46 @@ describe("private-alpha usage allowance", () => {
     expect(profileMenu).toContain("<UsageModal");
     expect(modal).toContain("getUsageAllowances");
     expect(modal).toContain("allowance.period_end");
+    expect(modal).toContain("usage.allowances.messages");
+    expect(modal).not.toContain("usage.allowances.backtests");
+    expect(modal).not.toContain("simulation_rule");
     expect(modal).not.toContain("Retry-After");
   });
 
-  test("localizes allowance labels and consumption rules", () => {
+  test("wraps keyboard focus inside the Usage dialog", async () => {
+    let dialogFocus:
+      | typeof import("@/lib/dialog-focus")
+      | undefined;
+    try {
+      dialogFocus = await import("@/lib/dialog-focus");
+    } catch {
+      dialogFocus = undefined;
+    }
+    expect(dialogFocus).toBeDefined();
+    if (!dialogFocus) return;
+
+    const first = { id: "first" };
+    const middle = { id: "middle" };
+    const last = { id: "last" };
+    const focusable = [first, middle, last];
+
+    expect(dialogFocus.dialogTabTarget(focusable, last, false)).toBe(first);
+    expect(dialogFocus.dialogTabTarget(focusable, first, true)).toBe(last);
+    expect(dialogFocus.dialogTabTarget(focusable, { id: "outside" }, false)).toBe(
+      first,
+    );
+    expect(dialogFocus.dialogTabTarget(focusable, middle, false)).toBeNull();
+
+    const modal = readFileSync(
+      join(root, "components/settings/UsageModal.tsx"),
+      "utf-8",
+    );
+    expect(modal).toContain("dialogTabTarget");
+    expect(modal).toContain('event.key === "Escape"');
+    expect(modal).toContain("returnFocusRef");
+  });
+
+  test("localizes allowance labels and reserved simulation rules", () => {
     const en = readLocale("en").settings.data.usage_panel;
     const es = readLocale("es-419").settings.data.usage_panel;
 

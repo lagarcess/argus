@@ -724,7 +724,7 @@
       "usage": "Usage",
       "usage_panel": {
         "title": "Usage",
-        "description": "Your current private-alpha allowance.",
+        "description": "Your current message allowance. Simulation usage is temporarily unavailable.",
         "messages": "Messages",
         "simulations": "Simulations",
         "used_of_limit": "{{used}} of {{limit}} used",
