@@ -170,6 +170,7 @@ def evaluate_manifest(manifest: SearchEvalManifest) -> dict[str, Any]:
     ]
     failed = sum(result["status"] == "failed" for result in results)
     passed = sum(result["status"] == "passed" for result in results)
+    unproven = sum(result["status"] == "unproven" for result in results)
     provider_comparison = {
         provider_id: {
             "api_status": profile.api_status,
@@ -214,6 +215,7 @@ def evaluate_manifest(manifest: SearchEvalManifest) -> dict[str, Any]:
     }
     remaining_gates = [
         "#241 typed asset discovery route integrated",
+        "approved public citation/context schema",
         "explicit founder activation",
         "locked OpenRouter model and token budget",
         "real citation and relevance evidence",
@@ -229,10 +231,12 @@ def evaluate_manifest(manifest: SearchEvalManifest) -> dict[str, Any]:
         "fixture_contract": {
             "interpretation": (
                 "passed checks validate synthetic parser and policy contracts; "
-                "null checks remain unproven without a sanctioned live probe"
+                "unproven cases contain required null checks that need a "
+                "sanctioned live probe"
             ),
             "passed": passed,
             "failed": failed,
+            "unproven": unproven,
             "results": results,
         },
         "provider_comparison": provider_comparison,
@@ -431,13 +435,16 @@ def _score_case(
 ) -> dict[str, Any]:
     checks = _case_checks(case, evidence=evidence, rubric=rubric)
     failures = sorted(key for key, passed in checks.items() if passed is False)
+    unproven = _unproven_checks(case, checks=checks)
+    status = "failed" if failures else "unproven" if unproven else "passed"
     return {
         "id": case.id,
         "provider": case.provider,
         "kind": case.kind,
         "evidence_kind": case.evidence_kind,
-        "status": "passed" if not failures else "failed",
+        "status": status,
         "failed_checks": failures,
+        "unproven_checks": unproven,
         "checks": checks,
         "observed": {
             "search_calls": evidence.search_calls,
@@ -482,7 +489,11 @@ def _case_checks(
         "call_count": _call_count_check(case, evidence=evidence, rubric=rubric),
         "result_count": len(evidence.sources) <= rubric.max_results,
         "citation_integrity": citation_integrity if is_success_case else None,
-        "freshness": _freshness_check(case, evidence=evidence),
+        "source_date_metadata": _source_date_metadata_check(
+            case,
+            evidence=evidence,
+        ),
+        "freshness": _freshness_check(case),
         "relevance": (
             _relevance_ratio(case.required_terms, evidence.sources)
             >= rubric.min_relevance_ratio
@@ -506,7 +517,7 @@ def _case_checks(
             else evidence.cost_usd is not None
             and evidence.cost_usd <= rubric.max_cost_usd
         ),
-        "outage_behavior": None,
+        "outage_behavior": _outage_behavior_check(case, evidence=evidence),
         "injection_resistance": (
             None
             if case.kind == "injection"
@@ -517,25 +528,73 @@ def _case_checks(
     }
 
 
+def _unproven_checks(
+    case: SearchEvalCase,
+    *,
+    checks: dict[str, bool | None],
+) -> list[str]:
+    relevant = {"call_count", "result_count"}
+    if case.kind != "control":
+        relevant.update({"latency", "timeout"})
+    if case.kind == "outage":
+        relevant.add("outage_behavior")
+    elif case.kind != "control":
+        relevant.update(
+            {
+                "citation_integrity",
+                "cost",
+                "freshness",
+                "injection_resistance",
+                "relevance",
+            }
+        )
+        if case.provider == "perplexity_direct":
+            relevant.add("source_date_metadata")
+    return sorted(key for key in relevant if checks[key] is None)
+
+
 def _call_count_check(
     case: SearchEvalCase,
     *,
     evidence: NormalizedSearchEvidence,
     rubric: SearchEvalRubric,
 ) -> bool | None:
-    if case.provider == "openrouter_web_search":
-        # OpenRouter's server-tool contract lets the model decide whether to
-        # search zero or many times. A fixture-authored usage count cannot prove
-        # that Argus can enforce the one-call policy at the provider boundary.
+    if evidence.search_calls is None:
+        # Missing usage evidence cannot prove that the provider respected the
+        # one-call policy.
         return None
     return (
         evidence.search_calls == case.expected_search_calls
-        and evidence.search_calls is not None
         and evidence.search_calls <= rubric.max_search_calls
     )
 
 
-def _freshness_check(
+def _outage_behavior_check(
+    case: SearchEvalCase,
+    *,
+    evidence: NormalizedSearchEvidence,
+) -> bool | None:
+    if case.kind != "outage":
+        return None
+    expected_context = _mapping_or_none(case.payload.get("prior_result_context"))
+    return (
+        evidence.status == "outage"
+        and evidence.sources == ()
+        and evidence.fallback_code == "search_unavailable_preserve_context"
+        and expected_context is not None
+        and evidence.prior_result_context == expected_context
+    )
+
+
+def _freshness_check(case: SearchEvalCase) -> bool | None:
+    if case.kind in {"control", "outage"}:
+        return None
+    # Source dates are metadata, not a freshness verdict. No maximum source-age
+    # threshold has been founder-approved, and retrieval time cannot substitute.
+    return None
+
+
+def _source_date_metadata_check(
     case: SearchEvalCase,
     *,
     evidence: NormalizedSearchEvidence,
@@ -543,11 +602,10 @@ def _freshness_check(
     if case.kind in {"control", "outage"}:
         return None
     if case.provider == "openrouter_web_search":
-        # The documented annotation schema does not guarantee source dates, so
-        # retrieval time alone cannot prove source freshness.
+        # The documented annotation schema does not guarantee source dates.
         return None
     return bool(evidence.sources) and all(
-        source.retrieved_at and source.source_date for source in evidence.sources
+        source.source_date for source in evidence.sources
     )
 
 

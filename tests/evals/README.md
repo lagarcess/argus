@@ -50,7 +50,8 @@ poetry run python -m tests.evals.search_provider_eval
 The report is written to
 `temp/issue-244-search-provider-evaluation.json`. It must recommend deferral
 until real provider evidence, issue #241 integration, and explicit founder
-activation exist.
+activation exist. Any public citation/context schema also remains behind its
+separate API-contract approval gate.
 
 ## Live Run
 

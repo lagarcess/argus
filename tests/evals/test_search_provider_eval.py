@@ -30,6 +30,7 @@ def test_manifest_is_bounded_provider_neutral_and_offline() -> None:
         "outage_behavior",
         "relevance",
         "result_count",
+        "source_date_metadata",
         "timeout",
     }
     assert manifest.rubric.max_search_calls == 1
@@ -144,21 +145,40 @@ def test_missing_or_conflicting_provider_evidence_is_not_fabricated() -> None:
     assert high_cost_evidence.cost_usd == 999
 
 
-def test_source_freshness_requires_source_dates_when_schema_supports_them() -> None:
+def test_observed_openrouter_call_overage_fails_the_case() -> None:
+    manifest = load_search_eval_manifest()
+    openrouter_case = next(
+        case for case in manifest.cases if case.id == "openrouter_equity_category_en"
+    )
+    overage_payload = deepcopy(openrouter_case.payload)
+    overage_payload["usage"]["server_tool_use"]["web_search_requests"] = 99
+    overage_case = replace(openrouter_case, payload=overage_payload)
+
+    result = evaluate_manifest(replace(manifest, cases=(overage_case,)))[
+        "fixture_contract"
+    ]["results"][0]
+
+    assert result["status"] == "failed"
+    assert result["checks"]["call_count"] is False
+
+
+def test_source_date_metadata_does_not_claim_freshness() -> None:
     manifest = load_search_eval_manifest()
     direct_case = next(
         case for case in manifest.cases if case.id == "perplexity_equity_category_en"
     )
-    payload_without_dates = deepcopy(direct_case.payload)
-    for result in payload_without_dates["results"]:
-        result.pop("date", None)
-        result.pop("last_updated", None)
-    case_without_dates = replace(direct_case, payload=payload_without_dates)
-    mutated_manifest = replace(manifest, cases=(case_without_dates,))
+    payload_with_stale_dates = deepcopy(direct_case.payload)
+    for item in payload_with_stale_dates["results"]:
+        item["date"] = "2000-01-01"
+        item["last_updated"] = "2000-01-01"
+    case_with_stale_dates = replace(direct_case, payload=payload_with_stale_dates)
+    mutated_manifest = replace(manifest, cases=(case_with_stale_dates,))
 
     result = evaluate_manifest(mutated_manifest)["fixture_contract"]["results"][0]
 
-    assert result["checks"]["freshness"] is False
+    assert result["checks"]["freshness"] is None
+    assert result["checks"].get("source_date_metadata") is True
+    assert result["status"] == "unproven"
 
 
 def test_outage_preservation_requires_explicit_prior_context() -> None:
@@ -167,18 +187,23 @@ def test_outage_preservation_requires_explicit_prior_context() -> None:
     payload_without_context = deepcopy(outage_case.payload)
     payload_without_context.pop("prior_result_context")
 
-    evidence = normalize_case(
-        replace(outage_case, payload=payload_without_context),
-        rubric=manifest.rubric,
-    )
+    case_without_context = replace(outage_case, payload=payload_without_context)
+    evidence = normalize_case(case_without_context, rubric=manifest.rubric)
+    result = evaluate_manifest(replace(manifest, cases=(case_without_context,)))[
+        "fixture_contract"
+    ]["results"][0]
 
     assert evidence.prior_result_context is None
+    assert result["status"] == "failed"
+    assert result["checks"]["outage_behavior"] is False
 
 
 def test_report_defers_activation_without_real_quality_or_latency_evidence() -> None:
     report = evaluate_manifest(load_search_eval_manifest())
 
     assert report["fixture_contract"]["failed"] == 0
+    assert report["fixture_contract"]["passed"] == 3
+    assert report["fixture_contract"]["unproven"] == 9
     expected_checks = {
         "call_count",
         "citation_integrity",
@@ -189,6 +214,7 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
         "outage_behavior",
         "relevance",
         "result_count",
+        "source_date_metadata",
         "timeout",
     }
     for result in report["fixture_contract"]["results"]:
@@ -206,7 +232,7 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
             "search_calls",
             "source_dates_present",
         }
-        if result["provider"] == "openrouter_web_search":
+        if result["observed"]["search_calls"] is None:
             assert result["checks"]["call_count"] is None
         else:
             assert result["checks"]["call_count"] is True
@@ -216,6 +242,7 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
     assert report["preferred_next_probe"] == "perplexity_direct"
     assert set(report["remaining_gates"]) == {
         "#241 typed asset discovery route integrated",
+        "approved public citation/context schema",
         "explicit founder activation",
         "locked OpenRouter model and token budget",
         "real citation and relevance evidence",
@@ -262,7 +289,7 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
         for result in report["fixture_contract"]["results"]
         if result["kind"] == "outage"
     ]
-    assert all(result["checks"]["outage_behavior"] is None for result in outage_results)
+    assert all(result["checks"]["outage_behavior"] is True for result in outage_results)
     assert set(report["criterion_comparison"]) == {
         "citation_integrity",
         "cost",
@@ -273,6 +300,12 @@ def test_report_defers_activation_without_real_quality_or_latency_evidence() -> 
         "relevance",
     }
     assert "README" in report["rollback_boundary"]
+
+
+def test_decision_packet_keeps_public_schema_approval_as_a_gate() -> None:
+    report = evaluate_manifest(load_search_eval_manifest())
+
+    assert "approved public citation/context schema" in report["remaining_gates"]
 
 
 def test_decision_evidence_writer_stays_in_nonversioned_temp(

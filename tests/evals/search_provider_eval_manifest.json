@@ -19,6 +19,7 @@
       "outage_behavior",
       "relevance",
       "result_count",
+      "source_date_metadata",
       "timeout"
     ],
     "max_search_calls": 1,
