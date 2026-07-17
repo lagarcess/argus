@@ -324,6 +324,7 @@ def scorecard_for_results(results: list[dict[str, Any]]) -> dict[str, Any]:
                 "passed": 0,
                 "failed": 0,
                 "expected_failed": 0,
+                "unexpected_pass": 0,
                 "skipped": 0,
                 "pass_rate": 0.0,
             },
@@ -334,8 +335,9 @@ def scorecard_for_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         bucket[status] = int(bucket[status]) + 1
 
     for bucket in by_category.values():
-        denominator = (
-            int(bucket["passed"]) + int(bucket["failed"]) + int(bucket["expected_failed"])
+        denominator = sum(
+            int(bucket[status])
+            for status in ("passed", "failed", "expected_failed", "unexpected_pass")
         )
         bucket["pass_rate"] = (
             0.0 if denominator == 0 else round(int(bucket["passed"]) / denominator, 4)
@@ -351,10 +353,33 @@ def scorecard_for_results(results: list[dict[str, Any]]) -> dict[str, Any]:
             "expected_failed": sum(
                 int(item["expected_failed"]) for item in by_category.values()
             ),
+            "unexpected_pass": sum(
+                int(item["unexpected_pass"]) for item in by_category.values()
+            ),
             "skipped": sum(int(item["skipped"]) for item in by_category.values()),
         },
         "results": results,
     }
+
+
+def blocking_eval_results(
+    results: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return result states that must fail a sanctioned live evaluation gate."""
+    return [
+        result
+        for result in results
+        if result.get("status") in {"failed", "unexpected_pass"}
+    ]
+
+
+def expected_fail_issue_for_result(result: dict[str, Any]) -> str | None:
+    """Return the exact expected-fail owner from a serialized eval result."""
+    expected_fail = result.get("expected_fail")
+    if not isinstance(expected_fail, dict):
+        return None
+    issue = expected_fail.get("issue")
+    return issue if isinstance(issue, str) and issue else None
 
 
 def write_scorecard(
@@ -943,6 +968,8 @@ def _result_status(
         return "expected_failed"
     if failed_checks:
         return "failed"
+    if expected_fail is not None:
+        return "unexpected_pass"
     return "passed"
 
 

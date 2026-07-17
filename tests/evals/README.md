@@ -7,9 +7,9 @@ assistant phrasing.
 ## Test Tiers
 
 - **Mocked harness - every change (free, no API calls):**
-  `poetry run pytest tests/evals/test_measurement_eval_harness.py`
-  Validates routing, state, and contract logic. This is the everyday inner-loop
-  check.
+  `poetry run pytest tests/evals/test_measurement_eval_harness.py tests/evals/test_chat_runtime_eval_manifest.py tests/evals/test_chat_runtime_trajectory_harness.py`
+  Validates routing, state, full conversation-step manifests, and the seven
+  session trajectories. This is the everyday inner-loop check.
 - **Live eval - only the 3 sanctioned moments:**
   1. Pre-merge on a PR that changes runtime behavior.
   2. Main promotion candidate.
@@ -22,7 +22,11 @@ assistant phrasing.
 Run the mocked harness checks with:
 
 ```bash
-poetry run pytest tests/evals/test_measurement_eval_harness.py -q
+poetry run pytest \
+  tests/evals/test_measurement_eval_harness.py \
+  tests/evals/test_chat_runtime_eval_manifest.py \
+  tests/evals/test_chat_runtime_trajectory_harness.py \
+  -q
 ```
 
 This run is free. It does not call the LLM, does not spend provider tokens, and
@@ -94,18 +98,51 @@ Live runs write JSON scorecards to:
 temp/argus_eval_scorecards/
 ```
 
-`temp/` is gitignored, so scorecards are local run artifacts. Each scorecard
-includes per-category totals and pass rates. Expected-fail cases never count as
-passes; they are reported separately so known broken behavior stays visible.
+`temp/` is gitignored, so scorecards are local run artifacts. Measurement
+scorecards include per-category totals and pass rates. Seven-session scorecards
+include stable trajectory labels, operation names, and failure prefixes only;
+they omit prompts, SSE payloads, route receipts, and runtime identifiers.
+
+Expected-fail cases never count as passes. They are reported separately so
+known broken behavior stays visible.
 
 ## Expected-Fail Cases
 
 An expected-fail case must be tagged with an issue number and scoped
-`allowed_failures`. The expected-fail tag only masks failures with those allowed
-prefixes; any unrelated failure still fails the eval.
+`allowed_failures`. Every mask names one exact `step_id` and one failure
+`prefix`. The tag only masks that failure family at that step; the same prefix
+at another step, or any unrelated failure, still fails the eval.
 
 The lane that fixes the tagged issue must flip the case to pass as part of that
 lane's acceptance. Expected-fail is a truthful baseline, not a permanent waiver.
+If a tagged case has no failures, its status is `unexpected_pass`, which also
+does not count as a pass. Remove the tag only after verifying the owning issue's
+full acceptance criteria.
+
+## Seven Alpha Session Trajectories
+
+`alpha_session_trajectories.json` is an append-only, sanitized fixture set with
+stable labels `alpha_session_01` through `alpha_session_07`. The typed adapter
+runner dispatches every user or action step through stream, action, disconnect,
+reload, retry, or persistence adapters. A disconnect step owns the submission
+that is cut before the client observes a terminal; it is never modeled as a
+second operation after a visible terminal. The runner rejects a disconnect for
+an identity whose terminal was already observed. It checks canonical SSE, visible
+response category, stage outcome, artifact and action identity, persistence and
+reload state, typed recovery, route budgets, terminal fingerprints, stale
+actions, and orphan-turn reconciliation.
+
+Each trajectory currently carries one exact owning issue and a narrow set of
+step-scoped allowed failure masks. The approved #229 contract now owns the exact
+reliability vocabulary: `confirmation_id` is the Run `action_identity`, its
+`Idempotency-Key` must match, and ambiguous Run responses reconcile through the
+owner-scoped by-action lookup before a `404` may permit one exact replay. Ordinary
+turns project approved lifecycle states; an unreconciled stale turn becomes
+terminal `abandoned` recovery with `turn_abandoned` and a `retry_last_turn`
+action keyed by `request_message_id`. Keep the tags until the corresponding
+runtime lane lands and the full trajectory passes. The mocked mechanics do not
+replace the sanctioned live gate, deployed exact-SHA browser proof, or founder
+approval.
 
 ## Categories
 
