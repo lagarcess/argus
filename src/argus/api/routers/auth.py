@@ -205,8 +205,26 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
         raise _login_auth_problem(request) from None
 
 
+def _enforce_browser_auth_origin(request: Request) -> None:
+    origin = request.headers.get("origin")
+    if not origin:
+        return
+    from argus.api.app_setup import cors_allow_origins
+
+    if origin in cors_allow_origins():
+        return
+    raise problem(
+        request,
+        status_code=403,
+        code="csrf_origin_rejected",
+        title="Request Rejected",
+        detail="This authentication request did not come from an allowed origin.",
+    )
+
+
 @router.post("/auth/logout")
-def logout() -> JSONResponse:
+def logout(request: Request) -> JSONResponse:
+    _enforce_browser_auth_origin(request)
     response = JSONResponse({"success": True})
     response.delete_cookie("sb-auth-token", path="/")
     response.delete_cookie("sb-refresh-token", path="/")

@@ -448,7 +448,10 @@ def mock_gateway():
         )
     )
     gateway.mark_result_card_decision_for_run.return_value = None
-    with patch("argus.api.state.supabase_gateway", gateway):
+    with (
+        patch("argus.api.state.supabase_gateway", gateway),
+        patch("argus.api.dependencies.auth_session_is_active", return_value=True),
+    ):
         yield gateway
 
 
@@ -1142,6 +1145,59 @@ def test_unauthorized_invalid_token(mock_gateway):
     assert response.status_code == 401
 
 
+def test_unauthorized_revoked_supabase_session(mock_gateway, monkeypatch):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    monkeypatch.setattr(api_state, "DATABASE_URL", "postgresql://auth-pool/argus")
+    mock_gateway.get_auth_user_from_token.return_value = {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "email": "developer@argus.local",
+    }
+    mock_gateway.private_alpha_email_allowed.return_value = True
+
+    with patch(
+        "argus.api.dependencies.auth_session_is_active", return_value=False
+    ) as is_active:
+        response = client.get(
+            "/api/v1/me",
+            cookies={"sb-auth-token": "revoked-but-unexpired-token"},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "unauthorized"
+    is_active.assert_called_once_with(
+        database_url="postgresql://auth-pool/argus",
+        token="revoked-but-unexpired-token",
+        user_id="00000000-0000-0000-0000-000000000001",
+    )
+    mock_gateway.get_or_create_profile_for_auth_user.assert_not_called()
+
+
+def test_auth_session_verification_failure_fails_closed(mock_gateway, monkeypatch):
+    from argus.api.auth_sessions import AuthSessionVerificationUnavailable
+
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    monkeypatch.setattr(api_state, "DATABASE_URL", "postgresql://auth-pool/argus")
+    mock_gateway.get_auth_user_from_token.return_value = {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "email": "developer@argus.local",
+    }
+
+    with patch(
+        "argus.api.dependencies.auth_session_is_active",
+        side_effect=AuthSessionVerificationUnavailable,
+    ):
+        response = client.get(
+            "/api/v1/me",
+            headers={"Authorization": "Bearer valid-but-unverifiable-token"},
+        )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "auth_session_verification_unavailable"
+    mock_gateway.get_or_create_profile_for_auth_user.assert_not_called()
+
+
 def test_profile_creation_on_first_login(mock_gateway):
     import os
 
@@ -1239,6 +1295,26 @@ def test_login_forces_secure_session_cookies_in_production(mock_gateway, monkeyp
     assert "sb-auth-token" in set_cookie
     assert "sb-refresh-token" in set_cookie
     assert "secure" in set_cookie
+
+
+def test_logout_rejects_untrusted_browser_origin() -> None:
+    response = client.post(
+        "/api/v1/auth/logout",
+        headers={"Origin": "https://attacker.example"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "csrf_origin_rejected"
+
+
+def test_logout_accepts_configured_browser_origin() -> None:
+    response = client.post(
+        "/api/v1/auth/logout",
+        headers={"Origin": "http://localhost:3000"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"success": True}
 
 
 def test_feedback_submission_persists_with_user_ownership(mock_gateway):
