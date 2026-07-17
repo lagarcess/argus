@@ -90,10 +90,16 @@ class TrajectoryExpectation:
 
 
 @dataclass(frozen=True)
+class TrajectoryAllowedFailure:
+    step_id: str
+    prefix: str
+
+
+@dataclass(frozen=True)
 class TrajectoryExpectedFail:
     issue: str
     reason: str
-    allowed_failures: tuple[str, ...]
+    allowed_failures: tuple[TrajectoryAllowedFailure, ...]
 
 
 @dataclass(frozen=True)
@@ -225,8 +231,12 @@ def load_alpha_trajectories(
                         issue=str(expected_fail["issue"]),
                         reason=str(expected_fail["reason"]),
                         allowed_failures=tuple(
-                            str(prefix)
-                            for prefix in expected_fail.get("allowed_failures") or ()
+                            TrajectoryAllowedFailure(
+                                step_id=str(allowed_failure["step_id"]),
+                                prefix=str(allowed_failure["prefix"]),
+                            )
+                            for allowed_failure in expected_fail.get("allowed_failures")
+                            or ()
                         ),
                     )
                 ),
@@ -255,11 +265,14 @@ def _trajectory_step_from_raw(
             max_latency_ms=raw_budget.get("max_latency_ms"),
         )
     )
+    request = dict(raw_step.get("request") or {})
+    if operation == "disconnect":
+        _validate_disconnect_submission(request=request, step_id=f"{label}:step:{index}")
     return TrajectoryStep(
         step_id=f"{label}:step:{index}",
         index=index,
         operation=operation,
-        request=dict(raw_step.get("request") or {}),
+        request=request,
         expectation=TrajectoryExpectation(
             visible_response_category=raw_expectation.get("visible_response_category"),
             stage_outcome=raw_expectation.get("stage_outcome"),
@@ -284,6 +297,7 @@ def run_alpha_trajectory(
     step_results: list[TrajectoryStepResult] = []
     failed_checks: list[str] = []
     unterminated_fingerprints: set[str] = set()
+    client_terminal_submissions: set[str] = set()
 
     for step in trajectory.steps:
         handler = adapters.for_operation(step.operation)
@@ -301,6 +315,18 @@ def run_alpha_trajectory(
             observation=observation,
             unterminated_fingerprints=unterminated_fingerprints,
         )
+        submission_identity = _submission_identity(step)
+        if (
+            step.operation == "disconnect"
+            and submission_identity in client_terminal_submissions
+        ):
+            step_failures.append(
+                "disconnect: "
+                f"{step.step_id} attempted to disconnect submission "
+                f"{submission_identity!r} after its client terminal was observed"
+            )
+        if observation.typed_terminal is True and submission_identity is not None:
+            client_terminal_submissions.add(submission_identity)
         step_results.append(
             TrajectoryStepResult(
                 step_id=step.step_id,
@@ -311,17 +337,46 @@ def run_alpha_trajectory(
         )
         failed_checks.extend(step_failures)
 
+    resolved_step_results = tuple(step_results)
     return TrajectoryResult(
         label=trajectory.label,
         locale=trajectory.locale,
         status=_trajectory_status(
-            failed_checks,
+            resolved_step_results,
             expected_fail=trajectory.expected_fail,
         ),
         failed_checks=tuple(failed_checks),
         expected_fail=trajectory.expected_fail,
-        step_results=tuple(step_results),
+        step_results=resolved_step_results,
     )
+
+
+def _validate_disconnect_submission(*, request: dict[str, Any], step_id: str) -> None:
+    submission = request.get("submission")
+    if not isinstance(submission, dict):
+        raise ValueError(f"disconnect step {step_id} must own a submission")
+    if submission.get("operation") not in {"stream", "action"}:
+        raise ValueError(
+            f"disconnect step {step_id} submission must use stream or action"
+        )
+    if not _non_empty_string(submission.get("identity")):
+        raise ValueError(
+            f"disconnect step {step_id} submission must have a stable identity"
+        )
+    if not isinstance(submission.get("request"), dict):
+        raise ValueError(
+            f"disconnect step {step_id} submission must include a request object"
+        )
+
+
+def _submission_identity(step: TrajectoryStep) -> str | None:
+    if step.operation == "disconnect":
+        submission = step.request.get("submission")
+        if isinstance(submission, dict) and _non_empty_string(submission.get("identity")):
+            return str(submission["identity"])
+        return None
+    identity = step.request.get("submission_identity")
+    return str(identity) if _non_empty_string(identity) else None
 
 
 def _trajectory_step_failures(
@@ -624,17 +679,23 @@ def _receipt_number(receipt: dict[str, Any], key: str) -> float | None:
 
 
 def _trajectory_status(
-    failed_checks: list[str],
+    step_results: tuple[TrajectoryStepResult, ...],
     *,
     expected_fail: TrajectoryExpectedFail | None,
 ) -> str:
-    if not failed_checks:
+    failed_step_results = [result for result in step_results if result.failed_checks]
+    if not failed_step_results:
         return "unexpected_pass" if expected_fail is not None else "passed"
     if expected_fail is None or not expected_fail.allowed_failures:
         return "failed"
     if all(
-        any(check.startswith(prefix) for prefix in expected_fail.allowed_failures)
-        for check in failed_checks
+        any(
+            allowed_failure.step_id == step_result.step_id
+            and check.startswith(allowed_failure.prefix)
+            for allowed_failure in expected_fail.allowed_failures
+        )
+        for step_result in failed_step_results
+        for check in step_result.failed_checks
     ):
         return "expected_failed"
     return "failed"
@@ -658,8 +719,16 @@ def trajectory_scorecard_for_results(
                 "expected_fail_issue": (
                     None if expected_fail is None else expected_fail.issue
                 ),
-                "allowed_failure_prefixes": (
-                    [] if expected_fail is None else list(expected_fail.allowed_failures)
+                "allowed_failures": (
+                    []
+                    if expected_fail is None
+                    else [
+                        {
+                            "step_id": allowed_failure.step_id,
+                            "prefix": allowed_failure.prefix,
+                        }
+                        for allowed_failure in expected_fail.allowed_failures
+                    ]
                 ),
                 "failure_prefixes": _failure_prefixes(result.failed_checks),
                 "steps": [

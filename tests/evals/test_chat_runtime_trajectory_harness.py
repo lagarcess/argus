@@ -132,7 +132,9 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
         assert trajectory.expected_fail.allowed_failures
         assert re.fullmatch(r"#\d+", trajectory.expected_fail.issue)
         assert all(
-            prefix.endswith(":") for prefix in trajectory.expected_fail.allowed_failures
+            allowed_failure.step_id.startswith(f"{trajectory.label}:step:")
+            and allowed_failure.prefix.endswith(":")
+            for allowed_failure in trajectory.expected_fail.allowed_failures
         )
         assert [step.index for step in trajectory.steps] == list(
             range(1, len(trajectory.steps) + 1)
@@ -148,7 +150,10 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
         if trajectory.expected_fail.issue == "#251"
     )
     assert "retail" in data_window.tags
-    assert "effective_window:" in data_window.expected_fail.allowed_failures
+    assert any(
+        allowed_failure.prefix == "effective_window:"
+        for allowed_failure in data_window.expected_fail.allowed_failures
+    )
 
     orphan_reconciliation = next(
         trajectory
@@ -162,8 +167,10 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
         orphan_reconciliation.steps[0].expectation.artifact_identity
         == "alpha_session_07:confirmation:1"
     )
-    assert orphan_reconciliation.steps[1].request == {
-        "message": "Change the active test to the last six months."
+    assert orphan_reconciliation.steps[1].request["submission"] == {
+        "operation": "stream",
+        "identity": "alpha_session_07:submission:edit:1",
+        "request": {"message": "Change the active test to the last six months."},
     }
 
     assert (
@@ -186,6 +193,92 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
     )
 
 
+def test_disconnect_fixtures_own_the_submission_before_client_terminal() -> None:
+    disconnect_steps = [
+        step
+        for trajectory in load_alpha_trajectories()
+        for step in trajectory.steps
+        if step.operation == "disconnect"
+    ]
+
+    assert disconnect_steps
+    for step in disconnect_steps:
+        submission = step.request.get("submission")
+        assert isinstance(submission, dict)
+        assert submission.get("operation") in {"stream", "action"}
+        assert isinstance(submission.get("identity"), str)
+        assert submission["identity"]
+        assert isinstance(submission.get("request"), dict)
+        assert "after" not in step.request
+        assert step.expectation.typed_terminal is False
+
+
+def test_contract_pending_trajectories_keep_canonical_confirmation_behavior() -> None:
+    contract_pending_issues = {"#230", "#240", "#242"}
+    trajectories = [
+        trajectory
+        for trajectory in load_alpha_trajectories()
+        if trajectory.expected_fail.issue in contract_pending_issues
+    ]
+
+    for trajectory in trajectories:
+        confirmation_step = trajectory.steps[0]
+        assert confirmation_step.operation == "stream"
+        assert confirmation_step.expectation.visible_response_category == "confirmation"
+        assert confirmation_step.expectation.stage_outcome == "ready_for_confirmation"
+        assert confirmation_step.expectation.typed_terminal is True
+
+        for step in trajectory.steps[1:]:
+            expectation = step.expectation
+            assert expectation.recovery_code is None
+            if step.operation in {"disconnect", "persistence", "reload", "retry"}:
+                assert expectation.persistence_state is None
+                assert expectation.reload_state is None
+
+
+def test_unapproved_recovery_codes_and_reload_states_are_not_fixtures() -> None:
+    raw = ALPHA_TRAJECTORY_PATH.read_text(encoding="utf-8")
+    assert "runtime_budget_exhausted" not in raw
+    assert "asset_discovery_unavailable" not in raw
+
+    contract_neutral_issues = {"#239", "#241"}
+    trajectories = [
+        trajectory
+        for trajectory in load_alpha_trajectories()
+        if trajectory.expected_fail.issue in contract_neutral_issues
+    ]
+    for trajectory in trajectories:
+        for step in trajectory.steps:
+            assert step.expectation.recovery_code is None
+            if step.operation in {"persistence", "reload"}:
+                assert step.expectation.persistence_state is None
+                assert step.expectation.reload_state is None
+
+    budget_retry = next(
+        trajectory
+        for trajectory in trajectories
+        if trajectory.expected_fail.issue == "#239"
+    ).steps[1]
+    assert budget_retry.expectation.visible_response_category == "typed_recovery"
+    assert budget_retry.expectation.stage_outcome == "ready_to_respond"
+
+    discovery_recovery = next(
+        trajectory
+        for trajectory in trajectories
+        if trajectory.expected_fail.issue == "#241"
+    ).steps[0]
+    assert discovery_recovery.expectation.visible_response_category == "typed_recovery"
+    assert discovery_recovery.expectation.stage_outcome == "needs_clarification"
+
+    orphan_recovery = next(
+        trajectory
+        for trajectory in load_alpha_trajectories()
+        if trajectory.expected_fail.issue == "#240"
+    ).steps[-1]
+    assert orphan_recovery.expectation.visible_response_category == "typed_recovery"
+    assert orphan_recovery.expectation.stage_outcome == "ready_to_respond"
+
+
 def test_expected_fail_prefixes_are_emitted_by_the_trajectory_contract() -> None:
     direct_expectation_prefixes = {
         "visible_response_category": "visible_response:",
@@ -199,8 +292,9 @@ def test_expected_fail_prefixes_are_emitted_by_the_trajectory_contract() -> None
     }
 
     for trajectory in load_alpha_trajectories():
-        supported = {"stale_action:", "orphan_turn:", "fingerprint:"}
+        supported_by_step: dict[str, set[str]] = {}
         for step in trajectory.steps:
+            supported = {"stale_action:", "orphan_turn:", "fingerprint:"}
             expectation = step.expectation
             for field_name, prefix in direct_expectation_prefixes.items():
                 if getattr(expectation, field_name) is not None:
@@ -213,11 +307,20 @@ def test_expected_fail_prefixes_are_emitted_by_the_trajectory_contract() -> None
                 f"{checkpoint.split('.', 1)[0]}:"
                 for checkpoint in expectation.checkpoints
             )
+            supported_by_step[step.step_id] = supported
 
-        assert set(trajectory.expected_fail.allowed_failures).issubset(supported), (
-            trajectory.label,
-            set(trajectory.expected_fail.allowed_failures) - supported,
-        )
+        masks = {
+            (allowed_failure.step_id, allowed_failure.prefix)
+            for allowed_failure in trajectory.expected_fail.allowed_failures
+        }
+        assert len(masks) == len(trajectory.expected_fail.allowed_failures)
+        for allowed_failure in trajectory.expected_fail.allowed_failures:
+            assert allowed_failure.step_id in supported_by_step
+            assert allowed_failure.prefix in supported_by_step[allowed_failure.step_id], (
+                trajectory.label,
+                allowed_failure.step_id,
+                allowed_failure.prefix,
+            )
 
 
 def test_trajectory_runner_dispatches_every_step_through_typed_adapters() -> None:
@@ -277,6 +380,110 @@ def test_expected_fail_allows_only_its_exact_failure_prefixes() -> None:
     )
     assert failed.status == "failed"
     assert any(check.startswith("stage_outcome:") for check in failed.failed_checks)
+
+
+def test_expected_fail_does_not_mask_same_prefix_at_another_step() -> None:
+    trajectory = next(
+        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#251"
+    )
+    first_step = trajectory.steps[0]
+    other_step = trajectory.steps[2]
+    assert any(
+        allowed_failure.step_id == first_step.step_id
+        and allowed_failure.prefix == "effective_window:"
+        for allowed_failure in trajectory.expected_fail.allowed_failures
+    )
+
+    other_step = replace(
+        other_step,
+        expectation=replace(
+            other_step.expectation,
+            artifact_identity="alpha_session_04:unexpected_identity_check",
+        ),
+    )
+    trajectory = replace(
+        trajectory,
+        steps=(first_step, trajectory.steps[1], other_step, *trajectory.steps[3:]),
+    )
+    matching = _matching_observation(other_step)
+    same_family_wrong_step = replace(
+        matching,
+        artifact_identity="alpha_session_04:wrong_identity",
+    )
+    result = run_alpha_trajectory(
+        trajectory=trajectory,
+        adapters=_recording_adapters(
+            [], overrides={other_step.step_id: same_family_wrong_step}
+        ),
+    )
+
+    assert result.status == "failed"
+    assert any(check.startswith("artifact_identity:") for check in result.failed_checks)
+
+
+def test_runner_rejects_disconnect_after_terminal_for_same_submission() -> None:
+    trajectory = next(
+        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#242"
+    )
+    terminal_step = replace(
+        trajectory.steps[0],
+        request={
+            **trajectory.steps[0].request,
+            "submission_identity": "alpha_session_05:submission:run:1",
+        },
+    )
+    disconnect_step = replace(
+        trajectory.steps[1],
+        request={
+            "submission": {
+                "operation": "action",
+                "identity": "alpha_session_05:submission:run:1",
+                "request": {"type": "run_backtest"},
+            }
+        },
+    )
+    invalid_trajectory = replace(
+        trajectory,
+        steps=(
+            terminal_step,
+            disconnect_step,
+            *trajectory.steps[2:],
+        ),
+    )
+
+    result = run_alpha_trajectory(
+        trajectory=invalid_trajectory,
+        adapters=_recording_adapters([]),
+    )
+
+    assert result.status == "failed"
+    assert any(check.startswith("disconnect:") for check in result.failed_checks)
+
+
+def test_orphan_recovery_terminal_must_keep_the_same_durable_identity() -> None:
+    trajectory = next(
+        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#240"
+    )
+    retry_step = trajectory.steps[-1]
+    assert retry_step.operation == "retry"
+    matching = _matching_observation(retry_step)
+    unrelated_terminal = replace(
+        matching,
+        checkpoints={
+            **matching.checkpoints,
+            "terminal.artifact_identity": "alpha_session_other:turn:1",
+        },
+    )
+
+    result = run_alpha_trajectory(
+        trajectory=trajectory,
+        adapters=_recording_adapters(
+            [], overrides={retry_step.step_id: unrelated_terminal}
+        ),
+    )
+
+    assert result.status == "failed"
+    assert any(check.startswith("terminal:") for check in result.failed_checks)
 
 
 def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:
@@ -590,7 +797,7 @@ def test_trajectory_scorecard_is_privacy_safe_and_marks_unexpected_passes(
             "locale",
             "status",
             "expected_fail_issue",
-            "allowed_failure_prefixes",
+            "allowed_failures",
             "failure_prefixes",
             "steps",
         }
@@ -600,6 +807,10 @@ def test_trajectory_scorecard_is_privacy_safe_and_marks_unexpected_passes(
         set(step) == {"step_id", "operation", "failure_prefixes"}
         for result in stored["results"]
         for step in result["steps"]
+    )
+    assert all(
+        all(set(mask) == {"step_id", "prefix"} for mask in result["allowed_failures"])
+        for result in stored["results"]
     )
     for trajectory in trajectories:
         for step in trajectory.steps:

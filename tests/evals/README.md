@@ -76,8 +76,9 @@ known broken behavior stays visible.
 ## Expected-Fail Cases
 
 An expected-fail case must be tagged with an issue number and scoped
-`allowed_failures`. The expected-fail tag only masks failures with those allowed
-prefixes; any unrelated failure still fails the eval.
+`allowed_failures`. Every mask names one exact `step_id` and one failure
+`prefix`. The tag only masks that failure family at that step; the same prefix
+at another step, or any unrelated failure, still fails the eval.
 
 The lane that fixes the tagged issue must flip the case to pass as part of that
 lane's acceptance. Expected-fail is a truthful baseline, not a permanent waiver.
@@ -90,15 +91,22 @@ full acceptance criteria.
 `alpha_session_trajectories.json` is an append-only, sanitized fixture set with
 stable labels `alpha_session_01` through `alpha_session_07`. The typed adapter
 runner dispatches every user or action step through stream, action, disconnect,
-reload, retry, or persistence adapters. It checks canonical SSE, visible
+reload, retry, or persistence adapters. A disconnect step owns the submission
+that is cut before the client observes a terminal; it is never modeled as a
+second operation after a visible terminal. The runner rejects a disconnect for
+an identity whose terminal was already observed. It checks canonical SSE, visible
 response category, stage outcome, artifact and action identity, persistence and
 reload state, typed recovery, route budgets, terminal fingerprints, stale
 actions, and orphan-turn reconciliation.
 
 Each trajectory currently carries one exact owning issue and a narrow set of
-allowed failure prefixes. Keep those tags until the corresponding runtime lane
-lands and the full trajectory passes. The mocked mechanics do not replace the
-sanctioned live gate, deployed exact-SHA browser proof, or founder approval.
+step-scoped allowed failure masks. Before #229, normal confirmation and generic
+typed visible/stage behavior stay asserted, while contract-dependent interrupted
+or recovery steps avoid speculative exact recovery/lifecycle codes. Those steps
+still assert typed transport behavior, zero orphan/duplicate effects, and stable
+durable identity. Keep the tags until the corresponding runtime lane lands and
+the full trajectory passes. The mocked mechanics do not replace the sanctioned
+live gate, deployed exact-SHA browser proof, or founder approval.
 
 ## Categories
 
