@@ -28,6 +28,30 @@ poetry run pytest tests/evals/test_measurement_eval_harness.py -q
 This run is free. It does not call the LLM, does not spend provider tokens, and
 is safe to run anywhere.
 
+## Search Provider Evaluation (Issue #244)
+
+Run the bounded Search provider contract with:
+
+```bash
+poetry run pytest tests/evals/test_search_provider_eval.py -q --no-cov
+```
+
+This evaluation is also free. It replays clearly labeled synthetic
+provider-shaped Perplexity-direct and OpenRouter web-search fixtures against a
+shared rubric. It does not make network or provider calls and therefore cannot
+prove real relevance, citation quality, or latency.
+
+Generate the non-versioned decision evidence with:
+
+```bash
+poetry run python -m tests.evals.search_provider_eval
+```
+
+The report is written to
+`temp/issue-244-search-provider-evaluation.json`. It must recommend deferral
+until real provider evidence, issue #241 integration, and explicit founder
+activation exist.
+
 ## Live Run
 
 Run the live harness with:
