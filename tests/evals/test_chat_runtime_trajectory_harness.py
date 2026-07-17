@@ -361,22 +361,49 @@ def test_canonical_sse_requires_framed_stage_sequence() -> None:
 
     invalid_streams = (
         # A terminal plus [DONE] is not the canonical stage lifecycle.
-        'data: {"type":"final","payload":{}}\n\ndata: [DONE]',
+        'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}\n\ndata: [DONE]',
         # SSE events must be separated by a blank line.
         "\n".join(
             (
-                'data: {"type":"stage_start","stage":"interpretation"}',
-                'data: {"type":"stage_outcome","stage":"interpretation"}',
-                'data: {"type":"final","payload":{}}',
+                'data: {"type":"stage_start","stage":"interpret"}',
+                'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
+                'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
                 "data: [DONE]",
             )
         ),
         # Canonical stages cannot complete before they start.
         "\n\n".join(
             (
-                'data: {"type":"stage_outcome","stage":"interpretation"}',
-                'data: {"type":"stage_start","stage":"interpretation"}',
-                'data: {"type":"final","payload":{}}',
+                'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
+                'data: {"type":"stage_start","stage":"interpret"}',
+                'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
+                "data: [DONE]",
+            )
+        ),
+        # A canonical stream needs exactly one typed terminal.
+        "\n\n".join(
+            (
+                'data: {"type":"stage_start","stage":"interpret"}',
+                'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
+                "data: [DONE]",
+            )
+        ),
+        "\n\n".join(
+            (
+                'data: {"type":"stage_start","stage":"interpret"}',
+                'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
+                'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
+                'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
+                "data: [DONE]",
+            )
+        ),
+        # No data event may follow the typed terminal.
+        "\n\n".join(
+            (
+                'data: {"type":"stage_start","stage":"interpret"}',
+                'data: {"type":"stage_outcome","outcome":"ready_for_confirmation"}',
+                'data: {"type":"final","payload":{"stage_outcome":"ready_for_confirmation"}}',
+                'data: {"type":"token","content":"late"}',
                 "data: [DONE]",
             )
         ),
