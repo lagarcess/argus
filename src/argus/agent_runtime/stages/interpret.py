@@ -2357,14 +2357,13 @@ def _strategy_with_requested_asset_answer_resolution(
     semantic_turn_act: str | None,
     pending_resolution_applied: bool,
 ) -> tuple[StrategySummary, bool]:
-    if pending_resolution_applied:
+    if pending_resolution_applied or semantic_turn_act == "new_idea":
         return strategy, False
     requested_field = _field_base(
         str(selected_thread_metadata.get("requested_field") or "")
     )
     if requested_field != "asset_universe":
         return strategy, False
-    del semantic_turn_act
     prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
     if len(prior_symbols) > 1:
         # This corridor fills a single asset slot; multi-asset universes are

@@ -7600,6 +7600,10 @@ def test_coverage_recovery_does_not_leak_optional_parameters_into_new_idea(
 
     assert result.outcome == "ready_for_confirmation"
     assert result.decision.candidate_strategy_draft.asset_universe == ["NVDA"]
+    assert result.decision.candidate_strategy_draft.date_range == {
+        "start": "2025-01-01",
+        "end": "2025-12-31",
+    }
     optional_status = result.patch.get("optional_parameter_status", {})
     assert "initial_capital" not in optional_status
     assert "fees" not in optional_status
