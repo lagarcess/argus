@@ -94,10 +94,11 @@ def test_browser_preserves_the_spanish_signup_and_login_release_gate() -> None:
 
     assert 'page.goto("/?auth=signup"' in browser_source
     assert 'isApiResponse(response, "/auth/signup", "POST")' in browser_source
-    assert "toMatchObject({" in browser_source
-    assert "language: canaryLanguage" in browser_source
+    assert "signupPayload.language !== canaryLanguage" in browser_source
     assert "expect(signupResponse.status()).toBe(400)" in browser_source
     assert 'page.goto("/?auth=login"' in browser_source
+    assert "signupResponse.request().postDataJSON()).toMatchObject" not in browser_source
+    assert "Spanish signup request omitted the canonical language" in browser_source
 
 
 def test_rendered_browser_owns_the_authoritative_golden_path() -> None:
@@ -145,6 +146,22 @@ def test_browser_opens_the_conversation_through_ui_and_captures_all_identities()
     assert (
         "Rendered decision did not preserve canonical artifact identity" in browser_source
     )
+    assert "decision.note !== canaryDecisionNote" in browser_source
+
+
+def test_browser_checkpoints_private_identity_for_first_run_failure_capture() -> None:
+    browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
+
+    conversation_checkpoint = browser_source.index('status: "conversation_created"')
+    run_click = browser_source.index(
+        'label("chat.confirmation.actions.run_backtest")'
+    )
+    result_checkpoint = browser_source.index('status: "result_captured"')
+    decision_click = browser_source.index('label("chat.result_card.add_decision")')
+    complete_checkpoint = browser_source.index('status: "complete"')
+
+    assert conversation_checkpoint < run_click
+    assert result_checkpoint < decision_click < complete_checkpoint
 
 
 def test_browser_exports_private_identity_handoff_and_shell_deletes_it() -> None:
@@ -226,6 +243,15 @@ def test_shell_requires_result_summary_receipt_and_llm_result_voice() -> None:
     )
     assert 'workflow_metadata.get("result_readout_fallback_used") is not False' in source
     assert 'row.get("task") == "result_summary"' in source
+
+
+def test_shell_verifies_the_profile_owned_decision_note_text() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert "canary-value decision_note" in source
+    assert "source_conversation_id,decision_state,note" in source
+    assert 'CANARY_DECISION_NOTE="$DECISION_NOTE"' in source
+    assert 'decision.get("note") != os.environ["CANARY_DECISION_NOTE"]' in source
 
 
 def test_browser_proves_reload_and_omnisearch_source_identity() -> None:
@@ -401,6 +427,25 @@ def test_canary_capture_builder_produces_a_replayable_artifact(tmp_path: Path) -
     assert stat.S_IMODE(capture_path.stat().st_mode) == 0o600
 
 
+def test_browser_failure_recovers_replay_inputs_before_writing_capture() -> None:
+    source = _source(".github/canary-render.sh")
+    browser_failure = source.split("if ! run_browser_canary; then", 1)[1].split(
+        "\nfi", 1
+    )[0]
+    recovery_body = source.split("recover_browser_failure_capture_inputs() {", 1)[
+        1
+    ].split("\n}", 1)[0]
+
+    assert "recover_browser_failure_capture_inputs" in browser_failure
+    assert browser_failure.index("recover_browser_failure_capture_inputs") < (
+        browser_failure.index('fail_canary "browser"')
+    )
+    assert "BROWSER_IDENTITY_HANDOFF" in recovery_body
+    assert "API_MESSAGES_RESPONSE" in recovery_body
+    assert "API_JOB_RESPONSE" in recovery_body
+    assert "RECEIPT_ROWS" in recovery_body
+
+
 def test_canary_writes_privacy_safe_failure_evidence() -> None:
     source = _source(".github/canary-render.sh")
     fail_body = source.split("fail_canary() {", 1)[1].split("\n}", 1)[0]
@@ -451,6 +496,10 @@ def test_workflow_runs_browser_canary_and_uploads_only_sanitized_artifacts() -> 
     assert "Install Chromium for the deployed browser canary" in workflow
     assert "cd web && bun test __tests__/spanish-ui-smoke.test.ts" in workflow
     assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json" in workflow
+    assert (
+        "ARGUS_CANARY_CAPTURE_PATH=temp/canary-evidence/es-419-capture.json"
+        in workflow
+    )
     assert "temp/canary-evidence/*" in workflow
     assert "BROWSER_IDENTITY_HANDOFF" not in workflow
 

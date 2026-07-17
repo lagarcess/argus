@@ -28,6 +28,7 @@ FOCUSED_SYMBOL_PATH="${ARGUS_CANARY_FOCUSED_SYMBOL_PATH:-}"
 RELEASE_PROFILE_TOOL="$SCRIPT_DIR/private-alpha-release-profile.py"
 PROMPT="$(python3 "$RELEASE_PROFILE_TOOL" canary-value prompt 2>/dev/null || true)"
 DECISION_STATE="$(python3 "$RELEASE_PROFILE_TOOL" canary-value decision_state 2>/dev/null || true)"
+DECISION_NOTE="$(python3 "$RELEASE_PROFILE_TOOL" canary-value decision_note 2>/dev/null || true)"
 SEARCH_QUERY="$(python3 "$RELEASE_PROFILE_TOOL" canary-value search_query 2>/dev/null || true)"
 
 if [ -z "$CHECKED_OUT_SHA" ]; then
@@ -729,6 +730,80 @@ PY
   echo "canary_result=$RESULT_LABEL"
 }
 
+recover_browser_failure_capture_inputs() {
+  local values
+  if ! values="$(python3 - "$BROWSER_IDENTITY_HANDOFF" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+if not path.is_file() or not path.read_text(encoding="utf-8").strip():
+    raise SystemExit(1)
+try:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+except json.JSONDecodeError as exc:
+    raise SystemExit(1) from exc
+if payload.get("schema_version") != 1 or payload.get("source") != "playwright":
+    raise SystemExit(1)
+required = ("user_id", "conversation_id")
+if any(not isinstance(payload.get(key), str) or not payload[key].strip() for key in required):
+    raise SystemExit(1)
+keys = (
+    "user_id",
+    "conversation_id",
+    "backtest_job_id",
+    "backtest_run_id",
+    "evidence_artifact_id",
+    "idea_id",
+    "idea_version_id",
+)
+print("|".join(payload.get(key) if isinstance(payload.get(key), str) else "-" for key in keys))
+PY
+  )"; then
+    return 0
+  fi
+
+  IFS='|' read -r \
+    USER_ID \
+    CONVERSATION_ID \
+    BACKTEST_JOB_ID \
+    BACKTEST_RUN_ID \
+    EVIDENCE_ARTIFACT_ID \
+    IDEA_ID \
+    IDEA_VERSION_ID <<< "$values"
+  [ "$BACKTEST_JOB_ID" = "-" ] && BACKTEST_JOB_ID=""
+  [ "$BACKTEST_RUN_ID" = "-" ] && BACKTEST_RUN_ID=""
+  [ "$EVIDENCE_ARTIFACT_ID" = "-" ] && EVIDENCE_ARTIFACT_ID=""
+  [ "$IDEA_ID" = "-" ] && IDEA_ID=""
+  [ "$IDEA_VERSION_ID" = "-" ] && IDEA_VERSION_ID=""
+
+  CONVERSATION_LABEL="$(privacy_safe_id_label conversation "$CONVERSATION_ID")"
+  BACKTEST_JOB_LABEL="$(privacy_safe_id_label backtest_job "$BACKTEST_JOB_ID")"
+  RESULT_LABEL="$(privacy_safe_id_label backtest_run "$BACKTEST_RUN_ID")"
+  EVIDENCE_ARTIFACT_LABEL="$(privacy_safe_id_label evidence_artifact "$EVIDENCE_ARTIFACT_ID")"
+  IDEA_LABEL="$(privacy_safe_id_label idea "$IDEA_ID")"
+  IDEA_VERSION_LABEL="$(privacy_safe_id_label idea_version "$IDEA_VERSION_ID")"
+
+  if ! login_for_read_only_api_postconditions; then
+    return 0
+  fi
+  curl -fsS -b "$COOKIE_JAR" \
+    "${API_URL}/api/v1/conversations/${CONVERSATION_ID}/messages" \
+    > "$API_MESSAGES_RESPONSE" || true
+  if [ -n "$BACKTEST_JOB_ID" ]; then
+    curl -fsS -b "$COOKIE_JAR" \
+      "${API_URL}/api/v1/backtest-jobs/${BACKTEST_JOB_ID}" \
+      > "$API_JOB_RESPONSE" || true
+  fi
+  if [ -n "$BACKTEST_RUN_ID" ]; then
+    supabase_get \
+      "${SUPABASE_URL}/rest/v1/route_receipts?select=id,user_id,conversation_id,run_id,task,outcome&conversation_id=eq.${CONVERSATION_ID}&run_id=eq.${BACKTEST_RUN_ID}" \
+      "$RECEIPT_ROWS" || true
+  fi
+  echo "canary_failed_browser_capture_inputs=collected"
+}
+
 login_for_read_only_api_postconditions() {
   local login_body
   login_body="$(CANARY_EMAIL="$EMAIL" CANARY_PASSWORD="$PASSWORD" python3 - <<'PY'
@@ -884,7 +959,7 @@ verify_canonical_postconditions() {
     "${SUPABASE_URL}/rest/v1/evidence_artifacts?select=id,user_id,idea_id,idea_version_id,source_conversation_id,source_run_id,artifact_type,lifecycle&id=eq.${EVIDENCE_ARTIFACT_ID}" \
     "$EVIDENCE_ROWS"
   supabase_get \
-    "${SUPABASE_URL}/rest/v1/decision_notes?select=id,user_id,evidence_artifact_id,idea_id,idea_version_id,source_conversation_id,decision_state&id=eq.${DECISION_NOTE_ID}" \
+    "${SUPABASE_URL}/rest/v1/decision_notes?select=id,user_id,evidence_artifact_id,idea_id,idea_version_id,source_conversation_id,decision_state,note&id=eq.${DECISION_NOTE_ID}" \
     "$DECISION_ROWS"
   supabase_get \
     "${SUPABASE_URL}/rest/v1/ideas?select=id,user_id,source_conversation_id,active_version_id,lifecycle&id=eq.${IDEA_ID}" \
@@ -911,6 +986,7 @@ verify_canonical_postconditions() {
   CANARY_EVIDENCE_ID="$EVIDENCE_ARTIFACT_ID" \
   CANARY_DECISION_ID="$DECISION_NOTE_ID" \
   CANARY_DECISION_STATE="$DECISION_STATE" \
+  CANARY_DECISION_NOTE="$DECISION_NOTE" \
   CANARY_IDEA_ID="$IDEA_ID" \
   CANARY_IDEA_VERSION_ID="$IDEA_VERSION_ID" \
   python3 - <<'PY'
@@ -1020,6 +1096,7 @@ if (
     or decision.get("idea_version_id") != os.environ["CANARY_IDEA_VERSION_ID"]
     or decision.get("source_conversation_id") != os.environ["CANARY_CONVERSATION_ID"]
     or decision.get("decision_state") != os.environ["CANARY_DECISION_STATE"]
+    or decision.get("note") != os.environ["CANARY_DECISION_NOTE"]
 ):
     raise SystemExit("canonical decision identity mismatch")
 if (
@@ -1055,6 +1132,7 @@ fi
 validate_release_evidence_contract
 
 if ! run_browser_canary; then
+  recover_browser_failure_capture_inputs || true
   fail_canary "browser" "rendered_golden_path_failed"
 fi
 if ! verify_browser_identity_handoff; then

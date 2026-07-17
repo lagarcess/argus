@@ -117,6 +117,7 @@ jobs:
           set +e
           ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
           ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json \
+          ARGUS_CANARY_CAPTURE_PATH=temp/canary-evidence/es-419-capture.json \
           .github/canary-render.sh
           status=$?
           echo "$status" > temp/canary-evidence/es-419.exit

@@ -41,6 +41,18 @@ function privateId(value: unknown, name: string): string {
   return value;
 }
 
+async function writePrivateHandoff(
+  path: string,
+  payload: JsonRecord,
+): Promise<void> {
+  await writeFile(path, `${JSON.stringify(payload)}\n`, {
+    encoding: "utf8",
+    flag: "w",
+    mode: 0o600,
+  });
+  await chmod(path, 0o600);
+}
+
 function isApiResponse(response: Response, suffix: string, method: string): boolean {
   try {
     return (
@@ -84,9 +96,10 @@ async function loginThroughRenderedUi(
       .getByRole("button", { name: label("auth.signup.submit") })
       .click();
     const signupResponse = await signupResponsePromise;
-    expect(signupResponse.request().postDataJSON()).toMatchObject({
-      language: canaryLanguage,
-    });
+    const signupPayload = signupResponse.request().postDataJSON() as JsonRecord;
+    if (signupPayload.language !== canaryLanguage) {
+      throw new Error("Spanish signup request omitted the canonical language");
+    }
     expect(signupResponse.status()).toBe(400);
     await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
   }
@@ -281,6 +294,13 @@ test.describe.serial("private-alpha rendered release canary", () => {
     if (new URL(page.url()).searchParams.get("conversation") !== conversationId) {
       throw new Error("Rendered conversation route did not preserve browser identity");
     }
+    await writePrivateHandoff(handoffPath, {
+      schema_version: 1,
+      source: "playwright",
+      status: "conversation_created",
+      user_id: userId,
+      conversation_id: conversationId,
+    });
 
     await expect(
       page.getByText(label("chat.confirmation.status.ready_to_run"), { exact: true }),
@@ -326,6 +346,21 @@ test.describe.serial("private-alpha rendered release canary", () => {
     ) {
       throw new Error("Browser-captured job and run identities did not finalize together");
     }
+    await writePrivateHandoff(handoffPath, {
+      schema_version: 1,
+      source: "playwright",
+      status: "result_captured",
+      user_id: userId,
+      conversation_id: conversationId,
+      backtest_job_id: backtestJobId,
+      backtest_run_id: backtestRunId,
+      evidence_artifact_id: evidenceArtifactId,
+      idea_id: ideaId,
+      idea_version_id: ideaVersionId,
+      decision_state: canaryDecisionState,
+      run_action_request_count: runBacktestRequests,
+      assertions: { result_rendered_once: true },
+    });
 
     await page
       .getByRole("button", { name: label("chat.result_card.add_decision") })
@@ -368,6 +403,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
       decision.idea_id !== ideaId ||
       decision.idea_version_id !== ideaVersionId ||
       decision.decision_state !== canaryDecisionState ||
+      decision.note !== canaryDecisionNote ||
       decidedArtifact.id !== evidenceArtifactId ||
       decidedArtifact.lifecycle !== "decided"
     ) {
@@ -449,33 +485,28 @@ test.describe.serial("private-alpha rendered release canary", () => {
     expect(browserErrors.consoleErrorCount).toBe(0);
     expect(browserErrors.pageErrorCount).toBe(0);
 
-    await writeFile(
-      handoffPath,
-      `${JSON.stringify({
-        schema_version: 1,
-        source: "playwright",
-        user_id: userId,
-        conversation_id: conversationId,
-        backtest_job_id: backtestJobId,
-        backtest_run_id: backtestRunId,
-        evidence_artifact_id: evidenceArtifactId,
-        decision_note_id: decisionNoteId,
-        idea_id: ideaId,
-        idea_version_id: ideaVersionId,
-        decision_state: canaryDecisionState,
-        run_action_request_count: runBacktestRequests,
-        assertions: {
-          result_rendered_once: true,
-          reload_hydrated: true,
-          omnisearch_reopened_source: true,
-          console_error_count: browserErrors.consoleErrorCount,
-          page_error_count: browserErrors.pageErrorCount,
-          blocking_overlay_present: false,
-        },
-      })}\n`,
-      { encoding: "utf8", flag: "w", mode: 0o600 },
-    );
-    await chmod(handoffPath, 0o600);
+    await writePrivateHandoff(handoffPath, {
+      schema_version: 1,
+      source: "playwright",
+      status: "complete",
+      user_id: userId,
+      conversation_id: conversationId,
+      backtest_job_id: backtestJobId,
+      backtest_run_id: backtestRunId,
+      evidence_artifact_id: evidenceArtifactId,
+      decision_note_id: decisionNoteId,
+      idea_id: ideaId,
+      idea_version_id: ideaVersionId,
+      decision_state: canaryDecisionState,
+      run_action_request_count: runBacktestRequests,
+      assertions: {
+        result_rendered_once: true,
+        reload_hydrated: true,
+        omnisearch_reopened_source: true,
+        console_error_count: browserErrors.consoleErrorCount,
+        page_error_count: browserErrors.pageErrorCount,
+        blocking_overlay_present: false,
+      },
+    });
   });
-
 });
