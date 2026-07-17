@@ -61,6 +61,7 @@ private_alpha_allowlist
 profiles
 conversations
 messages
+chat_turn_lifecycles
 strategies
 collections
 collection_strategies
@@ -92,6 +93,7 @@ auth.users
 profiles
    ├── conversations
    │      ├── messages
+   │      ├── chat_turn_lifecycles
    │      ├── backtest_jobs
    │      └── backtest_runs
    │
@@ -246,6 +248,70 @@ Represents individual messages within a conversation.
   references. Later turns that create a new draft, active confirmation,
   completed result, or explicit cancellation should supersede stale retry
   affordances during hydration.
+---
+
+## 8.1 chat_turn_lifecycles
+
+Represents one mutable current-state recovery record for each accepted ordinary
+chat turn. It is not a second job queue, transcript, event ledger, or LangGraph
+state store. Messages remain immutable; message reads project the current
+lifecycle row into `metadata.agent_runtime_turn` without rewriting the message.
+
+### Fields
+- `turn_id`: `uuid` (Primary Key and reference to the accepted user
+  `messages.id`; this is also the `request_message_id`)
+- `user_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
+- `conversation_id`: `uuid` (References `conversations.id` ON DELETE CASCADE)
+- `assistant_message_id`: `uuid` (Nullable, unique, references `messages.id` ON
+  DELETE SET NULL)
+- `request_id`: `text` (The request correlation id used by responses, logs, and
+  route-receipt metadata)
+- `status`: `text`
+- `reconciled_outcome`: `text` (Nullable)
+- `failure_code`: `text` (Nullable, stable and user-safe)
+- `retryable`: `boolean` (Default: `false`)
+- `accepted_at`: `timestamptz`
+- `running_at`: `timestamptz` (Nullable)
+- `terminal_at`: `timestamptz` (Nullable)
+- `reconciled_at`: `timestamptz` (Nullable)
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+### Enums and constraints
+- **status**: `accepted`, `running`, `completed`, `recoverable_failed`,
+  `abandoned`, `reconciled`.
+- **reconciled_outcome**: `completed`, `recoverable_failed`, or `abandoned`;
+  required only when `status = reconciled` and null otherwise.
+- `turn_id` makes lifecycle creation idempotent for the accepted user message.
+- `assistant_message_id` is unique when present so one terminal assistant
+  message cannot settle two turns.
+- Terminal statuses are `completed`, `recoverable_failed`, `abandoned`, and
+  `reconciled`.
+
+### Transition ownership and idempotency
+- The user message and `accepted` row are created in one database-owned
+  transaction after request admission succeeds.
+- One database compare-and-set function locks the lifecycle row and permits only
+  the transitions named in `docs/API_CONTRACT.md` under
+  `contract-chat-turn-lifecycle`.
+- Repeating the same target status, assistant-message link, failure code, and
+  reconciliation outcome returns the current row as a no-op. A different
+  terminal target is rejected.
+- Route receipts correlate through the same `user_id`, `conversation_id`,
+  `request_id`, and message ids; the lifecycle row does not duplicate receipt
+  payloads.
+- Owner-scoped RLS uses `auth.uid() = user_id`. Product writes use the
+  server-side persistence boundary; the frontend does not mutate lifecycle
+  state directly.
+
+### Reconciliation boundary
+- `accepted`/`running` rows become stale after 15 minutes.
+- The next chat POST and conversation-message read reconcile at most 20 stale
+  rows for that conversation. Private alpha does not add a background sweeper.
+- Durable terminal assistant artifacts, the existing terminal-runtime-failure
+  record, and checkpointer evidence are checked before a row can become
+  `abandoned` with `failure_code = turn_abandoned`.
+
 ---
 
 # 9. strategies
@@ -672,10 +738,13 @@ canonical immutable `backtest_runs` row and reference it through
 ### Fields
 - `id`: `uuid` (Primary Key)
 - `user_id`: `uuid` (References `profiles.id`)
-- `conversation_id`: `uuid` (References `conversations.id`)
+- `conversation_id`: `uuid` (Nullable only for direct `backtests.run` admission;
+  otherwise references `conversations.id`)
 - `request_message_id`: `uuid` (Nullable, references `messages.id`)
 - `confirmation_message_id`: `uuid` (Nullable, references `messages.id`)
-- `idempotency_key`: `text` (Nullable)
+- `operation_scope`: `text` (`chat.run_backtest` or `backtests.run`)
+- `idempotency_key`: `text` (Required, 1-128 visible ASCII characters)
+- `identity_hash`: `text` (SHA-256 of the operation's canonical identity tuple)
 - `payload_hash`: `text`
 - `launch_payload`: `jsonb`
 - `status`: `text`
@@ -695,6 +764,7 @@ canonical immutable `backtest_runs` row and reference it through
 
 ### Enums
 - **status**: `queued`, `running`, `succeeded`, `failed`, `canceled`, `expired`
+- **operation_scope**: `chat.run_backtest`, `backtests.run`
 - **priority**: `normal` initially; future values may support admin or canary
   jobs.
 
@@ -723,7 +793,15 @@ Unknown failures default to `failed`, `failed_internal` semantics,
 `failure_code` is intentionally added.
 
 ### Notes
-- Jobs are idempotent by user and payload/idempotency key.
+- Jobs are idempotent at
+  `UNIQUE(user_id, operation_scope, idempotency_key)`. Exact retries return the
+  current row before capacity/usage checks; a different `identity_hash` is a
+  collision and never returns the old row.
+- The reservation lasts for the durable job record's lifetime. A caller does
+  not reuse the same key for a new execution after an elapsed retention window.
+- Chat Run actions use `confirmation_id` as `idempotency_key`. Direct jobs may
+  omit `conversation_id` so the existing direct request shape remains
+  compatible, but they remain owner-scoped by `user_id`.
 - The UI must hydrate queued/running/succeeded/failed/canceled/expired state
   from durable rows, not frontend-invented state.
 - The current private-alpha UI hydrates status through the API polling endpoint;
@@ -866,7 +944,10 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - Users may only `SELECT`, `UPDATE`, or `DELETE` rows where `user_id = auth.uid()`.
 
 ### Tables Requiring RLS
-- `private_alpha_allowlist`, `profiles`, `conversations`, `messages`, `strategies`, `collections`, `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`, `usage_counters`.
+- `private_alpha_allowlist`, `profiles`, `conversations`, `messages`,
+  `chat_turn_lifecycles`, `strategies`, `collections`,
+  `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
+  `usage_counters`.
 
 ### Private Alpha Allowlist
 - No `anon` or `authenticated` role access is required.
@@ -881,13 +962,18 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - **profiles**: `(id)`, `(username)`
 - **conversations**: `(user_id, updated_at DESC)`, `(user_id, archived, deleted_at)`, `(user_id, pinned)`
 - **messages**: `(conversation_id, created_at DESC)`
+- **chat_turn_lifecycles**: `(conversation_id, status, updated_at)`,
+  `(user_id, status, updated_at)`, unique `(assistant_message_id)` where not null
 - **strategies**: `(user_id, updated_at DESC)`, `(user_id, pinned)`, `(user_id, deleted_at)`
 - **strategies (gin)**: `USING gin(symbols)`
 - **collections**: `(user_id, updated_at DESC)`, `(user_id, pinned)`, `(user_id, deleted_at)`
 - **collection_strategies**: `(collection_id)`, `(strategy_id)`
 - **backtest_jobs**: `(user_id, status, queued_at DESC)`, `(conversation_id, created_at DESC)`, `(result_run_id)`
-- **backtest_jobs unique/idempotency**: `(user_id, idempotency_key)` where `idempotency_key is not null`
+- **backtest_jobs unique/idempotency**:
+  `UNIQUE(user_id, operation_scope, idempotency_key)`
 - **backtest_jobs payload lookup**: `(user_id, payload_hash, created_at DESC)`
+- **backtest_jobs identity lookup**:
+  `(user_id, operation_scope, identity_hash, created_at DESC)`
 - **backtest_runs**: `(user_id, created_at DESC)`, `(conversation_id)`, `(strategy_id)`
 - **backtest_runs (gin)**: `USING gin(symbols)`
 - **feedback**: `(user_id, created_at DESC)`
@@ -933,8 +1019,11 @@ Short-window protection against abuse or runaway UI loops.
 Durable job backpressure protects the chat API from compute spikes.
 - **Per user**: 1 running backtest, 2 queued backtests.
 - **Global**: 5 running backtests, 10 queued backtests.
-- **Mechanism**: Enforced against `backtest_jobs` before creating or starting a
-  new workflow job.
+- **Mechanism**: The database-owned admission operation resolves idempotency,
+  checks both scopes, charges one unique admission, and inserts the queued job
+  atomically. Per-user exhaustion returns `429 backtest_capacity_exceeded`;
+  global exhaustion returns `503 backtest_capacity_exceeded`; both include
+  `Retry-After: 15`.
 
 ### Layer 3: Daily / Rolling Quotas
 Generous usage boundaries tracked via the `usage_counters` table.
@@ -949,17 +1038,22 @@ Generous usage boundaries tracked via the `usage_counters` table.
 ### Enforcement Flow
 1. **Authenticate**: Resolve `user_id` from session.
 2. **Hard Constraints**: Validate `backtest_run` inputs against Engine Constraints.
-3. **Check Counters**: Query `usage_counters` for applicable resource/period.
-4. **Check Job Backpressure**: Query `backtest_jobs` for per-user and global
-   queued/running limits before creating a workflow job.
-5. **Exceedance Policy**:
+3. **Atomic Admission**: In one database operation, resolve exact replay versus
+   identity collision, check the applicable usage period plus per-user/global
+   queued/running capacity, charge one unique simulation, and insert the queued
+   job. Chat and direct runs use the same boundary.
+4. **Exceedance Policy**:
    - If rate limit exceeded: Return `429 Too Many Requests`.
    - If daily quota exhausted: Return `429` (Alpha policy).
-   - If job backpressure limit is hit: return a product-safe queued/try-later
-     response instead of starting unbounded compute.
-6. **Execute**: Create a durable job and trigger workflow execution.
-7. **Increment**: Update/Insert the `usage_counters` row.
-8. **Response**: Return result or job state. Include rate-limit headers only
+   - If per-user capacity is exhausted: return
+     `429 backtest_capacity_exceeded` with `Retry-After: 15`.
+   - If global capacity is exhausted: return
+     `503 backtest_capacity_exceeded` with `Retry-After: 15`.
+   - If the same reservation key carries a different identity: return
+     `409 idempotency_conflict` without returning the old job.
+5. **Execute**: Dispatch workflow execution, or run the admitted direct
+   compatibility path synchronously, against the durable job.
+6. **Response**: Return result or job state. Include rate-limit headers only
    when they are backed by an active limiter; do not emit placeholder quota
    values.
 

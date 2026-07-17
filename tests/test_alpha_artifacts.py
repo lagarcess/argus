@@ -6,6 +6,132 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _markdown_section(text: str, anchor: str, next_anchor: str) -> str:
+    start = text.index(f'<a id="{anchor}"></a>')
+    end = text.index(f'<a id="{next_anchor}"></a>', start)
+    return text[start:end]
+
+
+def test_reliability_contract_locks_admission_and_run_reconciliation() -> None:
+    contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+
+    admission = _markdown_section(
+        contract,
+        "contract-idempotency-admission",
+        "contract-request-boundaries",
+    )
+    for exact_rule in (
+        "`(user_id, operation_scope, Idempotency-Key)`",
+        "`chat.run_backtest`",
+        "`backtests.run`",
+        "`409 idempotency_conflict`",
+        "`429` | `backtest_capacity_exceeded` | `15` seconds",
+        "`503` | `backtest_capacity_exceeded` | `15` seconds",
+        "`409 idempotency_in_progress`",
+        "`Retry-After: 1`",
+    ):
+        assert exact_rule in admission
+
+    reconciliation = _markdown_section(
+        contract,
+        "contract-run-action-reconciliation",
+        "contract-chat-turn-lifecycle",
+    )
+    for exact_rule in (
+        "`confirmation_id` is the Run action identity",
+        "`Idempotency-Key` must equal `confirmation_id`",
+        "`GET /api/v1/backtest-jobs/by-action/{confirmation_id}`",
+        "`queued` or `running`",
+        "`failed`, `canceled`, or `expired`",
+    ):
+        assert exact_rule in reconciliation
+
+
+def test_reliability_contract_locks_chat_request_boundaries() -> None:
+    contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+    bounds = _markdown_section(
+        contract,
+        "contract-request-boundaries",
+        "contract-openapi-authority",
+    )
+
+    for exact_rule in (
+        "| Entire request body | `65,536` UTF-8 bytes |",
+        "| `conversation_id` | `128` Unicode code points |",
+        "| `message` | `16,000` Unicode code points |",
+        "| `mentions` | `10` items |",
+        "| `mention.id` | `128` Unicode code points |",
+        "| `mention.label` | `120` Unicode code points |",
+        "| `mention.symbol` | `32` Unicode code points |",
+        "| `mention.description` | `256` Unicode code points |",
+        "| `mention.insert_text` | `64` Unicode code points |",
+        "| `mention.provider` | `64` Unicode code points |",
+        "| `action.label` | `120` Unicode code points |",
+        "| `action.labelKey` | `160` Unicode code points |",
+        "| `action.payload` serialized size | `16,384` UTF-8 bytes |",
+        "| `action.payload` container depth | `6` |",
+        "| Any `action.payload` object | `50` keys |",
+        "| Any `action.payload` array | `50` items |",
+        "| Any `action.payload` string | `4,096` Unicode code points |",
+        "`413 request_body_too_large`",
+        "`422 validation_error`",
+    ):
+        assert exact_rule in bounds
+
+
+def test_reliability_contract_locks_openapi_authority_and_exclusions() -> None:
+    contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+    authority = _markdown_section(
+        contract,
+        "contract-openapi-authority",
+        "contract-run-action-reconciliation",
+    )
+
+    for exact_rule in (
+        "FastAPI `app.openapi()` is the canonical machine-readable source",
+        "`docs/api/openapi.yaml` is the checked compatibility artifact",
+        "`GET /health`",
+        "`GET /internal/readiness`",
+        "`POST /api/v1/dev/reset`",
+        "`POST /api/v1/chat/stream` 200 `text/event-stream` response body",
+        "`/api/v1` appears exactly once",
+    ):
+        assert exact_rule in authority
+
+
+def test_reliability_contract_locks_durable_turn_lifecycle() -> None:
+    contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+    architecture = (ROOT / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+    data_model = (ROOT / "docs" / "DATA_MODEL.md").read_text(encoding="utf-8")
+
+    lifecycle_start = contract.index('<a id="contract-chat-turn-lifecycle"></a>')
+    lifecycle_end = contract.index("\n## Admin Bypass", lifecycle_start)
+    lifecycle = contract[lifecycle_start:lifecycle_end]
+    for state in (
+        "`accepted`",
+        "`running`",
+        "`completed`",
+        "`recoverable_failed`",
+        "`abandoned`",
+        "`reconciled`",
+    ):
+        assert state in lifecycle
+    for exact_rule in (
+        "`15 minutes`",
+        "`20` stale rows",
+        "`completed | recoverable_failed | abandoned`",
+        "`turn_abandoned`",
+    ):
+        assert exact_rule in lifecycle
+
+    assert (
+        "Supabase owns the current durable lifecycle of every accepted chat turn"
+        in architecture
+    )
+    assert "## 8.1 chat_turn_lifecycles" in data_model
+    assert "`UNIQUE(user_id, operation_scope, idempotency_key)`" in data_model
+
+
 def test_active_openapi_uses_alpha_contract_names() -> None:
     openapi = ROOT / "docs" / "api" / "openapi.yaml"
 
@@ -72,8 +198,7 @@ def test_p1_evidence_spine_migration_freezes_immutable_fields_only() -> None:
     )
 
     assert (
-        "create or replace function public.prevent_idea_version_immutable_update"
-        in text
+        "create or replace function public.prevent_idea_version_immutable_update" in text
     )
     assert "create trigger prevent_idea_versions_immutable_update" in text
     assert "before update on public.idea_versions" in text

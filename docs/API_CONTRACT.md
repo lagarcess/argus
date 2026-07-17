@@ -140,12 +140,279 @@ Supported rate-limit headers where applicable:
 - `canceled`
 - `expired`
 
-## Idempotency
+## Reliability Decision Gate (#229)
+
+The sections below are the exact approval candidate for issue #229. They become
+binding only when the founder approves the exact diff that introduced them.
+Merging this text without that approval does not unblock consumer issues. After
+approval, #230, #234, #235, #240, and #242 must link to the relevant anchored
+section before changing behavior.
+
+<a id="contract-idempotency-admission"></a>
+### Idempotency, admission, backpressure, and direct runs
+
 Alpha supports server-side idempotency for expensive state-changing operations.
-- **Header**: `Idempotency-Key`
-- **Duration**: 24 hours.
-- **Scope**: `authenticated user_id` + `endpoint` + `Idempotency-Key`.
-- **Behavior**: Identical requests (same key/user/endpoint) return the same response or current known status. Collisions across different users are prevented by user-scoping.
+
+#### Idempotency identity
+
+- `Idempotency-Key` is required for `run_backtest` chat actions and
+  `POST /api/v1/backtests/run`. It is optional for ordinary non-executing chat
+  turns.
+- A key is 1-128 visible ASCII characters (`0x21` through `0x7e`). It is not
+  trimmed, lowercased, or otherwise normalized. Empty/whitespace-only required
+  values are missing; any other value containing whitespace is invalid.
+- An accepted backtest key remains reserved and replayable for the lifetime of
+  its durable job record. It is never reused for a new execution after 24 hours;
+  a new execution requires a new key.
+- A missing/blank required key returns `400 idempotency_key_required`; invalid
+  length/characters return `422 validation_error`.
+- The unique reservation key is
+  `(user_id, operation_scope, Idempotency-Key)`. The two approved operation
+  scopes are `chat.run_backtest` and `backtests.run`.
+- `chat.run_backtest` identity is the canonical hash of `conversation_id`,
+  `confirmation_id`, and `launch_payload_hash`.
+- `backtests.run` identity is the canonical hash of nullable
+  `conversation_id`, nullable `strategy_id`, and the fully normalized inline or
+  saved-strategy backtest payload.
+- Canonical hashes use UTF-8 JSON with recursively sorted object keys, compact
+  separators, explicit nulls for the nullable identity fields, and SHA-256.
+- An exact replay is resolved before quota, capacity, or compute checks. It
+  returns the same durable job/current status or the same completed Run and
+  counts zero additional simulations.
+- Reusing the reservation key with a different canonical identity returns
+  `409 idempotency_conflict`. The response must not expose the existing job or
+  Run, increment usage, reserve capacity, or execute work.
+- Keys are scoped to the authenticated user. The same text used by another user
+  is a different reservation and never reveals the first user's state.
+
+Durable `backtest_jobs` rows therefore store `operation_scope`,
+`idempotency_key`, `identity_hash`, and the existing launch `payload_hash` as
+separate fields. `idempotency_key` is non-null for accepted jobs, and the
+database uniqueness boundary is
+`UNIQUE(user_id, operation_scope, idempotency_key)`.
+
+#### Atomic admission and backpressure
+
+One database-owned operation performs exact-replay/collision resolution,
+per-user and global queued/running capacity checks, durable job creation, and
+the unique-simulation allowance charge. A count-then-insert sequence in the API
+is not conforming admission.
+
+The private-alpha limits remain:
+
+| Scope | Running | Queued |
+| --- | ---: | ---: |
+| Per user | 1 | 2 |
+| Global | 5 | 10 |
+
+Capacity rejection is provider-neutral and does not disclose counts or other
+users' work:
+
+| Exhausted boundary | HTTP status | Problem `code` | `Retry-After` |
+| --- | ---: | --- | ---: |
+| Per-user running or queued cap | `429` | `backtest_capacity_exceeded` | `15` seconds |
+| Global running or queued cap | `503` | `backtest_capacity_exceeded` | `15` seconds |
+
+`Retry-After` is the integer delta-seconds value `15`, not an HTTP date or a
+client timer. A capacity rejection creates no job and consumes no simulation
+allowance. An exact replay of an already admitted identity bypasses current
+capacity checks and returns its existing state.
+
+#### Direct `POST /backtests/run`
+
+The direct route remains a compatibility/manual execution path with its current
+successful `200 {"run": ...}` response. It is not a production admission
+bypass:
+
+1. It must use the same database-owned reservation, capacity limits, identity
+   collision rules, and unique-simulation charge as chat admission.
+2. It creates the durable job before synchronous execution begins. A direct job
+   may have `conversation_id = null`; ownership remains `user_id`.
+3. The direct process transitions that job through `running` and a durable
+   terminal state, then returns the canonical finalized Run on success.
+4. An exact replay of a succeeded direct job returns the same Run. An exact
+   replay while its job is queued or running returns
+   `409 idempotency_in_progress`, includes `Retry-After: 1`, and identifies the
+   owner-scoped job as `context.backtest_job_id` without starting work again.
+5. An exact replay of a durable failed, canceled, or expired direct job returns
+   that same terminal RFC 9457 failure. A new execution requires a new key.
+
+<a id="contract-request-boundaries"></a>
+### Chat request-size and RFC 9457 ownership
+
+These are Argus-owned limits for `POST /api/v1/chat/stream`; provider token or
+gateway defaults do not define the product contract.
+
+| Boundary | Inclusive maximum |
+| --- | ---: |
+| Entire request body | `65,536` UTF-8 bytes |
+| `conversation_id` | `128` Unicode code points |
+| `message` | `16,000` Unicode code points |
+| `mentions` | `10` items |
+| `mention.id` | `128` Unicode code points |
+| `mention.label` | `120` Unicode code points |
+| `mention.symbol` | `32` Unicode code points |
+| `mention.description` | `256` Unicode code points |
+| `mention.insert_text` | `64` Unicode code points |
+| `mention.provider` | `64` Unicode code points |
+| `action.label` | `120` Unicode code points |
+| `action.labelKey` | `160` Unicode code points |
+| `action.payload` serialized size | `16,384` UTF-8 bytes |
+| `action.payload` container depth | `6` |
+| Any `action.payload` object | `50` keys |
+| Any `action.payload` array | `50` items |
+| Any `action.payload` string | `4,096` Unicode code points |
+
+The compact serialized-size calculation uses UTF-8 JSON, sorted object keys,
+separators `,` and `:`, and unescaped Unicode (`ensure_ascii = false`). The
+top-level `action.payload` object has container depth 1; each nested object or
+array adds 1, while scalars add no depth. Exact boundary-sized values remain
+valid.
+
+The application/ASGI boundary counts actual received bytes. A valid declared
+`Content-Length` above 65,536 is rejected immediately. Missing, invalid, or
+chunked `Content-Length` uses the same cumulative byte counter and cannot bypass
+the ceiling. Rejection occurs before JSON parsing, auth dependencies, quota,
+persistence, providers, or the interpreter.
+
+- A body above the raw ingress ceiling returns
+  `413 request_body_too_large` as RFC 9457 JSON.
+- A syntactically valid body that violates a field, list, payload-size, or depth
+  rule returns `422 validation_error` with validation details in
+  `context.errors`.
+- Both responses include one `request_id` in the body and the identical
+  `X-Request-Id` response header. Unexpected exceptions also return safe
+  `500 internal_error` Problem Details with that same correlation value and no
+  request body, secret, provider detail, or stack trace.
+
+<a id="contract-openapi-authority"></a>
+### OpenAPI authority and allowed differences
+
+FastAPI `app.openapi()` is the canonical machine-readable source for registered
+public paths, methods, parameters, request/response schemas, required fields,
+and enums. `docs/api/openapi.yaml` is the checked compatibility artifact, not a
+second API authority. This human contract remains authoritative for semantics
+that OpenAPI cannot express, such as idempotent transition ownership and SSE
+event ordering.
+
+The checked artifact uses origin-relative servers and generated paths that
+already contain `/api/v1`; `/api/v1` appears exactly once in the effective URL.
+
+The structural compatibility gate excludes only these individually named
+non-product operations:
+
+- `GET /health`
+- `GET /internal/readiness`
+- `POST /api/v1/dev/reset`
+
+No public `/api/v1` product route may be hidden by a prefix or wildcard
+allowlist. Documentation-only fields (`description`, `summary`, `operationId`,
+`tags`, examples, and external documentation links) do not participate in the
+structural comparison.
+
+One manual streaming difference is approved: for the
+`POST /api/v1/chat/stream` 200 `text/event-stream` response body, the gate
+normalizes FastAPI's generated success media type to `text/event-stream` and
+excludes only that success body schema from comparison. The checked artifact
+may then describe SSE events and examples precisely. The route, method, header
+parameter name/schema, request schema, 200 status, and all RFC 9457 error
+statuses/media/schema remain structural gate inputs. The conditional
+requirement that the header equal `confirmation_id` for `run_backtest` is
+semantic text because OpenAPI cannot express that body/header dependency. There
+are no other schema or public-route exclusions.
+
+<a id="contract-run-action-reconciliation"></a>
+### Stable Run action identity and ambiguous-result reconciliation
+
+`confirmation_id` is the Run action identity. A `run_backtest` action must carry
+the active `confirmation_id`, and `Idempotency-Key` must equal `confirmation_id`.
+The confirmation artifact and its action payload are persisted, so retry,
+reconnect, and reload can reproduce the same key and canonical identity without
+browser-only storage.
+
+A missing/blank header returns `400 idempotency_key_required`; a missing action
+`confirmation_id` returns `422 validation_error`; and a nonmatching header and
+`confirmation_id` return `409 idempotency_conflict`. All three reject before
+usage, admission, persistence, or compute.
+
+One action identity maps to one durable backtest job. The canonical Run id is
+stable because finalization derives it from that same job identity and retries
+reuse the job. A new intentional experiment requires a new confirmation and
+therefore a new action identity.
+
+The owner-scoped lookup is
+`GET /api/v1/backtest-jobs/by-action/{confirmation_id}` and returns the existing
+`BacktestJobResponse`. It searches only `operation_scope = chat.run_backtest`
+for the authenticated user:
+
+- `200` returns the current durable job and canonical Run when available.
+- `404 not_found` means no durable admission exists at lookup time. It is not a
+  business failure; the client may replay the original action once with the
+  same key and body. Atomic admission then returns the racing job or admits one
+  job, never both.
+- `409 idempotency_conflict` means the stable key was paired with different
+  identity data. The client must stop automatic replay and show typed recovery.
+
+A lost HTTP/SSE response is transport ambiguity. The client shows a typed
+checking/recoverable presentation while it reads durable truth; `checking` is
+not a durable job or turn status. A durable job that is `queued` or `running`
+keeps the confirmation non-terminal. `succeeded` hydrates exactly one canonical
+result. Only durable `failed`, `canceled`, or `expired` state may settle the
+confirmation as unsuccessful. A timeout, disconnect, fetch exception, empty
+response, or `404` lookup alone must never produce `could_not_run`.
+
+<a id="contract-chat-turn-lifecycle"></a>
+### Durable ordinary chat-turn lifecycle
+
+Supabase owns one current lifecycle row for every accepted ordinary chat turn.
+This record is recovery truth, not a second queue, chat brain, transcript, or
+replacement for LangGraph checkpointer state.
+
+Acceptance occurs only after auth, request validation, quota, conversation
+ownership, and the durable user message plus lifecycle row succeed. The server
+preallocates one `turn_id` and uses it as the user `request_message_id`, so one
+accepted user message maps to one lifecycle identity.
+
+| State | Meaning | Transition owner |
+| --- | --- | --- |
+| `accepted` | User message and lifecycle identity are durable; runtime work has not started. | Chat request boundary transaction |
+| `running` | LangGraph/runtime work has started for the accepted turn. | Runtime worker before the first graph operation |
+| `completed` | Terminal assistant message/artifact is durable. Network delivery is irrelevant. | Terminal message persistence/finalizer |
+| `recoverable_failed` | Existing terminal runtime-failure owner persisted safe recovery and any retry metadata. | Terminal failure guard/message store |
+| `abandoned` | A stale accepted/running turn has no durable success or failure proof after the reconciliation window. | Server reconciler |
+| `reconciled` | The lifecycle write was missing, but durable evidence proves a terminal outcome. | Server reconciler |
+
+Allowed transitions are `accepted -> running`, `accepted|running -> completed`,
+`accepted|running -> recoverable_failed`, `accepted|running -> abandoned`, and
+`accepted|running -> reconciled`. `reconciled` requires
+`reconciled_outcome` with the enum
+`completed | recoverable_failed | abandoned`. Completed, recoverable-failed,
+abandoned, and reconciled rows are terminal. Repeating the same transition with
+the same message links/outcome is a no-op; a conflicting terminal transition is
+rejected. Late success must not supersede the existing terminal-runtime-failure
+guard.
+
+One database-owned compare-and-set function locks the row, verifies the allowed
+source state, applies the transition and message/receipt links, and returns the
+current row. SSE completion only reports already-durable state. Client
+disconnect/cancellation never marks a turn failed or abandoned by itself;
+process loss and incomplete terminal persistence belong to reconciliation.
+
+An `accepted` or `running` row becomes stale after `15 minutes`. Before the next
+chat POST for that conversation and before returning
+`GET /conversations/{id}/messages`, the server reconciles at most `20` stale rows
+for that conversation; private alpha adds no background sweeper. The reconciler
+checks, in order, a terminal assistant artifact/message, the existing terminal
+runtime-failure record, and LangGraph/checkpointer evidence. It writes
+`reconciled` with `reconciled_outcome` when proof exists; otherwise it writes
+`abandoned`, sets `failure_code` to `turn_abandoned`, and adds retryable typed
+recovery.
+
+Message reads project the current row into
+`metadata.agent_runtime_turn` with `turn_id`, `status`, `terminal`,
+`reconciled_outcome`, `failure_code`, and `retryable` where applicable. The
+underlying immutable message is not rewritten. Frontends render that projection
+and do not infer lifecycle from prose or elapsed browser time.
 
 ## Admin Bypass
 
@@ -178,9 +445,11 @@ Errors follow RFC 9457 Problem Details.
 - **403 Forbidden**: Disabled feature or insufficient access
 - **404 Not Found**: Missing resource or inaccessible resource
 - **409 Conflict**: State conflict
+- **413 Content Too Large**: Raw request body exceeds the endpoint ingress limit
 - **422 Unprocessable**: Valid JSON but invalid domain request
 - **429 Too Many Requests**: Rate limit exceeded
 - **500 Server Error**: Unexpected failure
+- **503 Service Unavailable**: Temporary server capacity or required dependency unavailable
 
 **Example 422 Problem Details:**
 ```json
@@ -676,7 +945,9 @@ references it through `result_run_id`.
   "conversation_id": "uuid",
   "request_message_id": "uuid",
   "confirmation_message_id": "uuid",
+  "operation_scope": "chat.run_backtest",
   "idempotency_key": "uuid-or-client-key",
+  "identity_hash": "sha256:...",
   "payload_hash": "sha256:...",
   "launch_payload": {
     "strategy": {},
@@ -706,6 +977,12 @@ references it through `result_run_id`.
 
 **Job contract:**
 - Supabase is the source of truth for job lifecycle state.
+- Every admitted job has a non-null `operation_scope`, `idempotency_key`, and
+  `identity_hash`. Exact retries reuse the current row; same-key identity
+  mismatches return `409 idempotency_conflict` and never return that row.
+- Chat jobs use the active `confirmation_id` as their idempotency key. Direct
+  jobs use caller keys and may have a null conversation while retaining strict
+  `user_id` ownership.
 - Local/in-process and Render Workflow execution use the same typed backtest
   finalizer. A job becomes `succeeded` only after the immutable run, Idea,
   IdeaVersion, EvidenceArtifact, and enriched result-card identity have been
@@ -1363,8 +1640,12 @@ extracted candidates after interpretation. `provider` is optional machine
 provenance for resolver/debugging continuity; it must not be rendered as
 assistant-facing copy or used to bypass execution validation.
 
-**Required Header:**
-- `Idempotency-Key`: `uuid` (Highly recommended to prevent double-submits)
+**Conditional Header:**
+- `Idempotency-Key` is required when `action.type = run_backtest`, and its value
+  must equal `action.payload.confirmation_id`.
+- It is optional for non-executing ordinary chat turns.
+- Missing or mismatched Run-action identity returns the exact error defined in
+  `contract-run-action-reconciliation` before admission or compute.
 
 **Language Resolution:**
 Backend resolves preferred response language from:
@@ -1381,6 +1662,9 @@ AI response uses the resolved language unless the user clearly asks otherwise in
 If the stream disconnects, the client should reconnect by re-fetching the conversation messages (`GET /conversations/{id}/messages`).
 - No token-level replay is guaranteed in Alpha.
 - No `last_message_id` reconnect contract is enforced yet.
+- A disconnected `run_backtest` action additionally reconciles through
+  `GET /backtest-jobs/by-action/{confirmation_id}` and, only when no admission
+  exists, an exact replay with the same key and request identity.
 - Hydrated confirmation actions are valid only when the runtime checkpoint still has pending confirmation state or structured metadata can safely reconstruct the pending snapshot.
 - Hydrated result actions that save or explain a run require canonical run and conversation context.
 
@@ -1761,23 +2045,19 @@ Detach strategy.
 ## `POST /backtests/run`
 
 **Required Header:**
-- `Idempotency-Key`: `uuid` (Required to prevent duplicate engine runs)
+- `Idempotency-Key`: 1-128 visible ASCII characters (required to prevent
+  duplicate engine runs)
 - Missing or blank keys return `400 idempotency_key_required`.
 
 Run directly from saved strategy or inline config.
 
 Private-alpha chat execution should prefer the durable `backtest_jobs` flow
 instead of executing heavy backtests synchronously inside the API process. This
-direct endpoint remains a contract for direct/manual execution paths until the
-job API surface is formalized.
-
-Current private-alpha hardening supports shadow job creation, proof workflow
-dispatch, and default-off real workflow execution behind flags while preserving
-the existing in-process result response. The proof task remains a separate smoke
-check for the API -> Render Workflow -> Supabase lifecycle boundary. When
-`ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true`, dispatch uses the distinct
-`run_backtest_job` task so the workflow can execute the real backtest, persist a
-canonical `backtest_runs` row, and own the durable job's `result_run_id` link.
+direct endpoint remains a compatibility/manual execution path with the existing
+successful response shape. Before direct synchronous compute begins, it must
+use the same atomic durable admission, idempotency collision check, per-user and
+global capacity limits, and unique-simulation charge as chat-launched work. Its
+durable job owns running/terminal state and the stable finalized Run identity.
 
 **Request: Saved Strategy**
 ```json
@@ -1855,6 +2135,26 @@ canonical `backtest_runs` row, and own the durable job's `result_run_id` link.
   }
 }
 ```
+
+Exact replay behavior:
+- succeeded job: return the same `200 {"run": ...}` response;
+- queued/running job: return `409 idempotency_in_progress` with
+  `Retry-After: 1` and `context.backtest_job_id`;
+- failed/canceled/expired job: return the same terminal Problem Details;
+- same key with a different identity: return `409 idempotency_conflict`.
+
+## `GET /backtest-jobs/by-action/{confirmation_id}`
+
+Return the current owner-scoped durable job for one chat Run action identity.
+The lookup is restricted to `operation_scope = chat.run_backtest`; it never
+searches another user's jobs or direct/manual keys.
+
+**Response:** the same `BacktestJobResponse` shape used by job-id lookup.
+
+**Error rules:**
+- `404 Not Found`: no durable admission exists for that action identity at read
+  time. This is not proof of business failure; an exact replay remains safe.
+- `500 Server Error`: durable persistence is unavailable in a non-dev path.
 
 ## `GET /backtest-jobs/{id}`
 
