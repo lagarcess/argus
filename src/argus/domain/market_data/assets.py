@@ -94,7 +94,11 @@ def _asset_universe_loader_timeout_seconds() -> float:
 
 
 def _asset_provider_mode() -> AssetProviderMode:
-    raw = (os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider").strip()
+    raw = (
+        os.getenv("ARGUS_ASSET_PROVIDER_MODE")
+        or os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE")
+        or "live_provider"
+    ).strip()
     if raw in {
         "live_provider",
         "recorded_provider_fixture",

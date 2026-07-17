@@ -75,6 +75,11 @@ ARGUS_RUN_LIVE_EVALS=1 ARGUS_EVAL_ENV_FILE=<path> poetry run pytest tests/evals/
 
 Warning: this deliberately spends real LLM tokens. Use it when you want to
 measure the current real interpret path, not for routine local lint loops.
+The live harness keeps bar data in the configured market-data mode but uses a
+provider-backed asset catalog for company-name grounding. Set
+`ARGUS_ASSET_PROVIDER_MODE=recorded_provider_fixture` with a provider-shaped
+`ARGUS_ASSET_FIXTURE_PATH` for deterministic catalog input; otherwise the
+sanctioned live run requires Alpaca asset-catalog credentials.
 
 ## When to Run
 

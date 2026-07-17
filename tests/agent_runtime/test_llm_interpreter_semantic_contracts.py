@@ -638,6 +638,8 @@ def test_company_name_basket_context_survives_underfilled_repair_to_confirmation
         "ready_for_confirmation" if ready_for_confirmation else "needs_clarification"
     ]
     capability_verdict = "unsupported"
+    benchmark_symbol = None
+    confirmation_card_count = 0
     if ready_for_confirmation:
         confirm_state = RunState.new(
             current_user_message=message,
@@ -649,20 +651,31 @@ def test_company_name_basket_context_survives_underfilled_repair_to_confirmation
             contract=build_default_capability_contract(),
         )
         stage_outcomes.append(confirm_result.outcome)
-        validation = confirm_result.patch["confirmation_payload"]["validation"]
+        confirmation_payload = confirm_result.patch["confirmation_payload"]
+        validation = confirmation_payload["validation"]
+        benchmark_symbol = confirmation_payload["launch_payload"]["benchmark_symbol"]
+        confirmation_card_count = 1
         if validation.get("executable") is True:
             capability_verdict = "executable"
 
     observed = {
         "assets": strategy.asset_universe,
+        "asset_class": strategy.asset_class,
+        "benchmark_symbol": benchmark_symbol,
+        "strategy_type": strategy.strategy_type,
         "date_range": strategy.date_range,
         "capability_verdict": capability_verdict,
+        "confirmation_card_count": confirmation_card_count,
         "stage_outcomes": stage_outcomes,
     }
     assert observed == {
         "assets": ["TGT", "WMT", "COST"],
+        "asset_class": "equity",
+        "benchmark_symbol": "SPY",
+        "strategy_type": "buy_and_hold",
         "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
         "capability_verdict": "executable",
+        "confirmation_card_count": 1,
         "stage_outcomes": ["ready_for_confirmation", "await_approval"],
     }
 
