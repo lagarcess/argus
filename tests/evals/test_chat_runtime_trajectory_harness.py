@@ -91,6 +91,34 @@ def _recording_adapters(
     )
 
 
+def _trajectory_for_issue(issue: str) -> Any:
+    return next(
+        trajectory
+        for trajectory in load_alpha_trajectories()
+        if trajectory.expected_fail.issue == issue
+    )
+
+
+def _run_action_envelopes(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, list):
+        return [envelope for item in value for envelope in _run_action_envelopes(item)]
+    if not isinstance(value, dict):
+        return []
+
+    action = value.get("action")
+    envelopes = (
+        [value]
+        if isinstance(action, dict) and action.get("type") == "run_backtest"
+        else []
+    )
+    return envelopes + [
+        envelope
+        for key, item in value.items()
+        if key != "action"
+        for envelope in _run_action_envelopes(item)
+    ]
+
+
 def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> None:
     raw = ALPHA_TRAJECTORY_PATH.read_text(encoding="utf-8")
     trajectories = load_alpha_trajectories()
@@ -169,7 +197,7 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
     )
     assert orphan_reconciliation.steps[1].request["submission"] == {
         "operation": "stream",
-        "identity": "alpha_session_07:submission:edit:1",
+        "identity": "alpha_session_07:turn:1",
         "request": {"message": "Change the active test to the last six months."},
     }
 
@@ -191,6 +219,8 @@ def test_alpha_trajectory_fixtures_are_complete_sanitized_and_issue_tagged() -> 
             "access_token",
         )
     )
+    assert '"artifact":' not in raw
+    assert '"idempotency_label":' not in raw
 
 
 def test_disconnect_fixtures_own_the_submission_before_client_terminal() -> None:
@@ -213,27 +243,113 @@ def test_disconnect_fixtures_own_the_submission_before_client_terminal() -> None
         assert step.expectation.typed_terminal is False
 
 
-def test_contract_pending_trajectories_keep_canonical_confirmation_behavior() -> None:
-    contract_pending_issues = {"#230", "#240", "#242"}
-    trajectories = [
-        trajectory
-        for trajectory in load_alpha_trajectories()
-        if trajectory.expected_fail.issue in contract_pending_issues
-    ]
+def test_run_actions_use_confirmation_id_as_the_exact_idempotency_identity() -> None:
+    run_action_steps: list[tuple[Any, dict[str, Any]]] = []
 
-    for trajectory in trajectories:
-        confirmation_step = trajectory.steps[0]
-        assert confirmation_step.operation == "stream"
-        assert confirmation_step.expectation.visible_response_category == "confirmation"
-        assert confirmation_step.expectation.stage_outcome == "ready_for_confirmation"
-        assert confirmation_step.expectation.typed_terminal is True
+    for trajectory in load_alpha_trajectories():
+        for step in trajectory.steps:
+            action_identity = step.expectation.action_identity
+            if action_identity is not None:
+                assert re.fullmatch(
+                    rf"{trajectory.label}:confirmation:\d+",
+                    action_identity,
+                )
+                if ":confirmation:" in (step.expectation.artifact_identity or ""):
+                    assert action_identity == step.expectation.artifact_identity
 
-        for step in trajectory.steps[1:]:
-            expectation = step.expectation
-            assert expectation.recovery_code is None
-            if step.operation in {"disconnect", "persistence", "reload", "retry"}:
-                assert expectation.persistence_state is None
-                assert expectation.reload_state is None
+            run_action_steps.extend(
+                (step, envelope) for envelope in _run_action_envelopes(step.request)
+            )
+
+    assert run_action_steps
+    for step, envelope in run_action_steps:
+        action = envelope["action"]
+        confirmation_id = action["payload"]["confirmation_id"]
+        assert envelope["headers"] == {"Idempotency-Key": confirmation_id}
+        assert step.expectation.action_identity == confirmation_id
+
+        if step.operation == "disconnect":
+            assert step.request["submission"]["identity"] == confirmation_id
+
+
+def test_ambiguous_run_uses_by_action_lookup_before_one_exact_replay() -> None:
+    trajectory = _trajectory_for_issue("#242")
+    confirmation_id = "alpha_session_05:confirmation:1"
+    lookup_path = f"/api/v1/backtest-jobs/by-action/{confirmation_id}"
+    lookup_step = trajectory.steps[2]
+    replay_step = trajectory.steps[3]
+
+    assert lookup_step.operation == "reload"
+    assert lookup_step.request == {
+        "method": "GET",
+        "path": lookup_path,
+    }
+    assert lookup_step.expectation.reload_state == "not_found"
+    assert lookup_step.expectation.action_identity == confirmation_id
+    assert lookup_step.expectation.checkpoints == {
+        "by_action.lookup_status": 404,
+        "by_action.replay_allowed": True,
+    }
+
+    assert replay_step.operation == "retry"
+    replay_envelopes = _run_action_envelopes(replay_step.request)
+    assert len(replay_envelopes) == 1
+    assert replay_envelopes[0] == trajectory.steps[1].request["submission"]["request"]
+    assert replay_envelopes[0] == {
+        "action": {
+            "type": "run_backtest",
+            "payload": {"confirmation_id": confirmation_id},
+        },
+        "headers": {"Idempotency-Key": confirmation_id},
+    }
+    assert replay_step.expectation.checkpoints["by_action.replay_count"] == 1
+
+
+def test_abandoned_turn_projects_terminal_recovery_and_keyed_retry() -> None:
+    trajectory = _trajectory_for_issue("#240")
+    turn_id = "alpha_session_07:turn:1"
+    request_id = "alpha_session_07:request:1"
+    interrupted_message = "Change the active test to the last six months."
+    disconnect_step = trajectory.steps[1]
+    persistence_step = trajectory.steps[2]
+    reload_step = trajectory.steps[3]
+    retry_step = trajectory.steps[4]
+
+    assert disconnect_step.request["submission"] == {
+        "operation": "stream",
+        "identity": turn_id,
+        "request": {"message": interrupted_message},
+    }
+    assert disconnect_step.expectation.persistence_state == "accepted"
+    assert persistence_step.expectation.persistence_state == "accepted"
+
+    assert reload_step.expectation.reload_state == "abandoned"
+    assert reload_step.expectation.recovery_code == "turn_abandoned"
+    assert reload_step.expectation.typed_terminal is True
+    assert reload_step.expectation.checkpoints == {
+        "agent_runtime_turn.turn_id": turn_id,
+        "agent_runtime_turn.request_id": request_id,
+        "agent_runtime_turn.status": "abandoned",
+        "agent_runtime_turn.terminal": True,
+        "agent_runtime_turn.reconciled_outcome": None,
+        "agent_runtime_turn.failure_code": "turn_abandoned",
+        "agent_runtime_turn.retryable": True,
+        "recovery.code": "turn_abandoned",
+        "recovery.retryable": True,
+        "retry_last_turn.request_message_id": turn_id,
+        "retry_last_turn.message": interrupted_message,
+        "orphan_turn.after_window_count": 0,
+    }
+
+    assert retry_step.request == {
+        "action": {
+            "type": "retry_last_turn",
+            "payload": {"request_message_id": turn_id},
+        }
+    }
+    assert retry_step.expectation.checkpoints["retry_last_turn.request_message_id"] == (
+        turn_id
+    )
 
 
 def test_unapproved_recovery_codes_and_reload_states_are_not_fixtures() -> None:
@@ -270,13 +386,10 @@ def test_unapproved_recovery_codes_and_reload_states_are_not_fixtures() -> None:
     assert discovery_recovery.expectation.visible_response_category == "typed_recovery"
     assert discovery_recovery.expectation.stage_outcome == "needs_clarification"
 
-    orphan_recovery = next(
-        trajectory
-        for trajectory in load_alpha_trajectories()
-        if trajectory.expected_fail.issue == "#240"
-    ).steps[-1]
-    assert orphan_recovery.expectation.visible_response_category == "typed_recovery"
-    assert orphan_recovery.expectation.stage_outcome == "ready_to_respond"
+    orphan_recovery = _trajectory_for_issue("#240").steps[3]
+    assert orphan_recovery.expectation.reload_state == "abandoned"
+    assert orphan_recovery.expectation.recovery_code == "turn_abandoned"
+    assert orphan_recovery.expectation.typed_terminal is True
 
 
 def test_expected_fail_prefixes_are_emitted_by_the_trajectory_contract() -> None:
@@ -461,29 +574,27 @@ def test_runner_rejects_disconnect_after_terminal_for_same_submission() -> None:
 
 
 def test_orphan_recovery_terminal_must_keep_the_same_durable_identity() -> None:
-    trajectory = next(
-        item for item in load_alpha_trajectories() if item.expected_fail.issue == "#240"
-    )
-    retry_step = trajectory.steps[-1]
-    assert retry_step.operation == "retry"
-    matching = _matching_observation(retry_step)
+    trajectory = _trajectory_for_issue("#240")
+    reload_step = trajectory.steps[3]
+    assert reload_step.operation == "reload"
+    matching = _matching_observation(reload_step)
     unrelated_terminal = replace(
         matching,
         checkpoints={
             **matching.checkpoints,
-            "terminal.artifact_identity": "alpha_session_other:turn:1",
+            "agent_runtime_turn.turn_id": "alpha_session_other:turn:1",
         },
     )
 
     result = run_alpha_trajectory(
         trajectory=trajectory,
         adapters=_recording_adapters(
-            [], overrides={retry_step.step_id: unrelated_terminal}
+            [], overrides={reload_step.step_id: unrelated_terminal}
         ),
     )
 
-    assert result.status == "failed"
-    assert any(check.startswith("terminal:") for check in result.failed_checks)
+    assert result.status == "expected_failed"
+    assert any(check.startswith("agent_runtime_turn:") for check in result.failed_checks)
 
 
 def test_runner_enforces_sse_budget_and_session_terminal_invariants() -> None:

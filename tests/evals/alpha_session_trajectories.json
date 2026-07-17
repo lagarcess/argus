@@ -14,6 +14,7 @@
         "allowed_failures": [
           {"step_id": "alpha_session_01:step:2", "prefix": "artifact_identity:"},
           {"step_id": "alpha_session_01:step:2", "prefix": "action_identity:"},
+          {"step_id": "alpha_session_01:step:3", "prefix": "action_identity:"},
           {"step_id": "alpha_session_01:step:3", "prefix": "stale_action:"}
         ]
       },
@@ -26,7 +27,7 @@
             "stage_outcome": "ready_for_confirmation",
             "canonical_sse": true,
             "artifact_identity": "alpha_session_01:confirmation:1",
-            "action_identity": "alpha_session_01:confirmation:1:run_backtest",
+            "action_identity": "alpha_session_01:confirmation:1",
             "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
             "typed_terminal": true
           }
@@ -39,7 +40,7 @@
             "stage_outcome": "ready_for_confirmation",
             "canonical_sse": true,
             "artifact_identity": "alpha_session_01:confirmation:2",
-            "action_identity": "alpha_session_01:confirmation:2:run_backtest",
+            "action_identity": "alpha_session_01:confirmation:2",
             "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
             "typed_terminal": true,
             "checkpoints": {"stale_action.active_artifact": "alpha_session_01:confirmation:2"}
@@ -47,11 +48,18 @@
         },
         {
           "operation": "action",
-          "request": {"type": "run_backtest", "artifact": "alpha_session_01:confirmation:1"},
+          "request": {
+            "action": {
+              "type": "run_backtest",
+              "payload": {"confirmation_id": "alpha_session_01:confirmation:1"}
+            },
+            "headers": {"Idempotency-Key": "alpha_session_01:confirmation:1"}
+          },
           "expect": {
             "visible_response_category": "typed_recovery",
             "stage_outcome": "ready_to_respond",
             "canonical_sse": true,
+            "action_identity": "alpha_session_01:confirmation:1",
             "recovery_code": "confirmation_action_stale_card",
             "typed_terminal": true,
             "checkpoints": {"stale_action.execution_count": 0}
@@ -71,7 +79,7 @@
           "expect": {
             "reload_state": "alpha_session_01:confirmation:2",
             "artifact_identity": "alpha_session_01:confirmation:2",
-            "action_identity": "alpha_session_01:confirmation:2:run_backtest"
+            "action_identity": "alpha_session_01:confirmation:2"
           }
         }
       ]
@@ -229,7 +237,7 @@
             "stage_outcome": "ready_for_confirmation",
             "canonical_sse": true,
             "artifact_identity": "alpha_session_04:confirmation:1",
-            "action_identity": "alpha_session_04:confirmation:1:run_backtest",
+            "action_identity": "alpha_session_04:confirmation:1",
             "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
             "typed_terminal": true,
             "checkpoints": {
@@ -241,13 +249,19 @@
         },
         {
           "operation": "action",
-          "request": {"type": "run_backtest", "artifact": "alpha_session_04:confirmation:1"},
+          "request": {
+            "action": {
+              "type": "run_backtest",
+              "payload": {"confirmation_id": "alpha_session_04:confirmation:1"}
+            },
+            "headers": {"Idempotency-Key": "alpha_session_04:confirmation:1"}
+          },
           "expect": {
             "visible_response_category": "job_accepted",
             "stage_outcome": "ready_to_respond",
             "canonical_sse": true,
             "artifact_identity": "alpha_session_04:job:1",
-            "action_identity": "alpha_session_04:confirmation:1:run_backtest",
+            "action_identity": "alpha_session_04:confirmation:1",
             "typed_terminal": true,
             "checkpoints": {"effective_window.execution_matches_approval": true}
           }
@@ -281,12 +295,18 @@
         "reason": "Ambiguous Run reconciliation is owned by issue 242 after admission and polling land.",
         "allowed_failures": [
           {"step_id": "alpha_session_05:step:2", "prefix": "artifact_identity:"},
-          {"step_id": "alpha_session_05:step:2", "prefix": "admission:"},
+          {"step_id": "alpha_session_05:step:2", "prefix": "action_identity:"},
+          {"step_id": "alpha_session_05:step:2", "prefix": "by_action:"},
           {"step_id": "alpha_session_05:step:3", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_05:step:3", "prefix": "action_identity:"},
           {"step_id": "alpha_session_05:step:3", "prefix": "reload:"},
+          {"step_id": "alpha_session_05:step:3", "prefix": "by_action:"},
           {"step_id": "alpha_session_05:step:4", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_05:step:4", "prefix": "action_identity:"},
           {"step_id": "alpha_session_05:step:4", "prefix": "admission:"},
+          {"step_id": "alpha_session_05:step:4", "prefix": "by_action:"},
           {"step_id": "alpha_session_05:step:5", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_05:step:5", "prefix": "action_identity:"},
           {"step_id": "alpha_session_05:step:5", "prefix": "admission:"}
         ]
       },
@@ -299,7 +319,7 @@
             "stage_outcome": "ready_for_confirmation",
             "canonical_sse": true,
             "artifact_identity": "alpha_session_05:confirmation:1",
-            "action_identity": "alpha_session_05:confirmation:1:run_backtest",
+            "action_identity": "alpha_session_05:confirmation:1",
             "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
             "typed_terminal": true
           }
@@ -309,35 +329,57 @@
           "request": {
             "submission": {
               "operation": "action",
-              "identity": "alpha_session_05:submission:run:1",
-              "request": {"type": "run_backtest", "artifact": "alpha_session_05:confirmation:1"}
+              "identity": "alpha_session_05:confirmation:1",
+              "request": {
+                "action": {
+                  "type": "run_backtest",
+                  "payload": {"confirmation_id": "alpha_session_05:confirmation:1"}
+                },
+                "headers": {"Idempotency-Key": "alpha_session_05:confirmation:1"}
+              }
             }
           },
           "expect": {
-            "artifact_identity": "alpha_session_05:job:1",
+            "artifact_identity": "alpha_session_05:confirmation:1",
+            "action_identity": "alpha_session_05:confirmation:1",
             "typed_terminal": false,
-            "checkpoints": {
-              "admission.durable_identity_count": 1,
-              "admission.execution_count": 1
-            }
+            "checkpoints": {"by_action.reconciliation_required": true}
           }
         },
         {
           "operation": "reload",
-          "request": {"surface": "conversation_and_job"},
+          "request": {
+            "method": "GET",
+            "path": "/api/v1/backtest-jobs/by-action/alpha_session_05:confirmation:1"
+          },
           "expect": {
-            "artifact_identity": "alpha_session_05:job:1",
-            "checkpoints": {"reload.durable_identity_count": 1}
+            "artifact_identity": "alpha_session_05:confirmation:1",
+            "action_identity": "alpha_session_05:confirmation:1",
+            "reload_state": "not_found",
+            "checkpoints": {
+              "by_action.lookup_status": 404,
+              "by_action.replay_allowed": true
+            }
           }
         },
         {
           "operation": "retry",
-          "request": {"target": "alpha_session_05:job:1"},
+          "request": {
+            "action": {
+              "type": "run_backtest",
+              "payload": {"confirmation_id": "alpha_session_05:confirmation:1"}
+            },
+            "headers": {"Idempotency-Key": "alpha_session_05:confirmation:1"}
+          },
           "expect": {
             "canonical_sse": true,
             "artifact_identity": "alpha_session_05:job:1",
+            "action_identity": "alpha_session_05:confirmation:1",
             "typed_terminal": true,
-            "checkpoints": {"admission.execution_count": 1}
+            "checkpoints": {
+              "by_action.replay_count": 1,
+              "admission.execution_count": 1
+            }
           }
         },
         {
@@ -345,6 +387,7 @@
           "request": {"scope": "job_and_action_identity"},
           "expect": {
             "artifact_identity": "alpha_session_05:job:1",
+            "action_identity": "alpha_session_05:confirmation:1",
             "checkpoints": {"admission.execution_count": 1}
           }
         }
@@ -360,12 +403,16 @@
         "reason": "Database-owned atomic admission and replay identity are owned by issue 230 after issue 229 approval.",
         "allowed_failures": [
           {"step_id": "alpha_session_06:step:2", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_06:step:2", "prefix": "action_identity:"},
           {"step_id": "alpha_session_06:step:2", "prefix": "admission:"},
           {"step_id": "alpha_session_06:step:3", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_06:step:3", "prefix": "action_identity:"},
           {"step_id": "alpha_session_06:step:3", "prefix": "admission:"},
           {"step_id": "alpha_session_06:step:4", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_06:step:4", "prefix": "action_identity:"},
           {"step_id": "alpha_session_06:step:4", "prefix": "persistence:"},
           {"step_id": "alpha_session_06:step:5", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_06:step:5", "prefix": "action_identity:"},
           {"step_id": "alpha_session_06:step:5", "prefix": "admission:"}
         ]
       },
@@ -378,27 +425,41 @@
             "stage_outcome": "ready_for_confirmation",
             "canonical_sse": true,
             "artifact_identity": "alpha_session_06:confirmation:1",
-            "action_identity": "alpha_session_06:confirmation:1:run_backtest",
+            "action_identity": "alpha_session_06:confirmation:1",
             "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
             "typed_terminal": true
           }
         },
         {
           "operation": "action",
-          "request": {"type": "run_backtest", "artifact": "alpha_session_06:confirmation:1", "idempotency_label": "alpha_session_06:run:1"},
+          "request": {
+            "action": {
+              "type": "run_backtest",
+              "payload": {"confirmation_id": "alpha_session_06:confirmation:1"}
+            },
+            "headers": {"Idempotency-Key": "alpha_session_06:confirmation:1"}
+          },
           "expect": {
             "canonical_sse": true,
             "artifact_identity": "alpha_session_06:job:1",
+            "action_identity": "alpha_session_06:confirmation:1",
             "typed_terminal": true,
             "checkpoints": {"admission.allowance_count": 1}
           }
         },
         {
           "operation": "retry",
-          "request": {"target": "alpha_session_06:run:1"},
+          "request": {
+            "action": {
+              "type": "run_backtest",
+              "payload": {"confirmation_id": "alpha_session_06:confirmation:1"}
+            },
+            "headers": {"Idempotency-Key": "alpha_session_06:confirmation:1"}
+          },
           "expect": {
             "canonical_sse": true,
             "artifact_identity": "alpha_session_06:job:1",
+            "action_identity": "alpha_session_06:confirmation:1",
             "typed_terminal": true,
             "checkpoints": {
               "admission.execution_count": 1,
@@ -408,9 +469,10 @@
         },
         {
           "operation": "persistence",
-          "request": {"scope": "admission_identity"},
+          "request": {"scope": "durable_job"},
           "expect": {
             "artifact_identity": "alpha_session_06:job:1",
+            "action_identity": "alpha_session_06:confirmation:1",
             "checkpoints": {"persistence.durable_identity_count": 1}
           }
         },
@@ -419,6 +481,7 @@
           "request": {"surface": "conversation_and_job"},
           "expect": {
             "artifact_identity": "alpha_session_06:job:1",
+            "action_identity": "alpha_session_06:confirmation:1",
             "checkpoints": {"admission.execution_count": 1}
           }
         }
@@ -434,12 +497,22 @@
         "reason": "Durable accepted-turn lifecycle and orphan reconciliation are owned by issue 240 after issue 229 approval.",
         "allowed_failures": [
           {"step_id": "alpha_session_07:step:2", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_07:step:2", "prefix": "persistence:"},
+          {"step_id": "alpha_session_07:step:2", "prefix": "agent_runtime_turn:"},
           {"step_id": "alpha_session_07:step:2", "prefix": "orphan_turn:"},
           {"step_id": "alpha_session_07:step:3", "prefix": "artifact_identity:"},
           {"step_id": "alpha_session_07:step:3", "prefix": "persistence:"},
+          {"step_id": "alpha_session_07:step:3", "prefix": "agent_runtime_turn:"},
           {"step_id": "alpha_session_07:step:4", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_07:step:4", "prefix": "reload:"},
+          {"step_id": "alpha_session_07:step:4", "prefix": "recovery:"},
+          {"step_id": "alpha_session_07:step:4", "prefix": "terminal:"},
+          {"step_id": "alpha_session_07:step:4", "prefix": "agent_runtime_turn:"},
+          {"step_id": "alpha_session_07:step:4", "prefix": "retry_last_turn:"},
           {"step_id": "alpha_session_07:step:4", "prefix": "orphan_turn:"},
           {"step_id": "alpha_session_07:step:5", "prefix": "artifact_identity:"},
+          {"step_id": "alpha_session_07:step:5", "prefix": "action_identity:"},
+          {"step_id": "alpha_session_07:step:5", "prefix": "retry_last_turn:"},
           {"step_id": "alpha_session_07:step:5", "prefix": "orphan_turn:"}
         ]
       },
@@ -452,7 +525,7 @@
             "stage_outcome": "ready_for_confirmation",
             "canonical_sse": true,
             "artifact_identity": "alpha_session_07:confirmation:1",
-            "action_identity": "alpha_session_07:confirmation:1:run_backtest",
+            "action_identity": "alpha_session_07:confirmation:1",
             "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
             "typed_terminal": true
           }
@@ -462,14 +535,20 @@
           "request": {
             "submission": {
               "operation": "stream",
-              "identity": "alpha_session_07:submission:edit:1",
+              "identity": "alpha_session_07:turn:1",
               "request": {"message": "Change the active test to the last six months."}
             }
           },
           "expect": {
             "artifact_identity": "alpha_session_07:turn:1",
+            "persistence_state": "accepted",
             "typed_terminal": false,
-            "checkpoints": {"orphan_turn.client_terminal_invented": false}
+            "checkpoints": {
+              "agent_runtime_turn.turn_id": "alpha_session_07:turn:1",
+              "agent_runtime_turn.request_id": "alpha_session_07:request:1",
+              "agent_runtime_turn.status": "accepted",
+              "orphan_turn.client_terminal_invented": false
+            }
           }
         },
         {
@@ -477,7 +556,13 @@
           "request": {"scope": "turn_record"},
           "expect": {
             "artifact_identity": "alpha_session_07:turn:1",
-            "checkpoints": {"persistence.durable_identity_count": 1}
+            "persistence_state": "accepted",
+            "checkpoints": {
+              "agent_runtime_turn.turn_id": "alpha_session_07:turn:1",
+              "agent_runtime_turn.request_id": "alpha_session_07:request:1",
+              "agent_runtime_turn.status": "accepted",
+              "persistence.durable_identity_count": 1
+            }
           }
         },
         {
@@ -485,21 +570,44 @@
           "request": {"after": "reconciliation_window"},
           "expect": {
             "artifact_identity": "alpha_session_07:turn:1",
-            "checkpoints": {"orphan_turn.after_window_count": 0}
+            "reload_state": "abandoned",
+            "recovery_code": "turn_abandoned",
+            "typed_terminal": true,
+            "checkpoints": {
+              "agent_runtime_turn.turn_id": "alpha_session_07:turn:1",
+              "agent_runtime_turn.request_id": "alpha_session_07:request:1",
+              "agent_runtime_turn.status": "abandoned",
+              "agent_runtime_turn.terminal": true,
+              "agent_runtime_turn.reconciled_outcome": null,
+              "agent_runtime_turn.failure_code": "turn_abandoned",
+              "agent_runtime_turn.retryable": true,
+              "recovery.code": "turn_abandoned",
+              "recovery.retryable": true,
+              "retry_last_turn.request_message_id": "alpha_session_07:turn:1",
+              "retry_last_turn.message": "Change the active test to the last six months.",
+              "orphan_turn.after_window_count": 0
+            }
           }
         },
         {
           "operation": "retry",
-          "request": {"target": "alpha_session_07:turn:1"},
+          "request": {
+            "action": {
+              "type": "retry_last_turn",
+              "payload": {"request_message_id": "alpha_session_07:turn:1"}
+            }
+          },
           "expect": {
-            "visible_response_category": "typed_recovery",
-            "stage_outcome": "ready_to_respond",
+            "visible_response_category": "confirmation",
+            "stage_outcome": "ready_for_confirmation",
             "canonical_sse": true,
-            "artifact_identity": "alpha_session_07:turn:1",
+            "artifact_identity": "alpha_session_07:confirmation:2",
+            "action_identity": "alpha_session_07:confirmation:2",
             "typed_terminal": true,
             "checkpoints": {
+              "retry_last_turn.request_message_id": "alpha_session_07:turn:1",
               "orphan_turn.duplicate_turn_count": 0,
-              "terminal.artifact_identity": "alpha_session_07:turn:1"
+              "terminal.artifact_identity": "alpha_session_07:confirmation:2"
             }
           }
         }

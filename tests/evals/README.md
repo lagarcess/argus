@@ -133,13 +133,16 @@ reload state, typed recovery, route budgets, terminal fingerprints, stale
 actions, and orphan-turn reconciliation.
 
 Each trajectory currently carries one exact owning issue and a narrow set of
-step-scoped allowed failure masks. Before #229, normal confirmation and generic
-typed visible/stage behavior stay asserted, while contract-dependent interrupted
-or recovery steps avoid speculative exact recovery/lifecycle codes. Those steps
-still assert typed transport behavior, zero orphan/duplicate effects, and stable
-durable identity. Keep the tags until the corresponding runtime lane lands and
-the full trajectory passes. The mocked mechanics do not replace the sanctioned
-live gate, deployed exact-SHA browser proof, or founder approval.
+step-scoped allowed failure masks. The approved #229 contract now owns the exact
+reliability vocabulary: `confirmation_id` is the Run `action_identity`, its
+`Idempotency-Key` must match, and ambiguous Run responses reconcile through the
+owner-scoped by-action lookup before a `404` may permit one exact replay. Ordinary
+turns project approved lifecycle states; an unreconciled stale turn becomes
+terminal `abandoned` recovery with `turn_abandoned` and a `retry_last_turn`
+action keyed by `request_message_id`. Keep the tags until the corresponding
+runtime lane lands and the full trajectory passes. The mocked mechanics do not
+replace the sanctioned live gate, deployed exact-SHA browser proof, or founder
+approval.
 
 ## Categories
 
