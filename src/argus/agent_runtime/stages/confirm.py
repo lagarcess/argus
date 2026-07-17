@@ -212,7 +212,10 @@ def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
         MarketDataCoverageError,
         prepare_market_data,
     )
-    from argus.domain.engine_launch.adapter import validate_request_symbols
+    from argus.domain.engine_launch.adapter import (
+        validate_request_benchmark,
+        validate_request_symbols,
+    )
 
     try:
         request = LaunchBacktestRequest.model_validate(launch_payload)
@@ -230,6 +233,27 @@ def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
         asset_class = symbol_validation.asset_class
         if asset_class is None:
             return _launch_validation_failure("invalid_asset_class")
+        benchmark_validation = validate_request_benchmark(
+            request,
+            asset_class=asset_class,
+        )
+        if benchmark_validation.outcome == "unavailable":
+            return coverage_recovery_stage_patch(
+                error_code="market_data_unavailable",
+                launch_payload=launch_payload,
+            )
+        if (
+            benchmark_validation.outcome != "resolved"
+            or benchmark_validation.benchmark_symbol is None
+        ):
+            return _launch_validation_failure(
+                benchmark_validation.error_code or "invalid_benchmark_symbol"
+            )
+        canonical_launch_payload = {
+            **launch_payload,
+            "benchmark_symbol": benchmark_validation.benchmark_symbol,
+        }
+        request = LaunchBacktestRequest.model_validate(canonical_launch_payload)
         requested_range = request.requested_date_range or request.date_range
         config = {
             "asset_class": asset_class,
@@ -254,7 +278,7 @@ def _coverage_preflight(launch_payload: dict[str, Any]) -> dict[str, Any]:
     coverage = prepared.coverage_payload()
     coverage["preflight_id"] = coverage.pop("dataset_id")
     adjusted_launch_payload = {
-        **launch_payload,
+        **canonical_launch_payload,
         "date_range": effective,
         "requested_date_range": requested,
         "coverage_preflight": coverage,

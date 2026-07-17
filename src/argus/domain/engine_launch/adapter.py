@@ -69,6 +69,14 @@ class RequestSymbolValidationResult:
     error_code: str | None = None
 
 
+@dataclass(frozen=True)
+class BenchmarkSymbolValidationResult:
+    outcome: Literal["resolved", "conflict", "invalid", "unavailable"]
+    benchmark_symbol: str | None = None
+    asset_class: str | None = None
+    error_code: str | None = None
+
+
 def run_launch_backtest(
     request: LaunchBacktestRequest,
     *,
@@ -652,9 +660,10 @@ def _build_periodic_config(
     recurring_contribution: float,
     cadence: str,
 ) -> dict[str, Any]:
-    benchmark_asset = classify_symbol(request.benchmark_symbol)
-    if benchmark_asset.asset_class != asset_class:
-        raise ValueError("invalid_benchmark_symbol")
+    benchmark_symbol = _resolve_request_benchmark(
+        request,
+        asset_class=asset_class,
+    )
 
     config = {
         "template": "dca_accumulation",
@@ -668,7 +677,7 @@ def _build_periodic_config(
         # for DCA. Keep product-facing names in parameters/envelopes.
         "starting_capital": recurring_contribution,
         "allocation_method": "equal_weight",
-        "benchmark_symbol": benchmark_asset.symbol,
+        "benchmark_symbol": benchmark_symbol,
         "parameters": {"dca_cadence": cadence},
         "recurring_contribution": recurring_contribution,
         "starting_principal": 0.0,
@@ -732,9 +741,10 @@ def _build_buy_and_hold_config(
     symbols: list[str],
     starting_capital: float,
 ) -> dict[str, Any]:
-    benchmark_asset = classify_symbol(request.benchmark_symbol)
-    if benchmark_asset.asset_class != asset_class:
-        raise ValueError("invalid_benchmark_symbol")
+    benchmark_symbol = _resolve_request_benchmark(
+        request,
+        asset_class=asset_class,
+    )
 
     config = {
         "template": "buy_and_hold",
@@ -746,7 +756,7 @@ def _build_buy_and_hold_config(
         "side": "long",
         "starting_capital": starting_capital,
         "allocation_method": "equal_weight",
-        "benchmark_symbol": benchmark_asset.symbol,
+        "benchmark_symbol": benchmark_symbol,
         "parameters": {},
     }
     return _with_execution_realism(config, request)
@@ -760,9 +770,10 @@ def _build_indicator_threshold_config(
     starting_capital: float,
     indicator_parameters: dict[str, Any],
 ) -> dict[str, Any]:
-    benchmark_asset = classify_symbol(request.benchmark_symbol)
-    if benchmark_asset.asset_class != asset_class:
-        raise ValueError("invalid_benchmark_symbol")
+    benchmark_symbol = _resolve_request_benchmark(
+        request,
+        asset_class=asset_class,
+    )
 
     config = {
         "template": normalize_template_name(request),
@@ -774,7 +785,7 @@ def _build_indicator_threshold_config(
         "side": "long",
         "starting_capital": starting_capital,
         "allocation_method": "equal_weight",
-        "benchmark_symbol": benchmark_asset.symbol,
+        "benchmark_symbol": benchmark_symbol,
         "parameters": indicator_parameters,
     }
     return _with_execution_realism(config, request)
@@ -788,9 +799,10 @@ def _build_signal_strategy_config(
     starting_capital: float,
     rule_spec: dict[str, Any],
 ) -> dict[str, Any]:
-    benchmark_asset = classify_symbol(request.benchmark_symbol)
-    if benchmark_asset.asset_class != asset_class:
-        raise ValueError("invalid_benchmark_symbol")
+    benchmark_symbol = _resolve_request_benchmark(
+        request,
+        asset_class=asset_class,
+    )
 
     config = {
         "template": normalize_template_name(request),
@@ -802,7 +814,7 @@ def _build_signal_strategy_config(
         "side": "long",
         "starting_capital": starting_capital,
         "allocation_method": "equal_weight",
-        "benchmark_symbol": benchmark_asset.symbol,
+        "benchmark_symbol": benchmark_symbol,
         "parameters": {"rule_spec": rule_spec},
     }
     return _with_execution_realism(config, request)
@@ -858,6 +870,10 @@ def _prepared_market_data_for_request(
     if request.coverage_preflight is None:
         return None
     symbols, asset_class = _resolve_request_symbols(request)
+    benchmark_symbol = _resolve_request_benchmark(
+        request,
+        asset_class=asset_class,
+    )
     config = {
         "asset_class": asset_class,
         "symbols": symbols,
@@ -867,7 +883,7 @@ def _prepared_market_data_for_request(
         "requested_date_range": request.requested_date_range.model_dump()
         if request.requested_date_range is not None
         else request.date_range.model_dump(),
-        "benchmark_symbol": request.benchmark_symbol,
+        "benchmark_symbol": benchmark_symbol,
     }
     try:
         return prepare_market_data(
@@ -983,6 +999,60 @@ def validate_request_symbols(
     )
 
 
+def validate_request_benchmark(
+    request: LaunchBacktestRequest,
+    *,
+    asset_class: str,
+) -> BenchmarkSymbolValidationResult:
+    """Resolve the benchmark once and enforce the request's asset class."""
+    try:
+        benchmark = classify_symbol(request.benchmark_symbol)
+    except ValueError as exc:
+        error_code = str(exc)
+        if error_code == "asset_universe_unavailable":
+            return BenchmarkSymbolValidationResult(
+                outcome="unavailable",
+                error_code=error_code,
+            )
+        if error_code == "asset_class_conflict":
+            return BenchmarkSymbolValidationResult(
+                outcome="conflict",
+                error_code="invalid_benchmark_symbol",
+            )
+        return BenchmarkSymbolValidationResult(
+            outcome="invalid",
+            error_code=(
+                "invalid_benchmark_symbol"
+                if error_code == "invalid_symbol"
+                else error_code
+            ),
+        )
+
+    if benchmark.asset_class != asset_class:
+        return BenchmarkSymbolValidationResult(
+            outcome="conflict",
+            error_code="invalid_benchmark_symbol",
+        )
+    return BenchmarkSymbolValidationResult(
+        outcome="resolved",
+        benchmark_symbol=benchmark.symbol,
+        asset_class=benchmark.asset_class,
+    )
+
+
+def _resolve_request_benchmark(
+    request: LaunchBacktestRequest,
+    *,
+    asset_class: str,
+) -> str:
+    validation = validate_request_benchmark(request, asset_class=asset_class)
+    if validation.outcome == "unavailable":
+        raise MarketDataCoverageError("market_data_unavailable")
+    if validation.outcome != "resolved" or validation.benchmark_symbol is None:
+        raise ValueError(validation.error_code or "invalid_benchmark_symbol")
+    return validation.benchmark_symbol
+
+
 def _resolve_request_symbols(request: LaunchBacktestRequest) -> tuple[list[str], str]:
     validation = validate_request_symbols(request)
     if validation.outcome != "resolved" or validation.asset_class is None:
@@ -1020,6 +1090,7 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "invalid_symbol_count",
         "position_price_required",
         "asset_class_conflict",
+        "invalid_benchmark_symbol",
         "indicator_data_insufficient",
         "invalid_indicator_parameter",
         "indicator_period_out_of_bounds",

@@ -11,6 +11,150 @@ from argus.domain.engine_launch import adapter
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 
 
+def test_confirm_persists_canonical_benchmark_before_coverage_preflight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coverage_configs: list[dict[str, object]] = []
+
+    def classify_symbol(symbol: str) -> SimpleNamespace:
+        canonical = "BTC" if symbol in {"BTC", "BTC/USD"} else symbol
+        return SimpleNamespace(symbol=canonical, asset_class="crypto")
+
+    def prepare_market_data(config: dict[str, object]) -> SimpleNamespace:
+        coverage_configs.append(config)
+        date_range = SimpleNamespace(
+            model_dump=lambda: {"start": "2024-01-01", "end": "2024-01-05"}
+        )
+        return SimpleNamespace(
+            requested_date_range=date_range,
+            effective_date_range=date_range,
+            coverage_payload=lambda: {
+                "schema_version": "market_data_coverage_v1",
+                "outcome": "full_coverage",
+                "requested_date_range": date_range.model_dump(),
+                "effective_date_range": date_range.model_dump(),
+                "dataset_id": "sha256:canonical-benchmark-preflight",
+                "observations_by_symbol": {"ETH": 5, "BTC": 5},
+            },
+        )
+
+    monkeypatch.setattr(adapter, "classify_symbol", classify_symbol)
+    monkeypatch.setattr(coverage, "prepare_market_data", prepare_market_data)
+
+    state = RunState.new(
+        current_user_message="Hold ETH and compare it with BTC/USD.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold ETH against Bitcoin.",
+        asset_universe=["ETH"],
+        asset_class="crypto",
+        comparison_baseline="BTC/USD",
+        capital_amount=1_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+
+    result = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert result.outcome == "await_approval"
+    assert coverage_configs[0]["benchmark_symbol"] == "BTC"
+    confirmation = result.patch["confirmation_payload"]
+    assert confirmation["launch_payload"]["benchmark_symbol"] == "BTC"
+    assert confirmation["strategy"]["comparison_baseline"] == "BTC"
+
+
+def test_confirm_rejects_cross_asset_benchmark_before_coverage_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coverage_configs: list[dict[str, object]] = []
+
+    def classify_symbol(symbol: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            symbol=symbol,
+            asset_class="equity" if symbol == "SPY" else "crypto",
+        )
+
+    monkeypatch.setattr(adapter, "classify_symbol", classify_symbol)
+    monkeypatch.setattr(
+        coverage,
+        "prepare_market_data",
+        lambda config: coverage_configs.append(config),
+    )
+
+    state = RunState.new(
+        current_user_message="Hold ETH and compare it with SPY.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold ETH against SPY.",
+        asset_universe=["ETH"],
+        asset_class="crypto",
+        comparison_baseline="SPY",
+        capital_amount=1_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+
+    result = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert coverage_configs == []
+    constraints = result.patch["optional_parameter_status"]["unsupported_constraints"]
+    assert constraints[-1]["raw_value"] == "invalid_benchmark_symbol"
+    assert "confirmation_payload" not in result.patch
+
+
+def test_confirm_maps_transient_benchmark_catalog_failure_to_provider_neutral_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coverage_configs: list[dict[str, object]] = []
+
+    def classify_symbol(symbol: str) -> SimpleNamespace:
+        if symbol == "BTC/USD":
+            raise ValueError("asset_universe_unavailable")
+        return SimpleNamespace(symbol=symbol, asset_class="crypto")
+
+    monkeypatch.setattr(adapter, "classify_symbol", classify_symbol)
+    monkeypatch.setattr(
+        coverage,
+        "prepare_market_data",
+        lambda config: coverage_configs.append(config),
+    )
+
+    state = RunState.new(
+        current_user_message="Hold ETH and compare it with BTC/USD.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold ETH against Bitcoin.",
+        asset_universe=["ETH"],
+        asset_class="crypto",
+        comparison_baseline="BTC/USD",
+        capital_amount=1_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+
+    result = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert coverage_configs == []
+    recovery = result.patch["optional_parameter_status"]["coverage_recovery"]
+    assert recovery["code"] == "market_data_unavailable"
+    assert "provider" not in recovery
+    assert "confirmation_payload" not in result.patch
+
+
 @pytest.mark.parametrize(
     ("strategy_type", "cadence", "asset_class"),
     [

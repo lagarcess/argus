@@ -179,6 +179,87 @@ def test_approved_launch_uses_one_prepared_dataset_for_metrics_and_chart(
     }
 
 
+def test_approved_launch_reuses_canonical_benchmark_alias_without_duplicate_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: Counter[str] = Counter()
+
+    def fake_fetch(symbol: str, **_: Any) -> pd.DataFrame:
+        calls[symbol] += 1
+        index = pd.to_datetime(
+            ["2024-01-03", "2024-01-04", "2024-01-05"],
+            utc=True,
+        )
+        close = pd.Series([100.0, 101.0, 102.0], index=index)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    def classify_stub(symbol: str):
+        canonical = "BTC" if symbol in {"BTC", "BTC/USD"} else symbol
+        return type(
+            "ResolvedAsset",
+            (),
+            {
+                "canonical_symbol": canonical,
+                "asset_class": "crypto",
+                "symbol": canonical,
+            },
+        )()
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        classify_stub,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.fetch_ohlcv",
+        fake_fetch,
+    )
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="ETH",
+        symbols=["ETH"],
+        asset_class="crypto",
+        timeframe="1D",
+        date_range={"start": "2024-01-03", "end": "2024-01-05"},
+        requested_date_range={"start": "2024-01-03", "end": "2024-01-05"},
+        coverage_preflight={
+            "outcome": "full_coverage",
+            "requested_date_range": {
+                "start": "2024-01-03",
+                "end": "2024-01-05",
+            },
+            "effective_date_range": {
+                "start": "2024-01-03",
+                "end": "2024-01-05",
+            },
+            "preflight_id": "sha256:canonical-benchmark-preflight",
+        },
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=1_000,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="BTC/USD",
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    assert result.envelope.resolved_parameters["benchmark_symbol"] == "BTC"
+    assert calls == Counter({"ETH": 1, "BTC": 1})
+
+
 def test_approved_launch_preserves_transient_market_data_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
