@@ -14,8 +14,9 @@ export type AuthSecurityPort = {
 };
 
 export type SessionActionResult = {
-  currentSessionPreserved: boolean;
+  currentSessionPreserved: boolean | "unknown";
   freshLoginRequired: boolean;
+  revocation: "complete" | "failed";
   cookieSync: "not_required" | "cleared" | "failed";
 };
 
@@ -33,29 +34,34 @@ export function createAuthSecurityActions(
   const signOut = async (
     scope: "local" | "others" | "global",
   ): Promise<SessionActionResult> => {
-    const { error } = await auth.signOut({ scope });
-    throwOnAuthError(error);
+    let revocationError: unknown | null = null;
+    try {
+      const { error } = await auth.signOut({ scope });
+      revocationError = error;
+    } catch (error) {
+      revocationError = error;
+    }
     if (scope === "others") {
+      throwOnAuthError(revocationError);
       return {
         currentSessionPreserved: true,
         freshLoginRequired: false,
+        revocation: "complete",
         cookieSync: "not_required",
       };
     }
+    let cookieSync: SessionActionResult["cookieSync"] = "cleared";
     try {
       await clearCookies();
-      return {
-        currentSessionPreserved: false,
-        freshLoginRequired: true,
-        cookieSync: "cleared",
-      };
     } catch {
-      return {
-        currentSessionPreserved: false,
-        freshLoginRequired: true,
-        cookieSync: "failed",
-      };
+      cookieSync = "failed";
     }
+    return {
+      currentSessionPreserved: revocationError ? "unknown" : false,
+      freshLoginRequired: revocationError === null,
+      revocation: revocationError ? "failed" : "complete",
+      cookieSync,
+    };
   };
 
   return {

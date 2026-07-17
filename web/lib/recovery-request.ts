@@ -136,6 +136,12 @@ export async function handleRecoveryRequest(
   request: Request,
   dependencies: RecoveryRequestDependencies,
 ): Promise<Response> {
+  if (
+    dependencies.environment === "production" &&
+    !exactOrigin(dependencies.configuredAppOrigin)
+  ) {
+    return jsonResponse({ accepted: false }, 503);
+  }
   const requestOrigin = request.headers.get("origin");
   const redirectTo = recoveryRedirectTarget({
     requestUrl: request.url,

@@ -23,6 +23,7 @@ export default function AccountSecurityPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [freshLogin, setFreshLogin] = useState(false);
 
@@ -34,15 +35,25 @@ export default function AccountSecurityPage() {
       .catch(() => window.location.replace("/?auth=login"));
   }, []);
 
-  const applyResult = (result: SessionActionResult, successMessage: string) => {
-    setMessage(
-      result.cookieSync === "failed"
-        ? t(
-            "account_security.cookie_sync_warning",
-            "Sessions were revoked, but local cookie cleanup could not be confirmed.",
-          )
-        : successMessage,
-    );
+  const applyResult = (
+    result: SessionActionResult,
+    successMessage: string,
+    revocationWarning: string,
+  ) => {
+    setMessage(null);
+    setWarning(null);
+    if (result.revocation === "failed") {
+      setWarning(revocationWarning);
+    } else if (result.cookieSync === "failed") {
+      setWarning(
+        t(
+          "account_security.cookie_sync_warning",
+          "Sessions were revoked, but local cookie cleanup could not be confirmed.",
+        ),
+      );
+    } else {
+      setMessage(successMessage);
+    }
     setFreshLogin(result.freshLoginRequired);
   };
 
@@ -50,6 +61,7 @@ export default function AccountSecurityPage() {
     event.preventDefault();
     setError(null);
     setMessage(null);
+    setWarning(null);
     if (newPassword !== confirmPassword) {
       setError(t("auth.recovery.password_mismatch", "Passwords do not match."));
       return;
@@ -65,6 +77,10 @@ export default function AccountSecurityPage() {
         t(
           "account_security.password.changed",
           "Password changed. Sign in again on every browser.",
+        ),
+        t(
+          "account_security.password.revocation_warning",
+          "Password changed, but Argus could not confirm every session was signed out. Retry Sign out all sessions.",
         ),
       );
       setCurrentPassword("");
@@ -86,6 +102,7 @@ export default function AccountSecurityPage() {
     setConfirmation(null);
     setError(null);
     setMessage(null);
+    setWarning(null);
     setBusy(scope);
     try {
       const actions = getAuthSecurityActions();
@@ -106,6 +123,10 @@ export default function AccountSecurityPage() {
               "account_security.sessions.signed_out",
               "The selected sessions are signed out.",
             ),
+        t(
+          "account_security.sessions.revocation_warning",
+          "Argus could not confirm the selected sessions were signed out. Try the session action again.",
+        ),
       );
     } catch {
       setError(
@@ -146,6 +167,11 @@ export default function AccountSecurityPage() {
         {message && (
           <p role="status" className="mt-6 rounded-[18px] border border-emerald-500/20 bg-emerald-500/[0.06] p-4 text-sm text-emerald-800 dark:text-emerald-200">
             {message}
+          </p>
+        )}
+        {warning && (
+          <p role="alert" className="mt-6 rounded-[18px] border border-amber-500/20 bg-amber-500/[0.06] p-4 text-sm text-amber-800 dark:text-amber-200">
+            {warning}
           </p>
         )}
         {error && (

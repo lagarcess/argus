@@ -18,6 +18,7 @@ export default function RecoveryPage() {
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [result, setResult] = useState<SessionActionResult | null>(null);
+  const [retryingRevocation, setRetryingRevocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,6 +64,23 @@ export default function RecoveryPage() {
         ),
       );
       setState("invalid");
+    }
+  };
+
+  const retryRevocation = async () => {
+    setError(null);
+    setRetryingRevocation(true);
+    try {
+      setResult(await getAuthSecurityActions().signOutAllSessions());
+    } catch {
+      setError(
+        t(
+          "auth.recovery.revocation_retry_error",
+          "Argus still couldn’t confirm that every session was signed out. Try again.",
+        ),
+      );
+    } finally {
+      setRetryingRevocation(false);
     }
   };
 
@@ -139,12 +157,25 @@ export default function RecoveryPage() {
         {state === "done" && result && (
           <div className="mt-5 space-y-4">
             <p role="status" className="text-sm leading-relaxed text-emerald-700 dark:text-emerald-200">
-              {t(
-                "auth.recovery.reset_complete",
-                "Your password is updated. Sign in again on every browser.",
-              )}
+              {result.revocation === "failed"
+                ? t(
+                    "auth.recovery.password_updated",
+                    "Your password is updated.",
+                  )
+                : t(
+                    "auth.recovery.reset_complete",
+                    "Your password is updated. Sign in again on every browser.",
+                  )}
             </p>
-            {result.cookieSync === "failed" && (
+            {result.revocation === "failed" && (
+              <p role="alert" className="text-sm leading-relaxed text-amber-700 dark:text-amber-200">
+                {t(
+                  "auth.recovery.revocation_warning",
+                  "Argus could not confirm that every session was signed out. Retry before signing in again.",
+                )}
+              </p>
+            )}
+            {result.revocation === "complete" && result.cookieSync === "failed" && (
               <p role="alert" className="text-sm leading-relaxed text-amber-700 dark:text-amber-200">
                 {t(
                   "auth.recovery.cleanup_warning",
@@ -152,12 +183,26 @@ export default function RecoveryPage() {
                 )}
               </p>
             )}
-            <Link
-              href="/?auth=login"
-              className="inline-flex rounded-full bg-black px-5 py-3 text-sm font-medium text-white dark:bg-white dark:text-black"
-            >
-              {t("auth.recovery.back_to_sign_in", "Back to sign in")}
-            </Link>
+            {error && <p role="alert" className="text-sm text-red-600 dark:text-red-300">{error}</p>}
+            {result.revocation === "failed" ? (
+              <button
+                type="button"
+                disabled={retryingRevocation}
+                onClick={() => void retryRevocation()}
+                className="inline-flex rounded-full bg-black px-5 py-3 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+              >
+                {retryingRevocation
+                  ? t("auth.recovery.retrying_revocation", "Retrying...")
+                  : t("auth.recovery.retry_revocation", "Retry sign out all sessions")}
+              </button>
+            ) : (
+              <Link
+                href="/?auth=login"
+                className="inline-flex rounded-full bg-black px-5 py-3 text-sm font-medium text-white dark:bg-white dark:text-black"
+              >
+                {t("auth.recovery.back_to_sign_in", "Back to sign in")}
+              </Link>
+            )}
           </div>
         )}
       </section>

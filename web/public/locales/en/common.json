@@ -900,7 +900,12 @@
       "update_password": "Update password",
       "updating": "Updating...",
       "reset_error": "This recovery link is no longer valid. Request a new one.",
+      "password_updated": "Your password is updated.",
       "reset_complete": "Your password is updated. Sign in again on every browser.",
+      "revocation_warning": "Argus could not confirm that every session was signed out. Retry before signing in again.",
+      "retry_revocation": "Retry sign out all sessions",
+      "retrying_revocation": "Retrying...",
+      "revocation_retry_error": "Argus still couldn’t confirm that every session was signed out. Try again.",
       "cleanup_warning": "Sessions were revoked, but this browser could not confirm local cookie cleanup. A fresh sign-in is still required."
     },
     "errors": {
@@ -922,6 +927,7 @@
       "submit": "Change password",
       "changing": "Changing...",
       "changed": "Password changed. Sign in again on every browser.",
+      "revocation_warning": "Password changed, but Argus could not confirm every session was signed out. Retry Sign out all sessions.",
       "error": "We couldn’t change the password. Check your current password and try again."
     },
     "sessions": {
@@ -932,6 +938,7 @@
       "sign_out_all": "Sign out all sessions",
       "others_complete": "Other sessions are signed out. This browser remains signed in.",
       "signed_out": "The selected sessions are signed out.",
+      "revocation_warning": "Argus could not confirm the selected sessions were signed out. Try the session action again.",
       "error": "We couldn’t complete that session change. Try again.",
       "confirm_others_title": "Sign out other sessions?",
       "confirm_others_description": "Other browsers will lose access. This browser stays signed in.",

@@ -900,7 +900,12 @@
       "update_password": "Actualizar contraseña",
       "updating": "Actualizando...",
       "reset_error": "Este enlace ya no es válido. Solicita uno nuevo.",
+      "password_updated": "Tu contraseña fue actualizada.",
       "reset_complete": "Tu contraseña fue actualizada. Inicia sesión de nuevo en cada navegador.",
+      "revocation_warning": "Argus no pudo confirmar que todas las sesiones se cerraron. Vuelve a intentarlo antes de iniciar sesión de nuevo.",
+      "retry_revocation": "Reintentar cerrar todas las sesiones",
+      "retrying_revocation": "Reintentando...",
+      "revocation_retry_error": "Argus aún no pudo confirmar que todas las sesiones se cerraron. Inténtalo de nuevo.",
       "cleanup_warning": "Las sesiones fueron revocadas, pero este navegador no pudo confirmar la limpieza de cookies. Aún necesitas iniciar sesión de nuevo."
     },
     "errors": {
@@ -922,6 +927,7 @@
       "submit": "Cambiar contraseña",
       "changing": "Cambiando...",
       "changed": "Contraseña cambiada. Inicia sesión de nuevo en cada navegador.",
+      "revocation_warning": "La contraseña cambió, pero Argus no pudo confirmar que todas las sesiones se cerraron. Vuelve a intentar Cerrar todas las sesiones.",
       "error": "No pudimos cambiar la contraseña. Verifica la contraseña actual e inténtalo de nuevo."
     },
     "sessions": {
@@ -932,6 +938,7 @@
       "sign_out_all": "Cerrar todas las sesiones",
       "others_complete": "Las otras sesiones se cerraron. Este navegador sigue conectado.",
       "signed_out": "Las sesiones seleccionadas se cerraron.",
+      "revocation_warning": "Argus no pudo confirmar que las sesiones seleccionadas se cerraron. Intenta de nuevo la acción de sesión.",
       "error": "No pudimos completar ese cambio de sesión. Inténtalo de nuevo.",
       "confirm_others_title": "¿Cerrar las otras sesiones?",
       "confirm_others_description": "Los otros navegadores perderán acceso. Este navegador seguirá conectado.",

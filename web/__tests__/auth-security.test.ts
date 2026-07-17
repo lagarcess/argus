@@ -53,6 +53,24 @@ describe("account security actions", () => {
     expect(recoveryPage).toContain(".exchangeRecoveryCode(code)");
   });
 
+  test("partial revoke-all outcomes stay honest and retryable in both password flows", () => {
+    const accountPage = readFileSync(
+      join(import.meta.dir, "../app/account/security/page.tsx"),
+      "utf-8",
+    );
+    const recoveryPage = readFileSync(
+      join(import.meta.dir, "../app/auth/recovery/page.tsx"),
+      "utf-8",
+    );
+
+    expect(accountPage).toContain('result.revocation === "failed"');
+    expect(accountPage).toContain(
+      '"account_security.password.revocation_warning"',
+    );
+    expect(recoveryPage).toContain('result.revocation === "failed"');
+    expect(recoveryPage).toContain('"auth.recovery.retry_revocation"');
+  });
+
   test("ordinary logout clears Argus cookies even when local revocation fails", async () => {
     const scopes: string[] = [];
     let cookieClears = 0;
@@ -96,6 +114,32 @@ describe("account security actions", () => {
     expect(result).toEqual({
       currentSessionPreserved: false,
       freshLoginRequired: true,
+      revocation: "complete",
+      cookieSync: "cleared",
+    });
+  });
+
+  test("normal password change reports a successful update when revoke-all fails", async () => {
+    const port = authPort({ signOutError: new Error("provider unavailable") });
+    let cookieClears = 0;
+    const actions = createAuthSecurityActions(port.auth, async () => {
+      cookieClears += 1;
+    });
+
+    const result = await actions.changePassword({
+      currentPassword: "old-password",
+      newPassword: "new-password",
+    });
+
+    expect(port.updates).toEqual([
+      { password: "new-password", current_password: "old-password" },
+    ]);
+    expect(port.scopes).toEqual(["global"]);
+    expect(cookieClears).toBe(1);
+    expect(result).toEqual({
+      currentSessionPreserved: "unknown",
+      freshLoginRequired: false,
+      revocation: "failed",
       cookieSync: "cleared",
     });
   });
@@ -111,6 +155,18 @@ describe("account security actions", () => {
     expect(port.updates).toEqual([{ password: "new-password" }]);
     expect(port.scopes).toEqual(["global"]);
     expect(result.freshLoginRequired).toBe(true);
+  });
+
+  test("recovery reports a successful update when revoke-all fails", async () => {
+    const port = authPort({ signOutError: new Error("provider unavailable") });
+    const actions = createAuthSecurityActions(port.auth, async () => undefined);
+
+    const result = await actions.resetRecoveredPassword("new-password");
+
+    expect(port.updates).toEqual([{ password: "new-password" }]);
+    expect(port.scopes).toEqual(["global"]);
+    expect(result.revocation).toBe("failed");
+    expect(result.freshLoginRequired).toBe(false);
   });
 
   test("an invalid or reused recovery code cannot change a password", async () => {
@@ -136,6 +192,7 @@ describe("account security actions", () => {
     expect(result).toEqual({
       currentSessionPreserved: true,
       freshLoginRequired: false,
+      revocation: "complete",
       cookieSync: "not_required",
     });
   });
@@ -178,6 +235,7 @@ describe("account security actions", () => {
     expect(result).toEqual({
       currentSessionPreserved: false,
       freshLoginRequired: true,
+      revocation: "complete",
       cookieSync: "failed",
     });
   });
@@ -201,6 +259,30 @@ describe("recovery request safety", () => {
         environment: "production",
       }),
     ).toBeNull();
+  });
+
+  test("production recovery reports missing origin configuration as unavailable", async () => {
+    const response = await handleRecoveryRequest(
+      new Request("https://app.argus.example/api/auth/recovery", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://app.argus.example",
+        },
+        body: JSON.stringify({ email: "person@example.com" }),
+      }),
+      {
+        configuredAppOrigin: undefined,
+        environment: "production",
+        limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+        async sendRecovery() {
+          throw new Error("must not send without a configured origin");
+        },
+      },
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ accepted: false });
   });
 
   test("local recovery allows only the documented local origins", () => {
