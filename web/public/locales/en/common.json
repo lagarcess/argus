@@ -294,6 +294,8 @@
       "unsupported_recovery_for_asset": "That rule does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_with_raw_value": "{{rawValue}} does not define when to buy or sell on its own. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?",
+      "unsupported_timeframe": "That bar size is not supported. Choose daily or 1-hour bars.",
+      "unsupported_timeframe_with_raw_value": "{{rawValue}} is not a supported bar size. Choose daily or 1-hour bars.",
       "timeframe_actions": {
         "daily": "Retry with daily bars",
         "hour_1": "Retry with 1-hour bars"

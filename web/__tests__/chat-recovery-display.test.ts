@@ -181,6 +181,40 @@ describe("chat recovery display", () => {
     );
   });
 
+  test("renders degraded timeframe recovery truthfully in English and Spanish", () => {
+    const display = recoveryDisplayFromMetadata({
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "unsupported_time_granularity",
+        prompt_source: "degraded_fallback",
+        requested_field: "timeframe",
+        requested_fields: ["timeframe"],
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          raw_value: "5m",
+          strategy: { asset_universe: ["AAPL"], timeframe: "5m" },
+        },
+        options: [
+          {
+            id: "option_0",
+            replacement_values: { timeframe: "1D" },
+          },
+          {
+            id: "option_1",
+            replacement_values: { timeframe: "1h" },
+          },
+        ],
+      },
+    });
+
+    expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe(
+      "5m is not a supported bar size. Choose daily or 1-hour bars.",
+    );
+    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
+      "5m no es un tamaño de barra compatible. Elige barras diarias o de 1 hora.",
+    );
+  });
+
   test("renders provider-neutral coverage recovery in English and Spanish", () => {
     const metadata = {
       clarification: {

@@ -18,6 +18,9 @@ from argus.agent_runtime.coverage_recovery import (
     optional_parameter_status_without_coverage_recovery,
 )
 from argus.agent_runtime.llm_clarifier import ClarificationRequest
+from argus.agent_runtime.simplification_option_contract import (
+    simplification_option_kind,
+)
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
     PendingNeedName,
@@ -147,12 +150,23 @@ async def clarify_stage_async(
 
     if unsupported_constraints:
         options = _simplification_options(unsupported_constraints)
+        preserved_optional_parameter_status = (
+            optional_parameter_status_without_coverage_recovery(
+                state.optional_parameter_status
+            )
+        )
+        preserved_optional_parameter_status.pop("unsupported_constraints", None)
         response_intent = _response_intent(
             kind="unsupported_recovery",
             state=state,
             semantic_needs=["simplification_choice"],
             requested_fields=([state.requested_field] if state.requested_field else []),
-            facts={"unsupported_constraints": unsupported_constraints},
+            facts={
+                "unsupported_constraints": unsupported_constraints,
+                PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT: (
+                    preserved_optional_parameter_status
+                ),
+            },
             options=options,
             language=language,
         )
@@ -675,6 +689,7 @@ def _simplification_options(
     unsupported_constraints: list[dict[str, object]],
 ) -> list[dict[str, object]]:
     options: list[dict[str, object]] = []
+    seen_ids: set[str] = set()
     for constraint in unsupported_constraints:
         raw_options = constraint.get("simplification_options", [])
         if not isinstance(raw_options, list):
@@ -683,7 +698,21 @@ def _simplification_options(
             if not isinstance(option, dict):
                 continue
             if isinstance(option.get("label"), str):
-                options.append(option)
+                replacement_values = option.get("replacement_values")
+                raw_option_id = option.get("id")
+                option_id = (
+                    simplification_option_kind(replacement_values)
+                    or (
+                        raw_option_id.strip()
+                        if isinstance(raw_option_id, str) and raw_option_id.strip()
+                        else None
+                    )
+                    or f"option_{len(options)}"
+                )
+                if option_id in seen_ids:
+                    continue
+                seen_ids.add(option_id)
+                options.append({**option, "id": option_id})
     return options
 
 

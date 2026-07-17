@@ -294,6 +294,8 @@
       "unsupported_recovery_for_asset": "Esa regla no define por sí sola cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
       "unsupported_recovery_with_raw_value": "{{rawValue}} no define por sí solo cuándo comprar o vender. ¿Qué camino quieres usar: {{options}}?",
       "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} no define por sí solo cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_timeframe": "Ese tamaño de barra no es compatible. Elige barras diarias o de 1 hora.",
+      "unsupported_timeframe_with_raw_value": "{{rawValue}} no es un tamaño de barra compatible. Elige barras diarias o de 1 hora.",
       "timeframe_actions": {
         "daily": "Usar barras diarias",
         "hour_1": "Usar barras de 1 hora"

@@ -7487,6 +7487,7 @@ def test_unsupported_timeframe_action_preserves_assumptions_and_reconfirms(
         asset_class="equity",
         comparison_baseline="SPY",
         capital_amount=5_000,
+        timeframe="5m",
         date_range={"start": "2024-01-01", "end": "2024-01-05"},
     )
     option_id = "option_0" if timeframe == "1D" else "option_1"
@@ -7506,23 +7507,6 @@ def test_unsupported_timeframe_action_preserves_assumptions_and_reconfirms(
                     "replacement_values": {"timeframe": timeframe},
                 },
             },
-        ).model_copy(
-            update={
-                "optional_parameter_status": {
-                    "initial_capital": 5_000,
-                    "fees": 0.001,
-                    "slippage": 0.0005,
-                    "timeframe": "5m",
-                    "unsupported_constraints": [
-                        {
-                            "category": "unsupported_time_granularity",
-                            "raw_value": "5m",
-                            "explanation": "Choose a supported timeframe.",
-                            "simplification_options": options,
-                        }
-                    ],
-                }
-            }
         ),
         user=UserState(user_id="u1"),
         latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
@@ -7535,7 +7519,13 @@ def test_unsupported_timeframe_action_preserves_assumptions_and_reconfirms(
                 "facts": {
                     "unsupported_constraints": [
                         {"category": "unsupported_time_granularity"}
-                    ]
+                    ],
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "5m",
+                    },
                 },
                 "options": options,
             },
@@ -7544,7 +7534,10 @@ def test_unsupported_timeframe_action_preserves_assumptions_and_reconfirms(
     )
 
     assert result.outcome == "ready_for_confirmation"
-    assert result.patch["candidate_strategy_draft"] == pending.model_dump(mode="python")
+    assert result.patch["candidate_strategy_draft"] == pending.model_copy(
+        update={"timeframe": timeframe}
+    ).model_dump(mode="python")
+    assert result.patch["candidate_strategy_draft"]["timeframe"] == timeframe
     assert result.patch["optional_parameter_status"] == {
         "initial_capital": 5_000,
         "fees": 0.001,
@@ -7553,6 +7546,128 @@ def test_unsupported_timeframe_action_preserves_assumptions_and_reconfirms(
     }
     assert result.patch["requested_field"] is None
     assert result.patch["missing_required_fields"] == []
+
+
+def test_unsupported_timeframe_text_answer_restores_preserved_assumptions() -> None:
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        capital_amount=5_000,
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Use daily bars instead.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "requested_field": "timeframe",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "unsupported_recovery",
+                "requested_fields": ["timeframe"],
+                "facts": {
+                    "unsupported_constraints": [
+                        {"category": "unsupported_time_granularity"}
+                    ],
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "5m",
+                    },
+                },
+                "options": [],
+            },
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User selected daily bars.",
+                candidate_strategy_draft=StrategySummary(timeframe="1D"),
+                semantic_turn_act="answer_pending_need",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.timeframe == "1D"
+    optional_status = result.patch["optional_parameter_status"]
+    assert optional_status["initial_capital"] == 5_000
+    assert optional_status["fees"] == 0.001
+    assert optional_status["slippage"] == 0.0005
+    assert optional_status["timeframe"] == "1D"
+
+
+def test_unsupported_timeframe_recovery_does_not_leak_into_new_idea() -> None:
+    prior = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="New idea: buy and hold NVDA during 2025.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=prior),
+        selected_thread_metadata={
+            "requested_field": "timeframe",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "unsupported_recovery",
+                "requested_fields": ["timeframe"],
+                "facts": {
+                    "unsupported_constraints": [
+                        {"category": "unsupported_time_granularity"}
+                    ],
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "5m",
+                    },
+                },
+                "options": [],
+            },
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="new_task",
+                requires_clarification=False,
+                user_goal_summary="User started a separate investing idea.",
+                candidate_strategy_draft=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold NVDA during 2025.",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                    date_range={"start": "2025-01-01", "end": "2025-12-31"},
+                ),
+                semantic_turn_act="new_idea",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["NVDA"]
+    optional_status = result.patch.get("optional_parameter_status", {})
+    assert "initial_capital" not in optional_status
+    assert "fees" not in optional_status
+    assert "slippage" not in optional_status
+    assert "timeframe" not in optional_status
 
 
 @pytest.mark.parametrize("task_relation", ["continue", "new_task"])

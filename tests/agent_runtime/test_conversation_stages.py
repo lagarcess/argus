@@ -7,6 +7,9 @@ import pandas as pd
 import pytest
 from argus.agent_runtime.artifacts import ArtifactPatch, apply_artifact_patch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.coverage_recovery import (
+    PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT,
+)
 from argus.agent_runtime.llm_clarifier import (
     ClarificationRequest,
     ClarificationResponse,
@@ -580,6 +583,13 @@ def test_clarify_spanish_unsupported_recovery_fallback_uses_structured_options()
         "buy_and_hold",
         "moving_average_crossover",
     ]
+    assert [
+        option["id"] for option in result.patch["response_intent"]["options"]
+    ] == [
+        "rsi_threshold",
+        "buy_and_hold",
+        "moving_average_crossover",
+    ]
     assert clarification["options"][0]["replacement_values"] == {
         "simplify_logic": "rsi_only"
     }
@@ -895,6 +905,17 @@ def test_clarify_unsupported_timeframe_persists_typed_actions_with_llm_voice() -
 
     assert result.outcome == "await_user_reply"
     assert result.patch["assistant_prompt"] == clarifier.question
+    assert result.patch["response_intent"]["facts"][
+        PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT
+    ] == {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "5m",
+    }
+    assert [
+        option["id"] for option in result.patch["response_intent"]["options"]
+    ] == ["option_0", "option_1"]
     assert result.patch["clarification"] == {
         "kind": "unsupported_recovery",
         "reason_code": "unsupported_time_granularity",
@@ -919,6 +940,64 @@ def test_clarify_unsupported_timeframe_persists_typed_actions_with_llm_voice() -
             },
         ],
     }
+
+
+@pytest.mark.parametrize("language", ["en", "es-419"])
+def test_clarify_unsupported_timeframe_degraded_fallback_is_typed_and_truthful(
+    language: str,
+) -> None:
+    state = RunState.new(
+        current_user_message="Use five-minute bars.",
+        recent_thread_history=[],
+    )
+    state.intent = "unsupported_or_out_of_scope"
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        timeframe="5m",
+    )
+    state.requested_field = "timeframe"
+    state.missing_required_fields = ["timeframe"]
+    state.optional_parameter_status = {
+        "timeframe": "5m",
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_time_granularity",
+                "raw_value": "5m",
+                "explanation": "Choose a supported timeframe.",
+                "simplification_options": [
+                    {
+                        "label": "Retry with daily bars",
+                        "replacement_values": {"timeframe": "1D"},
+                    },
+                    {
+                        "label": "Retry with 1-hour bars",
+                        "replacement_values": {"timeframe": "1h"},
+                    },
+                ],
+            }
+        ],
+    }
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=RecordingClarifier(None),
+        language=language,
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == (
+        "5m is not a supported bar size. Choose daily or 1-hour bars."
+    )
+    assert result.patch["clarification"]["prompt_source"] == "degraded_fallback"
+    assert result.patch["clarification"]["reason_code"] == (
+        "unsupported_time_granularity"
+    )
+    assert [
+        option["id"] for option in result.patch["response_intent"]["options"]
+    ] == [option["id"] for option in result.patch["clarification"]["options"]]
 
 
 def test_clarification_renderer_collapses_adjacent_duplicate_sentences() -> None:

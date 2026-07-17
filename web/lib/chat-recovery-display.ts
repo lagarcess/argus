@@ -14,6 +14,7 @@ export type RecoveryDisplay =
   | {
       kind: "unsupported_recovery";
       values: {
+        reasonCode?: string;
         rawValue?: string;
         symbol?: string;
         options: Array<{
@@ -127,6 +128,13 @@ export function recoveryDisplayText(
     return t(`chat.coverage_recovery.${display.code}`);
   }
   if (display.kind === "unsupported_recovery") {
+    if (display.values.reasonCode === "unsupported_time_granularity") {
+      return display.values.rawValue
+        ? t("chat.clarification.unsupported_timeframe_with_raw_value", {
+            rawValue: display.values.rawValue,
+          })
+        : t("chat.clarification.unsupported_timeframe");
+    }
     const optionsText = joinLocalizedOptions(
       display.values.options.map((option) => optionDisplayText(option, t)),
       t,
@@ -192,6 +200,7 @@ function unsupportedRecoveryDisplay(
   return {
     kind: "unsupported_recovery",
     values: {
+      reasonCode: unsupportedReasonCode(facts),
       rawValue: unsupportedRawValue(facts),
       symbol: primarySymbol(recordOrNull(facts?.strategy)),
       options,
@@ -359,12 +368,28 @@ function unsupportedRecoveryDisplayFromClarification(
   return {
     kind: "unsupported_recovery",
     values: {
+      reasonCode: stringOrNull(clarification.reason_code) ?? undefined,
       rawValue:
         rawValue && !looksLikeInternalCode(rawValue) ? rawValue : undefined,
       symbol: primarySymbol(recordOrNull(payload?.strategy)),
       options,
     },
   };
+}
+
+function unsupportedReasonCode(
+  facts: Record<string, unknown> | null,
+): string | undefined {
+  const constraints = Array.isArray(facts?.unsupported_constraints)
+    ? facts.unsupported_constraints
+    : [];
+  for (const rawConstraint of constraints) {
+    const category = stringOrNull(recordOrNull(rawConstraint)?.category);
+    if (category) {
+      return category;
+    }
+  }
+  return undefined;
 }
 
 function strategyValues(value: unknown): Record<string, string> | undefined {

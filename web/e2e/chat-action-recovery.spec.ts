@@ -8,10 +8,17 @@ const COVERAGE_RECOVERY_REQUEST = "Test AAPL coverage recovery";
 const COVERAGE_RECOVERY_PROMPT =
   "AAPL and SPY do not share enough history for one trustworthy test. Which part should we change?";
 const TIMEFRAME_RECOVERY_REQUEST = "Test AAPL with five-minute bars";
+const DEGRADED_TIMEFRAME_RECOVERY_REQUEST =
+  "Test AAPL with five-minute bars while clarification is unavailable";
 const TIMEFRAME_RECOVERY_PROMPTS = {
   en: "Five-minute bars are not supported. Choose daily or one-hour bars.",
   "es-419":
     "Las barras de cinco minutos no son compatibles. Elige barras diarias o de una hora.",
+} as const;
+const DEGRADED_TIMEFRAME_RECOVERY_PROMPTS = {
+  en: "5m is not a supported bar size. Choose daily or 1-hour bars.",
+  "es-419":
+    "5m no es un tamaño de barra compatible. Elige barras diarias o de 1 hora.",
 } as const;
 
 type StreamRequest = {
@@ -601,8 +608,14 @@ async function mockChatApi(
       ]);
     }
 
-    if (body.message === TIMEFRAME_RECOVERY_REQUEST) {
-      const prompt = TIMEFRAME_RECOVERY_PROMPTS[language];
+    if (
+      body.message === TIMEFRAME_RECOVERY_REQUEST ||
+      body.message === DEGRADED_TIMEFRAME_RECOVERY_REQUEST
+    ) {
+      const degraded = body.message === DEGRADED_TIMEFRAME_RECOVERY_REQUEST;
+      const prompt = degraded
+        ? DEGRADED_TIMEFRAME_RECOVERY_PROMPTS[language]
+        : TIMEFRAME_RECOVERY_PROMPTS[language];
       const responseIntent = {
         kind: "unsupported_recovery",
         semantic_needs: ["simplification_choice"],
@@ -629,7 +642,7 @@ async function mockChatApi(
       const clarification = {
         kind: "unsupported_recovery",
         reason_code: "unsupported_time_granularity",
-        prompt_source: "llm_generated",
+        prompt_source: degraded ? "degraded_fallback" : "llm_generated",
         requested_field: "timeframe",
         requested_fields: ["timeframe"],
         semantic_needs: ["simplification_choice"],
@@ -1179,23 +1192,41 @@ test("successful LLM coverage recovery preserves exact voice and actions after r
 for (const testCase of [
   {
     language: "en" as const,
+    source: "LLM",
+    request: TIMEFRAME_RECOVERY_REQUEST,
     prompt: TIMEFRAME_RECOVERY_PROMPTS.en,
     dailyLabel: "Retry with daily bars",
   },
   {
     language: "es-419" as const,
+    source: "LLM",
+    request: TIMEFRAME_RECOVERY_REQUEST,
     prompt: TIMEFRAME_RECOVERY_PROMPTS["es-419"],
     dailyLabel: "Usar barras diarias",
   },
+  {
+    language: "en" as const,
+    source: "degraded",
+    request: DEGRADED_TIMEFRAME_RECOVERY_REQUEST,
+    prompt: DEGRADED_TIMEFRAME_RECOVERY_PROMPTS.en,
+    dailyLabel: "Retry with daily bars",
+  },
+  {
+    language: "es-419" as const,
+    source: "degraded",
+    request: DEGRADED_TIMEFRAME_RECOVERY_REQUEST,
+    prompt: DEGRADED_TIMEFRAME_RECOVERY_PROMPTS["es-419"],
+    dailyLabel: "Usar barras diarias",
+  },
 ]) {
-  test(`successful LLM timeframe recovery preserves assumptions and actions after reload (${testCase.language})`, async ({
+  test(`${testCase.source} timeframe recovery preserves assumptions and actions after reload (${testCase.language})`, async ({
     page,
   }) => {
     const api = await mockChatApi(page, { language: testCase.language });
 
     await page.goto("/chat", { waitUntil: "networkidle" });
     await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 15_000 });
-    await page.getByTestId("chat-input").fill(TIMEFRAME_RECOVERY_REQUEST);
+    await page.getByTestId("chat-input").fill(testCase.request);
     await page.getByTestId("chat-send").click();
 
     const expectTimeframeRecovery = async () => {

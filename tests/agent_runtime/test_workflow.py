@@ -4,6 +4,7 @@ from datetime import date
 from typing import Any
 
 import pytest
+from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.graph.workflow import (
     WorkflowStageOutcome,
     _apply_stage_result,
@@ -16,6 +17,7 @@ from argus.agent_runtime.runtime import (
     run_agent_turn,
     stream_agent_turn_events,
 )
+from argus.agent_runtime.stages.clarify import clarify_stage_async
 from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
     InterpretDecision,
@@ -55,6 +57,12 @@ class RecordingClarifier:
     def __call__(self, request: Any) -> str:
         self.requests.append(request)
         return self.response
+
+
+class UnexpectedInterpreter:
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        del request
+        raise AssertionError("typed recovery action must not call the interpreter")
 
 
 def test_task_snapshot_clears_failed_action_after_new_confirmation() -> None:
@@ -942,6 +950,117 @@ def test_workflow_publishes_pending_response_intent_options_for_recovery() -> No
 
 
 @pytest.mark.asyncio
+async def test_timeframe_recovery_action_rehydrates_assumptions_and_strategy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import confirm as confirm_module
+
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+        capital_amount=5_000,
+        comparison_baseline="SPY",
+    )
+    clarify_state = RunState.new(
+        current_user_message="Use five-minute bars.",
+        recent_thread_history=[],
+    )
+    clarify_state.intent = "unsupported_or_out_of_scope"
+    clarify_state.candidate_strategy_draft = pending
+    clarify_state.requested_field = "timeframe"
+    clarify_state.missing_required_fields = ["timeframe"]
+    clarify_state.optional_parameter_status = {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "5m",
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_time_granularity",
+                "raw_value": "5m",
+                "explanation": "Choose a supported timeframe.",
+                "simplification_options": [
+                    {
+                        "label": "Retry with daily bars",
+                        "replacement_values": {"timeframe": "1D"},
+                    },
+                    {
+                        "label": "Retry with 1-hour bars",
+                        "replacement_values": {"timeframe": "1h"},
+                    },
+                ],
+            }
+        ],
+    }
+    clarification = await clarify_stage_async(
+        state=clarify_state,
+        contract=build_default_capability_contract(),
+        clarification_generator=RecordingClarifier(
+            "Five-minute bars are not supported. Choose daily or one-hour bars."
+        ),
+    )
+
+    def prepared_coverage(
+        launch_payload: dict[str, Any],
+        *,
+        optional_parameter_status: dict[str, Any],
+    ) -> dict[str, Any]:
+        assert optional_parameter_status == {
+            "initial_capital": 5_000,
+            "fees": 0.001,
+            "slippage": 0.0005,
+            "timeframe": "1D",
+        }
+        return {"outcome": "ready_to_confirm", "launch_payload": launch_payload}
+
+    monkeypatch.setattr(confirm_module, "_coverage_preflight", prepared_coverage)
+    response_intent = clarification.patch["response_intent"]
+    action_option = response_intent["options"][0]
+    workflow = build_workflow(
+        structured_interpreter=UnexpectedInterpreter(),
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id="thread-timeframe-recovery",
+        message="Retry with daily bars",
+        action_context={
+            "type": "select_response_option",
+            "label": "Retry with daily bars",
+            "payload": {
+                "option_id": action_option["id"],
+                "replacement_values": action_option["replacement_values"],
+            },
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "timeframe",
+            "response_intent": response_intent,
+            "clarification": clarification.patch["clarification"],
+        },
+    )
+
+    assert result["stage_outcome"] == "await_approval"
+    confirmation = result["confirmation_payload"]
+    assert confirmation["strategy"]["timeframe"] == "1D"
+    assert confirmation["launch_payload"]["timeframe"] == "1D"
+    assert confirmation["optional_parameters"]["initial_capital"]["value"] == 5_000
+    assert confirmation["optional_parameters"]["initial_capital"]["source"] == "user"
+    assert confirmation["optional_parameters"]["fees"]["value"] == 0.001
+    assert confirmation["optional_parameters"]["slippage"]["value"] == 0.0005
+    assert result["pending_strategy"]["strategy"]["timeframe"] == "1D"
+
+
+@pytest.mark.asyncio
 async def test_workflow_requires_confirmation_before_execute(monkeypatch) -> None:
     from argus.agent_runtime import resolution as resolution_module
 
@@ -1067,9 +1186,9 @@ async def test_workflow_preserves_confirmation_validation_prompt(monkeypatch) ->
         == "data_window_too_short_for_rule"
     )
     assert clarifier.requests[0].response_intent["options"] == [
-        {"label": "Use a longer date range"},
-        {"label": "Use a shorter indicator period"},
-        {"label": "Choose a simpler supported rule"},
+        {"label": "Use a longer date range", "id": "option_0"},
+        {"label": "Use a shorter indicator period", "id": "option_1"},
+        {"label": "Choose a simpler supported rule", "id": "option_2"},
     ]
     assert "confirmation_payload" not in result
 

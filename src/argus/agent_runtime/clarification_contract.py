@@ -173,6 +173,14 @@ def _unsupported_recovery_fallback(
     strategy: StrategySummary | dict[str, Any] | None,
 ) -> str | None:
     _ = language
+    if _unsupported_reason_code(response_intent) == "unsupported_time_granularity":
+        raw_value = _unsupported_raw_value(response_intent)
+        if raw_value:
+            return (
+                f"{raw_value} is not a supported bar size. "
+                "Choose daily or 1-hour bars."
+            )
+        return "That bar size is not supported. Choose daily or 1-hour bars."
     options = _option_labels(response_intent)
     if not options:
         return None

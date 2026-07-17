@@ -360,8 +360,14 @@ def _unsupported_timeframe_action_result(
     if pending is None:
         return None
 
-    optional_parameter_status = dict(state.optional_parameter_status)
-    raw_constraints = optional_parameter_status.pop("unsupported_constraints", [])
+    optional_parameter_status = (
+        preserved_optional_parameter_status_from_response_intent(response_intent) or {}
+    )
+    optional_parameter_status.update(state.optional_parameter_status)
+    raw_constraints = optional_parameter_status.pop(
+        "unsupported_constraints",
+        constraints,
+    )
     remaining_constraints = [
         constraint
         for constraint in raw_constraints
@@ -373,12 +379,16 @@ def _unsupported_timeframe_action_result(
     if remaining_constraints:
         optional_parameter_status["unsupported_constraints"] = remaining_constraints
     optional_parameter_status["timeframe"] = timeframe
+    corrected_pending = pending.model_copy(
+        update={"timeframe": timeframe},
+        deep=True,
+    )
     return StageResult(
         outcome=(
             "needs_clarification" if remaining_constraints else "ready_for_confirmation"
         ),
         stage_patch={
-            "candidate_strategy_draft": pending.model_dump(mode="python"),
+            "candidate_strategy_draft": corrected_pending.model_dump(mode="python"),
             "assistant_prompt": None,
             "requested_field": None,
             "missing_required_fields": [],
