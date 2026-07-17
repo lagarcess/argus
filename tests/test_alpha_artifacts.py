@@ -84,8 +84,7 @@ def test_p1_evidence_spine_migration_freezes_immutable_fields_only() -> None:
     )
 
     assert (
-        "create or replace function public.prevent_idea_version_immutable_update"
-        in text
+        "create or replace function public.prevent_idea_version_immutable_update" in text
     )
     assert "create trigger prevent_idea_versions_immutable_update" in text
     assert "before update on public.idea_versions" in text

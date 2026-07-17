@@ -417,21 +417,17 @@ def mock_gateway():
     gateway.create_evidence_artifact.side_effect = lambda *, user_id, artifact: artifact
     gateway.get_decision_note_by_artifact.return_value = None
     gateway.upsert_decision_note.side_effect = lambda *, user_id, decision: decision
-    gateway.capture_current_decision_note.side_effect = (
-        lambda *,
-        user_id,
-        decision: (
-            decision,
-            api_state.store.evidence_artifacts[decision.evidence_artifact_id].model_copy(
-                update={"lifecycle": "decided"}
-            ),
-            api_state.store.ideas[decision.idea_id].model_copy(
-                update={"lifecycle": "decided"}
-            ),
-            api_state.store.idea_versions[decision.idea_version_id].model_copy(
-                update={"lifecycle": "decided"}
-            ),
-        )
+    gateway.capture_current_decision_note.side_effect = lambda *, user_id, decision: (
+        decision,
+        api_state.store.evidence_artifacts[decision.evidence_artifact_id].model_copy(
+            update={"lifecycle": "decided"}
+        ),
+        api_state.store.ideas[decision.idea_id].model_copy(
+            update={"lifecycle": "decided"}
+        ),
+        api_state.store.idea_versions[decision.idea_version_id].model_copy(
+            update={"lifecycle": "decided"}
+        ),
     )
     gateway.create_decision_note.side_effect = lambda *, user_id, decision: decision
     gateway.mark_evidence_artifact_lifecycle.side_effect = (
@@ -985,9 +981,12 @@ def test_chat_stream_finalization_retry_reuses_original_execution_identity(
         },
     )
 
-    assert next(
-        event for event in _stream_events(first.text) if event.get("type") == "error"
-    )["code"] == "finalization_failed"
+    assert (
+        next(
+            event for event in _stream_events(first.text) if event.get("type") == "error"
+        )["code"]
+        == "finalization_failed"
+    )
     assert _final_payload(second.text)["run"]["id"] == next(
         iter(finalization_store.backtest_runs)
     )
@@ -2068,14 +2067,14 @@ def test_search_supabase_orders_p1_artifacts_before_source_conversation(
     now = utcnow()
     newer = (now + timedelta(minutes=5)).replace(microsecond=0)
     mock_gateway.search_rows.return_value = {
-            "conversations": [
-                {
-                    "id": "conversation-1",
-                    "title": "AAPL MSFT TSLA source wrapper",
-                    "last_message_preview": "AAPL MSFT TSLA chat wrapper",
-                    "updated_at": newer.isoformat(),
-                    "pinned": False,
-                }
+        "conversations": [
+            {
+                "id": "conversation-1",
+                "title": "AAPL MSFT TSLA source wrapper",
+                "last_message_preview": "AAPL MSFT TSLA chat wrapper",
+                "updated_at": newer.isoformat(),
+                "pinned": False,
+            }
         ],
         "strategies": [],
         "collections": [],

@@ -114,11 +114,7 @@ def _enforce_auth_attempt_limit(
     action: _AuthAction,
     email: str,
 ) -> None:
-    limit = (
-        AUTH_LOGIN_ATTEMPT_LIMIT
-        if action == "login"
-        else AUTH_SIGNUP_ATTEMPT_LIMIT
-    )
+    limit = AUTH_LOGIN_ATTEMPT_LIMIT if action == "login" else AUTH_SIGNUP_ATTEMPT_LIMIT
     retry_after = _AUTH_ATTEMPT_LIMITER.record_or_retry_after(
         keys=(
             f"{action}:ip:{_client_identity(request)}",
@@ -134,9 +130,7 @@ def _enforce_auth_attempt_limit(
         status_code=429,
         code="too_many_requests",
         title="Too Many Requests",
-        detail=(
-            "Too many authentication attempts. Please wait before trying again."
-        ),
+        detail=("Too many authentication attempts. Please wait before trying again."),
         headers={"Retry-After": str(retry_after)},
     )
 
