@@ -1047,10 +1047,10 @@ Retrieve the current authenticated user profile and preferences.
 
 ## `GET /me/usage`
 
-Return the authenticated user's current private-alpha daily allowance truth.
-This is an owner-only read surface. The backend returns a zero-state allowance
-when the current counter row does not exist; reading usage does not create or
-increment a counter.
+Return the authenticated user's current private-alpha daily message allowance
+truth. This is an owner-only read surface. The backend returns a zero-state
+allowance when the current message counter row does not exist; reading usage
+does not create or increment a counter.
 
 **Response:**
 ```json
@@ -1061,12 +1061,6 @@ increment a counter.
       "used": 12,
       "remaining": 188,
       "period_end": "2026-07-17T00:00:00Z"
-    },
-    "backtests": {
-      "limit": 50,
-      "used": 3,
-      "remaining": 47,
-      "period_end": "2026-07-17T00:00:00Z"
     }
   }
 }
@@ -1075,13 +1069,10 @@ increment a counter.
 **Allowance semantics:**
 - `messages` reports the daily `chat_messages` counter independently from
   simulation usage.
-- `backtests` reports the daily unique durable simulation-admission counter.
-- One unique simulation consumes one unit only when durable admission succeeds.
-- Replaying the same idempotency identity consumes no additional unit.
-- Invalid, unauthenticated, quota-rejected, preflight, and other
-  pre-admission requests consume no simulation unit.
-- A successfully admitted simulation remains consumed if later execution
-  fails.
+- The response does not publish a `backtests` or simulation allowance until
+  unique durable simulation admission is the canonical counter source. Clients
+  must show simulation usage as temporarily unavailable and must not infer a
+  numeric value.
 - `remaining` is computed by the backend as
   `max(limit - used, 0)`.
 - `period_end` is the exact backend-owned quota reset timestamp. Clients may

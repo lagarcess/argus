@@ -45,12 +45,6 @@ async function mockUsageShell(
           body: JSON.stringify({
             allowances: {
               messages,
-              backtests: {
-                limit: 10,
-                used: 9,
-                remaining: 1,
-                period_end: messages.period_end,
-              },
             },
           }),
         })

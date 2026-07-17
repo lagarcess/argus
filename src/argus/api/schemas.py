@@ -119,7 +119,6 @@ class UsageAllowances(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     messages: UsageAllowance
-    backtests: UsageAllowance
 
 
 class UsageAllowanceResponse(BaseModel):

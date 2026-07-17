@@ -726,7 +726,6 @@
         "title": "Usage",
         "description": "Your current message allowance. Simulation usage is temporarily unavailable.",
         "messages": "Messages",
-        "simulations": "Simulations",
         "used_of_limit": "{{used}} of {{limit}} used",
         "remaining": "{{count}} remaining",
         "resets": "Resets {{time}}",
@@ -736,9 +735,7 @@
         "load_error": "Usage couldn’t be loaded.",
         "retry": "Try again",
         "close": "Close usage",
-        "message_rule": "Each message Argus accepts uses one message.",
-        "simulation_rule": "One simulation is used only after a unique run is accepted and saved.",
-        "simulation_zero_rule": "Replays, rejected requests, and period checks use none. If an accepted run later fails, its unit still counts."
+        "message_rule": "Each message Argus accepts uses one message."
       }
     },
     "help": {

@@ -37,10 +37,10 @@ paths:
           description: Updated user profile and preferences.
   /api/v1/me/usage:
     get:
-      description: Return the authenticated user's current daily private-alpha allowance truth.
+      description: Return the authenticated user's current daily private-alpha message allowance truth.
       responses:
         "200":
-          description: Backend-owned message and simulation limits, usage, remaining capacity, and reset time.
+          description: Backend-owned message limit, usage, remaining capacity, and reset time.
           content:
             application/json:
               schema:
@@ -601,11 +601,8 @@ components:
       type: object
       required:
         - messages
-        - backtests
       properties:
         messages:
-          $ref: "#/components/schemas/UsageAllowance"
-        backtests:
           $ref: "#/components/schemas/UsageAllowance"
     UsageAllowanceResponse:
       type: object

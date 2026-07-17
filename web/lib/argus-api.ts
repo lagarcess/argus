@@ -185,7 +185,6 @@ export type UsageAllowance = {
 export type UsageAllowanceResponse = {
   allowances: {
     messages: UsageAllowance;
-    backtests: UsageAllowance;
   };
 };
 

@@ -44,6 +44,7 @@ describe("private-alpha usage allowance", () => {
     );
 
     expect(api).toContain('apiFetch<UsageAllowanceResponse>("/me/usage")');
+    expect(api).not.toContain("backtests: UsageAllowance");
     expect(profileMenu).toContain('openModal("usage")');
     expect(profileMenu).toContain("<UsageModal");
     expect(modal).toContain("getUsageAllowances");
@@ -105,19 +106,27 @@ describe("private-alpha usage allowance", () => {
     expect(usageButton).toContain("min-h-11");
   });
 
-  test("localizes allowance labels and reserved simulation rules", () => {
+  test("localizes the explicit simulation-unavailable state without count rules", () => {
     const en = readLocale("en").settings.data.usage_panel;
     const es = readLocale("es-419").settings.data.usage_panel;
 
     expect(en.messages).toBe("Messages");
-    expect(en.simulations).toBe("Simulations");
     expect(en.no_usage).toBe("No usage yet");
     expect(en.exhausted).toBe("Allowance used for this period");
-    expect(en.simulation_zero_rule).toContain("Replays");
+    expect(en.description).toContain(
+      "Simulation usage is temporarily unavailable.",
+    );
+    expect(en.simulations).toBeUndefined();
+    expect(en.simulation_rule).toBeUndefined();
+    expect(en.simulation_zero_rule).toBeUndefined();
     expect(es.messages).toBe("Mensajes");
-    expect(es.simulations).toBe("Simulaciones");
     expect(es.no_usage).toBe("Aún no hay uso");
     expect(es.exhausted).toBe("Cupo agotado para este periodo");
-    expect(es.simulation_zero_rule).toContain("repeticiones");
+    expect(es.description).toContain(
+      "El uso de simulaciones no está disponible temporalmente.",
+    );
+    expect(es.simulations).toBeUndefined();
+    expect(es.simulation_rule).toBeUndefined();
+    expect(es.simulation_zero_rule).toBeUndefined();
   });
 });

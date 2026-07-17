@@ -23,7 +23,6 @@ router = APIRouter(prefix="/api/v1", tags=["profile"])
 
 _DAILY_ALLOWANCE_POLICIES = {
     "messages": ("chat_messages", 200),
-    "backtests": ("backtest_runs", 50),
 }
 
 
@@ -100,7 +99,6 @@ def get_me_usage(
     return UsageAllowanceResponse(
         allowances=UsageAllowances(
             messages=allowance("messages"),
-            backtests=allowance("backtests"),
         )
     )
 

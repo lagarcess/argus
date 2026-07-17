@@ -726,7 +726,6 @@
         "title": "Uso",
         "description": "Tu cupo actual de mensajes. El uso de simulaciones no está disponible temporalmente.",
         "messages": "Mensajes",
-        "simulations": "Simulaciones",
         "used_of_limit": "{{used}} de {{limit}} usados",
         "remaining": "Quedan {{count}}",
         "resets": "Se restablece {{time}}",
@@ -736,9 +735,7 @@
         "load_error": "No se pudo cargar el uso.",
         "retry": "Intentar de nuevo",
         "close": "Cerrar uso",
-        "message_rule": "Cada mensaje que Argus acepta usa un mensaje.",
-        "simulation_rule": "Una simulación se usa solo después de aceptar y guardar una ejecución única.",
-        "simulation_zero_rule": "Las repeticiones, las solicitudes rechazadas y las verificaciones del periodo no usan ninguna. Si una ejecución aceptada falla después, su unidad sigue contando."
+        "message_rule": "Cada mensaje que Argus acepta usa un mensaje."
       }
     },
     "help": {

@@ -1,10 +1,12 @@
 import json
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+import yaml
 from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.schemas import (
@@ -546,7 +548,7 @@ def test_me_reads_profile_from_supabase_gateway(mock_gateway):
     assert mock_gateway.get_user.call_count >= 1
 
 
-def test_me_usage_returns_exact_owner_scoped_daily_allowance_truth(mock_gateway):
+def test_me_usage_returns_exact_owner_scoped_message_allowance_truth(mock_gateway):
     mock_gateway.list_current_usage_counters.return_value = [
         {
             "resource": "chat_messages",
@@ -575,17 +577,12 @@ def test_me_usage_returns_exact_owner_scoped_daily_allowance_truth(mock_gateway)
                 "remaining": 188,
                 "period_end": "2026-07-17T00:00:00Z",
             },
-            "backtests": {
-                "limit": 50,
-                "used": 53,
-                "remaining": 0,
-                "period_end": "2026-07-17T00:00:00Z",
-            },
         }
     }
+    assert "backtests" not in response.json()["allowances"]
     call_kwargs = mock_gateway.list_current_usage_counters.call_args.kwargs
     assert call_kwargs["user_id"] == "00000000-0000-0000-0000-000000000001"
-    assert call_kwargs["resources"] == ("chat_messages", "backtest_runs")
+    assert call_kwargs["resources"] == ("chat_messages",)
     assert call_kwargs["period"] == "day"
 
 
@@ -600,12 +597,22 @@ def test_me_usage_zero_state_does_not_create_or_increment_counters(mock_gateway)
     allowances = response.json()["allowances"]
     assert allowances["messages"]["used"] == 0
     assert allowances["messages"]["remaining"] == 200
-    assert allowances["backtests"]["used"] == 0
-    assert allowances["backtests"]["remaining"] == 50
-    assert allowances["messages"]["period_end"] == allowances["backtests"][
-        "period_end"
-    ]
+    assert "backtests" not in allowances
     mock_gateway.check_and_increment_usage_limits.assert_not_called()
+
+
+def test_me_usage_openapi_contract_does_not_publish_backtest_allowance():
+    generated_schema = app.openapi()["components"]["schemas"]["UsageAllowances"]
+    checked_openapi = yaml.safe_load(
+        (
+            Path(__file__).resolve().parents[1] / "docs" / "api" / "openapi.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    checked_schema = checked_openapi["components"]["schemas"]["UsageAllowances"]
+
+    for schema in (generated_schema, checked_schema):
+        assert schema["required"] == ["messages"]
+        assert set(schema["properties"]) == {"messages"}
 
 
 def test_me_usage_requires_authentication(mock_gateway, monkeypatch):
