@@ -463,4 +463,80 @@ describe("chat transcript session cache", () => {
       cache.readSnapshot({ userId: "user-1", conversationId: "conversation-a" }),
     ).not.toBeNull();
   });
+
+  test("does not retain per-key metadata after invalidation and ignored abort", async () => {
+    const cache = new TranscriptSessionCache<Snapshot>();
+    const pending = deferred<Snapshot>();
+    const navigation = cache.navigate({
+      userId: "user-1",
+      conversationId: "conversation-active",
+      load: () => pending.promise,
+      onState: () => undefined,
+    });
+
+    cache.invalidateForMutation({
+      userId: "user-1",
+      conversationId: "conversation-active",
+      mutation: "message_send",
+    });
+    for (let index = 0; index < 1_000; index += 1) {
+      cache.invalidateForMutation({
+        userId: "user-1",
+        conversationId: `conversation-${index}`,
+        mutation: "message_send",
+      });
+    }
+
+    pending.resolve(snapshot("conversation-active", "late"));
+    await navigation.completion;
+
+    expect(
+      cache.readSnapshot({
+        userId: "user-1",
+        conversationId: "conversation-active",
+      }),
+    ).toBeNull();
+    const retainedMapSizes = Object.values(
+      cache as unknown as Record<string, unknown>,
+    )
+      .filter((value): value is Map<unknown, unknown> => value instanceof Map)
+      .map((value) => value.size);
+    expect(retainedMapSizes.every((size) => size === 0)).toBe(true);
+  });
+
+  test("keeps latest-navigation safety when cache retention is disabled", async () => {
+    const cache = new TranscriptSessionCache<Snapshot>({ maxEntries: 0 });
+    const delayedA = deferred<Snapshot>();
+    const statesA: TranscriptNavigationState<Snapshot>[] = [];
+    const statesB: TranscriptNavigationState<Snapshot>[] = [];
+
+    const navigationA = cache.navigate({
+      userId: "user-1",
+      conversationId: "conversation-a",
+      load: () => delayedA.promise,
+      onState: (state) => statesA.push(state),
+    });
+    const navigationB = cache.navigate({
+      userId: "user-1",
+      conversationId: "conversation-b",
+      load: async () => snapshot("conversation-b"),
+      onState: (state) => statesB.push(state),
+    });
+
+    await navigationB.completion;
+    delayedA.resolve(snapshot("conversation-a", "late"));
+    await navigationA.completion;
+
+    expect(statesA).toEqual([
+      { phase: "loading", source: "cache_miss", snapshot: null },
+    ]);
+    expect(statesB.at(-1)).toEqual({
+      phase: "ready",
+      source: "network",
+      snapshot: snapshot("conversation-b"),
+    });
+    expect(
+      cache.readSnapshot({ userId: "user-1", conversationId: "conversation-b" }),
+    ).toBeNull();
+  });
 });

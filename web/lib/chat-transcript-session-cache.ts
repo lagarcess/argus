@@ -16,6 +16,8 @@
  *   transcript and scroll entry.
  * - Abort reduces wasted work, while the monotonic navigation generation is
  *   the correctness guard when a loader ignores AbortSignal.
+ * - Set `maxEntries` to `0` to disable transcript retention while keeping the
+ *   latest-navigation guard active.
  *
  * ChatInterface integration is intentionally separate so the cache layer can
  * be reverted without removing latest-navigation protection.
@@ -140,7 +142,6 @@ export class TranscriptSessionCache<TSnapshot> {
   private readonly now: () => number;
   private readonly entries = new Map<string, CacheEntry<TSnapshot>>();
   private readonly inFlightLoads = new Map<string, InFlightLoad<TSnapshot>>();
-  private readonly keyRevisions = new Map<string, number>();
   private authenticatedUserId: string | null = null;
   private activeNavigation: ActiveNavigation | null = null;
   private navigationGeneration = 0;
@@ -260,7 +261,6 @@ export class TranscriptSessionCache<TSnapshot> {
     const key = this.cacheKey(identity);
     const hadEntry = this.entries.has(key);
     const hadLoad = this.inFlightLoads.has(key);
-    this.keyRevisions.set(key, this.keyRevision(key) + 1);
     this.abortLoad(key);
     this.deleteEntry(key);
     if (this.activeNavigation?.key === key) {
@@ -276,7 +276,6 @@ export class TranscriptSessionCache<TSnapshot> {
     }
     this.inFlightLoads.clear();
     this.entries.clear();
-    this.keyRevisions.clear();
     this.totalEstimatedBytes = 0;
     this.authenticatedUserId = null;
     this.activeNavigation = null;
@@ -328,7 +327,6 @@ export class TranscriptSessionCache<TSnapshot> {
 
     const controller = new AbortController();
     const epoch = this.sessionEpoch;
-    const revision = this.keyRevision(key);
     let loadPromise: Promise<TSnapshot>;
     try {
       loadPromise = load(controller.signal);
@@ -338,8 +336,7 @@ export class TranscriptSessionCache<TSnapshot> {
     const promise = loadPromise.then((snapshot) => {
       if (
         !controller.signal.aborted &&
-        this.sessionEpoch === epoch &&
-        this.keyRevision(key) === revision
+        this.sessionEpoch === epoch
       ) {
         this.rememberSnapshot(key, snapshot);
       }
@@ -423,10 +420,6 @@ export class TranscriptSessionCache<TSnapshot> {
       }
       this.deleteEntry(oldestKey);
     }
-  }
-
-  private keyRevision(key: string): number {
-    return this.keyRevisions.get(key) ?? 0;
   }
 
   private isLatestNavigation(key: string, generation: number): boolean {
