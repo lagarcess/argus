@@ -313,7 +313,7 @@ def test_workflow_runs_browser_canary_and_uploads_only_sanitized_artifacts() -> 
     frontend_dependencies = workflow.index("Install frontend dependencies")
     static_ui_assertions = workflow.index("Run Spanish static UI canary assertions")
     local_smoke = workflow.index("Run local predeploy smoke")
-    browser_canary = workflow.index("Run authoritative rendered Spanish release canary")
+    browser_canary = workflow.index("Run authoritative Spanish release canary")
 
     assert frontend_dependencies < static_ui_assertions < local_smoke < browser_canary
     assert "Install Chromium for the deployed browser canary" in workflow
