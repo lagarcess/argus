@@ -497,3 +497,96 @@ reconciliation functions) joins the existing real-database proof gate;
    0.0006 ms / p95 0.0065 ms with zero loader calls; cold miss p50 0.0138 ms
    / p95 0.0588 ms (50 samples each, budgets asserted in-suite). The
    deployed-browser EN/ES profile remains the external gate.
+
+### Third correction pass (2026-07-18, remaining P1 failures)
+
+All five commits red-first; states below are the honest post-pass positions.
+
+1. **#242 identity before any execution** — `d5b5a97`. A `run_backtest`
+   action whose confirmation artifact hash is missing or malformed now
+   raises a typed `BacktestArtifactIdentityError` before durable admission,
+   delegate execution, provider access, or compute; the dev fallback
+   explicitly re-raises it, so it can never degrade into in-process
+   execution. The `artifact_launch_hash or payload_digest` fallback
+   expression is deleted — identity binds only to the immutable artifact
+   hash. The by-action confirmation load composes the existing owner-scoped
+   `user_id + conversation_id + message_id` boundary
+   (`owned_conversation_message` / `gateway.get_message`) in both modes; the
+   unscoped `get_message_row` surface is removed. Red-first: three
+   malformed/missing-hash variants leave gateway, delegate, provider, and
+   compute untouched; a foreign-owned message row visible to an unscoped
+   lookup can never qualify as confirmation evidence.
+
+2. **#230 one-transaction success finalization** — `bdba12b`. New migration
+   `20260718000004_finalize_direct_backtest_success.sql`: one
+   security-scoped function locks the owner-scoped direct job (`for
+   update`), replays the terminal row untouched when reconciliation already
+   won (zero Runs created or returned), fails closed (`missing`) when the
+   row is gone, and otherwise composes `finalize_backtest_completion` and
+   links + succeeds the job in the same transaction. The Python
+   claim → client-side tuple → conditional-CAS sequence and
+   `claim_running_direct_job` are deleted; the API validates the returned
+   final job (`succeeded` + `result_run_id` linking the finalized run)
+   before exposing any Run, and the memory twin fails closed on a missing
+   job. This closes the second pass's recorded tuple-then-CAS residue.
+   Red-first: Supabase superseded ⇒ 503 replay with no tuple write; missing
+   job ⇒ 503 fail-closed (Supabase and memory); an inconsistent returned
+   final job ⇒ finalization failure, never a 200 Run.
+
+3. **#240 acceptance composes the canonical append** — `0096590`.
+   `accept_chat_turn` no longer contains a second `messages` writer: it
+   calls `append_conversation_message` (ownership, message identity +
+   replay, `messages.user_id`, monotonic `created_at`, preview, conversation
+   `updated_at`) and inserts the lifecycle row idempotently (`on conflict
+   (turn_id) do nothing`) in the same transaction; the gateway supplies the
+   writer's identity inputs (message id, created_at, computed preview). New
+   `tests/test_migration_schema_compat.py` parses every migration into a
+   column catalog and proves each insert list against the real schema
+   (existence + NOT-NULL-without-default coverage) plus the lifecycle
+   functions' alias-qualified references — the check that caught the
+   acceptance insert omitting `messages.user_id` (a NOT NULL column: the old
+   insert could never have succeeded on a real database).
+
+4. **#240 owner-scoped reconciliation** — `2b7bb31`. The RPC now requires
+   `p_user_id`, rejects an unowned conversation before touching any row,
+   filters stale selection to the owner's rows, and the evidence predicate
+   additionally requires `m.user_id = v_row.user_id`; the memory twin
+   applies the same requester scope and message-user check. Both routes
+   invoke reconciliation only after route ownership succeeds (the messages
+   GET hook moved below its 404). Red-first: an unauthorized GET returns 404
+   and leaves the owner's stale row untouched; a foreign `user_id` on an
+   otherwise-matching terminal message abandons instead of reconciling.
+
+5. **#240 page-scoped projection** — `a6f3356`. The recovery item is
+   inserted directly after its owning user message by position — its
+   `created_at` borrows the owning message's timestamp with the projection
+   id as the `(created_at, id)` tiebreak, keeping cursor ordering monotonic
+   — instead of a global re-sort that pushed it behind later turns.
+   Reconciled turns project `turn_lifecycle_reconciled`
+   (status/outcome/turn_id) onto the linked assistant message's response
+   copy without mutating persistence. The lifecycle lookup is scoped by the
+   page's user-turn ids in both modes (`list_projectable_*`), removing the
+   permanent first-20 historical ceiling. Red-first: multi-turn adjacency,
+   reconciled outcome on reload with unmutated storage, and a 21-abandoned
+   history projecting all 21.
+
+Complexity reassessment (pass 3): net simplification again. Deleted:
+`claim_running_direct_job`, `get_message_row`, the payload-digest identity
+fallback, the hand-rolled two-branch confirmation load (now one call to the
+existing owner boundary), the second SQL messages writer, and the projection
+re-sort + unowned-tail append. Added surface is one SQL function that
+composes an existing one, and the schema-compat test harness. No speculative
+abstraction was kept.
+
+Verification at `a6f3356`: hermetic sweep 1129/0; correction-surface
+cumulative 126 + 183 (+2 Postgres proofs skip-gated as designed); API
+contract + OpenAPI gate 147; web 402/0 from `web/` (frontend untouched this
+pass); modularity budget, ruff, and `git diff --check` clean; worktree
+clean.
+
+External gates updated: migration `20260718000004` joins `20260718000001–3`
+in the disposable-Postgres real-database proof (apply in order; exercise
+`finalize_direct_backtest_success` superseded/missing/success branches and
+`reconcile_stale_chat_turns` rejection on an unowned conversation, plus
+`accept_chat_turn` replay through `append_conversation_message`). All other
+recorded external gates stand unchanged.
