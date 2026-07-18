@@ -105,6 +105,18 @@ def confirmation_id_from_payload(
     return fallback or new_confirmation_id()
 
 
+def full_launch_payload_hash(value: Any) -> str | None:
+    """Full-width canonical launch hash (``sha256:`` + 64 hex) persisted on
+    the confirmation artifact; the Run-action admission identity and the
+    by-action durable lookup both recompute from this exact value."""
+
+    if value is None:
+        return None
+    from argus.domain.backtest_admission import canonical_hash
+
+    return canonical_hash(value)
+
+
 def stable_payload_hash(value: Any) -> str | None:
     if value is None:
         return None

@@ -30,7 +30,6 @@ def run_backtest(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     user: User = Depends(current_user),  # noqa: B008
 ) -> BacktestRunResponse:
-    endpoint = "/api/v1/backtests/run"
     clean_idempotency_key = _clean_required_idempotency_key(
         request=request,
         idempotency_key=idempotency_key,
@@ -146,7 +145,9 @@ def run_backtest(
         return _replay_direct_job(request, user=user, job=job or {})
 
     job_id = str((job or {}).get("id") or "").strip()
-    execution_identity = f"{endpoint}:{clean_idempotency_key}"
+    execution_identity = backtest_admission.direct_execution_identity(
+        clean_idempotency_key
+    )
     try:
         run = create_run_from_payload(
             data,
@@ -560,14 +561,16 @@ def get_backtest_job_by_action(
             detail="No durable Run reservation exists for this action.",
         )
 
-    _verify_confirmation_artifact_integrity(
+    artifact_conversation_id, artifact_launch_hash = _confirmation_artifact_identity(
         request, user=user, job=job, confirmation_id=confirmation_id
     )
 
+    # Expected identity recomputes from the immutable confirmation artifact,
+    # never from mutable job fields.
     expected_identity = backtest_admission.chat_run_identity_hash(
-        conversation_id=job.get("conversation_id"),
+        conversation_id=artifact_conversation_id,
         confirmation_id=confirmation_id,
-        launch_payload_hash=str(job.get("payload_hash") or ""),
+        launch_payload_hash=artifact_launch_hash,
     )
     if job.get("identity_hash") != expected_identity:
         raise problem(
@@ -589,15 +592,18 @@ def get_backtest_job_by_action(
     return BacktestJobResponse(job=BacktestJob.model_validate(job), run=run)
 
 
-def _verify_confirmation_artifact_integrity(
+def _confirmation_artifact_identity(
     request: Request,
     *,
     user: User,
     job: dict[str, Any],
     confirmation_id: str,
-) -> None:
-    """Durable-state integrity: the chat job must link an owned confirmation
-    artifact whose identity matches. Failure is 500, never a replay signal."""
+) -> tuple[str, str]:
+    """Load the immutable confirmation artifact linked by the chat job and
+    return its identity inputs. A missing link, missing message, ownership or
+    conversation mismatch, absent confirmation card, mismatched
+    confirmation_id, or absent full-width launch hash is inconsistent durable
+    state: 500, never a replay signal."""
 
     integrity_failure = problem(
         request,
@@ -646,10 +652,15 @@ def _verify_confirmation_artifact_integrity(
 
     artifact = metadata if isinstance(metadata, dict) else {}
     card = artifact.get("confirmation_card")
-    if isinstance(card, dict):
-        artifact_confirmation = str(card.get("confirmation_id") or "").strip()
-        if artifact_confirmation and artifact_confirmation != confirmation_id:
-            raise integrity_failure
+    if not isinstance(card, dict):
+        raise integrity_failure
+    artifact_confirmation = str(card.get("confirmation_id") or "").strip()
+    if artifact_confirmation != confirmation_id:
+        raise integrity_failure
+    launch_hash = card.get("launch_payload_hash_full")
+    if not isinstance(launch_hash, str) or not launch_hash.startswith("sha256:"):
+        raise integrity_failure
+    return message_conversation, launch_hash
 
 
 @router.get("/backtest-jobs/{job_id}", response_model=BacktestJobResponse)

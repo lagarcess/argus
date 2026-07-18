@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from argus.agent_runtime.confirmation_artifacts import (
     confirmation_id_from_payload,
+    full_launch_payload_hash,
     stable_payload_hash,
     validate_confirmation_execution_payload,
 )
@@ -163,6 +164,9 @@ def runtime_confirmation_card(
         "confirmation_id": active_confirmation_id,
         "artifact_id": active_confirmation_id,
         "launch_payload_hash": stable_payload_hash(execution_validation.launch_payload),
+        "launch_payload_hash_full": full_launch_payload_hash(
+            execution_validation.launch_payload
+        ),
     }
     if owner_conversation_id:
         action_payload["conversation_id"] = owner_conversation_id
@@ -215,6 +219,9 @@ def runtime_confirmation_card(
     card: dict[str, Any] = {
         "confirmation_id": active_confirmation_id,
         "confirmation_state": "active",
+        "launch_payload_hash_full": full_launch_payload_hash(
+            execution_validation.launch_payload
+        ),
         "title": title,
         "status": "ready_to_run" if is_ready_to_run else "needs_change",
         "statusLabel": _confirmation_status_label(

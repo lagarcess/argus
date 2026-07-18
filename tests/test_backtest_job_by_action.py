@@ -20,7 +20,9 @@ def _seed_chat_job(
     *,
     confirmation_id: str = "confirmation-1",
     with_artifact: bool = True,
+    with_artifact_hash: bool = True,
     artifact_confirmation_id: str | None = None,
+    artifact_launch_hash: str | None = None,
     status: str = "queued",
 ) -> dict:
     user_id = api_state.store.get_or_create_dev_user().id
@@ -33,26 +35,29 @@ def _seed_chat_job(
     conversation_id = conversation.id
 
     message_id = None
+    launch_hash = "sha256:" + "b" * 64
     if with_artifact:
+        card = {
+            "confirmation_id": artifact_confirmation_id or confirmation_id,
+            "confirmation_state": "active",
+        }
+        if with_artifact_hash:
+            card["launch_payload_hash_full"] = artifact_launch_hash or launch_hash
         message = memory_message(
             conversation_id=conversation_id,
             role="assistant",
             content="Ready to run.",
-            metadata={
-                "confirmation_card": {
-                    "confirmation_id": artifact_confirmation_id or confirmation_id,
-                    "confirmation_state": "active",
-                }
-            },
+            metadata={"confirmation_card": card},
         )
         message_id = message.id
 
-    payload_hash = "sha256:" + "b" * 64
+    # Admission identity binds to the artifact's full-width launch hash.
     identity = admission.chat_run_identity_hash(
         conversation_id=conversation_id,
         confirmation_id=confirmation_id,
-        launch_payload_hash=payload_hash,
+        launch_payload_hash=launch_hash,
     )
+    payload_hash = launch_hash
     outcome = admission.admit_backtest_job_memory(
         api_state.store,
         user_id=user_id,
@@ -73,9 +78,7 @@ def _seed_chat_job(
 
 def test_lookup_returns_existing_durable_job() -> None:
     job = _seed_chat_job()
-    response = TestClient(app).get(
-        "/api/v1/backtest-jobs/by-action/confirmation-1"
-    )
+    response = TestClient(app).get("/api/v1/backtest-jobs/by-action/confirmation-1")
 
     assert response.status_code == 200
     payload = response.json()
@@ -85,37 +88,50 @@ def test_lookup_returns_existing_durable_job() -> None:
 
 
 def test_lookup_without_reservation_is_replayable_404() -> None:
-    response = TestClient(app).get(
-        "/api/v1/backtest-jobs/by-action/never-clicked"
-    )
+    response = TestClient(app).get("/api/v1/backtest-jobs/by-action/never-clicked")
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
 
 
 def test_missing_confirmation_artifact_is_integrity_500() -> None:
     _seed_chat_job(with_artifact=False)
-    response = TestClient(app).get(
-        "/api/v1/backtest-jobs/by-action/confirmation-1"
-    )
+    response = TestClient(app).get("/api/v1/backtest-jobs/by-action/confirmation-1")
     assert response.status_code == 500
     assert response.json()["code"] == "internal_error"
 
 
 def test_mismatched_artifact_confirmation_is_integrity_500() -> None:
     _seed_chat_job(artifact_confirmation_id="confirmation-other")
-    response = TestClient(app).get(
-        "/api/v1/backtest-jobs/by-action/confirmation-1"
-    )
+    response = TestClient(app).get("/api/v1/backtest-jobs/by-action/confirmation-1")
     assert response.status_code == 500
+
+
+def test_artifact_hash_mismatch_returns_conflict() -> None:
+    """A card whose immutable launch hash disagrees with the reservation's
+    identity must conflict — the artifact, not job fields, is authority."""
+
+    _seed_chat_job(artifact_launch_hash="sha256:" + "e" * 64)
+
+    response = TestClient(app).get("/api/v1/backtest-jobs/by-action/confirmation-1")
+    assert response.status_code == 409
+    body = response.json()
+    assert body["code"] == "idempotency_conflict"
+    assert "job" not in body
+
+
+def test_card_without_full_launch_hash_is_integrity_500() -> None:
+    _seed_chat_job(with_artifact_hash=False)
+
+    response = TestClient(app).get("/api/v1/backtest-jobs/by-action/confirmation-1")
+    assert response.status_code == 500
+    assert response.json()["code"] == "internal_error"
 
 
 def test_identity_mismatch_returns_conflict_without_job_details() -> None:
     job = _seed_chat_job()
     api_state.store.backtest_jobs[job["id"]]["identity_hash"] = "sha256:" + "f" * 64
 
-    response = TestClient(app).get(
-        "/api/v1/backtest-jobs/by-action/confirmation-1"
-    )
+    response = TestClient(app).get("/api/v1/backtest-jobs/by-action/confirmation-1")
     assert response.status_code == 409
     body = response.json()
     assert body["code"] == "idempotency_conflict"
@@ -142,9 +158,7 @@ def test_succeeded_job_hydrates_exactly_one_canonical_run() -> None:
         created_at=datetime.now(timezone.utc),
     )
 
-    response = TestClient(app).get(
-        "/api/v1/backtest-jobs/by-action/confirmation-1"
-    )
+    response = TestClient(app).get("/api/v1/backtest-jobs/by-action/confirmation-1")
     assert response.status_code == 200
     payload = response.json()
     assert payload["job"]["status"] == "succeeded"

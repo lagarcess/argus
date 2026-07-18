@@ -804,14 +804,27 @@ class ShadowBacktestJobTool:
                 )
             payload_digest = payload_hash(payload)
             confirmation_id = None
+            artifact_launch_hash = None
             if isinstance(context.chat_action, dict):
                 raw_confirmation = context.chat_action.get("confirmation_id")
                 if isinstance(raw_confirmation, str) and raw_confirmation.strip():
                     confirmation_id = raw_confirmation.strip()
+                action_payload = context.chat_action.get("payload")
+                if isinstance(action_payload, dict):
+                    if confirmation_id is None:
+                        nested = action_payload.get("confirmation_id")
+                        if isinstance(nested, str) and nested.strip():
+                            confirmation_id = nested.strip()
+                    raw_full = action_payload.get("launch_payload_hash_full")
+                    if isinstance(raw_full, str) and raw_full.startswith("sha256:"):
+                        artifact_launch_hash = raw_full
+            # Identity binds to the immutable confirmation artifact's
+            # full-width launch hash; the runtime payload digest remains the
+            # fallback for actions that predate the artifact field.
             identity_hash = chat_run_identity_hash(
                 conversation_id=context.conversation_id,
                 confirmation_id=confirmation_id or context.idempotency_key,
-                launch_payload_hash=payload_digest,
+                launch_payload_hash=artifact_launch_hash or payload_digest,
             )
             job = self._admit_durable_job(
                 gateway=gateway,
