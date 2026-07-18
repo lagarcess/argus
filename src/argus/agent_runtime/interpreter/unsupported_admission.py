@@ -178,13 +178,17 @@ def admitted_or_blocked_confirmation_result(
     optional_parameter_values: dict[str, Any],
     assistant_response: str | None,
 ) -> StageResult:
-    """Admission invariant: unsupported intent cannot become an executable card.
+    """Admission invariant: an unsupported verdict cannot become an executable card.
 
-    Only a typed promotion path (audit, requested-asset answer, pending-option
-    selection, artifact patch) rewrites intent before this boundary; anything
-    still unsupported here fails closed into typed unsupported recovery."""
+    The verdict lives on either typed field (intent or semantic_turn_act). Only a
+    typed promotion path (audit, requested-asset answer, pending-option selection,
+    artifact patch) normalizes them before this boundary; anything still carrying
+    the unsupported verdict here fails closed into typed unsupported recovery."""
 
-    if decision.intent != "unsupported_or_out_of_scope":
+    if (
+        decision.intent != "unsupported_or_out_of_scope"
+        and decision.semantic_turn_act != "unsupported_request"
+    ):
         return StageResult(
             outcome="ready_for_confirmation",
             decision=decision,

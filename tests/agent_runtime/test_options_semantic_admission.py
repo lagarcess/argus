@@ -111,11 +111,16 @@ def _contradictory_interpretation(
     )
 
 
-def _assert_blocked_unsupported_admission(result, *, symbol: str) -> None:
+def _assert_blocked_unsupported_admission(
+    result,
+    *,
+    symbol: str,
+    expected_intent: str = "unsupported_or_out_of_scope",
+) -> None:
     assert result.outcome == "needs_clarification"
     assert result.decision is not None
     decision = result.decision
-    assert decision.intent == "unsupported_or_out_of_scope"
+    assert decision.intent == expected_intent
     assert decision.requires_clarification is True
     assert "unsupported_intent_confirmation_blocked" in decision.reason_codes
     constraints = decision.unsupported_constraints
@@ -184,6 +189,22 @@ def test_unsupported_request_turn_act_contradiction_blocks_and_keeps_prose(
     )
     _assert_blocked_unsupported_admission(result, symbol="TSLA")
     assert result.patch.get("assistant_response") == refusal
+
+
+def test_supported_intent_with_unsupported_request_act_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The unsupported verdict can arrive on either typed field; both fail closed."""
+
+    _stub_equity_asset_resolution(monkeypatch)
+    mixed = _contradictory_interpretation(
+        symbol="TSLA", semantic_turn_act="unsupported_request"
+    ).model_copy(update={"intent": "backtest_execution"})
+    result, _ = _run_interpret(message=EN_OPTIONS_MESSAGE, response=mixed)
+    _assert_blocked_unsupported_admission(
+        result, symbol="TSLA", expected_intent="backtest_execution"
+    )
+    assert result.decision.semantic_turn_act == "unsupported_request"
 
 
 def test_supported_intent_same_draft_still_admits(
@@ -329,6 +350,39 @@ async def test_inverse_contradiction_confident_audit_promotion_is_single_turn(
 
 
 @pytest.mark.asyncio
+async def test_mixed_shape_promotion_normalizes_intent_and_turn_act(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    recorder = _SchemaRecorder(
+        interpreter_module.SupportedStrategyCapabilityConflictAudit(
+            selected_strategy_type="buy_and_hold",
+            drop_unsupported_strategy_logic=True,
+            keep_unsupported_strategy_logic=False,
+            confidence=0.9,
+        )
+    )
+    monkeypatch.setattr(interpreter_module, "invoke_openrouter_json_schema", recorder)
+    mixed = _inverse_llm_response(date_range=FULL_YEAR_2024).model_copy(
+        update={
+            "intent": "backtest_execution",
+            "semantic_turn_act": "unsupported_request",
+        }
+    )
+
+    ready = await interpreter_module._response_ready_for_runtime(
+        response=mixed,
+        preferred_model="test-model",
+        request=_request("hold TSLA for all of 2024"),
+    )
+
+    assert ready.intent == "backtest_execution"
+    assert ready.semantic_turn_act == "new_idea"
+    assert "supported_strategy_capability_conflict_inverse" in ready.reason_codes
+
+
+@pytest.mark.asyncio
 async def test_inverse_promotion_without_dates_asks_for_the_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -361,6 +415,10 @@ class _WrongSchema:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    "response_shape",
+    [pytest.param("unsupported_intent"), pytest.param("mixed_unsupported_act")],
+)
+@pytest.mark.parametrize(
     "conflict_audit",
     [
         pytest.param(
@@ -374,6 +432,7 @@ class _WrongSchema:
 async def test_inverse_contradiction_fails_closed_without_promotion(
     monkeypatch: pytest.MonkeyPatch,
     conflict_audit: Any,
+    response_shape: str,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -393,14 +452,26 @@ async def test_inverse_contradiction_fails_closed_without_promotion(
         )
     recorder = _SchemaRecorder(conflict_audit)
     monkeypatch.setattr(interpreter_module, "invoke_openrouter_json_schema", recorder)
+    response = _inverse_llm_response(date_range=FULL_YEAR_2024)
+    expected_intent = "unsupported_or_out_of_scope"
+    if response_shape == "mixed_unsupported_act":
+        response = response.model_copy(
+            update={
+                "intent": "backtest_execution",
+                "semantic_turn_act": "unsupported_request",
+            }
+        )
+        expected_intent = "backtest_execution"
 
     ready = await interpreter_module._response_ready_for_runtime(
-        response=_inverse_llm_response(date_range=FULL_YEAR_2024),
+        response=response,
         preferred_model="test-model",
         request=_request(),
     )
 
-    assert ready.intent == "unsupported_or_out_of_scope"
+    assert ready.intent == expected_intent
+    if response_shape == "mixed_unsupported_act":
+        assert ready.semantic_turn_act == "unsupported_request"
     assert "supported_strategy_capability_conflict_audit" not in ready.reason_codes
     assert "supported_strategy_capability_conflict_inverse" not in ready.reason_codes
 
