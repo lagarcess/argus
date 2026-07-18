@@ -459,6 +459,35 @@ def mock_gateway():
             job["execution_metadata"] = kwargs["execution_metadata"]
         return dict(job)
 
+    def _finalize_direct_backtest_success(**kwargs):
+        # #230 truthful twin of the one-transaction success boundary: lock is
+        # implicit (single-threaded test), branch on the job row exactly like
+        # the database function.
+        job = admission_jobs.get(kwargs["job_id"])
+        if job is None:
+            return {"outcome": "missing"}
+        if job["status"] not in ("queued", "running"):
+            return {"outcome": "superseded", "job": dict(job)}
+        finalized = MemoryBacktestFinalizationGateway(
+            finalization_store
+        ).finalize_backtest_completion(finalization=kwargs["finalization"])
+        job.update(
+            status="succeeded",
+            result_run_id=finalized.run.id,
+            failure_code=None,
+            failure_detail=None,
+            retryable=False,
+        )
+        captured = finalized.captured
+        return {
+            "outcome": "finalized",
+            "job": dict(job),
+            "run": finalized.run.model_dump(mode="json"),
+            "idea": captured.idea.model_dump(mode="json"),
+            "idea_version": captured.idea_version.model_dump(mode="json"),
+            "evidence_artifact": captured.evidence_artifact.model_dump(mode="json"),
+        }
+
     def _get_backtest_job_by_reservation(**kwargs):
         key = (
             kwargs["user_id"],
@@ -470,6 +499,9 @@ def mock_gateway():
 
     gateway.admit_backtest_job.side_effect = _admit_backtest_job
     gateway.finalize_direct_backtest_job.side_effect = _finalize_direct_backtest_job
+    gateway.finalize_direct_backtest_success.side_effect = (
+        _finalize_direct_backtest_success
+    )
     gateway.get_backtest_job_by_reservation.side_effect = (
         _get_backtest_job_by_reservation
     )
@@ -666,6 +698,125 @@ def test_direct_run_persists_requested_and_effective_data_windows(
     assert run["chart"]["series"][0]["time"] == "2024-01-03"
     assert run["chart"]["series"][-1]["time"] == "2024-01-05"
     mock_gateway.check_and_increment_usage_limits.assert_called_once()
+
+
+_DIRECT_RUN_PAYLOAD = {
+    "template": "buy_and_hold",
+    "asset_class": "equity",
+    "symbols": ["AAPL"],
+    "start_date": "2024-01-01",
+    "end_date": "2024-01-05",
+}
+
+
+def test_direct_success_superseded_by_reconciliation_creates_no_run(
+    mock_gateway,
+) -> None:
+    """#230: the stale reconciler already made the job terminal — the single
+    finalization transaction returns the terminal job, and zero Runs are
+    created or returned; no client-side tuple write may happen."""
+
+    terminal_job = {
+        "id": "admitted-job-1",
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "conversation_id": None,
+        "operation_scope": "backtests.run",
+        "idempotency_key": "loses-to-db-reconciler",
+        "identity_hash": "sha256:" + "0" * 64,
+        "payload_hash": "sha256:" + "1" * 64,
+        "launch_payload": {"kind": "direct"},
+        "status": "failed",
+        "result_run_id": None,
+        "failure_code": "direct_execution_abandoned",
+        "failure_detail": "execution_interrupted",
+        "retryable": True,
+        "execution_metadata": {"failure_status": 503},
+    }
+    mock_gateway.finalize_direct_backtest_success.side_effect = (
+        lambda **kwargs: {"outcome": "superseded", "job": dict(terminal_job)}
+    )
+
+    failure_client = TestClient(app, raise_server_exceptions=False)
+    response = failure_client.post(
+        "/api/v1/backtests/run",
+        json=dict(_DIRECT_RUN_PAYLOAD),
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "loses-to-db-reconciler",
+        },
+    )
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["code"] == "direct_execution_abandoned"
+    assert "run" not in body
+    mock_gateway.finalize_direct_backtest_success.assert_called_once()
+    mock_gateway.finalize_backtest_completion.assert_not_called()
+
+
+def test_direct_success_with_missing_job_fails_closed(mock_gateway) -> None:
+    """#230: the admitted job row is gone at finalization time — fail closed
+    with zero Runs created or returned."""
+
+    mock_gateway.finalize_direct_backtest_success.side_effect = (
+        lambda **kwargs: {"outcome": "missing"}
+    )
+
+    failure_client = TestClient(app, raise_server_exceptions=False)
+    response = failure_client.post(
+        "/api/v1/backtests/run",
+        json=dict(_DIRECT_RUN_PAYLOAD),
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "job-vanished",
+        },
+    )
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["code"] == "finalization_failed"
+    assert "run" not in body
+    mock_gateway.finalize_backtest_completion.assert_not_called()
+
+
+def test_direct_success_validates_the_returned_final_job(mock_gateway) -> None:
+    """#230: the API validates the transaction's returned final job — a job
+    that did not actually succeed with the finalized Run linked is a
+    finalization failure, never a 200 with a Run."""
+
+    def _broken_success(**kwargs):
+        finalization = kwargs["finalization"]
+        run_payload = finalization.run.model_dump(mode="json")
+        captured = finalization.captured
+        return {
+            "outcome": "finalized",
+            # The job claims success but links a different run id.
+            "job": {
+                "id": kwargs["job_id"],
+                "status": "succeeded",
+                "result_run_id": "not-the-finalized-run",
+            },
+            "run": run_payload,
+            "idea": captured.idea.model_dump(mode="json"),
+            "idea_version": captured.idea_version.model_dump(mode="json"),
+            "evidence_artifact": captured.evidence_artifact.model_dump(mode="json"),
+        }
+
+    mock_gateway.finalize_direct_backtest_success.side_effect = _broken_success
+
+    failure_client = TestClient(app, raise_server_exceptions=False)
+    response = failure_client.post(
+        "/api/v1/backtests/run",
+        json=dict(_DIRECT_RUN_PAYLOAD),
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "inconsistent-final-job",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "finalization_failed"
+    assert "run" not in response.json()
 
 
 def test_chat_stream_quota_exceeded(mock_gateway):
@@ -997,8 +1148,8 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(
     assert "No fees/slippage" in run["conversation_result_card"]["assumptions"]
     assert run["conversation_result_card"]["assumptions"][-1] == "Benchmark: SPY"
     assert run["conversation_result_card"]["benchmark_note"] is None
-    mock_gateway.finalize_backtest_completion.assert_called_once()
-    called_run = mock_gateway.finalize_backtest_completion.call_args.kwargs[
+    mock_gateway.finalize_direct_backtest_success.assert_called_once()
+    called_run = mock_gateway.finalize_direct_backtest_success.call_args.kwargs[
         "finalization"
     ].run
     assert isinstance(called_run, BacktestRun)
@@ -1029,8 +1180,8 @@ def test_run_backtest_supabase_kill_switch_restores_legacy_snapshot(
     run = response.json()["run"]
     assert "_execution_realism" not in run["config_snapshot"]
     assert "No fees/slippage" in run["conversation_result_card"]["assumptions"]
-    mock_gateway.finalize_backtest_completion.assert_called_once()
-    called_run = mock_gateway.finalize_backtest_completion.call_args.kwargs[
+    mock_gateway.finalize_direct_backtest_success.assert_called_once()
+    called_run = mock_gateway.finalize_direct_backtest_success.call_args.kwargs[
         "finalization"
     ].run
     assert isinstance(called_run, BacktestRun)
@@ -1038,7 +1189,7 @@ def test_run_backtest_supabase_kill_switch_restores_legacy_snapshot(
 
 
 def test_run_backtest_finalization_failure_is_explicit_and_retryable(mock_gateway):
-    mock_gateway.finalize_backtest_completion.side_effect = RuntimeError(
+    mock_gateway.finalize_direct_backtest_success.side_effect = RuntimeError(
         "database unavailable"
     )
 

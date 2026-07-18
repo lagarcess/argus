@@ -312,6 +312,51 @@ def test_stale_reconciliation_win_blocks_late_run_creation(
     assert api_state.store.backtest_finalizations == finalizations_before
 
 
+def test_missing_direct_job_fails_closed_without_a_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#230: the admitted job row vanished before finalization — fail closed:
+    no Run may be created, exposed, or returned."""
+
+    from argus.api import backtest_service
+
+    client = TestClient(app, raise_server_exceptions=False)
+    api_state.store.get_or_create_dev_user()
+
+    original_create = backtest_service.create_run_from_payload
+
+    def create_then_lose_the_job(*args: Any, **kwargs: Any) -> Any:
+        run = original_create(*args, **kwargs)
+        api_state.store.backtest_jobs.clear()
+        api_state.store.backtest_job_reservations.clear()
+        return run
+
+    monkeypatch.setattr(
+        backtest_service, "create_run_from_payload", create_then_lose_the_job
+    )
+    monkeypatch.setattr(
+        "argus.api.routers.backtest.create_run_from_payload",
+        create_then_lose_the_job,
+        raising=False,
+    )
+
+    runs_before = set(api_state.store.backtest_runs)
+    finalizations_before = dict(api_state.store.backtest_finalizations)
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "job-vanished"},
+        json=_payload(),
+    )
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["code"] == "finalization_failed"
+    assert "run" not in body
+    assert set(api_state.store.backtest_runs) == runs_before
+    assert api_state.store.backtest_finalizations == finalizations_before
+
+
 def test_stale_running_direct_job_reconciles_on_poll() -> None:
     client = _client()
     user_id = api_state.store.get_or_create_dev_user().id

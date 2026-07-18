@@ -96,6 +96,15 @@ def finalize_backtest_completion(
     return finalized
 
 
+def prepare_backtest_finalization(
+    finalization: BacktestFinalizationInput,
+) -> PreparedBacktestFinalization:
+    """Public preparation boundary for finalizers that commit elsewhere
+    (#230's one-transaction direct success RPC)."""
+
+    return _prepare_finalization(finalization)
+
+
 class MemoryBacktestFinalizationGateway:
     def __init__(self, store: AlphaStore) -> None:
         self.store = store
@@ -359,6 +368,12 @@ def _same_immutable_run(left: BacktestRun, right: BacktestRun) -> bool:
     left_payload = left.model_dump(mode="json", exclude=ignored)
     right_payload = right.model_dump(mode="json", exclude=ignored)
     return left_payload == right_payload
+
+
+def validate_finalized_backtest(finalized: FinalizedBacktest) -> None:
+    """Public identity validation for finalizers that commit elsewhere."""
+
+    _validate_finalized_backtest(finalized)
 
 
 def _validate_finalized_backtest(finalized: FinalizedBacktest) -> None:

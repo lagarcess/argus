@@ -91,26 +91,38 @@ def get_backtest_job_by_reservation(
     return dict(row) if row is not None else None
 
 
-def claim_running_direct_job(
+def finalize_direct_backtest_success(
     client: Any,
     *,
-    user_id: str,
     job_id: str,
-) -> dict[str, Any] | None:
-    """Row-locking conditional claim: returns the job only while it is still
-    ``running``, serializing with the stale reconciler before the finalizer
-    creates the Run/evidence tuple."""
+    finalization: Any,
+) -> dict[str, Any]:
+    """#230: one database transaction locks and verifies the owner-scoped
+    direct job, creates/replays the canonical Run/evidence tuple, and links +
+    succeeds the job; a terminal job replays with no Run and a missing job
+    fails closed (see migration 20260718000004)."""
 
-    claimed = (
-        client.table("backtest_jobs")
-        .update({"updated_at": _now_iso()})
-        .eq("user_id", user_id)
-        .eq("id", job_id)
-        .eq("status", "running")
-        .execute()
-    )
-    row = _row_one(claimed)
-    return dict(row) if row is not None else None
+    captured = finalization.captured
+    result = client.rpc(
+        "finalize_direct_backtest_success",
+        {
+            "p_user_id": finalization.user_id,
+            "p_job_id": job_id,
+            "p_execution_identity": finalization.execution_identity,
+            "p_run": finalization.run.model_dump(mode="json"),
+            "p_idea": captured.idea.model_dump(mode="json"),
+            "p_idea_version": captured.idea_version.model_dump(mode="json"),
+            "p_evidence_artifact": captured.evidence_artifact.model_dump(mode="json"),
+        },
+    ).execute()
+    data = getattr(result, "data", None)
+    if isinstance(data, list):
+        data = data[0] if data else None
+    if not isinstance(data, dict):
+        raise RuntimeError(
+            "Direct backtest finalization did not return durable job state."
+        )
+    return dict(data)
 
 
 def finalize_direct_backtest_job(

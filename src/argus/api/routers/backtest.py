@@ -95,7 +95,6 @@ def run_backtest(
         create_run_from_payload,
         prepare_run_from_payload,
     )
-    from argus.api.chat.evidence import finalize_completed_backtest
 
     _validate_direct_payload_shape(data, request)
     normalized_payload = backtest_admission.normalize_direct_launch_payload(data)
@@ -164,7 +163,6 @@ def run_backtest(
             job_id=job_id,
             run=run,
             execution_identity=execution_identity,
-            finalize=finalize_completed_backtest,
         )
         if superseded_job is not None:
             # Stale reconciliation already won: no Run may be created,
@@ -227,24 +225,32 @@ def _finalize_direct_success(
     job_id: str,
     run: Any,
     execution_identity: str,
-    finalize: Any,
 ) -> tuple[Any, dict[str, Any] | None]:
-    """Job-aware atomic finalization boundary: lock/check the direct job
-    before creating the Run/evidence tuple, then transition it to succeeded.
+    """Job-aware atomic finalization boundary: the direct job is locked and
+    verified, the Run/evidence tuple created/replayed, and the job linked and
+    succeeded in one unit; a terminal job replays with no Run and a missing
+    job fails closed.
 
     Memory mode holds the admission lock across check, tuple creation, and
     the success transition, so the reconciler (same lock) fully serializes.
-    Supabase mode claims the still-running row (row-locking conditional
-    update) before creating the tuple; the tuple-then-CAS tail is recorded as
-    remaining database-transaction work in the ledger."""
+    Supabase mode runs the whole boundary in one database transaction."""
+
+    from argus.api.chat.evidence import (
+        finalize_completed_backtest,
+        finalize_direct_backtest_success,
+    )
 
     gateway = api_state.supabase_gateway
     if gateway is None:
         with api_state.store.backtest_admission_lock:
             current = api_state.store.backtest_jobs.get(job_id)
-            if current is not None and current.get("status") != "running":
+            if current is None:
+                raise BacktestFinalizationError(
+                    "Direct backtest job was missing at finalization time."
+                )
+            if current.get("status") != "running":
                 return None, dict(current)
-            finalized = finalize(
+            finalized = finalize_completed_backtest(
                 user_id=user.id,
                 conversation_id=run.conversation_id,
                 run=run,
@@ -258,24 +264,17 @@ def _finalize_direct_success(
             )
             return finalized, None
 
-    claimed = gateway.claim_running_direct_job(user_id=user.id, job_id=job_id)
-    if claimed is None:
-        current = gateway.get_backtest_job(user_id=user.id, job_id=job_id)
-        if current is not None:
-            return None, dict(current)
-    finalized = finalize(
+    finalized_result, superseded_job = finalize_direct_backtest_success(
         user_id=user.id,
         conversation_id=run.conversation_id,
         run=run,
         execution_identity=execution_identity,
-    ).run
-    gateway.finalize_direct_backtest_job(
-        user_id=user.id,
         job_id=job_id,
-        status="succeeded",
-        result_run_id=finalized.id,
     )
-    return finalized, None
+    if superseded_job is not None:
+        return None, superseded_job
+    assert finalized_result is not None
+    return finalized_result.run, None
 
 
 def _precheck_direct_allowance(request: Request, *, user: User) -> None:

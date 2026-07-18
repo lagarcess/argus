@@ -964,8 +964,8 @@ class SupabaseGateway(
             self.client, **kwargs
         )
 
-    def claim_running_direct_job(self, **kwargs: Any) -> dict[str, Any] | None:
-        return backtest_admission_gateway.claim_running_direct_job(
+    def finalize_direct_backtest_success(self, **kwargs: Any) -> dict[str, Any]:
+        return backtest_admission_gateway.finalize_direct_backtest_success(
             self.client, **kwargs
         )
 

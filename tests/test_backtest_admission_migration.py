@@ -87,3 +87,50 @@ def test_admission_function_is_service_role_only() -> None:
     assert "revoke all on function public.admit_backtest_job" in text
     assert "from public, anon, authenticated" in text
     assert "to service_role" in text
+
+
+SUCCESS_MIGRATION = (
+    Path(__file__).resolve().parents[1]
+    / "supabase"
+    / "migrations"
+    / "20260718000004_finalize_direct_backtest_success.sql"
+)
+
+
+def _success_text() -> str:
+    return SUCCESS_MIGRATION.read_text(encoding="utf-8")
+
+
+def test_direct_success_finalization_is_one_locked_transaction() -> None:
+    """#230: lock and verify the owner-scoped job, branch on its state, then
+    compose the canonical tuple writer and succeed the job in one function."""
+
+    text = _success_text()
+    assert "create or replace function public.finalize_direct_backtest_success" in text
+    lock = text.index("for update")
+    missing = text.index("'missing'")
+    superseded = text.index("'superseded'")
+    compose = text.index("from public.finalize_backtest_completion(")
+    succeed = text.index("set status = 'succeeded'")
+    assert lock < missing < superseded < compose < succeed
+    # The owner scope is part of the locked lookup, not a later filter.
+    assert text.index("and user_id = p_user_id") < lock
+
+
+def test_direct_success_terminal_branch_creates_nothing() -> None:
+    text = _success_text()
+    superseded = text.index("'superseded'")
+    compose = text.index("from public.finalize_backtest_completion(")
+    # The superseded return precedes tuple creation: reconciliation's win
+    # yields the terminal job untouched and no Run.
+    assert superseded < compose
+    assert "status not in ('queued', 'running')" in text
+
+
+def test_direct_success_function_is_service_role_only() -> None:
+    text = _success_text()
+    assert (
+        "revoke all on function public.finalize_direct_backtest_success" in text
+    )
+    assert "from public, anon, authenticated" in text
+    assert "to service_role" in text

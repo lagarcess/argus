@@ -17,11 +17,14 @@ from argus.api.schemas import (
     User,
 )
 from argus.domain.backtest_finalization import (
+    BacktestFinalizationError,
     BacktestFinalizationInput,
     FinalizedBacktest,
     MemoryBacktestFinalizationGateway,
     cache_finalized_backtest,
     finalize_backtest_completion,
+    prepare_backtest_finalization,
+    validate_finalized_backtest,
 )
 from argus.domain.evidence import (
     CapturedEvidence,
@@ -86,29 +89,30 @@ def auto_capture_completed_backtest(
     return finalized.captured
 
 
-def finalize_completed_backtest(
+def _finalization_input(
+    *,
+    user_id: str,
+    run: BacktestRun,
+    execution_identity: str,
+) -> BacktestFinalizationInput:
+    return BacktestFinalizationInput(
+        user_id=user_id,
+        execution_identity=execution_identity,
+        run=run,
+        result_card=dict(run.conversation_result_card),
+        idea_id=api_state.store.new_id(),
+        idea_version_id=api_state.store.new_id(),
+        evidence_artifact_id=api_state.store.new_id(),
+        finalized_at=utcnow(),
+    )
+
+
+def _publish_finalized_backtest(
     *,
     user_id: str,
     conversation_id: str | None,
-    run: BacktestRun,
-    execution_identity: str,
-) -> FinalizedBacktest:
-    gateway = api_state.supabase_gateway or MemoryBacktestFinalizationGateway(
-        api_state.store
-    )
-    finalized = finalize_backtest_completion(
-        gateway,
-        BacktestFinalizationInput(
-            user_id=user_id,
-            execution_identity=execution_identity,
-            run=run,
-            result_card=dict(run.conversation_result_card),
-            idea_id=api_state.store.new_id(),
-            idea_version_id=api_state.store.new_id(),
-            evidence_artifact_id=api_state.store.new_id(),
-            finalized_at=utcnow(),
-        ),
-    )
+    finalized: FinalizedBacktest,
+) -> None:
     if api_state.supabase_gateway is not None:
         try:
             cache_finalized_backtest(
@@ -137,7 +141,115 @@ def finalize_completed_backtest(
             ),
         },
     )
+
+
+def finalize_completed_backtest(
+    *,
+    user_id: str,
+    conversation_id: str | None,
+    run: BacktestRun,
+    execution_identity: str,
+) -> FinalizedBacktest:
+    gateway = api_state.supabase_gateway or MemoryBacktestFinalizationGateway(
+        api_state.store
+    )
+    finalized = finalize_backtest_completion(
+        gateway,
+        _finalization_input(
+            user_id=user_id,
+            run=run,
+            execution_identity=execution_identity,
+        ),
+    )
+    _publish_finalized_backtest(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        finalized=finalized,
+    )
     return finalized
+
+
+def finalize_direct_backtest_success(
+    *,
+    user_id: str,
+    conversation_id: str | None,
+    run: BacktestRun,
+    execution_identity: str,
+    job_id: str,
+) -> tuple[FinalizedBacktest | None, dict | None]:
+    """#230 gateway path: one database transaction locks the owner-scoped
+    direct job and either creates/replays the Run/evidence tuple and succeeds
+    the job, replays the terminal job with no Run when reconciliation already
+    won, or fails closed when the job is missing. The returned final job is
+    validated before any Run is exposed."""
+
+    gateway = api_state.supabase_gateway
+    if gateway is None:
+        raise BacktestFinalizationError(
+            "Direct success finalization requires the Supabase gateway."
+        )
+    prepared = prepare_backtest_finalization(
+        _finalization_input(
+            user_id=user_id,
+            run=run,
+            execution_identity=execution_identity,
+        )
+    )
+    try:
+        outcome = gateway.finalize_direct_backtest_success(
+            job_id=job_id,
+            finalization=prepared,
+        )
+    except Exception as exc:
+        raise BacktestFinalizationError("Backtest finalization failed.") from exc
+
+    kind = outcome.get("outcome") if isinstance(outcome, dict) else None
+    if kind == "superseded":
+        job = outcome.get("job")
+        if not isinstance(job, dict):
+            raise BacktestFinalizationError(
+                "Superseded finalization returned no terminal job."
+            )
+        return None, dict(job)
+    if kind != "finalized":
+        # "missing" and any unknown outcome fail closed: no Run exists.
+        raise BacktestFinalizationError(
+            "Direct backtest job was missing at finalization time."
+        )
+
+    try:
+        finalized = FinalizedBacktest(
+            run=BacktestRun.model_validate(outcome["run"]),
+            captured=CapturedEvidence(
+                idea=Idea.model_validate(outcome["idea"]),
+                idea_version=IdeaVersion.model_validate(outcome["idea_version"]),
+                evidence_artifact=EvidenceArtifact.model_validate(
+                    outcome["evidence_artifact"]
+                ),
+            ),
+        )
+    except Exception as exc:
+        raise BacktestFinalizationError(
+            "Backtest finalization returned an incomplete tuple."
+        ) from exc
+    validate_finalized_backtest(finalized)
+
+    final_job = outcome.get("job")
+    if (
+        not isinstance(final_job, dict)
+        or final_job.get("status") != "succeeded"
+        or str(final_job.get("result_run_id") or "") != finalized.run.id
+    ):
+        raise BacktestFinalizationError(
+            "Finalized job state does not link the finalized run."
+        )
+
+    _publish_finalized_backtest(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        finalized=finalized,
+    )
+    return finalized, None
 
 
 def create_decision_for_evidence_artifact(
