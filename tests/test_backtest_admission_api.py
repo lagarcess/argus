@@ -252,6 +252,66 @@ def test_replay_of_terminal_failure_returns_same_failure() -> None:
     assert body["code"] == "invalid_symbol"
 
 
+def test_stale_reconciliation_win_blocks_late_run_creation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If the stale reconciler abandons the job while execution is still in
+    flight, late finalization must not create, expose, or return a Run."""
+
+    from argus.api import backtest_service
+
+    client = TestClient(app, raise_server_exceptions=False)
+    user_id = api_state.store.get_or_create_dev_user().id
+
+    original_create = backtest_service.create_run_from_payload
+
+    def create_then_lose_to_reconciler(*args: Any, **kwargs: Any) -> Any:
+        run = original_create(*args, **kwargs)
+        # The reconciler wins mid-execution: the row goes stale and abandons.
+        for job in api_state.store.backtest_jobs.values():
+            if job.get("user_id") == user_id and job.get("status") == "running":
+                job["started_at"] = (
+                    datetime.now(timezone.utc) - timedelta(minutes=16)
+                ).isoformat()
+        admission.reconcile_stale_direct_jobs_memory(api_state.store)
+        return run
+
+    monkeypatch.setattr(
+        backtest_service, "create_run_from_payload", create_then_lose_to_reconciler
+    )
+    monkeypatch.setattr(
+        "argus.api.routers.backtest.create_run_from_payload",
+        create_then_lose_to_reconciler,
+        raising=False,
+    )
+
+    runs_before = set(api_state.store.backtest_runs)
+    finalizations_before = dict(api_state.store.backtest_finalizations)
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "loses-to-reconciler"},
+        json=_payload(),
+    )
+
+    assert response.status_code != 200
+    body = response.json()
+    assert body["code"] == "direct_execution_abandoned"
+    assert "run" not in body
+
+    jobs = [
+        job
+        for job in api_state.store.backtest_jobs.values()
+        if job.get("idempotency_key") == "loses-to-reconciler"
+    ]
+    assert len(jobs) == 1
+    assert jobs[0]["status"] == "failed"
+    assert jobs[0]["result_run_id"] is None
+    # No durable Run/evidence tuple was created for the abandoned execution.
+    assert set(api_state.store.backtest_runs) == runs_before
+    assert api_state.store.backtest_finalizations == finalizations_before
+
+
 def test_stale_running_direct_job_reconciles_on_poll() -> None:
     client = _client()
     user_id = api_state.store.get_or_create_dev_user().id

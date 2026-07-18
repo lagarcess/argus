@@ -976,6 +976,11 @@ class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
             self.client, **kwargs
         )
 
+    def claim_running_direct_job(self, **kwargs: Any) -> dict[str, Any] | None:
+        return backtest_admission_gateway.claim_running_direct_job(
+            self.client, **kwargs
+        )
+
     def get_backtest_job(self, *, user_id: str, job_id: str) -> dict[str, Any] | None:
         result = (
             self.client.table("backtest_jobs")

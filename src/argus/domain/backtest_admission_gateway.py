@@ -107,6 +107,28 @@ def get_message_row(
     return dict(row) if row is not None else None
 
 
+def claim_running_direct_job(
+    client: Any,
+    *,
+    user_id: str,
+    job_id: str,
+) -> dict[str, Any] | None:
+    """Row-locking conditional claim: returns the job only while it is still
+    ``running``, serializing with the stale reconciler before the finalizer
+    creates the Run/evidence tuple."""
+
+    claimed = (
+        client.table("backtest_jobs")
+        .update({"updated_at": _now_iso()})
+        .eq("user_id", user_id)
+        .eq("id", job_id)
+        .eq("status", "running")
+        .execute()
+    )
+    row = _row_one(claimed)
+    return dict(row) if row is not None else None
+
+
 def finalize_direct_backtest_job(
     client: Any,
     *,

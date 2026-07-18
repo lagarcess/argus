@@ -159,12 +159,19 @@ def run_backtest(
             run_id=stable_backtest_run_id(user.id, execution_identity),
             prepared_execution=prepared_execution,
         )
-        run = finalize_completed_backtest(
-            user_id=user.id,
-            conversation_id=run.conversation_id,
+        finalized_run, superseded_job = _finalize_direct_success(
+            user=user,
+            job_id=job_id,
             run=run,
             execution_identity=execution_identity,
-        ).run
+            finalize=finalize_completed_backtest,
+        )
+        if superseded_job is not None:
+            # Stale reconciliation already won: no Run may be created,
+            # exposed, or returned — replay the durable terminal decision.
+            return _replay_direct_job(request, user=user, job=superseded_job)
+        assert finalized_run is not None
+        run = finalized_run
     except BacktestFinalizationError as exc:
         _finalize_direct_job(
             user=user,
@@ -211,13 +218,64 @@ def run_backtest(
         )
         raise
 
-    _finalize_direct_job(
-        user=user,
+    return BacktestRunResponse(run=run)
+
+
+def _finalize_direct_success(
+    *,
+    user: User,
+    job_id: str,
+    run: Any,
+    execution_identity: str,
+    finalize: Any,
+) -> tuple[Any, dict[str, Any] | None]:
+    """Job-aware atomic finalization boundary: lock/check the direct job
+    before creating the Run/evidence tuple, then transition it to succeeded.
+
+    Memory mode holds the admission lock across check, tuple creation, and
+    the success transition, so the reconciler (same lock) fully serializes.
+    Supabase mode claims the still-running row (row-locking conditional
+    update) before creating the tuple; the tuple-then-CAS tail is recorded as
+    remaining database-transaction work in the ledger."""
+
+    gateway = api_state.supabase_gateway
+    if gateway is None:
+        with api_state.store.backtest_admission_lock:
+            current = api_state.store.backtest_jobs.get(job_id)
+            if current is not None and current.get("status") != "running":
+                return None, dict(current)
+            finalized = finalize(
+                user_id=user.id,
+                conversation_id=run.conversation_id,
+                run=run,
+                execution_identity=execution_identity,
+            ).run
+            backtest_admission.finalize_direct_job_memory(
+                api_state.store,
+                job_id=job_id,
+                status="succeeded",
+                result_run_id=finalized.id,
+            )
+            return finalized, None
+
+    claimed = gateway.claim_running_direct_job(user_id=user.id, job_id=job_id)
+    if claimed is None:
+        current = gateway.get_backtest_job(user_id=user.id, job_id=job_id)
+        if current is not None:
+            return None, dict(current)
+    finalized = finalize(
+        user_id=user.id,
+        conversation_id=run.conversation_id,
+        run=run,
+        execution_identity=execution_identity,
+    ).run
+    gateway.finalize_direct_backtest_job(
+        user_id=user.id,
         job_id=job_id,
         status="succeeded",
-        result_run_id=run.id,
+        result_run_id=finalized.id,
     )
-    return BacktestRunResponse(run=run)
+    return finalized, None
 
 
 def _precheck_direct_allowance(request: Request, *, user: User) -> None:
