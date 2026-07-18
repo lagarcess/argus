@@ -953,9 +953,6 @@ class SupabaseGateway(
             self.client, **kwargs
         )
 
-    def get_message_row(self, **kwargs: Any) -> dict[str, Any] | None:
-        return backtest_admission_gateway.get_message_row(self.client, **kwargs)
-
 
 
 

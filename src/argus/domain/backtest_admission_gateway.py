@@ -91,22 +91,6 @@ def get_backtest_job_by_reservation(
     return dict(row) if row is not None else None
 
 
-def get_message_row(
-    client: Any,
-    *,
-    message_id: str,
-) -> dict[str, Any] | None:
-    result = (
-        client.table("messages")
-        .select("*")
-        .eq("id", message_id)
-        .limit(1)
-        .execute()
-    )
-    row = _row_one(result)
-    return dict(row) if row is not None else None
-
-
 def claim_running_direct_job(
     client: Any,
     *,

@@ -22,6 +22,11 @@ class BacktestAdmissionConflictError(RuntimeError):
     """Idempotency-Key reuse with a different canonical identity (#229/#230)."""
 
 
+class BacktestArtifactIdentityError(RuntimeError):
+    """#242: a run action whose confirmation artifact lacks a valid full-width
+    launch hash must terminate before admission, execution, or compute."""
+
+
 def admit_durable_chat_job(
     *,
     gateway: Any,
@@ -44,14 +49,11 @@ def admit_durable_chat_job(
         return None
     if not is_full_sha256_hash(artifact_launch_hash):
         # A reservation without the artifact's full-width launch hash could
-        # never be reproduced by the by-action lookup; skip durable admission
-        # rather than create an unreconcilable reservation.
-        logger.warning(
-            "Chat run action lacks a reproducible artifact launch hash",
-            user_id=context.user_id,
-            conversation_id=context.conversation_id,
+        # never be reproduced by the by-action lookup; terminate before any
+        # durable admission, execution, or compute.
+        raise BacktestArtifactIdentityError(
+            "Run action confirmation artifact lacks a valid launch hash."
         )
-        return None
 
     execution_metadata = {
         "shadow_mode": True,

@@ -473,7 +473,7 @@ def mock_gateway():
     gateway.get_backtest_job_by_reservation.side_effect = (
         _get_backtest_job_by_reservation
     )
-    gateway.get_message_row.return_value = None
+    gateway.get_message.return_value = None
 
     gateway.get_user.return_value = _mock_profile()
     gateway.get_or_create_mock_user.return_value = _mock_profile()

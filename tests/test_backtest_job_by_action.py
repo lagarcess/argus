@@ -160,12 +160,16 @@ def test_malformed_artifact_hash_is_integrity_500(bad_hash: str) -> None:
 
 
 def test_missing_artifact_hash_cannot_create_a_reservation() -> None:
-    """Legacy actions without the artifact's full-width hash must not admit a
-    durable reservation the by-action lookup can never reproduce."""
+    """A run action without the artifact's full-width hash must terminate
+    before durable admission — never admit a reservation the by-action lookup
+    can never reproduce, and never fall through to execution."""
 
     from unittest.mock import MagicMock
 
-    from argus.api.chat.backtest_admission_flow import admit_durable_chat_job
+    from argus.api.chat.backtest_admission_flow import (
+        BacktestArtifactIdentityError,
+        admit_durable_chat_job,
+    )
 
     gateway = MagicMock()
     context = MagicMock()
@@ -177,18 +181,87 @@ def test_missing_artifact_hash_cannot_create_a_reservation() -> None:
         "payload": {"confirmation_id": "confirmation-legacy"},
     }
 
-    job = admit_durable_chat_job(
-        gateway=gateway,
-        context=context,
-        identity_hash="sha256:" + "0" * 64,
-        payload_digest="sha256:" + "1" * 64,
-        launch_payload={"kind": "legacy"},
-        reconcile_blockers=lambda **kwargs: False,
-        artifact_launch_hash=None,
-    )
+    with pytest.raises(BacktestArtifactIdentityError):
+        admit_durable_chat_job(
+            gateway=gateway,
+            context=context,
+            identity_hash="sha256:" + "0" * 64,
+            payload_digest="sha256:" + "1" * 64,
+            launch_payload={"kind": "legacy"},
+            reconcile_blockers=lambda **kwargs: False,
+            artifact_launch_hash=None,
+        )
 
-    assert job is None
     gateway.admit_backtest_job.assert_not_called()
+
+
+def test_gateway_confirmation_load_uses_owner_scoped_message_boundary() -> None:
+    """#242: the confirmation artifact loads through the existing owner-scoped
+    user_id + conversation_id + message_id boundary. A message another user
+    owns can never qualify, even when an unscoped row lookup would find it."""
+
+    from datetime import datetime, timezone
+    from unittest.mock import MagicMock
+
+    from argus.api.routers.backtest import _confirmation_artifact_identity
+    from argus.api.schemas import User
+    from fastapi import HTTPException
+    from starlette.requests import Request
+
+    now = datetime.now(timezone.utc)
+    user = User(
+        id="00000000-0000-0000-0000-000000000001",
+        email="developer@argus.local",
+        language="en",
+        created_at=now,
+        updated_at=now,
+    )
+    job = {
+        "conversation_id": "22222222-2222-2222-2222-222222222222",
+        "confirmation_message_id": "33333333-3333-3333-3333-333333333333",
+    }
+    gateway = MagicMock()
+    # Owner-scoped boundary: the foreign-owned message is invisible.
+    gateway.get_message.return_value = None
+    # Unscoped legacy lookup would still surface the row; it must not be used.
+    gateway.get_message_row.return_value = {
+        "conversation_id": job["conversation_id"],
+        "user_id": "99999999-9999-9999-9999-999999999999",
+        "metadata": {
+            "confirmation_card": {
+                "confirmation_id": "confirmation-1",
+                "launch_payload_hash_full": "sha256:" + "b" * 64,
+            }
+        },
+    }
+    api_state.supabase_gateway = gateway
+    try:
+        request = Request(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/",
+                "headers": [],
+                "state": {"request_id": "test-request-1"},
+            }
+        )
+        with pytest.raises(HTTPException) as exc_info:
+            _confirmation_artifact_identity(
+                request,
+                user=user,
+                job=job,
+                confirmation_id="confirmation-1",
+            )
+    finally:
+        api_state.supabase_gateway = None
+
+    assert exc_info.value.status_code == 500
+    gateway.get_message.assert_called_once_with(
+        user_id=user.id,
+        conversation_id=job["conversation_id"],
+        message_id=job["confirmation_message_id"],
+    )
+    gateway.get_message_row.assert_not_called()
 
 
 def test_identity_mismatch_returns_conflict_without_job_details() -> None:

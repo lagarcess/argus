@@ -663,6 +663,50 @@ def test_shadow_backtest_job_tool_reconciles_stale_proof_without_task_metadata(
     assert context.created_job_id == "job-1"
 
 
+@pytest.mark.parametrize(
+    "bad_payload",
+    [
+        {"confirmation_id": "confirmation-1"},
+        {
+            "confirmation_id": "confirmation-1",
+            "launch_payload_hash_full": "sha256:" + "Z" * 64,
+        },
+        {
+            "confirmation_id": "confirmation-1",
+            "launch_payload_hash_full": "sha256:" + "a" * 63,
+        },
+    ],
+)
+def test_run_action_without_artifact_hash_terminates_before_any_execution(
+    monkeypatch, bad_payload: dict[str, object]
+) -> None:
+    """#242: a run action whose confirmation artifact hash is missing or
+    malformed must terminate before durable admission, delegate execution,
+    provider access, or compute — even with the dev fallback enabled."""
+
+    from argus.api.chat.backtest_admission_flow import BacktestArtifactIdentityError
+
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
+    events: list[str] = []
+    gateway = _Gateway(events)
+    delegate = _DelegateTool(events)
+    tool = ShadowBacktestJobTool(
+        delegate=delegate,
+        gateway_getter=lambda: gateway,
+        dev_memory_fallback_getter=lambda: True,
+    )
+    context = _context()
+    context.chat_action = {"type": "run_backtest", "payload": dict(bad_payload)}
+
+    with backtest_job_shadow_context(context):
+        with pytest.raises(BacktestArtifactIdentityError):
+            tool.run(_payload())
+
+    assert events == []
+    assert gateway.jobs == []
+    assert delegate.calls == []
+
+
 def test_shadow_backtest_job_write_failure_falls_back_to_in_process_execution(
     monkeypatch,
 ) -> None:

@@ -14,7 +14,8 @@ from typing import Any
 import httpx
 from loguru import logger
 
-from argus.domain.backtest_admission import chat_run_identity_hash
+from argus.api.chat.backtest_admission_flow import BacktestArtifactIdentityError
+from argus.domain.backtest_admission import chat_run_identity_hash, is_full_sha256_hash
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 SHADOW_JOB_SCHEMA_VERSION = "backtest_job_launch/v1"
@@ -796,6 +797,34 @@ class ShadowBacktestJobTool:
             )
             return None
 
+        confirmation_id = None
+        artifact_launch_hash = None
+        is_run_action = False
+        if isinstance(context.chat_action, dict):
+            is_run_action = context.chat_action.get("type") == "run_backtest"
+            raw_confirmation = context.chat_action.get("confirmation_id")
+            if isinstance(raw_confirmation, str) and raw_confirmation.strip():
+                confirmation_id = raw_confirmation.strip()
+            action_payload = context.chat_action.get("payload")
+            if isinstance(action_payload, dict):
+                if confirmation_id is None:
+                    nested = action_payload.get("confirmation_id")
+                    if isinstance(nested, str) and nested.strip():
+                        confirmation_id = nested.strip()
+                raw_full = action_payload.get("launch_payload_hash_full")
+                if isinstance(raw_full, str):
+                    artifact_launch_hash = raw_full
+        # Identity binds to the immutable confirmation artifact's full-width
+        # launch hash. A run action without it terminates here — before any
+        # durable admission, delegate execution, provider access, or compute —
+        # and this typed failure is never swallowed by the dev fallback.
+        if is_run_action and not is_full_sha256_hash(artifact_launch_hash):
+            raise BacktestArtifactIdentityError(
+                "Run action confirmation artifact lacks a valid launch hash."
+            )
+        if not is_full_sha256_hash(artifact_launch_hash):
+            return None
+
         try:
             gateway = self._gateway_getter()
             if gateway is None:
@@ -803,28 +832,10 @@ class ShadowBacktestJobTool:
                     "Supabase persistence is required for shadow backtest jobs."
                 )
             payload_digest = payload_hash(payload)
-            confirmation_id = None
-            artifact_launch_hash = None
-            if isinstance(context.chat_action, dict):
-                raw_confirmation = context.chat_action.get("confirmation_id")
-                if isinstance(raw_confirmation, str) and raw_confirmation.strip():
-                    confirmation_id = raw_confirmation.strip()
-                action_payload = context.chat_action.get("payload")
-                if isinstance(action_payload, dict):
-                    if confirmation_id is None:
-                        nested = action_payload.get("confirmation_id")
-                        if isinstance(nested, str) and nested.strip():
-                            confirmation_id = nested.strip()
-                    raw_full = action_payload.get("launch_payload_hash_full")
-                    if isinstance(raw_full, str) and raw_full.startswith("sha256:"):
-                        artifact_launch_hash = raw_full
-            # Identity binds to the immutable confirmation artifact's
-            # full-width launch hash; without it no durable reservation is
-            # created (the by-action lookup could never reproduce it).
             identity_hash = chat_run_identity_hash(
                 conversation_id=context.conversation_id,
                 confirmation_id=confirmation_id or context.idempotency_key,
-                launch_payload_hash=artifact_launch_hash or payload_digest,
+                launch_payload_hash=artifact_launch_hash,
             )
             job = self._admit_durable_job(
                 gateway=gateway,
@@ -850,6 +861,10 @@ class ShadowBacktestJobTool:
                     payload_digest=payload_digest,
                 )
                 return dict(job)
+        except BacktestArtifactIdentityError:
+            # The identity failure is terminal by contract; the dev fallback
+            # must not convert it into in-process execution.
+            raise
         except Exception as exc:
             if not self._dev_memory_fallback_getter():
                 raise

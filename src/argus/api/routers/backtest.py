@@ -679,43 +679,19 @@ def _confirmation_artifact_identity(
     if not message_id or not conversation_id:
         raise integrity_failure
 
-    gateway = api_state.supabase_gateway
-    if gateway is not None:
-        # Ownership: the confirmation message must live in a conversation the
-        # requesting user owns; the owner-scoped read returns None otherwise.
-        if (
-            gateway.get_conversation(
-                user_id=user.id, conversation_id=conversation_id
-            )
-            is None
-        ):
-            raise integrity_failure
-        row = gateway.get_message_row(message_id=message_id)
-        message_conversation = str((row or {}).get("conversation_id") or "")
-        metadata = (row or {}).get("metadata")
-    else:
-        message = next(
-            (
-                candidate
-                for candidate in api_state.store.messages.get(conversation_id, [])
-                if candidate.id == message_id
-            ),
-            None,
-        )
-        message_conversation = message.conversation_id if message else ""
-        metadata = message.metadata if message else None
+    from argus.api.message_store import owned_conversation_message
 
-    if message_conversation != conversation_id:
+    # The confirmation artifact loads through the existing owner-scoped
+    # user_id + conversation_id + message_id boundary; a message another user
+    # owns is invisible in both persistence modes.
+    message = owned_conversation_message(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        message_id=message_id,
+    )
+    if message is None or message.conversation_id != conversation_id:
         raise integrity_failure
-    if (
-        api_state.store.conversation_owners.get(conversation_id)
-        not in (
-            None,
-            user.id,
-        )
-        and gateway is None
-    ):
-        raise integrity_failure
+    metadata = message.metadata
 
     artifact = metadata if isinstance(metadata, dict) else {}
     card = artifact.get("confirmation_card")
@@ -727,7 +703,7 @@ def _confirmation_artifact_identity(
     launch_hash = card.get("launch_payload_hash_full")
     if not backtest_admission.is_full_sha256_hash(launch_hash):
         raise integrity_failure
-    return message_conversation, launch_hash
+    return message.conversation_id, launch_hash
 
 
 @router.get("/backtest-jobs/{job_id}", response_model=BacktestJobResponse)
