@@ -63,6 +63,25 @@ def test_admission_function_reconciles_stale_direct_jobs_bounded() -> None:
     assert "order by started_at asc, id asc" in text
 
 
+def test_stale_reconciliation_checks_the_finalized_tuple_first() -> None:
+    text = _text()
+    assert "create or replace function public.finalized_direct_run_id" in text
+    assert "uuid_generate_v5" in text
+    assert "'https://argus.app/backtest-finalization/'" in text
+    assert "'/api/v1/backtests/run:'" in text
+
+    # Both stale paths resolve the finalized tuple before any abandon update.
+    replay_branch = text.index("Evidence order: the finalized Run/evidence tuple")
+    replay_lookup = text.index("public.finalized_direct_run_id(", replay_branch)
+    replay_abandon = text.index("'direct_execution_abandoned'", replay_branch)
+    assert replay_lookup < replay_abandon
+
+    bounded_pass = text.index("select public.finalized_direct_run_id(j.user_id")
+    bounded_abandon = text.index("'direct_execution_abandoned'", bounded_pass)
+    assert bounded_pass < bounded_abandon
+    assert text.count("status = 'succeeded'") >= 2
+
+
 def test_admission_function_is_service_role_only() -> None:
     text = _text()
     assert "revoke all on function public.admit_backtest_job" in text

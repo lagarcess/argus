@@ -42,6 +42,16 @@ STALE_DIRECT_JOB_BATCH = 20
 STALE_DIRECT_FAILURE_CODE = "direct_execution_abandoned"
 STALE_DIRECT_FAILURE_DETAIL = "execution_interrupted"
 
+DIRECT_RUN_ENDPOINT = "/api/v1/backtests/run"
+
+
+def direct_execution_identity(idempotency_key: str) -> str:
+    """The stable execution identity the finalizer keys the durable Run and
+    evidence tuple on; reconciliation derives the same identity."""
+
+    return f"{DIRECT_RUN_ENDPOINT}:{idempotency_key}"
+
+
 DEFAULT_USER_RUNNING_LIMIT = 1
 DEFAULT_USER_QUEUED_LIMIT = 2
 DEFAULT_GLOBAL_RUNNING_LIMIT = 5
@@ -244,15 +254,48 @@ def _job_started_at(job: dict[str, Any]) -> datetime | None:
     return None
 
 
+def _finalized_direct_run_id(store: Any, *, job: dict[str, Any]) -> str | None:
+    """The stable job-derived finalized Run/evidence tuple, or None.
+
+    ``result_run_id`` being null is not evidence of absence: the finalizer
+    records the durable tuple under (user_id, execution_identity), keyed by
+    the same stable Run identity reconciliation derives here.
+    """
+
+    from argus.domain.backtest_finalization import stable_backtest_run_id
+
+    user_id = str(job.get("user_id") or "")
+    idempotency_key = str(job.get("idempotency_key") or "")
+    if not user_id or not idempotency_key:
+        return None
+    execution_identity = direct_execution_identity(idempotency_key)
+    run_id = store.backtest_finalizations.get((user_id, execution_identity))
+    if run_id is None:
+        return None
+    expected = stable_backtest_run_id(user_id, execution_identity)
+    if run_id != expected:
+        return None
+    if run_id not in store.backtest_runs:
+        return None
+    owner = store.backtest_run_owners.get(run_id)
+    if owner is not None and owner != user_id:
+        return None
+    return str(run_id)
+
+
 def reconcile_stale_direct_jobs_memory(
     store: Any,
     *,
     now: datetime | None = None,
     only_job_id: str | None = None,
 ) -> int:
-    """Bounded stale direct-job pass: running ``backtests.run`` jobs whose
-    ``started_at`` is at least 15 minutes old become durable retryable
-    failures, oldest first, at most 20 per pass."""
+    """Bounded stale direct-job pass, oldest first, at most 20 per row batch.
+
+    Evidence order per locked row: the fully finalized Run/evidence tuple is
+    checked first — if it exists, the row links its Run and completes as
+    ``succeeded`` with failure fields cleared; only a row with no durable
+    tuple becomes a retryable ``direct_execution_abandoned`` failure.
+    """
 
     moment = now or _utcnow()
     cutoff = moment - timedelta(minutes=STALE_DIRECT_JOB_MINUTES)
@@ -272,10 +315,18 @@ def reconcile_stale_direct_jobs_memory(
 
     reconciled = 0
     for job in candidates[:STALE_DIRECT_JOB_BATCH]:
-        job["status"] = "failed"
-        job["failure_code"] = STALE_DIRECT_FAILURE_CODE
-        job["failure_detail"] = STALE_DIRECT_FAILURE_DETAIL
-        job["retryable"] = True
+        finalized_run_id = _finalized_direct_run_id(store, job=job)
+        if finalized_run_id is not None:
+            job["status"] = "succeeded"
+            job["result_run_id"] = finalized_run_id
+            job["failure_code"] = None
+            job["failure_detail"] = None
+            job["retryable"] = False
+        else:
+            job["status"] = "failed"
+            job["failure_code"] = STALE_DIRECT_FAILURE_CODE
+            job["failure_detail"] = STALE_DIRECT_FAILURE_DETAIL
+            job["retryable"] = True
         job["finished_at"] = _iso(moment)
         job["updated_at"] = _iso(moment)
         reconciled += 1
@@ -420,6 +471,11 @@ def finalize_direct_job_memory(
         job = store.backtest_jobs.get(job_id)
         if job is None:
             return None
+        if job.get("status") not in ("queued", "running"):
+            # The reconciler and finalizer serialize on this same lock; a
+            # terminal reconciliation decision is final — late success (or any
+            # late outcome) must not supersede it.
+            return dict(job)
         job["status"] = status
         job["result_run_id"] = result_run_id
         job["failure_code"] = failure_code

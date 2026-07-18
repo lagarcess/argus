@@ -135,6 +135,9 @@ def finalize_direct_backtest_job(
         .update(payload)
         .eq("user_id", user_id)
         .eq("id", job_id)
+        # Reconciler and finalizer serialize on the same row; a terminal
+        # reconciliation decision is final and late success cannot supersede.
+        .in_("status", ["queued", "running"])
         .execute()
     )
     row = _row_one(updated)

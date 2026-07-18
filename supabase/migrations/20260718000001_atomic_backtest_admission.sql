@@ -26,6 +26,30 @@ create unique index if not exists backtest_jobs_reservation_idx
 create index if not exists backtest_jobs_status_started_idx
     on public.backtest_jobs (status, started_at asc, id asc);
 
+-- Stable job-derived Run identity: uuid5(NAMESPACE_URL,
+-- 'https://argus.app/backtest-finalization/{user_id}/{execution_identity}'),
+-- matching argus.domain.backtest_finalization.stable_backtest_run_id. A row
+-- here is the fully finalized Run/evidence tuple; result_run_id being null on
+-- the job is not evidence of absence.
+create or replace function public.finalized_direct_run_id(
+    p_user_id uuid,
+    p_idempotency_key text
+) returns uuid
+language sql
+stable
+set search_path = public, extensions
+as $fn$
+    select r.id
+    from public.backtest_runs r
+    where r.id = extensions.uuid_generate_v5(
+            '6ba7b811-9dad-11d1-80b4-00c04fd430c8'::uuid,
+            'https://argus.app/backtest-finalization/' || p_user_id::text ||
+            '/' || '/api/v1/backtests/run:' || p_idempotency_key
+        )
+      and r.user_id = p_user_id
+    limit 1
+$fn$;
+
 create or replace function public.admit_backtest_job(
     p_user_id uuid,
     p_operation_scope text,
@@ -50,6 +74,7 @@ set search_path = public
 as $$
 declare
     v_existing public.backtest_jobs%rowtype;
+    v_finalized_run uuid;
     v_job public.backtest_jobs%rowtype;
     v_now timestamptz := now();
     v_stale record;
@@ -84,15 +109,32 @@ begin
                and v_existing.status = 'running'
                and v_existing.started_at is not null
                and v_existing.started_at <= v_now - interval '15 minutes' then
-                update public.backtest_jobs
-                set status = 'failed',
-                    failure_code = 'direct_execution_abandoned',
-                    failure_detail = 'execution_interrupted',
-                    retryable = true,
-                    finished_at = v_now,
-                    updated_at = v_now
-                where id = v_existing.id
-                returning * into v_existing;
+                -- Evidence order: the finalized Run/evidence tuple wins first.
+                v_finalized_run := public.finalized_direct_run_id(
+                    v_existing.user_id, v_existing.idempotency_key
+                );
+                if v_finalized_run is not null then
+                    update public.backtest_jobs
+                    set status = 'succeeded',
+                        result_run_id = v_finalized_run,
+                        failure_code = null,
+                        failure_detail = null,
+                        retryable = false,
+                        finished_at = v_now,
+                        updated_at = v_now
+                    where id = v_existing.id
+                    returning * into v_existing;
+                else
+                    update public.backtest_jobs
+                    set status = 'failed',
+                        failure_code = 'direct_execution_abandoned',
+                        failure_detail = 'execution_interrupted',
+                        retryable = true,
+                        finished_at = v_now,
+                        updated_at = v_now
+                    where id = v_existing.id
+                    returning * into v_existing;
+                end if;
             end if;
             return jsonb_build_object(
                 'decision', 'replay',
@@ -115,14 +157,30 @@ begin
             limit 20
             for update
         loop
-            update public.backtest_jobs
-            set status = 'failed',
-                failure_code = 'direct_execution_abandoned',
-                failure_detail = 'execution_interrupted',
-                retryable = true,
-                finished_at = v_now,
-                updated_at = v_now
-            where id = v_stale.id;
+            select public.finalized_direct_run_id(j.user_id, j.idempotency_key)
+            into v_finalized_run
+            from public.backtest_jobs j
+            where j.id = v_stale.id;
+            if v_finalized_run is not null then
+                update public.backtest_jobs
+                set status = 'succeeded',
+                    result_run_id = v_finalized_run,
+                    failure_code = null,
+                    failure_detail = null,
+                    retryable = false,
+                    finished_at = v_now,
+                    updated_at = v_now
+                where id = v_stale.id;
+            else
+                update public.backtest_jobs
+                set status = 'failed',
+                    failure_code = 'direct_execution_abandoned',
+                    failure_detail = 'execution_interrupted',
+                    retryable = true,
+                    finished_at = v_now,
+                    updated_at = v_now
+                where id = v_stale.id;
+            end if;
         end loop;
     end if;
 

@@ -293,6 +293,113 @@ def test_stale_direct_jobs_reconcile_before_new_direct_admission() -> None:
     assert reconciled["retryable"] is True
 
 
+def _finalize_tuple_for(store: AlphaStore, *, user_id: str, idempotency_key: str) -> str:
+    """Record the durable finalized Run/evidence tuple the reconciler must
+    honor: the stable job-derived Run plus the finalization marker."""
+
+    from argus.domain.backtest_finalization import stable_backtest_run_id
+
+    execution_identity = admission.direct_execution_identity(idempotency_key)
+    run_id = stable_backtest_run_id(user_id, execution_identity)
+    store.backtest_runs[run_id] = {"id": run_id, "status": "completed"}
+    store.backtest_run_owners[run_id] = user_id
+    store.backtest_finalizations[(user_id, execution_identity)] = run_id
+    return run_id
+
+
+def test_stale_direct_job_with_finalized_tuple_reconciles_to_succeeded() -> None:
+    store = AlphaStore()
+    stale = _admit(
+        store,
+        key="finalized-key",
+        identity="sha256:" + "6" * 64,
+        scope=admission.DIRECT_RUN_SCOPE,
+        initial_status="running",
+    )
+    assert stale.job is not None
+    store.backtest_jobs[stale.job["id"]]["started_at"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=16)
+    ).isoformat()
+    run_id = _finalize_tuple_for(store, user_id="user-1", idempotency_key="finalized-key")
+
+    fresh = _admit(
+        store,
+        key="another-key",
+        identity="sha256:" + "7" * 64,
+        scope=admission.DIRECT_RUN_SCOPE,
+        initial_status="running",
+    )
+    assert fresh.kind == "admitted"
+
+    reconciled = store.backtest_jobs[stale.job["id"]]
+    assert reconciled["status"] == "succeeded"
+    assert reconciled["result_run_id"] == run_id
+    assert reconciled["failure_code"] is None
+    assert reconciled["failure_detail"] is None
+    assert reconciled["retryable"] is False
+
+
+def test_stale_replay_with_finalized_tuple_returns_succeeded_state() -> None:
+    store = AlphaStore()
+    stale = _admit(
+        store,
+        key="replay-finalized",
+        identity="sha256:" + "8" * 64,
+        scope=admission.DIRECT_RUN_SCOPE,
+        initial_status="running",
+    )
+    assert stale.job is not None
+    store.backtest_jobs[stale.job["id"]]["started_at"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=16)
+    ).isoformat()
+    run_id = _finalize_tuple_for(
+        store, user_id="user-1", idempotency_key="replay-finalized"
+    )
+
+    replay = _admit(
+        store,
+        key="replay-finalized",
+        identity="sha256:" + "8" * 64,
+        scope=admission.DIRECT_RUN_SCOPE,
+        initial_status="running",
+    )
+    assert replay.kind == "replay"
+    assert replay.job is not None
+    assert replay.job["status"] == "succeeded"
+    assert replay.job["result_run_id"] == run_id
+
+
+def test_late_finalizer_cannot_supersede_terminal_reconciliation() -> None:
+    store = AlphaStore()
+    stale = _admit(
+        store,
+        key="late-success",
+        identity="sha256:" + "9" * 64,
+        scope=admission.DIRECT_RUN_SCOPE,
+        initial_status="running",
+    )
+    assert stale.job is not None
+    job_id = stale.job["id"]
+    store.backtest_jobs[job_id]["started_at"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=16)
+    ).isoformat()
+
+    reconciled = admission.reconcile_stale_direct_jobs_memory(store)
+    assert reconciled == 1
+    assert store.backtest_jobs[job_id]["status"] == "failed"
+
+    late = admission.finalize_direct_job_memory(
+        store,
+        job_id=job_id,
+        status="succeeded",
+        result_run_id="late-run",
+    )
+    assert late is not None
+    assert late["status"] == "failed"
+    assert store.backtest_jobs[job_id]["status"] == "failed"
+    assert store.backtest_jobs[job_id]["result_run_id"] is None
+
+
 def test_stale_replay_reconciles_only_that_row() -> None:
     store = AlphaStore()
     stale = _admit(
