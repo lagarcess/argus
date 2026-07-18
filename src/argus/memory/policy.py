@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from argus.memory.contracts import (
     MemoryCandidate,
@@ -55,10 +55,20 @@ def opt_in_scope_for(candidate: MemoryCandidate) -> list[MemoryCategory]:
 
 
 class UserMemorySettings(BaseModel):
-    """Per-user consent state. Memory is off until the user opts in."""
+    """Per-user consent state. Memory is off until the user opts in.
+
+    Enabled consent always names its categories; an enabled-but-empty scope
+    is invalid so no code path can create meaningless or implicit consent.
+    """
 
     enabled: bool = False
     enabled_categories: list[MemoryCategory] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _enabled_requires_scope(self) -> "UserMemorySettings":
+        if self.enabled and not self.enabled_categories:
+            raise ValueError("enabled consent requires a non-empty scope")
+        return self
 
     def consents_to(self, category: MemoryCategory) -> bool:
         return self.enabled and category in self.enabled_categories

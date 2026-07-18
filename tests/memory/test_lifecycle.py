@@ -8,7 +8,7 @@ from argus.memory.contracts import (
     ProposalReason,
     SensitivityFlag,
 )
-from argus.memory.policy import MemoryPolicy, PolicyOutcome
+from argus.memory.policy import MemoryPolicy, PolicyOutcome, UserMemorySettings
 from argus.memory.provider import DeterministicFakeMemoryProvider
 from argus.memory.service import (
     ExplicitMemoryRequest,
@@ -21,6 +21,19 @@ from argus.memory.service import (
 from argus.memory.store import InMemoryCanonicalMemoryStore
 
 NOW = datetime(2026, 7, 18, 3, 0, 0, tzinfo=timezone.utc)
+
+# The scopes this suite's flows exercise, granted explicitly per test user.
+EXPLICIT_TEST_SCOPE = [
+    MemoryCategory.EXPLICIT_DECISION_NOTE,
+    MemoryCategory.PERSONALIZATION_PREFERENCE,
+]
+
+
+def _opt_in(store: InMemoryCanonicalMemoryStore, user_id: str) -> None:
+    store.set_settings(
+        user_id,
+        UserMemorySettings(enabled=True, enabled_categories=list(EXPLICIT_TEST_SCOPE)),
+    )
 
 
 class ExplodingProvider:
@@ -91,7 +104,7 @@ class TestGlobalFlag:
 
     def test_globally_disabled_service_proposes_nothing(self) -> None:
         service, store = _service(globally_enabled=False)
-        store.set_enabled("user-a", True)
+        _opt_in(store, "user-a")
         result = service.propose_from_saved_decision("user-a", _decision_source())
         assert result.status is ProposalStatus.REJECTED_GLOBAL_DISABLED
         assert result.candidate is None
@@ -100,7 +113,7 @@ class TestGlobalFlag:
 class TestPropose:
     def test_saved_decision_yields_decision_grounded_candidate(self) -> None:
         service, store = _service()
-        store.set_enabled("user-a", True)
+        _opt_in(store, "user-a")
         result = service.propose_from_saved_decision("user-a", _decision_source())
         assert result.status is ProposalStatus.PROPOSED
         candidate = result.candidate
@@ -117,7 +130,7 @@ class TestPropose:
         self,
     ) -> None:
         service, store = _service()
-        store.set_enabled("user-a", True)
+        _opt_in(store, "user-a")
         result = service.propose_from_explicit_request("user-a", _explicit_request())
         assert result.status is ProposalStatus.PROPOSED
         candidate = result.candidate
@@ -142,7 +155,7 @@ class TestPropose:
 
     def test_sensitive_request_is_suppressed_and_not_stored(self) -> None:
         service, store = _service()
-        store.set_enabled("user-a", True)
+        _opt_in(store, "user-a")
         request = _explicit_request().model_copy(
             update={
                 "sensitivity_flags": [SensitivityFlag.ACCOUNT_BALANCE],
@@ -156,7 +169,7 @@ class TestPropose:
 
     def test_second_proposal_inside_cooldown_is_suppressed(self) -> None:
         service, store = _service()
-        store.set_enabled("user-a", True)
+        _opt_in(store, "user-a")
         first = service.propose_from_saved_decision("user-a", _decision_source())
         assert first.status is ProposalStatus.PROPOSED
         second = service.propose_from_saved_decision("user-a", _decision_source())
@@ -170,7 +183,7 @@ class TestConfirmAndDecline:
         self,
     ) -> None:
         service, store = _service()
-        store.set_enabled("user-a", True)
+        _opt_in(store, "user-a")
         proposed = service.propose_from_saved_decision("user-a", _decision_source())
         assert proposed.candidate is not None
         record = service.confirm("user-a", proposed.candidate.id)
@@ -183,7 +196,7 @@ class TestConfirmAndDecline:
 
     def test_confirm_is_owner_scoped(self) -> None:
         service, store = _service()
-        store.set_enabled("user-a", True)
+        _opt_in(store, "user-a")
         proposed = service.propose_from_saved_decision("user-a", _decision_source())
         assert proposed.candidate is not None
         assert service.confirm("user-b", proposed.candidate.id) is None
@@ -191,7 +204,7 @@ class TestConfirmAndDecline:
 
     def test_decline_discards_candidate_without_a_record(self) -> None:
         service, store = _service()
-        store.set_enabled("user-a", True)
+        _opt_in(store, "user-a")
         proposed = service.propose_from_saved_decision("user-a", _decision_source())
         assert proposed.candidate is not None
         service.decline("user-a", proposed.candidate.id)
@@ -200,7 +213,7 @@ class TestConfirmAndDecline:
 
     def test_provider_failure_does_not_block_confirmation(self) -> None:
         service, store = _service(provider=ExplodingProvider())
-        store.set_enabled("user-a", True)
+        _opt_in(store, "user-a")
         proposed = service.propose_from_saved_decision("user-a", _decision_source())
         assert proposed.candidate is not None
         record = service.confirm("user-a", proposed.candidate.id)
@@ -209,7 +222,7 @@ class TestConfirmAndDecline:
 
     def test_cooldown_state_survives_decline(self) -> None:
         service, store = _service()
-        store.set_enabled("user-a", True)
+        _opt_in(store, "user-a")
         proposed = service.propose_from_saved_decision("user-a", _decision_source())
         assert proposed.candidate is not None
         service.decline("user-a", proposed.candidate.id)
@@ -230,7 +243,7 @@ class TestConfirmAndDecline:
             clock=lambda: later["now"],
             id_factory=lambda: f"id-{next(ticker)}",
         )
-        store.set_enabled("user-a", True)
+        _opt_in(store, "user-a")
         first = service.propose_from_saved_decision("user-a", _decision_source())
         assert first.status is ProposalStatus.PROPOSED
         later["now"] = NOW + timedelta(days=8)

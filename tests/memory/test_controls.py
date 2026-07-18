@@ -47,7 +47,7 @@ def _confirmed(
     store: InMemoryCanonicalMemoryStore,
     user_id: str = "user-a",
 ) -> str:
-    service.enable(user_id)
+    service.enable(user_id, [MemoryCategory.PERSONALIZATION_PREFERENCE])
     store.mark_prompted(
         user_id,
         MemoryCategory.PERSONALIZATION_PREFERENCE,
@@ -190,7 +190,9 @@ class TestDisableAndReset:
     def test_enable_then_disable_round_trip_is_explicit(self) -> None:
         service, store, _fake = _service()
         assert store.get_settings("user-a").enabled is False
-        service.enable("user-a")
+        service.enable("user-a", [MemoryCategory.PERSONALIZATION_PREFERENCE])
         assert store.get_settings("user-a").enabled is True
         service.disable("user-a")
-        assert store.get_settings("user-a").enabled is False
+        settings = store.get_settings("user-a")
+        assert settings.enabled is False
+        assert settings.enabled_categories == []

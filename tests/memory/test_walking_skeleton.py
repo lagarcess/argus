@@ -9,7 +9,7 @@ Also proves the disabled configuration is inert end to end.
 from datetime import datetime, timedelta, timezone
 
 from argus.memory.contracts import ConsentState, MemoryCategory
-from argus.memory.policy import PolicyOutcome
+from argus.memory.policy import PolicyOutcome, UserMemorySettings
 from argus.memory.provider import DeterministicFakeMemoryProvider
 from argus.memory.service import (
     ExplicitMemoryRequest,
@@ -138,7 +138,14 @@ class TestWalkingSkeleton:
             clock=lambda: NOW,
         )
         user = "user-a"
-        store.set_enabled(user, True)  # even an opted-in user stays inert
+        # Even an explicitly opted-in user stays inert under the global flag.
+        store.set_settings(
+            user,
+            UserMemorySettings(
+                enabled=True,
+                enabled_categories=[MemoryCategory.PERSONALIZATION_PREFERENCE],
+            ),
+        )
         assert (
             service.propose_from_saved_decision(user, DECISION_FIXTURE).status
             is ProposalStatus.REJECTED_GLOBAL_DISABLED

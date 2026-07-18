@@ -14,6 +14,7 @@ from argus.memory.contracts import (
     MemoryRecord,
     MemorySourceRef,
 )
+from argus.memory.policy import UserMemorySettings
 from argus.memory.provider import (
     DeterministicFakeMemoryProvider,
     NoOpMemoryProvider,
@@ -72,7 +73,7 @@ def _confirm_preference(
 class TestNoOpProviderFallback:
     def test_noop_provider_does_not_mint_provider_refs(self) -> None:
         service, _store = _service(NoOpMemoryProvider())
-        service.enable("user-a")
+        service.enable("user-a", [MemoryCategory.PERSONALIZATION_PREFERENCE])
         result = service.propose_from_explicit_request(
             "user-a",
             ExplicitMemoryRequest(
@@ -90,7 +91,7 @@ class TestNoOpProviderFallback:
         self,
     ) -> None:
         service, store = _service(NoOpMemoryProvider())
-        service.enable("user-a")
+        service.enable("user-a", [MemoryCategory.PERSONALIZATION_PREFERENCE])
         expected = _confirm_preference(
             service,
             store,
@@ -109,7 +110,7 @@ class TestNoOpProviderFallback:
 
     def test_noop_fallback_is_bounded(self) -> None:
         service, store = _service(NoOpMemoryProvider())
-        service.enable("user-a")
+        service.enable("user-a", [MemoryCategory.PERSONALIZATION_PREFERENCE])
         for index in range(5):
             _confirm_preference(
                 service,
@@ -122,7 +123,7 @@ class TestNoOpProviderFallback:
 
     def test_delete_and_reset_work_without_provider_refs(self) -> None:
         service, store = _service(NoOpMemoryProvider())
-        service.enable("user-a")
+        service.enable("user-a", [MemoryCategory.PERSONALIZATION_PREFERENCE])
         record_id = _confirm_preference(
             service,
             store,
@@ -143,7 +144,13 @@ class TestNoOpProviderFallback:
         # A record the provider never indexed: the fake provider ANSWERS []
         # for it, so canonical fallback must not resurrect it.
         service, store = _service(DeterministicFakeMemoryProvider())
-        store.set_enabled("user-a", True)
+        store.set_settings(
+            "user-a",
+            UserMemorySettings(
+                enabled=True,
+                enabled_categories=[MemoryCategory.PERSONALIZATION_PREFERENCE],
+            ),
+        )
         store.add_record(
             MemoryRecord(
                 id="mem-unindexed",

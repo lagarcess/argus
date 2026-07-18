@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 
 from argus.memory.contracts import MemoryCategory
+from argus.memory.policy import UserMemorySettings
 from argus.memory.provider import DeterministicFakeMemoryProvider
 from argus.memory.service import (
     ExplicitMemoryRequest,
@@ -64,7 +65,13 @@ def _confirm_memory(
 def _seed_benchmark_memories(
     service: MemoryService, store: InMemoryCanonicalMemoryStore
 ) -> list[str]:
-    store.set_enabled("user-a", True)
+    store.set_settings(
+        "user-a",
+        UserMemorySettings(
+            enabled=True,
+            enabled_categories=[MemoryCategory.PERSONALIZATION_PREFERENCE],
+        ),
+    )
     ids = []
     specs = [
         ("Prefers SPY benchmark for equity ideas", "Prefers SPY benchmark"),
@@ -107,7 +114,7 @@ class TestRetrieve:
 
     def test_disabled_user_retrieves_nothing(self) -> None:
         service, store = _seed_service()
-        store.set_enabled("user-a", False)
+        store.set_settings("user-a", UserMemorySettings())
         assert service.retrieve("user-a", "benchmark") == []
 
     def test_globally_disabled_service_retrieves_nothing(self) -> None:
@@ -155,7 +162,13 @@ def _seed_service(
 class TestExplain:
     def test_explain_returns_reason_provenance_and_consent(self) -> None:
         service, store = _service()
-        store.set_enabled("user-a", True)
+        store.set_settings(
+            "user-a",
+            UserMemorySettings(
+                enabled=True,
+                enabled_categories=[MemoryCategory.EXPLICIT_DECISION_NOTE],
+            ),
+        )
         result = service.propose_from_saved_decision(
             "user-a",
             SavedDecisionSource(
@@ -176,5 +189,11 @@ class TestExplain:
 
     def test_explain_is_owner_scoped(self) -> None:
         service, store = _service()
-        store.set_enabled("user-a", True)
+        store.set_settings(
+            "user-a",
+            UserMemorySettings(
+                enabled=True,
+                enabled_categories=[MemoryCategory.EXPLICIT_DECISION_NOTE],
+            ),
+        )
         assert service.explain("user-b", "mem-unknown") is None

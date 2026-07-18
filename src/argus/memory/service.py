@@ -380,13 +380,14 @@ class MemoryService:
             )
         return self._store.delete_record(user_id, record_id)
 
-    def enable(
-        self, user_id: str, categories: list[MemoryCategory] | None = None
-    ) -> None:
-        """Explicit opt-in; ``None`` grants the full category allowlist."""
-        if categories is None:
-            self._store.set_enabled(user_id, True)
-            return
+    def enable(self, user_id: str, categories: list[MemoryCategory]) -> None:
+        """Explicit opt-in for an explicit, non-empty category scope.
+
+        There is deliberately no default scope: consent is never broadened
+        implicitly. Callers wanting every category must name every category.
+        """
+        if not categories:
+            raise ValueError("enable requires a non-empty category scope")
         self._store.set_settings(
             user_id,
             UserMemorySettings(enabled=True, enabled_categories=categories),
@@ -394,7 +395,7 @@ class MemoryService:
 
     def disable(self, user_id: str) -> None:
         """Disable memory and invalidate every pending proposal."""
-        self._store.set_enabled(user_id, False)
+        self._store.set_settings(user_id, UserMemorySettings())
         self._store.discard_all_candidates(user_id)
 
     def reset(self, user_id: str) -> int:

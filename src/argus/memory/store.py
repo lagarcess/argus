@@ -21,8 +21,6 @@ class CanonicalMemoryStore(Protocol):
         self, user_id: str, settings: UserMemorySettings
     ) -> UserMemorySettings: ...
 
-    def set_enabled(self, user_id: str, enabled: bool) -> UserMemorySettings: ...
-
     def add_candidate(self, candidate: MemoryCandidate) -> None: ...
 
     def get_candidate(
@@ -73,15 +71,6 @@ class InMemoryCanonicalMemoryStore:
     ) -> UserMemorySettings:
         self._settings[user_id] = settings
         return settings
-
-    def set_enabled(self, user_id: str, enabled: bool) -> UserMemorySettings:
-        # Convenience for full-scope enable / full disable; scoped grants go
-        # through set_settings.
-        categories = list(MemoryCategory) if enabled else []
-        return self.set_settings(
-            user_id,
-            UserMemorySettings(enabled=enabled, enabled_categories=categories),
-        )
 
     def add_candidate(self, candidate: MemoryCandidate) -> None:
         self._candidates.setdefault(candidate.user_id, {})[candidate.id] = candidate

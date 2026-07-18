@@ -186,7 +186,7 @@ class TestOptInOfferLifecycle:
 
     def test_ordinary_confirmed_record_has_no_opt_in_side_effect(self) -> None:
         service, store = _service()
-        service.enable("user-a")
+        service.enable("user-a", [MemoryCategory.PERSONALIZATION_PREFERENCE])
         before = store.get_settings("user-a")
         result = service.propose_from_explicit_request(
             "user-a",
@@ -301,7 +301,7 @@ class TestExplicitRequestOptIn:
 class TestDisableInvalidatesPending:
     def test_disable_discards_pending_candidates(self) -> None:
         service, store = _service()
-        service.enable("user-a")
+        service.enable("user-a", [MemoryCategory.PERSONALIZATION_PREFERENCE])
         proposed = service.propose_from_explicit_request(
             "user-a",
             ExplicitMemoryRequest(
@@ -375,7 +375,13 @@ class TestRetrievalHonorsScope:
             UserMemorySettings(enabled=True, enabled_categories=list(DECISION_SCOPE)),
         )
         assert service.retrieve("user-a", "SPY benchmark") == []
-        store.set_enabled("user-a", True)
+        store.set_settings(
+            "user-a",
+            UserMemorySettings(
+                enabled=True,
+                enabled_categories=[MemoryCategory.PERSONALIZATION_PREFERENCE],
+            ),
+        )
         assert [
             item.record.id for item in service.retrieve("user-a", "SPY benchmark")
         ] == ["mem-pref"]
