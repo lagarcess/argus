@@ -30,11 +30,11 @@ from argus.memory.contracts import (
     SensitivityFlag,
 )
 from argus.memory.policy import (
-    OPT_IN_SCOPE_BY_REASON,
     MemoryPolicy,
     PolicyDecision,
     PolicyOutcome,
     UserMemorySettings,
+    opt_in_scope_for,
 )
 from argus.memory.provider import MemoryRetrievalProvider
 from argus.memory.store import CanonicalMemoryStore
@@ -200,8 +200,9 @@ class MemoryService:
         if not decision.allowed:
             return ProposalResult(status=ProposalStatus.REJECTED_POLICY, policy=decision)
         if decision.outcome is PolicyOutcome.ALLOWED_OPT_IN_OFFER:
-            scope = OPT_IN_SCOPE_BY_REASON[candidate.proposal_reason]
-            candidate = candidate.model_copy(update={"opt_in_scope": list(scope)})
+            candidate = candidate.model_copy(
+                update={"opt_in_scope": opt_in_scope_for(candidate)}
+            )
         self._store.add_candidate(candidate)
         self._store.mark_prompted(candidate.user_id, candidate.category, now)
         return ProposalResult(

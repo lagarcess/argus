@@ -53,7 +53,9 @@ class TestWalkingSkeleton:
         service, store, provider = _build()
         user = "user-founder-qa"
 
-        # Off by default: ordinary requests neither propose nor retrieve.
+        # Off by default: nothing retrieves. An explicit request while off is
+        # itself an earned opt-in offer; declining it must not enable memory.
+        assert service.retrieve(user, "ETH idea") == []
         cold = service.propose_from_explicit_request(
             user,
             ExplicitMemoryRequest(
@@ -62,10 +64,13 @@ class TestWalkingSkeleton:
                 category=MemoryCategory.PERSONALIZATION_PREFERENCE,
             ),
         )
-        assert cold.status is ProposalStatus.REJECTED_POLICY
+        assert cold.status is ProposalStatus.PROPOSED
         assert cold.policy is not None
-        assert cold.policy.outcome is PolicyOutcome.DENIED_DISABLED
-        assert service.retrieve(user, "ETH idea") == []
+        assert cold.policy.outcome is PolicyOutcome.ALLOWED_OPT_IN_OFFER
+        assert cold.candidate is not None
+        service.decline(user, cold.candidate.id)
+        assert store.get_settings(user).enabled is False
+        assert service.retrieve(user, "SPY") == []
 
         # The saved-decision moment is the one approved earned opt-in offer.
         proposed = service.propose_from_saved_decision(user, DECISION_FIXTURE)

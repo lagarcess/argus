@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from argus.memory.contracts import MemoryCategory
+from argus.memory.policy import PolicyOutcome
 from argus.memory.provider import DeterministicFakeMemoryProvider
 from argus.memory.service import (
     ExplicitMemoryRequest,
@@ -150,11 +151,13 @@ class TestDelete:
 
 
 class TestDisableAndReset:
-    def test_disable_stops_proposals_and_retrieval(self) -> None:
+    def test_disable_stops_retrieval_and_ordinary_memory_use(self) -> None:
         service, store, _fake = _service()
         _confirmed(service, store)
         service.disable("user-a")
         assert service.retrieve("user-a", "SPY benchmark") == []
+        # A fresh explicit request is only a re-opt-in OFFER, and the recent
+        # prompt keeps it inside the cooldown window.
         proposed = service.propose_from_explicit_request(
             "user-a",
             ExplicitMemoryRequest(
@@ -164,6 +167,8 @@ class TestDisableAndReset:
             ),
         )
         assert proposed.status is ProposalStatus.REJECTED_POLICY
+        assert proposed.policy is not None
+        assert proposed.policy.outcome is PolicyOutcome.SUPPRESSED_COOLDOWN
 
     def test_reset_removes_only_that_users_memories(self) -> None:
         service, store, fake = _service()

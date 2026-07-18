@@ -43,7 +43,10 @@ class TestEnablement:
         assert UserMemorySettings().enabled is False
 
     def test_disabled_user_is_denied_for_unapproved_reasons(self) -> None:
-        decision = MemoryPolicy().evaluate(
+        narrowed = MemoryPolicy(
+            opt_in_proposal_reasons=frozenset({ProposalReason.SAVED_DECISION})
+        )
+        decision = narrowed.evaluate(
             _candidate(proposal_reason=ProposalReason.EXPLICIT_REQUEST),
             UserMemorySettings(),
             last_prompted_at=None,
@@ -53,7 +56,10 @@ class TestEnablement:
         assert decision.outcome is PolicyOutcome.DENIED_DISABLED
 
     def test_disabled_wins_over_every_other_rule(self) -> None:
-        decision = MemoryPolicy().evaluate(
+        narrowed = MemoryPolicy(
+            opt_in_proposal_reasons=frozenset({ProposalReason.SAVED_DECISION})
+        )
+        decision = narrowed.evaluate(
             _candidate(
                 proposal_reason=ProposalReason.EXPLICIT_REQUEST,
                 sensitivity_flags=[SensitivityFlag.ACCOUNT_BALANCE],

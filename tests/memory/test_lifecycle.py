@@ -127,14 +127,18 @@ class TestPropose:
         assert "explicit_request" in kinds
         assert "conversation" in kinds
 
-    def test_disabled_user_gets_policy_rejection_for_ordinary_requests(
+    def test_disabled_user_proposals_are_opt_in_offers_not_ordinary(
         self,
     ) -> None:
         service, _store = _service()
         result = service.propose_from_explicit_request("user-a", _explicit_request())
-        assert result.status is ProposalStatus.REJECTED_POLICY
+        assert result.status is ProposalStatus.PROPOSED
         assert result.policy is not None
-        assert result.policy.outcome is PolicyOutcome.DENIED_DISABLED
+        assert result.policy.outcome is PolicyOutcome.ALLOWED_OPT_IN_OFFER
+        assert result.candidate is not None
+        assert result.candidate.opt_in_scope == [
+            MemoryCategory.PERSONALIZATION_PREFERENCE
+        ]
 
     def test_sensitive_request_is_suppressed_and_not_stored(self) -> None:
         service, store = _service()

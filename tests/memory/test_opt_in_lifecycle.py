@@ -90,7 +90,10 @@ class TestPolicyOptIn:
         assert decision.outcome is PolicyOutcome.ALLOWED_OPT_IN_OFFER
 
     def test_disabled_plus_unapproved_reason_stays_denied(self) -> None:
-        decision = MemoryPolicy().evaluate(
+        narrowed = MemoryPolicy(
+            opt_in_proposal_reasons=frozenset({ProposalReason.SAVED_DECISION})
+        )
+        decision = narrowed.evaluate(
             _candidate(proposal_reason=ProposalReason.EXPLICIT_REQUEST),
             UserMemorySettings(),
             last_prompted_at=None,
@@ -197,6 +200,102 @@ class TestOptInOfferLifecycle:
         assert result.candidate.opt_in_scope is None
         assert service.confirm("user-a", result.candidate.id) is not None
         assert store.get_settings("user-a") == before
+
+
+class TestExplicitRequestOptIn:
+    """An explicit "remember this" while memory is off is an approved offer
+    (memo §15.3) granting only the requested category on confirmation."""
+
+    def _request(self) -> ExplicitMemoryRequest:
+        return ExplicitMemoryRequest(
+            text="Remember that I prefer SPY as my default benchmark",
+            label="Prefers SPY benchmark",
+            category=MemoryCategory.PERSONALIZATION_PREFERENCE,
+            conversation_id="conv-1",
+        )
+
+    def test_policy_treats_disabled_explicit_request_as_offer(self) -> None:
+        decision = MemoryPolicy().evaluate(
+            _candidate(proposal_reason=ProposalReason.EXPLICIT_REQUEST),
+            UserMemorySettings(),
+            last_prompted_at=None,
+            now=NOW,
+        )
+        assert decision.allowed is True
+        assert decision.outcome is PolicyOutcome.ALLOWED_OPT_IN_OFFER
+
+    def test_offer_grants_only_the_requested_category(self) -> None:
+        service, store = _service()
+        offered = service.propose_from_explicit_request("user-a", self._request())
+        assert offered.status is ProposalStatus.PROPOSED
+        assert offered.candidate is not None
+        assert offered.candidate.opt_in_scope == [
+            MemoryCategory.PERSONALIZATION_PREFERENCE
+        ]
+        record = service.confirm("user-a", offered.candidate.id)
+        assert record is not None
+        settings = store.get_settings("user-a")
+        assert settings.enabled is True
+        assert settings.enabled_categories == [MemoryCategory.PERSONALIZATION_PREFERENCE]
+        assert not settings.consents_to(MemoryCategory.EXPLICIT_DECISION_NOTE)
+
+    def test_declining_the_offer_does_not_enable_memory(self) -> None:
+        service, store = _service()
+        offered = service.propose_from_explicit_request("user-a", self._request())
+        assert offered.candidate is not None
+        service.decline("user-a", offered.candidate.id)
+        settings = store.get_settings("user-a")
+        assert settings.enabled is False
+        assert settings.enabled_categories == []
+        assert store.list_records("user-a") == []
+        assert store.get_candidate("user-a", offered.candidate.id) is None
+
+    def test_offer_still_respects_sensitivity_suppression(self) -> None:
+        service, store = _service()
+        request = self._request().model_copy(
+            update={"sensitivity_flags": [SensitivityFlag.ACCOUNT_BALANCE]}
+        )
+        result = service.propose_from_explicit_request("user-a", request)
+        assert result.status is ProposalStatus.REJECTED_POLICY
+        assert result.policy is not None
+        assert result.policy.outcome is PolicyOutcome.SUPPRESSED_SENSITIVE
+        assert store.list_candidates("user-a") == []
+
+    def test_offer_still_respects_cooldown(self) -> None:
+        service, _store = _service()
+        first = service.propose_from_explicit_request("user-a", self._request())
+        assert first.status is ProposalStatus.PROPOSED
+        second = service.propose_from_explicit_request("user-a", self._request())
+        assert second.status is ProposalStatus.REJECTED_POLICY
+        assert second.policy is not None
+        assert second.policy.outcome is PolicyOutcome.SUPPRESSED_COOLDOWN
+
+    def test_offer_still_respects_the_category_allowlist(self) -> None:
+        narrowed = MemoryPolicy(
+            allowed_categories=frozenset({MemoryCategory.EXPLICIT_DECISION_NOTE})
+        )
+        decision = narrowed.evaluate(
+            _candidate(
+                proposal_reason=ProposalReason.EXPLICIT_REQUEST,
+                category=MemoryCategory.PERSONALIZATION_PREFERENCE,
+            ),
+            UserMemorySettings(),
+            last_prompted_at=None,
+            now=NOW,
+        )
+        assert decision.allowed is False
+        assert decision.outcome is PolicyOutcome.DENIED_CATEGORY
+
+    def test_global_flag_still_gates_explicit_offers(self) -> None:
+        store = InMemoryCanonicalMemoryStore()
+        service = MemoryService(
+            store=store,
+            provider=DeterministicFakeMemoryProvider(),
+            config=MemoryServiceConfig(globally_enabled=False),
+            clock=lambda: NOW,
+        )
+        result = service.propose_from_explicit_request("user-a", self._request())
+        assert result.status is ProposalStatus.REJECTED_GLOBAL_DISABLED
 
 
 class TestDisableInvalidatesPending:

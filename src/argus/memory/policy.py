@@ -28,18 +28,30 @@ DEFAULT_PROPOSAL_COOLDOWN = timedelta(days=7)
 
 ALL_CATEGORIES: frozenset[MemoryCategory] = frozenset(MemoryCategory)
 
+# Earned opt-in moments approved by decision memo §15.3: the saved-decision
+# invite and the user's own explicit "remember this" request.
 DEFAULT_OPT_IN_PROPOSAL_REASONS: frozenset[ProposalReason] = frozenset(
-    {ProposalReason.SAVED_DECISION}
+    {ProposalReason.SAVED_DECISION, ProposalReason.EXPLICIT_REQUEST}
 )
 
-# The scope an earned opt-in offer grants when confirmed (memo §15.3: the
-# first opt-in is decision-grounded, not broad personalization).
+# The scope a saved-decision opt-in offer grants when confirmed (memo §15.3:
+# the first opt-in is decision-grounded, not broad personalization).
 OPT_IN_SCOPE_BY_REASON: dict[ProposalReason, tuple[MemoryCategory, ...]] = {
     ProposalReason.SAVED_DECISION: (
         MemoryCategory.EXPLICIT_DECISION_NOTE,
         MemoryCategory.PAST_SESSION_ANCHOR,
     ),
 }
+
+
+def opt_in_scope_for(candidate: MemoryCandidate) -> list[MemoryCategory]:
+    """The category scope an opt-in offer grants when confirmed.
+
+    An explicit request grants only the category the user asked to remember.
+    """
+    if candidate.proposal_reason is ProposalReason.EXPLICIT_REQUEST:
+        return [candidate.category]
+    return list(OPT_IN_SCOPE_BY_REASON[candidate.proposal_reason])
 
 
 class UserMemorySettings(BaseModel):
