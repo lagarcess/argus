@@ -12,19 +12,20 @@ const readChatShellSource = () =>
 
 
 describe("chat archive/delete lifecycle source contract", () => {
-  test("chat switching keeps prior messages visible until hydration completes", () => {
+  test("chat switching routes hydration through the navigation mapper", () => {
+    // Behavior lives in __tests__/chat-transcript-navigation.test.ts: a
+    // new-key cache miss clears to a neutral loading surface while stale
+    // same-key content stays visible during silent revalidation. This source
+    // check only pins that the shell routes through that one mapper.
     const chat = readChatShellSource();
     const loadConversationStart = chat.indexOf("const loadConversation = async (convId: string) => {");
     const loadConversationEnd = chat.indexOf("const loadConversationForRun", loadConversationStart);
     const loadConversation = chat.slice(loadConversationStart, loadConversationEnd);
 
     expect(loadConversationStart).toBeGreaterThan(-1);
-    // #252: hydration flows through the session cache; loading state is
-    // honest and prior messages stay visible until a snapshot is ready.
     expect(loadConversation).toContain("transcriptSessionCache.navigate");
-    expect(loadConversation).toContain("setStreamStatus(loading ? t('common.loading') : null)");
-    expect(loadConversation).not.toContain("setMessages([])");
     expect(loadConversation).toContain("applyTranscriptNavigationState(state,");
+    expect(loadConversation).toContain("clearToNeutralSurface");
   });
 
   test("active archive and delete navigate away from the removed chat", () => {

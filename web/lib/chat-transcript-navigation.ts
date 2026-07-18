@@ -6,6 +6,7 @@ import type { TranscriptNavigationState } from "@/lib/chat-transcript-session-ca
 
 export type TranscriptNavigationDeps<TSnapshot> = {
   applySnapshot: (snapshot: TSnapshot) => void;
+  clearToNeutralSurface: () => void;
   setLoading: (loading: boolean, statusText: string | null) => void;
   showLoadError: () => void;
   onMissingConversation: () => void;
@@ -18,6 +19,9 @@ export function applyTranscriptNavigationState<TSnapshot>(
   deps: TranscriptNavigationDeps<TSnapshot>,
 ): void {
   if (state.phase === "loading") {
+    // New-key cache miss: never show the previous conversation under the
+    // newly selected id — render a neutral loading surface instead.
+    deps.clearToNeutralSurface();
     deps.setLoading(true, "loading");
     return;
   }

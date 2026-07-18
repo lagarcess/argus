@@ -998,6 +998,10 @@ export default function ChatInterface() {
       onState: (state) =>
         applyTranscriptNavigationState(state, {
           applySnapshot,
+          clearToNeutralSurface: () => {
+            setMessages([]);
+            setInputActions([]);
+          },
           setLoading: (loading) => {
             setStreamStatus(loading ? t('common.loading') : null);
             setIsHydratingConversation(loading);

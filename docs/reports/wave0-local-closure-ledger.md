@@ -383,3 +383,59 @@ Recommended review order: as listed (each commit is independently revertible;
 No GitHub state, external environment, production data, integration branch,
 or tester exposure was changed by this laboratory branch. The two open PR
 branches and all founder stashes were left untouched.
+
+---
+
+## Review-blocker correction pass (2026-07-18)
+
+Five confirmed review blockers, one bounded TDD pass, minimal commits:
+
+1. **#235 safe failure logging** — `24306bd`. Unexpected exceptions now emit
+   one structured error log with the exact response `request_id`, exception
+   class, method, and path — never the exception message, body, secrets,
+   provider details, or a traceback. Captured-log correlation regression
+   proves the log/response ids match and that a secret-bearing message stays
+   out of the log stream. LOCAL_ACCEPTANCE_PASS.
+
+2. **#240 production gateway wiring** — `0c599b4` + `e3b4356`. The optional
+   `getattr` hooks are gone: acceptance upserts `chat_turn_lifecycles`
+   (idempotent on `turn_id`), transitions call the database CAS function,
+   terminal enrichment queries the active turn, and bounded reconciliation
+   runs the shared predicate/order/batch through PostgREST with CAS-guarded
+   transitions (`chat_turn_lifecycle_gateway`). Eight tests pin the wiring
+   and each gateway operation's shape. Real-database proof: still
+   EXTERNAL_GATE_PENDING (unchanged). Known nuance: gateway staleness
+   selection compares ISO strings computed from the API clock; the CAS
+   function's own timestamps remain database-clock owned.
+
+3. **#230 stale-direct-job contract completeness** — `80149fd`.
+   Reconciliation now resolves the stable job-derived finalized Run/evidence
+   tuple before failing, in the memory twin and in both database paths
+   (`finalized_direct_run_id` via uuid5, checked in the replay branch and the
+   bounded pass); a durable tuple links its Run and completes the row as
+   `succeeded` with failure fields cleared. Finalizer and reconciler
+   serialize on the same row (shared lock in memory; row lock in SQL), and a
+   late finalization can no longer supersede a terminal reconciliation
+   decision (memory guard + `queued/running` filter on the gateway update).
+   Supabase GET reconciliation stays database-only. LOCAL_ACCEPTANCE_PASS;
+   real-Postgres run unchanged as the external gate.
+
+4. **#242 artifact-bound identity** — `7e0cd5e`. The confirmation artifact
+   persists the full-width canonical launch hash (card + action payload);
+   chat admission binds the reservation identity to the artifact hash; the
+   by-action lookup requires the linked message to contain the confirmation
+   card and recomputes expected identity from the artifact's conversation,
+   confirmation_id, and full-width hash — never from mutable job fields.
+   Absent card or absent hash → integrity 500; artifact-hash mismatch → 409.
+   Regressions added for all three. LOCAL_ACCEPTANCE_PASS.
+
+5. **#252 neutral miss surface + measured profile** — (this commit). A
+   new-key cache miss clears to a neutral loading surface and never shows the
+   previous conversation under the new selection; stale same-key content
+   stays visible during silent revalidation. The contradictory source test
+   was replaced by behavior-level coverage of the navigation mapper (six
+   cases). The locally executable p50/p95 protocol is defined in
+   `docs/reports/transcript-cache-profile.md` and ran: warm revisit p50
+   0.0006 ms / p95 0.0065 ms with zero loader calls; cold miss p50 0.0138 ms
+   / p95 0.0588 ms (50 samples each, budgets asserted in-suite). The
+   deployed-browser EN/ES profile remains the external gate.
