@@ -20,6 +20,7 @@
     "retry": "Retry",
     "error_occurred": "An error occurred",
     "save": "Save",
+    "confirm": "Confirm",
     "cancel": "Cancel",
     "done": "Done",
     "search": "Search",
@@ -778,6 +779,7 @@
       "feedback": "General feedback"
     },
     "logout": "Log out",
+    "logout_error": "We couldn’t sign out this browser. Try again.",
     "dev": {
       "reset_onboarding": "Reset onboarding (dev)"
     },
@@ -919,8 +921,73 @@
       "show": "Show password",
       "hide": "Hide password"
     },
+    "recovery": {
+      "forgot": "Forgot password?",
+      "title": "Recover your account",
+      "description": "Enter your email and we’ll send recovery instructions if the account is eligible.",
+      "email_label": "Email address",
+      "send": "Send recovery instructions",
+      "sending": "Sending...",
+      "generic_sent": "If an eligible account exists for that email, recovery instructions will arrive shortly.",
+      "request_error": "We couldn’t start recovery. Wait a moment and try again.",
+      "back_to_sign_in": "Back to sign in",
+      "reset_title": "Choose a new password",
+      "checking": "Checking your recovery link...",
+      "invalid_link": "This recovery link is missing, expired, or already used.",
+      "request_new": "Request a new link",
+      "new_password": "New password",
+      "confirm_password": "Confirm new password",
+      "password_mismatch": "Passwords do not match.",
+      "update_password": "Update password",
+      "updating": "Updating...",
+      "reset_error": "This recovery link is no longer valid. Request a new one.",
+      "password_rejected": "We couldn’t update the password. Check the requirements or request a new recovery link.",
+      "password_updated": "Your password is updated.",
+      "reset_complete": "Your password is updated. Sign in again on every browser.",
+      "revocation_warning": "Argus could not confirm that every session was signed out. Retry before signing in again.",
+      "retry_revocation": "Retry sign out all sessions",
+      "retrying_revocation": "Retrying...",
+      "revocation_retry_error": "Argus still couldn’t confirm that every session was signed out. Try again.",
+      "cleanup_warning": "Sessions were revoked, but this browser could not confirm local cookie cleanup. A fresh sign-in is still required."
+    },
     "errors": {
       "generic": "Something went wrong. Please try again."
+    }
+  },
+  "account_security": {
+    "title": "Account security",
+    "description": "Change your password or choose exactly which sessions to sign out.",
+    "back": "Back to Argus",
+    "loading": "Checking your session...",
+    "session_check_unavailable": "Argus couldn’t verify your session right now. Try again.",
+    "retry": "Retry",
+    "cookie_sync_warning": "Sessions were revoked, but local cookie cleanup could not be confirmed.",
+    "password": {
+      "title": "Change password",
+      "description": "Enter your current password. After the change, every browser must sign in again.",
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Confirm new password",
+      "submit": "Change password",
+      "changing": "Changing...",
+      "changed": "Password changed. Sign in again on every browser.",
+      "revocation_warning": "Password changed, but Argus could not confirm every session was signed out. Retry Sign out all sessions.",
+      "error": "We couldn’t change the password. Check your current password and try again."
+    },
+    "sessions": {
+      "title": "Sessions",
+      "description": "Choose whether to keep this browser signed in.",
+      "sign_out_this": "Sign out this browser",
+      "sign_out_others": "Sign out other sessions",
+      "sign_out_all": "Sign out all sessions",
+      "others_complete": "Other sessions are signed out. This browser remains signed in.",
+      "signed_out": "The selected sessions are signed out.",
+      "revocation_warning": "Argus could not confirm the selected sessions were signed out. Try the session action again.",
+      "error": "We couldn’t complete that session change. Try again.",
+      "confirm_others_title": "Sign out other sessions?",
+      "confirm_others_description": "Other browsers will lose access. This browser stays signed in.",
+      "confirm_all_title": "Sign out everywhere?",
+      "confirm_all_description": "Every browser, including this one, will need a fresh login."
     }
   },
   "landing": {

@@ -1,3 +1,4 @@
+import { chatStreamIdempotencyKey } from "@/lib/chat-run-reconciliation";
 import { getSupabaseClient } from "./supabase-client";
 import type { AssetClass } from "./argus-types";
 import type {
@@ -183,10 +184,7 @@ export type UsageAllowance = {
 };
 
 export type UsageAllowanceResponse = {
-  allowances: {
-    messages: UsageAllowance;
-    backtests: UsageAllowance;
-  };
+  allowances: { messages: UsageAllowance; backtests: UsageAllowance };
 };
 
 type AuthSessionPayload = {
@@ -724,16 +722,43 @@ export async function loginWithEmail(payload: {
   return response;
 }
 
+export async function clearArgusSessionCookies() {
+  return unauthenticatedApiFetch<{ success: boolean }>("/auth/logout", {
+    method: "POST",
+  });
+}
+
+export type CurrentBrowserLogoutResult = {
+  revocation: "complete" | "failed";
+  cookieSync: "cleared" | "failed";
+};
+
+export async function synchronizeCurrentBrowserLogout<T>(
+  revokeCurrentSession: () => Promise<{ error: unknown | null }>,
+  clearCookies: () => Promise<T>,
+): Promise<CurrentBrowserLogoutResult> {
+  const [revocation, cookieSync] = await Promise.allSettled([
+    Promise.resolve().then(revokeCurrentSession),
+    Promise.resolve().then(clearCookies),
+  ]);
+  return {
+    revocation:
+      revocation.status === "fulfilled" && !revocation.value.error
+        ? "complete"
+        : "failed",
+    cookieSync: cookieSync.status === "fulfilled" ? "cleared" : "failed",
+  };
+}
+
 export async function logoutFromApi() {
-  try {
-    return await apiFetch<{ success: boolean }>("/auth/logout", {
-      method: "POST",
-    });
-  } finally {
-    await getSupabaseClient()
-      ?.auth.signOut()
-      .catch(() => null);
-  }
+  return synchronizeCurrentBrowserLogout(
+    async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return { error: null };
+      return supabase.auth.signOut({ scope: "local" });
+    },
+    clearArgusSessionCookies,
+  );
 }
 
 export async function createConversation(language?: string | null) {
@@ -997,29 +1022,12 @@ export async function getBacktestJob(jobId: string) {
   return apiFetch<BacktestJobResponse>(`/backtest-jobs/${jobId}`);
 }
 
-export async function getBacktestJobByAction(confirmationId: string) {
-  return apiFetch<BacktestJobResponse>(
+export const getBacktestJobByAction = (confirmationId: string) =>
+  apiFetch<BacktestJobResponse>(
     `/backtest-jobs/by-action/${encodeURIComponent(confirmationId)}`,
   );
-}
 
 // ─── Chat stream ──────────────────────────────────────────────────────────────
-
-export function chatStreamIdempotencyKey(
-  input: string | ChatActionRequest,
-): string {
-  if (typeof input !== "string" && input.type === "run_backtest") {
-    const payload = (input.payload ?? {}) as { confirmation_id?: unknown };
-    const confirmationId =
-      typeof payload.confirmation_id === "string"
-        ? payload.confirmation_id.trim()
-        : "";
-    // Contract: the Run action identity is its confirmation_id, so retry,
-    // reconnect, and reload reuse the same approved reservation.
-    if (confirmationId) return confirmationId;
-  }
-  return crypto.randomUUID();
-}
 
 export async function streamChatMessage(
   conversationId: string,

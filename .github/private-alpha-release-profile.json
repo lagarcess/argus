@@ -60,6 +60,7 @@
     "web": {
       "name": "argus-app",
       "env": {
+        "ARGUS_APP_ORIGIN": "https://argus-app-suz5.onrender.com",
         "NEXT_PUBLIC_APP_ENV": "production",
         "NEXT_PUBLIC_MOCK_AUTH": "false",
         "NEXT_PUBLIC_ENABLE_SPANISH": "true",

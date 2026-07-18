@@ -106,9 +106,6 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
             "404", _error_response("Referenced conversation or strategy not found.")
         )
         responses.setdefault("429", _error_response("Backtest quota exceeded."))
-        responses.setdefault(
-            "503", _error_response("Backtest finished but finalization failed safely.")
-        )
 
     stream_method, stream_path = STREAMING_OPERATION
     stream_op = spec.get("paths", {}).get(stream_path, {}).get(stream_method)
@@ -125,7 +122,52 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
         )
         responses.setdefault("429", _error_response("Chat message quota exceeded."))
 
+    logout_op = spec.get("paths", {}).get(f"{API_PREFIX}/auth/logout", {}).get("post")
+    if logout_op is not None:
+        logout_op.setdefault("responses", {}).setdefault(
+            "403",
+            _error_response(
+                "Logout rejected: untrusted browser Origin (csrf_origin_rejected)."
+            ),
+        )
+
+    _declare_session_verification_unavailable(spec)
     return spec
+
+
+_SESSION_VERIFICATION_EXEMPT_PATHS = frozenset(
+    {
+        f"{API_PREFIX}/auth/signup",
+        f"{API_PREFIX}/auth/login",
+        f"{API_PREFIX}/auth/logout",
+    }
+)
+
+
+def _declare_session_verification_unavailable(spec: dict[str, Any]) -> None:
+    """Every authenticated operation can fail closed with 503
+    ``auth_session_verification_unavailable`` when revoked-session
+    verification is unreachable (#248)."""
+
+    responses = spec.setdefault("components", {}).setdefault("responses", {})
+    responses["AuthSessionVerificationUnavailable"] = {
+        "description": (
+            "Session verification is temporarily unavailable; the request "
+            "fails closed with code auth_session_verification_unavailable."
+        ),
+        "content": {"application/json": {"schema": copy.deepcopy(_ERROR_REF)}},
+    }
+    for path, operations in spec.get("paths", {}).items():
+        if not path.startswith(f"{API_PREFIX}/"):
+            continue
+        if path in _SESSION_VERIFICATION_EXEMPT_PATHS:
+            continue
+        for method, operation in operations.items():
+            if method not in HTTP_METHODS or not isinstance(operation, dict):
+                continue
+            operation.setdefault("responses", {})["503"] = {
+                "$ref": "#/components/responses/AuthSessionVerificationUnavailable"
+            }
 
 
 def _rewrite_validation_errors(spec: dict[str, Any]) -> None:

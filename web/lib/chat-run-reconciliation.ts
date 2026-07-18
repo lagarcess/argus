@@ -21,6 +21,22 @@ export type RunReconciliationOutcome =
   | { state: "conflict"; replayAllowed: false }
   | { state: "unresolved"; replayAllowed: false };
 
+export function chatStreamIdempotencyKey(
+  input: string | ChatActionRequest,
+): string {
+  if (typeof input !== "string" && input.type === "run_backtest") {
+    const payload = (input.payload ?? {}) as { confirmation_id?: unknown };
+    const confirmationId =
+      typeof payload.confirmation_id === "string"
+        ? payload.confirmation_id.trim()
+        : "";
+    // Contract: the Run action identity is its confirmation_id, so retry,
+    // reconnect, and reload reuse the same approved reservation.
+    if (confirmationId) return confirmationId;
+  }
+  return crypto.randomUUID();
+}
+
 export function runActionConfirmationId(
   input: string | ChatActionRequest | undefined,
 ): string | null {

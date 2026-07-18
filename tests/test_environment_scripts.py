@@ -149,24 +149,26 @@ esac
         }
     )
 
-    script = ".github/render-env-sync.sh"
-    cwd = str(ROOT)
+    # Always mirror the scripts into a root with no .env so argus_load_root_env
+    # is a no-op: a developer/worktree .env (populated or deliberately blanked)
+    # must never leak into these fixture-driven audits. ``isolate`` additionally
+    # scrubs workflow secrets from the process env, reproducing the daily-gate
+    # warmup step, which exports neither .env nor the workflow secrets
+    # (ALPACA_*/OPENROUTER_API_KEY) it audits.
+    github_dir = tmp_path / ".github"
+    github_dir.mkdir()
+    for name in (
+        "render-env-sync.sh",
+        "argus-env.sh",
+        "private-alpha-release-profile.py",
+        "private-alpha-release-profile.json",
+    ):
+        copied = github_dir / name
+        shutil.copy(ROOT / ".github" / name, copied)
+        copied.chmod(0o755)
+    script = str(github_dir / "render-env-sync.sh")
+    cwd = str(tmp_path)
     if isolate:
-        # Mirror the scripts into a root with no .env so argus_load_root_env is a
-        # no-op, then scrub workflow secrets from the process env. This reproduces
-        # the daily-gate warmup step, which exports neither .env nor the workflow
-        # secrets (ALPACA_*/OPENROUTER_API_KEY) it audits.
-        github_dir = tmp_path / ".github"
-        github_dir.mkdir()
-        for name in (
-            "render-env-sync.sh",
-            "argus-env.sh",
-            "private-alpha-release-profile.py",
-            "private-alpha-release-profile.json",
-        ):
-            copied = github_dir / name
-            shutil.copy(ROOT / ".github" / name, copied)
-            copied.chmod(0o755)
         for secret in (
             "ALPACA_API_KEY",
             "ALPACA_SECRET_KEY",
@@ -174,8 +176,6 @@ esac
             "ARGUS_WORKFLOW_DATABASE_URL",
         ):
             env.pop(secret, None)
-        script = str(github_dir / "render-env-sync.sh")
-        cwd = str(tmp_path)
 
     return subprocess.run(
         [
@@ -365,15 +365,15 @@ def test_render_python_builds_use_managed_poetry() -> None:
     assert "pip install poetry" not in env_contract
     assert (
         'ARGUS_RENDER_API_BUILD_COMMAND="poetry config virtualenvs.create false '
-        "&& poetry install --only main --no-interaction\""
+        '&& poetry install --only main --no-interaction"'
     ) in env_contract
     assert (
         'ARGUS_RENDER_API_START_COMMAND="poetry run uvicorn argus.api.main:app '
-        "--host 0.0.0.0 --port \\$PORT\""
+        '--host 0.0.0.0 --port \\$PORT"'
     ) in env_contract
     assert (
         'ARGUS_RENDER_WORKFLOW_BUILD_COMMAND="poetry config virtualenvs.create false '
-        "&& poetry install --only main,workflows --no-interaction\""
+        '&& poetry install --only main,workflows --no-interaction"'
     ) in env_contract
 
 
@@ -387,6 +387,16 @@ def test_env_example_declares_render_api_key_once() -> None:
 def test_render_blueprint_declares_shared_render_env_contract_vars() -> None:
     assert set(_contract_array("ARGUS_RENDER_API_ENV")) == set(_render_env("argus-api"))
     assert set(_contract_array("ARGUS_RENDER_WEB_ENV")) == set(_render_env("argus-app"))
+
+
+def test_render_web_declares_exact_server_only_https_app_origin() -> None:
+    web_env = _render_env("argus-app")
+    env_contract = ENV_CONTRACT.read_text()
+
+    assert web_env["ARGUS_APP_ORIGIN"]["value"] == ("https://argus-app-suz5.onrender.com")
+    assert "ARGUS_APP_ORIGIN" in _contract_array("ARGUS_RENDER_WEB_ENV")
+    assert 'ARGUS_PRIVATE_LAUNCH_APP_URL="https://' in env_contract
+    assert "NEXT_PUBLIC_ARGUS_APP_ORIGIN" not in env_contract
 
 
 def test_render_blueprint_syncs_public_supabase_coordinates() -> None:
@@ -1048,9 +1058,9 @@ def test_warmup_script_runs_stale_job_scan_when_supabase_verifier_env_exists() -
 
 def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
-    before_sessions = runbook.split("## Before Tester Sessions", maxsplit=1)[
-        1
-    ].split("## Backtest Workflow Modes", maxsplit=1)[0]
+    before_sessions = runbook.split("## Before Tester Sessions", maxsplit=1)[1].split(
+        "## Backtest Workflow Modes", maxsplit=1
+    )[0]
     normalized_before_sessions = " ".join(before_sessions.split())
 
     assert ".github/render-env-sync.sh api-real-workflow-on" in before_sessions

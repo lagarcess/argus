@@ -3,11 +3,11 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  chatStreamIdempotencyKey,
   isAmbiguousTransportFailure,
   reconcileAmbiguousRun,
   runActionConfirmationId,
 } from "@/lib/chat-run-reconciliation";
-import { chatStreamIdempotencyKey } from "@/lib/argus-api";
 import type { BacktestJobResponse } from "@/lib/argus-types";
 
 const runAction = {

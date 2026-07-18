@@ -40,6 +40,12 @@ paths:
           content:
             application/json:
               schema: {}
+        '403':
+          description: 'Logout rejected: untrusted browser Origin (csrf_origin_rejected).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/auth/session:
     get:
       tags:
@@ -53,6 +59,8 @@ paths:
                 additionalProperties: true
                 type: object
                 title: Response Auth Session Api V1 Auth Session Get
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/auth/signup:
     post:
       tags:
@@ -109,6 +117,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/backtest-jobs/{job_id}:
     get:
       tags:
@@ -133,6 +143,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/backtests/run:
     post:
       tags:
@@ -181,11 +193,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '503':
-          description: Backtest finished but finalization failed safely.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/backtests/{run_id}:
     get:
       tags:
@@ -210,6 +218,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/chat/starter-prompts:
     get:
       tags:
@@ -221,6 +231,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StarterPromptsResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/chat/stream:
     post:
       tags:
@@ -264,6 +276,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/collections:
     get:
       tags:
@@ -299,6 +313,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
     post:
       tags:
       - collections
@@ -321,6 +337,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/collections/{collection_id}:
     patch:
       tags:
@@ -351,6 +369,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
     delete:
       tags:
       - collections
@@ -374,6 +394,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/collections/{collection_id}/strategies:
     post:
       tags:
@@ -404,6 +426,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/collections/{collection_id}/strategies/{strategy_id}:
     delete:
       tags:
@@ -434,6 +458,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/conversations:
     get:
       tags:
@@ -484,6 +510,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
     post:
       tags:
       - conversations
@@ -506,6 +534,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
     delete:
       tags:
       - conversations
@@ -516,6 +546,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BulkConversationDeleteResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/conversations/{conversation_id}:
     patch:
       tags:
@@ -546,6 +578,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
     delete:
       tags:
       - conversations
@@ -569,6 +603,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/conversations/{conversation_id}/messages:
     get:
       tags:
@@ -610,6 +646,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/discovery/assets:
     get:
       tags:
@@ -645,6 +683,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/discovery/indicators:
     get:
       tags:
@@ -680,6 +720,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/evidence-artifacts/{artifact_id}/decision:
     post:
       tags:
@@ -710,6 +752,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/feedback:
     post:
       tags:
@@ -733,6 +777,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/history:
     get:
       tags:
@@ -782,6 +828,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/me:
     get:
       tags:
@@ -793,6 +841,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
     patch:
       tags:
       - profile
@@ -815,6 +865,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/me/usage:
     get:
       tags:
@@ -826,6 +878,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UsageAllowanceResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/search:
     get:
       tags:
@@ -887,6 +941,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/strategies:
     get:
       tags:
@@ -929,6 +985,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
     post:
       tags:
       - strategies
@@ -951,6 +1009,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
   /api/v1/strategies/{strategy_id}:
     patch:
       tags:
@@ -981,6 +1041,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
     delete:
       tags:
       - strategies
@@ -1004,6 +1066,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
 components:
   schemas:
     BacktestJob:
@@ -2601,6 +2665,14 @@ components:
       required:
       - user
       title: UserResponse
+  responses:
+    AuthSessionVerificationUnavailable:
+      description: Session verification is temporarily unavailable; the request fails closed
+        with code auth_session_verification_unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
 tags:
 - name: backtest_runs
   description: Immutable Alpha simulation results.

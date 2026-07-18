@@ -160,6 +160,15 @@ export default function LandingPage() {
                 </button>
               </div>
 
+              {isLogin && (
+                <a
+                  href="/auth/forgot-password"
+                  className="block px-1 text-right text-sm font-medium text-black/60 transition-opacity hover:opacity-75 dark:text-white/60"
+                >
+                  {t("auth.recovery.forgot", "Forgot password?")}
+                </a>
+              )}
+
               {authError && (
                 <p className="rounded-[20px] border border-red-500/20 bg-red-500/[0.04] px-5 py-3 text-center text-sm font-medium text-red-600 dark:text-red-300">
                   {authError}

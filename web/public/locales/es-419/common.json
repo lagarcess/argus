@@ -20,6 +20,7 @@
     "retry": "Reintentar",
     "error_occurred": "Ha ocurrido un error",
     "save": "Guardar",
+    "confirm": "Confirmar",
     "cancel": "Cancelar",
     "done": "Listo",
     "search": "Buscar",
@@ -778,6 +779,7 @@
       "feedback": "Comentarios generales"
     },
     "logout": "Cerrar sesión",
+    "logout_error": "No pudimos cerrar la sesión en este navegador. Inténtalo de nuevo.",
     "dev": {
       "reset_onboarding": "Restablecer onboarding (dev)"
     },
@@ -919,8 +921,73 @@
       "show": "Mostrar contrasena",
       "hide": "Ocultar contrasena"
     },
+    "recovery": {
+      "forgot": "¿Olvidaste tu contraseña?",
+      "title": "Recupera tu cuenta",
+      "description": "Ingresa tu correo y enviaremos instrucciones de recuperación si la cuenta es elegible.",
+      "email_label": "Correo electrónico",
+      "send": "Enviar instrucciones",
+      "sending": "Enviando...",
+      "generic_sent": "Si existe una cuenta elegible para ese correo, las instrucciones llegarán pronto.",
+      "request_error": "No pudimos iniciar la recuperación. Espera un momento e inténtalo de nuevo.",
+      "back_to_sign_in": "Volver a iniciar sesión",
+      "reset_title": "Elige una contraseña nueva",
+      "checking": "Verificando tu enlace de recuperación...",
+      "invalid_link": "Este enlace de recuperación falta, venció o ya fue usado.",
+      "request_new": "Solicitar un enlace nuevo",
+      "new_password": "Contraseña nueva",
+      "confirm_password": "Confirmar contraseña nueva",
+      "password_mismatch": "Las contraseñas no coinciden.",
+      "update_password": "Actualizar contraseña",
+      "updating": "Actualizando...",
+      "reset_error": "Este enlace ya no es válido. Solicita uno nuevo.",
+      "password_rejected": "No pudimos actualizar la contraseña. Revisa los requisitos o solicita un enlace de recuperación nuevo.",
+      "password_updated": "Tu contraseña fue actualizada.",
+      "reset_complete": "Tu contraseña fue actualizada. Inicia sesión de nuevo en cada navegador.",
+      "revocation_warning": "Argus no pudo confirmar que todas las sesiones se cerraron. Vuelve a intentarlo antes de iniciar sesión de nuevo.",
+      "retry_revocation": "Reintentar cerrar todas las sesiones",
+      "retrying_revocation": "Reintentando...",
+      "revocation_retry_error": "Argus aún no pudo confirmar que todas las sesiones se cerraron. Inténtalo de nuevo.",
+      "cleanup_warning": "Las sesiones fueron revocadas, pero este navegador no pudo confirmar la limpieza de cookies. Aún necesitas iniciar sesión de nuevo."
+    },
     "errors": {
       "generic": "Algo salio mal. Intentalo de nuevo."
+    }
+  },
+  "account_security": {
+    "title": "Seguridad de la cuenta",
+    "description": "Cambia tu contraseña o elige exactamente qué sesiones cerrar.",
+    "back": "Volver a Argus",
+    "loading": "Verificando tu sesión...",
+    "session_check_unavailable": "Argus no pudo verificar tu sesión en este momento. Inténtalo de nuevo.",
+    "retry": "Reintentar",
+    "cookie_sync_warning": "Las sesiones fueron revocadas, pero no se pudo confirmar la limpieza local de cookies.",
+    "password": {
+      "title": "Cambiar contraseña",
+      "description": "Ingresa tu contraseña actual. Después del cambio, cada navegador deberá iniciar sesión de nuevo.",
+      "current": "Contraseña actual",
+      "new": "Contraseña nueva",
+      "confirm": "Confirmar contraseña nueva",
+      "submit": "Cambiar contraseña",
+      "changing": "Cambiando...",
+      "changed": "Contraseña cambiada. Inicia sesión de nuevo en cada navegador.",
+      "revocation_warning": "La contraseña cambió, pero Argus no pudo confirmar que todas las sesiones se cerraron. Vuelve a intentar Cerrar todas las sesiones.",
+      "error": "No pudimos cambiar la contraseña. Verifica la contraseña actual e inténtalo de nuevo."
+    },
+    "sessions": {
+      "title": "Sesiones",
+      "description": "Elige si deseas mantener la sesión de este navegador.",
+      "sign_out_this": "Cerrar sesión en este navegador",
+      "sign_out_others": "Cerrar otras sesiones",
+      "sign_out_all": "Cerrar todas las sesiones",
+      "others_complete": "Las otras sesiones se cerraron. Este navegador sigue conectado.",
+      "signed_out": "Las sesiones seleccionadas se cerraron.",
+      "revocation_warning": "Argus no pudo confirmar que las sesiones seleccionadas se cerraron. Intenta de nuevo la acción de sesión.",
+      "error": "No pudimos completar ese cambio de sesión. Inténtalo de nuevo.",
+      "confirm_others_title": "¿Cerrar las otras sesiones?",
+      "confirm_others_description": "Los otros navegadores perderán acceso. Este navegador seguirá conectado.",
+      "confirm_all_title": "¿Cerrar sesión en todas partes?",
+      "confirm_all_description": "Cada navegador, incluido este, necesitará iniciar sesión de nuevo."
     }
   },
   "landing": {

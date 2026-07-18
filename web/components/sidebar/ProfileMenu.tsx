@@ -789,13 +789,13 @@ export default function ProfileMenu({
               <Trash2 className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.data.recently_deleted", "Recently Deleted")}
             </button>
-            <button
-              disabled
-              className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25"
+            <a
+              href="/account/security"
+              className="flex min-h-11 w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
-              <Shield className="h-3.5 w-3.5 text-black/25 dark:text-white/25" />
+              <Shield className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.data.security", "Security")}
-            </button>
+            </a>
             <button
               onClick={() => openModal("usage")}
               className="flex min-h-11 w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"

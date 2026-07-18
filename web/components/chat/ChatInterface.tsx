@@ -1788,11 +1788,28 @@ export default function ChatInterface() {
     // #252: logout clears cached transcripts and scroll state immediately.
     transcriptSessionCache.clearAuthenticatedState();
     try {
-      await logoutFromApi();
-    } catch {
-      // Even if the network is unavailable, leave the authenticated surface.
-    } finally {
+      const result = await logoutFromApi();
+      if (result.revocation === "failed") {
+        showToast(
+          t(
+            "settings.logout_error",
+            "We couldn’t sign out this browser. Try again.",
+          ),
+        );
+        return;
+      }
+      resetToEmptyChatSurface();
+      setHistoryItems([]);
+      setHistoryNextCursor(null);
+      setSearchText("");
       window.location.href = "/";
+    } catch {
+      showToast(
+        t(
+          "settings.logout_error",
+          "We couldn’t sign out this browser. Try again.",
+        ),
+      );
     }
   };
 

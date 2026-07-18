@@ -249,6 +249,11 @@ dispatch/execution and removes the Render API key from `argus-api`.
 public service URLs, public Supabase URL/anon key values, feature flags, paper
 trading mode, CORS origins, and model routing IDs.
 
+The `argus-app` service must also set the server-only `ARGUS_APP_ORIGIN` to the
+exact HTTPS app origin. It builds password-recovery redirects and must never use
+a `NEXT_PUBLIC_` name. Local development may use the documented localhost
+origins; production must not use HTTP.
+
 Keep true secrets manual in Render:
 
 - `DATABASE_URL`
