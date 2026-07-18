@@ -429,7 +429,65 @@ Five confirmed review blockers, one bounded TDD pass, minimal commits:
    Absent card or absent hash → integrity 500; artifact-hash mismatch → 409.
    Regressions added for all three. LOCAL_ACCEPTANCE_PASS.
 
-5. **#252 neutral miss surface + measured profile** — (this commit). A
+### Second correction pass (2026-07-18, approved-contract alignment)
+
+Three further confirmed blockers, one bounded TDD pass:
+
+- **#242 artifact identity hardening** — `117f300`. Ownership of the
+  confirmation message is now enforced (owner-scoped conversation read in
+  Supabase mode; cross-owner rejection in memory); the artifact hash must be
+  exactly `sha256:` + 64 lowercase hex; and the payload-digest fallback is
+  gone — an action without the artifact's full-width hash cannot create a
+  durable reservation the by-action lookup could never reproduce. Red-first:
+  cross-owner 500, five malformed-hash variants 500, missing-hash
+  no-reservation with the gateway untouched.
+
+- **#230 job-aware atomic finalization** — `10b254c`. Direct success
+  finalization locks/checks the job before creating the Run/evidence tuple:
+  the memory twin holds the admission lock across check, tuple creation, and
+  the success transition (fully serialized with the reconciler); Supabase
+  mode claims the still-running row (row-locking conditional update) first.
+  If stale reconciliation already won, no Run is created, exposed, or
+  returned — the durable terminal decision replays. Red-first: a reconciler
+  win during execution yields `direct_execution_abandoned` with zero new
+  runs and zero finalization records. Remaining gateway-mode depth
+  (recorded, not hidden): the tuple-then-success tail is claim-guarded but
+  not yet one database transaction; closing it fully belongs to the
+  finalization RPC and rides the existing real-database external gate.
+
+- **#240 database-owned lifecycle boundaries** — `443d4a6`.
+  `accept_chat_turn` persists the accepted user message and lifecycle row in
+  one transaction (memory twin rolls the message back on lifecycle failure —
+  acceptance is fail-closed per contract; terminal persistence stays
+  fail-open because durable evidence reconciles it).
+  `reconcile_stale_chat_turns` in SQL owns database-clock stale selection,
+  20-row deterministic ordering, row locks, the post-lock stale recheck that
+  spares freshly running turns, the complete
+  owner/conversation/request/turn/terminal evidence predicate (owner via the
+  conversations join; foreign-owner evidence abandons), failure precedence,
+  and the terminal transition; the Python gateway is one RPC and the memory
+  twin mirrors the same rules under a single lock. Abandoned truth projects
+  into GET messages as an ephemeral typed retry-recovery item after the
+  owning user message (nothing persisted, nothing mutated). Hook logs carry
+  safe type/correlation fields only. Red-first: orphaned-acceptance
+  rollback, cross-owner evidence abandonment, RPC-boundary shape (no
+  client-side table orchestration), abandoned-turn GET projection with
+  `retry_last_turn`, and secret-free hook logs.
+
+Complexity reassessment: net simplification — the Python-side gateway
+reconciliation orchestration (row adapter + evidence ranking) was deleted in
+favor of the database boundary; the duplicate acceptance path in the message
+choke point was removed; the payload-digest identity fallback was removed;
+six gateway delegates collapsed into one mixin. Nothing speculative was kept.
+
+Verification at `443d4a6`: hermetic sweep 1129; evals 58 + 1 skip; API and
+reload regression 264; correction-surface cumulative 163; lint/budget/diff
+clean. New external-gate note: migration `20260718000003` (acceptance +
+reconciliation functions) joins the existing real-database proof gate;
+`uuid_generate_v5` (uuid-ossp) availability is asserted there for
+`finalized_direct_run_id`.
+
+5. **#252 neutral miss surface + measured profile** — `163c94d`. A
    new-key cache miss clears to a neutral loading surface and never shows the
    previous conversation under the new selection; stale same-key content
    stays visible during silent revalidation. The contradictory source test
