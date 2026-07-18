@@ -115,3 +115,28 @@ External gates remaining: real-Postgres barriered run on a disposable database
 
 Rollback boundary: revert the checkpoint commit; forward-safe (callers revert to
 prior path; migration function is replaceable; no historical rows dropped).
+
+---
+
+## #231 — database-only fresh job polling (prerequisite)
+
+Checkpoint commit: see commit map — `perf(backtests): make job polls database-only`
+
+Changed surfaces: `src/argus/api/routers/backtest.py` (GET no longer calls
+`reconcile_terminal_render_task_run`), `tests/test_backtest_jobs_poll_calls.py`
+(new call-count suite), `tests/test_backtest_jobs_async.py` (old
+endpoint-reconciles test rewritten to pin the database-only contract).
+
+| Criterion | State | Evidence |
+| --- | --- | --- |
+| Fresh queued/running/succeeded/failed GETs make zero Render calls | LOCAL_ACCEPTANCE_PASS | parametrized counting-client test: `calls == []` |
+| Stale job GETs return safe Supabase state without a Render call | LOCAL_ACCEPTANCE_PASS | stale-running poll returns `running`, zero calls; forbidden-client test asserts no client construction |
+| Bounded scanner still reconciles stale terminal task runs | LOCAL_ACCEPTANCE_PASS | scanner test: exactly one Render call, job marked failed |
+| Scanner failures bounded without breaking GETs | LOCAL_ACCEPTANCE_PASS | scanner error paths unchanged (existing suite); GET path no longer touches the client |
+| Owner/RLS + canonical hydration unchanged | LOCAL_ACCEPTANCE_PASS | hydration tests green (`run`, `result_readout` fields intact) |
+| Browser polling needs no response-shape change | LOCAL_ACCEPTANCE_PASS | `BacktestJobResponse` untouched; OpenAPI gate unchanged |
+| Focused endpoint + scanner call-count tests | LOCAL_ACCEPTANCE_PASS | new suite, measured counts asserted |
+| Closure evidence records SHA + measured counts, no p95 claim | LOCAL_ACCEPTANCE_PASS | this entry; no latency claims made |
+
+External gates remaining: #233 deployed journey consumes the user-facing proof.
+Rollback boundary: revert the checkpoint commit (restores poll-path reconciliation).

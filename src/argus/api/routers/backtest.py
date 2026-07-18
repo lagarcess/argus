@@ -5,7 +5,6 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from argus.api import state as api_state
-from argus.api.chat.backtest_jobs import reconcile_terminal_render_task_run
 from argus.api.dependencies import current_user, problem
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.schemas import (
@@ -458,20 +457,10 @@ def get_backtest_job(
             run=memory_run,
         )
 
+    # #231: ordinary polls are database-only. The bounded stale scanner is the
+    # single Render reconciliation owner; fresh and stale reads alike return
+    # canonical Supabase state without provider calls.
     job = api_state.supabase_gateway.get_backtest_job(user_id=user.id, job_id=job_id)
-    if not job:
-        raise problem(
-            request,
-            status_code=404,
-            code="not_found",
-            title="Not Found",
-            detail="Backtest job not found.",
-        )
-    job = reconcile_terminal_render_task_run(
-        gateway=api_state.supabase_gateway,
-        user_id=user.id,
-        job=job,
-    )
     if not job:
         raise problem(
             request,

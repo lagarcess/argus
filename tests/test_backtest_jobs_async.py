@@ -642,24 +642,22 @@ def test_terminal_render_task_reconciliation_ignores_malformed_metadata() -> Non
     assert gateway.failed_updates == []
 
 
-def test_backtest_job_status_endpoint_reconciles_terminal_workflow_run(
+def test_backtest_job_status_endpoint_is_database_only_for_stale_running_job(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """#231: ordinary polls never call Render; the stale scanner is the only
+    reconciliation owner, so a stale running job polls back as running."""
+
     from argus.api import state as api_state
     from argus.api.chat import backtest_jobs as backtest_job_helpers
 
     gateway = _TimedOutJobGateway()
+
+    def _forbidden_render_client(*args: object, **kwargs: object) -> object:
+        raise AssertionError("ordinary job polls must not construct a Render client")
+
     monkeypatch.setattr(
-        backtest_job_helpers,
-        "RenderTaskRunClient",
-        lambda: _FakeTerminalTaskRunClient(
-            {
-                "id": "trn-timeout-1",
-                "status": "failed",
-                "error": "task timed out",
-                "completedAt": "2026-06-06T12:01:10Z",
-            }
-        ),
+        backtest_job_helpers, "RenderTaskRunClient", _forbidden_render_client
     )
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     client = TestClient(app)
@@ -668,9 +666,8 @@ def test_backtest_job_status_endpoint_reconciles_terminal_workflow_run(
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["job"]["status"] == "failed"
-    assert payload["job"]["failure_code"] == "workflow_task_timeout"
-    assert payload["job"]["retryable"] is True
+    assert payload["job"]["status"] == "running"
+    assert payload["job"]["failure_code"] is None
 
 
 def test_stale_backtest_job_scan_reconciles_terminal_task_run() -> None:
