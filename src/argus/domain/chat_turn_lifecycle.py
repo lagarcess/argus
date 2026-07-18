@@ -224,6 +224,22 @@ def _terminal_turn_evidence(message: Any, *, row: dict[str, Any]) -> str | None:
 terminal_turn_evidence = _terminal_turn_evidence
 
 
+def list_abandoned_turns_memory(
+    store: Any,
+    *,
+    conversation_id: str,
+) -> list[dict[str, Any]]:
+    with store.chat_turn_lifecycle_lock:
+        rows = [
+            dict(row)
+            for row in store.chat_turn_lifecycles.values()
+            if row.get("conversation_id") == conversation_id
+            and row.get("status") == "abandoned"
+        ]
+    rows.sort(key=lambda row: (str(row.get("finished_at") or ""), str(row["turn_id"])))
+    return rows[:STALE_TURN_BATCH]
+
+
 def reconcile_stale_turns_memory(
     store: Any,
     *,
@@ -231,13 +247,18 @@ def reconcile_stale_turns_memory(
     now: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Bounded reconciliation for one conversation: at most 20 stale
-    accepted/running rows in deterministic stale_since ASC, turn_id ASC order.
-    Durable terminal evidence wins (failure precedence on ties); no proof
-    transitions directly to abandoned with retryable typed recovery."""
+    accepted/running rows in deterministic stale_since ASC, turn_id ASC order,
+    under one lock for the whole pass (selection, per-row stale recheck,
+    evidence, and transition), mirroring the database boundary's row locking.
+    Evidence must belong to the row's owner; foreign-owner conversations never
+    reconcile a row. Durable terminal evidence wins (failure precedence on
+    ties); no proof transitions directly to abandoned with retryable typed
+    recovery."""
 
     moment = now or _utcnow()
     cutoff = moment - timedelta(minutes=STALE_TURN_MINUTES)
 
+    reconciled: list[dict[str, Any]] = []
     with store.chat_turn_lifecycle_lock:
         stale_rows = []
         for row in store.chat_turn_lifecycles.values():
@@ -252,38 +273,57 @@ def reconcile_stale_turns_memory(
         stale_rows.sort(key=lambda item: (item[0], item[1]))
         stale_rows = stale_rows[:STALE_TURN_BATCH]
 
-    reconciled: list[dict[str, Any]] = []
-    for _, _, row in stale_rows:
-        candidates = []
-        for message in store.messages.get(conversation_id, []):
-            outcome = _terminal_turn_evidence(message, row=row)
-            if outcome is None:
-                continue
-            precedence = 0 if outcome == "recoverable_failed" else 1
-            candidates.append(
-                (message.created_at, precedence, str(message.id), outcome, message)
-            )
-        candidates.sort(key=lambda item: (item[0], item[1], item[2]))
+        conversation_owner = store.conversation_owners.get(conversation_id)
 
-        if candidates:
-            _, _, _, outcome, winner = candidates[0]
-            result = transition_memory(
-                store,
-                turn_id=str(row["turn_id"]),
-                to_status="reconciled",
-                assistant_message_id=str(winner.id),
-                reconciled_outcome=outcome,
-                now=moment,
+        for _, _, row in stale_rows:
+            # Stale recheck at transition time: a row freshened by a
+            # concurrent running transition is spared.
+            if row.get("status") not in ("accepted", "running"):
+                continue
+            stale_since = _stale_since(row)
+            if stale_since is None or stale_since > cutoff:
+                continue
+
+            owner_matches = conversation_owner is None or conversation_owner == row.get(
+                "user_id"
             )
-        else:
-            result = transition_memory(
-                store,
-                turn_id=str(row["turn_id"]),
-                to_status="abandoned",
-                failure_code=ABANDONED_FAILURE_CODE,
-                retryable=True,
-                now=moment,
-            )
-        if result.row is not None:
-            reconciled.append(result.row)
+            candidates = []
+            if owner_matches:
+                for message in store.messages.get(conversation_id, []):
+                    outcome = _terminal_turn_evidence(message, row=row)
+                    if outcome is None:
+                        continue
+                    precedence = 0 if outcome == "recoverable_failed" else 1
+                    candidates.append(
+                        (
+                            message.created_at,
+                            precedence,
+                            str(message.id),
+                            outcome,
+                            message,
+                        )
+                    )
+            candidates.sort(key=lambda item: (item[0], item[1], item[2]))
+
+            if candidates:
+                _, _, _, outcome, winner = candidates[0]
+                result = transition_memory(
+                    store,
+                    turn_id=str(row["turn_id"]),
+                    to_status="reconciled",
+                    assistant_message_id=str(winner.id),
+                    reconciled_outcome=outcome,
+                    now=moment,
+                )
+            else:
+                result = transition_memory(
+                    store,
+                    turn_id=str(row["turn_id"]),
+                    to_status="abandoned",
+                    failure_code=ABANDONED_FAILURE_CODE,
+                    retryable=True,
+                    now=moment,
+                )
+            if result.row is not None:
+                reconciled.append(result.row)
     return reconciled

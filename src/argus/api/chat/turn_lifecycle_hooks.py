@@ -47,7 +47,7 @@ def accept_turn(
     except Exception as exc:
         logger.warning(
             "Chat turn lifecycle acceptance failed open",
-            error=str(exc),
+            error_type=type(exc).__name__,
             turn_id=turn_id,
         )
 
@@ -82,7 +82,7 @@ def transition_turn(
     except Exception as exc:
         logger.warning(
             "Chat turn lifecycle transition failed open",
-            error=str(exc),
+            error_type=type(exc).__name__,
             turn_id=turn_id,
             to_status=to_status,
         )
@@ -104,6 +104,6 @@ def reconcile_conversation_turns(*, conversation_id: str) -> None:
     except Exception as exc:
         logger.warning(
             "Chat turn lifecycle reconciliation failed open",
-            error=str(exc),
+            error_type=type(exc).__name__,
             conversation_id=conversation_id,
         )

@@ -348,6 +348,16 @@ def create_message(
         role=role,
         metadata=metadata,
     )
+    acceptance_request_id = _turn_acceptance_request_id(role=role, metadata=metadata)
+    if acceptance_request_id is not None:
+        return _accept_user_turn(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            role=role,
+            content=content,
+            metadata=metadata,
+            request_id=acceptance_request_id,
+        )
     if api_state.supabase_gateway is not None:
         try:
             persisted = api_state.supabase_gateway.create_message(
@@ -376,6 +386,88 @@ def create_message(
     )
     _apply_turn_lifecycle_effects(user_id=user_id, message=persisted)
     return persisted
+
+
+def _turn_acceptance_request_id(
+    *, role: str, metadata: dict[str, Any] | None
+) -> str | None:
+    """The acceptance case: a started user turn that is not a run_backtest
+    action (backtest_jobs owns that action's durable state)."""
+
+    if role != "user" or not isinstance(metadata, dict):
+        return None
+    turn = metadata.get("agent_runtime_turn")
+    if not isinstance(turn, dict) or turn.get("status") != "started":
+        return None
+    chat_action = metadata.get("chat_action")
+    if isinstance(chat_action, dict) and chat_action.get("type") == "run_backtest":
+        return None
+    request_id = turn.get("request_id")
+    if isinstance(request_id, str) and request_id:
+        return request_id
+    return None
+
+
+def _accept_user_turn(
+    *,
+    user_id: str,
+    conversation_id: str,
+    role: str,
+    content: str,
+    metadata: dict[str, Any] | None,
+    request_id: str,
+) -> Message:
+    """#240 acceptance boundary: the user message and its lifecycle row
+    persist together. A lifecycle failure never leaves an accepted message
+    without its lifecycle (fail closed; the user retries the turn)."""
+
+    from argus.domain.chat_turn_lifecycle import create_accepted_memory
+
+    if api_state.supabase_gateway is not None:
+        try:
+            row = api_state.supabase_gateway.accept_chat_turn(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                role=role,
+                content=content,
+                metadata=metadata,
+                request_id=request_id,
+            )
+            return Message.model_validate(row)
+        except Exception as exc:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase turn acceptance failed; using dev memory fallback",
+                error_type=type(exc).__name__,
+                conversation_id=conversation_id,
+            )
+
+    with api_state.store.conversation_message_lock:
+        previous_conversation = api_state.store.conversations.get(conversation_id)
+        message = memory_message(
+            conversation_id=conversation_id,
+            role=role,
+            content=content,
+            metadata=metadata,
+        )
+        try:
+            create_accepted_memory(
+                api_state.store,
+                turn_id=message.id,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                request_id=request_id,
+            )
+        except Exception:
+            messages = api_state.store.messages.get(conversation_id, [])
+            api_state.store.messages[conversation_id] = [
+                item for item in messages if item.id != message.id
+            ]
+            if previous_conversation is not None:
+                api_state.store.conversations[conversation_id] = previous_conversation
+            raise
+        return message
 
 
 def _attach_turn_lifecycle_identity(
@@ -417,7 +509,7 @@ def _attach_turn_lifecycle_identity(
         except Exception as exc:
             logger.warning(
                 "Turn lifecycle lookup failed open during terminal enrichment",
-                error=str(exc),
+                error_type=type(exc).__name__,
                 conversation_id=conversation_id,
             )
             row = None
@@ -442,26 +534,8 @@ def _apply_turn_lifecycle_effects(*, user_id: str, message: Message) -> None:
     if not isinstance(turn, dict):
         return
 
-    chat_action = metadata.get("chat_action")
-    action_type = (
-        str(chat_action.get("type") or "") if isinstance(chat_action, dict) else ""
-    )
-
-    if (
-        message.role == "user"
-        and turn.get("status") == "started"
-        and action_type != "run_backtest"
-    ):
-        request_id = turn.get("request_id")
-        if isinstance(request_id, str) and request_id:
-            turn_lifecycle_hooks.accept_turn(
-                turn_id=message.id,
-                user_id=user_id,
-                conversation_id=message.conversation_id,
-                request_id=request_id,
-            )
-        return
-
+    # Acceptance is owned exclusively by the atomic _accept_user_turn
+    # boundary; this choke point only applies terminal transitions.
     if message.role == "assistant" and turn.get("terminal") is True:
         turn_id = turn.get("turn_id")
         if not isinstance(turn_id, str) or not turn_id:

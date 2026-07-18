@@ -7,6 +7,7 @@ from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.chat import turn_lifecycle_hooks
+from argus.api.chat.turn_lifecycle_projection import project_abandoned_turn_recovery
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.message_store import (
     memory_conversation,
@@ -28,6 +29,26 @@ from argus.api.schemas import (
 from argus.domain.store import utcnow
 
 router = APIRouter(prefix="/api/v1", tags=["conversations"])
+
+
+def _abandoned_turns_for(conversation_id: str) -> list[dict]:
+    from argus.domain.chat_turn_lifecycle import list_abandoned_turns_memory
+
+    try:
+        if api_state.supabase_gateway is not None:
+            return api_state.supabase_gateway.list_abandoned_chat_turns(
+                conversation_id=conversation_id
+            )
+        return list_abandoned_turns_memory(
+            api_state.store, conversation_id=conversation_id
+        )
+    except Exception as exc:
+        logger.warning(
+            "Abandoned-turn projection lookup failed open",
+            error_type=type(exc).__name__,
+            conversation_id=conversation_id,
+        )
+        return []
 
 
 def _memory_conversation_owned_by(
@@ -282,9 +303,7 @@ def list_messages(
         else api_state.store.conversations.get(conversation_id)
     )
     # #240: reconcile stale turns before returning conversation messages.
-    turn_lifecycle_hooks.reconcile_conversation_turns(
-        conversation_id=conversation_id
-    )
+    turn_lifecycle_hooks.reconcile_conversation_turns(conversation_id=conversation_id)
     if (
         not conversation
         or conversation.deleted_at is not None
@@ -347,6 +366,13 @@ def list_messages(
 
     items.sort(key=lambda item: (item.created_at, item.id))
     items = reconcile_reload_message_metadata(items)
+    # #240: abandoned lifecycle truth projects typed retry recovery after the
+    # owning user message without mutating immutable messages.
+    items = project_abandoned_turn_recovery(
+        items,
+        _abandoned_turns_for(conversation_id),
+        language=conversation.language if conversation else None,
+    )
     filtered = items
     if cursor:
         cursor_created_at, cursor_id = decode_cursor(cursor, request)

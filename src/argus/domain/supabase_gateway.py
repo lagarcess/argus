@@ -26,7 +26,7 @@ from argus.api.schemas import (
     Strategy,
     User,
 )
-from argus.domain import backtest_admission_gateway, chat_turn_lifecycle_gateway
+from argus.domain import backtest_admission_gateway
 from argus.domain.backtest_finalization import (
     FinalizedBacktest,
     PreparedBacktestFinalization,
@@ -34,6 +34,7 @@ from argus.domain.backtest_finalization import (
 from argus.domain.backtest_message_projection import (
     hydrate_completed_backtest_job_messages,
 )
+from argus.domain.chat_turn_lifecycle_gateway import ChatTurnLifecycleGatewayMixin
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
@@ -144,7 +145,11 @@ def _supabase_client_options() -> ClientOptions:
 
 
 @dataclass
-class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
+class SupabaseGateway(
+    ConversationMessagePersistenceMixin,
+    ChatTurnLifecycleGatewayMixin,
+    UsageCounterReader,
+):
     client: Client
     auth_client: Client | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
@@ -951,25 +956,11 @@ class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
     def get_message_row(self, **kwargs: Any) -> dict[str, Any] | None:
         return backtest_admission_gateway.get_message_row(self.client, **kwargs)
 
-    def create_chat_turn_lifecycle(self, **kwargs: Any) -> dict[str, Any]:
-        return chat_turn_lifecycle_gateway.create_chat_turn_lifecycle(
-            self.client, **kwargs
-        )
 
-    def transition_chat_turn_lifecycle(self, **kwargs: Any) -> dict[str, Any]:
-        return chat_turn_lifecycle_gateway.transition_chat_turn_lifecycle(
-            self.client, **kwargs
-        )
 
-    def find_active_chat_turn(self, **kwargs: Any) -> dict[str, Any] | None:
-        return chat_turn_lifecycle_gateway.find_active_chat_turn(
-            self.client, **kwargs
-        )
 
-    def reconcile_stale_chat_turns(self, **kwargs: Any) -> list[dict[str, Any]]:
-        return chat_turn_lifecycle_gateway.reconcile_stale_chat_turns(
-            self.client, **kwargs
-        )
+
+
 
     def finalize_direct_backtest_job(self, **kwargs: Any) -> dict[str, Any] | None:
         return backtest_admission_gateway.finalize_direct_backtest_job(

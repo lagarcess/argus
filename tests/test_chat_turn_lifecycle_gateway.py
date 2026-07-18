@@ -80,62 +80,49 @@ def test_gateway_find_active_turn_selects_accepted_or_running(
     table.in_.assert_any_call("status", ["accepted", "running"])
 
 
-def test_gateway_reconcile_transitions_stale_rows_through_the_cas() -> None:
-    client = MagicMock()
-    lifecycle_table = MagicMock()
-    message_table = MagicMock()
-
-    def _table(name: str) -> MagicMock:
-        return lifecycle_table if name == "chat_turn_lifecycles" else message_table
-
-    client.table.side_effect = _table
-    for chained in ("select", "eq", "in_", "order", "limit"):
-        getattr(lifecycle_table, chained).return_value = lifecycle_table
-        getattr(message_table, chained).return_value = message_table
-    lifecycle_table.execute.return_value = SimpleNamespace(
-        data=[
-            {
-                "turn_id": "turn-stale",
-                "user_id": "user-1",
-                "conversation_id": "conv-1",
-                "request_id": "req-1",
-                "status": "accepted",
-                "accepted_at": "2026-07-18T00:00:00+00:00",
-                "running_at": None,
-            }
-        ]
+def test_gateway_accept_chat_turn_calls_the_atomic_function(
+    gateway_client: MagicMock,
+) -> None:
+    gateway_client.rpc.return_value.execute.return_value = SimpleNamespace(
+        data={
+            "id": "message-1",
+            "conversation_id": "conv-1",
+            "role": "user",
+            "content": "test AAPL",
+            "created_at": "2026-07-18T00:00:00+00:00",
+            "metadata": {},
+        }
     )
-    message_table.execute.return_value = SimpleNamespace(
-        data=[
-            {
-                "id": "assistant-evidence",
-                "conversation_id": "conv-1",
-                "role": "assistant",
-                "created_at": "2026-07-18T00:05:00+00:00",
-                "metadata": {
-                    "agent_runtime_turn": {
-                        "turn_id": "turn-stale",
-                        "request_id": "req-1",
-                        "terminal": True,
-                        "status": "failed",
-                    }
-                },
-            }
-        ]
-    )
-    client.rpc.return_value.execute.return_value = SimpleNamespace(
-        data={"outcome": "applied", "row": {"turn_id": "turn-stale"}}
+    gateway = SupabaseGateway(client=gateway_client)
+
+    row = gateway.accept_chat_turn(
+        user_id="user-1",
+        conversation_id="conv-1",
+        role="user",
+        content="test AAPL",
+        metadata={},
+        request_id="req-1",
     )
 
-    gateway = SupabaseGateway(client=client)
-    reconciled = gateway.reconcile_stale_chat_turns(conversation_id="conv-1")
+    name, params = gateway_client.rpc.call_args.args
+    assert name == "accept_chat_turn"
+    assert params["p_user_id"] == "user-1"
+    assert params["p_request_id"] == "req-1"
+    assert row["id"] == "message-1"
 
-    assert len(reconciled) == 1
-    name, params = client.rpc.call_args.args
-    assert name == "transition_chat_turn_lifecycle"
-    assert params["p_to_status"] == "reconciled"
-    assert params["p_reconciled_outcome"] == "recoverable_failed"
-    assert params["p_assistant_message_id"] == "assistant-evidence"
+
+def test_gateway_lists_abandoned_turns_bounded(gateway_client: MagicMock) -> None:
+    table = gateway_client.table.return_value
+    table.execute.return_value = SimpleNamespace(
+        data=[{"turn_id": "turn-1", "status": "abandoned"}]
+    )
+    gateway = SupabaseGateway(client=gateway_client)
+
+    rows = gateway.list_abandoned_chat_turns(conversation_id="conv-1")
+
+    assert rows == [{"turn_id": "turn-1", "status": "abandoned"}]
+    table.eq.assert_any_call("status", "abandoned")
+    table.limit.assert_any_call(20)
 
 
 # ── Hook wiring: Supabase mode must hit the production gateway path ──────────

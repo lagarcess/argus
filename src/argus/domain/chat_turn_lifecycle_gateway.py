@@ -8,18 +8,34 @@ batch limits exactly. Real-database proof remains an external gate.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from argus.domain.chat_turn_lifecycle import (
-    STALE_TURN_BATCH,
-    STALE_TURN_MINUTES,
-    terminal_turn_evidence,
-)
+from argus.domain.chat_turn_lifecycle import STALE_TURN_BATCH
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+class ChatTurnLifecycleGatewayMixin:
+    """Gateway surface for the durable turn lifecycle; composed into
+    ``SupabaseGateway`` so the mega-file stays within its budget."""
+
+    client: Any
+
+    def create_chat_turn_lifecycle(self, **kwargs: Any) -> dict[str, Any]:
+        return create_chat_turn_lifecycle(self.client, **kwargs)
+
+    def transition_chat_turn_lifecycle(self, **kwargs: Any) -> dict[str, Any]:
+        return transition_chat_turn_lifecycle(self.client, **kwargs)
+
+    def find_active_chat_turn(self, **kwargs: Any) -> dict[str, Any] | None:
+        return find_active_chat_turn(self.client, **kwargs)
+
+    def reconcile_stale_chat_turns(self, **kwargs: Any) -> list[dict[str, Any]]:
+        return reconcile_stale_chat_turns(self.client, **kwargs)
+
+    def accept_chat_turn(self, **kwargs: Any) -> dict[str, Any]:
+        return accept_chat_turn(self.client, **kwargs)
+
+    def list_abandoned_chat_turns(self, **kwargs: Any) -> list[dict[str, Any]]:
+        return list_abandoned_chat_turns(self.client, **kwargs)
 
 
 def _rows(result: Any) -> list[dict[str, Any]]:
@@ -100,83 +116,75 @@ def find_active_chat_turn(
     return rows[0] if rows else None
 
 
-class _MessageRow:
-    """Adapter so the shared evidence predicate reads PostgREST rows."""
-
-    def __init__(self, row: dict[str, Any]) -> None:
-        self.id = str(row.get("id") or "")
-        self.conversation_id = row.get("conversation_id")
-        self.role = row.get("role")
-        self.created_at = str(row.get("created_at") or "")
-        self.metadata = row.get("metadata")
-
-
 def reconcile_stale_chat_turns(
     client: Any,
     *,
     conversation_id: str,
-    now: datetime | None = None,
 ) -> list[dict[str, Any]]:
-    """Bounded reconciliation through the database CAS: at most 20 stale rows
-    in deterministic order; durable terminal evidence wins with failure
-    precedence on equal timestamps; no proof transitions to abandoned."""
+    """One database-owned reconciliation boundary: stale selection on the
+    database clock, at-most-20 deterministic ordering, row locking, post-lock
+    stale recheck, the complete owner/conversation/request/turn evidence
+    predicate, and the terminal transition all live in
+    ``reconcile_stale_chat_turns`` (see migration 20260718000003)."""
 
-    moment = now or _utcnow()
-    cutoff = (moment - timedelta(minutes=STALE_TURN_MINUTES)).isoformat()
+    result = client.rpc(
+        "reconcile_stale_chat_turns",
+        {"p_conversation_id": conversation_id},
+    ).execute()
+    data = result.data
+    if isinstance(data, dict):
+        rows = data.get("reconciled")
+        return [dict(row) for row in rows] if isinstance(rows, list) else []
+    if isinstance(data, list):
+        return [dict(row) for row in data]
+    return []
 
-    candidates = _rows(
+
+def list_abandoned_chat_turns(
+    client: Any,
+    *,
+    conversation_id: str,
+) -> list[dict[str, Any]]:
+    result = (
         client.table("chat_turn_lifecycles")
         .select("*")
         .eq("conversation_id", conversation_id)
-        .in_("status", ["accepted", "running"])
+        .eq("status", "abandoned")
+        .order("finished_at", desc=False)
+        .limit(STALE_TURN_BATCH)
         .execute()
     )
-    stale = []
-    for row in candidates:
-        stale_since = str(row.get("running_at") or row.get("accepted_at") or "")
-        if stale_since and stale_since <= cutoff:
-            stale.append((stale_since, str(row.get("turn_id") or ""), row))
-    stale.sort(key=lambda item: (item[0], item[1]))
-    stale = stale[:STALE_TURN_BATCH]
+    return _rows(result)
 
-    reconciled: list[dict[str, Any]] = []
-    for _, turn_id, row in stale:
-        evidence_rows = _rows(
-            client.table("messages")
-            .select("id,conversation_id,role,created_at,metadata")
-            .eq("conversation_id", conversation_id)
-            .eq("role", "assistant")
-            .eq("metadata->agent_runtime_turn->>turn_id", turn_id)
-            .execute()
-        )
-        ranked = []
-        for message_row in evidence_rows:
-            message = _MessageRow(message_row)
-            outcome = terminal_turn_evidence(message, row=row)
-            if outcome is None:
-                continue
-            precedence = 0 if outcome == "recoverable_failed" else 1
-            ranked.append((message.created_at, precedence, message.id, outcome))
-        ranked.sort(key=lambda item: (item[0], item[1], item[2]))
 
-        if ranked:
-            _, _, winner_id, outcome = ranked[0]
-            result = transition_chat_turn_lifecycle(
-                client,
-                turn_id=turn_id,
-                to_status="reconciled",
-                assistant_message_id=winner_id,
-                reconciled_outcome=outcome,
-            )
-        else:
-            result = transition_chat_turn_lifecycle(
-                client,
-                turn_id=turn_id,
-                to_status="abandoned",
-                failure_code="turn_abandoned",
-                retryable=True,
-            )
-        row_result = result.get("row")
-        if isinstance(row_result, dict):
-            reconciled.append(row_result)
-    return reconciled
+def accept_chat_turn(
+    client: Any,
+    *,
+    user_id: str,
+    conversation_id: str,
+    role: str,
+    content: str,
+    metadata: dict[str, Any] | None,
+    request_id: str,
+) -> dict[str, Any]:
+    """Acceptance boundary: persist the user message and its lifecycle row in
+    one database-owned transaction (see migration 20260718000003)."""
+
+    result = client.rpc(
+        "accept_chat_turn",
+        {
+            "p_user_id": user_id,
+            "p_conversation_id": conversation_id,
+            "p_role": role,
+            "p_content": content,
+            "p_metadata": metadata or {},
+            "p_request_id": request_id,
+        },
+    ).execute()
+    row = result.data if isinstance(result.data, dict) else None
+    if row is None:
+        rows = _rows(result)
+        row = rows[0] if rows else None
+    if not isinstance(row, dict):
+        raise RuntimeError("Chat turn acceptance did not return the message row.")
+    return row
