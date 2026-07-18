@@ -26,6 +26,7 @@ from argus.api.schemas import (
     Strategy,
     User,
 )
+from argus.domain import backtest_admission_gateway, chat_turn_lifecycle_gateway
 from argus.domain.backtest_finalization import (
     FinalizedBacktest,
     PreparedBacktestFinalization,
@@ -940,53 +941,37 @@ class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
         return dict(_row_one(created) or {})
 
     def admit_backtest_job(self, **kwargs: Any) -> dict[str, Any]:
-        from argus.domain import backtest_admission_gateway
-
         return backtest_admission_gateway.admit_backtest_job(self.client, **kwargs)
 
     def get_backtest_job_by_reservation(self, **kwargs: Any) -> dict[str, Any] | None:
-        from argus.domain import backtest_admission_gateway
-
         return backtest_admission_gateway.get_backtest_job_by_reservation(
             self.client, **kwargs
         )
 
     def get_message_row(self, **kwargs: Any) -> dict[str, Any] | None:
-        from argus.domain import backtest_admission_gateway
-
         return backtest_admission_gateway.get_message_row(self.client, **kwargs)
 
     def create_chat_turn_lifecycle(self, **kwargs: Any) -> dict[str, Any]:
-        from argus.domain import chat_turn_lifecycle_gateway
-
         return chat_turn_lifecycle_gateway.create_chat_turn_lifecycle(
             self.client, **kwargs
         )
 
     def transition_chat_turn_lifecycle(self, **kwargs: Any) -> dict[str, Any]:
-        from argus.domain import chat_turn_lifecycle_gateway
-
         return chat_turn_lifecycle_gateway.transition_chat_turn_lifecycle(
             self.client, **kwargs
         )
 
     def find_active_chat_turn(self, **kwargs: Any) -> dict[str, Any] | None:
-        from argus.domain import chat_turn_lifecycle_gateway
-
         return chat_turn_lifecycle_gateway.find_active_chat_turn(
             self.client, **kwargs
         )
 
     def reconcile_stale_chat_turns(self, **kwargs: Any) -> list[dict[str, Any]]:
-        from argus.domain import chat_turn_lifecycle_gateway
-
         return chat_turn_lifecycle_gateway.reconcile_stale_chat_turns(
             self.client, **kwargs
         )
 
     def finalize_direct_backtest_job(self, **kwargs: Any) -> dict[str, Any] | None:
-        from argus.domain import backtest_admission_gateway
-
         return backtest_admission_gateway.finalize_direct_backtest_job(
             self.client, **kwargs
         )
