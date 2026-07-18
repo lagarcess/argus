@@ -68,6 +68,16 @@ class TestMemoryCandidate:
         with pytest.raises(ValidationError):
             _candidate(label="")
 
+    def test_whitespace_only_text_is_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            _candidate(label="   ")
+        with pytest.raises(ValidationError):
+            _candidate(proposed_value=" \t ")
+
+    def test_text_fields_are_stripped(self) -> None:
+        candidate = _candidate(label="  Avoids leveraged ETFs  ")
+        assert candidate.label == "Avoids leveraged ETFs"
+
     def test_sensitivity_flags_are_typed(self) -> None:
         candidate = _candidate(
             sensitivity_flags=[SensitivityFlag.ACCOUNT_BALANCE],

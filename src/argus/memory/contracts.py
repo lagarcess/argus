@@ -11,7 +11,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+def _strip_text(value: object) -> object:
+    """Normalize user-editable text before length constraints apply."""
+    return value.strip() if isinstance(value, str) else value
 
 
 class MemoryCategory(str, Enum):
@@ -87,6 +92,10 @@ class MemoryCandidate(BaseModel):
     locale: str = "en"
     created_at: datetime
 
+    _strip_text_fields = field_validator(
+        "proposed_value", "label", "future_benefit", mode="before"
+    )(_strip_text)
+
 
 class ConsentGrant(BaseModel):
     state: ConsentState
@@ -110,6 +119,10 @@ class MemoryRecord(BaseModel):
     updated_at: datetime
     last_used_at: datetime | None = None
     provider_ref: str | None = None
+
+    _strip_text_fields = field_validator(
+        "value", "label", "stored_reason", mode="before"
+    )(_strip_text)
 
     @model_validator(mode="after")
     def _require_confirmed_consent(self) -> "MemoryRecord":

@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from argus.memory.contracts import MemoryCategory
 from argus.memory.provider import DeterministicFakeMemoryProvider
 from argus.memory.service import (
@@ -11,6 +12,7 @@ from argus.memory.service import (
     ProposalStatus,
 )
 from argus.memory.store import InMemoryCanonicalMemoryStore
+from pydantic import ValidationError
 
 NOW = datetime(2026, 7, 18, 3, 0, 0, tzinfo=timezone.utc)
 
@@ -99,6 +101,30 @@ class TestEdit:
         service, store, _fake = _service()
         record_id = _confirmed(service, store)
         assert service.edit("user-b", record_id, value="hijack") is None
+
+    def test_invalid_edits_never_enter_the_canonical_record(self) -> None:
+        service, store, _fake = _service()
+        record_id = _confirmed(service, store)
+        before = store.get_record("user-a", record_id)
+        assert before is not None
+        with pytest.raises(ValidationError):
+            service.edit("user-a", record_id, value="")
+        with pytest.raises(ValidationError):
+            service.edit("user-a", record_id, value="   ")
+        with pytest.raises(ValidationError):
+            service.edit("user-a", record_id, label="")
+        with pytest.raises(ValidationError):
+            service.edit("user-a", record_id, label="  \t ")
+        with pytest.raises(ValidationError):
+            service.edit("user-a", record_id, label="x" * 121)
+        assert store.get_record("user-a", record_id) == before
+
+    def test_edit_normalizes_surrounding_whitespace(self) -> None:
+        service, store, _fake = _service()
+        record_id = _confirmed(service, store)
+        updated = service.edit("user-a", record_id, label="  Prefers QQQ benchmark  ")
+        assert updated is not None
+        assert updated.label == "Prefers QQQ benchmark"
 
 
 class TestDelete:

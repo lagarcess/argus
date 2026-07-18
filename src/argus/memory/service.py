@@ -356,7 +356,9 @@ class MemoryService:
             updates["value"] = value
         if label is not None:
             updates["label"] = label
-        updated = record.model_copy(update=updates)
+        # model_copy skips validation; re-validate so invalid edits can
+        # never enter the canonical store. ValidationError propagates.
+        updated = MemoryRecord.model_validate({**record.model_dump(), **updates})
         provider_ref = self._try_provider(
             "project", lambda: self._provider.project(updated)
         )
