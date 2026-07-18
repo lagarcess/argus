@@ -1,672 +1,2516 @@
+# Checked OpenAPI compatibility artifact. Generated from the canonical
+# FastAPI app.openapi() document by scripts/generate_openapi_artifact.py.
+# Structural gate: tests/test_openapi_compatibility.py (#234).
 openapi: 3.1.0
 info:
   title: Argus Alpha API
   version: 1.0.0-alpha
-  description: Contract-first Alpha API for chat-first investing idea validation.
-servers:
-  - url: /api/v1
+  description: Contract-first Alpha API for chat-first investing idea validation. Durable
+    results persist as backtest_runs; result cards render as conversation_result_card artifacts.
 paths:
-  /api/v1/auth/signup:
-    post:
-      responses:
-        "200":
-          description: Account created or mocked in development.
   /api/v1/auth/login:
     post:
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
       responses:
-        "200":
-          description: Session created.
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/auth/logout:
     post:
+      tags:
+      - auth
       responses:
-        "200":
-          description: Session cleared.
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
   /api/v1/auth/session:
     get:
+      tags:
+      - auth
       responses:
-        "200":
-          description: Current authentication state and user.
-  /api/v1/me:
-    get:
-      responses:
-        "200":
-          description: Current user profile and preferences.
-    patch:
-      responses:
-        "200":
-          description: Updated user profile and preferences.
-  /api/v1/conversations:
-    get:
-      responses:
-        "200":
-          description: Cursor-paginated conversations.
-    post:
-      responses:
-        "200":
-          description: Created conversation.
-    delete:
-      responses:
-        "200":
-          description: Soft-deleted all non-deleted conversations for the user.
-  /api/v1/conversations/{id}:
-    patch:
-      responses:
-        "200":
-          description: Updated conversation title, pin, or archive state.
-    delete:
-      responses:
-        "200":
-          description: Soft-deleted conversation.
-  /api/v1/conversations/{id}/messages:
-    get:
-      responses:
-        "200":
-          description: Cursor-paginated messages.
-  /api/v1/chat/stream:
-    post:
-      responses:
-        "200":
-          description: >
-            Server-sent token, status, title, result, and done events. Final
-            payloads and persisted assistant metadata may include typed
-            `recovery` and `clarification` objects so clients render localized
-            degraded-fallback UI from static i18n keys instead of assistant
-            prose.
-          content:
-            text/event-stream:
-              schema:
-                type: string
-        "409":
-          description: >
-            The selected response option is missing, mismatched, foreign to the
-            owner or conversation, or no longer attached to the latest active
-            assistant message.
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-  /api/v1/strategies:
+                additionalProperties: true
+                type: object
+                title: Response Auth Session Api V1 Auth Session Get
+  /api/v1/auth/signup:
+    post:
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/backtest-jobs/{job_id}:
     get:
+      tags:
+      - backtests
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Job Id
       responses:
-        "200":
-          description: Cursor-paginated strategies with strategy_surface_metrics.
-    post:
-      responses:
-        "200":
-          description: Created executable strategy.
-  /api/v1/strategies/{id}:
-    patch:
-      responses:
-        "200":
-          description: Updated strategy metadata or metric preferences.
-    delete:
-      responses:
-        "200":
-          description: Soft-deleted strategy.
-  /api/v1/collections:
-    get:
-      responses:
-        "200":
-          description: Cursor-paginated collections.
-    post:
-      responses:
-        "200":
-          description: Created organizational collection.
-  /api/v1/collections/{id}:
-    patch:
-      responses:
-        "200":
-          description: Updated collection name or pin state.
-    delete:
-      responses:
-        "200":
-          description: Soft-deleted collection.
-  /api/v1/collections/{id}/strategies:
-    post:
-      responses:
-        "200":
-          description: Attached strategies to a collection.
-  /api/v1/collections/{id}/strategies/{strategy_id}:
-    delete:
-      responses:
-        "200":
-          description: Detached strategy from collection.
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestJobResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/backtests/run:
     post:
+      tags:
+      - backtests
       parameters:
-        - name: Idempotency-Key
-          in: header
-          required: true
-          description: Stable client key for deduplicating direct backtest runs.
-          schema:
-            type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/BacktestRunRequest"
+              $ref: '#/components/schemas/BacktestRunRequest'
       responses:
-        "200":
-          description: Completed Alpha backtest run.
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                type: object
-                required: [run]
-                properties:
-                  run:
-                    $ref: "#/components/schemas/BacktestRun"
-        "400":
-          description: Missing required Idempotency-Key header.
-        "422":
-          description: Problem Details for unsupported Alpha requests or unusable common data coverage. Coverage rejection occurs before quota admission.
-        "409":
-          description: The data window changed after approval and must be reviewed again.
-        "503":
-          description: Market data is temporarily unavailable.
-  /api/v1/backtest-jobs/{id}:
+                $ref: '#/components/schemas/BacktestRunResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          description: Missing or blank Idempotency-Key header.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Referenced conversation or strategy not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Backtest quota exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Backtest finished but finalization failed safely.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/backtests/{run_id}:
     get:
+      tags:
+      - backtests
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
       responses:
-        "200":
-          description: Durable async backtest job state, with linked run when available.
-        "404":
-          description: Job not found or inaccessible.
-  /api/v1/backtests/{id}:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestRunResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/chat/starter-prompts:
     get:
+      tags:
+      - agent
       responses:
-        "200":
-          description: Backtest run detail including chart and trades.
-  /api/v1/history:
-    get:
-      responses:
-        "200":
-          description: Mixed recent activity feed.
-  /api/v1/search:
-    get:
-      responses:
-        "200":
-          description: Global keyword search across chats, strategies, collections, runs, and typed P1 recall objects.
-  /api/v1/evidence-artifacts/{id}/decision:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StarterPromptsResponse'
+  /api/v1/chat/stream:
     post:
-      description: Create or update the one current decision for a user-owned evidence artifact.
+      tags:
+      - agent
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Idempotency-Key
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/DecisionNoteCreate"
+              $ref: '#/components/schemas/ChatStreamRequest'
       responses:
-        "200":
-          description: Canonical current decision note and updated evidence/idea lifecycle.
+        '200':
+          description: 'Canonical data-only SSE stream: stage_start, token, stage_outcome,
+            final, then [DONE].'
+          content:
+            text/event-stream: {}
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DecisionNoteResponse"
-        "404":
-          description: Evidence artifact not found or inaccessible.
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Stale or superseded chat action rejected.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-        "422":
-          description: Malformed decision payload or unsupported decision state.
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Chat message quota exceeded.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-              example:
-                type: https://api.argus.app/problems/validation-error
-                title: Validation Error
-                status: 422
-                detail: Request validation failed.
-                code: validation_error
-                request_id: req_123
-                context:
-                  errors: []
-        "500":
-          description: Decision capture failed after request validation.
+                $ref: '#/components/schemas/Error'
+  /api/v1/collections:
+    get:
+      tags:
+      - collections
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+          title: Limit
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cursor
+      responses:
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-              example:
-                type: https://api.argus.app/problems/decision-capture-failed
-                title: Decision Capture Failed
-                status: 500
-                detail: Argus could not safely record that decision. Please retry in a moment.
-                code: decision_capture_failed
-                request_id: req_123
+                $ref: '#/components/schemas/PaginatedCollections'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - collections
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectionCreate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/collections/{collection_id}:
+    patch:
+      tags:
+      - collections
+      parameters:
+      - name: collection_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Collection Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectionPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - collections
+      parameters:
+      - name: collection_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Collection Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/collections/{collection_id}/strategies:
+    post:
+      tags:
+      - collections
+      parameters:
+      - name: collection_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Collection Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectionAttach'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/collections/{collection_id}/strategies/{strategy_id}:
+    delete:
+      tags:
+      - collections
+      parameters:
+      - name: collection_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Collection Id
+      - name: strategy_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Strategy Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations:
+    get:
+      tags:
+      - conversations
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+          title: Limit
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cursor
+      - name: archived
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Archived
+      - name: deleted
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Deleted
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedConversations'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - conversations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationCreate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - conversations
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkConversationDeleteResponse'
+  /api/v1/conversations/{conversation_id}:
+    patch:
+      tags:
+      - conversations
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Conversation Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - conversations
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Conversation Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/messages:
+    get:
+      tags:
+      - conversations
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Conversation Id
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cursor
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMessages'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/discovery/assets:
+    get:
+      tags:
+      - discovery
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 80
+          default: ''
+          title: Q
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 25
+          minimum: 1
+          default: 12
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoveryResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/discovery/indicators:
+    get:
+      tags:
+      - discovery
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 80
+          default: ''
+          title: Q
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 25
+          minimum: 1
+          default: 12
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoveryResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/evidence-artifacts/{artifact_id}/decision:
+    post:
+      tags:
+      - evidence
+      parameters:
+      - name: artifact_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Artifact Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionNoteCreate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionNoteResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/feedback:
     post:
+      tags:
+      - feedback
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/history:
+    get:
+      tags:
+      - history
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+          title: Limit
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cursor
+      - name: archived
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Archived
+      - name: deleted
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Deleted
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedHistory'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/me:
+    get:
+      tags:
+      - profile
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+    patch:
+      tags:
+      - profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfilePatch'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/search:
+    get:
+      tags:
+      - search
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Q
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+          title: Limit
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cursor
+      - name: decision_state
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - watching
+            - promising
+            - rejected
+            - revisit_later
+            type: string
+          - type: 'null'
+          title: Decision State
+      - name: include_ledger_groups
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Include Ledger Groups
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSearch'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/strategies:
+    get:
+      tags:
+      - strategies
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+          title: Limit
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cursor
+      - name: deleted
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Deleted
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStrategies'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - strategies
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - type
-                - message
-              properties:
-                type:
-                  type: string
-                  enum:
-                    - bug
-                    - feature
-                    - general
-                    - account_deletion_request
-                message:
-                  type: string
-                  minLength: 1
-                context:
-                  type: object
-                  additionalProperties: true
+              $ref: '#/components/schemas/StrategyCreate'
       responses:
-        "200":
-          description: Feedback accepted.
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/strategies/{strategy_id}:
+    patch:
+      tags:
+      - strategies
+      parameters:
+      - name: strategy_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Strategy Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StrategyPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - strategies
+      parameters:
+      - name: strategy_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Strategy Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
-    ChatClarification:
-      type: object
-      description: Typed degraded clarification, coverage-recovery, or unsupported-recovery sidecar for chat final payloads and assistant metadata.
-      required:
-        - kind
-        - reason_code
-        - semantic_needs
-        - payload
-        - options
-      properties:
-        kind:
-          type: string
-          enum: [clarification, coverage_recovery, unsupported_recovery]
-        reason_code:
-          type: string
-          examples: [missing_period, no_common_data_window, unsupported_strategy_logic]
-        requested_field:
-          type:
-            - string
-            - "null"
-        requested_fields:
-          type: array
-          items:
-            type: string
-        semantic_needs:
-          type: array
-          items:
-            type: string
-        payload:
-          type: object
-          additionalProperties: true
-          description: Typed strategy context and optional raw unsupported value.
-        options:
-          type: array
-          items:
-            $ref: "#/components/schemas/ChatClarificationOption"
-    ChatClarificationOption:
-      type: object
-      description: Button/action option identified by typed payload, not display text.
-      required:
-        - id
-        - replacement_values
-      properties:
-        id:
-          type: string
-          examples: [rsi_threshold, buy_and_hold, moving_average_crossover]
-        replacement_values:
-          type: object
-          additionalProperties: true
-    DateRange:
-      type: object
-      required: [start, end]
-      properties:
-        start:
-          type: string
-          format: date
-        end:
-          type: string
-          format: date
-    MarketDataCoverage:
-      type: object
-      required:
-        - schema_version
-        - outcome
-        - requested_date_range
-        - effective_date_range
-        - dataset_id
-      properties:
-        schema_version:
-          const: market_data_coverage_v1
-        outcome:
-          enum: [full_coverage, adjusted_coverage]
-        requested_date_range:
-          $ref: "#/components/schemas/DateRange"
-        effective_date_range:
-          $ref: "#/components/schemas/DateRange"
-        dataset_id:
-          type: string
-          description: Stable identity of the prepared bars shared by metrics, benchmark alignment, chart construction, and finalization.
-        observations_by_symbol:
-          type: object
-          additionalProperties:
-            type: integer
-            minimum: 0
-    ConfirmationPeriodAdjustment:
-      type: object
-      required: [code, requested_date_range, effective_date_range]
-      properties:
-        code:
-          const: effective_window_adjusted
-        requested_date_range:
-          $ref: "#/components/schemas/DateRange"
-        effective_date_range:
-          $ref: "#/components/schemas/DateRange"
-    BacktestRunRequest:
-      type: object
-      properties:
-        strategy_id:
-          type: string
-        conversation_id:
-          type: string
-        template:
-          type: string
-        asset_class:
-          enum: [equity, crypto, currency_pair]
-        symbols:
-          type: array
-          minItems: 1
-          maxItems: 5
-          items:
-            type: string
-        timeframe:
-          enum: [1h, 2h, 4h, 6h, 12h, 1D]
-        start_date:
-          type: string
-          format: date
-        end_date:
-          type: string
-          format: date
-        side:
-          type: string
-        starting_capital:
-          type: number
-        allocation_method:
-          const: equal_weight
-        parameters:
-          type: object
-          additionalProperties: true
-        benchmark_symbol:
-          type: string
-    BacktestRun:
-      type: object
-      required:
-        - id
-        - status
-        - asset_class
-        - symbols
-        - benchmark_symbol
-        - metrics
-        - config_snapshot
-        - conversation_result_card
-      properties:
-        id:
-          type: string
-          format: uuid
-        status:
-          enum: [queued, running, completed, failed]
-        asset_class:
-          enum: [equity, crypto]
-        symbols:
-          type: array
-          maxItems: 5
-          items:
-            type: string
-        allocation_method:
-          const: equal_weight
-        benchmark_symbol:
-          type: string
-          description: Equity defaults to SPY; crypto defaults to BTC.
-        metrics:
-          type: object
-          description: Canonical aggregate and by-symbol backtest metrics.
-        config_snapshot:
-          type: object
-          description: Reproducible normalized runtime configuration. New runs include requested_date_range, effective_date_range, and data_coverage; execution and display use the effective range while the requested range remains provenance.
-        conversation_result_card:
-          type: object
-          description: Beginner-friendly inline chat result card. Completed chat runs may include P1 sidecar ids, decision state, and optional structured execution_costs evidence when the engine modeled fees/slippage.
-    ArtifactLifecycle:
-      type: string
-      enum: [captured, reviewed, saved, decided, archived, discarded]
-    DecisionState:
-      type: string
-      enum: [watching, promising, rejected, revisit_later]
-    EvidenceArtifact:
-      type: object
-      required:
-        - id
-        - idea_id
-        - idea_version_id
-        - artifact_type
-        - lifecycle
-        - title
-        - digest
-        - payload
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        idea_id:
-          type: string
-          format: uuid
-        idea_version_id:
-          type: string
-          format: uuid
-        source_conversation_id:
-          type:
-            - string
-            - "null"
-          format: uuid
-        source_run_id:
-          type:
-            - string
-            - "null"
-          format: uuid
-        artifact_type:
-          const: backtest
-        lifecycle:
-          $ref: "#/components/schemas/ArtifactLifecycle"
-        title:
-          type: string
-        digest:
-          type: string
-        payload:
-          type: object
-          additionalProperties: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    DecisionNote:
-      type: object
-      required:
-        - id
-        - idea_id
-        - idea_version_id
-        - evidence_artifact_id
-        - decision_state
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        idea_id:
-          type: string
-          format: uuid
-        idea_version_id:
-          type: string
-          format: uuid
-        evidence_artifact_id:
-          type: string
-          format: uuid
-        source_conversation_id:
-          type:
-            - string
-            - "null"
-          format: uuid
-        decision_state:
-          $ref: "#/components/schemas/DecisionState"
-        note:
-          type:
-            - string
-            - "null"
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    DecisionNoteCreate:
-      type: object
-      required:
-        - decision_state
-      properties:
-        decision_state:
-          $ref: "#/components/schemas/DecisionState"
-        note:
-          type:
-            - string
-            - "null"
-          maxLength: 2000
-    DecisionNoteResponse:
-      type: object
-      required:
-        - decision
-        - evidence_artifact
-      properties:
-        decision:
-          $ref: "#/components/schemas/DecisionNote"
-        evidence_artifact:
-          $ref: "#/components/schemas/EvidenceArtifact"
     BacktestJob:
-      type: object
-      required:
-        - id
-        - conversation_id
-        - status
-        - retryable
       properties:
         id:
           type: string
-          format: uuid
+          title: Id
         conversation_id:
           type: string
-          format: uuid
+          title: Conversation Id
         request_message_id:
-          type:
-            - string
-            - "null"
-          format: uuid
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Request Message Id
         confirmation_message_id:
-          type:
-            - string
-            - "null"
-          format: uuid
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Confirmation Message Id
         status:
-          enum: [queued, running, succeeded, failed, canceled, expired]
+          type: string
+          enum:
+          - queued
+          - running
+          - succeeded
+          - failed
+          - canceled
+          - expired
+          title: Status
         result_run_id:
-          type:
-            - string
-            - "null"
-          format: uuid
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Result Run Id
         failure_code:
-          type:
-            - string
-            - "null"
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Failure Code
         failure_detail:
-          type:
-            - string
-            - "null"
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Failure Detail
         retryable:
           type: boolean
+          title: Retryable
+          default: false
         queued_at:
-          type:
-            - string
-            - "null"
-          format: date-time
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Queued At
         started_at:
-          type:
-            - string
-            - "null"
-          format: date-time
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Started At
         finished_at:
-          type:
-            - string
-            - "null"
-          format: date-time
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
         created_at:
-          type:
-            - string
-            - "null"
-          format: date-time
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Created At
         updated_at:
-          type:
-            - string
-            - "null"
-          format: date-time
-    BacktestJobResponse:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Updated At
       type: object
       required:
-        - job
-        - run
+      - id
+      - conversation_id
+      - status
+      title: BacktestJob
+    BacktestJobResponse:
       properties:
         job:
-          $ref: "#/components/schemas/BacktestJob"
+          $ref: '#/components/schemas/BacktestJob'
         run:
-          oneOf:
-            - $ref: "#/components/schemas/BacktestRun"
-            - type: "null"
+          anyOf:
+          - $ref: '#/components/schemas/BacktestRun'
+          - type: 'null'
         result_readout:
-          description: Backend-generated Quick take markdown for completed workflow jobs.
-          type:
-            - string
-            - "null"
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Result Readout
         result_readout_source:
-          description: Provenance for the backend-generated Quick take markdown.
-          type:
-            - string
-            - "null"
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Result Readout Source
         result_readout_fallback_used:
-          description: Whether the deterministic fallback renderer produced the readout.
-          type:
-            - boolean
-            - "null"
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Result Readout Fallback Used
         result_readout_failure_mode:
-          description: Optional reason the normal result readout path could not complete.
-          type:
-            - string
-            - "null"
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Result Readout Failure Mode
+      type: object
+      required:
+      - job
+      title: BacktestJobResponse
+    BacktestRun:
+      properties:
+        id:
+          type: string
+          title: Id
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Conversation Id
+        strategy_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Strategy Id
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - completed
+          - failed
+          title: Status
+        asset_class:
+          type: string
+          enum:
+          - equity
+          - crypto
+          - currency_pair
+          title: Asset Class
+        symbols:
+          items:
+            type: string
+          type: array
+          title: Symbols
+        allocation_method:
+          type: string
+          const: equal_weight
+          title: Allocation Method
+        benchmark_symbol:
+          type: string
+          title: Benchmark Symbol
+        metrics:
+          additionalProperties: true
+          type: object
+          title: Metrics
+        config_snapshot:
+          additionalProperties: true
+          type: object
+          title: Config Snapshot
+        conversation_result_card:
+          additionalProperties: true
+          type: object
+          title: Conversation Result Card
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        chart:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Chart
+        trades:
+          anyOf:
+          - items:
+              additionalProperties: true
+              type: object
+            type: array
+          - type: 'null'
+          title: Trades
+      type: object
+      required:
+      - id
+      - status
+      - asset_class
+      - symbols
+      - allocation_method
+      - benchmark_symbol
+      - metrics
+      - config_snapshot
+      - conversation_result_card
+      - created_at
+      title: BacktestRun
+    BacktestRunRequest:
+      properties:
+        strategy_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Strategy Id
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Conversation Id
+        template:
+          anyOf:
+          - type: string
+            enum:
+            - buy_and_hold
+            - buy_the_dip
+            - dca_accumulation
+            - moving_average_crossover
+            - rsi_mean_reversion
+            title: StrategyTemplate
+          - type: 'null'
+          title: Template
+        asset_class:
+          anyOf:
+          - type: string
+            enum:
+            - equity
+            - crypto
+            - currency_pair
+          - type: 'null'
+          title: Asset Class
+        symbols:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Symbols
+        timeframe:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Timeframe
+        start_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Start Date
+        end_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: End Date
+        side:
+          anyOf:
+          - type: string
+            enum:
+            - long
+            - short
+            - long_short
+            - market_neutral
+          - type: 'null'
+          title: Side
+        starting_capital:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Starting Capital
+        allocation_method:
+          anyOf:
+          - type: string
+            const: equal_weight
+          - type: 'null'
+          title: Allocation Method
+        parameters:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Parameters
+        benchmark_symbol:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Benchmark Symbol
+      type: object
+      title: BacktestRunRequest
+    BacktestRunResponse:
+      properties:
+        run:
+          $ref: '#/components/schemas/BacktestRun'
+      type: object
+      required:
+      - run
+      title: BacktestRunResponse
+    BulkConversationDeleteResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+        deleted_count:
+          type: integer
+          title: Deleted Count
+      type: object
+      required:
+      - success
+      - deleted_count
+      title: BulkConversationDeleteResponse
+    ChatActionPayload:
+      properties:
+        type:
+          type: string
+          enum:
+          - run_backtest
+          - change_dates
+          - change_asset
+          - adjust_assumptions
+          - cancel_confirmation
+          - show_breakdown
+          - refine_strategy
+          - save_strategy
+          - retry_failed_action
+          - select_response_option
+          title: Type
+        label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Label
+        labelKey:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Labelkey
+        payload:
+          additionalProperties: true
+          type: object
+          title: Payload
+        presentation:
+          anyOf:
+          - type: string
+            enum:
+            - confirmation
+            - result
+          - type: 'null'
+          title: Presentation
+      type: object
+      required:
+      - type
+      title: ChatActionPayload
+    ChatMentionPayload:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          enum:
+          - asset
+          - indicator
+          title: Type
+        label:
+          type: string
+          title: Label
+        symbol:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Symbol
+        asset_class:
+          anyOf:
+          - type: string
+            enum:
+            - equity
+            - crypto
+            - currency_pair
+          - type: 'null'
+          title: Asset Class
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        insert_text:
+          type: string
+          title: Insert Text
+        provider:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Provider
+        support_status:
+          type: string
+          enum:
+          - supported
+          - draft_only
+          - unavailable
+          title: Support Status
+          default: supported
+      type: object
+      required:
+      - id
+      - type
+      - label
+      - insert_text
+      title: ChatMentionPayload
+    ChatStreamRequest:
+      properties:
+        conversation_id:
+          type: string
+          title: Conversation Id
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        action:
+          anyOf:
+          - $ref: '#/components/schemas/ChatActionPayload'
+          - type: 'null'
+        mentions:
+          items:
+            $ref: '#/components/schemas/ChatMentionPayload'
+          type: array
+          title: Mentions
+        language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
+          - type: 'null'
+          title: Language
+      type: object
+      required:
+      - conversation_id
+      title: ChatStreamRequest
     Collection:
+      properties:
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        name_source:
+          type: string
+          enum:
+          - system_default
+          - ai_generated
+          - user_renamed
+          title: Name Source
+        pinned:
+          type: boolean
+          title: Pinned
+          default: false
+        strategy_count:
+          type: integer
+          title: Strategy Count
+          default: 0
+        deleted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Deleted At
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
       type: object
-      description: Lightweight organizational grouping of strategies.
-    Strategy:
+      required:
+      - id
+      - name
+      - name_source
+      - created_at
+      - updated_at
+      title: Collection
+    CollectionAttach:
+      properties:
+        strategy_ids:
+          items:
+            type: string
+          type: array
+          title: Strategy Ids
       type: object
-      description: Saved executable idea backed by a supported Alpha template.
+      required:
+      - strategy_ids
+      title: CollectionAttach
+    CollectionCreate:
+      properties:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+      type: object
+      title: CollectionCreate
+    CollectionPatch:
+      properties:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        pinned:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Pinned
+      type: object
+      title: CollectionPatch
+    CollectionResponse:
+      properties:
+        collection:
+          $ref: '#/components/schemas/Collection'
+      type: object
+      required:
+      - collection
+      title: CollectionResponse
+    Conversation:
+      properties:
+        id:
+          type: string
+          title: Id
+        title:
+          type: string
+          title: Title
+        title_source:
+          type: string
+          enum:
+          - system_default
+          - ai_generated
+          - user_renamed
+          title: Title Source
+          default: system_default
+        pinned:
+          type: boolean
+          title: Pinned
+          default: false
+        archived:
+          type: boolean
+          title: Archived
+          default: false
+        deleted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Deleted At
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        last_message_preview:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Message Preview
+        language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
+          - type: 'null'
+          title: Language
+      type: object
+      required:
+      - id
+      - title
+      - created_at
+      - updated_at
+      title: Conversation
+    ConversationCreate:
+      properties:
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Title
+        language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
+          - type: 'null'
+          title: Language
+      type: object
+      title: ConversationCreate
+    ConversationPatch:
+      properties:
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Title
+        pinned:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Pinned
+        archived:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Archived
+        deleted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Deleted At
+      type: object
+      title: ConversationPatch
+    ConversationResponse:
+      properties:
+        conversation:
+          $ref: '#/components/schemas/Conversation'
+      type: object
+      required:
+      - conversation
+      title: ConversationResponse
+    DecisionNote:
+      properties:
+        id:
+          type: string
+          title: Id
+        idea_id:
+          type: string
+          title: Idea Id
+        idea_version_id:
+          type: string
+          title: Idea Version Id
+        evidence_artifact_id:
+          type: string
+          title: Evidence Artifact Id
+        source_conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Conversation Id
+        decision_state:
+          type: string
+          enum:
+          - watching
+          - promising
+          - rejected
+          - revisit_later
+          title: Decision State
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - id
+      - idea_id
+      - idea_version_id
+      - evidence_artifact_id
+      - decision_state
+      - created_at
+      - updated_at
+      title: DecisionNote
+    DecisionNoteCreate:
+      properties:
+        decision_state:
+          type: string
+          enum:
+          - watching
+          - promising
+          - rejected
+          - revisit_later
+          title: Decision State
+        note:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Note
+      type: object
+      required:
+      - decision_state
+      title: DecisionNoteCreate
+    DecisionNoteResponse:
+      properties:
+        decision:
+          $ref: '#/components/schemas/DecisionNote'
+        evidence_artifact:
+          $ref: '#/components/schemas/EvidenceArtifact'
+      type: object
+      required:
+      - decision
+      - evidence_artifact
+      title: DecisionNoteResponse
+    DiscoveryItem:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          enum:
+          - asset
+          - indicator
+          title: Type
+        label:
+          type: string
+          title: Label
+        symbol:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Symbol
+        asset_class:
+          anyOf:
+          - type: string
+            enum:
+            - equity
+            - crypto
+            - currency_pair
+          - type: 'null'
+          title: Asset Class
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        insert_text:
+          type: string
+          title: Insert Text
+        provider:
+          type: string
+          title: Provider
+        support_status:
+          type: string
+          enum:
+          - supported
+          - draft_only
+          - unavailable
+          title: Support Status
+          default: supported
+      type: object
+      required:
+      - id
+      - type
+      - label
+      - insert_text
+      - provider
+      title: DiscoveryItem
+    DiscoveryResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DiscoveryItem'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: DiscoveryResponse
     Error:
       type: object
       description: RFC 9457 Problem Details with code and request_id.
+      required:
+      - type
+      - title
+      - status
+      - detail
+      - code
+      - request_id
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+        request_id:
+          type: string
+        context:
+          type: object
+    EvidenceArtifact:
+      properties:
+        id:
+          type: string
+          title: Id
+        idea_id:
+          type: string
+          title: Idea Id
+        idea_version_id:
+          type: string
+          title: Idea Version Id
+        source_conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Conversation Id
+        source_run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Run Id
+        artifact_type:
+          type: string
+          const: backtest
+          title: Artifact Type
+          default: backtest
+        lifecycle:
+          type: string
+          enum:
+          - captured
+          - reviewed
+          - saved
+          - decided
+          - archived
+          - discarded
+          title: Lifecycle
+          default: captured
+        title:
+          type: string
+          title: Title
+        digest:
+          type: string
+          title: Digest
+        payload:
+          additionalProperties: true
+          type: object
+          title: Payload
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - id
+      - idea_id
+      - idea_version_id
+      - title
+      - digest
+      - payload
+      - created_at
+      - updated_at
+      title: EvidenceArtifact
+    FeedbackRequest:
+      properties:
+        type:
+          type: string
+          enum:
+          - bug
+          - feature
+          - general
+          - account_deletion_request
+          title: Type
+        message:
+          type: string
+          maxLength: 5000
+          minLength: 1
+          title: Message
+        context:
+          additionalProperties: true
+          type: object
+          title: Context
+      type: object
+      required:
+      - type
+      - message
+      title: FeedbackRequest
+    HistoryItem:
+      properties:
+        type:
+          type: string
+          enum:
+          - chat
+          - strategy
+          - collection
+          - run
+          title: Type
+        id:
+          type: string
+          title: Id
+        title:
+          type: string
+          title: Title
+        subtitle:
+          type: string
+          title: Subtitle
+        pinned:
+          type: boolean
+          title: Pinned
+          default: false
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Conversation Id
+      type: object
+      required:
+      - type
+      - id
+      - title
+      - subtitle
+      - created_at
+      title: HistoryItem
+    LoginRequest:
+      properties:
+        email:
+          type: string
+          title: Email
+        password:
+          type: string
+          title: Password
+      type: object
+      required:
+      - email
+      - password
+      title: LoginRequest
+    Message:
+      properties:
+        id:
+          type: string
+          title: Id
+        conversation_id:
+          type: string
+          title: Conversation Id
+        role:
+          type: string
+          enum:
+          - user
+          - assistant
+          - system
+          - tool
+          title: Role
+        content:
+          type: string
+          title: Content
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        metadata:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Metadata
+      type: object
+      required:
+      - id
+      - conversation_id
+      - role
+      - content
+      - created_at
+      title: Message
+    OnboardingState:
+      properties:
+        completed:
+          type: boolean
+          title: Completed
+          default: false
+        stage:
+          type: string
+          enum:
+          - language_selection
+          - primary_goal_selection
+          - ready
+          - completed
+          title: Stage
+          default: language_selection
+        language_confirmed:
+          type: boolean
+          title: Language Confirmed
+          default: false
+        primary_goal:
+          anyOf:
+          - type: string
+            enum:
+            - learn_basics
+            - build_passive_strategy
+            - test_stock_idea
+            - explore_crypto
+            - surprise_me
+          - type: 'null'
+          title: Primary Goal
+      type: object
+      title: OnboardingState
+    PaginatedCollections:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Collection'
+          type: array
+          title: Items
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next Cursor
+      type: object
+      required:
+      - items
+      title: PaginatedCollections
+    PaginatedConversations:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Conversation'
+          type: array
+          title: Items
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next Cursor
+      type: object
+      required:
+      - items
+      title: PaginatedConversations
+    PaginatedHistory:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/HistoryItem'
+          type: array
+          title: Items
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next Cursor
+      type: object
+      required:
+      - items
+      title: PaginatedHistory
+    PaginatedMessages:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Message'
+          type: array
+          title: Items
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next Cursor
+      type: object
+      required:
+      - items
+      title: PaginatedMessages
+    PaginatedSearch:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/SearchItem'
+          type: array
+          title: Items
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next Cursor
+        ledger_groups:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/SearchLedgerGroup'
+            type: array
+          - type: 'null'
+          title: Ledger Groups
+      type: object
+      required:
+      - items
+      title: PaginatedSearch
+    PaginatedStrategies:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Strategy'
+          type: array
+          title: Items
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next Cursor
+      type: object
+      required:
+      - items
+      title: PaginatedStrategies
+    ProfilePatch:
+      properties:
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Display Name
+        language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
+          - type: 'null'
+          title: Language
+        locale:
+          anyOf:
+          - type: string
+            enum:
+            - en-US
+            - es-419
+          - type: 'null'
+          title: Locale
+        theme:
+          anyOf:
+          - type: string
+            enum:
+            - dark
+            - light
+            - system
+          - type: 'null'
+          title: Theme
+        onboarding:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Onboarding
+      type: object
+      title: ProfilePatch
+    SearchItem:
+      properties:
+        type:
+          type: string
+          enum:
+          - chat
+          - strategy
+          - collection
+          - run
+          - backtest
+          - evidence
+          - decision
+          - idea
+          title: Type
+        id:
+          type: string
+          title: Id
+        title:
+          type: string
+          title: Title
+        matched_text:
+          type: string
+          title: Matched Text
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Conversation Id
+        lifecycle:
+          anyOf:
+          - type: string
+            enum:
+            - captured
+            - reviewed
+            - saved
+            - decided
+            - archived
+            - discarded
+          - type: 'null'
+          title: Lifecycle
+        decision_state:
+          anyOf:
+          - type: string
+            enum:
+            - watching
+            - promising
+            - rejected
+            - revisit_later
+          - type: 'null'
+          title: Decision State
+        preview:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Preview
+      type: object
+      required:
+      - type
+      - id
+      - title
+      - matched_text
+      - updated_at
+      title: SearchItem
+    SearchLedgerGroup:
+      properties:
+        decision_state:
+          type: string
+          enum:
+          - watching
+          - promising
+          - rejected
+          - revisit_later
+          title: Decision State
+        count:
+          type: integer
+          title: Count
+      type: object
+      required:
+      - decision_state
+      - count
+      title: SearchLedgerGroup
+    SignupRequest:
+      properties:
+        email:
+          type: string
+          title: Email
+        password:
+          type: string
+          title: Password
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+          title: Language
+          default: en
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Display Name
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+      type: object
+      required:
+      - email
+      - password
+      title: SignupRequest
+    StarterPromptsResponse:
+      properties:
+        prompts:
+          items:
+            type: string
+          type: array
+          title: Prompts
+      type: object
+      required:
+      - prompts
+      title: StarterPromptsResponse
+    Strategy:
+      properties:
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        name_source:
+          type: string
+          enum:
+          - system_default
+          - ai_generated
+          - user_renamed
+          title: Name Source
+        template:
+          type: string
+          enum:
+          - buy_and_hold
+          - buy_the_dip
+          - dca_accumulation
+          - moving_average_crossover
+          - rsi_mean_reversion
+          title: StrategyTemplate
+        asset_class:
+          type: string
+          enum:
+          - equity
+          - crypto
+          - currency_pair
+          title: Asset Class
+        symbols:
+          items:
+            type: string
+          type: array
+          title: Symbols
+        parameters:
+          additionalProperties: true
+          type: object
+          title: Parameters
+        metrics_preferences:
+          items:
+            type: string
+          type: array
+          title: Metrics Preferences
+        benchmark_symbol:
+          type: string
+          title: Benchmark Symbol
+        pinned:
+          type: boolean
+          title: Pinned
+          default: false
+        deleted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Deleted At
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        strategy_surface_metrics:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Strategy Surface Metrics
+      type: object
+      required:
+      - id
+      - name
+      - name_source
+      - template
+      - asset_class
+      - symbols
+      - parameters
+      - metrics_preferences
+      - benchmark_symbol
+      - created_at
+      - updated_at
+      title: Strategy
+    StrategyCreate:
+      properties:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        template:
+          type: string
+          enum:
+          - buy_and_hold
+          - buy_the_dip
+          - dca_accumulation
+          - moving_average_crossover
+          - rsi_mean_reversion
+          title: StrategyTemplate
+        asset_class:
+          type: string
+          enum:
+          - equity
+          - crypto
+          - currency_pair
+          title: Asset Class
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+          minItems: 1
+          title: Symbols
+        parameters:
+          additionalProperties: true
+          type: object
+          title: Parameters
+        metrics_preferences:
+          items:
+            type: string
+          type: array
+          title: Metrics Preferences
+        benchmark_symbol:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Benchmark Symbol
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Conversation Id
+      type: object
+      required:
+      - template
+      - asset_class
+      - symbols
+      title: StrategyCreate
+    StrategyPatch:
+      properties:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        pinned:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Pinned
+        metrics_preferences:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Metrics Preferences
+        parameters:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Parameters
+        deleted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Deleted At
+      type: object
+      title: StrategyPatch
+    StrategyResponse:
+      properties:
+        strategy:
+          $ref: '#/components/schemas/Strategy'
+      type: object
+      required:
+      - strategy
+      title: StrategyResponse
+    SuccessResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+      type: object
+      required:
+      - success
+      title: SuccessResponse
+    User:
+      properties:
+        id:
+          type: string
+          title: Id
+        email:
+          type: string
+          title: Email
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Display Name
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+          title: Language
+          default: en
+        locale:
+          type: string
+          enum:
+          - en-US
+          - es-419
+          title: Locale
+          default: en-US
+        theme:
+          type: string
+          enum:
+          - dark
+          - light
+          - system
+          title: Theme
+          default: dark
+        is_admin:
+          type: boolean
+          title: Is Admin
+          default: false
+        onboarding:
+          $ref: '#/components/schemas/OnboardingState'
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - id
+      - email
+      - created_at
+      - updated_at
+      title: User
+    UserResponse:
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+      type: object
+      required:
+      - user
+      title: UserResponse
 tags:
-  - name: backtest_runs
-    description: Immutable Alpha simulation results.
+- name: backtest_runs
+  description: Immutable Alpha simulation results.

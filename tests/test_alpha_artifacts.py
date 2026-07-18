@@ -285,27 +285,33 @@ def test_active_openapi_uses_alpha_contract_names() -> None:
 
 
 def test_backtests_run_openapi_requires_idempotency_key() -> None:
-    openapi = ROOT / "docs" / "api" / "openapi.yaml"
+    import yaml
 
-    text = openapi.read_text(encoding="utf-8")
-    start = text.index("  /api/v1/backtests/run:")
-    end = text.index("  /api/v1/backtest-jobs/{id}:")
-    backtest_run_contract = text[start:end]
+    document = yaml.safe_load(
+        (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
+    )
 
-    assert "name: Idempotency-Key" in backtest_run_contract
-    assert "in: header" in backtest_run_contract
-    assert "required: true" in backtest_run_contract
+    operation = document["paths"]["/api/v1/backtests/run"]["post"]
+    parameters = {
+        parameter["name"]: parameter for parameter in operation.get("parameters", [])
+    }
+    idempotency = parameters["Idempotency-Key"]
+    assert idempotency["in"] == "header"
+    assert idempotency["required"] is True
+    assert idempotency["schema"] == {"type": "string"}
 
 
 def test_chat_stream_openapi_declares_stale_action_problem_response() -> None:
-    text = (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
-    start = text.index("  /api/v1/chat/stream:")
-    end = text.index("  /api/v1/strategies:", start)
-    chat_stream_contract = text[start:end]
+    import yaml
 
-    assert '"409":' in chat_stream_contract
-    assert "application/json:" in chat_stream_contract
-    assert "#/components/schemas/Error" in chat_stream_contract
+    document = yaml.safe_load(
+        (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
+    )
+
+    responses = document["paths"]["/api/v1/chat/stream"]["post"]["responses"]
+    stale = responses["409"]["content"]["application/json"]
+    assert stale["schema"] == {"$ref": "#/components/schemas/Error"}
+    assert list(responses["200"]["content"]) == ["text/event-stream"]
 
 
 def test_supabase_migration_matches_alpha_data_model() -> None:

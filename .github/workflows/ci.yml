@@ -61,6 +61,8 @@ jobs:
           poetry run pytest \
             tests/test_environment_scripts.py \
             tests/test_api_import_boundary.py \
+            tests/test_openapi_compatibility.py \
+            tests/test_alpha_artifacts.py \
             tests/test_spine_guardrails.py \
             tests/test_render_canary_script.py \
             tests/test_render_runtime_compatibility.py \
