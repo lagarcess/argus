@@ -1535,6 +1535,47 @@ Retrieve the current authenticated user profile and preferences.
 }
 ```
 
+## `GET /me/usage`
+
+Return the authenticated user's current private-alpha daily message allowance
+truth. This is an owner-only read surface. The backend returns a zero-state
+allowance when the current message counter row does not exist; reading usage
+does not create or increment a counter.
+
+**Response:**
+```json
+{
+  "allowances": {
+    "messages": {
+      "limit": 200,
+      "used": 12,
+      "remaining": 188,
+      "period_end": "2026-07-17T00:00:00Z"
+    }
+  }
+}
+```
+
+**Allowance semantics:**
+- `messages` reports the daily `chat_messages` counter independently from
+  simulation usage.
+- The response does not publish a `backtests` or simulation allowance until
+  unique durable simulation admission is the canonical counter source. Clients
+  must show simulation usage as temporarily unavailable and must not infer a
+  numeric value.
+- `remaining` is computed by the backend as
+  `max(limit - used, 0)`.
+- `period_end` is the exact backend-owned quota reset timestamp. Clients may
+  localize its display, but must not infer or replace it with a countdown,
+  local timer, or `Retry-After` value.
+
+**Error rules:**
+- `401 Unauthorized`: authentication is missing or invalid.
+- `403 Forbidden`: the authenticated identity no longer has private-alpha
+  access.
+- `500 Server Error`: durable usage truth is unavailable outside the explicit
+  development fallback mode.
+
 ## `PATCH /me`
 
 Update profile preferences and onboarding state. Partial update semantics are supported; clients do not need to resend the full onboarding object.

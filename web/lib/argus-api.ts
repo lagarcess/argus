@@ -175,6 +175,20 @@ export type ApiUser = {
   };
 };
 
+export type UsageAllowance = {
+  limit: number;
+  used: number;
+  remaining: number;
+  period_end: string;
+};
+
+export type UsageAllowanceResponse = {
+  allowances: {
+    messages: UsageAllowance;
+    backtests: UsageAllowance;
+  };
+};
+
 type AuthSessionPayload = {
   access_token?: string;
   refresh_token?: string;
@@ -655,6 +669,10 @@ export type ProfilePatch = {
 
 export async function getMe() {
   return apiFetch<{ user: ApiUser }>("/me");
+}
+
+export async function getUsageAllowances() {
+  return apiFetch<UsageAllowanceResponse>("/me/usage");
 }
 
 export async function patchMe(patch: ProfilePatch) {

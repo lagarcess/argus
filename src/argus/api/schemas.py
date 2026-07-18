@@ -106,6 +106,28 @@ class UserResponse(BaseModel):
     user: User
 
 
+class UsageAllowance(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    limit: int = Field(ge=0)
+    used: int = Field(ge=0)
+    remaining: int = Field(ge=0)
+    period_end: datetime
+
+
+class UsageAllowances(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    messages: UsageAllowance
+    backtests: UsageAllowance
+
+
+class UsageAllowanceResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    allowances: UsageAllowances
+
+
 class ProfilePatch(BaseModel):
     display_name: str | None = None
     language: Language | None = None

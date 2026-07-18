@@ -40,6 +40,7 @@ from argus.domain.supabase_backtest_finalization import finalize_backtest
 from argus.domain.supabase_conversation_messages import (
     ConversationMessagePersistenceMixin,
 )
+from argus.domain.usage_counter_reader import UsageCounterReader
 from argus.domain.usage_limits import (
     USAGE_COUNTER_LOCK as _USAGE_COUNTER_LOCK,
 )
@@ -142,7 +143,7 @@ def _supabase_client_options() -> ClientOptions:
 
 
 @dataclass
-class SupabaseGateway(ConversationMessagePersistenceMixin):
+class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
     client: Client
     auth_client: Client | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")

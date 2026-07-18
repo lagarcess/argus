@@ -195,6 +195,20 @@ def run_backtest(
             failure_status=exc.status_code,
         )
         raise
+    except Exception:
+        # An unexpected crash still transitions the durable row to a terminal
+        # state; the admitted unit stays consumed and replay returns the
+        # durable failure rather than re-executing.
+        _finalize_direct_job(
+            user=user,
+            job_id=job_id,
+            status="failed",
+            failure_code="execution_failed",
+            failure_detail="execution_interrupted",
+            retryable=True,
+            failure_status=500,
+        )
+        raise
 
     _finalize_direct_job(
         user=user,

@@ -744,7 +744,24 @@
       "delete_all_empty": "No conversations to delete.",
       "delete_all_error": "Couldn’t delete conversations. Try again.",
       "security": "Security",
-      "usage": "Usage"
+      "usage": "Usage",
+      "usage_panel": {
+        "title": "Usage",
+        "description": "Your current message and simulation allowances.",
+        "messages": "Messages",
+        "used_of_limit": "{{used}} of {{limit}} used",
+        "remaining": "{{count}} remaining",
+        "resets": "Resets {{time}}",
+        "no_usage": "No usage yet",
+        "exhausted": "Allowance used for this period",
+        "loading": "Loading usage…",
+        "load_error": "Usage couldn’t be loaded.",
+        "retry": "Try again",
+        "close": "Close usage",
+        "message_rule": "Each message Argus accepts uses one message.",
+        "backtests": "Simulations",
+        "backtest_rule": "One simulation is counted only when a unique run is durably admitted. Replays and rejected requests count nothing. Resets at the shown time."
+      }
     },
     "help": {
       "title": "Help & Legal",

@@ -815,6 +815,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/me/usage:
+    get:
+      tags:
+      - profile
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageAllowanceResponse'
   /api/v1/search:
     get:
       tags:
@@ -2477,6 +2488,50 @@ components:
       required:
       - success
       title: SuccessResponse
+    UsageAllowance:
+      properties:
+        limit:
+          type: integer
+          minimum: 0.0
+          title: Limit
+        used:
+          type: integer
+          minimum: 0.0
+          title: Used
+        remaining:
+          type: integer
+          minimum: 0.0
+          title: Remaining
+        period_end:
+          type: string
+          format: date-time
+          title: Period End
+      type: object
+      required:
+      - limit
+      - used
+      - remaining
+      - period_end
+      title: UsageAllowance
+    UsageAllowanceResponse:
+      properties:
+        allowances:
+          $ref: '#/components/schemas/UsageAllowances'
+      type: object
+      required:
+      - allowances
+      title: UsageAllowanceResponse
+    UsageAllowances:
+      properties:
+        messages:
+          $ref: '#/components/schemas/UsageAllowance'
+        backtests:
+          $ref: '#/components/schemas/UsageAllowance'
+      type: object
+      required:
+      - messages
+      - backtests
+      title: UsageAllowances
     User:
       properties:
         id:
