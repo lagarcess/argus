@@ -146,21 +146,26 @@ def list_projectable_chat_turns(
     client: Any,
     *,
     conversation_id: str,
-    turn_ids: list[str],
+    user_id: str,
+    message_ids: list[str],
 ) -> list[dict[str, Any]]:
-    """Terminal lifecycle truth for the turns actually on the page: scoping
-    by turn_id keeps projection complete for any history depth instead of
-    capping at the oldest rows."""
+    """Owner-scoped terminal lifecycle truth for the messages actually on the
+    read: an abandoned row matches its owning user message (turn_id) and a
+    reconciled row its linked assistant message. Scoping by message id keeps
+    projection complete for any history depth instead of capping at the
+    oldest rows."""
 
-    if not turn_ids:
+    if not message_ids:
         return []
+    ids_csv = ",".join(message_ids)
     result = (
         client.table("chat_turn_lifecycles")
         .select("*")
         .eq("conversation_id", conversation_id)
+        .eq("user_id", user_id)
         .in_("status", list(PROJECTABLE_STATUSES))
-        .in_("turn_id", list(turn_ids))
-        .order("finished_at", desc=False)
+        .or_(f"turn_id.in.({ids_csv}),assistant_message_id.in.({ids_csv})")
+        .order("turn_id", desc=False)
         .execute()
     )
     return _rows(result)

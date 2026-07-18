@@ -31,19 +31,27 @@ from argus.domain.store import utcnow
 router = APIRouter(prefix="/api/v1", tags=["conversations"])
 
 
-def _lifecycle_rows_for(conversation_id: str, turn_ids: set[str]) -> list[dict]:
+def _lifecycle_rows_for(
+    conversation_id: str,
+    user_id: str,
+    message_ids: set[str],
+) -> list[dict]:
     from argus.domain.chat_turn_lifecycle import list_projectable_turns_memory
 
-    if not turn_ids:
+    if not message_ids:
         return []
     try:
         if api_state.supabase_gateway is not None:
             return api_state.supabase_gateway.list_projectable_chat_turns(
                 conversation_id=conversation_id,
-                turn_ids=sorted(turn_ids),
+                user_id=user_id,
+                message_ids=sorted(message_ids),
             )
         return list_projectable_turns_memory(
-            api_state.store, conversation_id=conversation_id, turn_ids=turn_ids
+            api_state.store,
+            conversation_id=conversation_id,
+            user_id=user_id,
+            message_ids=message_ids,
         )
     except Exception as exc:
         logger.warning(
@@ -373,18 +381,18 @@ def list_messages(
 
     items.sort(key=lambda item: (item.created_at, item.id))
     items = reconcile_reload_message_metadata(items)
-    # #240: terminal lifecycle truth projects into the read — typed retry
-    # recovery directly after the owning user message, and reconciled
-    # status/outcome onto the linked assistant copy — without mutating
-    # immutable messages. Scoping by the page's user turns removes any
-    # historical row ceiling.
+    # #240: terminal lifecycle truth overlays response copies — abandoned
+    # recovery + typed retry on the owning user message, reconciled
+    # status/outcome on the linked assistant message — without mutating
+    # immutable messages or inserting synthetic ones. Scoping by the read's
+    # message ids removes any historical row ceiling.
     items = project_turn_lifecycle(
         items,
         _lifecycle_rows_for(
             conversation_id,
-            {item.id for item in items if item.role == "user"},
+            user.id,
+            {item.id for item in items},
         ),
-        language=conversation.language if conversation else None,
     )
     filtered = items
     if cursor:

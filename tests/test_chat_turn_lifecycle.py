@@ -502,7 +502,12 @@ def test_gateway_reconcile_recheck_spares_a_freshly_running_turn() -> None:
     client.table.assert_not_called()
 
 
-def test_abandoned_lifecycle_projects_typed_recovery_on_get(_memory_mode) -> None:
+def test_abandoned_read_overlays_the_persisted_user_message(_memory_mode) -> None:
+    """Contract (API_CONTRACT 539-585): the accepted user message owns the
+    abandoned read projection — returned exactly once with the exact recovery
+    metadata overlaid, no synthetic assistant message, persistence
+    untouched."""
+
     user_id = api_state.store.get_or_create_dev_user().id
     conversation = memory_conversation(
         user_id=user_id,
@@ -512,6 +517,7 @@ def test_abandoned_lifecycle_projects_typed_recovery_on_get(_memory_mode) -> Non
     )
     from argus.api.message_store import create_message
 
+    chat_action = {"type": "show_breakdown", "payload": {"run_id": "run-77"}}
     user_message = create_message(
         user_id=user_id,
         conversation_id=conversation.id,
@@ -522,6 +528,76 @@ def test_abandoned_lifecycle_projects_typed_recovery_on_get(_memory_mode) -> Non
                 "status": "started",
                 "conversation_id": conversation.id,
                 "request_id": "req-project",
+            },
+            "chat_action": dict(chat_action),
+        },
+    )
+    row = api_state.store.chat_turn_lifecycles[user_message.id]
+    row["accepted_at"] = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+
+    persisted_count = len(api_state.store.messages[conversation.id])
+    response = TestClient(app).get(f"/api/v1/conversations/{conversation.id}/messages")
+    assert response.status_code == 200
+    items = response.json()["items"]
+
+    # Exactly the persisted messages come back — nothing synthetic.
+    assert len(items) == persisted_count
+    matching = [item for item in items if item["id"] == user_message.id]
+    assert len(matching) == 1
+    overlaid = matching[0]
+    assert overlaid["role"] == "user"
+    assert overlaid["content"] == "test AAPL momentum"
+    assert overlaid["metadata"]["agent_runtime_turn"] == {
+        "turn_id": user_message.id,
+        "request_id": "req-project",
+        "status": "abandoned",
+        "terminal": True,
+        "reconciled_outcome": None,
+        "failure_code": "turn_abandoned",
+        "retryable": True,
+    }
+    assert overlaid["metadata"]["recovery"] == {
+        "code": "turn_abandoned",
+        "retryable": True,
+    }
+    assert overlaid["metadata"]["retry_last_turn"] == {
+        "request_message_id": user_message.id,
+        "message": "test AAPL momentum",
+        "action": chat_action,
+    }
+    # The original chat_action key itself is untouched on the copy.
+    assert overlaid["metadata"]["chat_action"] == chat_action
+    # Immutable persistence was not rewritten.
+    stored = next(
+        message
+        for message in api_state.store.messages[conversation.id]
+        if message.id == user_message.id
+    )
+    assert "recovery" not in (stored.metadata or {})
+    assert "retry_last_turn" not in (stored.metadata or {})
+    assert (stored.metadata or {})["agent_runtime_turn"]["status"] == "started"
+
+
+def test_abandoned_overlay_without_chat_action_omits_action(_memory_mode) -> None:
+    user_id = api_state.store.get_or_create_dev_user().id
+    conversation = memory_conversation(
+        user_id=user_id,
+        title="No action",
+        title_source="system_default",
+        language="en",
+    )
+    from argus.api.message_store import create_message
+
+    user_message = create_message(
+        user_id=user_id,
+        conversation_id=conversation.id,
+        role="user",
+        content="plain turn",
+        metadata={
+            "agent_runtime_turn": {
+                "status": "started",
+                "conversation_id": conversation.id,
+                "request_id": "req-plain",
             }
         },
     )
@@ -530,29 +606,21 @@ def test_abandoned_lifecycle_projects_typed_recovery_on_get(_memory_mode) -> Non
 
     response = TestClient(app).get(f"/api/v1/conversations/{conversation.id}/messages")
     assert response.status_code == 200
-    items = response.json()["items"]
-
-    user_index = next(
-        index for index, item in enumerate(items) if item["id"] == user_message.id
+    overlaid = next(
+        item
+        for item in response.json()["items"]
+        if item["id"] == user_message.id
     )
-    projection = items[user_index + 1]
-    assert projection["role"] == "assistant"
-    turn = projection["metadata"]["agent_runtime_turn"]
-    assert turn["status"] == "abandoned"
-    assert turn["terminal"] is True
-    assert turn["turn_id"] == user_message.id
-    assert projection["metadata"]["failure_code"] == "turn_abandoned"
-    assert projection["metadata"]["retryable"] is True
-    assert projection["metadata"]["retry_last_turn"] == {"message": "test AAPL momentum"}
-    # Immutable messages were not mutated: the projection is ephemeral.
-    persisted_ids = {message.id for message in api_state.store.messages[conversation.id]}
-    assert projection["id"] not in persisted_ids
+    assert overlaid["metadata"]["retry_last_turn"] == {
+        "request_message_id": user_message.id,
+        "message": "plain turn",
+    }
 
 
-def test_multi_turn_abandoned_recovery_stays_adjacent(_memory_mode) -> None:
-    """#240: the typed recovery item sits directly after its owning user
-    message even when later turns exist — never re-sorted to the end by its
-    reconciliation timestamp."""
+def test_abandoned_overlay_rides_its_message_among_later_turns(_memory_mode) -> None:
+    """#240: the recovery truth rides the persisted owning user message
+    itself, so later turns cannot displace it and no synthetic item exists
+    anywhere in the read."""
 
     user_id = api_state.store.get_or_create_dev_user().id
     conversation = memory_conversation(
@@ -592,20 +660,84 @@ def test_multi_turn_abandoned_recovery_stays_adjacent(_memory_mode) -> None:
         content="Answer to the second idea.",
     )
 
+    persisted_count = len(api_state.store.messages[conversation.id])
     response = TestClient(app).get(f"/api/v1/conversations/{conversation.id}/messages")
     assert response.status_code == 200
     items = response.json()["items"]
 
     ids = [item["id"] for item in items]
+    assert len(items) == persisted_count
     owner_index = ids.index(abandoned_user_message.id)
-    projection = items[owner_index + 1]
-    assert projection["metadata"].get("turn_lifecycle_projection") is True
-    assert projection["metadata"]["agent_runtime_turn"]["turn_id"] == (
-        abandoned_user_message.id
+    overlaid = items[owner_index]
+    assert overlaid["metadata"]["agent_runtime_turn"]["status"] == "abandoned"
+    assert overlaid["metadata"]["recovery"]["code"] == "turn_abandoned"
+    # The later turn immediately follows the overlaid user message.
+    assert ids[owner_index + 1] == later_user.id
+    assert ids.index(later_assistant.id) == owner_index + 2
+
+
+def test_abandoned_overlay_survives_cursor_paging(_memory_mode) -> None:
+    """#240: paging returns the overlaid user message exactly once on its own
+    page, and no orphan recovery item appears on any other page."""
+
+    user_id = api_state.store.get_or_create_dev_user().id
+    conversation = memory_conversation(
+        user_id=user_id,
+        title="Paging",
+        title_source="system_default",
+        language="en",
     )
-    # The later turn stays after the recovery item.
-    assert ids.index(later_user.id) > owner_index + 1
-    assert ids.index(later_assistant.id) > owner_index + 1
+    from argus.api.message_store import create_message
+
+    user_message = create_message(
+        user_id=user_id,
+        conversation_id=conversation.id,
+        role="user",
+        content="paged idea",
+        metadata={
+            "agent_runtime_turn": {
+                "status": "started",
+                "conversation_id": conversation.id,
+                "request_id": "req-paged",
+            }
+        },
+    )
+    row = api_state.store.chat_turn_lifecycles[user_message.id]
+    row["accepted_at"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=30)
+    ).isoformat()
+    memory_message(
+        conversation_id=conversation.id,
+        role="user",
+        content="second idea",
+    )
+    memory_message(
+        conversation_id=conversation.id,
+        role="assistant",
+        content="Second answer.",
+    )
+
+    client = TestClient(app)
+    seen_ids: list[str] = []
+    overlaid_pages = 0
+    cursor: str | None = None
+    for _ in range(6):
+        params = {"limit": 1} | ({"cursor": cursor} if cursor else {})
+        page = client.get(
+            f"/api/v1/conversations/{conversation.id}/messages", params=params
+        ).json()
+        for item in page["items"]:
+            seen_ids.append(item["id"])
+            if item["metadata"].get("recovery", {}).get("code") == "turn_abandoned":
+                overlaid_pages += 1
+                assert item["id"] == user_message.id
+        cursor = page.get("next_cursor")
+        if not cursor:
+            break
+
+    assert seen_ids.count(user_message.id) == 1
+    assert overlaid_pages == 1
+    assert len(seen_ids) == len(set(seen_ids))
 
 
 def test_reconciled_outcome_appears_on_reload(_memory_mode) -> None:
@@ -657,17 +789,23 @@ def test_reconciled_outcome_appears_on_reload(_memory_mode) -> None:
     items = response.json()["items"]
 
     reloaded = next(item for item in items if item["id"] == assistant.id)
-    reconciled = reloaded["metadata"]["turn_lifecycle_reconciled"]
-    assert reconciled["status"] == "reconciled"
-    assert reconciled["outcome"] == "recoverable_failed"
-    assert reconciled["turn_id"] == user_message.id
-    # Persistence was not mutated: the stored message has no projection key.
+    # Reconciled truth overlays the canonical agent_runtime_turn — no
+    # parallel projection contract exists.
+    turn = reloaded["metadata"]["agent_runtime_turn"]
+    assert turn["status"] == "reconciled"
+    assert turn["terminal"] is True
+    assert turn["reconciled_outcome"] == "recoverable_failed"
+    assert turn["turn_id"] == user_message.id
+    assert turn["request_id"] == "req-reconciled"
+    assert "turn_lifecycle_reconciled" not in reloaded["metadata"]
+    # Persistence was not mutated: the stored row keeps its written status.
     stored = next(
         message
         for message in api_state.store.messages[conversation.id]
         if message.id == assistant.id
     )
-    assert "turn_lifecycle_reconciled" not in (stored.metadata or {})
+    assert (stored.metadata or {})["agent_runtime_turn"]["status"] == "failed"
+    assert "reconciled_outcome" not in (stored.metadata or {})["agent_runtime_turn"]
 
 
 def test_projection_has_no_first_twenty_historical_ceiling(_memory_mode) -> None:
@@ -712,7 +850,7 @@ def test_projection_has_no_first_twenty_historical_ceiling(_memory_mode) -> None
     projected_turns = {
         item["metadata"]["agent_runtime_turn"]["turn_id"]
         for item in items
-        if item["metadata"].get("turn_lifecycle_projection")
+        if item["metadata"].get("recovery", {}).get("code") == "turn_abandoned"
     }
     assert len(projected_turns) == 21
     assert newest_turn_id in projected_turns

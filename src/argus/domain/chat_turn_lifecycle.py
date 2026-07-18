@@ -234,23 +234,30 @@ def list_projectable_turns_memory(
     store: Any,
     *,
     conversation_id: str,
-    turn_ids: set[str],
+    user_id: str,
+    message_ids: set[str],
 ) -> list[dict[str, Any]]:
-    """Terminal lifecycle truth for the turns actually on the page: scoping
-    by turn_id keeps projection complete for any history depth instead of
-    capping at the oldest STALE_TURN_BATCH rows."""
+    """Owner-scoped terminal lifecycle truth for the messages actually on the
+    read: an abandoned row matches its owning user message (turn_id) and a
+    reconciled row its linked assistant message. Scoping by message id keeps
+    projection complete for any history depth instead of capping at the
+    oldest STALE_TURN_BATCH rows."""
 
-    if not turn_ids:
+    if not message_ids:
         return []
     with store.chat_turn_lifecycle_lock:
         rows = [
             dict(row)
             for row in store.chat_turn_lifecycles.values()
             if row.get("conversation_id") == conversation_id
+            and row.get("user_id") == user_id
             and row.get("status") in PROJECTABLE_STATUSES
-            and str(row.get("turn_id")) in turn_ids
+            and (
+                str(row.get("turn_id")) in message_ids
+                or str(row.get("assistant_message_id")) in message_ids
+            )
         ]
-    rows.sort(key=lambda row: (str(row.get("finished_at") or ""), str(row["turn_id"])))
+    rows.sort(key=lambda row: str(row["turn_id"]))
     return rows
 
 

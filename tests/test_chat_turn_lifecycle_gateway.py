@@ -21,7 +21,7 @@ def gateway_client() -> MagicMock:
     client = MagicMock()
     table = MagicMock()
     client.table.return_value = table
-    for chained in ("select", "eq", "in_", "order", "limit", "upsert", "insert"):
+    for chained in ("select", "eq", "in_", "or_", "order", "limit", "upsert", "insert"):
         getattr(table, chained).return_value = table
     table.execute.return_value = SimpleNamespace(data=[])
     client.rpc.return_value.execute.return_value = SimpleNamespace(
@@ -119,8 +119,9 @@ def test_gateway_accept_chat_turn_calls_the_atomic_function(
 def test_gateway_lists_projectable_turns_scoped_to_the_page(
     gateway_client: MagicMock,
 ) -> None:
-    """Projection truth is scoped by the page's turn ids — terminal statuses
-    only, and no historical row cap."""
+    """Projection truth is owner-scoped and keyed by the read's message ids —
+    abandoned rows via turn_id, reconciled rows via assistant_message_id —
+    with terminal statuses only and no historical row cap."""
 
     table = gateway_client.table.return_value
     table.execute.return_value = SimpleNamespace(
@@ -130,12 +131,16 @@ def test_gateway_lists_projectable_turns_scoped_to_the_page(
 
     rows = gateway.list_projectable_chat_turns(
         conversation_id="conv-1",
-        turn_ids=["turn-1", "turn-2"],
+        user_id="user-1",
+        message_ids=["msg-1", "msg-2"],
     )
 
     assert rows == [{"turn_id": "turn-1", "status": "abandoned"}]
+    table.eq.assert_any_call("user_id", "user-1")
     table.in_.assert_any_call("status", ["abandoned", "reconciled"])
-    table.in_.assert_any_call("turn_id", ["turn-1", "turn-2"])
+    table.or_.assert_any_call(
+        "turn_id.in.(msg-1,msg-2),assistant_message_id.in.(msg-1,msg-2)"
+    )
     table.limit.assert_not_called()
 
 
