@@ -22,11 +22,14 @@ class ProviderHit(BaseModel):
 
 
 class MemoryRetrievalProvider(Protocol):
-    def project(self, record: MemoryRecord) -> str:
-        """Index a confirmed record; returns the provider reference."""
+    def project(self, record: MemoryRecord) -> str | None:
+        """Index a confirmed record; ``None`` means it was not indexed."""
         ...
 
-    def search(self, user_id: str, query: str, limit: int) -> list[ProviderHit]: ...
+    def search(self, user_id: str, query: str, limit: int) -> list[ProviderHit] | None:
+        """Ranked matches; ``None`` means unavailable (callers fall back to
+        bounded canonical matching), ``[]`` means answered with no matches."""
+        ...
 
     def delete(self, user_id: str, provider_ref: str) -> None: ...
 
@@ -34,13 +37,13 @@ class MemoryRetrievalProvider(Protocol):
 
 
 class NoOpMemoryProvider:
-    """Fallback provider: never indexes, never matches, never fails."""
+    """Absent-provider stand-in: indexes nothing, abstains from answering."""
 
-    def project(self, record: MemoryRecord) -> str:
-        return f"noop-{record.id}"
+    def project(self, record: MemoryRecord) -> str | None:
+        return None
 
-    def search(self, user_id: str, query: str, limit: int) -> list[ProviderHit]:
-        return []
+    def search(self, user_id: str, query: str, limit: int) -> list[ProviderHit] | None:
+        return None
 
     def delete(self, user_id: str, provider_ref: str) -> None:
         return None
