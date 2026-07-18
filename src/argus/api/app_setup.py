@@ -95,8 +95,7 @@ def _json_safe_validation_error(value: Any) -> Any:
         return str(value)
     if isinstance(value, dict):
         return {
-            str(key): _json_safe_validation_error(nested)
-            for key, nested in value.items()
+            str(key): _json_safe_validation_error(nested) for key, nested in value.items()
         }
     if isinstance(value, list | tuple):
         return [_json_safe_validation_error(nested) for nested in value]
@@ -107,12 +106,34 @@ def _json_safe_validation_errors(
     errors: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     return [
-        {
-            str(key): _json_safe_validation_error(value)
-            for key, value in error.items()
-        }
+        {str(key): _json_safe_validation_error(value) for key, value in error.items()}
         for error in errors
     ]
+
+
+async def unexpected_exception_handler(  # type: ignore[no-untyped-def]
+    request: Request,
+    exc: Exception,
+):
+    """#235: unexpected failures return safe RFC 9457 with the request's
+    correlation id and no request body, secret, provider detail, or trace."""
+
+    del exc
+    request_id = getattr(request.state, "request_id", None) or api_state.store.new_id()
+    body = {
+        "type": "https://api.argus.app/problems/internal-error",
+        "title": "Internal Error",
+        "status": 500,
+        "detail": "The request failed unexpectedly. Retry in a moment.",
+        "code": "internal_error",
+        "request_id": request_id,
+    }
+    origin = request.headers.get("origin")
+    headers: dict[str, str] = {"X-Request-Id": request_id}
+    if origin in cors_allow_origins():
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(body, status_code=500, headers=headers)
 
 
 async def validation_exception_handler(  # type: ignore[no-untyped-def]
@@ -138,7 +159,10 @@ async def validation_exception_handler(  # type: ignore[no-untyped-def]
 
 
 def add_core_middleware_and_handlers(app: FastAPI) -> None:
+    from argus.api.chat_request_bounds import ChatStreamBodyLimitMiddleware
+
     app.middleware("http")(request_id_middleware)
+    app.add_middleware(ChatStreamBodyLimitMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_allow_origins(),
@@ -148,3 +172,4 @@ def add_core_middleware_and_handlers(app: FastAPI) -> None:
     )
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(Exception, unexpected_exception_handler)

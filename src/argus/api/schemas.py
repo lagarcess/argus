@@ -484,11 +484,21 @@ class ChatStreamRequest(BaseModel):
 
     @model_validator(mode="after")
     def require_message_or_action(self) -> "ChatStreamRequest":
-        if self.action is not None:
-            return self
-        if self.message is not None and self.message.strip():
-            return self
-        raise ValueError("message_or_action_required")
+        if self.action is None:
+            if self.message is None or not self.message.strip():
+                raise ValueError("message_or_action_required")
+
+        from argus.api.chat_request_bounds import validate_chat_stream_bounds
+
+        validate_chat_stream_bounds(
+            conversation_id=self.conversation_id,
+            message=self.message,
+            mentions=self.mentions,
+            action_label=self.action.label if self.action else None,
+            action_label_key=self.action.label_key if self.action else None,
+            action_payload=self.action.payload if self.action else None,
+        )
+        return self
 
 
 class DiscoveryItem(BaseModel):

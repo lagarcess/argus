@@ -943,6 +943,18 @@ class SupabaseGateway(ConversationMessagePersistenceMixin):
 
         return backtest_admission_gateway.admit_backtest_job(self.client, **kwargs)
 
+    def get_backtest_job_by_reservation(self, **kwargs: Any) -> dict[str, Any] | None:
+        from argus.domain import backtest_admission_gateway
+
+        return backtest_admission_gateway.get_backtest_job_by_reservation(
+            self.client, **kwargs
+        )
+
+    def get_message_row(self, **kwargs: Any) -> dict[str, Any] | None:
+        from argus.domain import backtest_admission_gateway
+
+        return backtest_admission_gateway.get_message_row(self.client, **kwargs)
+
     def finalize_direct_backtest_job(self, **kwargs: Any) -> dict[str, Any] | None:
         from argus.domain import backtest_admission_gateway
 

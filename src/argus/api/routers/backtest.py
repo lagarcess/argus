@@ -107,6 +107,32 @@ def run_backtest(
     )
     launch_payload_digest = backtest_admission.canonical_hash(normalized_payload)
 
+    # Exact replay resolves before quota, capacity, or compute; a collision
+    # returns before any boundary can disclose or mutate state.
+    existing = _find_direct_reservation(user=user, idempotency_key=clean_idempotency_key)
+    if existing is not None:
+        # The atomic operation re-resolves the replay (and reconciles a stale
+        # running direct row) without charging; a mismatched identity conflicts.
+        decision, job = _admit_direct_run(
+            request,
+            user=user,
+            idempotency_key=clean_idempotency_key,
+            identity_hash=identity_hash,
+            payload_hash=launch_payload_digest,
+            launch_payload=normalized_payload,
+            conversation_id=payload.conversation_id,
+        )
+        if decision == "replay":
+            return _replay_direct_job(request, user=user, job=job or {})
+
+    # Non-consuming allowance precheck: exhausted quota rejects before any
+    # provider preflight and mutates nothing (#251 locked decision).
+    _precheck_direct_allowance(request, user=user)
+
+    # Coverage/provider preflight consumes no allowance and creates no job;
+    # only successful durable admission charges (#251 locked decision).
+    prepared_execution = prepare_run_from_payload(data, request)
+
     decision, job = _admit_direct_run(
         request,
         user=user,
@@ -122,7 +148,6 @@ def run_backtest(
     job_id = str((job or {}).get("id") or "").strip()
     execution_identity = f"{endpoint}:{clean_idempotency_key}"
     try:
-        prepared_execution = prepare_run_from_payload(data, request)
         run = create_run_from_payload(
             data,
             request,
@@ -178,6 +203,50 @@ def run_backtest(
         result_run_id=run.id,
     )
     return BacktestRunResponse(run=run)
+
+
+def _precheck_direct_allowance(request: Request, *, user: User) -> None:
+    gateway = api_state.supabase_gateway
+    if gateway is None:
+        return
+    from argus.domain.supabase_gateway import QuotaExceededError
+
+    try:
+        gateway.check_usage_limits(
+            user_id=user.id,
+            resource="backtest_runs",
+            limits=[("day", 50)],
+        )
+    except QuotaExceededError as exc:
+        raise problem(
+            request,
+            status_code=429,
+            code="too_many_requests",
+            title="Quota Exceeded",
+            detail=str(exc),
+            headers={"Retry-After": "60"},
+        ) from exc
+
+
+def _find_direct_reservation(
+    *, user: User, idempotency_key: str
+) -> dict[str, Any] | None:
+    gateway = api_state.supabase_gateway
+    if gateway is not None:
+        return gateway.get_backtest_job_by_reservation(
+            user_id=user.id,
+            operation_scope=backtest_admission.DIRECT_RUN_SCOPE,
+            idempotency_key=idempotency_key,
+        )
+    with api_state.store.backtest_admission_lock:
+        backtest_admission.reconcile_stale_direct_jobs_memory(api_state.store)
+        reservation = api_state.store.backtest_job_reservations.get(
+            (user.id, backtest_admission.DIRECT_RUN_SCOPE, idempotency_key)
+        )
+        if reservation is None:
+            return None
+        job = api_state.store.backtest_jobs.get(reservation)
+        return dict(job) if job is not None else None
 
 
 def _validate_direct_payload_shape(data: dict[str, Any], request: Request) -> None:
@@ -239,6 +308,7 @@ def _admit_direct_run(
         )
         decision = str(outcome.get("decision") or "")
         job = outcome.get("job") if isinstance(outcome.get("job"), dict) else None
+        outcome_detail = outcome.get("detail")
     else:
         memory_outcome = backtest_admission.admit_backtest_job_memory(
             api_state.store,
@@ -254,6 +324,7 @@ def _admit_direct_run(
         )
         decision = memory_outcome.kind
         job = memory_outcome.job
+        outcome_detail = None
 
     if decision in ("admitted", "replay"):
         return decision, job
@@ -274,7 +345,10 @@ def _admit_direct_run(
             status_code=429,
             code="too_many_requests",
             title="Quota Exceeded",
-            detail="Daily simulation allowance exhausted.",
+            detail=str(
+                (outcome_detail if isinstance(outcome_detail, str) else "")
+                or "Daily simulation allowance exhausted."
+            ),
             headers={"Retry-After": "60"},
         )
     if decision == "per_user_capacity":
@@ -447,10 +521,7 @@ def get_backtest_job_by_action(
 
     gateway = api_state.supabase_gateway
     if gateway is not None:
-        from argus.domain import backtest_admission_gateway
-
-        job = backtest_admission_gateway.get_backtest_job_by_reservation(
-            gateway.client,
+        job = gateway.get_backtest_job_by_reservation(
             user_id=user.id,
             operation_scope=backtest_admission.CHAT_RUN_SCOPE,
             idempotency_key=confirmation_id,
@@ -532,11 +603,7 @@ def _verify_confirmation_artifact_integrity(
 
     gateway = api_state.supabase_gateway
     if gateway is not None:
-        from argus.domain import backtest_admission_gateway
-
-        row = backtest_admission_gateway.get_message_row(
-            gateway.client, message_id=message_id
-        )
+        row = gateway.get_message_row(message_id=message_id)
         message_conversation = str((row or {}).get("conversation_id") or "")
         metadata = (row or {}).get("metadata")
     else:
@@ -553,10 +620,14 @@ def _verify_confirmation_artifact_integrity(
 
     if message_conversation != conversation_id:
         raise integrity_failure
-    if api_state.store.conversation_owners.get(conversation_id) not in (
-        None,
-        user.id,
-    ) and gateway is None:
+    if (
+        api_state.store.conversation_owners.get(conversation_id)
+        not in (
+            None,
+            user.id,
+        )
+        and gateway is None
+    ):
         raise integrity_failure
 
     artifact = metadata if isinstance(metadata, dict) else {}

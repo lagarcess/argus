@@ -393,6 +393,86 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
 def mock_gateway():
     gateway = MagicMock(spec=SupabaseGateway)
     finalization_store = AlphaStore()
+
+    # #230 admission twin over the mock: replay/conflict resolution, legacy
+    # quota semantics as the allowance boundary, and durable job rows.
+    admission_jobs: dict[str, dict] = {}
+    admission_reservations: dict[tuple[str, str, str], str] = {}
+
+    def _admit_backtest_job(**kwargs):
+        from argus.domain.supabase_gateway import QuotaExceededError as _Quota
+
+        key = (
+            kwargs["user_id"],
+            kwargs["operation_scope"],
+            kwargs["idempotency_key"],
+        )
+        existing_id = admission_reservations.get(key)
+        if existing_id is not None:
+            job = admission_jobs[existing_id]
+            if job["identity_hash"] == kwargs["identity_hash"]:
+                return {"decision": "replay", "job": dict(job)}
+            return {"decision": "conflict"}
+        try:
+            gateway.check_and_increment_usage_limits(
+                user_id=kwargs["user_id"],
+                resource="backtest_runs",
+                limits=[("day", 50)],
+            )
+        except _Quota as exc:
+            return {"decision": "allowance_exhausted", "detail": str(exc)}
+        job_id = f"admitted-job-{len(admission_jobs) + 1}"
+        job = {
+            "id": job_id,
+            "user_id": kwargs["user_id"],
+            "conversation_id": kwargs.get("conversation_id"),
+            "operation_scope": kwargs["operation_scope"],
+            "idempotency_key": kwargs["idempotency_key"],
+            "identity_hash": kwargs["identity_hash"],
+            "payload_hash": kwargs["payload_hash"],
+            "launch_payload": kwargs["launch_payload"],
+            "status": kwargs.get("initial_status") or "queued",
+            "result_run_id": None,
+            "failure_code": None,
+            "failure_detail": None,
+            "retryable": False,
+            "execution_metadata": kwargs.get("execution_metadata") or {},
+        }
+        admission_jobs[job_id] = job
+        admission_reservations[key] = job_id
+        return {"decision": "admitted", "job": dict(job)}
+
+    def _finalize_direct_backtest_job(**kwargs):
+        job = admission_jobs.get(kwargs["job_id"])
+        if job is None:
+            return None
+        job.update(
+            status=kwargs["status"],
+            result_run_id=kwargs.get("result_run_id"),
+            failure_code=kwargs.get("failure_code"),
+            failure_detail=kwargs.get("failure_detail"),
+            retryable=kwargs.get("retryable", False),
+        )
+        if kwargs.get("execution_metadata") is not None:
+            job["execution_metadata"] = kwargs["execution_metadata"]
+        return dict(job)
+
+    def _get_backtest_job_by_reservation(**kwargs):
+        key = (
+            kwargs["user_id"],
+            kwargs["operation_scope"],
+            kwargs["idempotency_key"],
+        )
+        job_id = admission_reservations.get(key)
+        return dict(admission_jobs[job_id]) if job_id else None
+
+    gateway.admit_backtest_job.side_effect = _admit_backtest_job
+    gateway.finalize_direct_backtest_job.side_effect = _finalize_direct_backtest_job
+    gateway.get_backtest_job_by_reservation.side_effect = (
+        _get_backtest_job_by_reservation
+    )
+    gateway.get_message_row.return_value = None
+
     gateway.get_user.return_value = _mock_profile()
     gateway.get_or_create_mock_user.return_value = _mock_profile()
     gateway.get_auth_user_from_token.return_value = {
