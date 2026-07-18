@@ -549,6 +549,175 @@ def test_abandoned_lifecycle_projects_typed_recovery_on_get(_memory_mode) -> Non
     assert projection["id"] not in persisted_ids
 
 
+def test_multi_turn_abandoned_recovery_stays_adjacent(_memory_mode) -> None:
+    """#240: the typed recovery item sits directly after its owning user
+    message even when later turns exist — never re-sorted to the end by its
+    reconciliation timestamp."""
+
+    user_id = api_state.store.get_or_create_dev_user().id
+    conversation = memory_conversation(
+        user_id=user_id,
+        title="Adjacency",
+        title_source="system_default",
+        language="en",
+    )
+    from argus.api.message_store import create_message
+
+    abandoned_user_message = create_message(
+        user_id=user_id,
+        conversation_id=conversation.id,
+        role="user",
+        content="first idea that stalled",
+        metadata={
+            "agent_runtime_turn": {
+                "status": "started",
+                "conversation_id": conversation.id,
+                "request_id": "req-stalled",
+            }
+        },
+    )
+    row = api_state.store.chat_turn_lifecycles[abandoned_user_message.id]
+    row["accepted_at"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=30)
+    ).isoformat()
+    # A later, healthy turn follows before anyone reloads.
+    later_user = memory_message(
+        conversation_id=conversation.id,
+        role="user",
+        content="second idea",
+    )
+    later_assistant = memory_message(
+        conversation_id=conversation.id,
+        role="assistant",
+        content="Answer to the second idea.",
+    )
+
+    response = TestClient(app).get(f"/api/v1/conversations/{conversation.id}/messages")
+    assert response.status_code == 200
+    items = response.json()["items"]
+
+    ids = [item["id"] for item in items]
+    owner_index = ids.index(abandoned_user_message.id)
+    projection = items[owner_index + 1]
+    assert projection["metadata"].get("turn_lifecycle_projection") is True
+    assert projection["metadata"]["agent_runtime_turn"]["turn_id"] == (
+        abandoned_user_message.id
+    )
+    # The later turn stays after the recovery item.
+    assert ids.index(later_user.id) > owner_index + 1
+    assert ids.index(later_assistant.id) > owner_index + 1
+
+
+def test_reconciled_outcome_appears_on_reload(_memory_mode) -> None:
+    """#240: a reconciled lifecycle projects its status and outcome onto the
+    linked assistant message on reload, without mutating persistence."""
+
+    user_id = api_state.store.get_or_create_dev_user().id
+    conversation = memory_conversation(
+        user_id=user_id,
+        title="Reconciled",
+        title_source="system_default",
+        language="en",
+    )
+    from argus.api.message_store import create_message
+
+    user_message = create_message(
+        user_id=user_id,
+        conversation_id=conversation.id,
+        role="user",
+        content="test SPY drift",
+        metadata={
+            "agent_runtime_turn": {
+                "status": "started",
+                "conversation_id": conversation.id,
+                "request_id": "req-reconciled",
+            }
+        },
+    )
+    row = api_state.store.chat_turn_lifecycles[user_message.id]
+    row["accepted_at"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=30)
+    ).isoformat()
+    assistant = memory_message(
+        conversation_id=conversation.id,
+        role="assistant",
+        content="Recovered terminal answer.",
+        metadata={
+            "agent_runtime_turn": {
+                "turn_id": user_message.id,
+                "request_id": "req-reconciled",
+                "terminal": True,
+                "status": "failed",
+            }
+        },
+    )
+
+    response = TestClient(app).get(f"/api/v1/conversations/{conversation.id}/messages")
+    assert response.status_code == 200
+    items = response.json()["items"]
+
+    reloaded = next(item for item in items if item["id"] == assistant.id)
+    reconciled = reloaded["metadata"]["turn_lifecycle_reconciled"]
+    assert reconciled["status"] == "reconciled"
+    assert reconciled["outcome"] == "recoverable_failed"
+    assert reconciled["turn_id"] == user_message.id
+    # Persistence was not mutated: the stored message has no projection key.
+    stored = next(
+        message
+        for message in api_state.store.messages[conversation.id]
+        if message.id == assistant.id
+    )
+    assert "turn_lifecycle_reconciled" not in (stored.metadata or {})
+
+
+def test_projection_has_no_first_twenty_historical_ceiling(_memory_mode) -> None:
+    """#240: a conversation with more than 20 historical abandoned turns
+    still projects recovery for the newest one."""
+
+    user_id = api_state.store.get_or_create_dev_user().id
+    conversation = memory_conversation(
+        user_id=user_id,
+        title="Deep history",
+        title_source="system_default",
+        language="en",
+    )
+    base = datetime.now(timezone.utc) - timedelta(hours=2)
+    newest_turn_id = None
+    for index in range(21):
+        message = memory_message(
+            conversation_id=conversation.id,
+            role="user",
+            content=f"idea {index}",
+        )
+        api_state.store.chat_turn_lifecycles[message.id] = {
+            "turn_id": message.id,
+            "user_id": user_id,
+            "conversation_id": conversation.id,
+            "request_id": f"req-{index}",
+            "status": "abandoned",
+            "failure_code": "turn_abandoned",
+            "retryable": True,
+            "accepted_at": (base + timedelta(minutes=index)).isoformat(),
+            "finished_at": (base + timedelta(minutes=index, seconds=30)).isoformat(),
+        }
+        newest_turn_id = message.id
+
+    response = TestClient(app).get(
+        f"/api/v1/conversations/{conversation.id}/messages",
+        params={"limit": 100},
+    )
+    assert response.status_code == 200
+    items = response.json()["items"]
+
+    projected_turns = {
+        item["metadata"]["agent_runtime_turn"]["turn_id"]
+        for item in items
+        if item["metadata"].get("turn_lifecycle_projection")
+    }
+    assert len(projected_turns) == 21
+    assert newest_turn_id in projected_turns
+
+
 def test_lifecycle_hooks_log_safe_fields_only(
     _memory_mode, monkeypatch: pytest.MonkeyPatch
 ) -> None:

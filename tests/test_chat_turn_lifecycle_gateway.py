@@ -116,18 +116,27 @@ def test_gateway_accept_chat_turn_calls_the_atomic_function(
     assert row["id"] == "message-1"
 
 
-def test_gateway_lists_abandoned_turns_bounded(gateway_client: MagicMock) -> None:
+def test_gateway_lists_projectable_turns_scoped_to_the_page(
+    gateway_client: MagicMock,
+) -> None:
+    """Projection truth is scoped by the page's turn ids — terminal statuses
+    only, and no historical row cap."""
+
     table = gateway_client.table.return_value
     table.execute.return_value = SimpleNamespace(
         data=[{"turn_id": "turn-1", "status": "abandoned"}]
     )
     gateway = SupabaseGateway(client=gateway_client)
 
-    rows = gateway.list_abandoned_chat_turns(conversation_id="conv-1")
+    rows = gateway.list_projectable_chat_turns(
+        conversation_id="conv-1",
+        turn_ids=["turn-1", "turn-2"],
+    )
 
     assert rows == [{"turn_id": "turn-1", "status": "abandoned"}]
-    table.eq.assert_any_call("status", "abandoned")
-    table.limit.assert_any_call(20)
+    table.in_.assert_any_call("status", ["abandoned", "reconciled"])
+    table.in_.assert_any_call("turn_id", ["turn-1", "turn-2"])
+    table.limit.assert_not_called()
 
 
 # ── Hook wiring: Supabase mode must hit the production gateway path ──────────

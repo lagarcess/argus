@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from argus.domain.chat_turn_lifecycle import STALE_TURN_BATCH
+from argus.domain.chat_turn_lifecycle import PROJECTABLE_STATUSES
 
 
 class ChatTurnLifecycleGatewayMixin:
@@ -34,8 +34,8 @@ class ChatTurnLifecycleGatewayMixin:
     def accept_chat_turn(self, **kwargs: Any) -> dict[str, Any]:
         return accept_chat_turn(self.client, **kwargs)
 
-    def list_abandoned_chat_turns(self, **kwargs: Any) -> list[dict[str, Any]]:
-        return list_abandoned_chat_turns(self.client, **kwargs)
+    def list_projectable_chat_turns(self, **kwargs: Any) -> list[dict[str, Any]]:
+        return list_projectable_chat_turns(self.client, **kwargs)
 
 
 def _rows(result: Any) -> list[dict[str, Any]]:
@@ -142,18 +142,25 @@ def reconcile_stale_chat_turns(
     return []
 
 
-def list_abandoned_chat_turns(
+def list_projectable_chat_turns(
     client: Any,
     *,
     conversation_id: str,
+    turn_ids: list[str],
 ) -> list[dict[str, Any]]:
+    """Terminal lifecycle truth for the turns actually on the page: scoping
+    by turn_id keeps projection complete for any history depth instead of
+    capping at the oldest rows."""
+
+    if not turn_ids:
+        return []
     result = (
         client.table("chat_turn_lifecycles")
         .select("*")
         .eq("conversation_id", conversation_id)
-        .eq("status", "abandoned")
+        .in_("status", list(PROJECTABLE_STATUSES))
+        .in_("turn_id", list(turn_ids))
         .order("finished_at", desc=False)
-        .limit(STALE_TURN_BATCH)
         .execute()
     )
     return _rows(result)

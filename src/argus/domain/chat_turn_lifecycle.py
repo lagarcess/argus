@@ -227,20 +227,31 @@ def _terminal_turn_evidence(message: Any, *, row: dict[str, Any]) -> str | None:
 terminal_turn_evidence = _terminal_turn_evidence
 
 
-def list_abandoned_turns_memory(
+PROJECTABLE_STATUSES = ("abandoned", "reconciled")
+
+
+def list_projectable_turns_memory(
     store: Any,
     *,
     conversation_id: str,
+    turn_ids: set[str],
 ) -> list[dict[str, Any]]:
+    """Terminal lifecycle truth for the turns actually on the page: scoping
+    by turn_id keeps projection complete for any history depth instead of
+    capping at the oldest STALE_TURN_BATCH rows."""
+
+    if not turn_ids:
+        return []
     with store.chat_turn_lifecycle_lock:
         rows = [
             dict(row)
             for row in store.chat_turn_lifecycles.values()
             if row.get("conversation_id") == conversation_id
-            and row.get("status") == "abandoned"
+            and row.get("status") in PROJECTABLE_STATUSES
+            and str(row.get("turn_id")) in turn_ids
         ]
     rows.sort(key=lambda row: (str(row.get("finished_at") or ""), str(row["turn_id"])))
-    return rows[:STALE_TURN_BATCH]
+    return rows
 
 
 def reconcile_stale_turns_memory(

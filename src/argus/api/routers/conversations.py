@@ -7,7 +7,7 @@ from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.chat import turn_lifecycle_hooks
-from argus.api.chat.turn_lifecycle_projection import project_abandoned_turn_recovery
+from argus.api.chat.turn_lifecycle_projection import project_turn_lifecycle
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.message_store import (
     memory_conversation,
@@ -31,20 +31,23 @@ from argus.domain.store import utcnow
 router = APIRouter(prefix="/api/v1", tags=["conversations"])
 
 
-def _abandoned_turns_for(conversation_id: str) -> list[dict]:
-    from argus.domain.chat_turn_lifecycle import list_abandoned_turns_memory
+def _lifecycle_rows_for(conversation_id: str, turn_ids: set[str]) -> list[dict]:
+    from argus.domain.chat_turn_lifecycle import list_projectable_turns_memory
 
+    if not turn_ids:
+        return []
     try:
         if api_state.supabase_gateway is not None:
-            return api_state.supabase_gateway.list_abandoned_chat_turns(
-                conversation_id=conversation_id
+            return api_state.supabase_gateway.list_projectable_chat_turns(
+                conversation_id=conversation_id,
+                turn_ids=sorted(turn_ids),
             )
-        return list_abandoned_turns_memory(
-            api_state.store, conversation_id=conversation_id
+        return list_projectable_turns_memory(
+            api_state.store, conversation_id=conversation_id, turn_ids=turn_ids
         )
     except Exception as exc:
         logger.warning(
-            "Abandoned-turn projection lookup failed open",
+            "Turn lifecycle projection lookup failed open",
             error_type=type(exc).__name__,
             conversation_id=conversation_id,
         )
@@ -370,11 +373,17 @@ def list_messages(
 
     items.sort(key=lambda item: (item.created_at, item.id))
     items = reconcile_reload_message_metadata(items)
-    # #240: abandoned lifecycle truth projects typed retry recovery after the
-    # owning user message without mutating immutable messages.
-    items = project_abandoned_turn_recovery(
+    # #240: terminal lifecycle truth projects into the read — typed retry
+    # recovery directly after the owning user message, and reconciled
+    # status/outcome onto the linked assistant copy — without mutating
+    # immutable messages. Scoping by the page's user turns removes any
+    # historical row ceiling.
+    items = project_turn_lifecycle(
         items,
-        _abandoned_turns_for(conversation_id),
+        _lifecycle_rows_for(
+            conversation_id,
+            {item.id for item in items if item.role == "user"},
+        ),
         language=conversation.language if conversation else None,
     )
     filtered = items
