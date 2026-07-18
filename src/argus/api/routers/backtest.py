@@ -623,6 +623,15 @@ def _confirmation_artifact_identity(
 
     gateway = api_state.supabase_gateway
     if gateway is not None:
+        # Ownership: the confirmation message must live in a conversation the
+        # requesting user owns; the owner-scoped read returns None otherwise.
+        if (
+            gateway.get_conversation(
+                user_id=user.id, conversation_id=conversation_id
+            )
+            is None
+        ):
+            raise integrity_failure
         row = gateway.get_message_row(message_id=message_id)
         message_conversation = str((row or {}).get("conversation_id") or "")
         metadata = (row or {}).get("metadata")
@@ -658,7 +667,7 @@ def _confirmation_artifact_identity(
     if artifact_confirmation != confirmation_id:
         raise integrity_failure
     launch_hash = card.get("launch_payload_hash_full")
-    if not isinstance(launch_hash, str) or not launch_hash.startswith("sha256:"):
+    if not backtest_admission.is_full_sha256_hash(launch_hash):
         raise integrity_failure
     return message_conversation, launch_hash
 

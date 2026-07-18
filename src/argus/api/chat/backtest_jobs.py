@@ -819,8 +819,8 @@ class ShadowBacktestJobTool:
                     if isinstance(raw_full, str) and raw_full.startswith("sha256:"):
                         artifact_launch_hash = raw_full
             # Identity binds to the immutable confirmation artifact's
-            # full-width launch hash; the runtime payload digest remains the
-            # fallback for actions that predate the artifact field.
+            # full-width launch hash; without it no durable reservation is
+            # created (the by-action lookup could never reproduce it).
             identity_hash = chat_run_identity_hash(
                 conversation_id=context.conversation_id,
                 confirmation_id=confirmation_id or context.idempotency_key,
@@ -835,6 +835,7 @@ class ShadowBacktestJobTool:
                     payload=payload,
                     context=context,
                 ),
+                artifact_launch_hash=artifact_launch_hash,
             )
             if job is None:
                 return None
@@ -868,6 +869,7 @@ class ShadowBacktestJobTool:
         identity_hash: str,
         payload_digest: str,
         launch_payload: dict[str, Any],
+        artifact_launch_hash: str | None = None,
     ) -> dict[str, Any] | None:
         from argus.api.chat.backtest_admission_flow import admit_durable_chat_job
 
@@ -878,6 +880,7 @@ class ShadowBacktestJobTool:
             payload_digest=payload_digest,
             launch_payload=launch_payload,
             reconcile_blockers=_reconcile_backpressure_blockers,
+            artifact_launch_hash=artifact_launch_hash,
         )
 
     @staticmethod

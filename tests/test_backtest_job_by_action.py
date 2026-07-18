@@ -127,6 +127,70 @@ def test_card_without_full_launch_hash_is_integrity_500() -> None:
     assert response.json()["code"] == "internal_error"
 
 
+def test_cross_owner_confirmation_artifact_is_rejected() -> None:
+    """The confirmation message must belong to the requesting user's
+    conversation; a foreign owner is integrity 500, never a replay signal."""
+
+    job = _seed_chat_job()
+    api_state.store.conversation_owners[job["conversation_id"]] = (
+        "11111111-1111-1111-1111-111111111111"
+    )
+
+    response = TestClient(app).get("/api/v1/backtest-jobs/by-action/confirmation-1")
+    assert response.status_code == 500
+    assert response.json()["code"] == "internal_error"
+
+
+@pytest.mark.parametrize(
+    "bad_hash",
+    [
+        "sha256:XYZ",
+        "sha256:" + "B" * 64,
+        "sha256:" + "b" * 63,
+        "sha256:" + "b" * 65,
+        "md5:" + "b" * 64,
+    ],
+)
+def test_malformed_artifact_hash_is_integrity_500(bad_hash: str) -> None:
+    _seed_chat_job(artifact_launch_hash=bad_hash)
+
+    response = TestClient(app).get("/api/v1/backtest-jobs/by-action/confirmation-1")
+    assert response.status_code == 500
+    assert response.json()["code"] == "internal_error"
+
+
+def test_missing_artifact_hash_cannot_create_a_reservation() -> None:
+    """Legacy actions without the artifact's full-width hash must not admit a
+    durable reservation the by-action lookup can never reproduce."""
+
+    from unittest.mock import MagicMock
+
+    from argus.api.chat.backtest_admission_flow import admit_durable_chat_job
+
+    gateway = MagicMock()
+    context = MagicMock()
+    context.idempotency_key = "confirmation-legacy"
+    context.user_id = "user-1"
+    context.conversation_id = "conv-1"
+    context.chat_action = {
+        "type": "run_backtest",
+        "payload": {"confirmation_id": "confirmation-legacy"},
+    }
+
+    job = admit_durable_chat_job(
+        gateway=gateway,
+        context=context,
+        identity_hash="sha256:" + "0" * 64,
+        payload_digest="sha256:" + "1" * 64,
+        launch_payload={"kind": "legacy"},
+        reconcile_blockers=lambda **kwargs: False,
+        artifact_launch_hash=None,
+    )
+
+    assert job is None
+    gateway.admit_backtest_job.assert_not_called()
+
+
 def test_identity_mismatch_returns_conflict_without_job_details() -> None:
     job = _seed_chat_job()
     api_state.store.backtest_jobs[job["id"]]["identity_hash"] = "sha256:" + "f" * 64

@@ -30,11 +30,24 @@ def admit_durable_chat_job(
     payload_digest: str,
     launch_payload: dict[str, Any],
     reconcile_blockers: Callable[..., bool],
+    artifact_launch_hash: str | None = None,
 ) -> dict[str, Any] | None:
+    from argus.domain.backtest_admission import is_full_sha256_hash
+
     idempotency_key = (context.idempotency_key or "").strip()
     if not idempotency_key:
         logger.warning(
             "Chat run action reached admission without an idempotency key",
+            user_id=context.user_id,
+            conversation_id=context.conversation_id,
+        )
+        return None
+    if not is_full_sha256_hash(artifact_launch_hash):
+        # A reservation without the artifact's full-width launch hash could
+        # never be reproduced by the by-action lookup; skip durable admission
+        # rather than create an unreconcilable reservation.
+        logger.warning(
+            "Chat run action lacks a reproducible artifact launch hash",
             user_id=context.user_id,
             conversation_id=context.conversation_id,
         )

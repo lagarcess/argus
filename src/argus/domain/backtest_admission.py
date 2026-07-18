@@ -130,6 +130,18 @@ def canonical_hash(value: Any) -> str:
     return f"sha256:{digest}"
 
 
+_HEX_DIGITS = frozenset("0123456789abcdef")
+
+
+def is_full_sha256_hash(value: Any) -> bool:
+    """Exactly ``sha256:`` followed by 64 lowercase hexadecimal characters."""
+
+    if not isinstance(value, str) or not value.startswith("sha256:"):
+        return False
+    digest = value[len("sha256:") :]
+    return len(digest) == 64 and set(digest) <= _HEX_DIGITS
+
+
 KeyState = Literal["ok", "missing", "invalid"]
 
 

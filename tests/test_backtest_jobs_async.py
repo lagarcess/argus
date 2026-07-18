@@ -362,7 +362,10 @@ def _context() -> BacktestJobShadowContext:
         request_id="request-1",
         chat_action={
             "type": "run_backtest",
-            "payload": {"confirmation_id": "confirmation-1"},
+            "payload": {
+                "confirmation_id": "confirmation-1",
+                "launch_payload_hash_full": "sha256:" + "a" * 64,
+            },
         },
     )
 

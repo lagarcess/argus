@@ -270,7 +270,10 @@ def _context() -> BacktestJobShadowContext:
         request_id="request-1",
         chat_action={
             "type": "run_backtest",
-            "payload": {"confirmation_id": "confirmation-1"},
+            "payload": {
+                "confirmation_id": "confirmation-1",
+                "launch_payload_hash_full": "sha256:" + "a" * 64,
+            },
         },
     )
 
@@ -409,7 +412,10 @@ def test_shadow_backtest_job_tool_creates_job_before_in_process_execution(
         "request": payload,
         "chat_action": {
             "type": "run_backtest",
-            "payload": {"confirmation_id": "confirmation-1"},
+            "payload": {
+                "confirmation_id": "confirmation-1",
+                "launch_payload_hash_full": "sha256:" + "a" * 64,
+            },
         },
     }
     assert job["execution_metadata"] == {
@@ -503,7 +509,10 @@ def test_shadow_backtest_job_tool_dispatches_real_task_only_when_execution_enabl
         "request": payload,
         "chat_action": {
             "type": "run_backtest",
-            "payload": {"confirmation_id": "confirmation-1"},
+            "payload": {
+                "confirmation_id": "confirmation-1",
+                "launch_payload_hash_full": "sha256:" + "a" * 64,
+            },
         },
     }
     assert (
