@@ -298,7 +298,7 @@ class BacktestRunResponse(BaseModel):
 
 class BacktestJob(BaseModel):
     id: str
-    conversation_id: str
+    conversation_id: str | None = None
     request_message_id: str | None = None
     confirmation_message_id: str | None = None
     status: BacktestJobStatus

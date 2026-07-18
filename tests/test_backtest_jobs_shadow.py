@@ -51,6 +51,40 @@ class _Gateway:
         self.jobs.append(payload)
         return {"id": "job-1", **payload}
 
+    def admit_backtest_job(self, **payload: object) -> dict[str, object]:
+        """#230 admission surface: decision order mirrored over the fake's
+        count/backpressure knobs so capacity scenarios keep working."""
+
+        user_id = payload.get("user_id")
+        boundaries = (
+            ("running", user_id, 1, "per_user_capacity"),
+            ("queued", user_id, 2, "per_user_capacity"),
+            ("running", None, 5, "global_capacity"),
+            ("queued", None, 10, "global_capacity"),
+        )
+        for status, scoped_user, limit, decision in boundaries:
+            if self.count_backtest_jobs(
+                status=status, user_id=scoped_user, limit=limit + 1
+            ) >= limit:
+                return {"decision": decision}
+
+        self.events.append("job")
+        if self.should_raise:
+            raise RuntimeError("write failed")
+        if self.create_result is not None:
+            return {"decision": "admitted", "job": self.create_result}
+        row = {
+            "id": "job-1",
+            "status": str(payload.get("initial_status") or "queued"),
+            **{
+                key: value
+                for key, value in payload.items()
+                if key not in ("initial_status", "simulation_day_limit")
+            },
+        }
+        self.jobs.append(row)
+        return {"decision": "admitted", "job": row}
+
     def merge_backtest_job_execution_metadata(
         self, **payload: object
     ) -> dict[str, object]:

@@ -68,3 +68,50 @@ Rollback boundary: revert `29cc1e9` (artifact + gate + declarations revert toget
 
 External gates remaining: one GitHub Actions run of the amended backend list on the
 eventually-pushed candidate.
+
+---
+
+## #230 — atomic backtest admission and idempotency (prerequisite)
+
+Checkpoint commit: see commit map — `feat(backtests): make admission and idempotency atomic`
+
+Changed surfaces: `src/argus/domain/backtest_admission.py` (new: canonical
+serializer/hashing, key validation, identity builders, in-process admission twin,
+stale direct-job reconciliation), `src/argus/domain/backtest_admission_gateway.py`
+(new: RPC calls), `supabase/migrations/20260718000001_atomic_backtest_admission.sql`
+(new: reservation columns, UNIQUE boundary, `admit_backtest_job` function with the
+approved decision order, service-role-only), `src/argus/api/routers/backtest.py`
+(direct-route disposition: running-only insert, replay semantics incl.
+`idempotency_in_progress`, capacity 429/503 + Retry-After 15, conflict 409,
+shape-validation before hashing), `src/argus/api/chat/backtest_admission_flow.py` +
+`ShadowBacktestJobTool` (chat path through the same admission), `AlphaStore`
+(jobs/reservations/charges), `BacktestJob.conversation_id` nullable (approved
+direct contract), OpenAPI artifact regenerated.
+
+Acceptance mapping:
+
+| Criterion | State | Evidence |
+| --- | --- | --- |
+| Barriered real-Postgres concurrency admits ≤1 at limit 1 | EXTERNAL_GATE_PENDING | `tests/test_backtest_admission_postgres.py` written and skip-gated on `ARGUS_ADMISSION_TEST_DATABASE_URL` (disposable DB); the issue itself says mock-only is insufficient for this criterion. In-process barriered proof (10 threads → 1 admitted) passes deterministically |
+| Admission/reservation cannot race count↔insert | LOCAL_ACCEPTANCE_PASS (in-process) / EXTERNAL_GATE_PENDING (cross-instance) | one lock-serialized memory operation; SQL function serializes on `pg_advisory_xact_lock` — cross-instance proof rides the Postgres gate |
+| Exact retry returns same job + current durable status | LOCAL_ACCEPTANCE_PASS | domain + API replay tests (same job id, same Run, one charge) |
+| Same key + mismatched identity → #229 conflict, never the old job | LOCAL_ACCEPTANCE_PASS | `409 idempotency_conflict` with no job/run disclosure; tests assert store untouched |
+| Capacity exhaustion returns approved product-safe response | LOCAL_ACCEPTANCE_PASS | per-user 429 / global 503, code `backtest_capacity_exceeded`, `Retry-After: 15` |
+| Direct /backtests/run cannot bypass production admission | LOCAL_ACCEPTANCE_PASS | direct route now reserves through the same operation, both-ceilings check, running-only insert, durable row before sync execution; replay of running → `409 idempotency_in_progress` + `context.backtest_job_id` |
+| Ownership, RLS, max attempts, worker claim, finalization unchanged | LOCAL_ACCEPTANCE_PASS | no RLS/claim/finalization surface edited; gateway/shadow/async suites green |
+| Focused gateway/job/API tests + hermetic gate pass | LOCAL_ACCEPTANCE_PASS | 206 focused tests + hermetic sweep 1129 passed |
+| Evidence records migration/SHA/concurrency output | LOCAL_ACCEPTANCE_PASS (local) | this ledger + commit map; real-PG output pending the external gate |
+| Closure hands stable admission identity to #231/#242 | LOCAL_ACCEPTANCE_PASS (artifact exists) | `operation_scope`/`identity_hash`/reservation live in rows; #242 lookup consumes it next |
+
+Deliberate scope notes: legacy hour-cap (10/hour) on the direct route is replaced
+by the approved single unique-simulation day allowance inside admission; the
+in-memory `store.idempotency` cache no longer backs the direct route (reservation
+store owns replay). Chat-side capacity/allowance rejections keep today's
+skip-durable-job behavior; typed 429/503 stream surfacing composes with #235/#242.
+
+External gates remaining: real-Postgres barriered run on a disposable database
+(command recorded in the test module); QA/production application of the migration
+(founder + #246-serialized authority).
+
+Rollback boundary: revert the checkpoint commit; forward-safe (callers revert to
+prior path; migration function is replaceable; no historical rows dropped).

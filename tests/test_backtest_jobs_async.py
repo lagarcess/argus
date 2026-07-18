@@ -50,6 +50,27 @@ class _Gateway:
         self.jobs.append(job)
         return job
 
+    def admit_backtest_job(self, **payload: object) -> dict[str, object]:
+        self.events.append("job")
+        job = {
+            "id": "job-async-1",
+            "status": str(payload.get("initial_status") or "queued"),
+            "result_run_id": None,
+            "failure_code": None,
+            "failure_detail": None,
+            "retryable": False,
+            "queued_at": "2026-06-06T12:00:00+00:00",
+            "created_at": "2026-06-06T12:00:00+00:00",
+            "updated_at": "2026-06-06T12:00:00+00:00",
+            **{
+                key: value
+                for key, value in payload.items()
+                if key not in ("initial_status", "simulation_day_limit")
+            },
+        }
+        self.jobs.append(job)
+        return {"decision": "admitted", "job": job}
+
     def merge_backtest_job_execution_metadata(
         self, **payload: object
     ) -> dict[str, object]:

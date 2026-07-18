@@ -967,7 +967,9 @@ components:
           type: string
           title: Id
         conversation_id:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           title: Conversation Id
         request_message_id:
           anyOf:
@@ -1041,7 +1043,6 @@ components:
       type: object
       required:
       - id
-      - conversation_id
       - status
       title: BacktestJob
     BacktestJobResponse:
