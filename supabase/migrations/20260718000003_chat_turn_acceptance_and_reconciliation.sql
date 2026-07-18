@@ -1,8 +1,11 @@
 -- #240: two database-owned boundaries for the ordinary chat-turn lifecycle.
 --
--- accept_chat_turn: the accepted user message and its lifecycle row persist
--- in one transaction, so a lifecycle failure can never orphan an accepted
--- message.
+-- accept_chat_turn: the accepted user message persists through the canonical
+-- serialized append boundary (append_conversation_message owns ownership,
+-- message identity + replay, messages.user_id, monotonic created_at, the
+-- preview, and conversation updated_at) and the lifecycle row lands in the
+-- same transaction, so a lifecycle failure can never orphan an accepted
+-- message and no second messages writer exists.
 --
 -- reconcile_stale_chat_turns: stale selection on the database clock,
 -- at-most-20 deterministic ordering, row locking, post-lock stale recheck,
@@ -12,9 +15,12 @@
 create or replace function public.accept_chat_turn(
     p_user_id uuid,
     p_conversation_id uuid,
+    p_message_id uuid,
     p_role text,
     p_content text,
     p_metadata jsonb,
+    p_created_at timestamptz,
+    p_preview text,
     p_request_id text
 ) returns jsonb
 language plpgsql
@@ -22,34 +28,42 @@ security definer
 set search_path = public
 as $$
 declare
-    v_message public.messages%rowtype;
+    v_message jsonb;
 begin
-    if not exists (
-        select 1 from public.conversations c
-        where c.id = p_conversation_id and c.user_id = p_user_id
-    ) then
-        raise exception 'conversation is not owned by the accepting user';
-    end if;
+    select appended.message into v_message
+      from public.append_conversation_message(
+        p_user_id,
+        p_conversation_id,
+        p_message_id,
+        p_role,
+        p_content,
+        p_metadata,
+        p_created_at,
+        p_preview,
+        null, null, null, null
+      ) as appended;
 
-    insert into public.messages (conversation_id, role, content, metadata)
-    values (p_conversation_id, p_role, p_content, coalesce(p_metadata, '{}'::jsonb))
-    returning * into v_message;
+    if v_message is null then
+        raise exception 'chat turn acceptance did not persist the message';
+    end if;
 
     insert into public.chat_turn_lifecycles (
         turn_id, user_id, conversation_id, request_id, status
     ) values (
-        v_message.id, p_user_id, p_conversation_id, p_request_id, 'accepted'
-    );
+        (v_message ->> 'id')::uuid, p_user_id, p_conversation_id,
+        p_request_id, 'accepted'
+    )
+    on conflict (turn_id) do nothing;
 
-    return to_jsonb(v_message);
+    return v_message;
 end;
 $$;
 
 revoke all on function public.accept_chat_turn(
-    uuid, uuid, text, text, jsonb, text
+    uuid, uuid, uuid, text, text, jsonb, timestamptz, text, text
 ) from public, anon, authenticated;
 grant execute on function public.accept_chat_turn(
-    uuid, uuid, text, text, jsonb, text
+    uuid, uuid, uuid, text, text, jsonb, timestamptz, text, text
 ) to service_role;
 
 create or replace function public.reconcile_stale_chat_turns(

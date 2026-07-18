@@ -23,19 +23,24 @@ def _row_one(result: Any) -> dict[str, Any] | None:
     return cast(dict[str, Any], data)
 
 
-def _message_preview(
+def message_preview(
     content: str,
     max_length: int = 180,
     *,
     role: str = "assistant",
     metadata: dict[str, Any] | None = None,
 ) -> str | None:
+    """Canonical conversation-preview computation for every durable append."""
+
     if is_degraded_clarification_compatibility_text(
         role=role,
         metadata=metadata,
     ):
         return None
     return plain_text_preview(content, max_length=max_length)
+
+
+_message_preview = message_preview
 
 
 class ConversationMessagePersistenceMixin:

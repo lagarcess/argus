@@ -167,17 +167,27 @@ def accept_chat_turn(
     metadata: dict[str, Any] | None,
     request_id: str,
 ) -> dict[str, Any]:
-    """Acceptance boundary: persist the user message and its lifecycle row in
-    one database-owned transaction (see migration 20260718000003)."""
+    """Acceptance boundary: the user message persists through the canonical
+    serialized append (message identity, user_id, monotonic created_at,
+    preview, conversation updated_at, replay) and its lifecycle row lands in
+    the same database-owned transaction (see migration 20260718000003)."""
+
+    from uuid import uuid4
+
+    from argus.domain.store import utcnow
+    from argus.domain.supabase_conversation_messages import message_preview
 
     result = client.rpc(
         "accept_chat_turn",
         {
             "p_user_id": user_id,
             "p_conversation_id": conversation_id,
+            "p_message_id": str(uuid4()),
             "p_role": role,
             "p_content": content,
             "p_metadata": metadata or {},
+            "p_created_at": utcnow().isoformat(),
+            "p_preview": message_preview(content, role=role, metadata=metadata),
             "p_request_id": request_id,
         },
     ).execute()

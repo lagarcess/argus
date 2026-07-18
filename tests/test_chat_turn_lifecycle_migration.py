@@ -62,14 +62,24 @@ def _boundaries_text() -> str:
 def test_acceptance_is_one_database_owned_transaction() -> None:
     text = _boundaries_text()
     assert "create or replace function public.accept_chat_turn" in text
-    assert "insert into public.messages" in text
     assert "insert into public.chat_turn_lifecycles" in text
-    assert text.index("insert into public.messages") < text.index(
-        "insert into public.chat_turn_lifecycles"
-    )
-    assert "conversation is not owned by the accepting user" in text
     assert "revoke all on function public.accept_chat_turn" in text
     assert "to service_role" in text
+
+
+def test_acceptance_composes_the_canonical_append_boundary() -> None:
+    """The accepted user message persists through append_conversation_message
+    (identity, user_id, monotonic created_at, preview, conversation
+    updated_at, replay) — never a second messages writer — and the lifecycle
+    row lands in the same transaction, idempotent per turn."""
+
+    text = _boundaries_text()
+    assert "from public.append_conversation_message(" in text
+    assert "insert into public.messages" not in text
+    assert text.index("public.append_conversation_message(") < text.index(
+        "insert into public.chat_turn_lifecycles"
+    )
+    assert "on conflict (turn_id) do nothing" in text
 
 
 def test_reconciliation_boundary_is_database_owned() -> None:

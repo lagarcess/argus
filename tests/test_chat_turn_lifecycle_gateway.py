@@ -108,6 +108,11 @@ def test_gateway_accept_chat_turn_calls_the_atomic_function(
     assert name == "accept_chat_turn"
     assert params["p_user_id"] == "user-1"
     assert params["p_request_id"] == "req-1"
+    # Composing the canonical append boundary requires the writer's full
+    # identity inputs: message id, created_at, and the computed preview.
+    assert params["p_message_id"]
+    assert params["p_created_at"]
+    assert params["p_preview"] == "test AAPL"
     assert row["id"] == "message-1"
 
 
