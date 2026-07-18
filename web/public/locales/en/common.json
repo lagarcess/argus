@@ -595,7 +595,13 @@
         "invalid": "Enter percentages of 0 or more (slippage up to {{max}}%).",
         "message": "Set fees to {{fee}}% and slippage to {{slippage}}% per trade."
       }
-    }
+    },
+    "run_reconcile_checking": "Checking your run against saved status…",
+    "run_reconcile_pending": "Your backtest is still running. The result will appear here when it finishes.",
+    "run_reconcile_recovered": "Reconnected. Loading your run's saved status.",
+    "run_reconcile_failed": "Your run stopped before finishing. You can run it again.",
+    "run_reconcile_conflict": "This Run action no longer matches its saved request. Review the confirmation and try again.",
+    "run_reconcile_unresolved": "We could not verify your run's status yet. Your run may still be processing — check back shortly."
   },
   "strategies": {
     "empty_state": "Strategies you save from chat will appear here.",

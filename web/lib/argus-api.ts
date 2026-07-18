@@ -979,7 +979,29 @@ export async function getBacktestJob(jobId: string) {
   return apiFetch<BacktestJobResponse>(`/backtest-jobs/${jobId}`);
 }
 
+export async function getBacktestJobByAction(confirmationId: string) {
+  return apiFetch<BacktestJobResponse>(
+    `/backtest-jobs/by-action/${encodeURIComponent(confirmationId)}`,
+  );
+}
+
 // ─── Chat stream ──────────────────────────────────────────────────────────────
+
+export function chatStreamIdempotencyKey(
+  input: string | ChatActionRequest,
+): string {
+  if (typeof input !== "string" && input.type === "run_backtest") {
+    const payload = (input.payload ?? {}) as { confirmation_id?: unknown };
+    const confirmationId =
+      typeof payload.confirmation_id === "string"
+        ? payload.confirmation_id.trim()
+        : "";
+    // Contract: the Run action identity is its confirmation_id, so retry,
+    // reconnect, and reload reuse the same approved reservation.
+    if (confirmationId) return confirmationId;
+  }
+  return crypto.randomUUID();
+}
 
 export async function streamChatMessage(
   conversationId: string,
@@ -1006,7 +1028,7 @@ export async function streamChatMessage(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Idempotency-Key": crypto.randomUUID(),
+      "Idempotency-Key": chatStreamIdempotencyKey(input),
       ...authHeaders,
     },
     body: JSON.stringify({

@@ -23,6 +23,7 @@ import {
   createConversation,
   deleteConversation,
   getBacktestJob,
+  getBacktestJobByAction,
   getBacktestRun,
   getMe,
   getConversationMessages,
@@ -46,6 +47,11 @@ import {
   type PrimaryGoal,
   type SearchItem,
 } from "@/lib/argus-api";
+import {
+  isAmbiguousTransportFailure,
+  reconcileAmbiguousRun,
+  runActionConfirmationId,
+} from "@/lib/chat-run-reconciliation";
 import {
   chatExploratorySuggestionsEnabled,
   collectionsEnabled,
@@ -1634,6 +1640,44 @@ export default function ChatInterface() {
       );
     };
 
+    const settleAmbiguousRunFromDurableTruth = async (options: {
+      confirmationId: string;
+      conversationId: string;
+      replay: () => Promise<void>;
+    }): Promise<boolean> => {
+      showToast(t("chat.run_reconcile_checking"));
+      const outcome = await reconcileAmbiguousRun({
+        confirmationId: options.confirmationId,
+        lookup: (confirmationId) => getBacktestJobByAction(confirmationId),
+      });
+      if (outcome.state === "no_reservation") {
+        // No durable reservation: replay the original action once with the
+        // same approved identity; atomic admission dedupes any race.
+        try {
+          await options.replay();
+          return true;
+        } catch {
+          showToast(t("chat.run_reconcile_unresolved"));
+        }
+      } else if (outcome.state === "pending") {
+        showToast(t("chat.run_reconcile_pending"));
+      } else if (outcome.state === "succeeded") {
+        showToast(t("chat.run_reconcile_recovered"));
+      } else if (outcome.state === "failed") {
+        showToast(t("chat.run_reconcile_failed"));
+      } else if (outcome.state === "conflict") {
+        showToast(t("chat.run_reconcile_conflict"));
+      } else {
+        showToast(t("chat.run_reconcile_unresolved"));
+      }
+      setIsStreamingResponse(false);
+      setStreamStatus(null);
+      activeStreamConversationIdRef.current = null;
+      // Render durable backend truth instead of inventing terminal state.
+      await loadConversation(options.conversationId).catch(() => undefined);
+      return true;
+    };
+
     try {
       await streamToConversation(targetConversationId);
     } catch (err: unknown) {
@@ -1647,6 +1691,22 @@ export default function ChatInterface() {
           return;
         } catch (retryErr) {
           err = retryErr;
+        }
+      }
+      // #242: a lost Run response is transport ambiguity, never an invented
+      // terminal failure. Resolve against durable backend truth first.
+      const runConfirmationId = runActionConfirmationId(
+        action?.type ? streamInput : undefined,
+      );
+      if (runConfirmationId && isAmbiguousTransportFailure(err)) {
+        const settled = await settleAmbiguousRunFromDurableTruth({
+          confirmationId: runConfirmationId,
+          conversationId: activeStreamTargetConversationId,
+          replay: () =>
+            streamToConversation(activeStreamTargetConversationId),
+        });
+        if (settled) {
+          return;
         }
       }
       const canApplyOwnedUpdate = canApplyConversationOwnedUpdate(

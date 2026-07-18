@@ -595,7 +595,13 @@
         "invalid": "Ingresa porcentajes de 0 o más (deslizamiento hasta {{max}}%).",
         "message": "Ajusta las comisiones a {{fee}}% y el deslizamiento a {{slippage}}% por operación."
       }
-    }
+    },
+    "run_reconcile_checking": "Verificando tu simulación contra el estado guardado…",
+    "run_reconcile_pending": "Tu backtest sigue en ejecución. El resultado aparecerá aquí cuando termine.",
+    "run_reconcile_recovered": "Reconectado. Cargando el estado guardado de tu simulación.",
+    "run_reconcile_failed": "Tu simulación se detuvo antes de terminar. Puedes ejecutarla de nuevo.",
+    "run_reconcile_conflict": "Esta acción de ejecución ya no coincide con su solicitud guardada. Revisa la confirmación e inténtalo de nuevo.",
+    "run_reconcile_unresolved": "Aún no pudimos verificar el estado de tu simulación. Puede seguir en proceso — vuelve a revisar en un momento."
   },
   "strategies": {
     "empty_state": "Las estrategias que guardes del chat aparecerán aquí.",

@@ -71,6 +71,42 @@ def admit_backtest_job(
     return row
 
 
+def get_backtest_job_by_reservation(
+    client: Any,
+    *,
+    user_id: str,
+    operation_scope: str,
+    idempotency_key: str,
+) -> dict[str, Any] | None:
+    result = (
+        client.table("backtest_jobs")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("operation_scope", operation_scope)
+        .eq("idempotency_key", idempotency_key)
+        .limit(1)
+        .execute()
+    )
+    row = _row_one(result)
+    return dict(row) if row is not None else None
+
+
+def get_message_row(
+    client: Any,
+    *,
+    message_id: str,
+) -> dict[str, Any] | None:
+    result = (
+        client.table("messages")
+        .select("*")
+        .eq("id", message_id)
+        .limit(1)
+        .execute()
+    )
+    row = _row_one(result)
+    return dict(row) if row is not None else None
+
+
 def finalize_direct_backtest_job(
     client: Any,
     *,

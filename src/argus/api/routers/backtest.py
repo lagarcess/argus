@@ -428,6 +428,145 @@ def _clean_required_idempotency_key(
     )
 
 
+@router.get(
+    "/backtest-jobs/by-action/{confirmation_id}",
+    response_model=BacktestJobResponse,
+)
+def get_backtest_job_by_action(
+    confirmation_id: str,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> BacktestJobResponse:
+    """#242: owner-scoped durable lookup for an ambiguous Run action.
+
+    Transport ambiguity resolves against durable truth: 404 means no
+    reservation exists (the client may replay the action once); 409 means the
+    key was paired with different identity data; 500 means required
+    confirmation-artifact integrity failed and the client must not replay.
+    """
+
+    gateway = api_state.supabase_gateway
+    if gateway is not None:
+        from argus.domain import backtest_admission_gateway
+
+        job = backtest_admission_gateway.get_backtest_job_by_reservation(
+            gateway.client,
+            user_id=user.id,
+            operation_scope=backtest_admission.CHAT_RUN_SCOPE,
+            idempotency_key=confirmation_id,
+        )
+    else:
+        with api_state.store.backtest_admission_lock:
+            reservation = api_state.store.backtest_job_reservations.get(
+                (user.id, backtest_admission.CHAT_RUN_SCOPE, confirmation_id)
+            )
+            job = (
+                dict(api_state.store.backtest_jobs[reservation])
+                if reservation is not None
+                and reservation in api_state.store.backtest_jobs
+                else None
+            )
+    if job is None:
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="No durable Run reservation exists for this action.",
+        )
+
+    _verify_confirmation_artifact_integrity(
+        request, user=user, job=job, confirmation_id=confirmation_id
+    )
+
+    expected_identity = backtest_admission.chat_run_identity_hash(
+        conversation_id=job.get("conversation_id"),
+        confirmation_id=confirmation_id,
+        launch_payload_hash=str(job.get("payload_hash") or ""),
+    )
+    if job.get("identity_hash") != expected_identity:
+        raise problem(
+            request,
+            status_code=409,
+            code="idempotency_conflict",
+            title="Idempotency Conflict",
+            detail="The action identity does not match the durable reservation.",
+        )
+
+    run = None
+    result_run_id = str(job.get("result_run_id") or "")
+    if job.get("status") == "succeeded" and result_run_id:
+        run = (
+            gateway.get_backtest_run(user_id=user.id, run_id=result_run_id)
+            if gateway is not None
+            else api_state.store.backtest_runs.get(result_run_id)
+        )
+    return BacktestJobResponse(job=BacktestJob.model_validate(job), run=run)
+
+
+def _verify_confirmation_artifact_integrity(
+    request: Request,
+    *,
+    user: User,
+    job: dict[str, Any],
+    confirmation_id: str,
+) -> None:
+    """Durable-state integrity: the chat job must link an owned confirmation
+    artifact whose identity matches. Failure is 500, never a replay signal."""
+
+    integrity_failure = problem(
+        request,
+        status_code=500,
+        code="internal_error",
+        title="Internal Error",
+        detail=(
+            "Durable confirmation-artifact integrity failed; do not replay "
+            "the Run action."
+        ),
+    )
+
+    message_id = str(job.get("confirmation_message_id") or "").strip()
+    conversation_id = str(job.get("conversation_id") or "").strip()
+    if not message_id or not conversation_id:
+        raise integrity_failure
+
+    gateway = api_state.supabase_gateway
+    if gateway is not None:
+        from argus.domain import backtest_admission_gateway
+
+        row = backtest_admission_gateway.get_message_row(
+            gateway.client, message_id=message_id
+        )
+        message_conversation = str((row or {}).get("conversation_id") or "")
+        metadata = (row or {}).get("metadata")
+    else:
+        message = next(
+            (
+                candidate
+                for candidate in api_state.store.messages.get(conversation_id, [])
+                if candidate.id == message_id
+            ),
+            None,
+        )
+        message_conversation = message.conversation_id if message else ""
+        metadata = message.metadata if message else None
+
+    if message_conversation != conversation_id:
+        raise integrity_failure
+    if api_state.store.conversation_owners.get(conversation_id) not in (
+        None,
+        user.id,
+    ) and gateway is None:
+        raise integrity_failure
+
+    artifact = metadata if isinstance(metadata, dict) else {}
+    card = artifact.get("confirmation_card")
+    if isinstance(card, dict):
+        artifact_confirmation = str(card.get("confirmation_id") or "").strip()
+        if artifact_confirmation and artifact_confirmation != confirmation_id:
+            raise integrity_failure
+
+
 @router.get("/backtest-jobs/{job_id}", response_model=BacktestJobResponse)
 def get_backtest_job(
     job_id: str,

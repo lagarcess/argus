@@ -75,6 +75,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/backtest-jobs/by-action/{confirmation_id}:
+    get:
+      tags:
+      - backtests
+      description: '#242: owner-scoped durable lookup for an ambiguous Run action.
+
+
+        Transport ambiguity resolves against durable truth: 404 means no
+
+        reservation exists (the client may replay the action once); 409 means the
+
+        key was paired with different identity data; 500 means required
+
+        confirmation-artifact integrity failed and the client must not replay.'
+      parameters:
+      - name: confirmation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Confirmation Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestJobResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/backtest-jobs/{job_id}:
     get:
       tags:

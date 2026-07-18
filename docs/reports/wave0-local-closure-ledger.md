@@ -140,3 +140,32 @@ endpoint-reconciles test rewritten to pin the database-only contract).
 
 External gates remaining: #233 deployed journey consumes the user-facing proof.
 Rollback boundary: revert the checkpoint commit (restores poll-path reconciliation).
+
+---
+
+## #242 — ambiguous Run reconciliation (prerequisite)
+
+Checkpoint commit: see commit map — `fix(chat): reconcile ambiguous Run actions from durable truth`
+
+Changed surfaces: `GET /api/v1/backtest-jobs/by-action/{confirmation_id}`
+(contract lookup: reservation → artifact-integrity 500 → identity 409 → job+run),
+`backtest_admission_gateway.get_backtest_job_by_reservation`/`get_message_row`,
+`web/lib/chat-run-reconciliation.ts` (typed durable resolution),
+`web/lib/argus-api.ts` (run actions now send `Idempotency-Key == confirmation_id`
+— previously a random UUID per attempt, so retries could never share identity),
+`ChatInterface.tsx` (ambiguous run failures resolve from durable truth instead of
+settling `could_not_run`), EN/es-419 strings, OpenAPI artifact regenerated.
+
+| Criterion | State | Evidence |
+| --- | --- | --- |
+| One accepted click → at most one durable job/run | LOCAL_ACCEPTANCE_PASS | #230 admission + key==confirmation_id; replay returns same job (API tests) |
+| Retry/reconnect/reload reuses the same approved identity | LOCAL_ACCEPTANCE_PASS | `chatStreamIdempotencyKey` derives from `confirmation_id`; bun test locks it |
+| Disconnect yields checking/recoverable until durable truth | LOCAL_ACCEPTANCE_PASS (deterministic) | `stream_interrupted` → reconcile → pending/succeeded/failed mapping; 12 bun tests |
+| Only durable failed/canceled/expired settle unsuccessful | LOCAL_ACCEPTANCE_PASS | mapping test: 404/exception/timeout never produce `could_not_run` |
+| Succeeded hydrates one canonical result, no duplicate | LOCAL_ACCEPTANCE_PASS | by-action succeeded hydration test; shell reloads durable transcript |
+| Focused API/artifact-history/reload/rapid-navigation tests | LOCAL_ACCEPTANCE_PASS | 6 backend by-action + 12 bun + full web suite 355 green |
+| Browser QA disconnect/reload EN/ES + cache hit/miss | EXTERNAL_GATE_PENDING (deployed) / partial local | deterministic suites cover the logic; local mocked browser pass scheduled with the Train 6 QA sweep; real-deploy QA remains #233's journey |
+| #243 includes the ambiguous Run trajectory | Tracked in Train 6 | `alpha_session_05` (#242 owner) flips when the concrete adapters land |
+
+Rollback boundary: revert the checkpoint commit (endpoint + frontend module are
+additive; the key-derivation change reverts with it).
