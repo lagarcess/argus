@@ -31,7 +31,7 @@ from argus.agent_runtime.coverage_recovery import (
 from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.interpreter import provider_context_assets
 from argus.agent_runtime.interpreter.unsupported_admission import (
-    admitted_or_blocked_confirmation_result,
+    strategy_route_admission_result,
 )
 from argus.agent_runtime.presentation_i18n import (
     asset_universe_operation_clarification_message,
@@ -1218,6 +1218,16 @@ async def _stage_result_from_interpretation(
             decision=decision,
             stage_patch={"assistant_response": interpretation.assistant_response},
         )
+    admission_result = strategy_route_admission_result(
+        expects_strategy_route=expects_strategy_route,
+        decision=decision,
+        stage_patch=optional_parameter_stage_patch,
+        contract=capability_contract,
+        optional_parameter_values=optional_parameter_values,
+        assistant_response=interpretation.assistant_response,
+    )
+    if admission_result is not None:
+        return admission_result
     if requires_clarification:
         stage_patch = dict(optional_parameter_stage_patch)
         if interpretation.assistant_response:
@@ -1226,21 +1236,6 @@ async def _stage_result_from_interpretation(
             outcome="needs_clarification",
             decision=decision,
             stage_patch=stage_patch,
-        )
-    if expects_strategy_route:
-        stage_patch = dict(optional_parameter_stage_patch)
-        # Edit-planner honesty notes ride the card; other routes keep overridden
-        # clarification prose suppressed (None -> no message).
-        if interpretation.assistant_response and "artifact_assumption_edit_planned" in (
-            interpretation.reason_codes or []
-        ):
-            stage_patch["assistant_response"] = interpretation.assistant_response
-        return admitted_or_blocked_confirmation_result(
-            decision=decision,
-            stage_patch=stage_patch,
-            contract=capability_contract,
-            optional_parameter_values=optional_parameter_values,
-            assistant_response=interpretation.assistant_response,
         )
     return StageResult(
         outcome="ready_to_respond",

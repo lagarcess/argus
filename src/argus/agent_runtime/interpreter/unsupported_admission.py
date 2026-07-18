@@ -226,3 +226,37 @@ def admitted_or_blocked_confirmation_result(
         decision=blocked_decision,
         stage_patch=blocked_patch,
     )
+
+
+def strategy_route_admission_result(
+    *,
+    expects_strategy_route: bool,
+    decision: InterpretDecision,
+    stage_patch: dict[str, Any],
+    contract: Any,
+    optional_parameter_values: dict[str, Any],
+    assistant_response: str | None,
+) -> StageResult | None:
+    """Apply unsupported admission before ordinary missing-field clarification."""
+
+    if not expects_strategy_route:
+        return None
+    has_unsupported_verdict = (
+        decision.intent == "unsupported_or_out_of_scope"
+        or decision.semantic_turn_act == "unsupported_request"
+    )
+    if decision.requires_clarification and not has_unsupported_verdict:
+        return None
+    confirmation_patch = dict(stage_patch)
+    if (
+        assistant_response
+        and "artifact_assumption_edit_planned" in decision.reason_codes
+    ):
+        confirmation_patch["assistant_response"] = assistant_response
+    return admitted_or_blocked_confirmation_result(
+        decision=decision,
+        stage_patch=confirmation_patch,
+        contract=contract,
+        optional_parameter_values=optional_parameter_values,
+        assistant_response=assistant_response,
+    )

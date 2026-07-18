@@ -764,6 +764,58 @@ async def test_prose_bearing_contradiction_confident_promotion_still_admits(
     assert result.decision.unsupported_constraints == []
 
 
+@pytest.mark.asyncio
+async def test_incomplete_non_promoted_contradiction_blocks_before_missing_field(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Missing run fields must not launder an unsupported typed verdict."""
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    recorder = _SchemaRecorder(
+        interpreter_module.SupportedStrategyCapabilityConflictAudit(
+            selected_strategy_type=None,
+            drop_unsupported_strategy_logic=False,
+            keep_unsupported_strategy_logic=True,
+            confidence=0.95,
+        )
+    )
+    monkeypatch.setattr(interpreter_module, "invoke_openrouter_json_schema", recorder)
+    response = _prose_bearing_inverse_response("both_unsupported").model_copy(
+        update={
+            "candidate_strategy_draft": _inverse_llm_response(
+                date_range=None
+            ).candidate_strategy_draft,
+            "missing_required_fields": ["date_range"],
+        }
+    )
+
+    readied = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=_request("run an options straddle on TSLA"),
+    )
+
+    assert readied.intent == "unsupported_or_out_of_scope"
+    assert readied.semantic_turn_act == "unsupported_request"
+    assert readied.requires_clarification is True
+    assert "date_range" in readied.missing_required_fields
+
+    _stub_equity_asset_resolution(monkeypatch)
+    result, _ = await _run_interpret_async(
+        message="run an options straddle on TSLA",
+        response=_stage_interpretation_from_readied(readied),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision is not None
+    assert "unsupported_intent_confirmation_blocked" in result.decision.reason_codes
+    assert [
+        constraint.category for constraint in result.decision.unsupported_constraints
+    ] == ["unsupported_strategy_logic"]
+    assert result.patch.get("confirmation_payload") is None
+
+
 def test_admission_invariant_blocks_even_with_model_constraint_free_edge(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
