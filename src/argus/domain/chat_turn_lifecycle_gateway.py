@@ -19,9 +19,6 @@ class ChatTurnLifecycleGatewayMixin:
 
     client: Any
 
-    def create_chat_turn_lifecycle(self, **kwargs: Any) -> dict[str, Any]:
-        return create_chat_turn_lifecycle(self.client, **kwargs)
-
     def transition_chat_turn_lifecycle(self, **kwargs: Any) -> dict[str, Any]:
         return transition_chat_turn_lifecycle(self.client, **kwargs)
 
@@ -41,32 +38,6 @@ class ChatTurnLifecycleGatewayMixin:
 def _rows(result: Any) -> list[dict[str, Any]]:
     data = getattr(result, "data", None)
     return [dict(row) for row in data] if isinstance(data, list) else []
-
-
-def create_chat_turn_lifecycle(
-    client: Any,
-    *,
-    turn_id: str,
-    user_id: str,
-    conversation_id: str,
-    request_id: str,
-) -> dict[str, Any]:
-    """Acceptance row; idempotent per turn_id (re-acceptance is a no-op)."""
-
-    payload = {
-        "turn_id": turn_id,
-        "user_id": user_id,
-        "conversation_id": conversation_id,
-        "request_id": request_id,
-        "status": "accepted",
-    }
-    result = (
-        client.table("chat_turn_lifecycles")
-        .upsert(payload, on_conflict="turn_id", ignore_duplicates=True)
-        .execute()
-    )
-    rows = _rows(result)
-    return rows[0] if rows else dict(payload)
 
 
 def transition_chat_turn_lifecycle(

@@ -137,10 +137,19 @@ def transition_memory(
 
         current = str(row.get("status") or "")
         if current == to_status or (current in TERMINAL_STATUSES):
+            # No-op requires the complete same truth: target status, assistant
+            # link, reconciliation outcome, and — when specified — the same
+            # failure code and retryable evidence. Different terminal failure
+            # truth conflicts.
             same_links = (
                 current == to_status
                 and row.get("assistant_message_id") == assistant_message_id
                 and row.get("reconciled_outcome") == reconciled_outcome
+                and (
+                    failure_code is None
+                    or row.get("failure_code") == failure_code
+                )
+                and (retryable is None or row.get("retryable") == retryable)
             )
             if same_links:
                 return TransitionResult(outcome="noop", row=dict(row))
@@ -271,23 +280,25 @@ def reconcile_stale_turns_memory(
     store: Any,
     *,
     conversation_id: str,
-    user_id: str | None = None,
+    user_id: str,
     now: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Bounded reconciliation for one conversation: at most 20 stale
     accepted/running rows in deterministic stale_since ASC, turn_id ASC order,
     under one lock for the whole pass (selection, per-row stale recheck,
     evidence, and transition), mirroring the database boundary's row locking.
-    The pass is owner-scoped: a requester who does not own the conversation
-    mutates nothing. Evidence must belong to the row's owner and be written
-    by that owner; foreign evidence never reconciles a row. Durable terminal
-    evidence wins (failure precedence on ties); no proof transitions directly
-    to abandoned with retryable typed recovery."""
+    The pass enforces the same ownership boundary as the database function:
+    only the requesting owner's rows are selected, and a requester who does
+    not own the conversation mutates nothing. Evidence must belong to the
+    row's owner and be written by that owner; foreign evidence never
+    reconciles a row. Durable terminal evidence wins (failure precedence on
+    ties) and a reconciled recoverable failure copies the winner's canonical
+    failure_code and retryable evidence; no proof transitions directly to
+    abandoned with retryable typed recovery."""
 
-    if user_id is not None:
-        owner = store.conversation_owners.get(conversation_id)
-        if owner is not None and owner != user_id:
-            return []
+    owner = store.conversation_owners.get(conversation_id)
+    if owner is not None and owner != user_id:
+        return []
 
     moment = now or _utcnow()
     cutoff = moment - timedelta(minutes=STALE_TURN_MINUTES)
@@ -298,6 +309,8 @@ def reconcile_stale_turns_memory(
         for row in store.chat_turn_lifecycles.values():
             if row.get("conversation_id") != conversation_id:
                 continue
+            if row.get("user_id") != user_id:
+                continue
             if row.get("status") not in ("accepted", "running"):
                 continue
             stale_since = _stale_since(row)
@@ -306,8 +319,6 @@ def reconcile_stale_turns_memory(
             stale_rows.append((stale_since, str(row["turn_id"]), row))
         stale_rows.sort(key=lambda item: (item[0], item[1]))
         stale_rows = stale_rows[:STALE_TURN_BATCH]
-
-        conversation_owner = store.conversation_owners.get(conversation_id)
 
         for _, _, row in stale_rows:
             # Stale recheck at transition time: a row freshened by a
@@ -318,35 +329,54 @@ def reconcile_stale_turns_memory(
             if stale_since is None or stale_since > cutoff:
                 continue
 
-            owner_matches = conversation_owner is None or conversation_owner == row.get(
-                "user_id"
-            )
+            # The pass-level and per-row owner scope above guarantee the row
+            # belongs to the requesting owner; the evidence predicate still
+            # rejects messages written by anyone else.
             candidates = []
-            if owner_matches:
-                for message in store.messages.get(conversation_id, []):
-                    outcome = _terminal_turn_evidence(message, row=row)
-                    if outcome is None:
-                        continue
-                    precedence = 0 if outcome == "recoverable_failed" else 1
-                    candidates.append(
-                        (
-                            message.created_at,
-                            precedence,
-                            str(message.id),
-                            outcome,
-                            message,
-                        )
+            for message in store.messages.get(conversation_id, []):
+                outcome = _terminal_turn_evidence(message, row=row)
+                if outcome is None:
+                    continue
+                precedence = 0 if outcome == "recoverable_failed" else 1
+                candidates.append(
+                    (
+                        message.created_at,
+                        precedence,
+                        str(message.id),
+                        outcome,
+                        message,
                     )
+                )
             candidates.sort(key=lambda item: (item[0], item[1], item[2]))
 
             if candidates:
                 _, _, _, outcome, winner = candidates[0]
+                evidence_failure_code = None
+                evidence_retryable = None
+                if outcome == "recoverable_failed":
+                    winner_metadata = getattr(winner, "metadata", None) or {}
+                    winner_turn = winner_metadata.get("agent_runtime_turn")
+                    winner_turn = winner_turn if isinstance(winner_turn, dict) else {}
+                    evidence_failure_code = winner_turn.get(
+                        "failure_code"
+                    ) or winner_metadata.get("failure_code")
+                    raw_retryable = winner_turn.get("retryable")
+                    if not isinstance(raw_retryable, bool):
+                        raw_retryable = winner_metadata.get("retryable")
+                    if isinstance(raw_retryable, bool):
+                        evidence_retryable = raw_retryable
                 result = transition_memory(
                     store,
                     turn_id=str(row["turn_id"]),
                     to_status="reconciled",
                     assistant_message_id=str(winner.id),
                     reconciled_outcome=outcome,
+                    failure_code=(
+                        str(evidence_failure_code)
+                        if evidence_failure_code
+                        else None
+                    ),
+                    retryable=evidence_retryable,
                     now=moment,
                 )
             else:

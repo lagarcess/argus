@@ -20,38 +20,6 @@ def _gateway() -> Any | None:
     return api_state.supabase_gateway
 
 
-def accept_turn(
-    *,
-    turn_id: str,
-    user_id: str,
-    conversation_id: str,
-    request_id: str,
-) -> None:
-    try:
-        gateway = _gateway()
-        if gateway is not None:
-            gateway.create_chat_turn_lifecycle(
-                turn_id=turn_id,
-                user_id=user_id,
-                conversation_id=conversation_id,
-                request_id=request_id,
-            )
-            return
-        lifecycle.create_accepted_memory(
-            api_state.store,
-            turn_id=turn_id,
-            user_id=user_id,
-            conversation_id=conversation_id,
-            request_id=request_id,
-        )
-    except Exception as exc:
-        logger.warning(
-            "Chat turn lifecycle acceptance failed open",
-            error_type=type(exc).__name__,
-            turn_id=turn_id,
-        )
-
-
 def transition_turn(
     *,
     turn_id: str,

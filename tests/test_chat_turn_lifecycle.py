@@ -97,6 +97,54 @@ def test_repeating_same_transition_with_same_links_is_noop() -> None:
     assert conflicting.outcome == "conflict"
 
 
+def test_noop_comparison_includes_failure_evidence() -> None:
+    """DATA_MODEL: repeating the same target status, assistant link, failure
+    code, and reconciliation outcome is a no-op — different terminal failure
+    truth must conflict, never silently no-op."""
+
+    store = AlphaStore()
+    _accept(store)
+    first = lifecycle.transition_memory(
+        store,
+        turn_id="turn-1",
+        to_status="recoverable_failed",
+        assistant_message_id="assistant-1",
+        failure_code="agent_runtime_failure",
+        retryable=True,
+    )
+    replay = lifecycle.transition_memory(
+        store,
+        turn_id="turn-1",
+        to_status="recoverable_failed",
+        assistant_message_id="assistant-1",
+        failure_code="agent_runtime_failure",
+        retryable=True,
+    )
+    different_code = lifecycle.transition_memory(
+        store,
+        turn_id="turn-1",
+        to_status="recoverable_failed",
+        assistant_message_id="assistant-1",
+        failure_code="finalization_failed",
+        retryable=True,
+    )
+    different_retry = lifecycle.transition_memory(
+        store,
+        turn_id="turn-1",
+        to_status="recoverable_failed",
+        assistant_message_id="assistant-1",
+        failure_code="agent_runtime_failure",
+        retryable=False,
+    )
+    assert first.outcome == "applied"
+    assert replay.outcome == "noop"
+    assert different_code.outcome == "conflict"
+    assert different_retry.outcome == "conflict"
+    row = store.chat_turn_lifecycles["turn-1"]
+    assert row["failure_code"] == "agent_runtime_failure"
+    assert row["retryable"] is True
+
+
 def test_terminal_transitions_use_the_approved_timestamp_fields() -> None:
     """DATA_MODEL 8.1: the lifecycle carries accepted_at/running_at/
     terminal_at/reconciled_at — never finished_at — and retryable defaults
@@ -228,7 +276,9 @@ def test_reconciliation_prefers_failure_on_equal_timestamps() -> None:
         ),
     ]
 
-    reconciled = lifecycle.reconcile_stale_turns_memory(store, conversation_id="conv-1")
+    reconciled = lifecycle.reconcile_stale_turns_memory(
+        store, conversation_id="conv-1", user_id="user-1"
+    )
 
     assert len(reconciled) == 1
     row = reconciled[0]
@@ -261,7 +311,9 @@ def test_reconciliation_ignores_other_turns_and_requests() -> None:
         ),
     ]
 
-    reconciled = lifecycle.reconcile_stale_turns_memory(store, conversation_id="conv-1")
+    reconciled = lifecycle.reconcile_stale_turns_memory(
+        store, conversation_id="conv-1", user_id="user-1"
+    )
 
     assert len(reconciled) == 1
     row = reconciled[0]
@@ -274,7 +326,9 @@ def test_fresh_rows_are_not_reconciled() -> None:
     store = AlphaStore()
     _seed_conversation(store)
     _accept(store, accepted_ago_minutes=5)
-    reconciled = lifecycle.reconcile_stale_turns_memory(store, conversation_id="conv-1")
+    reconciled = lifecycle.reconcile_stale_turns_memory(
+        store, conversation_id="conv-1", user_id="user-1"
+    )
     assert reconciled == []
     assert store.chat_turn_lifecycles["turn-1"]["status"] == "accepted"
 
@@ -290,7 +344,9 @@ def test_reconciliation_batch_is_bounded_and_deterministic() -> None:
             accepted_ago_minutes=30 + index,
         )
 
-    reconciled = lifecycle.reconcile_stale_turns_memory(store, conversation_id="conv-1")
+    reconciled = lifecycle.reconcile_stale_turns_memory(
+        store, conversation_id="conv-1", user_id="user-1"
+    )
 
     assert len(reconciled) == lifecycle.STALE_TURN_BATCH
     remaining = [
@@ -459,9 +515,10 @@ def test_lifecycle_creation_failure_cannot_orphan_the_accepted_message(
     assert api_state.store.chat_turn_lifecycles == {}
 
 
-def test_cross_owner_terminal_evidence_is_rejected() -> None:
-    """Evidence in a conversation the lifecycle owner does not own must never
-    reconcile the row; with no owned evidence the turn abandons."""
+def test_cross_owner_conversation_never_reconciles() -> None:
+    """The memory boundary mirrors the database function: a requester who
+    does not own the conversation mutates nothing — the stale row stays for
+    its real owner's reconciliation."""
 
     store = AlphaStore()
     _seed_conversation(store)
@@ -478,11 +535,63 @@ def test_cross_owner_terminal_evidence_is_rejected() -> None:
         )
     ]
 
-    reconciled = lifecycle.reconcile_stale_turns_memory(store, conversation_id="conv-1")
+    reconciled = lifecycle.reconcile_stale_turns_memory(
+        store, conversation_id="conv-1", user_id="user-1"
+    )
+
+    assert reconciled == []
+    assert store.chat_turn_lifecycles["turn-1"]["status"] == "accepted"
+
+
+def test_reconciliation_copies_recoverable_failure_evidence() -> None:
+    """A reconciled recoverable failure carries its canonical failure_code
+    and retryable evidence from the winning terminal message."""
+
+    store = AlphaStore()
+    _seed_conversation(store)
+    store.conversation_owners["conv-1"] = "user-1"
+    _accept(store, accepted_ago_minutes=20)
+    failure_message = _Msg(
+        message_id="assistant-failure",
+        conversation_id="conv-1",
+        turn_id="turn-1",
+        request_id="req-1",
+        status="recoverable_failed",
+        created_at=datetime.now(timezone.utc),
+    )
+    failure_message.metadata["agent_runtime_turn"]["failure_code"] = (
+        "agent_runtime_failure"
+    )
+    failure_message.metadata["agent_runtime_turn"]["retryable"] = True
+    store.messages["conv-1"] = [failure_message]
+
+    reconciled = lifecycle.reconcile_stale_turns_memory(
+        store, conversation_id="conv-1", user_id="user-1"
+    )
 
     assert len(reconciled) == 1
-    assert reconciled[0]["status"] == "abandoned"
-    assert reconciled[0]["failure_code"] == "turn_abandoned"
+    row = reconciled[0]
+    assert row["status"] == "reconciled"
+    assert row["reconciled_outcome"] == "recoverable_failed"
+    assert row["failure_code"] == "agent_runtime_failure"
+    assert row["retryable"] is True
+
+
+def test_memory_reconciliation_enforces_per_row_ownership() -> None:
+    """Memory reconciliation applies the same ownership boundary as the
+    database function: another user's rows are never touched, even when the
+    dev conversation has no recorded owner."""
+
+    store = AlphaStore()
+    _seed_conversation(store)
+    _accept(store, accepted_ago_minutes=20)  # row owned by user-1
+
+    reconciled = lifecycle.reconcile_stale_turns_memory(
+        store, conversation_id="conv-1", user_id="intruder-9"
+    )
+
+    assert reconciled == []
+    assert store.chat_turn_lifecycles["turn-1"]["status"] == "accepted"
 
 
 def test_foreign_message_user_cannot_qualify_as_evidence() -> None:
@@ -505,7 +614,9 @@ def test_foreign_message_user_cannot_qualify_as_evidence() -> None:
         )
     ]
 
-    reconciled = lifecycle.reconcile_stale_turns_memory(store, conversation_id="conv-1")
+    reconciled = lifecycle.reconcile_stale_turns_memory(
+        store, conversation_id="conv-1", user_id="user-1"
+    )
 
     assert len(reconciled) == 1
     assert reconciled[0]["status"] == "abandoned"

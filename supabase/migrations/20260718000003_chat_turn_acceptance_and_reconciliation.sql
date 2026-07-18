@@ -142,7 +142,17 @@ begin
         -- exact turn and request identity, terminal flag, and a terminal
         -- status; candidates order by created_at asc with failure
         -- precedence, then id.
-        select m.id, m.metadata->'agent_runtime_turn'->>'status' as turn_status
+        select
+            m.id,
+            m.metadata->'agent_runtime_turn'->>'status' as turn_status,
+            coalesce(
+                m.metadata->'agent_runtime_turn'->>'failure_code',
+                m.metadata->>'failure_code'
+            ) as failure_code,
+            coalesce(
+                m.metadata->'agent_runtime_turn'->>'retryable',
+                m.metadata->>'retryable'
+            ) as retryable
         into v_evidence
         from public.messages m
         join public.conversations c on c.id = m.conversation_id
@@ -163,12 +173,23 @@ begin
         limit 1;
 
         if found then
+            -- A reconciled recoverable failure copies the winning message's
+            -- canonical failure_code and retryable evidence.
             update public.chat_turn_lifecycles
             set status = 'reconciled',
                 reconciled_outcome = case
                     when v_evidence.turn_status in ('recoverable_failed', 'failed')
                     then 'recoverable_failed' else 'completed' end,
                 assistant_message_id = v_evidence.id,
+                failure_code = case
+                    when v_evidence.turn_status in ('recoverable_failed', 'failed')
+                    then coalesce(v_evidence.failure_code, failure_code)
+                    else failure_code end,
+                retryable = case
+                    when v_evidence.turn_status in ('recoverable_failed', 'failed')
+                         and v_evidence.retryable is not null
+                    then (v_evidence.retryable)::boolean
+                    else retryable end,
                 terminal_at = v_now,
                 reconciled_at = v_now,
                 updated_at = v_now

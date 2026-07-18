@@ -30,22 +30,17 @@ def gateway_client() -> MagicMock:
     return client
 
 
-def test_gateway_create_upserts_the_accepted_row(gateway_client: MagicMock) -> None:
-    gateway = SupabaseGateway(client=gateway_client)
-    gateway.create_chat_turn_lifecycle(
-        turn_id="turn-1",
-        user_id="user-1",
-        conversation_id="conv-1",
-        request_id="req-1",
-    )
+def test_acceptance_has_no_direct_lifecycle_writer() -> None:
+    """Acceptance is owned exclusively by the atomic accept_chat_turn
+    boundary (plain and option-claim turns alike); the standalone lifecycle
+    row writer is gone."""
 
-    gateway_client.table.assert_any_call("chat_turn_lifecycles")
-    upsert_args = gateway_client.table.return_value.upsert.call_args
-    assert upsert_args is not None
-    payload = upsert_args.args[0]
-    assert payload["turn_id"] == "turn-1"
-    assert payload["status"] == "accepted"
-    assert upsert_args.kwargs.get("on_conflict") == "turn_id"
+    import argus.api.chat.turn_lifecycle_hooks as hooks
+    import argus.domain.chat_turn_lifecycle_gateway as gateway_module
+
+    assert not hasattr(hooks, "accept_turn")
+    assert not hasattr(gateway_module, "create_chat_turn_lifecycle")
+    assert not hasattr(SupabaseGateway, "create_chat_turn_lifecycle")
 
 
 def test_gateway_transition_calls_the_cas_function(gateway_client: MagicMock) -> None:
@@ -150,27 +145,6 @@ def test_gateway_lists_projectable_turns_scoped_to_the_page(
 
 
 # ── Hook wiring: Supabase mode must hit the production gateway path ──────────
-
-
-def test_accept_turn_invokes_the_production_gateway(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    gateway = MagicMock(spec=SupabaseGateway)
-    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
-
-    turn_lifecycle_hooks.accept_turn(
-        turn_id="turn-1",
-        user_id="user-1",
-        conversation_id="conv-1",
-        request_id="req-1",
-    )
-
-    gateway.create_chat_turn_lifecycle.assert_called_once_with(
-        turn_id="turn-1",
-        user_id="user-1",
-        conversation_id="conv-1",
-        request_id="req-1",
-    )
 
 
 def test_transition_turn_invokes_the_production_gateway(

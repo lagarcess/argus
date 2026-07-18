@@ -74,6 +74,20 @@ def test_cas_function_verifies_source_state_and_is_service_role_only() -> None:
     assert "to service_role" in text
 
 
+def test_cas_noop_comparison_includes_failure_evidence() -> None:
+    """DATA_MODEL: the same-transition no-op comparison covers the assistant
+    link, reconciliation outcome, failure code, and retryable — different
+    terminal failure truth conflicts."""
+
+    text = _text()
+    noop_start = text.index("if v_row.status = p_to_status")
+    noop_block = text[noop_start : text.index("'noop'", noop_start)]
+    assert "assistant_message_id" in noop_block
+    assert "reconciled_outcome" in noop_block
+    assert "failure_code" in noop_block
+    assert "retryable" in noop_block
+
+
 BOUNDARIES_MIGRATION = (
     Path(__file__).resolve().parents[1]
     / "supabase"
@@ -121,6 +135,25 @@ def test_reconciliation_is_owner_scoped() -> None:
     assert "conversation is not owned by the reconciling user" in body
     assert "and user_id = p_user_id" in body
     assert "m.user_id = v_row.user_id" in body
+
+
+def test_reconciliation_copies_failure_evidence() -> None:
+    """A reconciled recoverable failure carries the winning message's
+    canonical failure_code and retryable evidence onto the lifecycle row."""
+
+    text = _boundaries_text()
+    evidence_start = text.index(
+        "m.metadata->'agent_runtime_turn'->>'status' as turn_status"
+    )
+    reconciled_update = text.index("set status = 'reconciled'")
+    assert "failure_code" in text[evidence_start:reconciled_update]
+    reconciled_block = text[
+        reconciled_update : text.index("returning * into v_row", reconciled_update)
+    ]
+    assert "failure_code = case" in reconciled_block
+    assert "retryable = case" in reconciled_block
+    assert "v_evidence.failure_code" in reconciled_block
+    assert "v_evidence.retryable" in reconciled_block
 
 
 def test_reconciliation_boundary_is_database_owned() -> None:
