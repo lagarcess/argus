@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
-
 from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.message_store import memory_conversation, memory_message
 from argus.domain import backtest_admission as admission
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture(autouse=True)

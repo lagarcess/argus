@@ -169,3 +169,35 @@ settling `could_not_run`), EN/es-419 strings, OpenAPI artifact regenerated.
 
 Rollback boundary: revert the checkpoint commit (endpoint + frontend module are
 additive; the key-derivation change reverts with it).
+
+---
+
+## #252 — transcript cache and race safety (Wave 3 integration slice)
+
+Checkpoint commit: see commit map — `perf(web): integrate the transcript session cache into the chat shell`
+
+Changed surfaces: `ChatInterface.tsx` — module-scoped `TranscriptSessionCache`
+instance; `loadConversation` routed through `navigate()` (fresh-cache instant
+ready, stale-cache show-then-silently-refresh, cache-miss honest loading,
+latest-navigation-wins, error keeps cached view visible); scroll offset
+remembered on departure and restored on revisit; New Chat cancels pending keyed
+work; logout clears authenticated cache state; user identity resolved from
+`getMe` at bootstrap; mutation invalidation wired at send-start,
+rename (preserved), delete (evicted), durable job completion, and
+missing-conversation eviction. `.claude/launch.json` added for local preview.
+
+| Criterion | State | Evidence |
+| --- | --- | --- |
+| Delayed A→B switch cannot overwrite B | LOCAL_ACCEPTANCE_PASS | primitive race tests (16) + shell routed through the same controller |
+| A→B→A fresh reuse without duplicate blocking GET | LOCAL_ACCEPTANCE_PASS (product path wired) | `navigate()` fresh-cache path returns synchronously; browser smoke: revisit renders full transcript instantly |
+| ≤1 background revalidation on stale | LOCAL_ACCEPTANCE_PASS | primitive dedup test; shell uses `loadOnce` |
+| Cache keys include user identity; logout/user change clears | LOCAL_ACCEPTANCE_PASS | identity from bootstrap `getMe`; `clearAuthenticatedState()` on logout; primitive test |
+| Mutations invalidate only documented keys | LOCAL_ACCEPTANCE_PASS | five wired call sites (send, rename-preserved, delete, job-completion, missing-conversation) |
+| Cache miss never shows previous conversation as new selection | LOCAL_ACCEPTANCE_PASS | miss path emits `snapshot:null` → honest loading state; browser smoke clean |
+| Eviction bounds memory | LOCAL_ACCEPTANCE_PASS | primitive LRU count/byte tests |
+| Scroll state restored per conversation | LOCAL_ACCEPTANCE_PASS (mechanism) | rememberScroll on departure + rAF restore on ready |
+| Browser switching/scroll/reload/logout EN+ES profile with cold/warm p50/p95 | EXTERNAL_GATE_PENDING | measurement protocol still undefined (in-lane gap from Wave 0, now explicitly carried); local mocked smoke done (EN, mock auth): send → New Chat → Recents → revisit rehydrates, zero console errors |
+| No durable browser transcript storage | LOCAL_ACCEPTANCE_PASS | memory-only instance; nothing written to storage |
+
+Rollback boundary: revert the checkpoint commit, or set `maxEntries: 0` via
+`TRANSCRIPT_CACHE_POLICY` to disable caching while keeping race safety.

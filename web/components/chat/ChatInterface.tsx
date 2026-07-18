@@ -52,6 +52,7 @@ import {
   reconcileAmbiguousRun,
   runActionConfirmationId,
 } from "@/lib/chat-run-reconciliation";
+import { TranscriptSessionCache } from "@/lib/chat-transcript-session-cache";
 import {
   chatExploratorySuggestionsEnabled,
   collectionsEnabled,
@@ -157,6 +158,8 @@ type OnboardingChoice = {
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
+// #252: one memory-only in-session transcript cache for the shared shell.
+const transcriptSessionCache = new TranscriptSessionCache<HydratedMessages>();
 const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
 
 type HydratedMessages = {
@@ -672,6 +675,14 @@ export default function ChatInterface() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
+  // #252: cache keys include the authenticated user; resolved at bootstrap.
+  const transcriptUserIdRef = useRef("session-user");
+
+  const transcriptIdentity = (targetConversationId: string) => ({
+    userId: transcriptUserIdRef.current,
+    conversationId: targetConversationId,
+  });
+
   const chatOptionsRef = useRef<HTMLDivElement>(null);
   const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
   const activeConversationIdRef = useRef<string | null>(null);
@@ -955,6 +966,9 @@ export default function ChatInterface() {
     (async () => {
       try {
         const meResponse = await getMe().catch(() => null);
+        if (meResponse?.user?.id) {
+          transcriptUserIdRef.current = meResponse.user.id;
+        }
         const resolvedLanguage = meResponse?.user?.language ?? i18n.language;
         if (resolvedLanguage && resolvedLanguage !== i18n.language) {
           await i18n.changeLanguage(resolvedLanguage);
@@ -1075,6 +1089,19 @@ export default function ChatInterface() {
           return;
         }
         applyDurableBacktestJobResponse(response);
+        const jobStatus = response.job.status;
+        if (
+          response.job.conversation_id &&
+          (jobStatus === "succeeded" ||
+            jobStatus === "failed" ||
+            jobStatus === "canceled" ||
+            jobStatus === "expired")
+        ) {
+          transcriptSessionCache.invalidateForMutation({
+            ...transcriptIdentity(response.job.conversation_id),
+            mutation: "durable_job_completion",
+          });
+        }
         const shouldContinue =
           response.job.status === "queued" ||
           response.job.status === "running" ||
@@ -1110,13 +1137,17 @@ export default function ChatInterface() {
     closeTransientSidebar();
     closeChatOptions();
     setCurrentView("chat");
+    // #252: remember the departing conversation's scroll offset in-session.
+    if (conversationId && scrollContainerRef.current) {
+      transcriptSessionCache.rememberScroll({
+        ...transcriptIdentity(conversationId),
+        scrollTop: scrollContainerRef.current.scrollTop,
+      });
+    }
     rememberActiveConversationId(convId);
     setConversationId(convId);
-    setStreamStatus(t('common.loading'));
-    setIsHydratingConversation(true);
-    try {
-      const { items } = await getConversationMessages(convId, 50);
-      const hydrated = hydrateMessagesFromApi(items);
+
+    const applySnapshot = (hydrated: HydratedMessages) => {
       if (hydrated.messages.length === 0) {
         // Keep empty persisted conversations from the active route.
         resetToEmptyChatSurface();
@@ -1124,22 +1155,61 @@ export default function ChatInterface() {
       }
       setMessages(hydrated.messages);
       setInputActions(hydrated.inputActions);
-    } catch (error) {
-      if (isMissingConversationLoadError(error)) {
-        setHistoryItems((prev) =>
-          prev.filter((item) => !historyItemBelongsToConversation(item, convId)),
-        );
-        resetToEmptyChatSurface();
-        showToast(t('chat.error_load'));
-        return;
+      const savedScroll = transcriptSessionCache.readScroll(
+        transcriptIdentity(convId),
+      );
+      if (savedScroll !== null) {
+        shouldAutoScrollRef.current = false;
+        requestAnimationFrame(() => {
+          const container = scrollContainerRef.current;
+          if (container) container.scrollTop = savedScroll;
+        });
       }
-      setMessages([conversationLoadFailureMessage(convId, t('chat.error_load'))]);
-      setInputActions([]);
-      showToast(t('chat.error_load'));
-    } finally {
-      setStreamStatus(null);
-      setIsHydratingConversation(false);
-    }
+    };
+
+    const handle = transcriptSessionCache.navigate({
+      ...transcriptIdentity(convId),
+      load: async () => {
+        const { items } = await getConversationMessages(convId, 50);
+        return hydrateMessagesFromApi(items);
+      },
+      onState: (state) => {
+        if (state.phase === "loading") {
+          setStreamStatus(t('common.loading'));
+          setIsHydratingConversation(true);
+          return;
+        }
+        if (state.phase === "refreshing" || state.phase === "ready") {
+          applySnapshot(state.snapshot);
+          setStreamStatus(null);
+          setIsHydratingConversation(false);
+          return;
+        }
+        setStreamStatus(null);
+        setIsHydratingConversation(false);
+        if (state.snapshot) {
+          // The cached view stays visible; only the silent refresh failed.
+          showToast(t('chat.error_load'));
+          return;
+        }
+        if (isMissingConversationLoadError(state.error)) {
+          setHistoryItems((prev) =>
+            prev.filter((item) => !historyItemBelongsToConversation(item, convId)),
+          );
+          transcriptSessionCache.invalidateForMutation({
+            ...transcriptIdentity(convId),
+            mutation: "conversation_delete",
+          });
+          resetToEmptyChatSurface();
+          showToast(t('chat.error_load'));
+          return;
+        }
+        setMessages([conversationLoadFailureMessage(convId, t('chat.error_load'))]);
+        setInputActions([]);
+        showToast(t('chat.error_load'));
+      },
+    });
+    await handle.completion;
   };
 
   const loadConversationForRun = async (item: Pick<HistoryItem | SearchItem, "id" | "conversation_id">) => {
@@ -1181,6 +1251,8 @@ export default function ChatInterface() {
   // ── Start new chat ─────────────────────────────────────────────────────────
 
   const startNewChat = useCallback(async () => {
+    // #252: retire pending keyed work without discarding cached revisits.
+    transcriptSessionCache.cancelActiveNavigation();
     resetToEmptyChatSurface();
     closeTransientSidebar();
     try {
@@ -1631,6 +1703,11 @@ export default function ChatInterface() {
     const streamToConversation = (nextTargetConversationId: string) => {
       activeStreamTargetConversationId = nextTargetConversationId;
       activeStreamConversationIdRef.current = nextTargetConversationId;
+      // #252: a send mutates the transcript; cached revisits must refetch.
+      transcriptSessionCache.invalidateForMutation({
+            ...transcriptIdentity(nextTargetConversationId),
+            mutation: "message_send",
+          });
       return streamChatMessage(
         nextTargetConversationId,
         streamInput,
@@ -1915,6 +1992,8 @@ export default function ChatInterface() {
   };
 
   const handleLogout = async () => {
+    // #252: logout clears cached transcripts and scroll state immediately.
+    transcriptSessionCache.clearAuthenticatedState();
     try {
       await logoutFromApi();
     } catch {
@@ -2066,6 +2145,10 @@ export default function ChatInterface() {
     setIsSavingHeaderRename(true);
     try {
       await patchConversation(conversationId, { title: nextTitle });
+      transcriptSessionCache.invalidateForMutation({
+            ...transcriptIdentity(conversationId),
+            mutation: "conversation_rename",
+          });
       refreshHistory();
       showToast(t('common.save'));
       closeChatOptions();
@@ -2103,6 +2186,10 @@ export default function ChatInterface() {
     setIsDeletingHeaderChat(true);
     try {
       await deleteConversation(pendingHeaderDeleteId);
+      transcriptSessionCache.invalidateForMutation({
+            ...transcriptIdentity(pendingHeaderDeleteId),
+            mutation: "conversation_delete",
+          });
       showToast(t('common.delete'));
       handleConversationRemoved(pendingHeaderDeleteId);
     } catch {
