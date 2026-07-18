@@ -120,16 +120,18 @@ def reconcile_stale_chat_turns(
     client: Any,
     *,
     conversation_id: str,
+    user_id: str,
 ) -> list[dict[str, Any]]:
-    """One database-owned reconciliation boundary: stale selection on the
-    database clock, at-most-20 deterministic ordering, row locking, post-lock
-    stale recheck, the complete owner/conversation/request/turn evidence
-    predicate, and the terminal transition all live in
-    ``reconcile_stale_chat_turns`` (see migration 20260718000003)."""
+    """One database-owned, owner-scoped reconciliation boundary: unowned
+    conversations are rejected, and stale selection on the database clock,
+    at-most-20 deterministic ordering, row locking, post-lock stale recheck,
+    the complete owner/conversation/request/turn evidence predicate, and the
+    terminal transition all live in ``reconcile_stale_chat_turns`` (see
+    migration 20260718000003)."""
 
     result = client.rpc(
         "reconcile_stale_chat_turns",
-        {"p_conversation_id": conversation_id},
+        {"p_conversation_id": conversation_id, "p_user_id": user_id},
     ).execute()
     data = result.data
     if isinstance(data, dict):

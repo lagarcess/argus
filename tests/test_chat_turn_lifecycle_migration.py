@@ -82,6 +82,20 @@ def test_acceptance_composes_the_canonical_append_boundary() -> None:
     assert "on conflict (turn_id) do nothing" in text
 
 
+def test_reconciliation_is_owner_scoped() -> None:
+    """#240: the RPC carries the requesting user, rejects an unowned
+    conversation before touching any row, scopes stale selection to the
+    owner, and requires the evidence message's own user_id to match."""
+
+    text = _boundaries_text()
+    start = text.index("create or replace function public.reconcile_stale_chat_turns")
+    body = text[start:]
+    assert "p_user_id uuid" in body
+    assert "conversation is not owned by the reconciling user" in body
+    assert "and user_id = p_user_id" in body
+    assert "m.user_id = v_row.user_id" in body
+
+
 def test_reconciliation_boundary_is_database_owned() -> None:
     text = _boundaries_text()
     assert "create or replace function public.reconcile_stale_chat_turns" in text

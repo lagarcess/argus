@@ -67,7 +67,8 @@ grant execute on function public.accept_chat_turn(
 ) to service_role;
 
 create or replace function public.reconcile_stale_chat_turns(
-    p_conversation_id uuid
+    p_conversation_id uuid,
+    p_user_id uuid
 ) returns jsonb
 language plpgsql
 security definer
@@ -81,10 +82,19 @@ declare
     v_evidence record;
     v_reconciled jsonb := '[]'::jsonb;
 begin
+    -- Owner scope: reconciliation acts only for the conversation's owner.
+    if not exists (
+        select 1 from public.conversations c
+        where c.id = p_conversation_id and c.user_id = p_user_id
+    ) then
+        raise exception 'conversation is not owned by the reconciling user';
+    end if;
+
     for v_stale in
         select turn_id
         from public.chat_turn_lifecycles
         where conversation_id = p_conversation_id
+          and user_id = p_user_id
           and status in ('accepted', 'running')
           and coalesce(running_at, accepted_at) <= v_cutoff
         order by coalesce(running_at, accepted_at) asc, turn_id asc
@@ -102,15 +112,17 @@ begin
             continue;
         end if;
 
-        -- Complete evidence predicate: owner (via the conversation), the
-        -- lifecycle conversation, assistant role, exact turn and request
-        -- identity, terminal flag, and a terminal status; candidates order by
-        -- created_at asc with failure precedence, then id.
+        -- Complete evidence predicate: the message's own writer, the owner
+        -- (via the conversation), the lifecycle conversation, assistant role,
+        -- exact turn and request identity, terminal flag, and a terminal
+        -- status; candidates order by created_at asc with failure
+        -- precedence, then id.
         select m.id, m.metadata->'agent_runtime_turn'->>'status' as turn_status
         into v_evidence
         from public.messages m
         join public.conversations c on c.id = m.conversation_id
         where m.conversation_id = v_row.conversation_id
+          and m.user_id = v_row.user_id
           and c.user_id = v_row.user_id
           and m.role = 'assistant'
           and m.metadata->'agent_runtime_turn'->>'turn_id' = v_row.turn_id::text
@@ -153,7 +165,7 @@ begin
 end;
 $$;
 
-revoke all on function public.reconcile_stale_chat_turns(uuid)
+revoke all on function public.reconcile_stale_chat_turns(uuid, uuid)
     from public, anon, authenticated;
-grant execute on function public.reconcile_stale_chat_turns(uuid)
+grant execute on function public.reconcile_stale_chat_turns(uuid, uuid)
     to service_role;

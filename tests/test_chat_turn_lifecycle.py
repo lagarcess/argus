@@ -121,11 +121,14 @@ class _Msg:
         status: str,
         created_at: datetime,
         terminal: bool = True,
+        user_id: str | None = None,
     ) -> None:
         self.id = message_id
         self.conversation_id = conversation_id
         self.role = "assistant"
         self.created_at = created_at
+        if user_id is not None:
+            self.user_id = user_id
         self.metadata = {
             "agent_runtime_turn": {
                 "turn_id": turn_id,
@@ -417,6 +420,61 @@ def test_cross_owner_terminal_evidence_is_rejected() -> None:
     assert reconciled[0]["failure_code"] == "turn_abandoned"
 
 
+def test_foreign_message_user_cannot_qualify_as_evidence() -> None:
+    """A message whose user_id differs from the lifecycle owner is never
+    terminal evidence, even inside the owner's conversation."""
+
+    store = AlphaStore()
+    _seed_conversation(store)
+    store.conversation_owners["conv-1"] = "user-1"
+    _accept(store, accepted_ago_minutes=20)
+    store.messages["conv-1"] = [
+        _Msg(
+            message_id="assistant-intruder",
+            conversation_id="conv-1",
+            turn_id="turn-1",
+            request_id="req-1",
+            status="succeeded",
+            created_at=datetime.now(timezone.utc),
+            user_id="intruder-9",
+        )
+    ]
+
+    reconciled = lifecycle.reconcile_stale_turns_memory(store, conversation_id="conv-1")
+
+    assert len(reconciled) == 1
+    assert reconciled[0]["status"] == "abandoned"
+    assert reconciled[0]["failure_code"] == "turn_abandoned"
+
+
+def test_unauthorized_get_cannot_trigger_reconciliation(_memory_mode) -> None:
+    """#240: reconciliation never runs before route ownership succeeds — an
+    unauthorized reader's GET must not mutate the owner's lifecycle rows."""
+
+    api_state.store.get_or_create_dev_user()
+    foreign_owner = "11111111-1111-1111-1111-111111111111"
+    conversation = memory_conversation(
+        user_id=foreign_owner,
+        title="Not yours",
+        title_source="system_default",
+        language="en",
+    )
+    lifecycle.create_accepted_memory(
+        api_state.store,
+        turn_id="foreign-stale-turn",
+        user_id=foreign_owner,
+        conversation_id=conversation.id,
+        request_id="req-foreign",
+        now=datetime.now(timezone.utc) - timedelta(minutes=30),
+    )
+
+    response = TestClient(app).get(f"/api/v1/conversations/{conversation.id}/messages")
+
+    assert response.status_code == 404
+    row = api_state.store.chat_turn_lifecycles["foreign-stale-turn"]
+    assert row["status"] == "accepted"
+
+
 def test_gateway_reconcile_recheck_spares_a_freshly_running_turn() -> None:
     """A row that went running with a fresh clock after the stale read must
     not be abandoned from that stale earlier read."""
@@ -432,14 +490,15 @@ def test_gateway_reconcile_recheck_spares_a_freshly_running_turn() -> None:
     )
     gateway = SupabaseGateway(client=client)
 
-    gateway.reconcile_stale_chat_turns(conversation_id="conv-1")
+    gateway.reconcile_stale_chat_turns(conversation_id="conv-1", user_id="user-1")
 
     # The reconciliation boundary is database-owned: one RPC, where the
-    # database clock, row locks, and the post-lock stale recheck live.
+    # database clock, row locks, and the post-lock stale recheck live, and it
+    # is owner-scoped by the requesting user.
     client.rpc.assert_called_once()
     name, params = client.rpc.call_args.args
     assert name == "reconcile_stale_chat_turns"
-    assert params == {"p_conversation_id": "conv-1"}
+    assert params == {"p_conversation_id": "conv-1", "p_user_id": "user-1"}
     client.table.assert_not_called()
 
 

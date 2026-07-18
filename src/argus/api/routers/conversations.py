@@ -302,8 +302,6 @@ def list_messages(
         if api_state.supabase_gateway
         else api_state.store.conversations.get(conversation_id)
     )
-    # #240: reconcile stale turns before returning conversation messages.
-    turn_lifecycle_hooks.reconcile_conversation_turns(conversation_id=conversation_id)
     if (
         not conversation
         or conversation.deleted_at is not None
@@ -320,6 +318,12 @@ def list_messages(
             title="Not Found",
             detail="Conversation not found.",
         )
+    # #240: reconcile stale turns before returning conversation messages —
+    # only after route ownership succeeded, scoped to the requesting user.
+    turn_lifecycle_hooks.reconcile_conversation_turns(
+        conversation_id=conversation_id,
+        user_id=user.id,
+    )
 
     items: list[Message] | None = None
     if api_state.supabase_gateway is not None:

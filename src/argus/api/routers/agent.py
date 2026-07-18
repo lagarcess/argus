@@ -419,9 +419,11 @@ async def chat_stream(
             detail="Conversation not found.",
         )
     # #240: reconcile stale accepted/running turns before the next chat POST
-    # for this conversation; bounded, database-clock owned, no sweeper.
+    # for this conversation; bounded, database-clock owned, owner-scoped,
+    # no sweeper.
     turn_lifecycle_hooks.reconcile_conversation_turns(
-        conversation_id=conversation.id
+        conversation_id=conversation.id,
+        user_id=user.id,
     )
     recent_thread_history = load_runtime_thread_history(
         user_id=user.id,

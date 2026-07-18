@@ -207,6 +207,9 @@ def _terminal_turn_evidence(message: Any, *, row: dict[str, Any]) -> str | None:
         return None
     if getattr(message, "conversation_id", None) != row.get("conversation_id"):
         return None
+    message_user = getattr(message, "user_id", None)
+    if message_user is not None and str(message_user) != str(row.get("user_id")):
+        return None
     turn = metadata.get("agent_runtime_turn")
     if not isinstance(turn, dict):
         return None
@@ -244,16 +247,23 @@ def reconcile_stale_turns_memory(
     store: Any,
     *,
     conversation_id: str,
+    user_id: str | None = None,
     now: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Bounded reconciliation for one conversation: at most 20 stale
     accepted/running rows in deterministic stale_since ASC, turn_id ASC order,
     under one lock for the whole pass (selection, per-row stale recheck,
     evidence, and transition), mirroring the database boundary's row locking.
-    Evidence must belong to the row's owner; foreign-owner conversations never
-    reconcile a row. Durable terminal evidence wins (failure precedence on
-    ties); no proof transitions directly to abandoned with retryable typed
-    recovery."""
+    The pass is owner-scoped: a requester who does not own the conversation
+    mutates nothing. Evidence must belong to the row's owner and be written
+    by that owner; foreign evidence never reconciles a row. Durable terminal
+    evidence wins (failure precedence on ties); no proof transitions directly
+    to abandoned with retryable typed recovery."""
+
+    if user_id is not None:
+        owner = store.conversation_owners.get(conversation_id)
+        if owner is not None and owner != user_id:
+            return []
 
     moment = now or _utcnow()
     cutoff = moment - timedelta(minutes=STALE_TURN_MINUTES)

@@ -181,9 +181,15 @@ def test_reconcile_hook_invokes_the_production_gateway(
     gateway = MagicMock(spec=SupabaseGateway)
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
 
-    turn_lifecycle_hooks.reconcile_conversation_turns(conversation_id="conv-1")
+    turn_lifecycle_hooks.reconcile_conversation_turns(
+        conversation_id="conv-1",
+        user_id="user-1",
+    )
 
-    gateway.reconcile_stale_chat_turns.assert_called_once_with(conversation_id="conv-1")
+    gateway.reconcile_stale_chat_turns.assert_called_once_with(
+        conversation_id="conv-1",
+        user_id="user-1",
+    )
 
 
 def test_terminal_metadata_enrichment_uses_the_production_finder(

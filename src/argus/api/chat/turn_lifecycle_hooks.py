@@ -88,18 +88,23 @@ def transition_turn(
         )
 
 
-def reconcile_conversation_turns(*, conversation_id: str) -> None:
+def reconcile_conversation_turns(*, conversation_id: str, user_id: str) -> None:
     """Bounded pre-read reconciliation: before the next chat POST for a
-    conversation and before returning its messages."""
+    conversation and before returning its messages, owner-scoped to the
+    requesting user and only after route ownership has succeeded."""
 
     try:
         gateway = _gateway()
         if gateway is not None:
-            gateway.reconcile_stale_chat_turns(conversation_id=conversation_id)
+            gateway.reconcile_stale_chat_turns(
+                conversation_id=conversation_id,
+                user_id=user_id,
+            )
             return
         lifecycle.reconcile_stale_turns_memory(
             api_state.store,
             conversation_id=conversation_id,
+            user_id=user_id,
         )
     except Exception as exc:
         logger.warning(
