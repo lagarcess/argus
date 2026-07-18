@@ -20,6 +20,31 @@ def _gateway() -> Any | None:
     return api_state.supabase_gateway
 
 
+def terminal_turn_metadata(
+    *,
+    conversation_id: str,
+    request_id: str,
+    status: str,
+    failure_code: str | None = None,
+    retryable: bool | None = None,
+) -> dict[str, Any]:
+    """Canonical terminal turn envelope (#240): completed or
+    recoverable_failed, never the legacy succeeded/failed statuses; the
+    turn_id is enriched by the message store from the accepted lifecycle."""
+
+    turn: dict[str, Any] = {
+        "status": status,
+        "terminal": True,
+        "conversation_id": conversation_id,
+        "request_id": request_id,
+    }
+    if failure_code is not None:
+        turn["failure_code"] = failure_code
+    if retryable is not None:
+        turn["retryable"] = retryable
+    return turn
+
+
 def transition_turn(
     *,
     turn_id: str,

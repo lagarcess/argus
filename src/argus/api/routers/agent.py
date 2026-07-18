@@ -25,6 +25,7 @@ from argus.api.chat.actions import (
     is_cancel_confirmation_action,
     is_confirmation_action,
     is_result_action,
+    missing_result_action_run_message,
     missing_run_confirmation_action_id_message,
     persisted_chat_action,
     recent_metadata_invalidates_confirmation,
@@ -46,6 +47,8 @@ from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
 from argus.api.chat.onboarding import (
+    onboarding_goal_followup_text,
+    onboarding_prompt_text,
     parse_onboarding_control_message,
     persist_onboarding_update,
 )
@@ -224,31 +227,6 @@ def _strategies_enabled() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
-def _terminal_turn_metadata(
-    *,
-    conversation_id: str,
-    request_id: str,
-    status: str,
-    failure_code: str | None = None,
-    retryable: bool | None = None,
-) -> dict[str, Any]:
-    """Canonical terminal turn envelope (#240): completed or
-    recoverable_failed, never the legacy succeeded/failed statuses; the
-    turn_id is enriched by the message store from the accepted lifecycle."""
-
-    turn: dict[str, Any] = {
-        "status": status,
-        "terminal": True,
-        "conversation_id": conversation_id,
-        "request_id": request_id,
-    }
-    if failure_code is not None:
-        turn["failure_code"] = failure_code
-    if retryable is not None:
-        turn["retryable"] = retryable
-    return turn
-
-
 def _clean_optional_header(value: str | None) -> str | None:
     if value is None:
         return None
@@ -319,35 +297,6 @@ def _result_action_request_type(runtime_result: dict[str, Any]) -> str | None:
     if action_type in {"show_breakdown", "save_strategy"}:
         return str(action_type)
     return None
-
-
-def _missing_result_action_run_message(
-    *,
-    action_type: str,
-    language: str | None,
-) -> str:
-    is_es = str(language or "").lower().startswith("es")
-    if action_type == "save_strategy":
-        if is_es:
-            return (
-                "No pude encontrar el backtest completado para guardarlo. "
-                "Ejecuta la estrategia de nuevo y luego guárdala desde la "
-                "tarjeta de resultado."
-            )
-        return (
-            "I could not find the completed backtest to save. Run the strategy "
-            "again, then save it from the result card."
-        )
-    if is_es:
-        return (
-            "No pude encontrar el backtest completado para explicarlo. Ejecuta "
-            "la estrategia de nuevo y luego usa Explicar resultado desde la "
-            "tarjeta de resultado."
-        )
-    return (
-        "I could not find the completed backtest to explain. Run the strategy "
-        "again, then explain it from the result card."
-    )
 
 
 @router.get("/api/v1/chat/starter-prompts", response_model=StarterPromptsResponse)
@@ -536,7 +485,7 @@ async def chat_stream(
         failure_metadata: dict[str, Any] = {
             "conversation_mode": "recovery",
             "agent_runtime_stage_outcome": "agent_runtime_failure",
-            "agent_runtime_turn": _terminal_turn_metadata(
+            "agent_runtime_turn": turn_lifecycle_hooks.terminal_turn_metadata(
                 conversation_id=conversation.id,
                 request_id=request.state.request_id,
                 status="recoverable_failed",
@@ -785,13 +734,8 @@ async def chat_stream(
                 or current_user_profile.language
                 or "en"
             )
-            is_es = resolve_language(lang) == "es-419"
-            msg = (
-                "\u00bfCu\u00e1l es tu objetivo principal ahora? No te preocupes, "
-                "podr\u00e1s cambiarlo despu\u00e9s en Settings."
-                if is_es
-                else "What is your current primary goal? Don't worry, "
-                "you can change it later in Settings."
+            msg = onboarding_prompt_text(
+                is_spanish=resolve_language(lang) == "es-419"
             )
             yield sse_data({"type": "stage_start", "stage": "clarify"})
             assistant_message = create_message(
@@ -801,7 +745,7 @@ async def chat_stream(
                 content=msg,
                 metadata=(
                     {
-                        "agent_runtime_turn": _terminal_turn_metadata(
+                        "agent_runtime_turn": turn_lifecycle_hooks.terminal_turn_metadata(
                             conversation_id=conversation.id,
                             request_id=accepted_turn_request_id,
                             status="completed",
@@ -841,45 +785,10 @@ async def chat_stream(
                 or current_user_profile.language
                 or "en"
             )
-            is_es = resolve_language(lang) == "es-419"
-            if is_es:
-                mapping = {
-                    "learn_basics": (
-                        "Perfecto. Te ayudar\u00e9 con ideas simples para empezar. "
-                        "\u00bfQu\u00e9 activo te interesa?"
-                    ),
-                    "test_stock_idea": (
-                        "Perfecto. Cu\u00e9ntame tu idea de acci\u00f3n y la probamos."
-                    ),
-                    "build_passive_strategy": (
-                        "Perfecto. Podemos empezar con una idea pasiva tipo DCA."
-                    ),
-                    "explore_crypto": (
-                        "Perfecto. Empecemos con una idea de cripto que quieras validar."
-                    ),
-                    "surprise_me": (
-                        "Genial. Te propondr\u00e9 una idea inicial guiada para comenzar."
-                    ),
-                }
-            else:
-                mapping = {
-                    "learn_basics": (
-                        "I'll keep this beginner-friendly. You can ask me to explain an investing term, "
-                        "walk through an asset in plain language, or set up a simple historical test. "
-                        "If you name an asset like Apple or Bitcoin, I'll help you choose a sensible next step."
-                    ),
-                    "test_stock_idea": (
-                        "Great. Share the stock idea you want to test and I'll run it."
-                    ),
-                    "build_passive_strategy": (
-                        "Great. We can start with a passive DCA-style idea."
-                    ),
-                    "explore_crypto": (
-                        "Great. Let's start with a crypto idea you want to validate."
-                    ),
-                    "surprise_me": "Great. I'll guide you with a starter idea to begin.",
-                }
-            follow_up = mapping.get(onboarding_goal, mapping["surprise_me"])
+            follow_up = onboarding_goal_followup_text(
+                onboarding_goal,
+                is_spanish=resolve_language(lang) == "es-419",
+            )
             assistant_message = create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -911,7 +820,7 @@ async def chat_stream(
             if accepted_turn_request_id is not None:
                 # Deterministic early responder: no graph work ran, so the
                 # accepted turn completes with this durable recovery answer.
-                metadata["agent_runtime_turn"] = _terminal_turn_metadata(
+                metadata["agent_runtime_turn"] = turn_lifecycle_hooks.terminal_turn_metadata(
                     conversation_id=conversation.id,
                     request_id=accepted_turn_request_id,
                     status="completed",
@@ -974,7 +883,7 @@ async def chat_stream(
             if accepted_turn_request_id is not None:
                 # Deterministic early responder: no graph work ran, so the
                 # accepted turn completes with this durable artifact.
-                metadata["agent_runtime_turn"] = _terminal_turn_metadata(
+                metadata["agent_runtime_turn"] = turn_lifecycle_hooks.terminal_turn_metadata(
                     conversation_id=conversation.id,
                     request_id=accepted_turn_request_id,
                     status="completed",
@@ -1165,7 +1074,7 @@ async def chat_stream(
                         else "guide"
                     ),
                     "agent_runtime_stage_outcome": stage_status,
-                    "agent_runtime_turn": _terminal_turn_metadata(
+                    "agent_runtime_turn": turn_lifecycle_hooks.terminal_turn_metadata(
                         conversation_id=conversation.id,
                         request_id=request.state.request_id,
                         status="completed",
@@ -1203,7 +1112,7 @@ async def chat_stream(
                     elif result_action_type == "save_strategy":
                         yield sse_data({"type": "stage_start", "stage": "next_step"})
                         if result_action_run is None:
-                            assistant_text = _missing_result_action_run_message(
+                            assistant_text = missing_result_action_run_message(
                                 action_type=result_action_type,
                                 language=runtime_user.language_preference,
                             )
@@ -1452,7 +1361,7 @@ async def chat_stream(
                 "agent_runtime_stage_outcome": "agent_runtime_failure",
                 "failure_code": failure_code,
                 "retryable": finalization_failed,
-                "agent_runtime_turn": _terminal_turn_metadata(
+                "agent_runtime_turn": turn_lifecycle_hooks.terminal_turn_metadata(
                     conversation_id=conversation.id,
                     request_id=request.state.request_id,
                     status="recoverable_failed",

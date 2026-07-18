@@ -353,6 +353,35 @@ def stale_confirmation_action_message(
     return recovery_message("confirmation_action_stale_card", language=language)
 
 
+def missing_result_action_run_message(
+    *,
+    action_type: str,
+    language: str | None,
+) -> str:
+    is_es = str(language or "").lower().startswith("es")
+    if action_type == "save_strategy":
+        if is_es:
+            return (
+                "No pude encontrar el backtest completado para guardarlo. "
+                "Ejecuta la estrategia de nuevo y luego guárdala desde la "
+                "tarjeta de resultado."
+            )
+        return (
+            "I could not find the completed backtest to save. Run the strategy "
+            "again, then save it from the result card."
+        )
+    if is_es:
+        return (
+            "No pude encontrar el backtest completado para explicarlo. Ejecuta "
+            "la estrategia de nuevo y luego usa Explicar resultado desde la "
+            "tarjeta de resultado."
+        )
+    return (
+        "I could not find the completed backtest to explain. Run the strategy "
+        "again, then explain it from the result card."
+    )
+
+
 def missing_run_confirmation_action_id_message(language: str | None = None) -> str:
     return recovery_message("confirmation_action_missing_identity", language=language)
 

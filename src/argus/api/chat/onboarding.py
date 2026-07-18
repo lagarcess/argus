@@ -30,6 +30,59 @@ def parse_onboarding_control_message(message: str) -> str | None:
     return None
 
 
+def onboarding_prompt_text(*, is_spanish: bool) -> str:
+    if is_spanish:
+        return (
+            "¿Cuál es tu objetivo principal ahora? No te preocupes, "
+            "podrás cambiarlo después en Settings."
+        )
+    return (
+        "What is your current primary goal? Don't worry, "
+        "you can change it later in Settings."
+    )
+
+
+def onboarding_goal_followup_text(goal: str, *, is_spanish: bool) -> str:
+    if is_spanish:
+        mapping = {
+            "learn_basics": (
+                "Perfecto. Te ayudaré con ideas simples para empezar. "
+                "¿Qué activo te interesa?"
+            ),
+            "test_stock_idea": (
+                "Perfecto. Cuéntame tu idea de acción y la probamos."
+            ),
+            "build_passive_strategy": (
+                "Perfecto. Podemos empezar con una idea pasiva tipo DCA."
+            ),
+            "explore_crypto": (
+                "Perfecto. Empecemos con una idea de cripto que quieras validar."
+            ),
+            "surprise_me": (
+                "Genial. Te propondré una idea inicial guiada para comenzar."
+            ),
+        }
+    else:
+        mapping = {
+            "learn_basics": (
+                "I'll keep this beginner-friendly. You can ask me to explain an investing term, "
+                "walk through an asset in plain language, or set up a simple historical test. "
+                "If you name an asset like Apple or Bitcoin, I'll help you choose a sensible next step."
+            ),
+            "test_stock_idea": (
+                "Great. Share the stock idea you want to test and I'll run it."
+            ),
+            "build_passive_strategy": (
+                "Great. We can start with a passive DCA-style idea."
+            ),
+            "explore_crypto": (
+                "Great. Let's start with a crypto idea you want to validate."
+            ),
+            "surprise_me": "Great. I'll guide you with a starter idea to begin.",
+        }
+    return mapping.get(goal, mapping["surprise_me"])
+
+
 def persist_onboarding_update(user: User, patch: dict[str, Any]) -> User:
     current = (
         api_state.supabase_gateway.get_user(user_id=user.id)
