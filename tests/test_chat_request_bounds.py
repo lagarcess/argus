@@ -221,6 +221,47 @@ def test_other_routes_bypass_the_chat_ingress_ceiling() -> None:
     assert response.status_code != 413
 
 
+def test_unexpected_exception_is_logged_safely_with_response_request_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from loguru import logger as loguru_logger
+
+    class _ExplodingGateway:
+        def list_history_rows(self, **kwargs: object) -> object:
+            raise RuntimeError("secret provider detail sk-live-12345")
+
+    monkeypatch.setattr(api_state, "supabase_gateway", _ExplodingGateway())
+
+    records: list[dict] = []
+    sink_id = loguru_logger.add(
+        lambda message: records.append(dict(message.record["extra"])
+        | {"text": message.record["message"]}),
+        level="ERROR",
+    )
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get(
+            "/api/v1/history", headers={"X-Request-Id": "corr-500-log"}
+        )
+    finally:
+        loguru_logger.remove(sink_id)
+
+    assert response.status_code == 500
+    assert response.json()["request_id"] == "corr-500-log"
+
+    matching = [
+        record for record in records if record.get("request_id") == "corr-500-log"
+    ]
+    assert matching, records
+    logged = matching[0]
+    assert logged.get("error_type") == "RuntimeError"
+    assert logged.get("path") == "/api/v1/history"
+    blob = str(matching)
+    assert "secret provider detail" not in blob
+    assert "sk-live-12345" not in blob
+    assert "Traceback" not in blob
+
+
 def test_unexpected_exception_returns_safe_correlated_500(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

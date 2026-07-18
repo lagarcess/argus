@@ -118,8 +118,16 @@ async def unexpected_exception_handler(  # type: ignore[no-untyped-def]
     """#235: unexpected failures return safe RFC 9457 with the request's
     correlation id and no request body, secret, provider detail, or trace."""
 
-    del exc
     request_id = getattr(request.state, "request_id", None) or api_state.store.new_id()
+    # Ops correlation only: the exception class and route, never the message
+    # (which can embed provider or secret material), body, or a traceback.
+    logger.error(
+        "Unhandled request failure",
+        request_id=request_id,
+        error_type=type(exc).__name__,
+        method=request.method,
+        path=request.url.path,
+    )
     body = {
         "type": "https://api.argus.app/problems/internal-error",
         "title": "Internal Error",
