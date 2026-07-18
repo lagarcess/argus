@@ -266,3 +266,120 @@ implemented, so after review/merge of this branch the serialization gate
 reduces to the founder's authority decision), then apply
 `supabase/migrations/20260702000001_add_cost_ledger_entries.sql` and run the
 six-step verification in `docs/reports/issue-246-qa-cost-ledger-diagnosis.md`.
+
+---
+
+## #247 — allowance and reset truth (composition)
+
+Checkpoint commit: `a7238b1` — `feat(usage): expose private-alpha allowance truth with durable accounting`
+
+Applied PR #259's read/UI slice with the audit-recommended resolutions
+(duplicate period helper consolidated on `usage_limits.align_usage_period`;
+gateway composes the reader mixin; OpenAPI regenerated, not hand-merged), then
+completed the accounting composition the merged wave could not: simulation
+allowance is truthful and published in API + UI (EN/es-419) because #230's
+atomic admission owns the one-unit charge.
+
+| Criterion | State | Evidence |
+| --- | --- | --- |
+| Read model returns limit/used/remaining/exact period_end for messages AND simulations | LOCAL_ACCEPTANCE_PASS | endpoint tests incl. over-charge clamp; UI renders both cards |
+| Frontend never infers resets from Retry-After | LOCAL_ACCEPTANCE_PASS | contract test carried from PR #259 |
+| First durable admission +1 | LOCAL_ACCEPTANCE_PASS | composition proof |
+| 10 concurrent same-identity → 1 admission, 1 unit | LOCAL_ACCEPTANCE_PASS | barriered composition proof |
+| Replays consume zero | LOCAL_ACCEPTANCE_PASS | composition proof |
+| Pre-admission rejections consume zero | LOCAL_ACCEPTANCE_PASS | 400/422/mixed-asset proofs |
+| Post-admission failure leaves exactly one | LOCAL_ACCEPTANCE_PASS | crash-finalization proof (also fixed a real gap: crashes now finalize the durable job) |
+| Direct and chat launches share one rule | LOCAL_ACCEPTANCE_PASS | same operation, parity proof |
+| #251 preflight consumes zero | LOCAL_ACCEPTANCE_PASS | non-consuming precheck + preflight-before-charge proofs |
+| EN/ES browser QA of usage states | EXTERNAL_GATE_PENDING (real-auth/deployed) | mocked bun+Playwright specs green; real-auth ride the #233 candidate |
+| Real-Supabase counter parity | EXTERNAL_GATE_PENDING | RPC charges `usage_counters`; disposable-DB run shared with #230 gate |
+
+## #248 — account recovery and session controls (composition)
+
+Checkpoint commit: `a49179d` — `feat(auth): add account recovery and session controls`
+
+Applied PR #261 resolved onto this branch (OpenAPI via generator + declared
+503/403 truth; env-script suite made dotenv-hermetic), plus the serialized
+ProfileMenu Account-security entry now that #247's menu slice is landed.
+
+| Criterion | State | Evidence |
+| --- | --- | --- |
+| Enumeration-safe recovery, origin enforcement, bounded limiter | LOCAL_ACCEPTANCE_PASS | carried suites green (auth-security 791-line suite, backend auth tests) |
+| One-time recovery link exchange; safe invalid/expired/reused states | LOCAL_ACCEPTANCE_PASS (deterministic) | PKCE strip + parity tests |
+| local/others/global session scopes with honest partial outcomes | LOCAL_ACCEPTANCE_PASS (deterministic) | scoped-action tests |
+| Revoked sessions rejected; verification unavailable fails closed 503 | LOCAL_ACCEPTANCE_PASS (deterministic) | auth_sessions tests; 503 declared on every authenticated op in the artifact |
+| Profile-menu entry after #247 | LOCAL_ACCEPTANCE_PASS | live `/account/security` link; menu guard test updated to the truthful state |
+| Real Supabase Auth QA (real emails/links, two-browser revocation, deployed auth.sessions role proof) | EXTERNAL_GATE_PENDING | founder-gated exactly as PR #261 recorded |
+
+## #251 — remaining in-lane items (status tonight)
+
+Core implementation remains merged from PR #262 and revalidated green in
+tonight's sweeps. The two truly-external criteria (#230/#247 accounting — now
+locally satisfiable pending review; #243/#233 evidence) stand. The two
+audit-flagged unblocked items — the async drift→confirmation recovery bridge
+and the live-provider EN/ES QA session — were **not reached tonight**
+(GENUINE_BLOCKER: none; prioritization under finite runtime). They remain the
+first #251 follow-ups.
+
+## Train 4 (#238, #239, #241, #244 runtime) — NOT REACHED
+
+No interpreter-spine work was attempted tonight (deliberate: the spine is the
+highest-risk surface and the composition/evidence trains carried more provable
+acceptance per hour). No code claims exist. #244's paid provider comparison and
+founder activation checkpoint remain exactly as the audit recorded.
+
+## Train 6 (#243 adapters, #233 completion) — NOT REACHED
+
+The concrete mocked-runtime trajectory adapters and the #233 charge-delta
+authoring remain undone; the audit's finding that the #243 gate cannot register
+owner progress until adapters exist still stands and is the highest-leverage
+next slice after review of this branch.
+
+---
+
+## Final verification at the functional tip `a49179d`
+
+- Hermetic agent-runtime sweep: `poetry run pytest tests/agent_runtime tests/test_spine_guardrails.py -q --no-cov` → **1129 passed** (keys blanked, synthetic fixture).
+- Mocked evals: `poetry run pytest tests/evals -q --no-cov` → **58 passed, 1 sanctioned live-skip**.
+- Cumulative backend gate (CI list + every suite added tonight): → **660 passed**.
+- Web: `bun test __tests__` → **395 passed** (3,735 assertions); `bun run lint` → 0 errors (1 pre-existing warning); `bun run build` → production build green.
+- `ruff check src tests scripts workflows` clean; modularity budget clean; `git diff --check` clean.
+- Local mocked browser smoke (mock auth, sentinel env): chat turn with honest
+  degraded recovery, New Chat → Recents → revisit rehydration, zero console
+  errors (Train 2).
+
+## Commit map (base `390d572`)
+
+1. `29cc1e9` feat(api): OpenAPI structural gate (#234)
+2. `1149f76` docs(reports): ledger open
+3. `84fc0d6` feat(backtests): atomic admission (#230)
+4. `8bfc702` perf(backtests): database-only polls (#231)
+5. `3995cf2` fix(chat): ambiguous Run reconciliation (#242)
+6. `673d763` perf(web): transcript cache integration (#252)
+7. `3025e78` refactor(web): transcript hydration extraction (#252)
+8. `b1415ac` fix(api): chat request bounds + correlation (#235)
+9. `c384d29` feat(chat): durable turn lifecycle (#240)
+10. `a7238b1` feat(usage): allowance truth + durable accounting (#247)
+11. `a49179d` feat(auth): recovery and session controls (#248)
+12. (this commit) docs(reports): ledger completion
+
+Recommended review order: as listed (each commit is independently revertible;
+7 depends on 6; 10–11 depend on 3).
+
+## Consolidated external gates for tomorrow
+
+1. Real-Postgres barriered admission + CAS proofs on a disposable database
+   (`ARGUS_ADMISSION_TEST_DATABASE_URL`; tests are pre-written and skip-gated).
+2. QA cost-ledger repair under founder mutation authority (#246 runbook).
+3. #244: founder decision — bounded paid provider probe (proposed cap: ≤ $5)
+   and rubric threshold approval; then the real empirical comparison.
+4. #251: authorized live-provider EN/ES QA session; async bridge slice.
+5. #248: founder-approved test accounts + deployed recovery redirect +
+   deployed `auth.sessions` role proof; real-auth browser matrix.
+6. GitHub Actions run of the amended CI on the pushed candidate; then the
+   exact-SHA deployed Render browser canary (#233) after #243 adapters/green.
+7. Founder decisions: ratify this branch's scope, then review/integration.
+
+No GitHub state, external environment, production data, integration branch,
+or tester exposure was changed by this laboratory branch. The two open PR
+branches and all founder stashes were left untouched.
