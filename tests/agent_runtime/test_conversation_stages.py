@@ -823,7 +823,7 @@ def test_confirmation_action_assumption_uses_llm_voice_in_spanish() -> None:
     assert clarifier.requests[0].response_intent["semantic_needs"] == ["assumption"]
 
 
-def test_clarify_unsupported_recovery_uses_generator_over_prefilled_copy() -> None:
+def test_clarify_unsupported_recovery_prefers_prefilled_interpreter_prose() -> None:
     state = RunState.new(
         current_user_message="Test Apple when news sentiment turns positive.",
         recent_thread_history=[],
@@ -843,20 +843,37 @@ def test_clarify_unsupported_recovery_uses_generator_over_prefilled_copy() -> No
         ]
     }
     clarifier = RecordingClarifier(
-        "I understand the Apple sentiment idea over the past year, but sentiment is "
-        "not executable yet. I can use RSI or compare with buy-and-hold. Which "
-        "direction should I use?"
+        "generated prose that must never replace the interpreter's refusal"
+    )
+    refusal = (
+        "News sentiment isn't executable yet — I can test an RSI rule or a plain "
+        "buy-and-hold on Apple instead."
     )
 
     result = clarify_stage(
         state=state,
         contract=build_default_capability_contract(),
         clarification_generator=clarifier,
-        prefilled_assistant_prompt="Please simplify the strategy.",
+        prefilled_assistant_prompt=refusal,
     )
 
     assert result.outcome == "await_user_reply"
-    assert result.patch["assistant_prompt"] == clarifier.question
+    assert result.patch["assistant_prompt"] == refusal
+    assert clarifier.requests == []
+    assert result.patch["clarification"]["prompt_source"] == "llm_generated"
+    assert [option["label"] for option in result.patch["simplification_options"]] == [
+        "Use a supported RSI threshold rule",
+        "Compare with buy and hold",
+    ]
+
+    blank_prefill = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+        prefilled_assistant_prompt="   ",
+    )
+
+    assert blank_prefill.patch["assistant_prompt"] == clarifier.question
     assert clarifier.requests[0].unsupported_constraints[0]["category"] == (
         "unsupported_strategy_logic"
     )

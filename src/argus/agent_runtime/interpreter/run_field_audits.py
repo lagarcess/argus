@@ -250,6 +250,8 @@ def _clear_rule_or_indicator_fields(draft: LLMStrategyDraft) -> None:
 def _response_with_executable_fields_preferred_over_clarification_prose(
     response: LLMInterpretationResponse,
 ) -> LLMInterpretationResponse:
+    # An unsupported verdict on either typed field is not clarification noise;
+    # only the inverse capability audit may normalize it into a supported run.
     draft = response.candidate_strategy_draft
     if not (
         response.requires_clarification
@@ -258,7 +260,6 @@ def _response_with_executable_fields_preferred_over_clarification_prose(
         in {
             "strategy_drafting",
             "backtest_execution",
-            "unsupported_or_out_of_scope",
         }
         and response.semantic_turn_act
         not in {
@@ -268,6 +269,7 @@ def _response_with_executable_fields_preferred_over_clarification_prose(
             "refine_current_idea",
             "result_followup",
             "retry_failed_action",
+            "unsupported_request",
         }
         and response.capability_question_focus is None
         and response.context_question_focus is None

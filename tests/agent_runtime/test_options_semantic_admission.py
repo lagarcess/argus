@@ -19,6 +19,7 @@ from argus.agent_runtime.llm_interpreter_types import (
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
+    interpret_stage_async,
 )
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import (
@@ -579,6 +580,188 @@ async def test_pending_simplification_acceptance_progresses_without_loop(
     assert ready.intent == "backtest_execution"
     assert "pending_response_option_selected" in ready.reason_codes
     assert ready.unsupported_constraints == []
+
+
+# --- prose-bearing contradiction: readiness + admission cross-layer coverage ---------
+
+REFUSAL_PROSE_EN = "I can't run options strategies yet — I can test holding TSLA instead."
+
+_EXPECTED_VERDICT_BY_SHAPE = {
+    "unsupported_intent_only": ("unsupported_or_out_of_scope", "new_idea"),
+    "unsupported_act_only": ("backtest_execution", "unsupported_request"),
+    "both_unsupported": ("unsupported_or_out_of_scope", "unsupported_request"),
+}
+
+
+def _prose_bearing_inverse_response(shape: str) -> LLMInterpretationResponse:
+    response = _inverse_llm_response(date_range=FULL_YEAR_2024).model_copy(
+        update={
+            "requires_clarification": True,
+            "assistant_response": REFUSAL_PROSE_EN,
+        }
+    )
+    if shape == "unsupported_intent_only":
+        return response
+    if shape == "unsupported_act_only":
+        return response.model_copy(
+            update={
+                "intent": "backtest_execution",
+                "semantic_turn_act": "unsupported_request",
+            }
+        )
+    return response.model_copy(update={"semantic_turn_act": "unsupported_request"})
+
+
+def _stage_interpretation_from_readied(
+    readied: LLMInterpretationResponse,
+) -> StructuredInterpretation:
+    draft = readied.candidate_strategy_draft
+    return StructuredInterpretation(
+        intent=readied.intent,
+        task_relation=readied.task_relation,
+        requires_clarification=readied.requires_clarification,
+        user_goal_summary=readied.user_goal_summary,
+        assistant_response=readied.assistant_response,
+        candidate_strategy_draft=StrategySummary(
+            strategy_type=draft.strategy_type,
+            asset_universe=list(draft.asset_universe or []),
+            asset_class=draft.asset_class,
+            date_range=dict(draft.date_range)
+            if isinstance(draft.date_range, dict)
+            else None,
+        ),
+        semantic_turn_act=readied.semantic_turn_act,
+        missing_required_fields=list(readied.missing_required_fields),
+        reason_codes=list(readied.reason_codes),
+    )
+
+
+async def _run_interpret_async(
+    *,
+    message: str,
+    response: StructuredInterpretation,
+    user: UserState | None = None,
+):
+    interpreter = RecordingInterpreter(response)
+    result = await interpret_stage_async(
+        state=RunState.new(current_user_message=message, recent_thread_history=[]),
+        user=user or UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=interpreter,
+    )
+    return result, interpreter
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response_shape",
+    [
+        pytest.param("unsupported_intent_only"),
+        pytest.param("unsupported_act_only"),
+        pytest.param("both_unsupported"),
+    ],
+)
+@pytest.mark.parametrize(
+    "conflict_audit",
+    [
+        pytest.param(
+            RuntimeError("capability_conflict audit unavailable"), id="exception"
+        ),
+        pytest.param(_WrongSchema(), id="invalid_payload"),
+        pytest.param("keep", id="keep_unsupported"),
+        pytest.param("low_confidence", id="low_confidence"),
+    ],
+)
+async def test_prose_bearing_contradiction_keeps_verdict_through_readiness_and_admission(
+    monkeypatch: pytest.MonkeyPatch,
+    conflict_audit: Any,
+    response_shape: str,
+) -> None:
+    """The clarification-prose normalizer must never erase a non-promoted verdict."""
+
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    if conflict_audit == "keep":
+        conflict_audit = interpreter_module.SupportedStrategyCapabilityConflictAudit(
+            selected_strategy_type=None,
+            drop_unsupported_strategy_logic=False,
+            keep_unsupported_strategy_logic=True,
+            confidence=0.95,
+        )
+    elif conflict_audit == "low_confidence":
+        conflict_audit = interpreter_module.SupportedStrategyCapabilityConflictAudit(
+            selected_strategy_type="buy_and_hold",
+            drop_unsupported_strategy_logic=True,
+            keep_unsupported_strategy_logic=False,
+            confidence=0.4,
+        )
+    recorder = _SchemaRecorder(conflict_audit)
+    monkeypatch.setattr(interpreter_module, "invoke_openrouter_json_schema", recorder)
+    expected_intent, expected_turn_act = _EXPECTED_VERDICT_BY_SHAPE[response_shape]
+
+    readied = await interpreter_module._response_ready_for_runtime(
+        response=_prose_bearing_inverse_response(response_shape),
+        preferred_model="test-model",
+        request=_request(),
+    )
+
+    assert readied.intent == expected_intent
+    assert readied.semantic_turn_act == expected_turn_act
+    assert readied.requires_clarification is True
+    assert readied.assistant_response == REFUSAL_PROSE_EN
+    assert "executable_fields_overrode_clarification_prose" not in readied.reason_codes
+    assert "supported_strategy_capability_conflict_audit" not in readied.reason_codes
+    assert "supported_strategy_capability_conflict_inverse" not in readied.reason_codes
+
+    _stub_equity_asset_resolution(monkeypatch)
+    result, _ = await _run_interpret_async(
+        message=EN_OPTIONS_MESSAGE,
+        response=_stage_interpretation_from_readied(readied),
+    )
+    _assert_blocked_unsupported_admission(
+        result, symbol="TSLA", expected_intent=expected_intent
+    )
+    assert result.decision.semantic_turn_act == expected_turn_act
+    assert result.patch.get("assistant_response") == REFUSAL_PROSE_EN
+
+
+@pytest.mark.asyncio
+async def test_prose_bearing_contradiction_confident_promotion_still_admits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    recorder = _SchemaRecorder(
+        interpreter_module.SupportedStrategyCapabilityConflictAudit(
+            selected_strategy_type="buy_and_hold",
+            drop_unsupported_strategy_logic=True,
+            keep_unsupported_strategy_logic=False,
+            confidence=0.9,
+        )
+    )
+    monkeypatch.setattr(interpreter_module, "invoke_openrouter_json_schema", recorder)
+
+    readied = await interpreter_module._response_ready_for_runtime(
+        response=_prose_bearing_inverse_response("unsupported_intent_only"),
+        preferred_model="test-model",
+        request=_request("hold TSLA for all of 2024"),
+    )
+
+    assert readied.intent == "backtest_execution"
+    assert readied.semantic_turn_act == "new_idea"
+    assert readied.requires_clarification is False
+    assert readied.assistant_response is None
+    assert "supported_strategy_capability_conflict_inverse" in readied.reason_codes
+
+    _stub_equity_asset_resolution(monkeypatch)
+    result, _ = await _run_interpret_async(
+        message="hold TSLA for all of 2024",
+        response=_stage_interpretation_from_readied(readied),
+    )
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    assert result.decision.unsupported_constraints == []
 
 
 def test_admission_invariant_blocks_even_with_model_constraint_free_edge(
