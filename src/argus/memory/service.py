@@ -13,6 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from typing import TypeVar
 
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -25,11 +26,14 @@ from argus.memory.contracts import (
     MemoryRecord,
     MemorySourceRef,
     ProposalReason,
+    RetrievedMemory,
     SensitivityFlag,
 )
 from argus.memory.policy import MemoryPolicy, PolicyDecision
 from argus.memory.provider import MemoryRetrievalProvider
 from argus.memory.store import CanonicalMemoryStore
+
+T = TypeVar("T")
 
 MEMORY_ENABLED_ENV = "ARGUS_MEMORY_ENABLED"
 
@@ -79,6 +83,17 @@ class ProposalResult(BaseModel):
     status: ProposalStatus
     candidate: MemoryCandidate | None = None
     policy: PolicyDecision | None = None
+
+
+class MemoryExplanation(BaseModel):
+    """Answers "why was this remembered/used?" from canonical fields only."""
+
+    record_id: str
+    stored_reason: str
+    provenance: list[MemorySourceRef]
+    consent_version: str
+    confirmed_at: datetime
+    last_used_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -222,9 +237,87 @@ class MemoryService:
     def decline(self, user_id: str, candidate_id: str) -> None:
         self._store.discard_candidate(user_id, candidate_id)
 
+    # -- retrieval ----------------------------------------------------------
+
+    def retrieve(self, user_id: str, query: str) -> list[RetrievedMemory]:
+        if not self._config.globally_enabled:
+            return []
+        if not self._store.get_settings(user_id).enabled:
+            return []
+        records = {
+            record.id: record
+            for record in self._store.list_records(user_id)
+            if record.enabled
+        }
+        if not records:
+            return []
+        limit = self._config.retrieval_limit
+        hits = self._try_provider(
+            "search",
+            lambda: self._provider.search(user_id, query, limit),
+        )
+        if hits is None:
+            selected = self._canonical_matches(records, query, limit)
+        else:
+            selected = []
+            for hit in hits:
+                record = records.get(hit.record_id)
+                if record is None:
+                    continue
+                matched = ", ".join(hit.matched_terms)
+                selected.append((record, f"retrieval provider matched: {matched}"))
+        now = self._clock()
+        results: list[RetrievedMemory] = []
+        for record, why in selected[:limit]:
+            used = record.model_copy(update={"last_used_at": now})
+            self._store.replace_record(used)
+            results.append(
+                RetrievedMemory(
+                    record=used,
+                    why_selected=why,
+                    provenance=used.source_refs,
+                )
+            )
+        return results
+
+    @staticmethod
+    def _canonical_matches(
+        records: dict[str, MemoryRecord], query: str, limit: int
+    ) -> list[tuple[MemoryRecord, str]]:
+        query_tokens = {token for token in query.lower().split() if len(token) > 2}
+        scored: list[tuple[float, str, MemoryRecord, str]] = []
+        for record in records.values():
+            haystack = f"{record.value} {record.label}".lower().split()
+            matched = sorted(query_tokens & set(haystack))
+            if matched:
+                scored.append(
+                    (
+                        float(len(matched)),
+                        record.id,
+                        record,
+                        "provider unavailable; canonical store matched: "
+                        + ", ".join(matched),
+                    )
+                )
+        scored.sort(key=lambda row: (-row[0], row[1]))
+        return [(record, why) for _, _, record, why in scored[:limit]]
+
+    def explain(self, user_id: str, record_id: str) -> MemoryExplanation | None:
+        record = self._store.get_record(user_id, record_id)
+        if record is None:
+            return None
+        return MemoryExplanation(
+            record_id=record.id,
+            stored_reason=record.stored_reason,
+            provenance=record.source_refs,
+            consent_version=record.consent.version,
+            confirmed_at=record.consent.decided_at,
+            last_used_at=record.last_used_at,
+        )
+
     # -- provider fail-open -------------------------------------------------
 
-    def _try_provider(self, action: str, call: Callable[[], object]) -> object:
+    def _try_provider(self, action: str, call: Callable[[], T]) -> T | None:
         try:
             return call()
         except Exception as error:  # noqa: BLE001 - fail-open by contract
