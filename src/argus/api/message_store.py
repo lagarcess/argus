@@ -410,12 +410,17 @@ def _attach_turn_lifecycle_identity(
             request_id=request_id,
         )
     else:
-        finder = getattr(api_state.supabase_gateway, "find_active_chat_turn", None)
-        row = (
-            finder(conversation_id=conversation_id, request_id=request_id)
-            if finder
-            else None
-        )
+        try:
+            row = api_state.supabase_gateway.find_active_chat_turn(
+                conversation_id=conversation_id, request_id=request_id
+            )
+        except Exception as exc:
+            logger.warning(
+                "Turn lifecycle lookup failed open during terminal enrichment",
+                error=str(exc),
+                conversation_id=conversation_id,
+            )
+            row = None
     if not row or row.get("user_id") != user_id:
         return metadata
     return {

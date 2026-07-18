@@ -219,6 +219,11 @@ def _terminal_turn_evidence(message: Any, *, row: dict[str, Any]) -> str | None:
     return _METADATA_OUTCOMES.get(str(turn.get("status") or ""))
 
 
+# Public name for the shared reconciliation-evidence predicate; the gateway
+# orchestration reuses it verbatim so both backends judge identical evidence.
+terminal_turn_evidence = _terminal_turn_evidence
+
+
 def reconcile_stale_turns_memory(
     store: Any,
     *,

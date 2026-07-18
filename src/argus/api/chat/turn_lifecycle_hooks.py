@@ -30,14 +30,12 @@ def accept_turn(
     try:
         gateway = _gateway()
         if gateway is not None:
-            create = getattr(gateway, "create_chat_turn_lifecycle", None)
-            if create is not None:
-                create(
-                    turn_id=turn_id,
-                    user_id=user_id,
-                    conversation_id=conversation_id,
-                    request_id=request_id,
-                )
+            gateway.create_chat_turn_lifecycle(
+                turn_id=turn_id,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                request_id=request_id,
+            )
             return
         lifecycle.create_accepted_memory(
             api_state.store,
@@ -65,15 +63,13 @@ def transition_turn(
     try:
         gateway = _gateway()
         if gateway is not None:
-            transition = getattr(gateway, "transition_chat_turn_lifecycle", None)
-            if transition is not None:
-                transition(
-                    turn_id=turn_id,
-                    to_status=to_status,
-                    assistant_message_id=assistant_message_id,
-                    failure_code=failure_code,
-                    retryable=retryable,
-                )
+            gateway.transition_chat_turn_lifecycle(
+                turn_id=turn_id,
+                to_status=to_status,
+                assistant_message_id=assistant_message_id,
+                failure_code=failure_code,
+                retryable=retryable,
+            )
             return
         lifecycle.transition_memory(
             api_state.store,
@@ -99,9 +95,7 @@ def reconcile_conversation_turns(*, conversation_id: str) -> None:
     try:
         gateway = _gateway()
         if gateway is not None:
-            reconcile = getattr(gateway, "reconcile_stale_chat_turns", None)
-            if reconcile is not None:
-                reconcile(conversation_id=conversation_id)
+            gateway.reconcile_stale_chat_turns(conversation_id=conversation_id)
             return
         lifecycle.reconcile_stale_turns_memory(
             api_state.store,
