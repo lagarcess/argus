@@ -238,4 +238,10 @@ export type Message = {
   resultFactHeadingKey?: string | null;
   /** Typed degraded/offline recovery display rendered through web i18n. */
   recoveryDisplay?: RecoveryDisplay | null;
+  /** #240: presentation-only abandoned-turn recovery derived from the owning
+   * user message's overlay — no API message identity of its own. */
+  abandonedRecovery?: {
+    display: RecoveryDisplay;
+    action: ChatActionOption;
+  } | null;
 };

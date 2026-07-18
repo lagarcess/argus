@@ -6,6 +6,7 @@ import {
 import {
   coverageRecoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
+  recoveryDisplayFromRecoveryState,
   unsupportedTimeframeActionsFromMetadata,
 } from "./chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "./result-followup-heading";
@@ -23,6 +24,30 @@ function retryActionsFromMetadata(
     failedActionRetryActionFromMetadata(metadata),
     retryLastTurnActionFromMetadata(metadata, { assistantMessageId }),
   ].filter((action): action is ChatActionOption => Boolean(action));
+}
+
+function recordOrNull(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+// #240: the persisted user message carries the abandoned-turn overlay; one
+// presentation-only recovery attachment derives from it. It has no message
+// identity of its own, so it stays with its owner across cursor pages.
+function abandonedRecoveryFromMetadata(
+  metadata: Record<string, unknown>,
+): Message["abandonedRecovery"] {
+  const turn = recordOrNull(metadata.agent_runtime_turn);
+  if (turn?.status !== "abandoned" || turn?.terminal !== true) {
+    return undefined;
+  }
+  const display = recoveryDisplayFromRecoveryState(metadata.recovery);
+  const action = retryLastTurnActionFromMetadata(metadata);
+  if (!display || !action) {
+    return undefined;
+  }
+  return { display, action };
 }
 
 export function hydrateTextMessageFromApi(
@@ -61,6 +86,9 @@ export function hydrateTextMessageFromApi(
     recoveryDisplay: isAssistant
       ? recoveryDisplayFromMetadata(metadata)
       : undefined,
+    abandonedRecovery: isAssistant
+      ? undefined
+      : abandonedRecoveryFromMetadata(metadata),
   };
 }
 

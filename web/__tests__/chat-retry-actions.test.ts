@@ -179,6 +179,30 @@ describe("failed-action retry UI contract", () => {
     });
   });
 
+  test("keys the retry action by the persisted request_message_id", () => {
+    // #240: the stable retry action is keyed by request_message_id from the
+    // abandoned-turn overlay, never derived from display prose.
+    const action = retryLastTurnActionFromMetadata({
+      retry_last_turn: {
+        request_message_id: "user-turn-1",
+        message: "test AAPL momentum",
+        action: {
+          type: "show_breakdown",
+          label: "Show breakdown",
+          payload: { run_id: "run-77" },
+        },
+      },
+    });
+
+    expect(action?.payload?.request_message_id).toBe("user-turn-1");
+    expect(action?.payload?.message).toBe("test AAPL momentum");
+    expect(retryLastTurnChatActionFromAction(action)).toEqual({
+      type: "show_breakdown",
+      label: "Show breakdown",
+      payload: { run_id: "run-77" },
+    });
+  });
+
   test("preserves a typed chat action for finalization retry", () => {
     const action = retryLastTurnActionFromMetadata(
       {

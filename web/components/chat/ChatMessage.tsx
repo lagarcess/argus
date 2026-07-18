@@ -225,11 +225,38 @@ export default function ChatMessage({
   }
 
   if (isUser) {
+    const abandonedRecovery = message.abandonedRecovery;
     return (
-      <div className="flex w-full justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <div className="max-w-[85%] bg-black/5 dark:bg-white/10 text-black dark:text-white px-5 py-3.5 rounded-[24px] rounded-br-sm text-[16px] leading-[1.5] tracking-[0.24px] font-normal">
-          <UserMessageContent content={displayContent} mentions={message.mentions ?? []} />
+      <div className="flex w-full flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="flex w-full justify-end">
+          <div className="max-w-[85%] bg-black/5 dark:bg-white/10 text-black dark:text-white px-5 py-3.5 rounded-[24px] rounded-br-sm text-[16px] leading-[1.5] tracking-[0.24px] font-normal">
+            <UserMessageContent content={displayContent} mentions={message.mentions ?? []} />
+          </div>
         </div>
+        {abandonedRecovery && (
+          // #240 presentation-only recovery row: derived from this user
+          // message's overlay, never an assistant bubble, no message id, no
+          // feedback or copy affordances.
+          <div
+            data-testid="abandoned-recovery-row"
+            className="flex w-full justify-start"
+          >
+            <div className="flex max-w-[85%] flex-col gap-2">
+              <p className="text-[15px] leading-[1.55] tracking-[0.2px] text-black/70 dark:text-white/70">
+                {recoveryDisplayText(abandonedRecovery.display, t)}
+              </p>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => onAction?.(abandonedRecovery.action)}
+                  className="rounded-full border border-black/12 dark:border-white/12 px-3 py-1.5 text-[13px] font-medium tracking-tight text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
+                >
+                  {actionLabel(abandonedRecovery.action)}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

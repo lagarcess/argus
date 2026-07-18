@@ -123,6 +123,7 @@ export function failedActionRetryActionFromMetadata(
 type RetryLastTurnOptions = {
   assistantMessageId?: string;
   chatAction?: ChatActionOption | null;
+  requestMessageId?: string | null;
 };
 
 export function retryLastTurnActionFromMessage(
@@ -134,6 +135,7 @@ export function retryLastTurnActionFromMessage(
     return null;
   }
   const failedAssistantId = options?.assistantMessageId?.trim();
+  const requestMessageId = options?.requestMessageId?.trim();
   return {
     id: "retry-last-turn",
     label: "Retry",
@@ -142,6 +144,7 @@ export function retryLastTurnActionFromMessage(
     type: "retry_last_turn",
     payload: {
       message: trimmed,
+      ...(requestMessageId ? { request_message_id: requestMessageId } : {}),
       ...(failedAssistantId ? { failed_assistant_id: failedAssistantId } : {}),
       ...(options?.chatAction ? { chat_action: options.chatAction } : {}),
     },
@@ -160,6 +163,7 @@ export function retryLastTurnActionFromMetadata(
   return retryLastTurnActionFromMessage(message, {
     ...options,
     chatAction: structuredChatActionOrNull(retryLastTurn?.action),
+    requestMessageId: stringOrNull(retryLastTurn?.request_message_id),
   });
 }
 

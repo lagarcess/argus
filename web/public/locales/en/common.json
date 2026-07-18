@@ -266,6 +266,7 @@
       "context_market_movers_seed_recovery": "A short-lived movers snapshot can help pick experiment seeds: {{seeds}}. Treat those as symbols to validate, not recommendations or a live ranking. Choose one and I can shape a supported historical test.",
       "capability_answer_unavailable": "I could not phrase that capability answer clearly just now. Tell me the asset, period, or supported rule you want to test, or try again in a moment.",
       "runtime_failure": "Something went wrong. Your conversation is saved. Please try again.",
+      "turn_abandoned": "The assistant could not finish this turn. Your conversation is saved. Please try again.",
       "artifact_action_invalid_state": "That action is no longer attached to the current conversation state. Use the latest visible action or tell me what you want to do next.",
       "artifact_action_retry_stale": "That retry belongs to an older failed run. Use the latest retry action or confirm the setup you want to run.",
       "artifact_action_retry_missing_artifact_id": "That retry is missing its failed-run reference. Use the latest retry action or confirm the strategy you want me to run.",

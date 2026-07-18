@@ -266,6 +266,7 @@
       "context_market_movers_seed_recovery": "Una foto momentánea de movimientos puede ayudar a elegir semillas para un experimento: {{seeds}}. Trátalas como símbolos por validar, no como recomendaciones ni como un ranking en vivo. Elige uno y puedo plantear una prueba histórica compatible.",
       "capability_answer_unavailable": "No pude formular esa respuesta de capacidades con claridad en este momento. Dime el activo, periodo o regla compatible que quieres probar, o intenta de nuevo en un momento.",
       "runtime_failure": "Algo salió mal. Tu conversación está guardada. Intenta de nuevo.",
+      "turn_abandoned": "El asistente no pudo terminar este turno. Tu conversación está guardada. Intenta de nuevo.",
       "artifact_action_invalid_state": "Esa acción ya no está conectada al estado actual de la conversación. Usa la acción visible más reciente o dime qué quieres hacer ahora.",
       "artifact_action_retry_stale": "Ese reintento pertenece a una ejecución fallida anterior. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",
       "artifact_action_retry_missing_artifact_id": "A ese reintento le falta la referencia de la ejecución fallida. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",

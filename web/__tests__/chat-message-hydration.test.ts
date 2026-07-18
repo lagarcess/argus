@@ -71,6 +71,78 @@ describe("chat message hydration", () => {
     expect(message.actions).toBeUndefined();
   });
 
+  test("hydrates the abandoned-turn overlay into a presentation-only recovery", () => {
+    // #240: the persisted user message carries the abandoned overlay; the
+    // frontend derives one presentation-only recovery attachment from it —
+    // no assistant bubble and no API message identity.
+    const chatAction = {
+      type: "show_breakdown",
+      label: "Show breakdown",
+      payload: { run_id: "run-77" },
+    };
+    const message = hydrateTextMessageFromApi(
+      apiMessage({
+        id: "user-turn-1",
+        role: "user",
+        content: "test AAPL momentum",
+        metadata: {
+          agent_runtime_turn: {
+            turn_id: "user-turn-1",
+            request_id: "req-1",
+            status: "abandoned",
+            terminal: true,
+            reconciled_outcome: null,
+            failure_code: "turn_abandoned",
+            retryable: true,
+          },
+          recovery: { code: "turn_abandoned", retryable: true },
+          retry_last_turn: {
+            request_message_id: "user-turn-1",
+            message: "test AAPL momentum",
+            action: chatAction,
+          },
+        },
+      }),
+    );
+
+    expect(message.role).toBe("user");
+    expect(message.actions).toBeUndefined();
+    expect(message.abandonedRecovery?.display).toEqual({
+      kind: "recovery_code",
+      code: "turn_abandoned",
+      values: undefined,
+    });
+    expect(message.abandonedRecovery?.action.type).toBe("retry_last_turn");
+    expect(message.abandonedRecovery?.action.payload?.request_message_id).toBe(
+      "user-turn-1",
+    );
+    expect(message.abandonedRecovery?.action.payload?.message).toBe(
+      "test AAPL momentum",
+    );
+    expect(message.abandonedRecovery?.action.payload?.chat_action).toEqual(
+      chatAction,
+    );
+  });
+
+  test("non-abandoned user messages carry no recovery attachment", () => {
+    const message = hydrateTextMessageFromApi(
+      apiMessage({
+        id: "user-2",
+        role: "user",
+        content: "healthy turn",
+        metadata: {
+          agent_runtime_turn: {
+            turn_id: "user-2",
+            request_id: "req-2",
+            status: "started",
+          },
+        },
+      }),
+    );
+
+    expect(message.abandonedRecovery).toBeUndefined();
+  });
+
   test("hydrates coverage recovery actions from persisted typed metadata", () => {
     const message = hydrateTextMessageFromApi(
       apiMessage({
