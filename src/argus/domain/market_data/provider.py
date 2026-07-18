@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time as time_module
@@ -302,12 +303,65 @@ def fetch_ohlcv(
     end_date: date,
     timeframe: str,
 ) -> pd.DataFrame:
+    if os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "").strip().lower() == (
+        "synthetic_unit_fixture"
+    ):
+        return _synthetic_ohlcv(
+            symbol=symbol,
+            start_date=start_date,
+            end_date=end_date,
+            timeframe=timeframe,
+        )
     return _fetch_bars_with_ttl(
         symbol=symbol,
         asset_class=asset_class,
         start_date=start_date,
         end_date=end_date,
         timeframe=timeframe,
+    )
+
+
+def _synthetic_ohlcv(
+    *,
+    symbol: str,
+    start_date: date,
+    end_date: date,
+    timeframe: str,
+) -> pd.DataFrame:
+    frequency = {
+        "1D": "1D",
+        "1d": "1D",
+        "1h": "1h",
+        "2h": "2h",
+        "4h": "4h",
+        "6h": "6h",
+        "12h": "12h",
+    }.get(timeframe)
+    if frequency is None:
+        raise ValueError("unsupported_timeframe")
+    index = pd.date_range(
+        start=_to_utc_datetime(start_date),
+        end=_to_utc_datetime(end_date, end_of_day=frequency != "1D"),
+        freq=frequency,
+    )
+    if len(index) < 2:
+        raise ValueError("market_data_unavailable")
+    seed = int.from_bytes(
+        hashlib.sha256(symbol.strip().upper().encode("utf-8")).digest()[:4],
+        "big",
+    )
+    base = 50.0 + float(seed % 20_000) / 100.0
+    offsets = pd.Series(range(len(index)), index=index, dtype=float)
+    close = base + offsets * 0.1
+    return pd.DataFrame(
+        {
+            "open": close - 0.05,
+            "high": close + 0.1,
+            "low": close - 0.1,
+            "close": close,
+            "volume": 1_000.0 + offsets,
+        },
+        index=index,
     )
 
 

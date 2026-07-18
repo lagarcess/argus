@@ -263,6 +263,22 @@ def resolve_executable_date_range(
     return explicit_resolution
 
 
+def requested_date_range_from_strategy(
+    strategy: Mapping[str, Any],
+) -> dict[str, str] | None:
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, Mapping):
+        return None
+    requested = extra_parameters.get("requested_date_range")
+    if not (
+        isinstance(requested, Mapping)
+        and isinstance(requested.get("start"), str)
+        and isinstance(requested.get("end"), str)
+    ):
+        return None
+    return resolve_executable_date_range(requested).payload
+
+
 def normalize_date_range_candidate(
     value: Any,
     *,

@@ -41,6 +41,7 @@ PendingNeedName = Literal[
 ResponseIntentKind = Literal[
     "clarification",
     "beginner_guidance",
+    "coverage_recovery",
     "unsupported_recovery",
     "ambiguity_check",
     "optional_settings",

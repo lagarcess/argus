@@ -11,6 +11,7 @@ from argus.agent_runtime.confirmation_artifacts import (
     confirmation_artifact_reference,
     new_confirmation_id,
 )
+from argus.agent_runtime.coverage_recovery import coverage_recovery_stage_patch
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState, StrategySummary
 from argus.agent_runtime.strategy_contract import (
@@ -44,8 +45,10 @@ def confirm_stage(
     strategy = _strategy_payload(state.candidate_strategy_draft)
     strategy = _strategy_with_runtime_language(strategy, language=language)
     strategy = _strategy_with_explicit_date_intent(strategy)
+    strategy = _strategy_with_requested_date_range_provenance(strategy)
     strategy = _strategy_without_incompatible_rule_fields(strategy)
     strategy = _strategy_with_latest_complete_data_adjustment(strategy)
+    strategy = _strategy_with_requested_date_range_for_preflight(strategy)
     logger.debug(
         "Confirm stage latest complete data adjustment checked",
         strategy_type=strategy.get("strategy_type"),
@@ -95,7 +98,7 @@ def confirm_stage(
             outcome="needs_clarification",
             stage_patch=unsupported_assumption,
         )
-    confirmation_payload = {
+    confirmation_payload: dict[str, Any] = {
         "strategy": strategy,
         "optional_parameters": optional_parameters,
     }
@@ -111,12 +114,30 @@ def confirm_stage(
             if key not in {"outcome", "launch_payload"}
         }
         return StageResult(
-            outcome=str(validation_result["outcome"]),
+            outcome="needs_clarification",
             stage_patch=stage_patch,
         )
     launch_payload = validation_result["launch_payload"]
+    coverage_result = _coverage_preflight(
+        launch_payload,
+        optional_parameter_status=state.optional_parameter_status,
+    )
+    if coverage_result["outcome"] != "ready_to_confirm":
+        return StageResult(
+            outcome="needs_clarification",
+            stage_patch={
+                key: value
+                for key, value in coverage_result.items()
+                if key not in {"outcome", "launch_payload"}
+            },
+        )
+    launch_payload = dict(coverage_result["launch_payload"])
     canonical_strategy = _strategy_with_launch_benchmark(
         strategy,
+        launch_payload=launch_payload,
+    )
+    canonical_strategy = _strategy_with_effective_date_range(
+        canonical_strategy,
         launch_payload=launch_payload,
     )
     card_assumptions = _visible_card_assumptions(
@@ -134,7 +155,10 @@ def confirm_stage(
     confirmation_payload["validation"] = {
         "status": "ready_to_run",
         "executable": True,
-        "date_adjusted": _has_data_availability_adjustment(strategy_with_assumptions),
+        "date_adjusted": (
+            _has_data_availability_adjustment(strategy_with_assumptions)
+            or _has_effective_window_adjustment(launch_payload)
+        ),
     }
     confirmation_reference = confirmation_artifact_reference(
         confirmation_id=confirmation_id,
@@ -159,6 +183,7 @@ def _validated_launch_payload(
     state: RunState,
     confirmation_payload: dict[str, Any],
 ) -> dict[str, Any]:
+    launch_payload: dict[str, Any] = {}
     try:
         from argus.agent_runtime.stages.execute import _launch_payload
 
@@ -174,7 +199,11 @@ def _validated_launch_payload(
     except ValidationError as exc:
         return _launch_validation_failure(_validation_error_code(exc))
     except ValueError as exc:
-        return _launch_validation_failure(str(exc))
+        return _launch_validation_failure(
+            str(exc),
+            raw_value=launch_payload.get("timeframe"),
+            optional_parameter_status=state.optional_parameter_status,
+        )
     except Exception:
         return _launch_validation_failure("missing_rule_group")
     return {
@@ -184,6 +213,199 @@ def _validated_launch_payload(
         "requested_field": None,
         "assistant_prompt": None,
     }
+
+
+def _coverage_preflight(
+    launch_payload: dict[str, Any],
+    *,
+    optional_parameter_status: dict[str, Any],
+) -> dict[str, Any]:
+    from argus.domain.backtesting.coverage import (
+        MarketDataCoverageError,
+        prepare_market_data,
+    )
+    from argus.domain.engine_launch.adapter import (
+        validate_request_benchmark,
+        validate_request_symbols,
+    )
+
+    try:
+        request = LaunchBacktestRequest.model_validate(launch_payload)
+        symbol_validation = validate_request_symbols(request)
+        if symbol_validation.outcome == "unavailable":
+            return coverage_recovery_stage_patch(
+                error_code="market_data_unavailable",
+                launch_payload=launch_payload,
+                optional_parameter_status=optional_parameter_status,
+            )
+        if symbol_validation.outcome != "resolved":
+            return _launch_validation_failure(
+                symbol_validation.error_code or "invalid_symbol"
+            )
+        symbols = list(symbol_validation.symbols)
+        asset_class = symbol_validation.asset_class
+        if asset_class is None:
+            return _launch_validation_failure("invalid_asset_class")
+        benchmark_validation = validate_request_benchmark(
+            request,
+            asset_class=asset_class,
+        )
+        if benchmark_validation.outcome == "unavailable":
+            return coverage_recovery_stage_patch(
+                error_code="market_data_unavailable",
+                launch_payload=launch_payload,
+                optional_parameter_status=optional_parameter_status,
+            )
+        if (
+            benchmark_validation.outcome != "resolved"
+            or benchmark_validation.benchmark_symbol is None
+        ):
+            return _launch_validation_failure(
+                benchmark_validation.error_code or "invalid_benchmark_symbol"
+            )
+        canonical_launch_payload = {
+            **launch_payload,
+            "benchmark_symbol": benchmark_validation.benchmark_symbol,
+        }
+        request = LaunchBacktestRequest.model_validate(canonical_launch_payload)
+        requested_range = request.requested_date_range or request.date_range
+        config = {
+            "asset_class": asset_class,
+            "symbols": symbols,
+            "timeframe": request.timeframe,
+            "start_date": request.date_range.start,
+            "end_date": request.date_range.end,
+            "requested_date_range": requested_range.model_dump(),
+            "benchmark_symbol": request.benchmark_symbol,
+        }
+        prepared = prepare_market_data(config)
+    except MarketDataCoverageError as exc:
+        return coverage_recovery_stage_patch(
+            error_code=exc.code,
+            launch_payload=launch_payload,
+            optional_parameter_status=optional_parameter_status,
+        )
+    except ValueError as exc:
+        return _launch_validation_failure(str(exc))
+
+    requested = prepared.requested_date_range.model_dump()
+    effective = prepared.effective_date_range.model_dump()
+    coverage = prepared.coverage_payload()
+    coverage["preflight_id"] = coverage.pop("dataset_id")
+    adjusted_launch_payload = {
+        **canonical_launch_payload,
+        "date_range": effective,
+        "requested_date_range": requested,
+        "coverage_preflight": coverage,
+    }
+    try:
+        adjusted_request = LaunchBacktestRequest.model_validate(adjusted_launch_payload)
+        validate_launch_supported(adjusted_request)
+    except ValidationError as exc:
+        return _launch_validation_failure(_validation_error_code(exc))
+    except ValueError as exc:
+        return _launch_validation_failure(str(exc))
+    return {
+        "outcome": "ready_to_confirm",
+        "launch_payload": adjusted_launch_payload,
+    }
+
+
+def _strategy_with_effective_date_range(
+    strategy: dict[str, Any],
+    *,
+    launch_payload: dict[str, Any],
+) -> dict[str, Any]:
+    effective = launch_payload.get("date_range")
+    requested = launch_payload.get("requested_date_range")
+    if not isinstance(effective, dict) or not isinstance(requested, dict):
+        return strategy
+    extra_parameters = dict(strategy.get("extra_parameters") or {})
+    extra_parameters["requested_date_range"] = dict(requested)
+    extra_parameters["effective_date_range"] = dict(effective)
+    return {
+        **strategy,
+        "date_range": dict(effective),
+        "extra_parameters": extra_parameters,
+    }
+
+
+def _strategy_with_requested_date_range_for_preflight(
+    strategy: dict[str, Any],
+) -> dict[str, Any]:
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return strategy
+    requested = extra_parameters.get("requested_date_range")
+    effective = extra_parameters.get("effective_date_range")
+    current = strategy.get("date_range")
+    if not all(
+        _is_structured_date_range(value)
+        for value in (requested, effective, current)
+    ):
+        return strategy
+    artifact_patch = extra_parameters.get("artifact_patch")
+    changed_fields = (
+        artifact_patch.get("changed_fields")
+        if isinstance(artifact_patch, dict)
+        else []
+    )
+    if isinstance(changed_fields, list) and "date_range" in changed_fields:
+        return strategy
+    if current != effective:
+        return strategy
+    return {**strategy, "date_range": dict(requested)}
+
+
+def _strategy_with_requested_date_range_provenance(
+    strategy: dict[str, Any],
+) -> dict[str, Any]:
+    extra_parameters = dict(strategy.get("extra_parameters") or {})
+    artifact_patch = extra_parameters.get("artifact_patch")
+    changed_fields = (
+        artifact_patch.get("changed_fields")
+        if isinstance(artifact_patch, dict)
+        else []
+    )
+    date_was_edited = isinstance(changed_fields, list) and (
+        "date_range" in changed_fields
+    )
+    current = strategy.get("date_range")
+    requested = extra_parameters.get("requested_date_range")
+    effective = extra_parameters.get("effective_date_range")
+    preserve_existing = (
+        not date_was_edited
+        and _is_structured_date_range(requested)
+        and _is_structured_date_range(effective)
+        and current == effective
+    )
+    if not preserve_existing:
+        try:
+            resolved = resolve_executable_date_range(
+                current,
+                extra_parameters=extra_parameters,
+                today=_today(),
+            )
+        except (TypeError, ValueError):
+            return strategy
+        requested = resolved.payload
+    extra_parameters["requested_date_range"] = dict(requested)
+    if date_was_edited:
+        extra_parameters.pop("effective_date_range", None)
+    return {**strategy, "extra_parameters": extra_parameters}
+
+
+def _is_structured_date_range(value: Any) -> bool:
+    return (
+        isinstance(value, dict)
+        and isinstance(value.get("start"), str)
+        and isinstance(value.get("end"), str)
+    )
+
+
+def _has_effective_window_adjustment(launch_payload: dict[str, Any]) -> bool:
+    coverage = launch_payload.get("coverage_preflight")
+    return isinstance(coverage, dict) and coverage.get("outcome") == ("adjusted_coverage")
 
 
 def _confirmation_payload_language(confirmation_payload: dict[str, Any]) -> str:
@@ -211,7 +433,41 @@ def _validation_error_code(exc: ValidationError) -> str:
     return "missing_rule_group"
 
 
-def _launch_validation_failure(error_code: str) -> dict[str, Any]:
+def _launch_validation_failure(
+    error_code: str,
+    *,
+    raw_value: Any | None = None,
+    optional_parameter_status: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if error_code == "unsupported_timeframe":
+        return {
+            "outcome": "needs_clarification",
+            "missing_required_fields": ["timeframe"],
+            "requested_field": "timeframe",
+            "assistant_prompt": None,
+            "optional_parameter_status": _with_unsupported_constraint(
+                dict(optional_parameter_status or {}),
+                {
+                    "category": "unsupported_time_granularity",
+                    "raw_value": raw_value or error_code,
+                    "explanation": (
+                        "That bar size is not supported by the current backtest "
+                        "engine. Choose a supported timeframe to keep the rest of "
+                        "the strategy unchanged."
+                    ),
+                    "simplification_options": [
+                        {
+                            "label": "Retry with daily bars",
+                            "replacement_values": {"timeframe": "1D"},
+                        },
+                        {
+                            "label": "Retry with 1-hour bars",
+                            "replacement_values": {"timeframe": "1h"},
+                        },
+                    ],
+                },
+            ),
+        }
     if error_code == "future_end_date":
         return {
             "outcome": "needs_clarification",
@@ -486,7 +742,9 @@ def _market_clock_for_strategy(asset_class: str) -> Any:
     try:
         logger.debug("Confirm stage market clock fetch started", asset_class=asset_class)
         clock = fetch_alpaca_market_clock()
-        logger.debug("Confirm stage market clock fetch completed", asset_class=asset_class)
+        logger.debug(
+            "Confirm stage market clock fetch completed", asset_class=asset_class
+        )
         return clock
     except Exception:
         logger.opt(exception=True).debug(

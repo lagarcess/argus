@@ -25,6 +25,9 @@ from argus.agent_runtime.capabilities.answers import (
     capability_fact_packet,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.coverage_recovery import (
+    preserved_optional_parameter_status_from_response_intent,
+)
 from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.interpreter import provider_context_assets
 from argus.agent_runtime.presentation_i18n import (
@@ -440,6 +443,7 @@ async def _stage_result_from_interpretation(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
+    is_new_idea_interpretation = interpretation.semantic_turn_act == "new_idea"
     logger.debug(
         "Interpret stage post-LLM repair started",
         intent=interpretation.intent,
@@ -1018,6 +1022,28 @@ async def _stage_result_from_interpretation(
         decision=decision,
         values=optional_parameter_values,
     )
+    preserved_optional_parameter_status = (
+        preserved_optional_parameter_status_from_response_intent(
+            selected_thread_metadata.get("response_intent")
+        )
+    )
+    if (
+        preserved_optional_parameter_status is not None
+        and not is_new_idea_interpretation
+    ):
+        current_optional_parameter_status = optional_parameter_stage_patch.get(
+            "optional_parameter_status"
+        )
+        optional_parameter_stage_patch = {
+            "optional_parameter_status": {
+                **preserved_optional_parameter_status,
+                **(
+                    current_optional_parameter_status
+                    if isinstance(current_optional_parameter_status, dict)
+                    else {}
+                ),
+            }
+        }
     approval_result = _approval_stage_result_if_applicable(
         decision=decision,
         snapshot=snapshot,
@@ -2331,14 +2357,13 @@ def _strategy_with_requested_asset_answer_resolution(
     semantic_turn_act: str | None,
     pending_resolution_applied: bool,
 ) -> tuple[StrategySummary, bool]:
-    if pending_resolution_applied:
+    if pending_resolution_applied or semantic_turn_act == "new_idea":
         return strategy, False
     requested_field = _field_base(
         str(selected_thread_metadata.get("requested_field") or "")
     )
     if requested_field != "asset_universe":
         return strategy, False
-    del semantic_turn_act
     prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
     if len(prior_symbols) > 1:
         # This corridor fills a single asset slot; multi-asset universes are

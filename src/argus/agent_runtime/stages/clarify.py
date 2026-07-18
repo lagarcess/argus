@@ -7,10 +7,20 @@ from typing import Protocol
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.clarification_contract import (
+    ClarificationPromptSource,
     offline_clarification_fallback,
     typed_clarification_contract,
 )
+from argus.agent_runtime.coverage_recovery import (
+    PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT,
+    coverage_recovery_from_status,
+    coverage_recovery_options,
+    optional_parameter_status_without_coverage_recovery,
+)
 from argus.agent_runtime.llm_clarifier import ClarificationRequest
+from argus.agent_runtime.simplification_option_contract import (
+    simplification_option_kind,
+)
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
     PendingNeedName,
@@ -62,6 +72,7 @@ async def clarify_stage_async(
     language: str = "en",
     prefilled_assistant_prompt: str | None = None,
 ) -> StageResult:
+    coverage_recovery = coverage_recovery_from_status(state.optional_parameter_status)
     unsupported_constraints = _unsupported_constraints(state.optional_parameter_status)
     ambiguous_fields = _ambiguous_fields(state.optional_parameter_status)
     optional_parameter_choices = _optional_parameter_choices(
@@ -80,13 +91,82 @@ async def clarify_stage_async(
         unsupported_constraints=unsupported_constraints,
     )
 
+    if coverage_recovery is not None:
+        requested_fields = [
+            "date_range",
+            "asset_universe",
+            "comparison_baseline",
+        ]
+        options = coverage_recovery_options()
+        response_intent = _response_intent(
+            kind="coverage_recovery",
+            state=state,
+            semantic_needs=["simplification_choice"],
+            requested_fields=requested_fields,
+            facts={
+                "coverage": coverage_recovery,
+                PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT: (
+                    optional_parameter_status_without_coverage_recovery(
+                        state.optional_parameter_status
+                    )
+                ),
+            },
+            options=options,
+            language=language,
+        )
+        generated = await _generate_clarifying_question_result(
+            state=state,
+            response_intent=response_intent,
+            missing_required_fields=[],
+            ambiguous_fields=[],
+            unsupported_constraints=[],
+            optional_parameter_choices=[],
+            clarification_generator=clarification_generator,
+            language=language,
+        )
+        stage_patch: dict[str, object] = {
+            "assistant_prompt": generated.prompt,
+            "response_intent": response_intent,
+            "requested_field": None,
+            "requested_fields": requested_fields,
+            "missing_required_fields": [],
+        }
+        stage_patch.update(
+            _clarification_sidecar_patch(
+                state=state,
+                response_intent=response_intent,
+                requested_field=None,
+                prompt_source=(
+                    "degraded_fallback"
+                    if generated.used_degraded_fallback
+                    else "llm_generated"
+                ),
+            )
+        )
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch=stage_patch,
+        )
+
     if unsupported_constraints:
         options = _simplification_options(unsupported_constraints)
+        preserved_optional_parameter_status = (
+            optional_parameter_status_without_coverage_recovery(
+                state.optional_parameter_status
+            )
+        )
+        preserved_optional_parameter_status.pop("unsupported_constraints", None)
         response_intent = _response_intent(
             kind="unsupported_recovery",
             state=state,
             semantic_needs=["simplification_choice"],
-            facts={"unsupported_constraints": unsupported_constraints},
+            requested_fields=([state.requested_field] if state.requested_field else []),
+            facts={
+                "unsupported_constraints": unsupported_constraints,
+                PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT: (
+                    preserved_optional_parameter_status
+                ),
+            },
             options=options,
             language=language,
         )
@@ -108,14 +188,18 @@ async def clarify_stage_async(
             "unsupported_constraints": unsupported_constraints,
             "simplification_options": options,
         }
-        if generated.used_degraded_fallback:
-            stage_patch.update(
-                _clarification_sidecar_patch(
-                    state=state,
-                    response_intent=response_intent,
-                    requested_field=state.requested_field or "unsupported_constraints",
-                )
+        stage_patch.update(
+            _clarification_sidecar_patch(
+                state=state,
+                response_intent=response_intent,
+                requested_field=state.requested_field or "unsupported_constraints",
+                prompt_source=(
+                    "degraded_fallback"
+                    if generated.used_degraded_fallback
+                    else "llm_generated"
+                ),
             )
+        )
         return StageResult(
             outcome="await_user_reply",
             stage_patch=stage_patch,
@@ -157,6 +241,7 @@ async def clarify_stage_async(
                     state=state,
                     response_intent=response_intent,
                     requested_field=requested_field,
+                    prompt_source="degraded_fallback",
                 )
             )
         return StageResult(
@@ -195,6 +280,7 @@ async def clarify_stage_async(
                     state=state,
                     response_intent=response_intent,
                     requested_field=requested_field,
+                    prompt_source="degraded_fallback",
                 )
             )
         return StageResult(
@@ -363,11 +449,13 @@ def _clarification_sidecar_patch(
     state: RunState,
     response_intent: dict[str, object],
     requested_field: str | None,
+    prompt_source: ClarificationPromptSource,
 ) -> dict[str, object]:
     clarification = typed_clarification_contract(
         response_intent=response_intent,
         requested_field=requested_field,
         strategy=state.candidate_strategy_draft,
+        prompt_source=prompt_source,
     )
     return {"clarification": clarification} if clarification is not None else {}
 
@@ -601,6 +689,7 @@ def _simplification_options(
     unsupported_constraints: list[dict[str, object]],
 ) -> list[dict[str, object]]:
     options: list[dict[str, object]] = []
+    seen_ids: set[str] = set()
     for constraint in unsupported_constraints:
         raw_options = constraint.get("simplification_options", [])
         if not isinstance(raw_options, list):
@@ -609,7 +698,21 @@ def _simplification_options(
             if not isinstance(option, dict):
                 continue
             if isinstance(option.get("label"), str):
-                options.append(option)
+                replacement_values = option.get("replacement_values")
+                raw_option_id = option.get("id")
+                option_id = (
+                    simplification_option_kind(replacement_values)
+                    or (
+                        raw_option_id.strip()
+                        if isinstance(raw_option_id, str) and raw_option_id.strip()
+                        else None
+                    )
+                    or f"option_{len(options)}"
+                )
+                if option_id in seen_ids:
+                    continue
+                seen_ids.add(option_id)
+                options.append({**option, "id": option_id})
     return options
 
 

@@ -305,6 +305,11 @@ def test_interpreter_unavailable_spanish_atr_routes_to_unsupported_recovery(
 
 def validated_confirmation_payload(strategy: StrategySummary) -> dict[str, Any]:
     symbol = strategy.asset_universe[0] if strategy.asset_universe else "SPY"
+    date_range = (
+        strategy.date_range
+        if isinstance(strategy.date_range, dict)
+        else {"start": "2025-05-14", "end": "2026-05-14"}
+    )
     return {
         "strategy": strategy.model_dump(mode="python"),
         "optional_parameters": {},
@@ -313,11 +318,14 @@ def validated_confirmation_payload(strategy: StrategySummary) -> dict[str, Any]:
             "symbol": symbol,
             "symbols": list(strategy.asset_universe),
             "timeframe": "1D",
-            "date_range": (
-                strategy.date_range
-                if isinstance(strategy.date_range, dict)
-                else {"start": "2025-05-14", "end": "2026-05-14"}
-            ),
+            "date_range": date_range,
+            "requested_date_range": date_range,
+            "coverage_preflight": {
+                "outcome": "full_coverage",
+                "requested_date_range": date_range,
+                "effective_date_range": date_range,
+                "preflight_id": "sha256:test-coverage",
+            },
             "entry_rule": None,
             "exit_rule": None,
             "sizing_mode": "capital_amount",
@@ -2476,6 +2484,47 @@ def test_structured_confirmation_action_uses_snapshot_payload_when_turn_payload_
 
     assert result.outcome == "approved_for_execution"
     assert result.patch["confirmation_payload"]["launch_payload"]["symbol"] == "TSLA"
+
+
+def test_structured_confirmation_action_reconfirms_legacy_payload_without_coverage(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Tesla.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=1000,
+    )
+    legacy_payload = validated_confirmation_payload(pending)
+    legacy_payload["launch_payload"].pop("requested_date_range")
+    legacy_payload["launch_payload"].pop("coverage_preflight")
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.structured_action = StructuredActionContext(
+        type="run_backtest",
+        label="Run backtest",
+        presentation="confirmation",
+    )
+    state.confirmation_payload = legacy_payload
+
+    result = interpret_stage(
+        state=state,
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        structured_interpreter=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["TSLA"]
 
 
 def test_selected_asset_mention_provenance_keeps_equity_symbol_binding(
@@ -7343,6 +7392,439 @@ def test_interpreter_unavailable_spanish_pending_strategy_applies_calendar_year_
     )
 
 
+
+@pytest.mark.parametrize(
+    ("option_id", "requested_field"),
+    [
+        ("change_dates", "date_range"),
+        ("change_asset", "asset_universe"),
+        ("change_benchmark", "comparison_baseline"),
+    ],
+)
+def test_coverage_recovery_action_requests_typed_field_without_llm_selection(
+    option_id: str,
+    requested_field: str,
+) -> None:
+    source_assistant_id = "00000000-0000-0000-0000-000000000101"
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=f"Choose {option_id}",
+            recent_thread_history=[],
+            action_context={
+                "type": "select_response_option",
+                "label": option_id,
+                "payload": {
+                    "source_assistant_id": source_assistant_id,
+                    "validated_source_assistant_id": source_assistant_id,
+                    "option_id": option_id,
+                    "replacement_values": {"requested_field": requested_field},
+                },
+            },
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "validated_source_assistant_id": source_assistant_id,
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "coverage_recovery",
+                "semantic_needs": ["simplification_choice"],
+                "requested_fields": [
+                    "date_range",
+                    "asset_universe",
+                    "comparison_baseline",
+                ],
+                "options": [
+                    {
+                        "id": option_id,
+                        "replacement_values": {"requested_field": requested_field},
+                    }
+                ],
+                "facts": {
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "1h",
+                    }
+                },
+            },
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.patch["requested_field"] == requested_field
+    assert result.patch["missing_required_fields"] == [requested_field]
+    assert result.patch["response_intent"]["kind"] == "clarification"
+    assert result.patch["response_intent"]["facts"]["structured_action"] == {
+        "type": "select_response_option",
+        "payload": {
+            "option_id": option_id,
+            "replacement_values": {"requested_field": requested_field},
+        },
+    }
+    assert source_assistant_id not in repr(result.patch["response_intent"])
+    assert result.patch["response_intent"]["facts"][
+        "preserved_optional_parameter_status"
+    ] == {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "1h",
+    }
+    assert result.patch["optional_parameter_status"] == {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "1h",
+    }
+
+
+@pytest.mark.parametrize("timeframe", ["1D", "1h"])
+def test_unsupported_timeframe_action_preserves_assumptions_and_reconfirms(
+    timeframe: str,
+) -> None:
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        capital_amount=5_000,
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    option_id = "option_0" if timeframe == "1D" else "option_1"
+    options = [
+        {"id": "option_0", "replacement_values": {"timeframe": "1D"}},
+        {"id": "option_1", "replacement_values": {"timeframe": "1h"}},
+    ]
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=f"Use {timeframe} bars",
+            recent_thread_history=[],
+            action_context={
+                "type": "select_response_option",
+                "label": f"Use {timeframe} bars",
+                "payload": {
+                    "source_assistant_id": "assistant-recovery",
+                    "validated_source_assistant_id": "assistant-recovery",
+                    "option_id": option_id,
+                    "replacement_values": {"timeframe": timeframe},
+                },
+            },
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-recovery",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "unsupported_recovery",
+                "semantic_needs": ["simplification_choice"],
+                "requested_fields": ["timeframe"],
+                "facts": {
+                    "unsupported_constraints": [
+                        {"category": "unsupported_time_granularity"}
+                    ],
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "5m",
+                    },
+                },
+                "options": options,
+            },
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.patch["candidate_strategy_draft"] == pending.model_copy(
+        update={"timeframe": timeframe}
+    ).model_dump(mode="python")
+    assert result.patch["candidate_strategy_draft"]["timeframe"] == timeframe
+    assert result.patch["optional_parameter_status"] == {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": timeframe,
+    }
+    assert result.patch["requested_field"] is None
+    assert result.patch["missing_required_fields"] == []
+
+
+def test_unsupported_timeframe_text_answer_restores_preserved_assumptions() -> None:
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        capital_amount=5_000,
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Use daily bars instead.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "requested_field": "timeframe",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "unsupported_recovery",
+                "requested_fields": ["timeframe"],
+                "facts": {
+                    "unsupported_constraints": [
+                        {"category": "unsupported_time_granularity"}
+                    ],
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "5m",
+                    },
+                },
+                "options": [],
+            },
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User selected daily bars.",
+                candidate_strategy_draft=StrategySummary(timeframe="1D"),
+                semantic_turn_act="answer_pending_need",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.timeframe == "1D"
+    optional_status = result.patch["optional_parameter_status"]
+    assert optional_status["initial_capital"] == 5_000
+    assert optional_status["fees"] == 0.001
+    assert optional_status["slippage"] == 0.0005
+    assert optional_status["timeframe"] == "1D"
+
+
+def test_unsupported_timeframe_recovery_does_not_leak_into_new_idea() -> None:
+    prior = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="New idea: buy and hold NVDA during 2025.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=prior),
+        selected_thread_metadata={
+            "requested_field": "timeframe",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "unsupported_recovery",
+                "requested_fields": ["timeframe"],
+                "facts": {
+                    "unsupported_constraints": [
+                        {"category": "unsupported_time_granularity"}
+                    ],
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "5m",
+                    },
+                },
+                "options": [],
+            },
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="new_task",
+                requires_clarification=False,
+                user_goal_summary="User started a separate investing idea.",
+                candidate_strategy_draft=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold NVDA during 2025.",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                    date_range={"start": "2025-01-01", "end": "2025-12-31"},
+                ),
+                semantic_turn_act="new_idea",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["NVDA"]
+    optional_status = result.patch.get("optional_parameter_status", {})
+    assert "initial_capital" not in optional_status
+    assert "fees" not in optional_status
+    assert "slippage" not in optional_status
+    assert "timeframe" not in optional_status
+
+
+@pytest.mark.parametrize("task_relation", ["continue", "new_task"])
+def test_coverage_recovery_answer_restores_preserved_optional_parameters(
+    monkeypatch,
+    task_relation: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    preserved_status = {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "1h",
+    }
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Use MSFT instead",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "requested_field": "asset_universe",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "clarification",
+                "requested_fields": ["asset_universe"],
+                "facts": {
+                    "preserved_optional_parameter_status": preserved_status,
+                },
+            },
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation=task_relation,
+                requires_clarification=False,
+                user_goal_summary="User selected a replacement asset.",
+                candidate_strategy_draft=StrategySummary(
+                    asset_universe=["MSFT"],
+                    asset_class="equity",
+                ),
+                semantic_turn_act="answer_pending_need",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["MSFT"]
+    assert result.patch["optional_parameter_status"] == preserved_status
+
+
+@pytest.mark.parametrize("task_relation", ["new_task", "continue"])
+def test_coverage_recovery_does_not_leak_optional_parameters_into_new_idea(
+    monkeypatch,
+    task_relation: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="New idea: buy and hold NVDA during 2025.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=prior),
+        selected_thread_metadata={
+            "requested_field": "asset_universe",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "clarification",
+                "requested_fields": ["asset_universe"],
+                "facts": {
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "1h",
+                    },
+                },
+            },
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation=task_relation,
+                requires_clarification=False,
+                user_goal_summary="User started a separate investing idea.",
+                candidate_strategy_draft=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold NVDA during 2025.",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                    date_range={"start": "2025-01-01", "end": "2025-12-31"},
+                ),
+                semantic_turn_act="new_idea",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["NVDA"]
+    assert result.decision.candidate_strategy_draft.date_range == {
+        "start": "2025-01-01",
+        "end": "2025-12-31",
+    }
+    optional_status = result.patch.get("optional_parameter_status", {})
+    assert "initial_capital" not in optional_status
+    assert "fees" not in optional_status
+    assert "slippage" not in optional_status
+    assert "timeframe" not in optional_status
+
+
+
 def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choice(
     monkeypatch,
 ) -> None:
@@ -7374,6 +7856,8 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choi
                 "type": "select_response_option",
                 "label": "Compare with buy and hold",
                 "payload": {
+                    "source_assistant_id": "assistant-recovery",
+                    "validated_source_assistant_id": "assistant-recovery",
                     "replacement_values": {"strategy_type": "buy_and_hold"},
                 },
             },
@@ -7381,6 +7865,7 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choi
         user=UserState(user_id="u1"),
         latest_task_snapshot=snapshot,
         selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-recovery",
             "last_stage_outcome": "await_user_reply",
             "response_intent": {
                 "kind": "unsupported_recovery",
@@ -7478,6 +7963,8 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_selection(
                 "type": "select_response_option",
                 "label": message,
                 "payload": {
+                    "source_assistant_id": "assistant-recovery",
+                    "validated_source_assistant_id": "assistant-recovery",
                     "replacement_values": typed_selection,
                 },
             },
@@ -7485,6 +7972,7 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_selection(
         user=UserState(user_id="u1", language_preference="es-419"),
         latest_task_snapshot=snapshot,
         selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-recovery",
             "last_stage_outcome": "await_user_reply",
             "response_intent": {
                 "kind": "unsupported_recovery",

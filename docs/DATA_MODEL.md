@@ -230,7 +230,25 @@ Represents individual messages within a conversation.
 - **role**: `user`, `assistant`, `system`, `tool`
 
 ### Notes
-- Messages are immutable in Alpha.
+- Message identity, owner, conversation, role, content, and ordering are
+  immutable in Alpha. Narrow artifact metadata enrichments may update
+  `metadata`, but they must not change message identity or ordering.
+- Every durable message append uses the service-role-only
+  `append_conversation_message` RPC. The function locks the owned conversation
+  row, inserts the message, and updates `last_message_preview` in one
+  transaction. `PUBLIC`, `anon`, and `authenticated` cannot execute the
+  function or mutate `messages` directly.
+- Conversation message order is deterministic by `(created_at DESC, id DESC)`.
+  Under the conversation lock, a new append receives `created_at` at least one
+  microsecond newer than the current maximum. Metadata-only updates do not
+  change `created_at` or `id`, so they cannot promote an older message into the
+  latest response-option source.
+- A response-option request uses the same RPC as an atomic admission boundary.
+  It matches the owner, conversation, exact latest assistant id, canonical
+  metadata snapshot, option id, and replacement values before inserting the
+  preallocated request id. An exact replay returns the existing request and the
+  source immediately preceding it without inserting a duplicate; a stale or
+  mismatched claim returns no row.
 - `metadata` stores token usage, model identifiers, latency, and tool execution traces.
 - Every terminal assistant message for an ordinary non-backtest chat turn stores
   immutable `metadata.agent_runtime_turn.turn_id`, `request_id`, `terminal`, and
@@ -242,6 +260,13 @@ Represents individual messages within a conversation.
   `retry_last_turn`, `recovery`, and `clarification`. These fields hydrate the
   transcript, action affordances, and localized degraded-fallback UI; they do
   not make free-form transcript text the source of truth for strategy state.
+  A typed `clarification.prompt_source` distinguishes exact LLM-authored prose
+  (`llm_generated`) from frontend-localized deterministic fallback
+  (`degraded_fallback`); structured options remain reloadable in both cases.
+  Degraded fallback `content` remains stored only as compatibility transport;
+  it is not projected into later model history or `last_message_preview`, so
+  Recents and conversation search do not expose the fallback language. Exact
+  `llm_generated` prose remains eligible for those continuity surfaces.
 - When a turn follows an artifact-backed setup, the runtime must reconstruct the
   working draft from canonical artifact state before applying the new user
   message as a patch. Canonical artifact state comes from, in order of

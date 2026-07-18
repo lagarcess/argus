@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import json
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier, Event
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from argus.api import state as api_state
 from argus.api.main import app
-from argus.api.message_store import create_message
+from argus.api.message_store import (
+    claim_response_option_action,
+    create_message,
+    prepare_message,
+)
 from argus.api.schemas import BacktestRun
 from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
@@ -131,6 +138,78 @@ def _pending_strategy_metadata() -> dict[str, Any]:
             },
             "requested_field": "initial_capital",
             "missing_required_fields": ["initial_capital"],
+        },
+    }
+
+
+def _timeframe_recovery_metadata(symbol: str) -> dict[str, Any]:
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "semantic_needs": ["simplification_choice"],
+        "requested_fields": ["timeframe"],
+        "facts": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": [symbol],
+                "asset_class": "equity",
+            },
+            "unsupported_constraints": [
+                {
+                    "category": "unsupported_time_granularity",
+                    "raw_value": "5m",
+                }
+            ],
+        },
+        "options": [
+            {"id": "option_0", "replacement_values": {"timeframe": "1D"}},
+            {"id": "option_1", "replacement_values": {"timeframe": "1h"}},
+        ],
+    }
+    clarification = {
+        "kind": "unsupported_recovery",
+        "reason_code": "unsupported_time_granularity",
+        "prompt_source": "llm_generated",
+        "requested_field": "timeframe",
+        "requested_fields": ["timeframe"],
+        "semantic_needs": ["simplification_choice"],
+        "payload": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": [symbol],
+                "asset_class": "equity",
+            },
+            "raw_value": "5m",
+        },
+        "options": [
+            {
+                "id": "option_0",
+                "compatibility_label": "Retry with daily bars",
+                "replacement_values": {"timeframe": "1D"},
+            },
+            {
+                "id": "option_1",
+                "compatibility_label": "Retry with 1-hour bars",
+                "replacement_values": {"timeframe": "1h"},
+            },
+        ],
+    }
+    return {
+        "conversation_mode": "setup",
+        "agent_runtime_stage_outcome": "await_user_reply",
+        "response_intent": response_intent,
+        "clarification": clarification,
+        "pending_strategy": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": f"Buy and hold {symbol}.",
+                "asset_universe": [symbol],
+                "asset_class": "equity",
+                "timeframe": "5m",
+                "date_range": {"start": "2024-01-01", "end": "2024-01-05"},
+            },
+            "requested_field": "timeframe",
+            "missing_required_fields": ["timeframe"],
+            "response_intent": response_intent,
         },
     }
 
@@ -1083,6 +1162,605 @@ def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
     assert "latest" in text.lower()
 
 
+def test_response_option_action_rejects_an_older_recovery_message_identity(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_approval",
+                "assistant_response": "This stale action must not reach the runtime.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    old_recovery = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="NVDA needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("NVDA"),
+    )
+    message_count_before = len(
+        client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()["items"]
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "labelKey": "chat.clarification.timeframe_actions.daily",
+                "payload": {
+                    "source_assistant_id": old_recovery.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.headers["content-type"].startswith("application/json")
+    assert runtime_calls == 0
+    assert response.json()["code"] == "artifact_action_invalid_state"
+    persisted_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert len(persisted_messages) == message_count_before
+
+
+def test_response_option_action_rejects_source_superseded_during_checkpoint_read(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_approval",
+                "assistant_response": "The stale action reached the runtime.",
+            },
+        }
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    old_recovery = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+
+    async def _checkpoint_race(**_: Any) -> dict[str, Any]:
+        create_message(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            role="assistant",
+            content="NVDA needs a supported timeframe.",
+            metadata=_timeframe_recovery_metadata("NVDA"),
+        )
+        return {}
+
+    monkeypatch.setattr(agent_router, "runtime_checkpoint_values", _checkpoint_race)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "payload": {
+                    "source_assistant_id": old_recovery.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "artifact_action_invalid_state"
+    assert runtime_calls == 0
+    persisted_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert [message["content"] for message in persisted_messages] == [
+        "AAPL needs a supported timeframe.",
+        "NVDA needs a supported timeframe.",
+    ]
+
+
+def test_concurrent_response_option_clicks_admit_exactly_one_request(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    checkpoint_barrier = Barrier(2)
+    runtime_calls: list[str] = []
+
+    async def _checkpoint_race(**_: Any) -> dict[str, Any]:
+        checkpoint_barrier.wait(timeout=5)
+        return {}
+
+    async def _runtime(**kwargs: Any):
+        runtime_calls.append(kwargs["action_context"]["payload"]["source_assistant_id"])
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "The current recovery was selected.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "runtime_checkpoint_values", _checkpoint_race)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    current_recovery = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="NVDA needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("NVDA"),
+    )
+    action_request = {
+        "conversation_id": conversation["id"],
+        "action": {
+            "type": "select_response_option",
+            "label": "Retry with daily bars",
+            "payload": {
+                "source_assistant_id": current_recovery.id,
+                "option_id": "option_0",
+                "replacement_values": {"timeframe": "1D"},
+            },
+        },
+        "language": "en",
+    }
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(
+            executor.map(
+                lambda _: client.post("/api/v1/chat/stream", json=action_request),
+                range(2),
+            )
+        )
+
+    assert sorted(response.status_code for response in responses) == [200, 409]
+    assert len(runtime_calls) == 1
+    rejected = next(response for response in responses if response.status_code == 409)
+    assert rejected.json()["code"] == "artifact_action_invalid_state"
+
+
+def test_memory_newer_message_wins_before_response_option_admission() -> None:
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    source = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+    request_message = prepare_message(
+        conversation_id=conversation["id"],
+        role="user",
+        content="Retry with daily bars",
+        metadata={"chat_action": {"type": "select_response_option"}},
+    )
+    claim_started = Event()
+
+    def _claim():
+        claim_started.set()
+        return claim_response_option_action(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            source_assistant_id=source.id,
+            option_id="option_0",
+            replacement_values={"timeframe": "1D"},
+            request_message=request_message,
+            expected_source_metadata=source.metadata,
+        )
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    api_state.store.conversation_message_lock.acquire()
+    try:
+        claimed = executor.submit(_claim)
+        assert claim_started.wait(timeout=5)
+        create_message(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            role="assistant",
+            content="NVDA needs a supported timeframe.",
+            metadata=_timeframe_recovery_metadata("NVDA"),
+        )
+    finally:
+        api_state.store.conversation_message_lock.release()
+
+    assert claimed.result(timeout=5) is None
+    executor.shutdown()
+
+
+def test_memory_response_option_admission_wins_and_exact_replay_survives_later_message() -> (
+    None
+):
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    source = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+    request_message = prepare_message(
+        conversation_id=conversation["id"],
+        role="user",
+        content="Retry with daily bars",
+        metadata={"chat_action": {"type": "select_response_option"}},
+    )
+    append_started = Event()
+
+    def _append_newer():
+        append_started.set()
+        return create_message(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            role="assistant",
+            content="A later assistant turn.",
+            metadata={},
+        )
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    api_state.store.conversation_message_lock.acquire()
+    try:
+        later_message = executor.submit(_append_newer)
+        assert append_started.wait(timeout=5)
+        accepted = claim_response_option_action(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            source_assistant_id=source.id,
+            option_id="option_0",
+            replacement_values={"timeframe": "1D"},
+            request_message=request_message,
+            expected_source_metadata=source.metadata,
+        )
+    finally:
+        api_state.store.conversation_message_lock.release()
+
+    assert accepted is not None
+    assert accepted.request_message.id == request_message.id
+    assert accepted.request_message.created_at > source.created_at
+    assert later_message.result(timeout=5).created_at > accepted.request_message.created_at
+    replay = claim_response_option_action(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        source_assistant_id=source.id,
+        option_id="option_0",
+        replacement_values={"timeframe": "1D"},
+        request_message=request_message,
+        expected_source_metadata=source.metadata,
+    )
+    assert replay is not None
+    assert replay.source_message.id == source.id
+    assert replay.request_message.id == request_message.id
+    assert sum(
+        message.id == request_message.id
+        for message in api_state.store.messages[conversation["id"]]
+    ) == 1
+    executor.shutdown()
+
+
+@pytest.mark.parametrize("invalid_source", ["missing", "option_mismatch"])
+def test_response_option_action_rejects_unowned_or_mismatched_source(
+    monkeypatch,
+    invalid_source: str,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Invalid source reached the runtime.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    current_recovery = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="NVDA needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("NVDA"),
+    )
+    action_payload: dict[str, Any] = {
+        "source_assistant_id": current_recovery.id,
+        "option_id": "option_0",
+        "replacement_values": {"timeframe": "1D"},
+    }
+    if invalid_source == "missing":
+        action_payload.pop("source_assistant_id")
+    else:
+        action_payload["replacement_values"] = {"timeframe": "1h"}
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "payload": action_payload,
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "artifact_action_invalid_state"
+    assert runtime_calls == 0
+    persisted_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert [message["id"] for message in persisted_messages] == [
+        current_recovery.id
+    ]
+
+
+def test_response_option_action_rejects_malformed_source_without_persisting_request(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Malformed source reached the runtime.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    malformed = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Choose a timeframe.",
+        metadata={
+            "clarification": {
+                "options": [
+                    {
+                        "id": "option_0",
+                        "replacement_values": {"timeframe": "1D"},
+                    }
+                ]
+            }
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "payload": {
+                    "source_assistant_id": malformed.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "artifact_action_invalid_state"
+    assert runtime_calls == 0
+    persisted_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert [message["id"] for message in persisted_messages] == [malformed.id]
+
+
+def test_response_option_action_rejects_source_from_another_conversation(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Foreign source reached the runtime.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    target_conversation = _conversation(client)
+    other_conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=target_conversation["id"],
+        role="assistant",
+        content="NVDA needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("NVDA"),
+    )
+    foreign_recovery = create_message(
+        user_id=user_id,
+        conversation_id=other_conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": target_conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "payload": {
+                    "source_assistant_id": foreign_recovery.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "artifact_action_invalid_state"
+    assert runtime_calls == 0
+    target_messages = client.get(
+        f"/api/v1/conversations/{target_conversation['id']}/messages"
+    ).json()["items"]
+    assert len(target_messages) == 1
+
+
+def test_response_option_action_accepts_the_current_recovery_message_identity(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "The current NVDA recovery was selected.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+    current_recovery = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="NVDA needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("NVDA"),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "labelKey": "chat.clarification.timeframe_actions.daily",
+                "payload": {
+                    "source_assistant_id": current_recovery.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.pending_strategy_summary.asset_universe == ["NVDA"]
+    assert captured["fallback_selected_thread_metadata"] == {
+        "latest_task_type": "backtest_execution",
+        "last_stage_outcome": "await_user_reply",
+        "fallback_source": "validated_response_option_source",
+        "validated_source_assistant_id": current_recovery.id,
+        "response_intent": _timeframe_recovery_metadata("NVDA")["response_intent"],
+        "clarification": _timeframe_recovery_metadata("NVDA")["clarification"],
+        "requested_field": "timeframe",
+    }
+    assert captured["action_context"]["payload"] == {
+        "source_assistant_id": current_recovery.id,
+        "validated_source_assistant_id": current_recovery.id,
+        "option_id": "option_0",
+        "replacement_values": {"timeframe": "1D"},
+    }
+    persisted_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    persisted_metadata = repr(
+        [message.get("metadata") for message in persisted_messages]
+    )
+    assert "source_assistant_id" not in persisted_metadata
+    assert "validated_source_assistant_id" not in persisted_metadata
+    assert current_recovery.id not in persisted_metadata
+
+
 def test_stale_confirmation_action_id_returns_spanish_recovery(monkeypatch) -> None:
     from argus.api.routers import agent as agent_router
 
@@ -1918,6 +2596,9 @@ def test_refine_strategy_action_preserves_completed_dca_fields_after_reload() ->
 def test_review_one_replay_preserves_result_artifact_through_date_patch(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv(
+        "ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture"
+    )
     from argus.agent_runtime import resolution as resolution_module
     from argus.agent_runtime.graph.workflow import build_workflow
     from argus.agent_runtime.stages.interpret_types import (
@@ -2859,6 +3540,9 @@ def test_plain_text_after_pending_edit_prompt_passes_requested_field_to_runtime(
 def test_confirmation_action_asset_edit_round_trips_through_api_metadata(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv(
+        "ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture"
+    )
     from argus.agent_runtime import resolution as resolution_module
     from argus.agent_runtime.graph.workflow import build_workflow
     from argus.agent_runtime.stages.interpret_types import (

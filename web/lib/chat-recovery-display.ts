@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import type { ChatActionOption } from "@/components/chat/types";
 
 export type RecoveryDisplay =
   | {
@@ -7,8 +8,13 @@ export type RecoveryDisplay =
       values?: Record<string, string>;
     }
   | {
+      kind: "coverage_recovery";
+      code: string;
+    }
+  | {
       kind: "unsupported_recovery";
       values: {
+        reasonCode?: string;
         rawValue?: string;
         symbol?: string;
         options: Array<{
@@ -51,9 +57,16 @@ function stringArrayOrNull(value: unknown): string[] | null {
 export function recoveryDisplayFromMetadata(
   metadata: Record<string, unknown>,
 ): RecoveryDisplay | null {
+  const recoveryState = recoveryDisplayFromRecoveryState(metadata.recovery);
+  if (recoveryState) {
+    return recoveryState;
+  }
+  const clarification = recordOrNull(metadata.clarification);
+  if (stringOrNull(clarification?.prompt_source) === "llm_generated") {
+    return null;
+  }
   return (
-    recoveryDisplayFromRecoveryState(metadata.recovery) ??
-    recoveryDisplayFromClarification(metadata.clarification) ??
+    recoveryDisplayFromClarification(clarification) ??
     recoveryDisplayFromResponseIntent(metadata.response_intent) ??
     recoveryDisplayFromResponseIntent(
       recordOrNull(metadata.pending_strategy)?.response_intent,
@@ -111,7 +124,17 @@ export function recoveryDisplayText(
   if (display.kind === "recovery_code") {
     return t(`chat.recovery.${display.code}`, recoveryCodeValues(display, t));
   }
+  if (display.kind === "coverage_recovery") {
+    return t(`chat.coverage_recovery.${display.code}`);
+  }
   if (display.kind === "unsupported_recovery") {
+    if (display.values.reasonCode === "unsupported_time_granularity") {
+      return display.values.rawValue
+        ? t("chat.clarification.unsupported_timeframe_with_raw_value", {
+            rawValue: display.values.rawValue,
+          })
+        : t("chat.clarification.unsupported_timeframe");
+    }
     const optionsText = joinLocalizedOptions(
       display.values.options.map((option) => optionDisplayText(option, t)),
       t,
@@ -139,6 +162,14 @@ export function recoveryDisplayText(
   }
   const statusKey = artifactActionStatusKey(display.status);
   return t(`chat.recovery.${statusKey}`, artifactActionValues(display));
+}
+
+export function recoveryDisplayCopyText(
+  display: RecoveryDisplay | null | undefined,
+  t: TFunction,
+): string | null {
+  const localized = recoveryDisplayText(display, t).trim();
+  return localized || null;
 }
 
 function recoveryCodeValues(
@@ -177,6 +208,7 @@ function unsupportedRecoveryDisplay(
   return {
     kind: "unsupported_recovery",
     values: {
+      reasonCode: unsupportedReasonCode(facts),
       rawValue: unsupportedRawValue(facts),
       symbol: primarySymbol(recordOrNull(facts?.strategy)),
       options,
@@ -189,6 +221,14 @@ function recoveryDisplayFromClarification(value: unknown): RecoveryDisplay | nul
   const kind = stringOrNull(clarification?.kind);
   if (!clarification || !kind) {
     return null;
+  }
+  const promptSource = stringOrNull(clarification.prompt_source);
+  if (promptSource && promptSource !== "degraded_fallback") {
+    return null;
+  }
+  if (kind === "coverage_recovery") {
+    const code = stringOrNull(clarification.reason_code);
+    return code ? { kind: "coverage_recovery", code } : null;
   }
   if (kind === "unsupported_recovery") {
     return unsupportedRecoveryDisplayFromClarification(clarification);
@@ -205,6 +245,121 @@ function recoveryDisplayFromClarification(value: unknown): RecoveryDisplay | nul
     semanticNeeds,
     values: strategyValues(payload?.strategy),
   };
+}
+
+export function coverageRecoveryActionsFromMetadata(
+  metadata: Record<string, unknown>,
+  sourceAssistantId: string,
+): ChatActionOption[] {
+  if (!stringOrNull(sourceAssistantId)) {
+    return [];
+  }
+  const clarification = recordOrNull(metadata.clarification);
+  if (stringOrNull(clarification?.kind) !== "coverage_recovery") {
+    return [];
+  }
+  const options = Array.isArray(clarification?.options)
+    ? clarification.options
+    : [];
+  const allowed = new Map([
+    ["change_dates", { field: "date_range", label: "Change dates" }],
+    ["change_asset", { field: "asset_universe", label: "Change asset" }],
+    [
+      "change_benchmark",
+      { field: "comparison_baseline", label: "Change benchmark" },
+    ],
+  ]);
+  return options.flatMap((rawOption): ChatActionOption[] => {
+    const option = recordOrNull(rawOption);
+    const id = stringOrNull(option?.id);
+    const definition = id ? allowed.get(id) : undefined;
+    const replacementValues = recordOrNull(option?.replacement_values);
+    if (
+      !id ||
+      !definition ||
+      stringOrNull(replacementValues?.requested_field) !== definition.field
+    ) {
+      return [];
+    }
+    return [
+      {
+        id: `coverage-${id.replaceAll("_", "-")}`,
+        label: definition.label,
+        labelKey: `chat.coverage_recovery.actions.${id}`,
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: sourceAssistantId,
+          option_id: id,
+          replacement_values: { requested_field: definition.field },
+        },
+      },
+    ];
+  });
+}
+
+export function unsupportedTimeframeActionsFromMetadata(
+  metadata: Record<string, unknown>,
+  sourceAssistantId: string,
+): ChatActionOption[] {
+  if (!stringOrNull(sourceAssistantId)) {
+    return [];
+  }
+  const clarification = recordOrNull(metadata.clarification);
+  if (
+    stringOrNull(clarification?.kind) !== "unsupported_recovery" ||
+    stringOrNull(clarification?.reason_code) !== "unsupported_time_granularity"
+  ) {
+    return [];
+  }
+  const options = Array.isArray(clarification?.options)
+    ? clarification.options
+    : [];
+  const allowedTimeframes = new Map([
+    [
+      "1D",
+      {
+        label: "Retry with daily bars",
+        labelKey: "chat.clarification.timeframe_actions.daily",
+      },
+    ],
+    [
+      "1h",
+      {
+        label: "Retry with 1-hour bars",
+        labelKey: "chat.clarification.timeframe_actions.hour_1",
+      },
+    ],
+  ]);
+  return options.flatMap((rawOption): ChatActionOption[] => {
+    const option = recordOrNull(rawOption);
+    const optionId = stringOrNull(option?.id);
+    const replacementValues = recordOrNull(option?.replacement_values);
+    if (
+      !optionId ||
+      !replacementValues ||
+      Object.keys(replacementValues).length !== 1
+    ) {
+      return [];
+    }
+    const timeframe = stringOrNull(replacementValues.timeframe);
+    const allowed = timeframe ? allowedTimeframes.get(timeframe) : undefined;
+    if (!timeframe || !allowed) {
+      return [];
+    }
+    return [
+      {
+        id: `unsupported-timeframe-${optionId.replaceAll("_", "-")}`,
+        label: stringOrNull(option?.compatibility_label) ?? allowed.label,
+        labelKey: allowed.labelKey,
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: sourceAssistantId,
+          option_id: optionId,
+          replacement_values: { timeframe },
+        },
+      },
+    ];
+  });
 }
 
 function unsupportedRecoveryDisplayFromClarification(
@@ -231,12 +386,28 @@ function unsupportedRecoveryDisplayFromClarification(
   return {
     kind: "unsupported_recovery",
     values: {
+      reasonCode: stringOrNull(clarification.reason_code) ?? undefined,
       rawValue:
         rawValue && !looksLikeInternalCode(rawValue) ? rawValue : undefined,
       symbol: primarySymbol(recordOrNull(payload?.strategy)),
       options,
     },
   };
+}
+
+function unsupportedReasonCode(
+  facts: Record<string, unknown> | null,
+): string | undefined {
+  const constraints = Array.isArray(facts?.unsupported_constraints)
+    ? facts.unsupported_constraints
+    : [];
+  for (const rawConstraint of constraints) {
+    const category = stringOrNull(recordOrNull(rawConstraint)?.category);
+    if (category) {
+      return category;
+    }
+  }
+  return undefined;
 }
 
 function strategyValues(value: unknown): Record<string, string> | undefined {

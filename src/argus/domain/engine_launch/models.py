@@ -30,6 +30,15 @@ class DateRange(BaseModel):
     end: str
 
 
+class CoveragePreflight(BaseModel):
+    schema_version: str = "market_data_coverage_v1"
+    outcome: Literal["full_coverage", "adjusted_coverage"]
+    requested_date_range: DateRange
+    effective_date_range: DateRange
+    preflight_id: str
+    observations_by_symbol: dict[str, int] = Field(default_factory=dict)
+
+
 class LaunchBacktestRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -39,6 +48,8 @@ class LaunchBacktestRequest(BaseModel):
     asset_class: AssetClass | None = None
     timeframe: str
     date_range: DateRange
+    requested_date_range: DateRange | None = None
+    coverage_preflight: CoveragePreflight | None = None
     entry_rule: dict[str, Any] | None = None
     exit_rule: dict[str, Any] | None = None
     rule_spec: dict[str, Any] | None = None
@@ -84,6 +95,17 @@ class LaunchBacktestRequest(BaseModel):
         except ValueError as exc:
             raise ValueError("invalid_date_range") from exc
         validate_backtest_date_window(start=start, end=end)
+
+        if self.requested_date_range is not None:
+            try:
+                requested_start = date.fromisoformat(self.requested_date_range.start)
+                requested_end = date.fromisoformat(self.requested_date_range.end)
+            except ValueError as exc:
+                raise ValueError("invalid_date_range") from exc
+            validate_backtest_date_window(
+                start=requested_start,
+                end=requested_end,
+            )
 
         return self
 

@@ -779,6 +779,11 @@ machine-readable fields alongside display labels:
   `crypto`, or `currency_pair`; clients may render this as muted trust metadata.
 - `date_range`: optional canonical `{ start, end, display }` range for cards
   whose period row is visually compacted from ISO fields.
+- `period_adjustment`: optional typed sidecar with
+  `code = effective_window_adjusted`, `requested_date_range`, and
+  `effective_date_range`. The frontend renders one localized, provider-neutral
+  assistant lead-in directly above the corrected card. Full-coverage cards omit
+  this field.
 - `display_facts`: optional canonical facts for localized card metadata, such as
   `timeframe`, `data_through`, `fees`, `slippage`, and `benchmark_symbol`.
   Clients should render these facts through locale-aware presentation code and
@@ -931,8 +936,26 @@ Ownership hardening:
     "asset_class": "equity",
     "symbols": ["NVDA", "BYD"],
     "timeframe": "1D",
-    "start_date": "2022-01-01",
+    "start_date": "2022-03-18",
     "end_date": "2024-12-31",
+    "requested_date_range": {
+      "start": "2022-01-01",
+      "end": "2024-12-31"
+    },
+    "effective_date_range": {
+      "start": "2022-03-18",
+      "end": "2024-12-31"
+    },
+    "data_coverage": {
+      "schema_version": "market_data_coverage_v1",
+      "outcome": "adjusted_coverage",
+      "dataset_id": "sha256:...",
+      "observations_by_symbol": {
+        "NVDA": 700,
+        "BYD": 681,
+        "SPY": 700
+      }
+    },
     "side": "long",
     "starting_capital": 1000,
     "allocation_method": "equal_weight",
@@ -948,9 +971,9 @@ Ownership hardening:
     "evidence_artifact_id": "uuid",
     "evidence_lifecycle": "captured",
     "date_range": {
-      "start": "2022-01-01",
+      "start": "2022-03-18",
       "end": "2024-12-31",
-      "display": "January 1, 2022 to December 31, 2024"
+      "display": "March 18, 2022 to December 31, 2024"
     },
     "status_label": "Simulation Complete",
     "rows": [
@@ -1036,12 +1059,12 @@ Ownership hardening:
     "chart": {
       "kind": "portfolio_equity",
       "series": [
-        { "time": "2022-01-03", "value": 10000.0 },
-        { "time": "2022-01-04", "value": 10042.5 }
+        { "time": "2022-03-18", "value": 10000.0 },
+        { "time": "2022-03-21", "value": 10042.5 }
       ],
       "markers": [
         {
-          "time": "2022-01-03",
+          "time": "2022-03-18",
           "type": "entry",
           "label": "Buy NVDA, BYD",
           "symbols": ["NVDA", "BYD"]
@@ -1091,6 +1114,22 @@ commitment is represented by an explicit `DecisionNote`.
 - `benchmark_treatment` is currently `same_modeled_costs`, meaning the benchmark comparison used the same modeled cost assumptions.
 
 **Reproducibility contract:**
+- Before a runnable confirmation or direct run exists, the backend fetches the
+  requested symbols and benchmark once to compute a viable common data window.
+  The requested window remains provenance; `start_date`, `end_date`, result
+  cards, metrics, benchmark comparison, and chart use the effective window.
+- If the common window is shorter, chat returns one corrected confirmation card
+  in the same turn. If there is no viable common window or coverage is too
+  sparse, chat returns typed recovery with no runnable card and direct execution
+  returns `422 no_common_data_window` or `422 insufficient_common_data`.
+- Execution must revalidate the approved effective window. A changed window is
+  rejected as `approved_data_window_unavailable`; it is never silently adjusted
+  after approval.
+- Persisted legacy confirmations without a validated coverage preflight are not
+  executable. They return to preflight and require approval of a fresh card.
+- Metrics, benchmark alignment, chart construction, finalization, reload, and
+  evidence provenance share the same prepared execution dataset identity. Edge
+  gaps may not be backward-filled.
 - Direct `/backtests/run` records store the normalized engine config directly in
   `config_snapshot`.
 - Chat-launched runtime runs may also include
@@ -1738,9 +1777,24 @@ Soft delete conversation.
   hidden saved-strategy object when the Strategies surface is disabled.
 - `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose. Assistant message metadata must record `result_breakdown_source`, `result_breakdown_fallback_used`, and, when applicable, `result_breakdown_failure_mode` so optional Explain-result fallback does not masquerade as the normal LLM path.
 - `select_response_option` is valid only for typed response-intent options. Its
-  payload must identify the selected option through `option_index` or
-  `replacement_values`. Labels are display text only and must not drive runtime
-  selection.
+  payload must include the durable assistant `message_id` that presented the
+  option as `source_assistant_id`, plus the exact `option_id` and
+  `replacement_values` from that message's typed clarification metadata. Labels
+  are display text only and must not drive runtime selection. Before persisting
+  the action request or invoking LangGraph, the backend recovers the canonical
+  pending-strategy context from that exact source. It then uses one serialized
+  append/admit transaction to verify that the source belongs to the user and
+  conversation, is still latest by `(created_at DESC, id DESC)`, has the same
+  validated metadata snapshot, and contains the exact selected option. That
+  transaction inserts the preallocated user request exactly once and assigns a
+  timestamp strictly newer than the conversation's current latest message.
+  Missing, malformed, foreign, mismatched, or superseded sources fail with `409
+  artifact_action_invalid_state`; no request message is persisted and LangGraph
+  is not invoked. Replaying the same accepted request id is a no-op, even after
+  later messages exist, provided the immediately preceding source still matches.
+  A valid action reaches LangGraph with the pending strategy and continuity
+  artifacts recovered from that exact source message, not from a newer
+  checkpoint draft.
 
 ### Conversation Artifact Continuity Contract
 
@@ -1938,14 +1992,20 @@ stable `code`, `retryable`, and optional `params`. User-facing recovery copy is
 presentation only; clients must render retry affordances and localized recovery
 copy from structured metadata, not by matching assistant prose.
 
-When the clarification/composer path is degraded, the final payload and
-persisted assistant message metadata may also include `clarification`. This is
-the typed contract for localized fallback clarification UI. The backend remains
-the source of truth for the reason, requested field, strategy payload, and
-structured option payloads; frontend clients render localized strings from
-static i18n bundles using those typed fields. `assistant_prompt` or
-`assistant_response` may still carry compatibility English text for older
-clients, but new clients should prefer `clarification` when present.
+The final payload and persisted assistant message metadata may also include
+`clarification`. This typed contract carries the reason, requested field,
+strategy payload, structured option payloads, and `prompt_source` provenance.
+`prompt_source = llm_generated` means `assistant_prompt` or
+`assistant_response` owns the exact user-visible prose; clients keep that text
+while hydrating actions from `clarification`. `prompt_source =
+degraded_fallback` means clients render localized deterministic copy from
+static i18n bundles using the typed fields. Legacy sidecars without
+`prompt_source` are treated as degraded fallback for reload compatibility.
+The persisted `content` on a degraded fallback remains compatibility transport
+for reload and non-upgraded clients; it is excluded from later interpreter and
+clarifier history and from `last_message_preview` (therefore Recents and
+conversation search). Exact `llm_generated` prose remains eligible for both
+model history and preview surfaces.
 
 Recoverable streaming error frames may also include the same structured fields
 so live clients can render retry controls immediately, before reload hydration:
@@ -1979,6 +2039,7 @@ Example degraded clarification payload:
     "clarification": {
       "kind": "clarification",
       "reason_code": "missing_period",
+      "prompt_source": "degraded_fallback",
       "requested_field": "date_range",
       "requested_fields": ["date_range"],
       "semantic_needs": ["period"],
@@ -2001,6 +2062,7 @@ Example unsupported-recovery clarification payload:
   "clarification": {
     "kind": "unsupported_recovery",
     "reason_code": "unsupported_strategy_logic",
+    "prompt_source": "degraded_fallback",
     "requested_field": "unsupported_constraints",
     "requested_fields": ["unsupported_constraints"],
     "semantic_needs": ["simplification_choice"],
@@ -2275,6 +2337,12 @@ After every queued and running ceiling passes, a conforming direct job starts in
 - mixed asset requests rejected with **422**
 - unsupported templates/timeframes rejected with **422**
 - `starting_capital` outside range [1000, 100000000] rejected with **422**
+- A non-consuming quota exhaustion check runs before provider-backed coverage
+  preflight. Coverage rejection consumes no backtest allowance; the definitive
+  admission check and increment run only after coverage succeeds.
+- `config_snapshot.requested_date_range` records the submitted period, while
+  `config_snapshot.effective_date_range` records the common period actually
+  simulated. The response card and chart use the effective period.
 
 **Example 422: Mixed Asset Error**
 ```json

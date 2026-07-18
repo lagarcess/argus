@@ -7,6 +7,7 @@ import pandas as pd
 import vectorbt as vbt
 
 from argus.domain.backtesting.config import _periods_per_year, _vbt_freq
+from argus.domain.backtesting.coverage import PreparedMarketData
 from argus.domain.backtesting.execution import (
     _build_long_only_execution_ledger,
     _dca_equity_curve,
@@ -115,6 +116,7 @@ def compute_alpha_metrics(
     fetch_ohlcv_func=fetch_ohlcv,
     build_signals_func=_build_signals,
     build_benchmark_curve_func=build_benchmark_curve,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> dict[str, Any]:
     by_symbol: dict[str, Any] = {}
     symbol_equity_curves: list[pd.Series] = []
@@ -129,13 +131,16 @@ def compute_alpha_metrics(
     is_dca = config["template"] == "dca_accumulation"
 
     for symbol in config["symbols"]:
-        bars = fetch_ohlcv_func(
-            symbol=symbol,
-            asset_class=config["asset_class"],
-            start_date=start,
-            end_date=end,
-            timeframe=config["timeframe"],
-        )
+        if prepared_market_data is None:
+            bars = fetch_ohlcv_func(
+                symbol=symbol,
+                asset_class=config["asset_class"],
+                start_date=start,
+                end_date=end,
+                timeframe=config["timeframe"],
+            )
+        else:
+            bars = prepared_market_data.bars_for(symbol)
         close = bars["close"].astype(float)
         entries, exits = build_signals_func(config, bars)
         execution_events = _build_long_only_execution_ledger(
@@ -145,7 +150,16 @@ def compute_alpha_metrics(
             allow_accumulation=is_dca,
         )
 
-        benchmark_curve = build_benchmark_curve_func(config, close.index)
+        if prepared_market_data is None:
+            benchmark_curve = build_benchmark_curve_func(config, close.index)
+        else:
+            benchmark_curve = build_benchmark_curve(
+                config,
+                close.index,
+                fetch_price_series_func=lambda *, symbol, **_: (
+                    prepared_market_data.price_series_for(symbol)
+                ),
+            )
         benchmark_normalized = pd.Series(
             benchmark_curve["equity_curve"], index=close.index, dtype=float
         )
@@ -243,12 +257,8 @@ def compute_alpha_metrics(
         symbol_equity_curves.append(symbol_equity)
         benchmark_equity_curves.append(benchmark_equity)
 
-    aggregate_strategy_equity = (
-        pd.concat(symbol_equity_curves, axis=1).ffill().bfill().sum(axis=1)
-    )
-    aggregate_benchmark_equity = (
-        pd.concat(benchmark_equity_curves, axis=1).ffill().bfill().sum(axis=1)
-    )
+    aggregate_strategy_equity = _sum_without_edge_backfill(symbol_equity_curves)
+    aggregate_benchmark_equity = _sum_without_edge_backfill(benchmark_equity_curves)
     trade_count = sum(row["efficiency"]["total_trades"] for row in by_symbol.values())
     if is_dca:
         aggregate_invested = allocation_capital * max(trade_count, 1)
@@ -278,9 +288,7 @@ def compute_alpha_metrics(
                 trade_count=trade_count,
             )
     if has_modeled_costs and gross_symbol_equity_curves:
-        gross_aggregate_equity = (
-            pd.concat(gross_symbol_equity_curves, axis=1).ffill().bfill().sum(axis=1)
-        )
+        gross_aggregate_equity = _sum_without_edge_backfill(gross_symbol_equity_curves)
         gross_metrics = _compute_metrics_from_equity(
             strategy_equity=gross_aggregate_equity,
             benchmark_equity=aggregate_benchmark_equity,
@@ -288,23 +296,30 @@ def compute_alpha_metrics(
             periods_per_year=periods_per_year,
             trade_count=trade_count,
         )
-        aggregate_metrics.setdefault("performance", {})[
-            "execution_realism"
-        ] = _execution_realism_performance_summary(
-            realism=realism,
-            gross_performance=gross_metrics["performance"],
-            net_performance=aggregate_metrics["performance"],
+        aggregate_metrics.setdefault("performance", {})["execution_realism"] = (
+            _execution_realism_performance_summary(
+                realism=realism,
+                gross_performance=gross_metrics["performance"],
+                net_performance=aggregate_metrics["performance"],
+            )
         )
     value_summary = portfolio_value_summary(aggregate_strategy_equity)
     if value_summary is not None:
-        aggregate_metrics.setdefault("performance", {})[
-            "portfolio_value_range"
-        ] = value_summary
+        aggregate_metrics.setdefault("performance", {})["portfolio_value_range"] = (
+            value_summary
+        )
 
     return {
         "aggregate": aggregate_metrics,
         "by_symbol": by_symbol,
     }
+
+
+def _sum_without_edge_backfill(curves: list[pd.Series]) -> pd.Series:
+    aligned = pd.concat(curves, axis=1).sort_index().ffill().dropna(how="any")
+    if aligned.empty:
+        raise ValueError("market_data_unavailable")
+    return aligned.sum(axis=1)
 
 
 def _execution_realism_has_costs(realism: dict[str, float | bool]) -> bool:

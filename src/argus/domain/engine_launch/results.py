@@ -63,6 +63,10 @@ USER_SAFE_FAILURE_MESSAGES = {
         "That end date is later than the latest date Argus can backtest. Choose "
         "an end date up to today and I will keep the strategy intact."
     ),
+    "approved_data_window_unavailable": (
+        "That confirmation needs its data window checked again before it can run. "
+        "Review the refreshed dates and approve the new card."
+    ),
 }
 
 
@@ -80,6 +84,7 @@ USER_SAFE_FAILURE_DETAILS = {
     "invalid_date_range": "invalid_date_window",
     "invalid_chronological_date_range": "invalid_date_window",
     "future_end_date": "future_date_window",
+    "approved_data_window_unavailable": "approved_data_window_unavailable",
     "capital_amount_required": "invalid_parameter",
     "position_size_required": "invalid_parameter",
     "capital_amount_not_applicable": "invalid_parameter",
@@ -109,6 +114,18 @@ def user_safe_failure_detail(
 def is_user_safe_failure_code(value: str | None) -> bool:
     code = str(value or "").strip()
     return code in USER_SAFE_FAILURE_MESSAGES or code in USER_SAFE_FAILURE_DETAILS
+
+
+def is_user_safe_failure_detail(value: str | None) -> bool:
+    detail = str(value or "").strip()
+    return detail in {
+        *USER_SAFE_FAILURE_DETAILS.values(),
+        "missing_required_input",
+        "unsupported_capability",
+        "invalid_parameter",
+        "temporary_dependency_issue",
+        "execution_failed",
+    }
 
 
 def build_success_envelope(

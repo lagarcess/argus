@@ -3,8 +3,13 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+import pandas as pd
 import pytest
+from argus.agent_runtime.artifacts import ArtifactPatch, apply_artifact_patch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.coverage_recovery import (
+    PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT,
+)
 from argus.agent_runtime.llm_clarifier import (
     ClarificationRequest,
     ClarificationResponse,
@@ -65,9 +70,7 @@ def test_clarify_confirmation_action_period_uses_llm_voice_in_spanish() -> None:
         date_range={"start": "2025-06-14", "end": "2026-06-12"},
         capital_amount=100000,
     )
-    clarifier = RecordingClarifier(
-        "Claro. ¿Qué nuevo rango quieres usar para AAPL?"
-    )
+    clarifier = RecordingClarifier("Claro. ¿Qué nuevo rango quieres usar para AAPL?")
 
     result = clarify_stage(
         state=state,
@@ -580,12 +583,21 @@ def test_clarify_spanish_unsupported_recovery_fallback_uses_structured_options()
         "buy_and_hold",
         "moving_average_crossover",
     ]
+    assert [
+        option["id"] for option in result.patch["response_intent"]["options"]
+    ] == [
+        "rsi_threshold",
+        "buy_and_hold",
+        "moving_average_crossover",
+    ]
     assert clarification["options"][0]["replacement_values"] == {
         "simplify_logic": "rsi_only"
     }
 
 
-def test_clarify_uses_generator_for_dca_cap_recovery_after_execution_fields_are_known() -> None:
+def test_clarify_uses_generator_for_dca_cap_recovery_after_execution_fields_are_known() -> (
+    None
+):
     state = RunState.new(
         current_user_message=(
             "what if I bought $125 of BTC every two weeks from 2022 through "
@@ -752,9 +764,7 @@ def test_rule_clarification_preserves_known_asset_context() -> None:
     assert result.outcome == "await_user_reply"
     assert result.patch["assistant_prompt"] == clarifier.question
     assert clarifier.requests[0].candidate_strategy_draft.asset_universe == ["NVDA"]
-    assert clarifier.requests[0].response_intent["semantic_needs"] == [
-        "rule_definition"
-    ]
+    assert clarifier.requests[0].response_intent["semantic_needs"] == ["rule_definition"]
 
 
 def test_multi_field_signal_clarification_uses_plain_language() -> None:
@@ -787,7 +797,9 @@ def test_multi_field_signal_clarification_uses_plain_language() -> None:
 
 
 def test_confirmation_action_assumption_uses_llm_voice_in_spanish() -> None:
-    state = RunState.new(current_user_message="Ajustar supuestos", recent_thread_history=[])
+    state = RunState.new(
+        current_user_message="Ajustar supuestos", recent_thread_history=[]
+    )
     state.intent = "strategy_drafting"
     state.requested_field = "assumption"
     state.missing_required_fields = ["assumption"]
@@ -850,6 +862,144 @@ def test_clarify_unsupported_recovery_uses_generator_over_prefilled_copy() -> No
     )
 
 
+def test_clarify_unsupported_timeframe_persists_typed_actions_with_llm_voice() -> None:
+    state = RunState.new(
+        current_user_message="Use five-minute bars.",
+        recent_thread_history=[],
+    )
+    state.intent = "unsupported_or_out_of_scope"
+    state.requested_field = "timeframe"
+    state.missing_required_fields = ["timeframe"]
+    state.optional_parameter_status = {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "5m",
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_time_granularity",
+                "raw_value": "5m",
+                "explanation": "Choose a supported timeframe.",
+                "simplification_options": [
+                    {
+                        "label": "Retry with daily bars",
+                        "replacement_values": {"timeframe": "1D"},
+                    },
+                    {
+                        "label": "Retry with 1-hour bars",
+                        "replacement_values": {"timeframe": "1h"},
+                    },
+                ],
+            }
+        ],
+    }
+    clarifier = RecordingClarifier(
+        "Five-minute bars are not supported. Choose daily or one-hour bars."
+    )
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == clarifier.question
+    assert result.patch["response_intent"]["facts"][
+        PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT
+    ] == {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "5m",
+    }
+    assert [
+        option["id"] for option in result.patch["response_intent"]["options"]
+    ] == ["option_0", "option_1"]
+    assert result.patch["clarification"] == {
+        "kind": "unsupported_recovery",
+        "reason_code": "unsupported_time_granularity",
+        "prompt_source": "llm_generated",
+        "requested_field": "timeframe",
+        "requested_fields": ["timeframe"],
+        "semantic_needs": ["simplification_choice"],
+        "payload": {
+            "strategy": state.candidate_strategy_draft.model_dump(mode="python"),
+            "raw_value": "5m",
+        },
+        "options": [
+            {
+                "id": "option_0",
+                "replacement_values": {"timeframe": "1D"},
+                "compatibility_label": "Retry with daily bars",
+            },
+            {
+                "id": "option_1",
+                "replacement_values": {"timeframe": "1h"},
+                "compatibility_label": "Retry with 1-hour bars",
+            },
+        ],
+    }
+
+
+@pytest.mark.parametrize("language", ["en", "es-419"])
+def test_clarify_unsupported_timeframe_degraded_fallback_is_typed_and_truthful(
+    language: str,
+) -> None:
+    state = RunState.new(
+        current_user_message="Use five-minute bars.",
+        recent_thread_history=[],
+    )
+    state.intent = "unsupported_or_out_of_scope"
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        timeframe="5m",
+    )
+    state.requested_field = "timeframe"
+    state.missing_required_fields = ["timeframe"]
+    state.optional_parameter_status = {
+        "timeframe": "5m",
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_time_granularity",
+                "raw_value": "5m",
+                "explanation": "Choose a supported timeframe.",
+                "simplification_options": [
+                    {
+                        "label": "Retry with daily bars",
+                        "replacement_values": {"timeframe": "1D"},
+                    },
+                    {
+                        "label": "Retry with 1-hour bars",
+                        "replacement_values": {"timeframe": "1h"},
+                    },
+                ],
+            }
+        ],
+    }
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=RecordingClarifier(None),
+        language=language,
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == (
+        "5m is not a supported bar size. Choose daily or 1-hour bars."
+    )
+    assert result.patch["clarification"]["prompt_source"] == "degraded_fallback"
+    assert result.patch["clarification"]["reason_code"] == (
+        "unsupported_time_granularity"
+    )
+    assert [
+        option["id"] for option in result.patch["response_intent"]["options"]
+    ] == [option["id"] for option in result.patch["clarification"]["options"]]
+
+
 def test_clarification_renderer_collapses_adjacent_duplicate_sentences() -> None:
     request = ClarificationRequest(
         current_user_message="Use the supported version.",
@@ -874,7 +1024,9 @@ def test_clarification_renderer_collapses_adjacent_duplicate_sentences() -> None
     assert rendered == "I can keep the runnable version. Which direction should I use?"
 
 
-def test_clarification_renderer_collapses_duplicates_after_direct_question_append() -> None:
+def test_clarification_renderer_collapses_duplicates_after_direct_question_append() -> (
+    None
+):
     repeated = (
         "ATR 14 is a volatility indicator, but I need an explicit entry or exit "
         "rule to run a test."
@@ -912,7 +1064,9 @@ def test_clarification_renderer_collapses_duplicates_after_direct_question_appen
     )
 
 
-def test_clarification_renderer_collapses_repeated_context_block_before_question() -> None:
+def test_clarification_renderer_collapses_repeated_context_block_before_question() -> (
+    None
+):
     first = (
         "El ATR 14 es un indicador de volatilidad que aún no podemos ejecutar "
         "como regla de entrada o salida."
@@ -1965,10 +2119,517 @@ def test_confirm_stage_still_builds_confirmation_card() -> None:
     assert result.patch["confirmation_payload"]["strategy"]["entry_logic"] == (
         "RSI drops below 30"
     )
-    assert "$1,000 starting capital" in result.patch["candidate_strategy_draft"][
-        "assumptions"
-    ]
+    assert (
+        "$1,000 starting capital"
+        in result.patch["candidate_strategy_draft"]["assumptions"]
+    )
     assert "1D bars" in result.patch["candidate_strategy_draft"]["assumptions"]
+
+
+def test_confirm_stage_reconciles_effective_window_before_approval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain import market_data
+
+    def fake_fetch(symbol: str, **_: object) -> pd.DataFrame:
+        days = (
+            ["2024-01-03", "2024-01-04", "2024-01-05"]
+            if symbol == "AAPL"
+            else [
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-04",
+                "2024-01-05",
+            ]
+        )
+        index = pd.to_datetime(days, utc=True)
+        close = pd.Series(range(100, 100 + len(index)), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", fake_fetch)
+    state = RunState.new(
+        current_user_message="Hold AAPL from January 1 through January 5, 2024.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_approval"
+    confirmation = result.patch["confirmation_payload"]
+    assert confirmation["strategy"]["date_range"] == {
+        "start": "2024-01-03",
+        "end": "2024-01-05",
+    }
+    assert confirmation["launch_payload"]["requested_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-01-05",
+    }
+    assert confirmation["launch_payload"]["date_range"] == {
+        "start": "2024-01-03",
+        "end": "2024-01-05",
+    }
+    assert confirmation["launch_payload"]["coverage_preflight"]["outcome"] == (
+        "adjusted_coverage"
+    )
+    assert confirmation["validation"]["date_adjusted"] is True
+
+
+def test_confirm_stage_preserves_requested_window_after_non_date_edit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import confirm as confirm_module
+    from argus.agent_runtime.stages.execute import _launch_payload
+    from argus.domain import market_data
+
+    def fake_fetch(symbol: str, **_: object) -> pd.DataFrame:  # noqa: ARG001
+        index = pd.to_datetime(
+            ["2024-01-03", "2024-01-04", "2024-01-05"],
+            utc=True,
+        )
+        close = pd.Series([100.0, 101.0, 102.0], index=index)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(confirm_module, "_market_clock_for_strategy", lambda _: None)
+    first_state = RunState.new(
+        current_user_message="Hold AAPL from January 1 through January 5, 2024.",
+        recent_thread_history=[],
+    )
+    first_state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    first = confirm_stage(
+        state=first_state,
+        contract=build_default_capability_contract(),
+    )
+    edited = apply_artifact_patch(
+        StrategySummary.model_validate(first.patch["candidate_strategy_draft"]),
+        ArtifactPatch(source="user_patch", capital_amount=20_000),
+    )
+    second_state = RunState.new(
+        current_user_message="Use $20,000 instead.",
+        recent_thread_history=[],
+    )
+    second_state.candidate_strategy_draft = edited
+
+    second = confirm_stage(
+        state=second_state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert second.outcome == "await_approval"
+    confirmation = second.patch["confirmation_payload"]
+    assert confirmation["launch_payload"]["requested_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-01-05",
+    }
+    assert confirmation["launch_payload"]["date_range"] == {
+        "start": "2024-01-03",
+        "end": "2024-01-05",
+    }
+    second_state.confirmation_payload = confirmation
+    assert _launch_payload(second_state)["requested_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-01-05",
+    }
+
+    date_edited = apply_artifact_patch(
+        StrategySummary.model_validate(first.patch["candidate_strategy_draft"]),
+        ArtifactPatch(
+            source="user_patch",
+            date_range={"start": "2024-01-04", "end": "2024-01-05"},
+        ),
+    )
+    date_edit_state = RunState.new(
+        current_user_message="Use January 4 through January 5 instead.",
+        recent_thread_history=[],
+    )
+    date_edit_state.candidate_strategy_draft = date_edited
+
+    date_edit_result = confirm_stage(
+        state=date_edit_state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert date_edit_result.patch["confirmation_payload"]["launch_payload"][
+        "requested_date_range"
+    ] == {"start": "2024-01-04", "end": "2024-01-05"}
+
+
+def test_confirm_stage_returns_typed_recovery_without_runnable_card_when_no_common_data(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain import market_data
+
+    def fake_fetch(symbol: str, **_: object) -> pd.DataFrame:
+        days = (
+            ["2024-01-01", "2024-01-02"]
+            if symbol == "AAPL"
+            else ["2024-01-04", "2024-01-05"]
+        )
+        index = pd.to_datetime(days, utc=True)
+        close = pd.Series(range(100, 100 + len(index)), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", fake_fetch)
+    state = RunState.new(
+        current_user_message="Hold AAPL from January 1 through January 5, 2024.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    state.optional_parameter_status = {"fees": 0.001, "slippage": 0.0005}
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "needs_clarification"
+    assert "confirmation_payload" not in result.patch
+    assert "unsupported_constraints" not in result.patch["optional_parameter_status"]
+    assert result.patch["optional_parameter_status"]["fees"] == 0.001
+    assert result.patch["optional_parameter_status"]["slippage"] == 0.0005
+    recovery = result.patch["optional_parameter_status"]["coverage_recovery"]
+    assert recovery == {
+        "code": "no_common_data_window",
+        "requested_date_range": {
+            "start": "2024-01-01",
+            "end": "2024-01-05",
+        },
+        "asset_universe": ["AAPL"],
+        "benchmark_symbol": "SPY",
+    }
+
+    clarify_state = state.model_copy(update=result.patch)
+    clarifier = RecordingClarifier(
+        "The shared history is not usable. Which part should we change?"
+    )
+    clarified = clarify_stage(
+        state=clarify_state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+        language="en",
+    )
+
+    assert clarified.outcome == "await_user_reply"
+    assert clarified.patch["assistant_prompt"] == (
+        "The shared history is not usable. Which part should we change?"
+    )
+    response_intent = clarified.patch["response_intent"]
+    clarification = clarified.patch["clarification"]
+    assert clarification["kind"] == "coverage_recovery"
+    assert clarification["prompt_source"] == "llm_generated"
+    assert clarification["options"] == response_intent["options"]
+    assert response_intent["kind"] == "coverage_recovery"
+    assert response_intent["facts"]["coverage"] == recovery
+    assert response_intent["facts"]["preserved_optional_parameter_status"] == {
+        "fees": 0.001,
+        "slippage": 0.0005,
+    }
+    assert response_intent["options"] == [
+        {
+            "id": "change_dates",
+            "replacement_values": {"requested_field": "date_range"},
+        },
+        {
+            "id": "change_asset",
+            "replacement_values": {"requested_field": "asset_universe"},
+        },
+        {
+            "id": "change_benchmark",
+            "replacement_values": {"requested_field": "comparison_baseline"},
+        },
+    ]
+    assert all("label" not in option for option in response_intent["options"])
+    assert clarifier.requests[0].unsupported_constraints == []
+
+
+def test_confirm_stage_fails_closed_when_live_equity_calendar_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import confirm as confirm_module
+    from argus.domain.engine_launch import adapter
+    from argus.domain.market_data import capabilities, provider
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    dates = [
+        "2024-12-24",
+        "2024-12-26",
+        "2024-12-27",
+        "2024-12-30",
+        "2024-12-31",
+        "2025-01-02",
+    ]
+    index = pd.to_datetime(dates, utc=True)
+    close = pd.Series(range(100, 106), index=index, dtype=float)
+    bars = pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": 1_000.0,
+        },
+        index=index,
+    )
+    calendar_calls = 0
+
+    def unavailable_calendar(**_: object):
+        nonlocal calendar_calls
+        calendar_calls += 1
+        raise ValueError("calendar unavailable")
+
+    monkeypatch.setattr(provider, "_fetch_bars_with_ttl", lambda **_: bars.copy())
+    monkeypatch.setattr(
+        capabilities,
+        "fetch_alpaca_market_calendar",
+        unavailable_calendar,
+    )
+    monkeypatch.setattr(confirm_module, "_market_clock_for_strategy", lambda _: None)
+    monkeypatch.setattr(
+        adapter,
+        "validate_request_symbols",
+        lambda _: adapter.RequestSymbolValidationResult(
+            outcome="resolved",
+            symbols=("AAPL",),
+            asset_class="equity",
+        ),
+    )
+    monkeypatch.setattr(
+        adapter,
+        "validate_request_benchmark",
+        lambda *_, **__: adapter.BenchmarkSymbolValidationResult(
+            outcome="resolved",
+            benchmark_symbol="SPY",
+            asset_class="equity",
+        ),
+    )
+    state = RunState.new(
+        current_user_message="Hold AAPL across the 2024 year-end holidays.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": dates[0], "end": dates[-1]},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "needs_clarification"
+    assert "confirmation_payload" not in result.patch
+    assert result.patch["optional_parameter_status"]["coverage_recovery"]["code"] == (
+        "market_data_unavailable"
+    )
+    assert calendar_calls == 1
+
+
+def test_confirm_stage_returns_coverage_recovery_for_sparse_common_data(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain import market_data
+
+    def fake_fetch(symbol: str, **_: object) -> pd.DataFrame:  # noqa: ARG001
+        index = pd.to_datetime(["2024-01-01", "2024-01-10"], utc=True)
+        close = pd.Series([100.0, 101.0], index=index)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", fake_fetch)
+    state = RunState.new(
+        current_user_message="Hold AAPL from January 1 through January 10, 2024.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-10"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "needs_clarification"
+    assert "confirmation_payload" not in result.patch
+    assert result.patch["optional_parameter_status"]["coverage_recovery"]["code"] == (
+        "insufficient_common_data"
+    )
+
+
+def test_degraded_coverage_recovery_emits_typed_localizable_sidecar() -> None:
+    state = RunState.new(
+        current_user_message="Prueba AAPL en ese periodo.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    state.optional_parameter_status = {
+        "coverage_recovery": {
+            "code": "no_common_data_window",
+            "requested_date_range": {
+                "start": "2024-01-01",
+                "end": "2024-01-05",
+            },
+            "asset_universe": ["AAPL"],
+            "benchmark_symbol": "SPY",
+        }
+    }
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=None,
+        language="es-419",
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["clarification"] == {
+        "kind": "coverage_recovery",
+        "reason_code": "no_common_data_window",
+        "prompt_source": "degraded_fallback",
+        "requested_field": None,
+        "requested_fields": [
+            "date_range",
+            "asset_universe",
+            "comparison_baseline",
+        ],
+        "semantic_needs": ["simplification_choice"],
+        "payload": {
+            "strategy": state.candidate_strategy_draft.model_dump(mode="python"),
+            "coverage": state.optional_parameter_status["coverage_recovery"],
+        },
+        "options": [
+            {
+                "id": "change_dates",
+                "replacement_values": {"requested_field": "date_range"},
+            },
+            {
+                "id": "change_asset",
+                "replacement_values": {"requested_field": "asset_universe"},
+            },
+            {
+                "id": "change_benchmark",
+                "replacement_values": {"requested_field": "comparison_baseline"},
+            },
+        ],
+    }
+
+
+def test_confirm_stage_revalidates_strategy_viability_after_window_adjustment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import confirm as confirm_module
+    from argus.domain import market_data
+
+    def fake_fetch(symbol: str, **_: object) -> pd.DataFrame:
+        days = (
+            [f"2024-01-{day:02d}" for day in range(22, 32)]
+            if symbol == "AAPL"
+            else [f"2024-01-{day:02d}" for day in range(1, 32)]
+        )
+        index = pd.to_datetime(days, utc=True)
+        close = pd.Series(range(100, 100 + len(index)), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(confirm_module, "_market_clock_for_strategy", lambda _: None)
+    state = RunState.new(
+        current_user_message="Test AAPL RSI during January 2024.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Test AAPL when RSI drops below 30.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": "2024-01-01", "end": "2024-01-31"},
+        entry_logic="RSI drops below 30",
+        exit_logic="RSI rises above 55",
+        extra_parameters={
+            "indicator": "rsi",
+            "indicator_parameters": {"indicator": "rsi", "indicator_period": 14},
+        },
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "needs_clarification"
+    assert "confirmation_payload" not in result.patch
+    assert result.patch["requested_field"] == "date_range"
+    constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
+    assert constraint["category"] == "data_window_too_short_for_rule"
 
 
 def test_confirm_stage_preserves_explicit_benchmark_in_card_assumptions() -> None:
@@ -2140,6 +2801,18 @@ def test_confirm_stage_marks_daily_today_endpoint_as_latest_complete_data(
 
     assert strategy["date_range"] == {"start": "2026-01-01", "end": "2026-06-02"}
     assert launch_payload["date_range"] == {
+        "start": "2026-01-01",
+        "end": "2026-06-02",
+    }
+    assert launch_payload["requested_date_range"] == {
+        "start": "2026-01-01",
+        "end": "2026-06-03",
+    }
+    assert launch_payload["coverage_preflight"]["requested_date_range"] == {
+        "start": "2026-01-01",
+        "end": "2026-06-03",
+    }
+    assert launch_payload["coverage_preflight"]["effective_date_range"] == {
         "start": "2026-01-01",
         "end": "2026-06-02",
     }
@@ -2373,14 +3046,11 @@ def test_confirm_stage_uses_product_language_for_data_window_limits() -> None:
     assert result.outcome == "needs_clarification"
     assert result.patch["assistant_prompt"] is None
     assert result.patch["requested_field"] == "date_range"
-    constraint = result.patch["optional_parameter_status"][
-        "unsupported_constraints"
-    ][0]
+    constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
     assert constraint["category"] == "data_window_unavailable"
     assert "provider" not in constraint["explanation"].lower()
     assert any(
-        "2016" in option["label"]
-        for option in constraint["simplification_options"]
+        "2016" in option["label"] for option in constraint["simplification_options"]
     )
 
 
@@ -2563,8 +3233,7 @@ def test_confirm_stage_keeps_date_edit_visible_card_and_launch_payload_in_sync()
                 "end": "2026-04-14",
                 "confidence": 1.0,
                 "evidence": (
-                    "change the period to show march 2 of 2025 "
-                    "until april 14 of 2026"
+                    "change the period to show march 2 of 2025 " "until april 14 of 2026"
                 ),
             },
             "field_provenance": {"date_range": "explicit_user"},
@@ -2775,9 +3444,7 @@ def test_confirm_stage_blocks_unsupported_nonzero_fee_assumption(
     assert result.outcome == "needs_clarification"
     assert result.patch["requested_field"] == "fees"
     assert result.patch["assistant_prompt"] is None
-    constraint = result.patch["optional_parameter_status"][
-        "unsupported_constraints"
-    ][0]
+    constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
     assert constraint["category"] == "unsupported_execution_assumption"
     assert constraint["raw_value"] == "custom trading fees"
 
@@ -2852,7 +3519,9 @@ def test_confirm_stage_clarifies_non_executable_signal_rule_before_date() -> Non
     assert result.patch["missing_required_fields"] == ["entry_logic"]
 
 
-def test_confirm_stage_blocks_canonical_signal_window_when_window_cannot_cover_warmup() -> None:
+def test_confirm_stage_blocks_canonical_signal_window_when_window_cannot_cover_warmup() -> (
+    None
+):
     state = RunState.new(
         current_user_message=(
             "Test SPY when the 50-day SMA crosses above the 200-day SMA last month."
@@ -2892,9 +3561,7 @@ def test_confirm_stage_blocks_canonical_signal_window_when_window_cannot_cover_w
     assert result.outcome == "needs_clarification"
     assert result.patch["assistant_prompt"] is None
     assert result.patch["requested_field"] == "date_range"
-    constraint = result.patch["optional_parameter_status"][
-        "unsupported_constraints"
-    ][0]
+    constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
     assert constraint["category"] == "data_window_too_short_for_rule"
     assert any(
         option["label"] == "Use a longer date range"

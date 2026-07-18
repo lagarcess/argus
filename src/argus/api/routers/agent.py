@@ -5,7 +5,6 @@ import os
 import time
 from collections.abc import AsyncIterator
 from contextlib import suppress
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, Request
@@ -26,6 +25,7 @@ from argus.api.chat.actions import (
     is_confirmation_action,
     is_result_action,
     missing_run_confirmation_action_id_message,
+    persisted_chat_action,
     recent_metadata_invalidates_confirmation,
     run_for_result_action,
     stale_confirmation_action_message,
@@ -59,6 +59,7 @@ from argus.api.chat.recovery import (
     pending_strategy_metadata_fallback_context,
     runtime_checkpoint_values,
 )
+from argus.api.chat.request_admission import prepare_chat_request_admission
 from argus.api.chat.route_receipts import persist_route_receipts
 from argus.api.chat.runtime_worker import (
     runtime_worker_enabled,
@@ -82,7 +83,12 @@ from argus.api.message_store import (
     load_runtime_thread_history,
 )
 from argus.api.naming import get_starter_prompts, resolve_language
-from argus.api.schemas import BacktestRun, ChatStreamRequest, StarterPromptsResponse, User
+from argus.api.schemas import (
+    BacktestRun,
+    ChatStreamRequest,
+    StarterPromptsResponse,
+    User,
+)
 from argus.domain.backtest_finalization import BacktestFinalizationError
 from argus.domain.supabase_gateway import QuotaExceededError
 from argus.llm.openrouter import (
@@ -431,33 +437,17 @@ async def chat_stream(
         ),
     )
 
-    def persist_request_message() -> Any | None:
-        if onboarding_goal is not None or cancel_confirmation_action:
-            return None
-        user_metadata: dict[str, Any] = {
-            "agent_runtime_turn": {
-                "status": "started",
-                "conversation_id": conversation.id,
-                "request_id": request.state.request_id,
-                "started_at": datetime.now(timezone.utc).isoformat(),
-            }
-        }
-        if mention_provenance:
-            user_metadata["mentions"] = [
-                mention.model_dump(mode="python") for mention in payload.mentions
-            ]
-            user_metadata["resolution_provenance"] = [
-                item.model_dump(mode="python") for item in mention_provenance
-            ]
-        if payload.action is not None:
-            user_metadata["chat_action"] = payload.action.model_dump(mode="python")
-        return create_message(
-            user_id=user.id,
-            conversation_id=conversation.id,
-            role="user",
-            content=display_message,
-            metadata=user_metadata,
-        )
+    request_admission = prepare_chat_request_admission(
+        payload=payload,
+        request=request,
+        user_id=user.id,
+        conversation_id=conversation.id,
+        display_message=display_message,
+        mention_provenance=mention_provenance,
+        enabled=onboarding_goal is None and not cancel_confirmation_action,
+        language=language,
+    )
+    runtime_fallback = RuntimeFallbackContext()
 
     workflow: Any | None = None
     retry_finalization_execution_identity: str | None = None
@@ -487,11 +477,14 @@ async def chat_stream(
             conversation_id=conversation.id,
         )
     except Exception:
+        validated_option_source = request_admission.admit_response_option()
+        if validated_option_source is not None:
+            runtime_fallback = validated_option_source.runtime_fallback
         logger.exception(
             "Agent runtime initialization failed",
             conversation_id=conversation.id,
         )
-        persist_request_message()
+        request_admission.persist()
         language = payload.language or conversation.language or current_user_profile.language
         assistant_text = recovery_message("runtime_failure", language=language)
         retry_metadata = chat_retry.retry_last_turn_metadata(
@@ -560,7 +553,9 @@ async def chat_stream(
             media_type="text/event-stream",
             headers=headers,
         )
-    runtime_fallback = RuntimeFallbackContext()
+    validated_option_source = request_admission.admit_response_option()
+    if validated_option_source is not None:
+        runtime_fallback = validated_option_source.runtime_fallback
     confirmation_action_messages = (
         _recent_messages_for_conversation(
             user_id=user.id,
@@ -680,7 +675,7 @@ async def chat_stream(
                     )
                     if result_fallback is not None:
                         runtime_fallback = result_fallback
-    request_message_record = persist_request_message()
+    request_message_record = request_admission.persist()
 
     # Onboarding feature flag on the API service. Default enabled so prod/QA/tests keep the
     # flow; dev mode sets it false. The deployed API must set this to match the web
@@ -709,6 +704,7 @@ async def chat_stream(
         def schedule_artifact_naming(
             *,
             assistant_message: str | None,
+            assistant_metadata: dict[str, Any] | None = None,
             current_run: BacktestRun | None = None,
             saved_strategy_id: str | None = None,
             message_id: str | None = None,
@@ -722,6 +718,7 @@ async def chat_stream(
                     saved_strategy_id=saved_strategy_id,
                     user_message=display_message,
                     assistant_message=assistant_message,
+                    assistant_metadata=assistant_metadata,
                     message_id=message_id,
                     run_id=current_run.id if current_run is not None else None,
                 )
@@ -847,13 +844,13 @@ async def chat_stream(
 
         if runtime_fallback.recovery_message:
             assistant_text = runtime_fallback.recovery_message
-            metadata = {
+            metadata: dict[str, Any] = {
                 "conversation_mode": "confirm",
                 "agent_runtime_stage_outcome": "await_user_reply",
                 "recovery_reason": "missing_confirmation_checkpoint",
             }
             if payload.action is not None:
-                metadata["chat_action"] = payload.action.model_dump(mode="python")
+                metadata["chat_action"] = persisted_chat_action(payload)
             if runtime_fallback.recovery is not None:
                 metadata["recovery"] = dict(runtime_fallback.recovery)
             assistant_message = create_message(
@@ -901,10 +898,10 @@ async def chat_stream(
                 "type": "confirmation_cancelled",
                 "confirmation_id": confirmation_id,
             }
-            metadata = {
+            metadata: dict[str, Any] = {
                 "conversation_mode": "confirm",
                 "agent_runtime_stage_outcome": "ready_to_respond",
-                "chat_action": payload.action.model_dump(mode="python"),
+                "chat_action": persisted_chat_action(payload),
                 "artifact_event": artifact_event,
             }
             assistant_message = create_message(
@@ -928,11 +925,7 @@ async def chat_stream(
             yield sse_done()
             return
 
-        action_context = (
-            payload.action.model_dump(mode="python")
-            if payload.action is not None
-            else None
-        )
+        action_context = request_admission.runtime_action_context()
         streamed_text_parts: list[str] = []
         receipt_run_id: str | None = None
         receipt_message_id: str | None = None
@@ -1078,7 +1071,7 @@ async def chat_stream(
                         },
                     )
 
-                metadata = {
+                metadata: dict[str, Any] = {
                     "conversation_mode": (
                         "result_review"
                         if result_card is not None or result_action_type is not None
@@ -1097,7 +1090,7 @@ async def chat_stream(
                     },
                 }
                 if payload.action is not None:
-                    metadata["chat_action"] = payload.action.model_dump(mode="python")
+                    metadata["chat_action"] = persisted_chat_action(payload)
                 if result_action_type is not None and payload.action is not None:
                     confirmation_card = None
                     confirmation_anchor_text = None
@@ -1339,6 +1332,7 @@ async def chat_stream(
                 )
                 schedule_artifact_naming(
                     assistant_message=persisted_text,
+                    assistant_metadata=metadata,
                     current_run=result_action_run or run,
                     saved_strategy_id=saved_strategy_id_for_naming,
                     message_id=(
