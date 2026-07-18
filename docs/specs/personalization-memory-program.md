@@ -158,7 +158,7 @@ memory lane is always the junior owner and integrates last. Concretely:
 
 | Shared surface | Interim owner order | Memory lane behavior |
 | --- | --- | --- |
-| Interpreter/runtime spine | #238 → #239 → #241 → #249 runtime | wait for release; inject only inside #239's turn budget |
+| Interpreter/runtime spine | #238 → #239 → #241 → #249 runtime | wait for release; memory never feeds interpretation/routing — only a proven post-interpretation seam, inside #239's turn budget (S10) |
 | `agent.py` request boundary | #235 → #240 | wait |
 | Supabase gateway/migrations | #230 → #232 → #240 → proven #246 repair | author SQL early; apply only in a post-chain window |
 | Profile menu | #247 → #248 | memory Data Controls mounts third |
@@ -402,33 +402,47 @@ migration in the same review.
 
 - **User outcome:** Argus actually uses confirmed memories in conversation,
   visibly and explainably.
-- **Product meaning:** a small typed confirmed-memory packet enters the turn at
-  exactly three seams: `runtime.build_workflow_input`,
-  `InterpretationRequest`, and `llm_interpreter._messages` (new
-  `SystemMessage`), reusing the context-packet shape (immutable, budgeted,
-  `not_for: simulation_truth`). Bounded K, provenance ids attached, fetched
-  inside #239's turn budget, fail-open on any failure. Responses that use a
-  memory can explain why (S12/S5 link).
-- **Allowed surfaces:** the three seams + a new pre-interpret assembly module
-  mirroring `api/chat/context_packets.py`.
-- **Forbidden:** new routing heuristics; retrieval influencing route selection;
-  a second orchestrator; unbudgeted latency.
-- **Dependencies:** S3/S4/S9 evidence; interim spine + `agent.py` release;
-  #239's budget exists.
+- **Hard boundary (founder, 2026-07-18):** memory must not influence
+  interpretation, routing, or simulation truth. The interpreter decides what
+  the user means and where the turn routes from user language and canonical
+  artifacts alone; memory may only shape post-interpretation surfaces
+  (voicing, explanations, suggested next steps) and must carry
+  `not_for: simulation_truth` semantics like every context packet.
+- **Exact integration seam: DESIGN-BLOCKED.** The three seams previously
+  mapped (`runtime.build_workflow_input`, `InterpretationRequest`,
+  `llm_interpreter._messages`) all feed the interpreter and are therefore
+  **not approved** — they remain in this card only as coupling-map evidence.
+  A safe post-interpretation seam (e.g. explain/next-step/response-voicing
+  stages) has not yet been proven; this slice cannot start until a seam
+  design shows, with tests, that memory context cannot reach interpretation,
+  routing inputs, or simulation state.
+- **Product meaning:** a small typed confirmed-memory packet, bounded K,
+  provenance ids attached, fetched inside #239's turn budget, fail-open on
+  any failure. Responses that use a memory can explain why (S12/S5 link).
+- **Allowed surfaces:** the future approved post-interpretation seam + a new
+  assembly module mirroring `api/chat/context_packets.py`.
+- **Forbidden:** any input to interpretation or routing; simulation truth;
+  new routing heuristics; a second orchestrator; unbudgeted latency.
+- **Dependencies:** a founder-approved safe-seam design; S3/S4/S9 evidence;
+  interim spine + `agent.py` release; #239's budget exists.
 - **Owner/handoff:** single-owner change after #241/#249-runtime close; founder
-  approves activation cohort.
+  approves the seam design and the activation cohort.
 - **Data/privacy boundary:** only confirmed, enabled, allowlisted memories;
   suppressed in sensitive contexts per policy.
 - **Deterministic tests:** flag-off byte-identity on the turn (cross-commit
   full-precision proof, per the established flag-off discipline); packet
-  bounding; fail-open on store/provider failure.
+  bounding; fail-open on store/provider failure; interpretation/routing
+  isolation proofs (identical interpreter inputs and route selection with
+  memory on vs off).
 - **Live evidence:** gates L4 (injection behavior) and L5 (off-neutrality).
 - **Flag:** `ARGUS_MEMORY_CONTEXT_ENABLED` default off; independent from
   storage flags.
 - **Stop conditions:** interpreter-facing change without the live gate
-  (standing release discipline); any routing effect.
-- **Status:** `blocked-interim(#238→#239→#241)` + `founder-approval`;
-  activation post-PMF per §16.1.
+  (standing release discipline); any interpretation, routing, or simulation
+  effect.
+- **Status:** `design-blocked(safe post-interpretation seam)` +
+  `blocked-interim(#238→#239→#241)` + `founder-approval`; activation post-PMF
+  per §16.1.
 
 ### S11. Explicit saved-decision opt-in (first user-facing milestone)
 
@@ -605,6 +619,9 @@ conversations, or talk to any real provider.
 7. Whether shadow mode (S9) runs for internal users pre-PMF.
 8. Reconcile activation timing with §16.1's post-PMF boundary when the PMF
    gate becomes measurable again (§16.4 compute blocker).
+9. S10 safe seam: approve a post-interpretation injection seam design proving
+   memory cannot influence interpretation, routing, or simulation truth; until
+   then S10 stays design-blocked.
 
 ## 9. Integration Gates Checklist
 
