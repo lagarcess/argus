@@ -435,6 +435,11 @@ def _turn_acceptance_request_id(
     return None
 
 
+# Public name: the route uses the same predicate to decide whether a persisted
+# request message owns an ordinary lifecycle (run_backtest turns never do).
+ordinary_turn_request_id = _turn_acceptance_request_id
+
+
 def _accept_user_turn(
     *,
     user_id: str,
@@ -580,20 +585,18 @@ def _apply_turn_lifecycle_effects(*, user_id: str, message: Message) -> None:
         )
         if to_status is None:
             return
+        # The canonical turn envelope owns failure evidence; legacy top-level
+        # metadata fields remain a read-compatible fallback.
+        failure_code = turn.get("failure_code") or metadata.get("failure_code")
+        retryable = turn.get("retryable")
+        if not isinstance(retryable, bool):
+            retryable = metadata.get("retryable")
         turn_lifecycle_hooks.transition_turn(
             turn_id=turn_id,
             to_status=to_status,
             assistant_message_id=message.id,
-            failure_code=(
-                str(metadata.get("failure_code"))
-                if metadata.get("failure_code")
-                else None
-            ),
-            retryable=(
-                bool(metadata.get("retryable"))
-                if isinstance(metadata.get("retryable"), bool)
-                else None
-            ),
+            failure_code=str(failure_code) if failure_code else None,
+            retryable=retryable if isinstance(retryable, bool) else None,
         )
 
 
@@ -812,9 +815,11 @@ def _is_visible_runtime_failure(metadata: dict[str, Any]) -> bool:
 
 def _is_terminal_owner_runtime_failure(metadata: dict[str, Any]) -> bool:
     turn = metadata.get("agent_runtime_turn")
+    # Canonical status is recoverable_failed; historical rows persisted the
+    # legacy "failed" status and must stay readable.
     return (
         isinstance(turn, dict)
-        and turn.get("status") == "failed"
+        and turn.get("status") in ("recoverable_failed", "failed")
         and turn.get("terminal") is True
         and _is_visible_runtime_failure(metadata)
     )

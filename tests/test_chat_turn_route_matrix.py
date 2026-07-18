@@ -99,6 +99,255 @@ def _user_turns(conversation_id: str) -> list[Any]:
     ]
 
 
+# ── Path 1: normal message reaching LangGraph ────────────────────────────────
+
+
+def test_normal_message_runs_before_graph_work_and_completes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Path 1: the accepted turn transitions to running immediately before
+    the first actual runtime operation, and the terminal assistant message
+    carries canonical completed metadata that finishes the lifecycle."""
+
+    from argus.api.routers import agent as agent_router
+
+    statuses_at_graph_start: list[dict[str, str]] = []
+
+    async def _probing_runtime_events(**kwargs: Any):
+        statuses_at_graph_start.append(
+            {
+                turn_id: str(row.get("status"))
+                for turn_id, row in api_state.store.chat_turn_lifecycles.items()
+            }
+        )
+        yield {"type": "token", "content": "Answer."}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Answer.",
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router, "stream_agent_turn_events", _probing_runtime_events
+    )
+
+    client = _client()
+    user_id = _ready_user(client)
+    conversation_id = _conversation(user_id)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "message": "test AAPL momentum",
+            "language": "en",
+        },
+    )
+    assert response.status_code == 200
+
+    turns = _user_turns(conversation_id)
+    assert len(turns) == 1
+    turn_id = turns[0].id
+    assert statuses_at_graph_start == [{turn_id: "running"}]
+
+    row = api_state.store.chat_turn_lifecycles[turn_id]
+    assert row["status"] == "completed"
+    assistant = api_state.store.messages[conversation_id][-1]
+    turn = (assistant.metadata or {})["agent_runtime_turn"]
+    assert turn["status"] == "completed"
+    assert turn["terminal"] is True
+    assert turn["turn_id"] == turn_id
+    assert turn["request_id"] == row["request_id"]
+
+
+# ── Path 2: onboarding-required early assistant response ─────────────────────
+
+
+def test_onboarding_prompt_completes_the_accepted_turn() -> None:
+    """Path 2 (the accepted-forever reproduction): the onboarding prompt is a
+    deterministic early responder — HTTP 200 must leave the accepted turn
+    completed, never accepted forever."""
+
+    client = _client()
+    # Fresh dev user keeps the default onboarding stage (language_selection),
+    # so the route answers with the onboarding prompt before any graph work.
+    user_id = api_state.store.get_or_create_dev_user().id
+    conversation_id = _conversation(user_id)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "message": "test AAPL momentum",
+            "language": "en",
+        },
+    )
+    assert response.status_code == 200
+    events = _stream_events(response.text)
+    assert any(event.get("type") == "final" for event in events)
+
+    turns = _user_turns(conversation_id)
+    assert len(turns) == 1
+    row = api_state.store.chat_turn_lifecycles[turns[0].id]
+    assert row["status"] == "completed"
+    assistant = api_state.store.messages[conversation_id][-1]
+    turn = (assistant.metadata or {})["agent_runtime_turn"]
+    assert turn["status"] == "completed"
+    assert turn["terminal"] is True
+    assert turn["turn_id"] == turns[0].id
+
+
+# ── Path 3: runtime-fallback early response ──────────────────────────────────
+
+
+def test_runtime_fallback_early_response_completes_the_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Path 3: a deterministic fallback responder performs no graph work and
+    completes the accepted turn directly with its durable recovery answer."""
+
+    from argus.api.routers import agent as agent_router
+
+    async def _must_not_run(**kwargs: Any):
+        raise AssertionError("fallback turns must not reach the runtime")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _must_not_run)
+    monkeypatch.setattr(
+        agent_router,
+        "stale_confirmation_action_message",
+        lambda **kwargs: "That confirmation is no longer active.",
+    )
+
+    client = _client()
+    user_id = _ready_user(client)
+    conversation_id = _conversation(user_id)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "message": "Change dates",
+            "language": "en",
+            "action": {
+                "type": "change_dates",
+                "label": "Change dates",
+                "payload": {"confirmation_id": "confirmation-stale"},
+            },
+        },
+    )
+    assert response.status_code == 200
+
+    turns = _user_turns(conversation_id)
+    assert len(turns) == 1
+    row = api_state.store.chat_turn_lifecycles[turns[0].id]
+    assert row["status"] == "completed"
+    assistant = api_state.store.messages[conversation_id][-1]
+    turn = (assistant.metadata or {})["agent_runtime_turn"]
+    assert turn["status"] == "completed"
+    assert turn["terminal"] is True
+    assert turn["turn_id"] == turns[0].id
+
+
+# ── Path 7: recoverable terminal failure ─────────────────────────────────────
+
+
+def test_runtime_failure_writes_canonical_recoverable_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Path 7: a runtime failure persists canonical recoverable_failed turn
+    metadata (never the legacy 'failed' status) with failure_code and
+    retryable, and the lifecycle row carries the same evidence."""
+
+    from argus.api.routers import agent as agent_router
+
+    async def _exploding_runtime_events(**kwargs: Any):
+        yield {"type": "token", "content": "partial"}
+        raise RuntimeError("runtime exploded")
+
+    monkeypatch.setattr(
+        agent_router, "stream_agent_turn_events", _exploding_runtime_events
+    )
+
+    client = _client()
+    user_id = _ready_user(client)
+    conversation_id = _conversation(user_id)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "message": "test AAPL momentum",
+            "language": "en",
+        },
+    )
+    assert response.status_code == 200
+    events = _stream_events(response.text)
+    assert any(event.get("type") == "error" for event in events)
+
+    turns = _user_turns(conversation_id)
+    assert len(turns) == 1
+    assistant = api_state.store.messages[conversation_id][-1]
+    turn = (assistant.metadata or {})["agent_runtime_turn"]
+    assert turn["status"] == "recoverable_failed"
+    assert turn["terminal"] is True
+    assert turn["turn_id"] == turns[0].id
+    assert turn["failure_code"] == "agent_runtime_failure"
+    assert turn["retryable"] is True
+
+    row = api_state.store.chat_turn_lifecycles[turns[0].id]
+    assert row["status"] == "recoverable_failed"
+    assert row["failure_code"] == "agent_runtime_failure"
+    assert row["retryable"] is True
+
+
+# ── Path 8: initialization / pre-graph failure ───────────────────────────────
+
+
+def test_initialization_failure_completes_recoverable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Path 8: a pre-graph initialization failure still accepts the turn and
+    ends it recoverable_failed with canonical metadata."""
+
+    def _broken_workflow(request: Any) -> Any:
+        raise RuntimeError("workflow init failed")
+
+    monkeypatch.setattr(api_state, "get_agent_runtime_workflow", _broken_workflow)
+
+    client = _client()
+    user_id = _ready_user(client)
+    conversation_id = _conversation(user_id)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "message": "test AAPL momentum",
+            "language": "en",
+        },
+    )
+    assert response.status_code == 200
+    events = _stream_events(response.text)
+    assert any(event.get("type") == "error" for event in events)
+
+    turns = _user_turns(conversation_id)
+    assert len(turns) == 1
+    assistant = api_state.store.messages[conversation_id][-1]
+    turn = (assistant.metadata or {})["agent_runtime_turn"]
+    assert turn["status"] == "recoverable_failed"
+    assert turn["terminal"] is True
+    assert turn["turn_id"] == turns[0].id
+    assert turn["failure_code"] == "agent_runtime_failure"
+    assert turn["retryable"] is True
+
+    row = api_state.store.chat_turn_lifecycles[turns[0].id]
+    assert row["status"] == "recoverable_failed"
+    assert row["failure_code"] == "agent_runtime_failure"
+
+
 # ── Path 4: select_response_option ───────────────────────────────────────────
 
 

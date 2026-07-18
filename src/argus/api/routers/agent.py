@@ -82,6 +82,7 @@ from argus.api.message_store import (
     create_message,
     latest_unresolved_terminal_runtime_failure_metadata,
     load_runtime_thread_history,
+    ordinary_turn_request_id,
 )
 from argus.api.naming import get_starter_prompts, resolve_language
 from argus.api.schemas import (
@@ -221,6 +222,31 @@ def _runtime_failure_diagnostics(exc: BaseException) -> dict[str, Any] | None:
 def _strategies_enabled() -> bool:
     raw = os.getenv("ARGUS_STRATEGIES_ENABLED", "false").strip().lower()
     return raw in {"1", "true", "yes", "on"}
+
+
+def _terminal_turn_metadata(
+    *,
+    conversation_id: str,
+    request_id: str,
+    status: str,
+    failure_code: str | None = None,
+    retryable: bool | None = None,
+) -> dict[str, Any]:
+    """Canonical terminal turn envelope (#240): completed or
+    recoverable_failed, never the legacy succeeded/failed statuses; the
+    turn_id is enriched by the message store from the accepted lifecycle."""
+
+    turn: dict[str, Any] = {
+        "status": status,
+        "terminal": True,
+        "conversation_id": conversation_id,
+        "request_id": request_id,
+    }
+    if failure_code is not None:
+        turn["failure_code"] = failure_code
+    if retryable is not None:
+        turn["retryable"] = retryable
+    return turn
 
 
 def _clean_optional_header(value: str | None) -> str | None:
@@ -510,12 +536,13 @@ async def chat_stream(
         failure_metadata: dict[str, Any] = {
             "conversation_mode": "recovery",
             "agent_runtime_stage_outcome": "agent_runtime_failure",
-            "agent_runtime_turn": {
-                "status": "failed",
-                "terminal": True,
-                "conversation_id": conversation.id,
-                "request_id": request.state.request_id,
-            },
+            "agent_runtime_turn": _terminal_turn_metadata(
+                conversation_id=conversation.id,
+                request_id=request.state.request_id,
+                status="recoverable_failed",
+                failure_code="agent_runtime_failure",
+                retryable=retry_metadata is not None,
+            ),
             "recovery": recovery,
         }
         if retry_metadata is not None:
@@ -687,6 +714,16 @@ async def chat_stream(
                     if result_fallback is not None:
                         runtime_fallback = result_fallback
     request_message_record = request_admission.persist()
+    # The accepted ordinary turn's lifecycle identity; run_backtest turns and
+    # non-accepted protocol paths have none.
+    accepted_turn_request_id = (
+        ordinary_turn_request_id(
+            role="user",
+            metadata=request_message_record.metadata,
+        )
+        if request_message_record is not None
+        else None
+    )
 
     # Onboarding feature flag on the API service. Default enabled so prod/QA/tests keep the
     # flow; dev mode sets it false. The deployed API must set this to match the web
@@ -762,6 +799,17 @@ async def chat_stream(
                 conversation_id=conversation.id,
                 role="assistant",
                 content=msg,
+                metadata=(
+                    {
+                        "agent_runtime_turn": _terminal_turn_metadata(
+                            conversation_id=conversation.id,
+                            request_id=accepted_turn_request_id,
+                            status="completed",
+                        )
+                    }
+                    if accepted_turn_request_id is not None
+                    else None
+                ),
             )
             yield sse_data({"type": "token", "content": msg})
             yield sse_data(
@@ -860,6 +908,14 @@ async def chat_stream(
                 "agent_runtime_stage_outcome": "await_user_reply",
                 "recovery_reason": "missing_confirmation_checkpoint",
             }
+            if accepted_turn_request_id is not None:
+                # Deterministic early responder: no graph work ran, so the
+                # accepted turn completes with this durable recovery answer.
+                metadata["agent_runtime_turn"] = _terminal_turn_metadata(
+                    conversation_id=conversation.id,
+                    request_id=accepted_turn_request_id,
+                    status="completed",
+                )
             if payload.action is not None:
                 metadata["chat_action"] = persisted_chat_action(payload)
             if runtime_fallback.recovery is not None:
@@ -914,15 +970,15 @@ async def chat_stream(
                 "agent_runtime_stage_outcome": "ready_to_respond",
                 "chat_action": persisted_chat_action(payload),
                 "artifact_event": artifact_event,
-                # Deterministic early responder: no graph work ran, so the
-                # accepted turn completes directly with this durable artifact.
-                "agent_runtime_turn": {
-                    "status": "completed",
-                    "terminal": True,
-                    "conversation_id": conversation.id,
-                    "request_id": request.state.request_id,
-                },
             }
+            if accepted_turn_request_id is not None:
+                # Deterministic early responder: no graph work ran, so the
+                # accepted turn completes with this durable artifact.
+                metadata["agent_runtime_turn"] = _terminal_turn_metadata(
+                    conversation_id=conversation.id,
+                    request_id=accepted_turn_request_id,
+                    status="completed",
+                )
             assistant_message = create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -949,6 +1005,14 @@ async def chat_stream(
         receipt_run_id: str | None = None
         receipt_message_id: str | None = None
         receipt_metadata: dict[str, Any] = {}
+
+        if accepted_turn_request_id is not None and request_message_record is not None:
+            # Runtime work starts now: the accepted turn transitions to
+            # running immediately before the first graph operation.
+            turn_lifecycle_hooks.transition_turn(
+                turn_id=request_message_record.id,
+                to_status="running",
+            )
 
         receipt_token = begin_openrouter_route_receipt_capture()
         shadow_context_token = set_backtest_job_shadow_context(
@@ -1101,12 +1165,11 @@ async def chat_stream(
                         else "guide"
                     ),
                     "agent_runtime_stage_outcome": stage_status,
-                    "agent_runtime_turn": {
-                        "status": "succeeded",
-                        "terminal": True,
-                        "conversation_id": conversation.id,
-                        "request_id": request.state.request_id,
-                    },
+                    "agent_runtime_turn": _terminal_turn_metadata(
+                        conversation_id=conversation.id,
+                        request_id=request.state.request_id,
+                        status="completed",
+                    ),
                 }
                 if payload.action is not None:
                     metadata["chat_action"] = persisted_chat_action(payload)
@@ -1378,17 +1441,24 @@ async def chat_stream(
                 "runtime_failure",
                 language=runtime_user.language_preference,
             )
+            retry_metadata = chat_retry.retry_last_turn_metadata(
+                payload=payload,
+                request_message=request_message,
+                include_structured_action=finalization_failed,
+            )
+            turn_retryable = finalization_failed or retry_metadata is not None
             failure_metadata: dict[str, Any] = {
                 "conversation_mode": "recovery",
                 "agent_runtime_stage_outcome": "agent_runtime_failure",
                 "failure_code": failure_code,
                 "retryable": finalization_failed,
-                "agent_runtime_turn": {
-                    "status": "failed",
-                    "terminal": True,
-                    "conversation_id": conversation.id,
-                    "request_id": request.state.request_id,
-                },
+                "agent_runtime_turn": _terminal_turn_metadata(
+                    conversation_id=conversation.id,
+                    request_id=request.state.request_id,
+                    status="recoverable_failed",
+                    failure_code=failure_code,
+                    retryable=turn_retryable,
+                ),
             }
             if runtime_diagnostics is not None:
                 failure_metadata["runtime_diagnostics"] = runtime_diagnostics
@@ -1396,15 +1466,10 @@ async def chat_stream(
                 failure_metadata["backtest_finalization"] = {
                     "execution_identity": active_finalization_execution_identity,
                 }
-            retry_metadata = chat_retry.retry_last_turn_metadata(
-                payload=payload,
-                request_message=request_message,
-                include_structured_action=finalization_failed,
-            )
             recovery = recovery_state(
                 "runtime_failure",
                 language=runtime_user.language_preference,
-                retryable=finalization_failed or retry_metadata is not None,
+                retryable=turn_retryable,
             )
             failure_metadata["recovery"] = recovery
             if retry_metadata is not None:
