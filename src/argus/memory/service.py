@@ -315,6 +315,56 @@ class MemoryService:
             last_used_at=record.last_used_at,
         )
 
+    # -- user controls ------------------------------------------------------
+
+    def edit(
+        self,
+        user_id: str,
+        record_id: str,
+        *,
+        value: str | None = None,
+        label: str | None = None,
+    ) -> MemoryRecord | None:
+        record = self._store.get_record(user_id, record_id)
+        if record is None:
+            return None
+        updates: dict[str, object] = {"updated_at": self._clock()}
+        if value is not None:
+            updates["value"] = value
+        if label is not None:
+            updates["label"] = label
+        updated = record.model_copy(update=updates)
+        provider_ref = self._try_provider(
+            "project", lambda: self._provider.project(updated)
+        )
+        if provider_ref is not None:
+            updated = updated.model_copy(update={"provider_ref": provider_ref})
+        self._store.replace_record(updated)
+        return updated
+
+    def delete(self, user_id: str, record_id: str) -> bool:
+        record = self._store.get_record(user_id, record_id)
+        if record is None:
+            return False
+        if record.provider_ref is not None:
+            provider_ref = record.provider_ref
+            self._try_provider(
+                "delete",
+                lambda: self._provider.delete(user_id, provider_ref),
+            )
+        return self._store.delete_record(user_id, record_id)
+
+    def enable(self, user_id: str) -> None:
+        self._store.set_enabled(user_id, True)
+
+    def disable(self, user_id: str) -> None:
+        self._store.set_enabled(user_id, False)
+
+    def reset(self, user_id: str) -> int:
+        removed = self._store.delete_all_records(user_id)
+        self._try_provider("reset", lambda: self._provider.reset(user_id))
+        return removed
+
     # -- provider fail-open -------------------------------------------------
 
     def _try_provider(self, action: str, call: Callable[[], T]) -> T | None:
