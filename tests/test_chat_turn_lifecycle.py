@@ -97,6 +97,71 @@ def test_repeating_same_transition_with_same_links_is_noop() -> None:
     assert conflicting.outcome == "conflict"
 
 
+def test_terminal_transitions_use_the_approved_timestamp_fields() -> None:
+    """DATA_MODEL 8.1: the lifecycle carries accepted_at/running_at/
+    terminal_at/reconciled_at — never finished_at — and retryable defaults
+    false."""
+
+    store = AlphaStore()
+    accepted = _accept(store)
+    assert accepted["retryable"] is False
+    assert accepted["terminal_at"] is None
+    assert accepted["reconciled_at"] is None
+    assert "finished_at" not in accepted
+
+    lifecycle.transition_memory(store, turn_id="turn-1", to_status="running")
+    running = store.chat_turn_lifecycles["turn-1"]
+    assert running["running_at"] is not None
+    assert running["terminal_at"] is None
+
+    lifecycle.transition_memory(
+        store,
+        turn_id="turn-1",
+        to_status="abandoned",
+        failure_code="turn_abandoned",
+        retryable=True,
+    )
+    abandoned = store.chat_turn_lifecycles["turn-1"]
+    assert abandoned["terminal_at"] is not None
+    assert abandoned["reconciled_at"] is None
+    assert "finished_at" not in abandoned
+
+    _accept(store, turn_id="turn-2", request_id="req-2")
+    lifecycle.transition_memory(
+        store,
+        turn_id="turn-2",
+        to_status="reconciled",
+        assistant_message_id="assistant-2",
+        reconciled_outcome="completed",
+    )
+    reconciled = store.chat_turn_lifecycles["turn-2"]
+    assert reconciled["terminal_at"] is not None
+    assert reconciled["reconciled_at"] is not None
+
+
+def test_find_active_turn_is_owner_scoped() -> None:
+    """Every service-role lifecycle lookup carries the owner: a foreign user
+    cannot resolve another owner's active turn."""
+
+    store = AlphaStore()
+    _accept(store)
+
+    foreign = lifecycle.find_active_turn_memory(
+        store,
+        conversation_id="conv-1",
+        request_id="req-1",
+        user_id="intruder-9",
+    )
+    owned = lifecycle.find_active_turn_memory(
+        store,
+        conversation_id="conv-1",
+        request_id="req-1",
+        user_id="user-1",
+    )
+    assert foreign is None
+    assert owned is not None and owned["turn_id"] == "turn-1"
+
+
 def test_reconciled_requires_a_valid_outcome() -> None:
     store = AlphaStore()
     _accept(store)
@@ -836,7 +901,7 @@ def test_projection_has_no_first_twenty_historical_ceiling(_memory_mode) -> None
             "failure_code": "turn_abandoned",
             "retryable": True,
             "accepted_at": (base + timedelta(minutes=index)).isoformat(),
-            "finished_at": (base + timedelta(minutes=index, seconds=30)).isoformat(),
+            "terminal_at": (base + timedelta(minutes=index, seconds=30)).isoformat(),
         }
         newest_turn_id = message.id
 

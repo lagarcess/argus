@@ -144,7 +144,8 @@ begin
                     when v_evidence.turn_status in ('recoverable_failed', 'failed')
                     then 'recoverable_failed' else 'completed' end,
                 assistant_message_id = v_evidence.id,
-                finished_at = v_now,
+                terminal_at = v_now,
+                reconciled_at = v_now,
                 updated_at = v_now
             where turn_id = v_row.turn_id
             returning * into v_row;
@@ -153,7 +154,7 @@ begin
             set status = 'abandoned',
                 failure_code = 'turn_abandoned',
                 retryable = true,
-                finished_at = v_now,
+                terminal_at = v_now,
                 updated_at = v_now
             where turn_id = v_row.turn_id
             returning * into v_row;

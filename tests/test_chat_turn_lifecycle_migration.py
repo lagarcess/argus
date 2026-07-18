@@ -38,6 +38,33 @@ def test_lifecycle_rows_are_owner_readable_and_service_writable() -> None:
     assert "revoke insert, update, delete on public.chat_turn_lifecycles" in text
 
 
+def test_lifecycle_table_matches_the_data_model() -> None:
+    """DATA_MODEL 8.1: turn_id references the accepted messages.id; one
+    terminal assistant message cannot settle two turns; retryable is
+    non-null defaulting false; reconciled_outcome exists exactly for
+    reconciled; abandoned has no assistant link; the approved timestamp
+    fields are terminal_at/reconciled_at, never finished_at."""
+
+    text = _text()
+    assert "turn_id uuid primary key references public.messages(id)" in text
+    assert "create unique index" in text
+    assert "assistant_message_id" in text
+    assert "where assistant_message_id is not null" in text
+    assert "retryable boolean not null default false" in text
+    assert "(status = 'reconciled') = (reconciled_outcome is not null)" in text
+    assert "status <> 'abandoned' or assistant_message_id is null" in text
+    assert "terminal_at timestamptz" in text
+    assert "reconciled_at timestamptz" in text
+    assert "finished_at" not in text
+
+
+def test_boundaries_use_the_approved_timestamp_fields() -> None:
+    text = _boundaries_text()
+    assert "finished_at" not in text
+    assert "terminal_at = v_now" in text
+    assert "reconciled_at = v_now" in text
+
+
 def test_cas_function_verifies_source_state_and_is_service_role_only() -> None:
     text = _text()
     assert "create or replace function public.transition_chat_turn_lifecycle" in text

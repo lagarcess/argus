@@ -74,9 +74,14 @@ def test_gateway_find_active_turn_selects_accepted_or_running(
     )
     gateway = SupabaseGateway(client=gateway_client)
 
-    row = gateway.find_active_chat_turn(conversation_id="conv-1", request_id="req-1")
+    row = gateway.find_active_chat_turn(
+        conversation_id="conv-1",
+        request_id="req-1",
+        user_id="user-1",
+    )
 
     assert row == {"turn_id": "turn-1", "status": "accepted"}
+    table.eq.assert_any_call("user_id", "user-1")
     table.in_.assert_any_call("status", ["accepted", "running"])
 
 
@@ -232,6 +237,6 @@ def test_terminal_metadata_enrichment_uses_the_production_finder(
     )
 
     gateway.find_active_chat_turn.assert_called_once_with(
-        conversation_id="conv-1", request_id="req-9"
+        conversation_id="conv-1", request_id="req-9", user_id="user-1"
     )
     assert enriched["agent_runtime_turn"]["turn_id"] == "turn-9"

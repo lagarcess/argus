@@ -102,11 +102,13 @@ def find_active_chat_turn(
     *,
     conversation_id: str,
     request_id: str,
+    user_id: str,
 ) -> dict[str, Any] | None:
     result = (
         client.table("chat_turn_lifecycles")
         .select("*")
         .eq("conversation_id", conversation_id)
+        .eq("user_id", user_id)
         .eq("request_id", request_id)
         .in_("status", ["accepted", "running"])
         .limit(1)

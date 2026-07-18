@@ -91,11 +91,12 @@ def create_accepted_memory(
             "status": "accepted",
             "accepted_at": _iso(moment),
             "running_at": None,
-            "finished_at": None,
+            "terminal_at": None,
+            "reconciled_at": None,
             "assistant_message_id": None,
             "reconciled_outcome": None,
             "failure_code": None,
-            "retryable": None,
+            "retryable": False,
             "created_at": _iso(moment),
             "updated_at": _iso(moment),
         }
@@ -154,7 +155,9 @@ def transition_memory(
         if to_status == "running":
             row["running_at"] = _iso(moment)
         else:
-            row["finished_at"] = _iso(moment)
+            row["terminal_at"] = _iso(moment)
+        if to_status == "reconciled":
+            row["reconciled_at"] = _iso(moment)
         if assistant_message_id is not None:
             row["assistant_message_id"] = assistant_message_id
         if to_status == "reconciled":
@@ -171,13 +174,16 @@ def find_active_turn_memory(
     *,
     conversation_id: str,
     request_id: str,
+    user_id: str,
 ) -> dict[str, Any] | None:
-    """Locate the accepted/running lifecycle row for one request identity."""
+    """Locate the owner's accepted/running lifecycle row for one request
+    identity; a foreign user resolves nothing."""
 
     with store.chat_turn_lifecycle_lock:
         for row in store.chat_turn_lifecycles.values():
             if (
                 row.get("conversation_id") == conversation_id
+                and row.get("user_id") == user_id
                 and row.get("request_id") == request_id
                 and row.get("status") in ("accepted", "running")
             ):

@@ -500,11 +500,14 @@ def _attach_turn_lifecycle_identity(
             api_state.store,
             conversation_id=conversation_id,
             request_id=request_id,
+            user_id=user_id,
         )
     else:
         try:
             row = api_state.supabase_gateway.find_active_chat_turn(
-                conversation_id=conversation_id, request_id=request_id
+                conversation_id=conversation_id,
+                request_id=request_id,
+                user_id=user_id,
             )
         except Exception as exc:
             logger.warning(

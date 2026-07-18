@@ -2,7 +2,7 @@
 -- non-backtest chat turn; recovery truth, not a second queue or chat brain.
 
 create table if not exists public.chat_turn_lifecycles (
-    turn_id uuid primary key,
+    turn_id uuid primary key references public.messages(id) on delete cascade,
     user_id uuid not null references public.profiles(id) on delete cascade,
     conversation_id uuid not null references public.conversations(id) on delete cascade,
     request_id text not null,
@@ -14,16 +14,30 @@ create table if not exists public.chat_turn_lifecycles (
     ),
     accepted_at timestamptz not null default now(),
     running_at timestamptz,
-    finished_at timestamptz,
+    terminal_at timestamptz,
+    reconciled_at timestamptz,
     assistant_message_id uuid references public.messages(id) on delete set null,
     reconciled_outcome text check (
         reconciled_outcome in ('completed', 'recoverable_failed')
     ),
     failure_code text,
-    retryable boolean,
+    retryable boolean not null default false,
     created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now()
+    updated_at timestamptz not null default now(),
+    -- reconciled_outcome exists exactly when the row is reconciled.
+    constraint chat_turn_lifecycles_reconciled_outcome_matches check (
+        (status = 'reconciled') = (reconciled_outcome is not null)
+    ),
+    -- abandoned means no qualifying terminal assistant message settled it.
+    constraint chat_turn_lifecycles_abandoned_unlinked check (
+        status <> 'abandoned' or assistant_message_id is null
+    )
 );
+
+-- One terminal assistant message cannot settle two turns.
+create unique index if not exists idx_chat_turn_lifecycles_assistant_unique
+    on public.chat_turn_lifecycles (assistant_message_id)
+    where assistant_message_id is not null;
 
 create index if not exists idx_chat_turn_lifecycles_conversation_stale
     on public.chat_turn_lifecycles (
@@ -106,8 +120,10 @@ begin
     update public.chat_turn_lifecycles
     set status = p_to_status,
         running_at = case when p_to_status = 'running' then v_now else running_at end,
-        finished_at = case
-            when p_to_status <> 'running' then v_now else finished_at end,
+        terminal_at = case
+            when p_to_status <> 'running' then v_now else terminal_at end,
+        reconciled_at = case
+            when p_to_status = 'reconciled' then v_now else reconciled_at end,
         assistant_message_id =
             coalesce(p_assistant_message_id, assistant_message_id),
         reconciled_outcome = case
