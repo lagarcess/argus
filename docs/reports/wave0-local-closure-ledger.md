@@ -590,3 +590,73 @@ in the disposable-Postgres real-database proof (apply in order; exercise
 `reconcile_stale_chat_turns` rejection on an unowned conversation, plus
 `accept_chat_turn` replay through `append_conversation_message`). All other
 recorded external gates stand unchanged.
+
+### Fourth correction pass (2026-07-18, #240 read-projection contract)
+
+The third-pass review cleared #230 finalization, #242 artifact identity,
+#240 atomic acceptance, and #240 owner-scoped reconciliation. This pass
+corrects the remaining #240 contract mismatch against
+`docs/API_CONTRACT.md` 539-585 and `docs/DATA_MODEL.md` 8.1. All red-first.
+
+1. **Read overlay on persisted messages** — `50ccd10`. Abandoned-turn reads
+   return the persisted accepted user message exactly once with the exact
+   contract overlay on its response copy: canonical `agent_runtime_turn`
+   (turn_id, request_id, abandoned, terminal, reconciled_outcome null,
+   failure_code, retryable), the `recovery` object, and typed
+   `retry_last_turn` keyed by `request_message_id` with the exact
+   `chat_action` copied when present (omitted otherwise). No synthetic
+   assistant message is injected and persistence is never mutated, so
+   adjacency and cursor attachment are properties of the persisted message
+   itself (proven by a limit-1 paging red). Reconciled truth overlays the
+   linked assistant message's canonical `metadata.agent_runtime_turn`
+   (status reconciled, terminal true, reconciled_outcome, applicable
+   failure/retry fields); the parallel `turn_lifecycle_reconciled` key from
+   pass 3 is removed. The projection lookup is owner-scoped and keyed by the
+   read's message ids (abandoned via turn_id, reconciled via
+   assistant_message_id).
+
+2. **Schema aligned with DATA_MODEL 8.1** — `5612448`. The unpublished
+   candidate migrations were corrected in place (no compatibility layer):
+   `turn_id` references the accepted `messages.id`; `assistant_message_id`
+   is unique when present; `retryable` is non-null defaulting false;
+   `reconciled_outcome` exists exactly when reconciled; abandoned requires a
+   null assistant link; and the approved `terminal_at`/`reconciled_at`
+   fields replace the silently substituted `finished_at` across the table,
+   CAS, reconciliation branches, and memory twin. Every service-role
+   lifecycle lookup is owner-scoped: the active-turn finder now requires the
+   requesting user in both modes, joining the already-scoped reconciliation
+   and projection reads.
+
+3. **Presentation-only recovery row** — `593532d`. The smallest frontend
+   surface for the approved contract: hydration derives one recovery
+   attachment from the user message's abandoned overlay (reusing the
+   existing recovery-display and retry-action helpers; the typed
+   `retry_last_turn` action now carries `request_message_id`), and
+   `ChatMessage` renders it immediately beneath the owning user bubble — not
+   an assistant bubble, no API message identity, no feedback/copy
+   affordances. Deriving from the message itself keeps it attached across
+   cursor pages with no orphan possibility. Localized `turn_abandoned` copy
+   added for EN and ES.
+
+Complexity reassessment (pass 4): net simplification. Deleted: the
+synthetic projection-message builder and its id scheme, the server-side
+localized recovery content dependency, the parallel
+`turn_lifecycle_reconciled` contract, and `finished_at`. The projection
+module is now pure metadata overlays; the frontend addition reuses two
+existing helpers plus one render block. No second lifecycle abstraction,
+synthetic API message type, or background sweeper was introduced.
+
+Verification at `593532d`: hermetic runtime gate 1129/0; focused +
+cumulative correction surface 291/0; API contract + OpenAPI gate 106/0;
+web 408/0 from `web/` plus `bun run lint` (0 errors, 1 pre-existing
+warning) and a green production build; modularity budget, ruff, and
+`git diff --check` clean; worktree clean.
+
+External gates after this pass: disposable-Postgres real-database proof now
+covers the reworked migrations `20260718000002/3` (messages FK, unique
+assistant link, status checks, terminal_at/reconciled_at, acceptance
+replay through `append_conversation_message`, owner-scoped reconcile) plus
+`20260718000004`; real-auth/RLS matrix; deployed-browser EN/ES QA now
+including the abandoned-recovery row and its retry; GitHub Actions run;
+exact-SHA Render canary; the #244 paid probe and #251 live QA stand
+unchanged.
