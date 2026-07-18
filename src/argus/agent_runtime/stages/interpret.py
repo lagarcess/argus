@@ -30,6 +30,9 @@ from argus.agent_runtime.coverage_recovery import (
 )
 from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.interpreter import provider_context_assets
+from argus.agent_runtime.interpreter.unsupported_admission import (
+    admitted_or_blocked_confirmation_result,
+)
 from argus.agent_runtime.presentation_i18n import (
     asset_universe_operation_clarification_message,
 )
@@ -1226,19 +1229,18 @@ async def _stage_result_from_interpretation(
         )
     if expects_strategy_route:
         stage_patch = dict(optional_parameter_stage_patch)
-        # Preserve the artifact-edit planner's honesty note (a mixed
-        # supported/unsupported edit) alongside the confirmation card, so it is
-        # not silently dropped. Scoped to the edit-planner reason code so spurious
-        # clarifications overridden to a confirmation on other routes stay
-        # suppressed; clean edits leave assistant_response None -> no message.
+        # Edit-planner honesty notes ride the card; other routes keep overridden
+        # clarification prose suppressed (None -> no message).
         if interpretation.assistant_response and "artifact_assumption_edit_planned" in (
             interpretation.reason_codes or []
         ):
             stage_patch["assistant_response"] = interpretation.assistant_response
-        return StageResult(
-            outcome="ready_for_confirmation",
+        return admitted_or_blocked_confirmation_result(
             decision=decision,
             stage_patch=stage_patch,
+            contract=capability_contract,
+            optional_parameter_values=optional_parameter_values,
+            assistant_response=interpretation.assistant_response,
         )
     return StageResult(
         outcome="ready_to_respond",
