@@ -1321,6 +1321,163 @@ async def test_workflow_preserves_confirmation_validation_prompt(monkeypatch) ->
     assert "confirmation_payload" not in result
 
 
+UNSUPPORTED_REFUSAL_PROSE_EN = (
+    "I can't run options strategies yet — I can test plain holding of TSLA instead."
+)
+UNSUPPORTED_REFUSAL_PROSE_ES = (
+    "Todavía no puedo ejecutar estrategias de opciones — sí puedo probar "
+    "mantener TSLA durante ese período."
+)
+
+
+class OptionsRefusalInterpreter:
+    def __init__(self, *, refusal: str, language: str | None = None) -> None:
+        self.refusal = refusal
+        self.language = language
+
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="unsupported_or_out_of_scope",
+            task_relation="new_task",
+            requires_clarification=True,
+            user_goal_summary="User asked to backtest an options idea on TSLA.",
+            detected_user_language=self.language,
+            assistant_response=self.refusal,
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                strategy_type="buy_and_hold",
+                asset_universe=["TSLA"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            ),
+            semantic_turn_act="unsupported_request",
+        )
+
+
+async def _unsupported_recovery_prose_two_turn_proof(
+    *,
+    refusal: str,
+    user: UserState,
+    thread_id: str,
+    first_message: str,
+    selection_message: str,
+) -> None:
+    clarifier = RecordingClarifier("generated prose that must never replace the model's")
+    workflow = build_workflow(
+        structured_interpreter=OptionsRefusalInterpreter(
+            refusal=refusal,
+            language=user.language_preference,
+        ),
+        clarification_generator=clarifier,
+        checkpointer=MemorySaver(),
+    )
+
+    first = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message=first_message,
+    )
+
+    assert first["stage_outcome"] == "await_user_reply"
+    assert first["assistant_prompt"] == refusal
+    assert first["assistant_response"] == refusal
+    assert clarifier.requests == []
+    clarification = first["clarification"]
+    assert clarification["kind"] == "unsupported_recovery"
+    assert clarification["prompt_source"] == "llm_generated"
+    pending = first["pending_strategy"]
+    assert pending["strategy"]["asset_universe"] == ["TSLA"]
+    assert pending["strategy"]["date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-12-31",
+    }
+    response_intent = pending["response_intent"]
+    assert response_intent["kind"] == "unsupported_recovery"
+    buy_and_hold_option = next(
+        option
+        for option in response_intent["options"]
+        if option.get("replacement_values") == {"strategy_type": "buy_and_hold"}
+    )
+    assert "confirmation_payload" not in first
+
+    source_id = f"assistant-{thread_id}"
+    second = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message=selection_message,
+        action_context={
+            "type": "select_response_option",
+            "label": str(buy_and_hold_option.get("label") or selection_message),
+            "payload": {
+                "source_assistant_id": source_id,
+                "validated_source_assistant_id": source_id,
+                "option_id": buy_and_hold_option["id"],
+                "replacement_values": buy_and_hold_option["replacement_values"],
+            },
+        },
+        fallback_selected_thread_metadata={
+            "validated_source_assistant_id": source_id,
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "unsupported_constraints",
+            "response_intent": response_intent,
+            "clarification": clarification,
+        },
+    )
+
+    assert second["stage_outcome"] == "await_approval"
+    confirmed = second["confirmation_payload"]["strategy"]
+    assert confirmed["strategy_type"] == "buy_and_hold"
+    assert confirmed["asset_universe"] == ["TSLA"]
+    assert second.get("assistant_prompt") is None
+    assert clarifier.requests == []
+
+
+@pytest.mark.asyncio
+async def test_unsupported_recovery_preserves_interpreter_prose_full_graph_en(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+    await _unsupported_recovery_prose_two_turn_proof(
+        refusal=UNSUPPORTED_REFUSAL_PROSE_EN,
+        user=UserState(user_id="u1", expertise_level="beginner"),
+        thread_id="thread-unsupported-prose-en",
+        first_message=(
+            "can you run an options straddle on TSLA from 2024-01-01 "
+            "through 2024-12-31?"
+        ),
+        selection_message="Compare with buy and hold",
+    )
+
+
+@pytest.mark.asyncio
+async def test_unsupported_recovery_preserves_interpreter_prose_full_graph_es(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+    await _unsupported_recovery_prose_two_turn_proof(
+        refusal=UNSUPPORTED_REFUSAL_PROSE_ES,
+        user=UserState(user_id="u1", language_preference="es-419"),
+        thread_id="thread-unsupported-prose-es",
+        first_message=(
+            "puedes probar un straddle de opciones sobre TSLA desde 2024-01-01 "
+            "hasta 2024-12-31?"
+        ),
+        selection_message="Comparar con comprar y mantener",
+    )
+
+
 @pytest.mark.asyncio
 async def test_workflow_preserves_indicator_parameters_when_user_repairs_date_range(
     monkeypatch,

@@ -30,6 +30,9 @@ from argus.agent_runtime.coverage_recovery import (
 )
 from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.interpreter import provider_context_assets
+from argus.agent_runtime.interpreter.unsupported_admission import (
+    strategy_route_admission_result,
+)
 from argus.agent_runtime.presentation_i18n import (
     asset_universe_operation_clarification_message,
 )
@@ -1215,28 +1218,22 @@ async def _stage_result_from_interpretation(
             decision=decision,
             stage_patch={"assistant_response": interpretation.assistant_response},
         )
+    admission_result = strategy_route_admission_result(
+        expects_strategy_route=expects_strategy_route,
+        decision=decision,
+        stage_patch=optional_parameter_stage_patch,
+        contract=capability_contract,
+        optional_parameter_values=optional_parameter_values,
+        assistant_response=interpretation.assistant_response,
+    )
+    if admission_result is not None:
+        return admission_result
     if requires_clarification:
         stage_patch = dict(optional_parameter_stage_patch)
         if interpretation.assistant_response:
             stage_patch["assistant_response"] = interpretation.assistant_response
         return StageResult(
             outcome="needs_clarification",
-            decision=decision,
-            stage_patch=stage_patch,
-        )
-    if expects_strategy_route:
-        stage_patch = dict(optional_parameter_stage_patch)
-        # Preserve the artifact-edit planner's honesty note (a mixed
-        # supported/unsupported edit) alongside the confirmation card, so it is
-        # not silently dropped. Scoped to the edit-planner reason code so spurious
-        # clarifications overridden to a confirmation on other routes stay
-        # suppressed; clean edits leave assistant_response None -> no message.
-        if interpretation.assistant_response and "artifact_assumption_edit_planned" in (
-            interpretation.reason_codes or []
-        ):
-            stage_patch["assistant_response"] = interpretation.assistant_response
-        return StageResult(
-            outcome="ready_for_confirmation",
             decision=decision,
             stage_patch=stage_patch,
         )

@@ -170,16 +170,25 @@ async def clarify_stage_async(
             options=options,
             language=language,
         )
-        generated = await _generate_clarifying_question_result(
-            state=state,
-            response_intent=response_intent,
-            missing_required_fields=[],
-            ambiguous_fields=[],
-            unsupported_constraints=unsupported_constraints,
-            optional_parameter_choices=[],
-            clarification_generator=clarification_generator,
-            language=language,
-        )
+        # Interpreter-authored recovery prose owns this turn's voice; generate
+        # replacement prose only when no usable prefilled prompt exists.
+        prefilled = _usable_prefilled_prompt(prefilled_assistant_prompt)
+        if prefilled is not None:
+            generated = ClarifyingQuestionResult(
+                prompt=prefilled,
+                used_degraded_fallback=False,
+            )
+        else:
+            generated = await _generate_clarifying_question_result(
+                state=state,
+                response_intent=response_intent,
+                missing_required_fields=[],
+                ambiguous_fields=[],
+                unsupported_constraints=unsupported_constraints,
+                optional_parameter_choices=[],
+                clarification_generator=clarification_generator,
+                language=language,
+            )
         stage_patch = {
             "assistant_prompt": generated.prompt,
             "response_intent": response_intent,
