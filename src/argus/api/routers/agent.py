@@ -452,7 +452,10 @@ async def chat_stream(
         conversation_id=conversation.id,
         display_message=display_message,
         mention_provenance=mention_provenance,
-        enabled=onboarding_goal is None and not cancel_confirmation_action,
+        # Every ordinary structured action participates in lifecycle
+        # admission, including cancel_confirmation; only the onboarding
+        # goal-selection control message is a non-accepted protocol path.
+        enabled=onboarding_goal is None,
         language=language,
     )
     runtime_fallback = RuntimeFallbackContext()
@@ -911,6 +914,14 @@ async def chat_stream(
                 "agent_runtime_stage_outcome": "ready_to_respond",
                 "chat_action": persisted_chat_action(payload),
                 "artifact_event": artifact_event,
+                # Deterministic early responder: no graph work ran, so the
+                # accepted turn completes directly with this durable artifact.
+                "agent_runtime_turn": {
+                    "status": "completed",
+                    "terminal": True,
+                    "conversation_id": conversation.id,
+                    "request_id": request.state.request_id,
+                },
             }
             assistant_message = create_message(
                 user_id=user.id,

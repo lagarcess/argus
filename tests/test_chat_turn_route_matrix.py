@@ -1,0 +1,324 @@
+"""#240 — route matrix for every accepted POST /api/v1/chat/stream path.
+
+Each non-backtest path must atomically accept (user message + lifecycle row
+sharing the preallocated turn_id), transition running only before real
+runtime work, and end with durable completed/recoverable_failed evidence —
+or remain genuinely incomplete for stale reconciliation. chat.run_backtest
+stays excluded because backtest_jobs owns that action's durable state.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+import pytest
+from argus.api import state as api_state
+from argus.api.main import app
+from argus.api.message_store import memory_conversation, memory_message
+from fastapi.testclient import TestClient
+
+
+def _stream_events(stream: str) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for part in stream.split("\n\n"):
+        data_line = next(
+            (line for line in part.splitlines() if line.startswith("data: ")),
+            None,
+        )
+        if data_line is None:
+            continue
+        raw = data_line.removeprefix("data: ").strip()
+        if raw == "[DONE]":
+            events.append({"type": "done"})
+            continue
+        events.append(json.loads(raw))
+    return events
+
+
+async def _runtime_success_events(**kwargs: Any):
+    yield {"type": "stage_start", "stage": "interpret"}
+    yield {"type": "token", "content": "Here is my answer."}
+    yield {
+        "type": "final",
+        "payload": {
+            "stage_outcome": "ready_to_respond",
+            "assistant_response": "Here is my answer.",
+        },
+    }
+
+
+@pytest.fixture(autouse=True)
+def _memory_mode(monkeypatch: pytest.MonkeyPatch):
+    from argus.api.routers import agent as agent_router
+
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
+    monkeypatch.setattr(
+        agent_router, "stream_agent_turn_events", _runtime_success_events
+    )
+    api_state.store.reset()
+    yield
+
+
+def _client() -> TestClient:
+    client = TestClient(app)
+    client.post("/api/v1/dev/reset")
+    return client
+
+
+def _ready_user(client: TestClient) -> str:
+    client.patch(
+        "/api/v1/me",
+        json={
+            "onboarding": {
+                "stage": "ready",
+                "completed": True,
+                "language_confirmed": True,
+                "primary_goal": "surprise_me",
+            }
+        },
+    )
+    return api_state.store.get_or_create_dev_user().id
+
+
+def _conversation(user_id: str) -> str:
+    conversation = memory_conversation(
+        user_id=user_id,
+        title="Route matrix",
+        title_source="system_default",
+        language="en",
+    )
+    return conversation.id
+
+
+def _user_turns(conversation_id: str) -> list[Any]:
+    return [
+        message
+        for message in api_state.store.messages.get(conversation_id, [])
+        if message.role == "user"
+    ]
+
+
+# ── Path 4: select_response_option ───────────────────────────────────────────
+
+
+def _seed_clarification(conversation_id: str) -> str:
+    assistant = memory_message(
+        conversation_id=conversation_id,
+        role="assistant",
+        content="Which timeframe should we use?",
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "await_user_reply",
+            "clarification": {
+                "options": [
+                    {
+                        "id": "option_0",
+                        "replacement_values": {"timeframe": "1D"},
+                    }
+                ]
+            },
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold Apple.",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "timeframe": "5m",
+                    "date_range": {"start": "2024-01-01", "end": "2024-01-05"},
+                },
+                "requested_field": "timeframe",
+                "missing_required_fields": ["timeframe"],
+            },
+        },
+    )
+    return assistant.id
+
+
+def _response_option_payload(conversation_id: str, assistant_id: str) -> dict:
+    return {
+        "conversation_id": conversation_id,
+        "message": "Retry with daily bars",
+        "language": "en",
+        "action": {
+            "type": "select_response_option",
+            "label": "Retry with daily bars",
+            "payload": {
+                "source_assistant_id": assistant_id,
+                "option_id": "option_0",
+                "replacement_values": {"timeframe": "1D"},
+            },
+        },
+    }
+
+
+def test_select_response_option_accepts_atomically() -> None:
+    """Path 4: the option claim persists the request message and its
+    lifecycle row in the same admission, sharing the preallocated turn_id,
+    and the turn ends completed."""
+
+    client = _client()
+    user_id = _ready_user(client)
+    conversation_id = _conversation(user_id)
+    assistant_id = _seed_clarification(conversation_id)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json=_response_option_payload(conversation_id, assistant_id),
+    )
+    assert response.status_code == 200
+
+    turns = _user_turns(conversation_id)
+    assert len(turns) == 1
+    request_message = turns[0]
+    row = api_state.store.chat_turn_lifecycles.get(request_message.id)
+    assert row is not None
+    assert row["user_id"] == user_id
+    assert row["conversation_id"] == conversation_id
+    assert row["status"] == "completed"
+
+
+def test_select_response_option_acceptance_is_atomic_on_lifecycle_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Path 4 rollback: if the lifecycle write fails inside the claim, the
+    appended request message rolls back — acceptance is all-or-nothing."""
+
+    from argus.domain import chat_turn_lifecycle as lifecycle_module
+
+    client = _client()
+    user_id = _ready_user(client)
+    conversation_id = _conversation(user_id)
+    assistant_id = _seed_clarification(conversation_id)
+
+    def _boom(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("lifecycle write failed")
+
+    monkeypatch.setattr(lifecycle_module, "create_accepted_memory", _boom)
+    monkeypatch.setattr(
+        "argus.api.message_store.create_accepted_memory", _boom, raising=False
+    )
+
+    failure_client = TestClient(app, raise_server_exceptions=False)
+    response = failure_client.post(
+        "/api/v1/chat/stream",
+        json=_response_option_payload(conversation_id, assistant_id),
+    )
+
+    assert response.status_code >= 500
+    assert _user_turns(conversation_id) == []
+    assert api_state.store.chat_turn_lifecycles == {}
+
+
+# ── Path 5: cancel_confirmation ──────────────────────────────────────────────
+
+
+def test_cancel_confirmation_participates_in_the_lifecycle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Path 5: cancellation is an ordinary accepted turn — durable user
+    message plus lifecycle row — and completes after its durable (empty)
+    assistant cancellation artifact."""
+
+    from argus.api.routers import agent as agent_router
+
+    monkeypatch.setattr(
+        agent_router, "checkpoint_has_pending_confirmation", lambda values: True
+    )
+    monkeypatch.setattr(
+        agent_router,
+        "stale_confirmation_action_message",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        agent_router,
+        "confirmation_metadata_fallback_context",
+        lambda **kwargs: None,
+    )
+
+    client = _client()
+    user_id = _ready_user(client)
+    conversation_id = _conversation(user_id)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "message": "Cancel",
+            "language": "en",
+            "action": {
+                "type": "cancel_confirmation",
+                "label": "Cancel",
+                "payload": {"confirmation_id": "confirmation-9"},
+            },
+        },
+    )
+    assert response.status_code == 200
+    events = _stream_events(response.text)
+    assert any(event.get("type") == "final" for event in events)
+
+    turns = _user_turns(conversation_id)
+    assert len(turns) == 1
+    cancel_turn = turns[0]
+    assert (cancel_turn.metadata or {})["chat_action"]["type"] == (
+        "cancel_confirmation"
+    )
+    row = api_state.store.chat_turn_lifecycles.get(cancel_turn.id)
+    assert row is not None
+    assert row["status"] == "completed"
+    assistant = api_state.store.messages[conversation_id][-1]
+    assert assistant.role == "assistant"
+    turn = (assistant.metadata or {})["agent_runtime_turn"]
+    assert turn["status"] == "completed"
+    assert turn["terminal"] is True
+    assert turn["turn_id"] == cancel_turn.id
+
+
+# ── Path 9: chat.run_backtest exclusion ──────────────────────────────────────
+
+
+def test_run_backtest_action_route_stays_excluded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Path 9: a run action's user message persists, but backtest_jobs owns
+    its durable state — no chat lifecycle row exists for that turn."""
+
+    from argus.api.routers import agent as agent_router
+
+    monkeypatch.setattr(
+        agent_router, "checkpoint_has_pending_confirmation", lambda values: True
+    )
+    monkeypatch.setattr(
+        agent_router,
+        "stale_confirmation_action_message",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        agent_router,
+        "confirmation_metadata_fallback_context",
+        lambda **kwargs: None,
+    )
+
+    client = _client()
+    user_id = _ready_user(client)
+    conversation_id = _conversation(user_id)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "message": "Run backtest",
+            "language": "en",
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "payload": {"confirmation_id": "confirmation-run-1"},
+            },
+        },
+    )
+    assert response.status_code == 200
+
+    turns = _user_turns(conversation_id)
+    assert len(turns) == 1
+    assert (turns[0].metadata or {})["chat_action"]["type"] == "run_backtest"
+    assert api_state.store.chat_turn_lifecycles == {}

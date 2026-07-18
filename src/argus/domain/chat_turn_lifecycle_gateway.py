@@ -211,6 +211,8 @@ def accept_chat_turn(
     if row is None:
         rows = _rows(result)
         row = rows[0] if rows else None
+    if isinstance(row, dict) and isinstance(row.get("message"), dict):
+        row = row["message"]
     if not isinstance(row, dict):
         raise RuntimeError("Chat turn acceptance did not return the message row.")
     return row

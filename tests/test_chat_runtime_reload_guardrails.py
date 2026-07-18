@@ -2020,15 +2020,17 @@ def test_cancel_confirmation_action_persists_invisible_artifact_tombstone() -> N
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
-    assert all(
-        not (
-            message["role"] == "user"
-            and message["metadata"]
-            and message["metadata"].get("chat_action", {}).get("type")
-            == "cancel_confirmation"
-        )
+    # #240: cancellation is an ordinary accepted turn — exactly one durable
+    # user action message with its lifecycle identity precedes the tombstone.
+    cancel_turns = [
+        message
         for message in messages
-    )
+        if message["role"] == "user"
+        and message["metadata"]
+        and message["metadata"].get("chat_action", {}).get("type")
+        == "cancel_confirmation"
+    ]
+    assert len(cancel_turns) == 1
     assert messages[-1]["role"] == "assistant"
     assert messages[-1]["content"] == ""
     assert messages[-1]["metadata"]["chat_action"]["type"] == "cancel_confirmation"
@@ -2036,6 +2038,10 @@ def test_cancel_confirmation_action_persists_invisible_artifact_tombstone() -> N
         "type": "confirmation_cancelled",
         "confirmation_id": "confirm-aapl",
     }
+    tombstone_turn = messages[-1]["metadata"]["agent_runtime_turn"]
+    assert tombstone_turn["status"] == "completed"
+    assert tombstone_turn["terminal"] is True
+    assert tombstone_turn["turn_id"] == cancel_turns[0]["id"]
 
 
 def test_canceled_confirmation_blocks_stale_checkpoint_run_action(monkeypatch) -> None:

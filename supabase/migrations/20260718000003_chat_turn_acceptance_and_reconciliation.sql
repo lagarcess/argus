@@ -21,7 +21,11 @@ create or replace function public.accept_chat_turn(
     p_metadata jsonb,
     p_created_at timestamptz,
     p_preview text,
-    p_request_id text
+    p_request_id text,
+    p_expected_source_assistant_id uuid default null,
+    p_expected_source_metadata jsonb default null,
+    p_option_id text default null,
+    p_replacement_values jsonb default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -29,8 +33,11 @@ set search_path = public
 as $$
 declare
     v_message jsonb;
+    v_source jsonb;
+    v_replayed boolean;
 begin
-    select appended.message into v_message
+    select appended.message, appended.source_message, appended.replayed
+      into v_message, v_source, v_replayed
       from public.append_conversation_message(
         p_user_id,
         p_conversation_id,
@@ -40,30 +47,48 @@ begin
         p_metadata,
         p_created_at,
         p_preview,
-        null, null, null, null
+        p_expected_source_assistant_id,
+        p_expected_source_metadata,
+        p_option_id,
+        p_replacement_values
       ) as appended;
 
     if v_message is null then
+        if p_expected_source_assistant_id is not null then
+            -- Response-option claim: the exact option source no longer
+            -- matches, which is a normal not-claimable outcome.
+            return jsonb_build_object('message', null);
+        end if;
         raise exception 'chat turn acceptance did not persist the message';
     end if;
 
-    insert into public.chat_turn_lifecycles (
-        turn_id, user_id, conversation_id, request_id, status
-    ) values (
-        (v_message ->> 'id')::uuid, p_user_id, p_conversation_id,
-        p_request_id, 'accepted'
-    )
-    on conflict (turn_id) do nothing;
+    -- Legacy request messages that predate lifecycle admission replay with
+    -- no request identity; only identified turns gain a lifecycle row.
+    if p_request_id is not null then
+        insert into public.chat_turn_lifecycles (
+            turn_id, user_id, conversation_id, request_id, status
+        ) values (
+            (v_message ->> 'id')::uuid, p_user_id, p_conversation_id,
+            p_request_id, 'accepted'
+        )
+        on conflict (turn_id) do nothing;
+    end if;
 
-    return v_message;
+    return jsonb_build_object(
+        'message', v_message,
+        'source_message', v_source,
+        'replayed', coalesce(v_replayed, false)
+    );
 end;
 $$;
 
 revoke all on function public.accept_chat_turn(
-    uuid, uuid, uuid, text, text, jsonb, timestamptz, text, text
+    uuid, uuid, uuid, text, text, jsonb, timestamptz, text, text,
+    uuid, jsonb, text, jsonb
 ) from public, anon, authenticated;
 grant execute on function public.accept_chat_turn(
-    uuid, uuid, uuid, text, text, jsonb, timestamptz, text, text
+    uuid, uuid, uuid, text, text, jsonb, timestamptz, text, text,
+    uuid, jsonb, text, jsonb
 ) to service_role;
 
 create or replace function public.reconcile_stale_chat_turns(

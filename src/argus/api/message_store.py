@@ -220,7 +220,34 @@ def claim_response_option_action(
         ):
             return None
         assert latest is not None
+        previous_conversation = api_state.store.conversations.get(conversation_id)
         accepted_request = _append_memory_message(request_message)
+        # #240 acceptance rides the claim transaction: the accepted request
+        # and its lifecycle row persist together or not at all.
+        acceptance_request_id = _turn_acceptance_request_id(
+            role="user", metadata=request_message.metadata
+        )
+        if acceptance_request_id is not None:
+            from argus.domain.chat_turn_lifecycle import create_accepted_memory
+
+            try:
+                create_accepted_memory(
+                    api_state.store,
+                    turn_id=accepted_request.id,
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    request_id=acceptance_request_id,
+                )
+            except Exception:
+                messages = api_state.store.messages.get(conversation_id, [])
+                api_state.store.messages[conversation_id] = [
+                    item for item in messages if item.id != accepted_request.id
+                ]
+                if previous_conversation is not None:
+                    api_state.store.conversations[conversation_id] = (
+                        previous_conversation
+                    )
+                raise
         return ResponseOptionActionClaim(
             source_message=latest,
             request_message=accepted_request,

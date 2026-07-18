@@ -123,22 +123,47 @@ class ConversationMessagePersistenceMixin:
     ) -> tuple[Message, Message] | None:
         if request_message.conversation_id != conversation_id:
             raise ValueError("Request message conversation does not match claim.")
-        appended, source, _replayed = self._append_conversation_message(
-            user_id=user_id,
-            message=request_message,
-            preview=_message_preview(
-                request_message.content,
-                role=request_message.role,
-                metadata=request_message.metadata,
-            ),
-            expected_source_assistant_id=source_assistant_id,
-            option_id=option_id,
-            replacement_values=replacement_values,
-            expected_source_metadata=expected_source_metadata,
-        )
-        if source is None:
+        # #240: the claim routes through the acceptance boundary so the exact
+        # source validation, message append, and lifecycle row commit in one
+        # database transaction — never a second post-transaction write.
+        turn = (request_message.metadata or {}).get("agent_runtime_turn")
+        request_id = turn.get("request_id") if isinstance(turn, dict) else None
+        result = self.client.rpc(
+            "accept_chat_turn",
+            {
+                "p_user_id": user_id,
+                "p_conversation_id": conversation_id,
+                "p_message_id": request_message.id,
+                "p_role": request_message.role,
+                "p_content": request_message.content,
+                "p_metadata": (
+                    request_message.metadata
+                    if request_message.metadata is not None
+                    else {}
+                ),
+                "p_created_at": request_message.created_at.isoformat(),
+                "p_preview": message_preview(
+                    request_message.content,
+                    role=request_message.role,
+                    metadata=request_message.metadata,
+                ),
+                "p_request_id": request_id,
+                "p_expected_source_assistant_id": source_assistant_id,
+                "p_expected_source_metadata": expected_source_metadata,
+                "p_option_id": option_id,
+                "p_replacement_values": replacement_values,
+            },
+        ).execute()
+        row = _row_one(result)
+        if row is None or not isinstance(row.get("message"), dict):
             return None
-        return source, appended
+        source_row = row.get("source_message")
+        if not source_row:
+            return None
+        return (
+            Message.model_validate(source_row),
+            Message.model_validate(row["message"]),
+        )
 
     def _append_conversation_message(
         self,

@@ -475,7 +475,9 @@ class _SerializedMessageRpcClient:
         self.append_started = Event()
 
     def rpc(self, function_name: str, params: dict[str, Any]):
-        assert function_name == "append_conversation_message"
+        # Plain appends use the serialized writer; response-option claims go
+        # through the acceptance boundary that composes the same writer.
+        assert function_name in ("append_conversation_message", "accept_chat_turn")
         if params.get("p_expected_source_assistant_id") is None:
             self.append_started.set()
         else:
