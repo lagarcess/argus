@@ -124,6 +124,38 @@ describe("chat message hydration", () => {
     );
   });
 
+  test("superseded abandoned recovery keeps its display but loses its action", () => {
+    // #240 retry supersession: the backend omits retry_last_turn once a later
+    // artifact supersedes the abandoned turn; the row still renders the
+    // historical recovery state with no actionable retry.
+    const message = hydrateTextMessageFromApi(
+      apiMessage({
+        id: "user-superseded",
+        role: "user",
+        content: "stalled idea",
+        metadata: {
+          agent_runtime_turn: {
+            turn_id: "user-superseded",
+            request_id: "req-superseded",
+            status: "abandoned",
+            terminal: true,
+            reconciled_outcome: null,
+            failure_code: "turn_abandoned",
+            retryable: true,
+          },
+          recovery: { code: "turn_abandoned", retryable: true },
+        },
+      }),
+    );
+
+    expect(message.abandonedRecovery?.display).toEqual({
+      kind: "recovery_code",
+      code: "turn_abandoned",
+      values: undefined,
+    });
+    expect(message.abandonedRecovery?.action).toBeNull();
+  });
+
   test("non-abandoned user messages carry no recovery attachment", () => {
     const message = hydrateTextMessageFromApi(
       apiMessage({

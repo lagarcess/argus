@@ -226,6 +226,7 @@ export default function ChatMessage({
 
   if (isUser) {
     const abandonedRecovery = message.abandonedRecovery;
+    const abandonedRetryAction = abandonedRecovery?.action ?? null;
     return (
       <div className="flex w-full flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="flex w-full justify-end">
@@ -245,15 +246,17 @@ export default function ChatMessage({
               <p className="text-[15px] leading-[1.55] tracking-[0.2px] text-black/70 dark:text-white/70">
                 {recoveryDisplayText(abandonedRecovery.display, t)}
               </p>
-              <div>
-                <button
-                  type="button"
-                  onClick={() => onAction?.(abandonedRecovery.action)}
-                  className="rounded-full border border-black/12 dark:border-white/12 px-3 py-1.5 text-[13px] font-medium tracking-tight text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
-                >
-                  {actionLabel(abandonedRecovery.action)}
-                </button>
-              </div>
+              {abandonedRetryAction && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => onAction?.(abandonedRetryAction)}
+                    className="rounded-full border border-black/12 dark:border-white/12 px-3 py-1.5 text-[13px] font-medium tracking-tight text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
+                  >
+                    {actionLabel(abandonedRetryAction)}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

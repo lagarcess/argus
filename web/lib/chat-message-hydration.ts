@@ -34,7 +34,9 @@ function recordOrNull(value: unknown): Record<string, unknown> | null {
 
 // #240: the persisted user message carries the abandoned-turn overlay; one
 // presentation-only recovery attachment derives from it. It has no message
-// identity of its own, so it stays with its owner across cursor pages.
+// identity of its own, so it stays with its owner across cursor pages. When a
+// later artifact superseded the retry, the backend omits retry_last_turn and
+// the recovery state renders with no actionable retry.
 function abandonedRecoveryFromMetadata(
   metadata: Record<string, unknown>,
 ): Message["abandonedRecovery"] {
@@ -43,11 +45,10 @@ function abandonedRecoveryFromMetadata(
     return undefined;
   }
   const display = recoveryDisplayFromRecoveryState(metadata.recovery);
-  const action = retryLastTurnActionFromMetadata(metadata);
-  if (!display || !action) {
+  if (!display) {
     return undefined;
   }
-  return { display, action };
+  return { display, action: retryLastTurnActionFromMetadata(metadata) };
 }
 
 export function hydrateTextMessageFromApi(

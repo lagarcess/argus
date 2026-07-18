@@ -18,7 +18,12 @@ from typing import Any
 from argus.api.schemas import Message
 
 
-def _with_abandoned_overlay(message: Message, row: dict[str, Any]) -> Message:
+def _with_abandoned_overlay(
+    message: Message,
+    row: dict[str, Any],
+    *,
+    superseded: bool,
+) -> Message:
     turn_id = str(row.get("turn_id") or "")
     metadata = dict(message.metadata or {})
     metadata["agent_runtime_turn"] = {
@@ -34,15 +39,31 @@ def _with_abandoned_overlay(message: Message, row: dict[str, Any]) -> Message:
         "code": row.get("failure_code"),
         "retryable": row.get("retryable"),
     }
-    retry_last_turn: dict[str, Any] = {
-        "request_message_id": turn_id,
-        "message": message.content,
-    }
-    chat_action = metadata.get("chat_action")
-    if isinstance(chat_action, dict):
-        retry_last_turn["action"] = deepcopy(chat_action)
-    metadata["retry_last_turn"] = retry_last_turn
+    # A later user turn, confirmation, result, or cancellation supersedes the
+    # actionable retry; the historical recovery state above stays visible.
+    if not superseded:
+        retry_last_turn: dict[str, Any] = {
+            "request_message_id": turn_id,
+            "message": message.content,
+        }
+        chat_action = metadata.get("chat_action")
+        if isinstance(chat_action, dict):
+            retry_last_turn["action"] = deepcopy(chat_action)
+        metadata["retry_last_turn"] = retry_last_turn
     return message.model_copy(update={"metadata": metadata})
+
+
+def _supersedes_stale_retry(message: Message) -> bool:
+    from argus.api.message_store import metadata_has_authoritative_artifact
+
+    if message.role == "user":
+        return True
+    if message.role != "assistant":
+        return False
+    metadata = message.metadata if isinstance(message.metadata, dict) else {}
+    return metadata_has_authoritative_artifact(metadata) or isinstance(
+        metadata.get("artifact_event"), dict
+    )
 
 
 def _with_reconciled_overlay(message: Message, row: dict[str, Any]) -> Message:
@@ -83,12 +104,24 @@ def project_turn_lifecycle(
             if assistant_id:
                 reconciled_by_assistant[assistant_id] = row
 
+    # supersedes_after[i] is true when any message after index i supersedes a
+    # stale retry (later user turn, confirmation, result, or cancellation).
+    supersedes_after = [False] * (len(messages) + 1)
+    for index in range(len(messages) - 1, -1, -1):
+        supersedes_after[index] = supersedes_after[index + 1] or (
+            _supersedes_stale_retry(messages[index])
+        )
+
     projected: list[Message] = []
-    for message in messages:
+    for index, message in enumerate(messages):
         abandoned_row = abandoned.get(message.id)
         reconciled_row = reconciled_by_assistant.get(message.id)
         if abandoned_row is not None and message.role == "user":
-            message = _with_abandoned_overlay(message, abandoned_row)
+            message = _with_abandoned_overlay(
+                message,
+                abandoned_row,
+                superseded=supersedes_after[index + 1],
+            )
         elif reconciled_row is not None and message.role == "assistant":
             message = _with_reconciled_overlay(message, reconciled_row)
         projected.append(message)

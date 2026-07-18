@@ -28,9 +28,12 @@ describe("abandoned-turn recovery row", () => {
     expect(userBranch).toContain("message.abandonedRecovery");
     expect(userBranch).toContain('data-testid="abandoned-recovery-row"');
     // The row derives its text through the shared localized recovery path
-    // and fires the typed retry action through the normal action handler.
+    // and fires the typed retry action through the normal action handler —
+    // but only when the backend still provides the action (a superseded
+    // recovery renders its state with no retry affordance).
     expect(userBranch).toContain("recoveryDisplayText(abandonedRecovery.display, t)");
-    expect(userBranch).toContain("onAction?.(abandonedRecovery.action)");
+    expect(userBranch).toContain("abandonedRetryAction && (");
+    expect(userBranch).toContain("onAction?.(abandonedRetryAction)");
     expect(userBranchEnd).toBeGreaterThan(-1);
   });
 

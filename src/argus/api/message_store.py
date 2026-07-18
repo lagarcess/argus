@@ -783,6 +783,15 @@ def _has_unresolved_visible_runtime_failure(
     return False
 
 
+def metadata_has_authoritative_artifact(
+    metadata: dict[str, Any] | None,
+) -> bool:
+    """Public name: read-time projections use the same authoritative-artifact
+    predicate to supersede stale retry affordances."""
+
+    return _metadata_has_authoritative_artifact(metadata)
+
+
 def _metadata_has_authoritative_artifact(
     metadata: dict[str, Any] | None,
 ) -> bool:

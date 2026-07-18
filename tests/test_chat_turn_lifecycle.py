@@ -1032,6 +1032,115 @@ def test_projection_has_no_first_twenty_historical_ceiling(_memory_mode) -> None
     assert newest_turn_id in projected_turns
 
 
+@pytest.mark.parametrize(
+    ("later_role", "later_metadata"),
+    [
+        ("user", None),
+        ("assistant", {"confirmation_card": {"confirmation_id": "c-9"}}),
+        ("assistant", {"result_card": {"title": "Result"}}),
+        (
+            "assistant",
+            {"artifact_event": {"type": "confirmation_cancelled"}},
+        ),
+    ],
+    ids=["later_user_turn", "confirmation", "result", "cancellation"],
+)
+def test_superseded_abandoned_recovery_loses_its_retry_affordance(
+    _memory_mode, later_role: str, later_metadata: dict | None
+) -> None:
+    """#240 retry supersession: a later user turn, confirmation, result, or
+    cancellation keeps the historical abandoned recovery state visible but
+    removes its actionable retry_last_turn."""
+
+    user_id = api_state.store.get_or_create_dev_user().id
+    conversation = memory_conversation(
+        user_id=user_id,
+        title="Supersession",
+        title_source="system_default",
+        language="en",
+    )
+    from argus.api.message_store import create_message
+
+    abandoned_user_message = create_message(
+        user_id=user_id,
+        conversation_id=conversation.id,
+        role="user",
+        content="stalled idea",
+        metadata={
+            "agent_runtime_turn": {
+                "status": "started",
+                "conversation_id": conversation.id,
+                "request_id": "req-superseded",
+            }
+        },
+    )
+    row = api_state.store.chat_turn_lifecycles[abandoned_user_message.id]
+    row["accepted_at"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=30)
+    ).isoformat()
+    memory_message(
+        conversation_id=conversation.id,
+        role=later_role,
+        content="Later artifact." if later_role == "assistant" else "next idea",
+        metadata=later_metadata,
+    )
+
+    response = TestClient(app).get(f"/api/v1/conversations/{conversation.id}/messages")
+    assert response.status_code == 200
+    overlaid = next(
+        item
+        for item in response.json()["items"]
+        if item["id"] == abandoned_user_message.id
+    )
+    # Historical recovery state is preserved…
+    assert overlaid["metadata"]["agent_runtime_turn"]["status"] == "abandoned"
+    assert overlaid["metadata"]["recovery"]["code"] == "turn_abandoned"
+    # …but the actionable retry affordance is gone.
+    assert "retry_last_turn" not in overlaid["metadata"]
+
+
+def test_unsuperseded_abandoned_recovery_keeps_its_bound_retry(_memory_mode) -> None:
+    """With nothing after the abandoned turn, the typed retry stays and is
+    bound to its request_message_id."""
+
+    user_id = api_state.store.get_or_create_dev_user().id
+    conversation = memory_conversation(
+        user_id=user_id,
+        title="Still latest",
+        title_source="system_default",
+        language="en",
+    )
+    from argus.api.message_store import create_message
+
+    user_message = create_message(
+        user_id=user_id,
+        conversation_id=conversation.id,
+        role="user",
+        content="stalled idea",
+        metadata={
+            "agent_runtime_turn": {
+                "status": "started",
+                "conversation_id": conversation.id,
+                "request_id": "req-latest",
+            }
+        },
+    )
+    row = api_state.store.chat_turn_lifecycles[user_message.id]
+    row["accepted_at"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=30)
+    ).isoformat()
+
+    response = TestClient(app).get(f"/api/v1/conversations/{conversation.id}/messages")
+    overlaid = next(
+        item
+        for item in response.json()["items"]
+        if item["id"] == user_message.id
+    )
+    retry = overlaid["metadata"]["retry_last_turn"]
+    assert retry["request_message_id"] == user_message.id
+    assert retry["message"] == "stalled idea"
+
+
 def test_lifecycle_hooks_log_safe_fields_only(
     _memory_mode, monkeypatch: pytest.MonkeyPatch
 ) -> None:

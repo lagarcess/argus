@@ -239,9 +239,10 @@ export type Message = {
   /** Typed degraded/offline recovery display rendered through web i18n. */
   recoveryDisplay?: RecoveryDisplay | null;
   /** #240: presentation-only abandoned-turn recovery derived from the owning
-   * user message's overlay — no API message identity of its own. */
+   * user message's overlay — no API message identity of its own. The action
+   * is null once a later artifact superseded the retry affordance. */
   abandonedRecovery?: {
     display: RecoveryDisplay;
-    action: ChatActionOption;
+    action: ChatActionOption | null;
   } | null;
 };
