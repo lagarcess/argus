@@ -14,6 +14,13 @@ import type { ChatActionOption } from "../components/chat/types";
 
 const root = join(import.meta.dir, "..");
 
+const readChatShellSource = () =>
+  [
+    readFileSync(join(root, "components/chat/transcript-hydration.ts"), "utf-8"),
+    readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8"),
+  ].join("\n");
+
+
 describe("chat turn artifact UX", () => {
   test("shared action ownership keeps card actions out of composer and footer surfaces", () => {
     const actions: ChatActionOption[] = [
@@ -108,10 +115,7 @@ describe("chat turn artifact UX", () => {
       join(root, "components/chat/StrategyConfirmationCard.tsx"),
       "utf-8",
     );
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(card).toContain("confirmationStatusAllowsActions(displayState.status)");
     expect(chat).toContain("confirmationStatusAllowsActions(confirmationStatus)");
@@ -136,10 +140,7 @@ describe("chat turn artifact UX", () => {
       join(root, "lib/chat-action-ownership.ts"),
       "utf-8",
     );
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(ownership).toContain("export function actionHasCardScopedOwnership");
     expect(ownership).toContain("export function visibleComposerActions");
@@ -157,10 +158,7 @@ describe("chat turn artifact UX", () => {
   });
 
   test("card-scoped confirmation actions close the source card before sending", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const handleActionStart = chat.indexOf("const handleAction =");
     const handleActionEnd = chat.indexOf("// ── Chat options helpers", handleActionStart);
     const handleActionBlock = chat.slice(handleActionStart, handleActionEnd);
@@ -177,10 +175,7 @@ describe("chat turn artifact UX", () => {
   });
 
   test("final recovery responses hydrate retry controls from structured metadata", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(chat).toContain("retryLastTurnActionFromMetadata");
     expect(chat).toContain("const finalMessageId =");
@@ -230,10 +225,7 @@ describe("chat turn artifact UX", () => {
   });
 
   test("stream error handling settles confirmation artifacts and clears stale composer actions", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const errorStart = chat.indexOf('if (event.event === "error")');
     const errorEnd = chat.indexOf('if (event.event === "final")', errorStart);
     const errorBlock = chat.slice(errorStart, errorEnd);

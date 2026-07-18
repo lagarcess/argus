@@ -12,6 +12,13 @@ import {
 
 const root = join(import.meta.dir, "..");
 
+const readChatShellSource = () =>
+  [
+    readFileSync(join(root, "components/chat/transcript-hydration.ts"), "utf-8"),
+    readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8"),
+  ].join("\n");
+
+
 describe("Argus Alpha frontend contract", () => {
   test("maps API conversation_result_card into chat result payload", () => {
     const result = resultCardFromRun({
@@ -74,10 +81,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("collections are indefinitely deferred from private-alpha UI", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const sidebar = readFileSync(
       join(root, "components/sidebar/ChatSidebar.tsx"),
       "utf-8",
@@ -110,10 +114,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat header keeps the history options affordance", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(chat).toContain(
       'aria-label={t("chat.chat_options", "Chat options")}',
@@ -168,10 +169,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("private-alpha defaults hide exploratory chat suggestions while keeping starter chips", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const input = readFileSync(
       join(root, "components/chat/ChatInput.tsx"),
       "utf-8",
@@ -272,10 +270,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat result messages preserve assistant explanation next to card", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
@@ -296,10 +291,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("failed-action retry stays a structured footer action and message menus close on focus loss", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
@@ -442,10 +434,7 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
     );
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const css = readFileSync(join(root, "app/globals.css"), "utf-8");
 
     expect(message).toContain("function ResultBreakdown");
@@ -488,10 +477,7 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ResultEquityChart.tsx"),
       "utf-8",
     );
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(card).toContain("<ResultEquityChart");
     expect(card).toContain('presentation="heroDeltaEvidence"');
@@ -532,10 +518,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat renders structured confirmation cards with card-scoped actions only", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
@@ -589,10 +572,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("composer hides artifact actions whenever any active card owns them", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     const activeArtifactHelper = chat.slice(
       chat.indexOf("function hasActiveArtifactActionSet"),
@@ -612,10 +592,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat supersedes older confirmation cards when a newer draft appears", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const artifactHistory = readFileSync(
       join(root, "components/chat/artifact-history.ts"),
       "utf-8",
@@ -646,10 +623,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat supersedes active confirmations when a later turn asks for recovery", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const artifactHistory = readFileSync(
       join(root, "components/chat/artifact-history.ts"),
       "utf-8",
@@ -675,10 +649,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("confirmation action chips render as action transcript items", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
@@ -695,10 +666,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("streaming backend errors keep backend detail when provided", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(chat).toContain("chatStreamErrorText(");
     expect(chat).toContain("event.data.detail");
@@ -837,10 +805,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat status is driven by backend stage_start events", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const locale = readFileSync(
       join(root, "public/locales/en/common.json"),
       "utf-8",
@@ -853,10 +818,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("latest pending assistant response hides feedback before stage_start arrives", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
@@ -872,10 +834,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("stream status hides once assistant tokens are visible", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(chat).toContain("latestAssistantContent");
     expect(chat).toContain(
@@ -885,10 +844,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat composer prevents overlapping turns while stream is active", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const input = readFileSync(
       join(root, "components/chat/ChatInput.tsx"),
       "utf-8",
@@ -911,10 +867,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat restores jump-to-latest affordance without forced reading jumps", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(chat).toContain("scrollContainerRef");
     expect(chat).toContain("showJumpToLatest");
@@ -925,10 +878,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat hydrates persisted structured cards from message metadata", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const artifactHistory = readFileSync(
       join(root, "components/chat/artifact-history.ts"),
@@ -944,10 +894,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("result actions carry canonical run and conversation context", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const resultActions = readFileSync(
       join(root, "lib/chat-result-actions.ts"),
       "utf-8",
@@ -972,10 +919,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("artifact actions stay attached to historical cards", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(chat).toContain("markComposerActionsInactive");
     expect(chat).not.toContain(
@@ -1034,10 +978,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat updates saved state from save strategy final payloads", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const types = readFileSync(join(root, "components/chat/types.ts"), "utf-8");
 
     expect(types).toContain("savedStrategyId?: string | null");
@@ -1050,19 +991,14 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("saved result state is not inferred from plain result strategy linkage", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
-    const metadataHelper = chat.slice(
-      chat.indexOf("function savedStrategyIdFromMetadata"),
-      chat.indexOf("function savedStrategyIdFromFinalPayload"),
-    );
-    const finalPayloadHelper = chat.slice(
-      chat.indexOf("function savedStrategyIdFromFinalPayload"),
-      chat.indexOf("function resultRunIdFromFinalPayload"),
-    );
+    const helperBody = (name: string) => {
+      const start = chat.indexOf(`function ${name}`);
+      return chat.slice(start, chat.indexOf("\n}", start) + 2);
+    };
+    const metadataHelper = helperBody("savedStrategyIdFromMetadata");
+    const finalPayloadHelper = helperBody("savedStrategyIdFromFinalPayload");
 
     expect(metadataHelper).toContain("saved_strategy_id");
     expect(metadataHelper).not.toContain("result_strategy_id");
@@ -1075,10 +1011,7 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
     );
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const en = readFileSync(
       join(root, "public/locales/en/common.json"),
       "utf-8",
@@ -1113,10 +1046,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat consumes result action chips after breakdown is requested", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(chat).toContain("consumeInputAction");
     expect(chat).toContain("consumeResultActionOnMessages");
@@ -1132,10 +1062,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat resumes explicit conversation routes instead of creating a fresh one on reload", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(chat).toContain("ACTIVE_CONVERSATION_QUERY_KEY");
     expect(chat).toContain("readActiveConversationIdFromUrl");
@@ -1152,10 +1079,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("history menu reuses structured conversation hydration", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
 
     expect(chat).toContain("hydrateMessagesFromApi");
@@ -1181,10 +1105,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat includes onboarding goal cards and hidden onboarding protocol", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(chat).toContain('data-testid="onboarding-goal-cards"');
     expect(chat).toContain('data-testid="onboarding-skip"');
@@ -1193,10 +1114,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat sidebar opens a safe command palette instead of hydrating chat previews", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const palette = readFileSync(
       join(root, "components/sidebar/ChatCommandPalette.tsx"),
       "utf-8",
@@ -1289,10 +1207,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat command palette keeps safe hover management actions without chat hydration", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const palette = readFileSync(
       join(root, "components/sidebar/ChatCommandPalette.tsx"),
       "utf-8",
@@ -1323,10 +1238,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat schedules bounded history refreshes for async artifact naming", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(chat).toContain("function schedulePostTurnHistoryRefresh");
     expect(chat).toContain("listConversations");
@@ -1403,10 +1315,7 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatMessage.tsx"),
       "utf-8",
     );
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const feedbackContext = readFileSync(
       join(root, "lib/chat-message-feedback-context.ts"),
       "utf-8",
@@ -1641,10 +1550,7 @@ describe("Argus Alpha frontend contract", () => {
 
   test("profile menu delete all conversations is recoverable and outcome-aware", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const sidebar = readFileSync(
       join(root, "components/sidebar/ChatSidebar.tsx"),
       "utf-8",
@@ -1743,10 +1649,7 @@ describe("Argus Alpha frontend contract", () => {
 
   test("auth exits return to the clean front door", () => {
     const chatPage = readFileSync(join(root, "app/chat/page.tsx"), "utf-8");
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
 
     expect(chatPage).toContain('redirect("/?auth=login")');
     expect(chatPage).not.toContain('redirect("/login")');
@@ -1789,10 +1692,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("sidebar keeps strategies flagged while omnisearch is enabled by default", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const sidebar = readFileSync(
       join(root, "components/sidebar/ChatSidebar.tsx"),
       "utf-8",
@@ -1843,10 +1743,7 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInput.tsx"),
       "utf-8",
     );
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const locale = readFileSync(
       join(root, "public/locales/en/common.json"),
       "utf-8",
@@ -1860,10 +1757,7 @@ describe("Argus Alpha frontend contract", () => {
   });
 
   test("chat stream errors preserve status for stale conversation recovery", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
+    const chat = readChatShellSource();
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
 
     expect(api).toContain("class ChatStreamError");

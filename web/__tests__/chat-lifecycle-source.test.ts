@@ -4,22 +4,31 @@ import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");
 
+const readChatShellSource = () =>
+  [
+    readFileSync(join(root, "components/chat/transcript-hydration.ts"), "utf-8"),
+    readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8"),
+  ].join("\n");
+
+
 describe("chat archive/delete lifecycle source contract", () => {
   test("chat switching keeps prior messages visible until hydration completes", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const chat = readChatShellSource();
     const loadConversationStart = chat.indexOf("const loadConversation = async (convId: string) => {");
     const loadConversationEnd = chat.indexOf("const loadConversationForRun", loadConversationStart);
     const loadConversation = chat.slice(loadConversationStart, loadConversationEnd);
-    const beforeCatch = loadConversation.slice(0, loadConversation.indexOf("} catch (error)"));
 
     expect(loadConversationStart).toBeGreaterThan(-1);
-    expect(loadConversation).toContain("setStreamStatus(t('common.loading'))");
-    expect(beforeCatch).not.toContain("setMessages([])");
-    expect(beforeCatch).not.toContain("setInputActions([])");
+    // #252: hydration flows through the session cache; loading state is
+    // honest and prior messages stay visible until a snapshot is ready.
+    expect(loadConversation).toContain("transcriptSessionCache.navigate");
+    expect(loadConversation).toContain("setStreamStatus(loading ? t('common.loading') : null)");
+    expect(loadConversation).not.toContain("setMessages([])");
+    expect(loadConversation).toContain("applyTranscriptNavigationState(state,");
   });
 
   test("active archive and delete navigate away from the removed chat", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const chat = readChatShellSource();
     const sidebar = readFileSync(join(root, "components/sidebar/ChatSidebar.tsx"), "utf-8");
     const palette = readFileSync(join(root, "components/sidebar/ChatCommandPalette.tsx"), "utf-8");
 
@@ -39,7 +48,7 @@ describe("chat archive/delete lifecycle source contract", () => {
   });
 
   test("stale or deleted active chats reset to a lazy empty chat instead of creating a new stored conversation", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const chat = readChatShellSource();
     const initStart = chat.indexOf("// ── Init conversation");
     const initEnd = chat.indexOf("const updateScrollPositionState", initStart);
     const initBlock = chat.slice(initStart, initEnd);
@@ -61,20 +70,22 @@ describe("chat archive/delete lifecycle source contract", () => {
   });
 
   test("missing recent conversations are pruned after a failed load", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const chat = readChatShellSource();
     const loadConversationStart = chat.indexOf("const loadConversation = async (convId: string) => {");
     const loadConversationEnd = chat.indexOf("const loadConversationForRun", loadConversationStart);
     const loadConversation = chat.slice(loadConversationStart, loadConversationEnd);
 
     expect(chat).toContain("function isMissingConversationLoadError(error: unknown)");
-    expect(loadConversation).toContain("catch (error)");
-    expect(loadConversation).toContain("isMissingConversationLoadError(error)");
+    expect(loadConversation).toContain(
+      "isMissingConversationError: isMissingConversationLoadError",
+    );
+    expect(loadConversation).toContain("onMissingConversation: () => {");
     expect(loadConversation).toContain("setHistoryItems((prev) =>");
     expect(loadConversation).toContain("!historyItemBelongsToConversation(item, convId)");
   });
 
   test("restoring archived or deleted chats refreshes visible history", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const chat = readChatShellSource();
     const sidebar = readFileSync(join(root, "components/sidebar/ChatSidebar.tsx"), "utf-8");
     const profileMenu = readFileSync(join(root, "components/sidebar/ProfileMenu.tsx"), "utf-8");
     const settings = readFileSync(join(root, "components/views/SettingsView.tsx"), "utf-8");
@@ -94,7 +105,7 @@ describe("chat archive/delete lifecycle source contract", () => {
   });
 
   test("persisted result cards are validated before structured hydration", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const chat = readChatShellSource();
     const hydrateStart = chat.indexOf("function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages");
     const hydrateEnd = chat.indexOf("function createPendingAssistantMessage", hydrateStart);
     const hydrateBlock = chat.slice(hydrateStart, hydrateEnd);
@@ -105,7 +116,7 @@ describe("chat archive/delete lifecycle source contract", () => {
   });
 
   test("header delete requires a selected chat and confirmation", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const chat = readChatShellSource();
 
     expect(chat).toContain('import { ConfirmDialog } from "@/components/ui/ConfirmDialog";');
     expect(chat).toContain("const [pendingHeaderDeleteId, setPendingHeaderDeleteId] = useState<string | null>(null);");
@@ -119,7 +130,7 @@ describe("chat archive/delete lifecycle source contract", () => {
   });
 
   test("chat disclaimer appears only after conversation activity and is localized", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const chat = readChatShellSource();
     const en = JSON.parse(readFileSync(join(root, "public/locales/en/common.json"), "utf-8"));
     const es = JSON.parse(readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"));
     const coldStartBranchStart = chat.indexOf("{messages.length === 0 ? (");

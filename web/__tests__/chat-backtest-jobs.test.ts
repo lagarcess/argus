@@ -17,6 +17,13 @@ import type { Message } from "../components/chat/types";
 
 const root = join(import.meta.dir, "..");
 
+const readChatShellSource = () =>
+  [
+    readFileSync(join(root, "components/chat/transcript-hydration.ts"), "utf-8"),
+    readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8"),
+  ].join("\n");
+
+
 function job(overrides: Partial<BacktestJob> = {}): BacktestJob {
   return {
     id: "job-1",
@@ -614,7 +621,7 @@ describe("chat backtest jobs", () => {
   });
 
   test("chat stream, polling, and reload paths use durable job helpers", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const chat = readChatShellSource();
 
     expect(chat).toContain("getBacktestJob");
     expect(chat).toContain("backtestJobMessageFromApi(m)");

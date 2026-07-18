@@ -32,15 +32,11 @@ import {
   logoutFromApi,
   patchConversation,
   patchMe,
-  resultCardFromConversationCard,
   resultCardFromRun,
   streamChatMessage,
-  type ApiMessage,
-  type AssetClass,
   ChatStreamError,
   type ChatStreamEvent,
   type ChatActionRequest,
-  type ConversationResultCard,
   type HistoryItem,
   type BacktestRun,
   type BacktestJobResponse,
@@ -49,10 +45,18 @@ import {
 } from "@/lib/argus-api";
 import {
   isAmbiguousTransportFailure,
-  reconcileAmbiguousRun,
   runActionConfirmationId,
+  settleAmbiguousRun,
 } from "@/lib/chat-run-reconciliation";
+import {
+  applyTranscriptNavigationState,
+  isTerminalJobStatus,
+} from "@/lib/chat-transcript-navigation";
 import { TranscriptSessionCache } from "@/lib/chat-transcript-session-cache";
+import {
+  type HydratedMessages,
+  hydrateMessagesFromApi,
+} from "./transcript-hydration";
 import {
   chatExploratorySuggestionsEnabled,
   collectionsEnabled,
@@ -94,7 +98,6 @@ import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading"
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
 import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
 import {
-  hydrateResultActions,
   hydrateResultActionsForRun,
 } from "@/lib/chat-result-actions";
 import {
@@ -104,7 +107,6 @@ import {
 import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
-  backtestJobMessageFromApi,
   pendingBacktestJobIds,
 } from "@/lib/chat-backtest-jobs";
 import {
@@ -124,14 +126,9 @@ import ChatMessage from "./ChatMessage";
 import FeedbackDialog from "../feedback/FeedbackDialog";
 import { type ChatActionOption, type ChatMention, type Message, type StrategyConfirmationPayload } from "./types";
 import {
-  applyConsumedResultActions,
   applyConfirmationActionEffects,
   confirmationActionEffectFromAction,
-  confirmationActionEffectsFromApi,
   consumeResultActionOnMessages,
-  consumedResultActionsFromApi,
-  hiddenSaveActionMessageIdsFromApi,
-  isBreakdownActionMetadata,
   normalizeConfirmationHistory,
   settleConfirmationAfterActionTransportError,
   resultActionRunId,
@@ -161,11 +158,6 @@ const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
 // #252: one memory-only in-session transcript cache for the shared shell.
 const transcriptSessionCache = new TranscriptSessionCache<HydratedMessages>();
 const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
-
-type HydratedMessages = {
-  messages: Message[];
-  inputActions: ChatActionOption[];
-};
 
 function chatActionRequestFromAction(action: ChatActionOption): ChatActionRequest {
   return {
@@ -247,21 +239,6 @@ function clearActiveConversationPointer() {
   return clearActiveConversationRoute();
 }
 
-function latestInputActions(messages: Message[]) {
-  if (hasActiveArtifactActionSet(messages)) {
-    return [];
-  }
-  const latestAi = [...messages].reverse().find((message) => message.role === "ai");
-  if (
-    latestAi?.kind === "strategy_confirmation" ||
-    latestAi?.kind === "strategy_result"
-  ) {
-    return [];
-  }
-  return visibleComposerActions(latestAi?.actions ?? []).filter(
-    (action) => action.artifactType !== "failed_action",
-  );
-}
 
 function isFailedActionRetry(action: ChatActionOption | undefined) {
   if (!action) return false;
@@ -330,60 +307,10 @@ function stringOrNull(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-function recordOrNull(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
 
-function stringArrayOrNull(value: unknown): string[] | null {
-  if (!Array.isArray(value)) {
-    return null;
-  }
-  const values = value.map(String).filter(Boolean);
-  return values.length > 0 ? values : null;
-}
 
-function isHydratableResultCard(value: unknown): value is ConversationResultCard {
-  const card = recordOrNull(value);
-  const dateRange = recordOrNull(card?.date_range);
-  return Boolean(
-    card &&
-      typeof card.title === "string" &&
-      typeof card.status_label === "string" &&
-      Array.isArray(card.rows) &&
-      Array.isArray(card.assumptions) &&
-      Array.isArray(card.actions) &&
-      dateRange &&
-      typeof dateRange.start === "string" &&
-      typeof dateRange.end === "string" &&
-      typeof dateRange.display === "string",
-  );
-}
 
-function assetClassOrUndefined(value: unknown): AssetClass | undefined {
-  return value === "crypto" || value === "equity" || value === "currency_pair"
-    ? value
-    : undefined;
-}
 
-function resultActionContextFromMetadata(
-  metadata: Record<string, unknown>,
-  card: ReturnType<typeof resultCardFromConversationCard>,
-) {
-  const factBank = recordOrNull(metadata.result_fact_bank);
-  const configSnapshot = recordOrNull(factBank?.config_snapshot);
-  const symbols = card.symbols ?? stringArrayOrNull(factBank?.symbols) ?? [];
-  return {
-    symbols,
-    template: stringOrNull(configSnapshot?.template),
-    assetClass: assetClassOrUndefined(factBank?.asset_class),
-  };
-}
-
-function savedStrategyIdFromMetadata(metadata: Record<string, unknown>) {
-  return stringOrNull(metadata.saved_strategy_id);
-}
 
 function savedStrategyIdFromFinalPayload(payload: Record<string, unknown>) {
   return stringOrNull(payload.saved_strategy_id);
@@ -486,107 +413,6 @@ function markResultCardSaving(
   });
 }
 
-function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
-  const consumedResultActions = consumedResultActionsFromApi(items);
-  const confirmationActionEffects = confirmationActionEffectsFromApi(items);
-  const hiddenMessageIds = new Set([
-    ...hiddenSaveActionMessageIdsFromApi(items),
-    ...confirmationActionEffects.hiddenMessageIds,
-  ]);
-  const messages: Message[] = items.filter((m) => !hiddenMessageIds.has(m.id)).map((m) => {
-    const metadata = m.metadata ?? {};
-    const chatAction = metadata.chat_action as ChatActionOption | undefined;
-    const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
-    const resultCard = metadata.result_card;
-    if (m.role === "user" && chatAction && typeof chatAction === "object") {
-      return {
-        id: m.id,
-        role: "user",
-        kind: "action",
-        content: m.content,
-        selectedAction: chatAction,
-      };
-    }
-    if (
-      m.role !== "user" &&
-      !isBreakdownActionMetadata(metadata) &&
-      isHydratableResultCard(resultCard)
-    ) {
-      const runId = String(metadata.result_run_id ?? metadata.latest_run_id ?? "");
-      const conversationId =
-        typeof metadata.result_conversation_id === "string"
-          ? metadata.result_conversation_id
-          : m.conversation_id;
-      const resultStrategyId = stringOrNull(metadata.result_strategy_id);
-      const savedStrategyId = savedStrategyIdFromMetadata(metadata);
-      const factBank = recordOrNull(metadata.result_fact_bank);
-      const configSnapshot = recordOrNull(factBank?.config_snapshot);
-      const card = resultCardFromConversationCard(resultCard, {
-        id: runId,
-        strategy_id: resultStrategyId,
-        benchmark_symbol: stringOrNull(factBank?.benchmark_symbol) ?? undefined,
-        config_snapshot: configSnapshot ?? undefined,
-      });
-      const resultActionContext = resultActionContextFromMetadata(metadata, card);
-      const restoredActions = hydrateResultActions(card.actions ?? [], {
-        runId: card.runId,
-        strategyId: card.strategyId,
-        conversationId,
-        strategyName: card.strategyName,
-        symbols: resultActionContext.symbols,
-        template: resultActionContext.template ?? undefined,
-        assetClass: resultActionContext.assetClass,
-      });
-      return {
-        id: m.id,
-        role: "ai",
-        kind: "strategy_result",
-        content: m.content,
-        result: {
-          ...card,
-          symbols: resultActionContext.symbols,
-          template: resultActionContext.template ?? undefined,
-          assetClass: resultActionContext.assetClass,
-          savedStrategyId,
-          actions: restoredActions,
-        },
-        actions: restoredActions,
-        savedStrategyId,
-      };
-    }
-    const backtestJobMessage = backtestJobMessageFromApi(m);
-    if (backtestJobMessage) {
-      return backtestJobMessage;
-    }
-    if (m.role !== "user" && confirmation && Array.isArray(confirmation.rows)) {
-      return {
-        id: m.id,
-        role: "ai",
-        kind: "strategy_confirmation",
-        content: m.content,
-        confirmation,
-        actions: confirmation.actions ?? [],
-      };
-    }
-    return hydrateTextMessageFromApi(m, {
-      contentPresentation:
-        m.role !== "user" && isBreakdownActionMetadata(metadata)
-          ? "result_breakdown"
-          : undefined,
-    });
-  });
-
-  const normalized = normalizeRetryActionHistory(
-    applyConsumedResultActions(
-      applyConfirmationActionEffects(
-        normalizeConfirmationHistory(messages),
-        confirmationActionEffects.effects,
-      ),
-      consumedResultActions,
-    ),
-  );
-  return { messages: normalized, inputActions: latestInputActions(normalized) };
-}
 
 function chatStreamErrorText(detail: string | undefined, fallback: string) {
   return detail || fallback;
@@ -1089,13 +915,9 @@ export default function ChatInterface() {
           return;
         }
         applyDurableBacktestJobResponse(response);
-        const jobStatus = response.job.status;
         if (
           response.job.conversation_id &&
-          (jobStatus === "succeeded" ||
-            jobStatus === "failed" ||
-            jobStatus === "canceled" ||
-            jobStatus === "expired")
+          isTerminalJobStatus(response.job.status)
         ) {
           transcriptSessionCache.invalidateForMutation({
             ...transcriptIdentity(response.job.conversation_id),
@@ -1173,41 +995,32 @@ export default function ChatInterface() {
         const { items } = await getConversationMessages(convId, 50);
         return hydrateMessagesFromApi(items);
       },
-      onState: (state) => {
-        if (state.phase === "loading") {
-          setStreamStatus(t('common.loading'));
-          setIsHydratingConversation(true);
-          return;
-        }
-        if (state.phase === "refreshing" || state.phase === "ready") {
-          applySnapshot(state.snapshot);
-          setStreamStatus(null);
-          setIsHydratingConversation(false);
-          return;
-        }
-        setStreamStatus(null);
-        setIsHydratingConversation(false);
-        if (state.snapshot) {
-          // The cached view stays visible; only the silent refresh failed.
-          showToast(t('chat.error_load'));
-          return;
-        }
-        if (isMissingConversationLoadError(state.error)) {
-          setHistoryItems((prev) =>
-            prev.filter((item) => !historyItemBelongsToConversation(item, convId)),
-          );
-          transcriptSessionCache.invalidateForMutation({
-            ...transcriptIdentity(convId),
-            mutation: "conversation_delete",
-          });
-          resetToEmptyChatSurface();
-          showToast(t('chat.error_load'));
-          return;
-        }
-        setMessages([conversationLoadFailureMessage(convId, t('chat.error_load'))]);
-        setInputActions([]);
-        showToast(t('chat.error_load'));
-      },
+      onState: (state) =>
+        applyTranscriptNavigationState(state, {
+          applySnapshot,
+          setLoading: (loading) => {
+            setStreamStatus(loading ? t('common.loading') : null);
+            setIsHydratingConversation(loading);
+          },
+          showLoadError: () => showToast(t('chat.error_load')),
+          isMissingConversationError: isMissingConversationLoadError,
+          onMissingConversation: () => {
+            setHistoryItems((prev) =>
+              prev.filter((item) => !historyItemBelongsToConversation(item, convId)),
+            );
+            transcriptSessionCache.invalidateForMutation({
+              ...transcriptIdentity(convId),
+              mutation: "conversation_delete",
+            });
+            resetToEmptyChatSurface();
+            showToast(t('chat.error_load'));
+          },
+          onLoadFailure: () => {
+            setMessages([conversationLoadFailureMessage(convId, t('chat.error_load'))]);
+            setInputActions([]);
+            showToast(t('chat.error_load'));
+          },
+        }),
     });
     await handle.completion;
   };
@@ -1717,43 +1530,23 @@ export default function ChatInterface() {
       );
     };
 
-    const settleAmbiguousRunFromDurableTruth = async (options: {
+    const settleAmbiguousRunFromDurableTruth = (options: {
       confirmationId: string;
       conversationId: string;
       replay: () => Promise<void>;
-    }): Promise<boolean> => {
-      showToast(t("chat.run_reconcile_checking"));
-      const outcome = await reconcileAmbiguousRun({
+    }): Promise<boolean> =>
+      settleAmbiguousRun({
         confirmationId: options.confirmationId,
         lookup: (confirmationId) => getBacktestJobByAction(confirmationId),
+        replay: options.replay,
+        notify: (key) => showToast(t(`chat.run_reconcile_${key}`)),
+        renderDurableTruth: async () => {
+          setIsStreamingResponse(false);
+          setStreamStatus(null);
+          activeStreamConversationIdRef.current = null;
+          await loadConversation(options.conversationId).catch(() => undefined);
+        },
       });
-      if (outcome.state === "no_reservation") {
-        // No durable reservation: replay the original action once with the
-        // same approved identity; atomic admission dedupes any race.
-        try {
-          await options.replay();
-          return true;
-        } catch {
-          showToast(t("chat.run_reconcile_unresolved"));
-        }
-      } else if (outcome.state === "pending") {
-        showToast(t("chat.run_reconcile_pending"));
-      } else if (outcome.state === "succeeded") {
-        showToast(t("chat.run_reconcile_recovered"));
-      } else if (outcome.state === "failed") {
-        showToast(t("chat.run_reconcile_failed"));
-      } else if (outcome.state === "conflict") {
-        showToast(t("chat.run_reconcile_conflict"));
-      } else {
-        showToast(t("chat.run_reconcile_unresolved"));
-      }
-      setIsStreamingResponse(false);
-      setStreamStatus(null);
-      activeStreamConversationIdRef.current = null;
-      // Render durable backend truth instead of inventing terminal state.
-      await loadConversation(options.conversationId).catch(() => undefined);
-      return true;
-    };
 
     try {
       await streamToConversation(targetConversationId);

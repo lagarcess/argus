@@ -44,6 +44,55 @@ export function isAmbiguousTransportFailure(error: unknown): boolean {
   return true;
 }
 
+export type AmbiguousRunSettlementDeps = {
+  confirmationId: string;
+  lookup: (confirmationId: string) => Promise<BacktestJobResponse>;
+  replay: () => Promise<void>;
+  notify: (
+    key:
+      | "checking"
+      | "pending"
+      | "recovered"
+      | "failed"
+      | "conflict"
+      | "unresolved",
+  ) => void;
+  renderDurableTruth: () => Promise<void>;
+};
+
+// Full settlement flow for an ambiguous Run transport failure: typed checking
+// presentation, at most one same-identity replay when no reservation exists,
+// then rendering durable backend truth instead of inventing terminal state.
+export async function settleAmbiguousRun(
+  deps: AmbiguousRunSettlementDeps,
+): Promise<boolean> {
+  deps.notify("checking");
+  const outcome = await reconcileAmbiguousRun({
+    confirmationId: deps.confirmationId,
+    lookup: deps.lookup,
+  });
+  if (outcome.state === "no_reservation") {
+    try {
+      await deps.replay();
+      return true;
+    } catch {
+      deps.notify("unresolved");
+    }
+  } else if (outcome.state === "pending") {
+    deps.notify("pending");
+  } else if (outcome.state === "succeeded") {
+    deps.notify("recovered");
+  } else if (outcome.state === "failed") {
+    deps.notify("failed");
+  } else if (outcome.state === "conflict") {
+    deps.notify("conflict");
+  } else {
+    deps.notify("unresolved");
+  }
+  await deps.renderDurableTruth();
+  return true;
+}
+
 export async function reconcileAmbiguousRun(options: {
   confirmationId: string;
   lookup: (confirmationId: string) => Promise<BacktestJobResponse>;
