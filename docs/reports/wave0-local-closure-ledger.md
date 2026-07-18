@@ -660,3 +660,92 @@ replay through `append_conversation_message`, owner-scoped reconcile) plus
 including the abandoned-recovery row and its retry; GitHub Actions run;
 exact-SHA Render canary; the #244 paid probe and #251 live QA stand
 unchanged.
+
+### Fifth pass (2026-07-18, #240 end-to-end lifecycle closure)
+
+Bounded assignment: finish issue #240's durable ordinary chat-turn
+lifecycle end to end against `contract-chat-turn-lifecycle`, the retry
+semantics, and DATA_MODEL 8.1. The fourth pass's schema alignment,
+persisted-message overlay, and recovery-row design are preserved
+unchanged. All corrections red-first; `tests/test_chat_turn_route_matrix.py`
+is the route-matrix suite.
+
+Route matrix (acceptance / running / terminal owner per accepted
+non-backtest POST /api/v1/chat/stream path):
+
+1. Normal message → LangGraph: persist()+accept_chat_turn / route
+   transitions running immediately before consuming runtime events /
+   terminal assistant write (canonical completed) drives the CAS.
+2. Onboarding-required prompt: acceptance as above / no graph work /
+   completes directly with the durable prompt (the accepted-forever
+   HTTP-200 reproduction, now fixed). The onboarding goal-selection
+   control message remains a non-accepted protocol path (no user message
+   is persisted today).
+3. Runtime-fallback / missing-checkpoint early response: acceptance /
+   none / completes directly with the durable recovery answer.
+4. select_response_option: atomic claim now commits the lifecycle row in
+   the same transaction (acceptance SQL gained the writer's option-claim
+   parameters; memory claim creates the row under the same lock with
+   rollback) / running before runtime / terminal as (1).
+5. cancel_confirmation: now participates in ordinary admission (user
+   action message + lifecycle) / none / completes with the durable
+   cancellation tombstone carrying canonical metadata.
+6. Successful terminal response: terminal message writes status
+   completed (legacy "succeeded" is no longer written).
+7. Recoverable terminal failure: canonical recoverable_failed with
+   failure_code and retryable inside the turn envelope; lifecycle carries
+   the same evidence.
+8. Initialization/pre-graph failure: accepted, then recoverable_failed
+   with canonical metadata; no running transition.
+9. chat.run_backtest: user message persists with no chat lifecycle row —
+   backtest_jobs owns durable state (route-level proof retained).
+   A final with no persisted message/artifact stays genuinely incomplete
+   for stale reconciliation.
+
+Commits:
+- `d4eaa94` acceptance coverage (A): cancel admission + tombstone
+  completion, response-option atomic lifecycle (SQL + memory rollback),
+  run_backtest exclusion proof.
+- `ab72194` running + canonical terminal truth (B+C): running before the
+  first graph operation; early responders complete; canonical
+  completed/recoverable_failed envelopes with turn_id/request_id/failure
+  fields; read-compatible legacy mapping (suppression guard + CAS both
+  accept historical succeeded/failed; nothing writes them anymore).
+- `f0434f3` CAS + reconciliation (D+E): no-op comparison includes
+  failure_code/retryable in both backends (different terminal failure
+  truth conflicts); reconciled recoverable failures copy the winner's
+  canonical failure evidence; memory reconciliation enforces the same
+  required-owner boundary as the database function; the unused direct
+  lifecycle writer (hooks accept_turn + gateway upsert) is removed with a
+  guard test.
+- `20633b6` retry supersession (F): a later user turn, confirmation,
+  result, or cancellation removes the abandoned overlay's actionable
+  retry_last_turn while preserving the historical recovery state;
+  retry_last_turn stays keyed by request_message_id; frontend renders the
+  recovery row without a button when the backend withheld the action.
+- `2d41fcb` modularity extractions (onboarding texts →
+  chat/onboarding.py, terminal turn envelope → turn_lifecycle_hooks,
+  missing-result-action message → chat/actions.py); behavior-preserving,
+  budget back to zero violations.
+
+Complexity reassessment (pass 5): one acceptance boundary now covers
+plain, option-claim, and cancellation turns (the SQL function gained four
+optional pass-through parameters instead of a second writer); the
+standalone lifecycle writer was deleted; supersession reuses the existing
+authoritative-artifact predicate; no parallel lifecycle writer,
+orchestration layer, or sweeper was added. agent.py shrank under its
+budget via cohesive extractions.
+
+Verification at `2d41fcb`: hermetic runtime gate 1129/0; focused
+lifecycle/router/migration battery 323/0 (route matrix 9/9);
+contract + OpenAPI 103/0; web 409/0 with lint (0 errors, 1 pre-existing
+warning) and green production build; modularity budget, ruff, and
+`git diff --check` clean; worktree clean.
+
+External gates updated: the disposable-Postgres proof must additionally
+exercise the extended `accept_chat_turn` option-claim parameters (claim
+replay, not-claimable outcome, lifecycle-on-conflict), the CAS
+failure-evidence no-op/conflict branches, and reconciliation's
+failure-evidence copy. Real-auth/RLS, deployed-browser EN/ES QA (now
+including cancel-turn transcript rows and retry supersession), GitHub
+Actions, exact-SHA Render canary, #244 probe, and #251 live QA stand.
