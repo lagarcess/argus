@@ -67,7 +67,11 @@ class ProposalReason(str, Enum):
 
 
 class MemoryCandidate(BaseModel):
-    """A proposed memory. Never durable and never retrievable as memory."""
+    """A proposed memory. Never durable and never retrievable as memory.
+
+    ``opt_in_scope`` is set only on earned opt-in offers made while the user
+    has memory off; confirming such a candidate grants exactly that scope.
+    """
 
     id: str
     user_id: str
@@ -79,6 +83,7 @@ class MemoryCandidate(BaseModel):
     sensitivity_flags: list[SensitivityFlag] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0)
     proposal_reason: ProposalReason
+    opt_in_scope: list[MemoryCategory] | None = None
     locale: str = "en"
     created_at: datetime
 

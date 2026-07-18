@@ -53,27 +53,38 @@ class TestWalkingSkeleton:
         service, store, provider = _build()
         user = "user-founder-qa"
 
-        # Off by default: nothing proposes or retrieves before opt-in.
-        cold = service.propose_from_saved_decision(user, DECISION_FIXTURE)
+        # Off by default: ordinary requests neither propose nor retrieve.
+        cold = service.propose_from_explicit_request(
+            user,
+            ExplicitMemoryRequest(
+                text="Remember I prefer SPY",
+                label="Prefers SPY",
+                category=MemoryCategory.PERSONALIZATION_PREFERENCE,
+            ),
+        )
         assert cold.status is ProposalStatus.REJECTED_POLICY
         assert cold.policy is not None
         assert cold.policy.outcome is PolicyOutcome.DENIED_DISABLED
         assert service.retrieve(user, "ETH idea") == []
 
-        # Earned opt-in, then a decision-grounded proposal.
-        service.enable(user)
+        # The saved-decision moment is the one approved earned opt-in offer.
         proposed = service.propose_from_saved_decision(user, DECISION_FIXTURE)
         assert proposed.status is ProposalStatus.PROPOSED
         candidate = proposed.candidate
         assert candidate is not None
         assert candidate.category is MemoryCategory.EXPLICIT_DECISION_NOTE
         assert candidate.locale == "es-419"
+        assert candidate.opt_in_scope is not None
 
-        # Explicit confirmation creates the canonical record.
+        # Explicit confirmation creates the scoped opt-in and the record.
         record = service.confirm(user, candidate.id)
         assert record is not None
         assert record.consent.state is ConsentState.CONFIRMED
         assert record.provider_ref is not None
+        settings = store.get_settings(user)
+        assert settings.enabled is True
+        assert settings.enabled_categories == candidate.opt_in_scope
+        assert not settings.consents_to(MemoryCategory.PERSONALIZATION_PREFERENCE)
 
         # Bounded retrieval returns it with provenance and why.
         results = service.retrieve(user, "what did I decide about ETH RSI")

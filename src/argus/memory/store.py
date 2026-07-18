@@ -17,6 +17,10 @@ from argus.memory.policy import UserMemorySettings
 class CanonicalMemoryStore(Protocol):
     def get_settings(self, user_id: str) -> UserMemorySettings: ...
 
+    def set_settings(
+        self, user_id: str, settings: UserMemorySettings
+    ) -> UserMemorySettings: ...
+
     def set_enabled(self, user_id: str, enabled: bool) -> UserMemorySettings: ...
 
     def add_candidate(self, candidate: MemoryCandidate) -> None: ...
@@ -28,6 +32,8 @@ class CanonicalMemoryStore(Protocol):
     def list_candidates(self, user_id: str) -> list[MemoryCandidate]: ...
 
     def discard_candidate(self, user_id: str, candidate_id: str) -> None: ...
+
+    def discard_all_candidates(self, user_id: str) -> int: ...
 
     def last_prompted_at(
         self, user_id: str, category: MemoryCategory
@@ -62,10 +68,20 @@ class InMemoryCanonicalMemoryStore:
     def get_settings(self, user_id: str) -> UserMemorySettings:
         return self._settings.get(user_id, UserMemorySettings())
 
-    def set_enabled(self, user_id: str, enabled: bool) -> UserMemorySettings:
-        settings = UserMemorySettings(enabled=enabled)
+    def set_settings(
+        self, user_id: str, settings: UserMemorySettings
+    ) -> UserMemorySettings:
         self._settings[user_id] = settings
         return settings
+
+    def set_enabled(self, user_id: str, enabled: bool) -> UserMemorySettings:
+        # Convenience for full-scope enable / full disable; scoped grants go
+        # through set_settings.
+        categories = list(MemoryCategory) if enabled else []
+        return self.set_settings(
+            user_id,
+            UserMemorySettings(enabled=enabled, enabled_categories=categories),
+        )
 
     def add_candidate(self, candidate: MemoryCandidate) -> None:
         self._candidates.setdefault(candidate.user_id, {})[candidate.id] = candidate
@@ -78,6 +94,11 @@ class InMemoryCanonicalMemoryStore:
 
     def discard_candidate(self, user_id: str, candidate_id: str) -> None:
         self._candidates.get(user_id, {}).pop(candidate_id, None)
+
+    def discard_all_candidates(self, user_id: str) -> int:
+        removed = len(self._candidates.get(user_id, {}))
+        self._candidates[user_id] = {}
+        return removed
 
     def last_prompted_at(self, user_id: str, category: MemoryCategory) -> datetime | None:
         return self._prompted.get((user_id, category))

@@ -35,23 +35,29 @@ def _candidate(**overrides: object) -> MemoryCandidate:
     return MemoryCandidate.model_validate(payload)
 
 
-ENABLED = UserMemorySettings(enabled=True)
+ENABLED = UserMemorySettings(enabled=True, enabled_categories=list(MemoryCategory))
 
 
 class TestEnablement:
     def test_memory_is_off_by_default(self) -> None:
         assert UserMemorySettings().enabled is False
 
-    def test_disabled_user_is_denied(self) -> None:
+    def test_disabled_user_is_denied_for_unapproved_reasons(self) -> None:
         decision = MemoryPolicy().evaluate(
-            _candidate(), UserMemorySettings(), last_prompted_at=None, now=NOW
+            _candidate(proposal_reason=ProposalReason.EXPLICIT_REQUEST),
+            UserMemorySettings(),
+            last_prompted_at=None,
+            now=NOW,
         )
         assert decision.allowed is False
         assert decision.outcome is PolicyOutcome.DENIED_DISABLED
 
     def test_disabled_wins_over_every_other_rule(self) -> None:
         decision = MemoryPolicy().evaluate(
-            _candidate(sensitivity_flags=[SensitivityFlag.ACCOUNT_BALANCE]),
+            _candidate(
+                proposal_reason=ProposalReason.EXPLICIT_REQUEST,
+                sensitivity_flags=[SensitivityFlag.ACCOUNT_BALANCE],
+            ),
             UserMemorySettings(),
             last_prompted_at=NOW,
             now=NOW,

@@ -127,9 +127,11 @@ class TestPropose:
         assert "explicit_request" in kinds
         assert "conversation" in kinds
 
-    def test_disabled_user_gets_policy_rejection(self) -> None:
+    def test_disabled_user_gets_policy_rejection_for_ordinary_requests(
+        self,
+    ) -> None:
         service, _store = _service()
-        result = service.propose_from_saved_decision("user-a", _decision_source())
+        result = service.propose_from_explicit_request("user-a", _explicit_request())
         assert result.status is ProposalStatus.REJECTED_POLICY
         assert result.policy is not None
         assert result.policy.outcome is PolicyOutcome.DENIED_DISABLED

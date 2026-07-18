@@ -29,7 +29,13 @@ from argus.memory.contracts import (
     RetrievedMemory,
     SensitivityFlag,
 )
-from argus.memory.policy import MemoryPolicy, PolicyDecision
+from argus.memory.policy import (
+    OPT_IN_SCOPE_BY_REASON,
+    MemoryPolicy,
+    PolicyDecision,
+    PolicyOutcome,
+    UserMemorySettings,
+)
 from argus.memory.provider import MemoryRetrievalProvider
 from argus.memory.store import CanonicalMemoryStore
 
@@ -193,6 +199,9 @@ class MemoryService:
         )
         if not decision.allowed:
             return ProposalResult(status=ProposalStatus.REJECTED_POLICY, policy=decision)
+        if decision.outcome is PolicyOutcome.ALLOWED_OPT_IN_OFFER:
+            scope = OPT_IN_SCOPE_BY_REASON[candidate.proposal_reason]
+            candidate = candidate.model_copy(update={"opt_in_scope": list(scope)})
         self._store.add_candidate(candidate)
         self._store.mark_prompted(candidate.user_id, candidate.category, now)
         return ProposalResult(
@@ -208,6 +217,19 @@ class MemoryService:
             return None
         candidate = self._store.get_candidate(user_id, candidate_id)
         if candidate is None:
+            return None
+        # Consent may have changed since the proposal; recheck it now.
+        settings = self._store.get_settings(user_id)
+        if candidate.opt_in_scope:
+            settings = self._store.set_settings(
+                user_id,
+                UserMemorySettings(
+                    enabled=True,
+                    enabled_categories=list(candidate.opt_in_scope),
+                ),
+            )
+        elif not settings.consents_to(candidate.category):
+            self._store.discard_candidate(user_id, candidate_id)
             return None
         now = self._clock()
         record = MemoryRecord(
@@ -242,12 +264,13 @@ class MemoryService:
     def retrieve(self, user_id: str, query: str) -> list[RetrievedMemory]:
         if not self._config.globally_enabled:
             return []
-        if not self._store.get_settings(user_id).enabled:
+        settings = self._store.get_settings(user_id)
+        if not settings.enabled:
             return []
         records = {
             record.id: record
             for record in self._store.list_records(user_id)
-            if record.enabled
+            if record.enabled and settings.consents_to(record.category)
         }
         if not records:
             return []
@@ -354,11 +377,22 @@ class MemoryService:
             )
         return self._store.delete_record(user_id, record_id)
 
-    def enable(self, user_id: str) -> None:
-        self._store.set_enabled(user_id, True)
+    def enable(
+        self, user_id: str, categories: list[MemoryCategory] | None = None
+    ) -> None:
+        """Explicit opt-in; ``None`` grants the full category allowlist."""
+        if categories is None:
+            self._store.set_enabled(user_id, True)
+            return
+        self._store.set_settings(
+            user_id,
+            UserMemorySettings(enabled=True, enabled_categories=categories),
+        )
 
     def disable(self, user_id: str) -> None:
+        """Disable memory and invalidate every pending proposal."""
         self._store.set_enabled(user_id, False)
+        self._store.discard_all_candidates(user_id)
 
     def reset(self, user_id: str) -> int:
         removed = self._store.delete_all_records(user_id)
