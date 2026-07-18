@@ -17,6 +17,7 @@ from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
 from argus.api.chat import retry as chat_retry
+from argus.api.chat import turn_lifecycle_hooks
 from argus.api.chat.actions import (
     chat_display_message,
     chat_request_message,
@@ -417,6 +418,11 @@ async def chat_stream(
             title="Not Found",
             detail="Conversation not found.",
         )
+    # #240: reconcile stale accepted/running turns before the next chat POST
+    # for this conversation; bounded, database-clock owned, no sweeper.
+    turn_lifecycle_hooks.reconcile_conversation_turns(
+        conversation_id=conversation.id
+    )
     recent_thread_history = load_runtime_thread_history(
         user_id=user.id,
         conversation_id=conversation.id,

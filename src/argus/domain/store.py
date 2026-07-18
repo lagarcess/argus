@@ -68,6 +68,12 @@ class AlphaStore:
         repr=False,
         compare=False,
     )
+    chat_turn_lifecycles: dict[str, dict[str, Any]] = field(default_factory=dict)
+    chat_turn_lifecycle_lock: Any = field(
+        default_factory=RLock,
+        repr=False,
+        compare=False,
+    )
 
     def reset(self) -> None:
         self.users.clear()
@@ -95,6 +101,7 @@ class AlphaStore:
         self.backtest_jobs.clear()
         self.backtest_job_reservations.clear()
         self.simulation_admissions.clear()
+        self.chat_turn_lifecycles.clear()
 
     def get_or_create_dev_user(self) -> User:
         user_id = "00000000-0000-0000-0000-000000000001"

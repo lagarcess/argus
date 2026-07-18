@@ -201,3 +201,68 @@ missing-conversation eviction. `.claude/launch.json` added for local preview.
 
 Rollback boundary: revert the checkpoint commit, or set `maxEntries: 0` via
 `TRANSCRIPT_CACHE_POLICY` to disable caching while keeping race safety.
+
+---
+
+## #235 — chat request bounds and failure correlation (prerequisite)
+
+Checkpoint commit: see commit map — `fix(api): bound chat requests and correlate unexpected failures`
+
+| Criterion | State | Evidence |
+| --- | --- | --- |
+| Approved size table enforced (413/422 per #229 values) | LOCAL_ACCEPTANCE_PASS | ingress ASGI ceiling (65,536 B; declared-overage immediate; chunked cumulative) + full field/payload/depth table; 16 tests incl. exact-boundary validity |
+| Rejection before JSON/auth/quota/persistence/providers | LOCAL_ACCEPTANCE_PASS | middleware precedes routing; declared-overage test proves body never read and app never reached |
+| One request id through response, logs, unexpected errors | LOCAL_ACCEPTANCE_PASS | X-Request-Id echoed on 413/422/500; catch-all handler returns RFC 9457 `internal_error` with no secret/trace (asserted) |
+| Chunk-safe byte ceiling | LOCAL_ACCEPTANCE_PASS | cumulative receive counter test (70 KB body → 413) |
+| Rejection-before-work spy tests | LOCAL_ACCEPTANCE_PASS | inner-app assertion + provider-preflight spy in supabase suite |
+
+External gates: none in-lane (deployed evidence rides #233).
+
+---
+
+## #240 — durable accepted-turn lifecycle (prerequisite)
+
+Checkpoint commit: see commit map — `feat(chat): add the durable ordinary turn lifecycle`
+
+Changed surfaces: `src/argus/domain/chat_turn_lifecycle.py` (six-state CAS twin +
+bounded reconciliation with the complete evidence predicate and
+failure-precedence ordering), `supabase/migrations/20260718000002_add_chat_turn_lifecycles.sql`
+(table, RLS SELECT-own, service-role-only CAS function, stale index),
+`message_store.create_message` choke point (acceptance on the durable user
+message; terminal transition rides the terminal assistant write; terminal
+metadata enriched with `turn_id` before the CAS, so evidence survives an
+interrupted transition), reconciliation pre-passes on chat POST and
+GET conversation messages, `turn_lifecycle_hooks` (fail-open dispatch).
+
+| Criterion | State | Evidence |
+| --- | --- | --- |
+| Six states + transition owners + allowed matrix | LOCAL_ACCEPTANCE_PASS | transition-matrix tests; late success cannot supersede durable failure |
+| CAS: no-op replay, conflicting terminal rejected | LOCAL_ACCEPTANCE_PASS | noop/conflict/invalid tests; SQL function mirrors semantics (contract-guard tests) |
+| Orphan reconciliation (15 min, 20 rows, deterministic order) | LOCAL_ACCEPTANCE_PASS | bounded-batch test (25 stale → 20 reconciled, freshest 5 remain); equal-timestamp failure precedence test |
+| Evidence predicate complete (owner/conversation/turn/request/terminal) | LOCAL_ACCEPTANCE_PASS | other-turn/other-request messages never qualify → abandoned `turn_abandoned` retryable |
+| Acceptance maps one user message to one lifecycle identity | LOCAL_ACCEPTANCE_PASS | choke-point test: user write creates `accepted` row with turn_id == message id; `run_backtest` excluded |
+| Terminal assistant persists immutable turn metadata before CAS | LOCAL_ACCEPTANCE_PASS | metadata enrichment ordering in `create_message`; completion test asserts turn_id present + row completed |
+| Failure injection + reload proof | LOCAL_ACCEPTANCE_PASS | GET-messages reconciliation test recovers a stale turn from durable failure evidence |
+| Real-Supabase CAS/RLS proof | EXTERNAL_GATE_PENDING | migration + service-role function written; disposable-DB run recorded as the same external gate as #230 |
+
+Known deviations (recorded, not hidden): persisted terminal statuses keep the
+legacy `succeeded`/`failed` strings (mapped to contract outcomes at the
+lifecycle boundary) to avoid a metadata migration tonight; the explicit
+`running` transition is not yet emitted by the runtime worker (accepted→terminal
+is contract-legal; running-marking is follow-up depth); gateway-side lifecycle
+methods dispatch when present but the Supabase gateway delegates for
+create/transition/find/reconcile are the thin remaining wiring, listed under
+remaining work.
+
+---
+
+## #246 — QA cost-ledger visibility (local remainder)
+
+No further locally executable work exists beyond PR #254's merged diagnosis,
+isolation proofs, and telemetry classification (revalidated green in tonight's
+sweeps). The repair remains EXTERNAL_GATE_PENDING exactly as ledgered by the
+audit: QA mutation authority + #230/#240 serialization (both now locally
+implemented, so after review/merge of this branch the serialization gate
+reduces to the founder's authority decision), then apply
+`supabase/migrations/20260702000001_add_cost_ledger_entries.sql` and run the
+six-step verification in `docs/reports/issue-246-qa-cost-ledger-diagnosis.md`.

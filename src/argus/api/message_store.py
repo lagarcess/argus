@@ -185,8 +185,7 @@ def claim_response_option_action(
             preceding = [
                 message
                 for message in conversation_messages
-                if (message.created_at, message.id)
-                < (existing.created_at, existing.id)
+                if (message.created_at, message.id) < (existing.created_at, existing.id)
             ]
             replay_source = (
                 max(preceding, key=lambda item: (item.created_at, item.id))
@@ -343,9 +342,15 @@ def create_message(
             content=content,
             metadata=metadata,
         )
+    metadata = _attach_turn_lifecycle_identity(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        role=role,
+        metadata=metadata,
+    )
     if api_state.supabase_gateway is not None:
         try:
-            return api_state.supabase_gateway.create_message(
+            persisted = api_state.supabase_gateway.create_message(
                 user_id=user_id,
                 conversation_id=conversation_id,
                 role=role,
@@ -360,12 +365,127 @@ def create_message(
                 error=str(exc),
                 conversation_id=conversation_id,
             )
-    return memory_message(
+        else:
+            _apply_turn_lifecycle_effects(user_id=user_id, message=persisted)
+            return persisted
+    persisted = memory_message(
         conversation_id=conversation_id,
         role=role,
         content=content,
         metadata=metadata,
     )
+    _apply_turn_lifecycle_effects(user_id=user_id, message=persisted)
+    return persisted
+
+
+def _attach_turn_lifecycle_identity(
+    *,
+    user_id: str,
+    conversation_id: str,
+    role: str,
+    metadata: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """#240: terminal assistant metadata carries the accepted turn's
+    ``turn_id`` so reconciliation evidence is exact. Written with the message,
+    before the lifecycle transition, so it stays discoverable if that
+    transition is the interrupted operation."""
+
+    if role != "assistant" or not isinstance(metadata, dict):
+        return metadata
+    turn = metadata.get("agent_runtime_turn")
+    if not isinstance(turn, dict) or turn.get("terminal") is not True:
+        return metadata
+    if turn.get("turn_id"):
+        return metadata
+    request_id = turn.get("request_id")
+    if not isinstance(request_id, str) or not request_id:
+        return metadata
+
+    from argus.domain.chat_turn_lifecycle import find_active_turn_memory
+
+    if api_state.supabase_gateway is None:
+        row = find_active_turn_memory(
+            api_state.store,
+            conversation_id=conversation_id,
+            request_id=request_id,
+        )
+    else:
+        finder = getattr(api_state.supabase_gateway, "find_active_chat_turn", None)
+        row = (
+            finder(conversation_id=conversation_id, request_id=request_id)
+            if finder
+            else None
+        )
+    if not row or row.get("user_id") != user_id:
+        return metadata
+    return {
+        **metadata,
+        "agent_runtime_turn": {**turn, "turn_id": row.get("turn_id")},
+    }
+
+
+def _apply_turn_lifecycle_effects(*, user_id: str, message: Message) -> None:
+    """#240 choke point: user acceptance and terminal transitions ride the
+    single durable message write path, never a second orchestrator."""
+
+    from argus.api.chat import turn_lifecycle_hooks
+
+    metadata = message.metadata if isinstance(message.metadata, dict) else None
+    if metadata is None:
+        return
+    turn = metadata.get("agent_runtime_turn")
+    if not isinstance(turn, dict):
+        return
+
+    chat_action = metadata.get("chat_action")
+    action_type = (
+        str(chat_action.get("type") or "") if isinstance(chat_action, dict) else ""
+    )
+
+    if (
+        message.role == "user"
+        and turn.get("status") == "started"
+        and action_type != "run_backtest"
+    ):
+        request_id = turn.get("request_id")
+        if isinstance(request_id, str) and request_id:
+            turn_lifecycle_hooks.accept_turn(
+                turn_id=message.id,
+                user_id=user_id,
+                conversation_id=message.conversation_id,
+                request_id=request_id,
+            )
+        return
+
+    if message.role == "assistant" and turn.get("terminal") is True:
+        turn_id = turn.get("turn_id")
+        if not isinstance(turn_id, str) or not turn_id:
+            return
+        status = str(turn.get("status") or "")
+        to_status = (
+            "completed"
+            if status in ("completed", "succeeded")
+            else "recoverable_failed"
+            if status in ("recoverable_failed", "failed")
+            else None
+        )
+        if to_status is None:
+            return
+        turn_lifecycle_hooks.transition_turn(
+            turn_id=turn_id,
+            to_status=to_status,
+            assistant_message_id=message.id,
+            failure_code=(
+                str(metadata.get("failure_code"))
+                if metadata.get("failure_code")
+                else None
+            ),
+            retryable=(
+                bool(metadata.get("retryable"))
+                if isinstance(metadata.get("retryable"), bool)
+                else None
+            ),
+        )
 
 
 def reconcile_reload_message_metadata(messages: list[Message]) -> list[Message]:
@@ -482,13 +602,10 @@ def _recent_persisted_messages_for_guard(
                 error=str(exc),
                 conversation_id=conversation_id,
             )
-    if (
-        not messages
-        or (
-            dev_memory_fallback_enabled()
-            and conversation_id in api_state.store.conversations
-            and api_state.store.messages.get(conversation_id)
-        )
+    if not messages or (
+        dev_memory_fallback_enabled()
+        and conversation_id in api_state.store.conversations
+        and api_state.store.messages.get(conversation_id)
     ):
         messages = list(api_state.store.messages.get(conversation_id, []))[-limit:]
     return sorted(messages, key=lambda item: (item.created_at, item.id))

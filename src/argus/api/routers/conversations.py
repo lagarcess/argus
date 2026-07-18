@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
 
 from argus.api import state as api_state
+from argus.api.chat import turn_lifecycle_hooks
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.message_store import (
     memory_conversation,
@@ -279,6 +280,10 @@ def list_messages(
         )
         if api_state.supabase_gateway
         else api_state.store.conversations.get(conversation_id)
+    )
+    # #240: reconcile stale turns before returning conversation messages.
+    turn_lifecycle_hooks.reconcile_conversation_turns(
+        conversation_id=conversation_id
     )
     if (
         not conversation
