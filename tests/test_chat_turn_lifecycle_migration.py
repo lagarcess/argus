@@ -84,8 +84,14 @@ def test_cas_noop_comparison_includes_failure_evidence() -> None:
     noop_block = text[noop_start : text.index("'noop'", noop_start)]
     assert "assistant_message_id" in noop_block
     assert "reconciled_outcome" in noop_block
-    assert "failure_code" in noop_block
-    assert "retryable" in noop_block
+    # Exact null-safe truth, never omitted-value wildcards: failure_code
+    # compares IS NOT DISTINCT FROM and retryable compares effective false.
+    assert "p_failure_code is not distinct from v_row.failure_code" in noop_block
+    assert (
+        "coalesce(p_retryable, false) = coalesce(v_row.retryable, false)"
+        in noop_block
+    )
+    assert "p_failure_code is null\n" not in noop_block
 
 
 BOUNDARIES_MIGRATION = (

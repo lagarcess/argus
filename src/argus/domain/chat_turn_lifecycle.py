@@ -137,19 +137,18 @@ def transition_memory(
 
         current = str(row.get("status") or "")
         if current == to_status or (current in TERMINAL_STATUSES):
-            # No-op requires the complete same truth: target status, assistant
-            # link, reconciliation outcome, and — when specified — the same
-            # failure code and retryable evidence. Different terminal failure
-            # truth conflicts.
+            # No-op requires the complete effective truth: target status,
+            # assistant link, reconciliation outcome, exact (null-safe)
+            # failure_code, and effective retryable (omitted means false, the
+            # column default). Omitted values are never wildcards — a replay
+            # that drops or changes stored failure evidence conflicts.
             same_links = (
                 current == to_status
                 and row.get("assistant_message_id") == assistant_message_id
                 and row.get("reconciled_outcome") == reconciled_outcome
-                and (
-                    failure_code is None
-                    or row.get("failure_code") == failure_code
-                )
-                and (retryable is None or row.get("retryable") == retryable)
+                and row.get("failure_code") == failure_code
+                and bool(row.get("retryable") or False)
+                == bool(retryable or False)
             )
             if same_links:
                 return TransitionResult(outcome="noop", row=dict(row))

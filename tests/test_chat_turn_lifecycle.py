@@ -136,13 +136,61 @@ def test_noop_comparison_includes_failure_evidence() -> None:
         failure_code="agent_runtime_failure",
         retryable=False,
     )
+    # Omitted values are effective truth, never wildcards: a replay that
+    # drops its stored failure evidence claims different terminal truth.
+    omitted_code = lifecycle.transition_memory(
+        store,
+        turn_id="turn-1",
+        to_status="recoverable_failed",
+        assistant_message_id="assistant-1",
+        retryable=True,
+    )
+    omitted_retry = lifecycle.transition_memory(
+        store,
+        turn_id="turn-1",
+        to_status="recoverable_failed",
+        assistant_message_id="assistant-1",
+        failure_code="agent_runtime_failure",
+    )
     assert first.outcome == "applied"
     assert replay.outcome == "noop"
     assert different_code.outcome == "conflict"
     assert different_retry.outcome == "conflict"
+    assert omitted_code.outcome == "conflict"
+    assert omitted_retry.outcome == "conflict"
     row = store.chat_turn_lifecycles["turn-1"]
     assert row["failure_code"] == "agent_runtime_failure"
     assert row["retryable"] is True
+
+
+def test_completed_replay_with_effective_defaults_is_noop() -> None:
+    """A completed replay with canonical null failure_code and effective
+    retryable=false remains a no-op against the stored defaults."""
+
+    store = AlphaStore()
+    _accept(store)
+    first = lifecycle.transition_memory(
+        store,
+        turn_id="turn-1",
+        to_status="completed",
+        assistant_message_id="assistant-1",
+    )
+    replay = lifecycle.transition_memory(
+        store,
+        turn_id="turn-1",
+        to_status="completed",
+        assistant_message_id="assistant-1",
+    )
+    explicit_defaults = lifecycle.transition_memory(
+        store,
+        turn_id="turn-1",
+        to_status="completed",
+        assistant_message_id="assistant-1",
+        retryable=False,
+    )
+    assert first.outcome == "applied"
+    assert replay.outcome == "noop"
+    assert explicit_defaults.outcome == "noop"
 
 
 def test_terminal_transitions_use_the_approved_timestamp_fields() -> None:

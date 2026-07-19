@@ -95,20 +95,19 @@ begin
        or v_row.status in (
            'completed', 'recoverable_failed', 'abandoned', 'reconciled'
        ) then
-        -- No-op requires the complete same truth: target status, assistant
-        -- link, reconciliation outcome, and — when specified — the same
-        -- failure_code and retryable evidence. Different terminal failure
-        -- truth conflicts.
+        -- No-op requires the complete effective truth: target status,
+        -- assistant link, reconciliation outcome, exact (null-safe)
+        -- failure_code, and effective retryable (omitted means false, the
+        -- column default). Omitted values are never wildcards — a replay
+        -- that drops or changes stored failure evidence conflicts.
         if v_row.status = p_to_status
            and coalesce(v_row.assistant_message_id::text, '')
                = coalesce(p_assistant_message_id::text, '')
            and coalesce(v_row.reconciled_outcome, '')
                = coalesce(p_reconciled_outcome, '')
-           and (
-               p_failure_code is null
-               or coalesce(v_row.failure_code, '') = p_failure_code
-           )
-           and (p_retryable is null or v_row.retryable = p_retryable) then
+           and p_failure_code is not distinct from v_row.failure_code
+           and coalesce(p_retryable, false) = coalesce(v_row.retryable, false)
+        then
             return jsonb_build_object('outcome', 'noop', 'row', to_jsonb(v_row));
         end if;
         return jsonb_build_object('outcome', 'conflict', 'row', to_jsonb(v_row));
