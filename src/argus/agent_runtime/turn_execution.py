@@ -104,6 +104,8 @@ class ProviderCallPermit:
 @dataclass
 class TurnExecutionContext:
     deadline_monotonic: float
+    started_monotonic: float
+    deadline_seconds: float
     call_allowance: int
     entry_fingerprint: str | None
     calls_reserved: int = 0
@@ -118,6 +120,9 @@ class TurnExecutionContext:
     def remaining_deadline_seconds(self) -> float:
         return self.deadline_monotonic - _monotonic()
 
+    def elapsed_seconds(self) -> float:
+        return _monotonic() - self.started_monotonic
+
 
 _ACTIVE_TURN_EXECUTION: ContextVar[TurnExecutionContext | None] = ContextVar(
     "argus_turn_execution",
@@ -131,9 +136,14 @@ def begin_turn_execution(
     call_allowance: int | None = None,
     entry_fingerprint: str | None = None,
 ) -> Token[TurnExecutionContext | None]:
+    started = _monotonic()
+    duration = (
+        deadline_seconds if deadline_seconds is not None else turn_deadline_seconds()
+    )
     context = TurnExecutionContext(
-        deadline_monotonic=_monotonic()
-        + (deadline_seconds if deadline_seconds is not None else turn_deadline_seconds()),
+        deadline_monotonic=started + duration,
+        started_monotonic=started,
+        deadline_seconds=duration,
         call_allowance=(
             call_allowance if call_allowance is not None else turn_call_allowance()
         ),
@@ -245,6 +255,7 @@ _STRATEGY_TYPED_FIELDS = (
     "exit_rule",
     "rule_spec",
     "risk_rules",
+    "extra_parameters",
 )
 
 # Typed identity keys a structured action's payload may carry. Everything
@@ -345,12 +356,17 @@ def _first_scalar(*candidates: Any) -> Any:
     return None
 
 
+def _string_items(value: Any) -> list[str]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [str(item) for item in value if isinstance(item, str) and item]
+
+
 def _first_string_list(*candidates: Any) -> list[str]:
     for candidate in candidates:
-        if isinstance(candidate, (list, tuple)):
-            values = [str(item) for item in candidate if isinstance(item, str) and item]
-            if values:
-                return sorted(values)
+        values = _string_items(candidate)
+        if values:
+            return sorted(values)
     return []
 
 
@@ -460,6 +476,28 @@ def semantic_turn_fingerprint(state: Any) -> str | None:
     )
     if strategy:
         projection["strategy"] = strategy
+
+    # Typed pending progress: the checkpoint carries snapshot.pending_needs
+    # plus the run-state response intent; the public payload carries
+    # response_intent only. Both normalize into one pending-state shape.
+    # Prose carriers on the intent (facts, options) never participate.
+    intent = (
+        _as_state_mapping(root.get("response_intent"))
+        or _as_state_mapping(run_state.get("response_intent"))
+        or {}
+    )
+    intent_kind = _scalar_fingerprint_value(intent.get("kind"))
+    if not _is_empty_fingerprint_value(intent_kind):
+        projection["intent_kind"] = intent_kind
+    pending_needs = sorted(
+        set(_string_items(snapshot.get("pending_needs")))
+        | set(_string_items(intent.get("semantic_needs")))
+    )
+    if pending_needs:
+        projection["pending_needs"] = pending_needs
+    intent_requested_fields = _first_string_list(intent.get("requested_fields"))
+    if intent_requested_fields:
+        projection["intent_requested_fields"] = intent_requested_fields
 
     confirmed = _first_canonical_strategy(
         snapshot.get("confirmed_strategy_summary"),

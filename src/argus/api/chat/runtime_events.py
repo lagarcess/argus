@@ -84,15 +84,16 @@ async def _runtime_events_with_keepalive(
             return math.inf
         return turn_context.remaining_deadline_seconds()
 
-    def _raise_turn_deadline_exhausted(elapsed_seconds: float) -> None:
+    def _raise_turn_deadline_exhausted(context) -> None:
         # The absolute turn wall: events kept arriving, but the accepted
-        # turn's single monotonic deadline is spent.
+        # turn's single monotonic deadline is spent. Diagnostics carry the
+        # turn's own timing, not the per-event guard's.
         mark_turn_deadline_exhausted()
         raise RuntimeEventTimeoutError(
             {
                 "code": "turn_deadline_exhausted",
-                "timeout_seconds": runtime_timeout_seconds,
-                "elapsed_seconds": round(elapsed_seconds, 3),
+                "timeout_seconds": context.deadline_seconds,
+                "elapsed_seconds": round(context.elapsed_seconds(), 3),
                 "keepalive_seconds": runtime_keepalive_seconds,
                 "event_count": event_count,
                 "last_event": last_event,
@@ -120,10 +121,10 @@ async def _runtime_events_with_keepalive(
                 next_runtime_event = None
             except asyncio.TimeoutError:
                 elapsed_seconds = time.monotonic() - next_runtime_event_started
-                if _turn_remaining_seconds() <= 0:
+                if turn_context is not None and _turn_remaining_seconds() <= 0:
                     await _cancel_runtime_event_task(next_runtime_event)
                     next_runtime_event = None
-                    _raise_turn_deadline_exhausted(elapsed_seconds)
+                    _raise_turn_deadline_exhausted(turn_context)
                 if elapsed_seconds >= runtime_timeout_seconds:
                     await _cancel_runtime_event_task(next_runtime_event)
                     next_runtime_event = None
