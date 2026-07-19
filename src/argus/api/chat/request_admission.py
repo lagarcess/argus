@@ -96,6 +96,7 @@ def prepare_chat_request_admission(
     mention_provenance: list[ResolutionProvenance],
     enabled: bool,
     language: str | None,
+    onboarding_control: dict[str, Any] | None = None,
 ) -> ChatRequestAdmission:
     candidate = None
     if enabled:
@@ -107,6 +108,10 @@ def prepare_chat_request_admission(
                 "started_at": datetime.now(timezone.utc).isoformat(),
             }
         }
+        if onboarding_control is not None:
+            # Owned protocol state: runtime filtering and preview
+            # suppression key off this, never a raw-text prefix.
+            user_metadata["onboarding_control"] = dict(onboarding_control)
         if mention_provenance:
             user_metadata["mentions"] = [
                 mention.model_dump(mode="python") for mention in payload.mentions

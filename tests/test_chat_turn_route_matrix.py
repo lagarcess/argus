@@ -204,17 +204,24 @@ def test_onboarding_prompt_completes_the_accepted_turn() -> None:
 
 
 @pytest.mark.parametrize(
-    "control_message",
-    ["__ONBOARDING_GOAL__:learn_basics", "__ONBOARDING_SKIP__"],
+    ("control_message", "expected_control"),
+    [
+        (
+            "__ONBOARDING_GOAL__:learn_basics",
+            {"kind": "goal_selection", "goal": "learn_basics"},
+        ),
+        ("__ONBOARDING_SKIP__", {"kind": "skip", "goal": "surprise_me"}),
+    ],
     ids=["goal_selection", "skip"],
 )
 def test_onboarding_controls_are_durable_accepted_turns(
     control_message: str,
+    expected_control: dict,
 ) -> None:
     """Path 2b: goal selection and skip are supported message-only requests —
-    they accept atomically (user message + lifecycle) and complete through
-    the durable assistant response, with no raw control token leaking into
-    the conversation preview."""
+    they accept atomically (user message + lifecycle) carrying typed
+    onboarding protocol metadata, and complete through the durable assistant
+    response, with no raw control token leaking into the preview."""
 
     client = _client()
     user_id = api_state.store.get_or_create_dev_user().id
@@ -236,6 +243,8 @@ def test_onboarding_controls_are_durable_accepted_turns(
     assert len(turns) == 1
     control_turn = turns[0]
     assert control_turn.content == control_message
+    # The protocol state is owned, typed metadata — never a prefix heuristic.
+    assert (control_turn.metadata or {})["onboarding_control"] == expected_control
     row = api_state.store.chat_turn_lifecycles.get(control_turn.id)
     assert row is not None
     assert row["status"] == "completed"
@@ -249,6 +258,39 @@ def test_onboarding_controls_are_durable_accepted_turns(
 
     conversation = api_state.store.conversations[conversation_id]
     assert "__ONBOARDING" not in str(conversation.last_message_preview or "")
+
+
+def test_onboarding_controls_stay_out_of_runtime_history() -> None:
+    """Path 2b: internal protocol tokens never become LLM conversation
+    context — runtime thread history filters them by typed metadata while
+    keeping the assistant responses."""
+
+    from argus.api.message_store import load_runtime_thread_history
+
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    conversation_id = _conversation(user_id)
+
+    for control_message in (
+        "__ONBOARDING_GOAL__:learn_basics",
+        "__ONBOARDING_SKIP__",
+    ):
+        response = client.post(
+            "/api/v1/chat/stream",
+            json={
+                "conversation_id": conversation_id,
+                "message": control_message,
+                "language": "en",
+            },
+        )
+        assert response.status_code == 200
+
+    history = load_runtime_thread_history(
+        user_id=user_id, conversation_id=conversation_id
+    )
+    assert history, "assistant onboarding responses stay in history"
+    assert all("__ONBOARDING_" not in entry.content for entry in history)
+    assert all(entry.role == "assistant" for entry in history)
 
 
 def test_onboarding_goal_interruption_leaves_reconcilable_acceptance(
@@ -298,6 +340,21 @@ def test_onboarding_goal_interruption_leaves_reconcilable_acceptance(
     )
     assert len(reconciled) == 1
     assert reconciled[0]["status"] == "abandoned"
+
+    # The abandoned control stays retryable through its owning durable
+    # message: the overlay's typed retry replays the exact persisted token.
+    reload_response = TestClient(app).get(
+        f"/api/v1/conversations/{conversation_id}/messages"
+    )
+    assert reload_response.status_code == 200
+    overlaid = next(
+        item
+        for item in reload_response.json()["items"]
+        if item["id"] == turns[0].id
+    )
+    retry = overlaid["metadata"]["retry_last_turn"]
+    assert retry["request_message_id"] == turns[0].id
+    assert retry["message"] == "__ONBOARDING_GOAL__:learn_basics"
 
 
 # ── Path 3: runtime-fallback early response ──────────────────────────────────

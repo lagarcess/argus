@@ -18,16 +18,25 @@ SUPPORTED_ONBOARDING_GOALS = {
 }
 
 
-def parse_onboarding_control_message(message: str) -> str | None:
+def onboarding_control_state(message: str) -> dict[str, Any] | None:
+    """Typed protocol state for an onboarding control message. Persistence
+    stamps this onto the accepted turn so runtime filtering and previews key
+    off owned state, never a raw-text prefix heuristic."""
+
     if message == "__ONBOARDING_SKIP__":
-        return "surprise_me"
+        return {"kind": "skip", "goal": "surprise_me"}
     prefix = "__ONBOARDING_GOAL__:"
     if not message.startswith(prefix):
         return None
     goal = message.removeprefix(prefix)
     if goal in SUPPORTED_ONBOARDING_GOALS:
-        return goal
+        return {"kind": "goal_selection", "goal": goal}
     return None
+
+
+def parse_onboarding_control_message(message: str) -> str | None:
+    state = onboarding_control_state(message)
+    return state["goal"] if state is not None else None
 
 
 def onboarding_prompt_text(*, is_spanish: bool) -> str:

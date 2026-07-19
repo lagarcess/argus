@@ -1649,9 +1649,8 @@ export default function ChatInterface() {
     setMessages((prev) => {
       shouldAutoScrollRef.current = true;
       const base = markComposerActionsInactive(prev);
-      if (isSkip) {
-        return [...base, { id: assistantId, role: "ai", kind: "text", content: "" }];
-      }
+      // #240: one consistent presentation — the localized choice shows as a
+      // live user bubble for goal and skip alike, matching reload.
       return [...base, userMsg, { id: assistantId, role: "ai", kind: "text", content: "" }];
     });
     setStreamStatus(t("chat.status.understanding"));

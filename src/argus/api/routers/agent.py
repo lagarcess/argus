@@ -47,9 +47,9 @@ from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
 from argus.api.chat.onboarding import (
+    onboarding_control_state,
     onboarding_goal_followup_text,
     onboarding_prompt_text,
-    parse_onboarding_control_message,
     persist_onboarding_update,
 )
 from argus.api.chat.recovery import (
@@ -365,7 +365,10 @@ async def chat_stream(
     language = payload.language or current_user_profile.language or "en"
     request_message = chat_request_message(payload, language=language)
     display_message = chat_display_message(payload, language=language)
-    onboarding_goal = parse_onboarding_control_message(request_message)
+    onboarding_control = onboarding_control_state(request_message)
+    onboarding_goal = (
+        onboarding_control["goal"] if onboarding_control is not None else None
+    )
 
     conversation = None
     if api_state.supabase_gateway is not None:
@@ -432,6 +435,7 @@ async def chat_stream(
         # onboarding control messages alike.
         enabled=True,
         language=language,
+        onboarding_control=onboarding_control,
     )
     runtime_fallback = RuntimeFallbackContext()
 

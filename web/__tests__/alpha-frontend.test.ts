@@ -1115,6 +1115,54 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("__ONBOARDING_SKIP__");
   });
 
+  test("onboarding choices present identically live and after reload in both languages", () => {
+    // #240: one consistent user-visible presentation — the localized choice
+    // shows as a live user bubble for goal AND skip, and reload maps the
+    // persisted protocol token through the same i18n keys.
+    const chat = readChatShellSource();
+    const chatMessage = readFileSync(
+      join(root, "components/chat/ChatMessage.tsx"),
+      "utf-8",
+    );
+    const handlerStart = chat.indexOf("const handleOnboardingGoalChoice");
+    const handlerEnd = chat.indexOf("const handleSend", handlerStart);
+    const handler = chat.slice(handlerStart, handlerEnd);
+    expect(handlerStart).toBeGreaterThan(-1);
+    // Skip is no longer bubble-less: every choice appends the localized
+    // user message before the assistant placeholder.
+    expect(handler).toContain("return [...base, userMsg, { id: assistantId");
+    expect(handler).not.toContain("? [...base, { id: assistantId");
+    expect(handler).not.toContain(
+      "return [...base, { id: assistantId, role",
+    );
+    // Live copy and reload mapping share the exact i18n keys.
+    expect(handler).toContain('t("onboarding.skip"');
+    expect(chatMessage).toContain('t("onboarding.skip", "Skip for now")');
+    expect(chatMessage).toContain("t(`onboarding.goals.${goal}.title`, goal)");
+
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+    // surprise_me is only reachable through skip, which renders
+    // onboarding.skip; the four goal cards carry their own titles.
+    for (const locale of [en, es]) {
+      expect(typeof locale.onboarding.skip).toBe("string");
+      expect(locale.onboarding.skip.length).toBeGreaterThan(0);
+      for (const goal of [
+        "learn_basics",
+        "test_stock_idea",
+        "build_passive_strategy",
+        "explore_crypto",
+      ]) {
+        expect(typeof locale.onboarding.goals[goal].title).toBe("string");
+        expect(locale.onboarding.goals[goal].title.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
   test("chat sidebar opens a safe command palette instead of hydrating chat previews", () => {
     const chat = readChatShellSource();
     const palette = readFileSync(
