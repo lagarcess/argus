@@ -903,3 +903,59 @@ as never reached. The complete unfinished-local-work inventory is:
 This branch is **not** a complete local Wave 0 candidate and must not be
 described as one while any of the above remains unwritten. External gates
 are unchanged from the seventh-pass entry.
+
+## Train 4 checkpoint — #238 landed locally (2026-07-18, eighth pass)
+
+First interpreter-spine issue implemented red-first at `6160839`
+(**9 code/test files**, +562/−158). #239, #241, and gated #244 remain
+NOT REACHED. Pre-edit audit findings honored: the stale-guard fail-open
+reproduced exactly as the issue described; the claimed pending-option
+asset overwrite did NOT reproduce (the clarification corridor deep-copies
+and patches only named fields) and is pinned against regressing instead
+of "fixed".
+
+- **One typed patch, one merge corridor.** Legacy flat planner output now
+  converts into the same typed `EditOperation` list the operation path
+  emits (`_operations_from_flat_plan`), so a flat `append` and an
+  operation `add` resolve to the identical patch — the final asset set as
+  one canonical replace — and `_apply_legacy_flat_edit_fields` (the
+  second merge corridor) is deleted. Three historical tests pinning the
+  dual-carrier append fragment were updated to the single resolved
+  carrier (identical downstream truth). The asset symbol resolver has one
+  definition beside the planner; both corridors import it (`is`-identity
+  pinned).
+- **Fail-closed confirmation identity.** An action carrying an explicit
+  `confirmation_id` that cannot be validated against a visible latest
+  confirmation returns typed `confirmation_action_stale_card` recovery
+  and executes nothing — including post-cancel replays and the
+  checkpoint-divergence hole where a checkpoint still claimed a pending
+  confirmation. Id-less chips keep binding to the visible latest card
+  (the designed chip-clarify corridor, pinned by the existing contract
+  test). The post-cancel reload-guardrails expectation moved from 409 to
+  the typed-recovery surface per the issue's acceptance wording.
+- **Acceptance corridors covered:** NL edits, clarification answers,
+  action-chip edits, asset keep/add/remove/replace (existing operation
+  suite + parity red), capital/date edits, untouched-field preservation
+  (sparse-patch discipline + summary-applier pins), confirmation
+  invalidation (supersession fixtures + post-cancel), and missing/stale
+  identity fail-closed (unit + route corridors).
+- **#243 expectations authored now:** `alpha_session_01` gains the
+  missing-identity fail-closed step (typed recovery, zero executions);
+  its expected_fail reason records that #238 landed locally and the #243
+  typed adapters must execute the trajectory; the fixture identity rule
+  learned the typed missing-identity exemption. The general #243 adapter
+  lane remains unwritten.
+
+Complexity reassessment (pass 8): merge corridors 2 → 1; duplicate
+resolver deleted; the additions are a data-mapping converter into the
+existing planner and one guard branch. No phrase matching, localized
+gates, second edit corridor, public schema, or frontend inference.
+
+Verification at `6160839`: #238 focused set (atomicity, action contract,
+chip/refine/post-result routing, edit operations, evals) 130/0 + 1 skip;
+broader focused battery 272/0; hermetic runtime/spine gate **1134/0**
+(five new tests); mocked eval harness 58 + 1 skipped; modularity budget,
+ruff, and `git diff --check` clean; worktree clean.
+
+Outstanding for #238 before promotion: the sanctioned pre-merge live
+eval scorecard (external, paid — not run in this laboratory).
