@@ -55,6 +55,23 @@ describe("abandoned-turn recovery row", () => {
     expect(branch).not.toContain("turn-recovery-");
   });
 
+  test("action-kind user messages share the same recovery row", () => {
+    // #240: an abandoned structured action renders its chip presentation AND
+    // the recovery row — one user branch owns both message kinds, so the row
+    // cannot be bypassed by an early action-kind return.
+    const source = chatMessageSource();
+    expect(source).not.toContain('if (isUser && message.kind === "action")');
+    const userBranchStart = source.indexOf("if (isUser) {");
+    const userBranch = source.slice(
+      userBranchStart,
+      source.indexOf("\n  return (\n", userBranchStart),
+    );
+    expect(userBranch).toContain('message.kind === "action"');
+    expect(
+      userBranch.split('data-testid="abandoned-recovery-row"').length,
+    ).toBe(2);
+  });
+
   test("the click path resolves the persisted owning message before replay", () => {
     const source = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),

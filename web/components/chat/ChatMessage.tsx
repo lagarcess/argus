@@ -214,25 +214,21 @@ export default function ChatMessage({
     i18n.resolvedLanguage ?? i18n.language ?? "en",
   );
 
-  if (isUser && message.kind === "action") {
-    return (
-      <div className="flex w-full justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <div className="max-w-[85%] rounded-full border border-black/10 bg-black/[0.03] px-4 py-2.5 text-[14px] font-medium leading-[1.45] text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">
-          {displayContent || (message.selectedAction ? actionLabel(message.selectedAction) : "")}
-        </div>
-      </div>
-    );
-  }
-
   if (isUser) {
     const abandonedRecovery = message.abandonedRecovery;
     const abandonedRetryAction = abandonedRecovery?.action ?? null;
     return (
       <div className="flex w-full flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="flex w-full justify-end">
-          <div className="max-w-[85%] bg-black/5 dark:bg-white/10 text-black dark:text-white px-5 py-3.5 rounded-[24px] rounded-br-sm text-[16px] leading-[1.5] tracking-[0.24px] font-normal">
-            <UserMessageContent content={displayContent} mentions={message.mentions ?? []} />
-          </div>
+          {message.kind === "action" ? (
+            <div className="max-w-[85%] rounded-full border border-black/10 bg-black/[0.03] px-4 py-2.5 text-[14px] font-medium leading-[1.45] text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">
+              {displayContent || (message.selectedAction ? actionLabel(message.selectedAction) : "")}
+            </div>
+          ) : (
+            <div className="max-w-[85%] bg-black/5 dark:bg-white/10 text-black dark:text-white px-5 py-3.5 rounded-[24px] rounded-br-sm text-[16px] leading-[1.5] tracking-[0.24px] font-normal">
+              <UserMessageContent content={displayContent} mentions={message.mentions ?? []} />
+            </div>
+          )}
         </div>
         {abandonedRecovery && (
           // #240 presentation-only recovery row: derived from this user

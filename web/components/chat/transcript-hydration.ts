@@ -10,7 +10,10 @@ import {
 } from "@/lib/argus-api";
 import { visibleComposerActions } from "@/lib/chat-action-ownership";
 import { backtestJobMessageFromApi } from "@/lib/chat-backtest-jobs";
-import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
+import {
+  abandonedRecoveryFromApiMessage,
+  hydrateTextMessageFromApi,
+} from "@/lib/chat-message-hydration";
 import { hydrateResultActions } from "@/lib/chat-result-actions";
 import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
 import {
@@ -155,6 +158,9 @@ export function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
         kind: "action",
         content: m.content,
         selectedAction: chatAction,
+        // #240: a structured abandoned action keeps its action-row
+        // presentation and still carries its recovery attachment.
+        abandonedRecovery: abandonedRecoveryFromApiMessage(m),
       };
     }
     if (

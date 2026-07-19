@@ -64,6 +64,17 @@ function abandonedRecoveryFromMetadata(
   };
 }
 
+// Canonical hydration entry for the recovery attachment: structured-action
+// user rows compose this too, so no transcript shape can bypass it.
+export function abandonedRecoveryFromApiMessage(
+  message: ApiMessage,
+): Message["abandonedRecovery"] {
+  if (message.role !== "user") {
+    return undefined;
+  }
+  return abandonedRecoveryFromMetadata(message.metadata ?? {}, message.id);
+}
+
 export function hydrateTextMessageFromApi(
   message: ApiMessage,
   options: TextMessageHydrationOptions = {},
@@ -100,9 +111,7 @@ export function hydrateTextMessageFromApi(
     recoveryDisplay: isAssistant
       ? recoveryDisplayFromMetadata(metadata)
       : undefined,
-    abandonedRecovery: isAssistant
-      ? undefined
-      : abandonedRecoveryFromMetadata(metadata, message.id),
+    abandonedRecovery: abandonedRecoveryFromApiMessage(message),
   };
 }
 
