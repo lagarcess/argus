@@ -8,6 +8,7 @@ from threading import Event
 from typing import Any
 
 import pytest
+from argus.api.chat import runtime_events
 from argus.api.main import app
 from fastapi.testclient import TestClient
 
@@ -848,7 +849,7 @@ def test_chat_stream_runtime_stall_emits_recoverable_error(
         "stream_agent_turn_events",
         _stalling_stream_agent_turn_events,
     )
-    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(runtime_events, "RUNTIME_EVENT_TIMEOUT_SECONDS", 0.01)
     client = _client()
     conversation = _conversation(client)
 
@@ -957,8 +958,8 @@ def test_chat_stream_visible_failure_path_is_terminal_for_turn(
         yield "worker_loop_workflow"
 
     monkeypatch.setattr(agent_router, "runtime_worker_enabled", lambda: True)
-    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 0.01)
-    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.005)
+    monkeypatch.setattr(runtime_events, "RUNTIME_EVENT_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(runtime_events, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.005)
     monkeypatch.setattr(
         agent_router,
         "stream_agent_turn_events",
@@ -1051,8 +1052,8 @@ def test_chat_stream_runtime_keepalive_preserves_slow_progressing_turn(
         "stream_agent_turn_events",
         _slow_progressing_stream_agent_turn_events,
     )
-    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 1)
-    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.01)
+    monkeypatch.setattr(runtime_events, "RUNTIME_EVENT_TIMEOUT_SECONDS", 1)
+    monkeypatch.setattr(runtime_events, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.01)
     client = _client()
     conversation = _conversation(client)
 
@@ -1090,8 +1091,8 @@ async def test_runtime_keepalive_wrapper_cleans_pending_task_on_close(
         finally:
             cleanup_seen.set()
 
-    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 1)
-    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.01)
+    monkeypatch.setattr(runtime_events, "RUNTIME_EVENT_TIMEOUT_SECONDS", 1)
+    monkeypatch.setattr(runtime_events, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.01)
     wrapped_events = agent_router._runtime_events_with_keepalive(_runtime_events())
 
     assert await anext(wrapped_events) == {
