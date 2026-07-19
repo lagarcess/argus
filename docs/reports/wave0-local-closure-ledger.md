@@ -1138,3 +1138,87 @@ modularity budget: **no violations**; `ruff check` clean;
 `git diff --check` clean; worktree clean. The sanctioned live eval was
 NOT run (external gate, unchanged). Frontend untouched this pass; the
 web gate stands as previously recorded.
+
+### Twelfth pass (2026-07-19, #239 correction — four confirmed blockers)
+
+Correction to the eleventh-pass claims. Four gaps were confirmed against
+the first #239 cut at `edbc5dd`; each was reproduced red-first (12 reds
+failing at the untouched tip for exactly the stated reasons, plus two
+preservation guards that already held) and then closed. **#241 and gated
+#244 remain NOT REACHED.**
+
+- **The deadline was not turn-wide.** The controller bounded provider
+  reservations, but `_runtime_events_with_keepalive` reset its timeout on
+  every emitted event, so a progressing-but-endless turn never hit the
+  absolute wall (red: 40 events at 0.03s spacing sailed past a 0.25s
+  deadline; route reds: both inline and threaded corridors streamed to a
+  normal final). The keepalive wrapper now reads the active turn context
+  and enforces `min(keepalive, per-event remaining, turn remaining)`;
+  exhaustion cancels the pending event task, marks the context, and
+  raises the existing timeout type with code `turn_deadline_exhausted`.
+  The per-event stall guard is preserved unchanged (pinned), provider
+  task-local timeouts remain the tighter bound, and the route maps the
+  exhaustion to the existing recoverable behavior — the internal
+  terminal reason is `turn_deadline_exhausted` while the durable #240
+  failure vocabulary stays untouched.
+- **The fingerprint was not canonical across real representations.** The
+  first cut hashed dictionary shapes generically, so a production
+  checkpoint (`run_state.candidate_strategy_draft`,
+  `latest_task_snapshot.pending_strategy_summary`, model objects) and
+  the equivalent public payload (`pending_strategy.strategy`) hashed
+  differently, and `structured_action.payload.message` prose leaked into
+  the hash (reds: checkpoint≠payload; reworded action message changed
+  the hash; artifact `metadata.version` changes did NOT). One canonical
+  semantic projection now normalizes both representations — typed stage,
+  pending need (requested field + missing fields), canonical strategy
+  fields with the same snapshot-before-draft precedence the public
+  payload builder uses, confirmed strategy, structured-action identity
+  restricted to typed identity keys, artifact identity including
+  version, and result identities. No raw-text matching, phrase tables,
+  regexes, language gates, or per-representation algorithms; model
+  objects and serialized dicts normalize identically (pinned).
+- **Not every accepted turn received an internal terminal.** The
+  controller began only on the runtime corridor, so five persisted
+  accepted paths ended with no internal terminal: onboarding prompt,
+  onboarding goal/skip control, the deterministic typed-recovery early
+  responder, `cancel_confirmation`, and runtime initialization failure
+  after admission persistence (reds: zero claims on all five). One
+  central `turn_execution_scope` boundary now wraps the accepted-turn
+  stream (and the init-failure stream), replacing the route-local
+  begin/reset pair; each early responder claims its typed terminal
+  (`answered`/`onboarding_prompt`, `answered`/`onboarding_control`,
+  `answered`/<typed recovery code>, `completed`/`cancel_confirmation`,
+  `recoverable_failed`/`agent_runtime_init_failure`), the scope
+  backstops severed exits and always releases the context, and the inner
+  generator is closed explicitly so receipt persistence still runs
+  inside the scope. No schema, no public outcome field, no #240 change,
+  and no fake receipts for zero-call turns.
+- **After-stream naming inherited the completed turn's context.**
+  `schedule_artifact_naming_after_stream` creates its task before the
+  route releases the scope, so the task (and its `asyncio.to_thread`
+  work) shared the same mutable context and could reserve from and
+  mutate the finished turn's allowance and receipt summary (red:
+  naming's reservation moved the route turn's `calls_reserved` to 1).
+  The task now detaches first (`detach_turn_execution()` clears the
+  inherited context in the task's own context copy); naming keeps its
+  independent receipt capture and fail-open behavior (pinned:
+  unconstrained permit, zero turn mutation, stable summary).
+
+Complexity reassessment (pass 12): net machinery went down where it
+matters — the generic two-allowlist recursive projection was deleted in
+favor of the explicit canonical projection; the route-local begin/reset
+pair became one shared scope; the only additions beyond that are the
+turn-wall check in the keepalive wrapper, a three-line deadline marker,
+and a one-call detach. An unused scope parameter added during the fix
+was removed before commit. `agent.py` is at 1433 lines (limit 1468);
+no modularity violations.
+
+Verification at the pass tip: correction suite **14/14** (12 reds green
+plus 2 preservation guards); full #239 suite **32/0**; hermetic
+runtime/spine sweep (provider keys blanked) **1169/0**; combined
+runtime-event/worker/route/lifecycle/recovery/onboarding/artifact-naming
+/receipts/state-machine + mocked eval + stream-contract battery
+**514 passed, 1 sanctioned live-skip**; modularity budget **no
+violations**; `ruff check` clean; touched files `ruff format` clean;
+`git diff --check` clean; worktree clean. Sanctioned live eval NOT run
+(external gate, unchanged). Nothing pushed.
