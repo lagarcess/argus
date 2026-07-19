@@ -1042,3 +1042,99 @@ Verification at this cleanup: eval manifest + trajectory harnesses
 58 passed + 1 skipped; API contract guards (action contract + OpenAPI
 gate) 17/0; ruff and `git diff --check` clean; worktree clean. No
 runtime/API behavior changed in this pass.
+
+## Train 4 checkpoint — #239 landed locally (2026-07-18, eleventh pass)
+
+Second interpreter-spine issue implemented red-first: feat `aa51292`
+plus the paired `refactor(modularity)` commit `d85e76f`
+(behavior-preserving extraction only). **#241 and gated #244 remain
+NOT REACHED.**
+
+Pre-edit audit findings honored: the runtime's only stall bound was the
+**per-event** timeout (`ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS`, reset on
+every event, so a progressing-but-looping turn had no whole-turn bound);
+model-backed calls reach providers through exactly two corridors — the
+three OpenRouter invoke wrappers (async/sync json_schema, chat
+completion) and the interpreter's direct ChatOpenRouter primary+fallback
+path; task-local timeouts and the bounded repair pass owned no shared
+allowance; after-stream work (measurement events, artifact naming) runs
+outside the turn window and stays outside the budget; receipts already
+persist per-route through the capture window with a metadata dict.
+
+- **One removable internal controller.**
+  `agent_runtime/turn_execution.py` owns, per accepted runtime turn: a
+  monotonic absolute deadline that never resets on events or retries, a
+  shared provider-call allowance, the entry/exit typed fingerprint, and
+  a single idempotent first-wins internal terminal
+  (`completed`/`answered`/`recoverable_failed`/`terminal_failed`/
+  `no_progress`). ContextVar-scoped and inert when no context is active;
+  #240's durable lifecycle states, persistence, and public contracts are
+  untouched.
+- **Reservation before every actual provider attempt.** Both corridors
+  reserve from the shared allowance before each candidate or fallback
+  attempt; blocked attempts record `skipped` receipts with
+  `turn_deadline_exhausted`/`turn_call_allowance_exhausted` and never
+  reach the provider. Task-local timeouts remain the tighter bound
+  (min with remaining deadline, never widened); nested components and
+  fallbacks cannot restart either allowance. Defaults derive from
+  existing limits, not invention: deadline `ARGUS_TURN_DEADLINE_SECONDS`
+  → existing runtime event ceiling (120s); allowance
+  `ARGUS_TURN_CALL_ALLOWANCE` → 6, the audited maximal legitimate chain
+  (interpretation primary+fallback 2, bounded repair plan+audit 2,
+  clarification/recovery composition 1, result composition 1). Normal
+  one-call turns stay within the pinned `max_calls: 1` trajectory
+  budgets (harness re-run green).
+- **Typed semantic fingerprint.** Allowlist-only projection over typed
+  state (typed stage/route, pending need, canonical strategy fields,
+  action/artifact identity, result ids) canonicalized to deterministic
+  JSON and hashed; `strategy_thesis`, raw user phrasing, assistant
+  prose, localized copy, model names, and timestamps are excluded by
+  construction; a state with no typed material fingerprints as None.
+- **Exactly one internal terminal per accepted turn.** The route claims
+  from the final typed outcome (`execution_succeeded`→`completed`,
+  `execution_failed_terminally`→`terminal_failed`, recoverable
+  stages/exceptions→`recoverable_failed`, else `answered`); an unchanged
+  fingerprint on a would-be success claims `no_progress`
+  (`unchanged_fingerprint`) instead of recurring as success; a severed
+  stream lands the `recoverable_failed`/`stream_severed` backstop; all
+  claims are first-wins no-ops afterward.
+- **Evidence rides the existing receipt boundary.** The turn summary
+  (call count, per-call latency, tasks/outcomes, reserved vs allowance,
+  exhaustion flags, blocked tasks, fingerprint transition, terminal +
+  reason) is added to the existing `persist_route_receipts` metadata —
+  no new tables, no user content, no schema change.
+- **12 specified reds green as 18 tests** in
+  `tests/agent_runtime/test_turn_execution_budget.py`, including the two
+  route-level reds through the real chat route (one terminal in receipt
+  metadata; repeated equivalent clarification → `no_progress`),
+  concurrency isolation, reset non-leak, timeout tightness, composer
+  restart denial, and direct-interpreter-path reservation.
+- **No #239 trajectory-fixture change.** The eval harness has no
+  persisted-metadata expectation surface, so a `turn_execution` fixture
+  expectation would require harness/adapter implementation — the #243
+  adapter lane, which stays excluded. The existing `max_calls` budgets
+  already pin the one-call route ceiling; fixture formatting untouched.
+
+Complexity reassessment (pass 11): the modularity gate forced
+right-sizing rather than growth. The interpreter's near-duplicate
+primary/fallback direct attempts deduplicated into one budget-reserved
+helper (`llm_interpreter.py` 5393 → 5354, now exactly at its budget
+limit — this file is the top candidate for a dedicated extraction lane);
+the route's SSE pacing cluster moved verbatim to
+`api/chat/runtime_events.py` (agent.py 1510 → 1398, limit 1468) with the
+timeout/keepalive test overrides retargeted to the new module; the
+passive route-receipt store moved to `llm/openrouter_receipts.py`
+(openrouter.py → 1007, limit 1090) with the active recorder staying
+beside model routing and existing importers preserved via re-exports.
+At the feat commit alone the modularity gate is red on those two spine
+files by design of the pairing; every test/lint gate is green there, and
+the paired refactor commit restores the modularity gate at the tip.
+
+Verification at the pass tip: hermetic runtime/spine sweep **1155/0**;
+chat-route + lifecycle + admission + receipts + observability + canary
+batch **416 passed, 1 skipped**; stream contract 30/0; mocked eval
+manifest + trajectory harnesses **58 + 1 sanctioned live-skip**;
+modularity budget: **no violations**; `ruff check` clean;
+`git diff --check` clean; worktree clean. The sanctioned live eval was
+NOT run (external gate, unchanged). Frontend untouched this pass; the
+web gate stands as previously recorded.
