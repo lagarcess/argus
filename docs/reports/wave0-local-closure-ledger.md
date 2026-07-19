@@ -1005,3 +1005,40 @@ continuity + grounding 405/0; hermetic runtime/spine gate **1137/0**;
 eval manifest + trajectory harnesses 58 + 1 skipped; ruff and
 `git diff --check` clean; worktree clean. The sanctioned pre-merge live
 eval scorecard remains the external #238 gate.
+
+### Tenth pass (2026-07-18, #238 evidence-honesty cleanup)
+
+Correction to the eighth/ninth-pass fixture claims: the retained
+missing-submitted-confirmation-id trajectory step was **not** valid #238
+coverage and encoded behavior that conflicts with the approved #229/API
+canon. The canonical Run-request contract rejects malformed requests
+before any usage, admission, persistence, or compute: missing/blank
+Idempotency-Key → 400 `idempotency_key_required`; missing action
+`confirmation_id` → 422 `validation_error`; mismatched header/id → 409
+`idempotency_conflict`. Encoding a 200 SSE
+`confirmation_action_missing_identity` recovery as the expected outcome
+for a malformed Run request contradicted that contract, so the step and
+its harness special-case exemption are removed. Every remaining Run
+action in the trajectories again carries `payload.confirmation_id`, an
+Idempotency-Key exactly equal to it, and a matching `action_identity`.
+The correct #238 trajectory expectation stays: cancel the active
+confirmation, replay its explicit prior `confirmation_id`, expect
+`confirmation_action_stale_card`, and prove `stale_action.execution_count`
+stays zero — the repaired missing-latest-confirmation case.
+
+#### New unresolved Wave 0 contract blocker (recorded, not fixed here)
+
+Current chat Run handling — and the existing route tests that pin it —
+returns **200 SSE typed recovery** (`confirmation_action_missing_identity`)
+for a chat Run action submitted without a `confirmation_id`, while the
+approved #229/API canon requires **pre-work 422 validation** that rejects
+before usage, admission, persistence, or compute. This is a genuine
+contract divergence in the Run-action identity/admission surface. It is
+deliberately NOT corrected in this #238 cleanup; the release captain will
+assign it to the appropriate Run-action identity/admission correction.
+Wave 0 cannot be declared locally complete while this blocker stands.
+
+Verification at this cleanup: eval manifest + trajectory harnesses
+58 passed + 1 skipped; API contract guards (action contract + OpenAPI
+gate) 17/0; ruff and `git diff --check` clean; worktree clean. No
+runtime/API behavior changed in this pass.

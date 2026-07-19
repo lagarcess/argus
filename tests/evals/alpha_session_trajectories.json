@@ -18,9 +18,7 @@
           {"step_id": "alpha_session_01:step:3", "prefix": "stale_action:"},
           {"step_id": "alpha_session_01:step:7", "prefix": "action_identity:"},
           {"step_id": "alpha_session_01:step:7", "prefix": "recovery:"},
-          {"step_id": "alpha_session_01:step:7", "prefix": "stale_action:"},
-          {"step_id": "alpha_session_01:step:8", "prefix": "recovery:"},
-          {"step_id": "alpha_session_01:step:8", "prefix": "stale_action:"}
+          {"step_id": "alpha_session_01:step:7", "prefix": "stale_action:"}
         ]
       },
       "steps": [
@@ -116,21 +114,6 @@
             "canonical_sse": true,
             "action_identity": "alpha_session_01:confirmation:2",
             "recovery_code": "confirmation_action_stale_card",
-            "typed_terminal": true,
-            "checkpoints": {"stale_action.execution_count": 0}
-          }
-        },
-        {
-          "operation": "action",
-          "request": {
-            "action": {"type": "run_backtest", "payload": {}},
-            "headers": {"Idempotency-Key": "alpha_session_01:missing-identity"}
-          },
-          "expect": {
-            "visible_response_category": "typed_recovery",
-            "stage_outcome": "ready_to_respond",
-            "canonical_sse": true,
-            "recovery_code": "confirmation_action_missing_identity",
             "typed_terminal": true,
             "checkpoints": {"stale_action.execution_count": 0}
           }
