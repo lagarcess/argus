@@ -1277,3 +1277,66 @@ runtime-event/worker/route/lifecycle/recovery/onboarding/artifact-naming
 violations**; `ruff check` clean; touched files `ruff format` clean;
 `git diff --check` clean; worktree clean. Sanctioned live eval NOT run
 (external gate, unchanged). Nothing pushed.
+
+### Fourteenth pass (2026-07-19, #239 — executable-only extra_parameters projection)
+
+One confirmed finding: the thirteenth pass hashed
+`StrategySummary.extra_parameters` as an unrestricted structural
+dictionary, but production stores prose and evidence inside it
+(`date_range_raw_text`, `date_range_intent.evidence`, `evidence_spans`,
+`field_provenance`, `raw_strategy_type`, `language`, provider context).
+Two strategies with identical typed state differing only in equivalent
+English-vs-Spanish raw/evidence text produced different fingerprints —
+rewording falsely counted as semantic progress.
+
+Red-first at untouched `2b4d4b6`: the EN/ES prose-equivalence red failed
+(`a6aef9ca… != 45518370…` where equality is required) and the
+unknown-key red failed (a `future_annotation` key changed the hash).
+Seven executable-change guards (`fee_rate`, `slippage`,
+`recurring_contribution`, `recurring_cadence`, `total_budget`,
+`indicator`, `indicator_parameters`) and a model/dict guard passed at
+the tip and now pin the fix against over-removal.
+
+The fix replaces unrestricted hashing with an explicit allowlist
+projection, `_EXECUTABLE_EXTRA_PARAMETER_KEYS`, derived from auditing
+every producer and execution consumer: the execution-realism costs
+(`fee_rate`, `slippage`), launch-capital family read by
+`execute.py`/`pending_option.py` (`capital_amount`, `recurring_amount`,
+`contribution_amount`, `initial_capital`, `total_capital`,
+`total_budget`, `recurring_contribution`), schedule (`cadence`,
+`recurring_cadence`), typed strategy identity resolution
+(`strategy_type`, `template`), typed signal/rule configuration
+(`indicator`, `indicator_parameters`, `entry_rule`, `exit_rule`,
+`rule_spec`, `risk_rules`), the typed execution window
+(`requested_date_range`, `effective_date_range`), and the typed
+universe-merge directive (`asset_universe_operation`). Excluded
+families: raw wording (`date_range_raw_text`, `raw_strategy_type`),
+evidence (`evidence_spans`, `date_range_intent` — its typed effect
+already participates via canonical `date_range` and the
+requested/effective windows), provenance (`field_provenance`),
+localization (`language`), provider context
+(`provider_resolved_assets`), transient patch mechanics
+(`artifact_patch` — pending-action identity already participates via
+the confirmation payload), recovery/presentation diagnostics
+(`invalid_symbols`, `data_availability_adjustment`), and all unknown
+keys by construction (allowlist, never denylist). The thirteenth-pass
+`rebalance_frequency` test key was corrected to the actually supported
+`recurring_cadence` (no producer or consumer exists for
+`rebalance_frequency`).
+
+Complexity reassessment (pass 14): one tuple constant plus a seven-line
+projection loop inside `_canonical_strategy`; `extra_parameters` left
+the generic field tuple. No raw-text parsing, regexes, phrase tables,
+language gates, new models, or API/schema changes.
+
+Verification at the pass tip: final-correction suite **18/18** (2 new
+reds green, 8 executable/model-dict guards pinned); all #239 suites
+**50/0**; hermetic runtime/spine sweep (provider keys blanked)
+**1187/0**; combined runtime-event/worker/route/lifecycle/recovery
+/onboarding/artifact-naming/receipts/state-machine + mocked eval +
+stream-contract battery **514 passed, 1 sanctioned live-skip**;
+modularity budget **no violations**; `ruff check` clean; touched files
+`ruff format` clean; `git diff --check` clean; worktree clean.
+Sanctioned live eval NOT run (external gate, unchanged). Nothing
+pushed. Next step per the release captain: local production-parity
+browser QA before any #241 work.
