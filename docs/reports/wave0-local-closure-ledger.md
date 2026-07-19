@@ -959,3 +959,49 @@ ruff, and `git diff --check` clean; worktree clean.
 
 Outstanding for #238 before promotion: the sanctioned pre-merge live
 eval scorecard (external, paid — not run in this laboratory).
+
+### Ninth pass (2026-07-18, #238 correction: the invariant made true)
+
+Review found the eighth-pass "one typed merge corridor" claim premature:
+`interpreter_unavailable_continuity._planned_artifact_edit_interpretation`
+was a reachable third corridor with its own flat-field branch (a legacy
+flat append over AAPL produced `[AAPL, MSFT]`+replace online but
+`[MSFT]`+append offline). Corrected at `8d5926f`, red-first:
+
+- **One shared conversion.** `edit_operations_from_flat_plan` /
+  `effective_edit_operations` now live beside the typed planner; the
+  online interpreter corridor and the interpreter-unavailable corridor
+  both consume them and apply through the same canonical
+  `apply_edit_operations` + appliers. The offline flat branch (separate
+  benchmark/capital/cadence/timeframe applications) is deleted. A red
+  parity test drives the same flat plan through both corridors and
+  asserts the identical resolved patch. Preserved and pinned: sparse
+  patches, canonical-artifact merge base, untouched fields, DCA
+  starting-capital demotion, RSI-only indicator restriction, typed
+  unsupported outcomes.
+- **Inapplicable edits fail closed.** The main corridor's empty-patch
+  guard checks the effective converted operations, so a flat
+  `cadence="yearly"` plan returns typed clarification (generic fallback
+  copy; model-authored copy when present) instead of an executable
+  intent with an empty patch; the offline corridor's None-rejection for
+  the same case is pinned.
+- **Fixture expectation corrected, churn removed.** The eighth pass's
+  whole-file reserialization of `alpha_session_trajectories.json` is
+  reverted to the original formatting; the net semantic diff versus the
+  pre-#238 file is 57 changed lines: alpha_session_01 now cancels the
+  active confirmation and replays the explicit prior confirmation id
+  expecting `confirmation_action_stale_card` with zero executions — the
+  repaired guard's exact hole — and keeps the missing-submitted-id step
+  as its own independently useful case (it covers
+  `confirmation_action_missing_identity`, not the repaired guard).
+
+Complexity reassessment (pass 9): corridors 3 → 1 conversion + 2 shape
+appliers; ~40 lines of duplicated offline flat application deleted; the
+only additions are the two shared helpers beside the planner.
+
+Verification at `8d5926f`: atomicity suite 8/0 (two new reds green);
+focused edit/chip/refine/post-result/action/reload set 134/0;
+continuity + grounding 405/0; hermetic runtime/spine gate **1137/0**;
+eval manifest + trajectory harnesses 58 + 1 skipped; ruff and
+`git diff --check` clean; worktree clean. The sanctioned pre-merge live
+eval scorecard remains the external #238 gate.
