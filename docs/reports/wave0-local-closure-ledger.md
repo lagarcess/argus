@@ -749,3 +749,80 @@ failure-evidence no-op/conflict branches, and reconciliation's
 failure-evidence copy. Real-auth/RLS, deployed-browser EN/ES QA (now
 including cancel-turn transcript rows and retry supersession), GitHub
 Actions, exact-SHA Render canary, #244 probe, and #251 live QA stand.
+
+### Sixth correction pass (2026-07-18, verified #240 gaps)
+
+Accounting correction first: the fifth pass changed **22 files**
+(+1377/−312 over `f8898d6`, including its ledger commit; 21 code/test
+files at `2d41fcb`). This sixth pass changes **16 code/test files**
+(+429/−45 at `5cc09b2`) plus this ledger update. The earlier
+"Local Wave 0 implementation candidate ready for review" claim is
+**retired**: it overstated the branch, because locally executable work
+remains unfinished (listed below) independent of any external gate.
+
+1. **Onboarding controls are durable accepted turns** — `9468ef3`.
+   `__ONBOARDING_GOAL__`/`__ONBOARDING_SKIP__` are supported message-only
+   paths and can no longer bypass the lifecycle: admission is enabled for
+   every supported request, the control message and lifecycle row persist
+   atomically through the existing acceptance boundary, and the localized
+   assistant response completes the turn with canonical terminal metadata.
+   Both preview writers suppress raw control tokens; live and reload
+   render through the existing localized mapping (pinned by the frontend
+   contract suite). Red-first: goal and skip durable turns with completed
+   lifecycles and token-free previews; a persistence interruption leaves
+   an accepted row that the stale reconciler settles to abandoned.
+
+2. **Abandoned retry actually bound to its owning message** — `cff6c69`.
+   Hydration exposes the retry only when `request_message_id`, the API
+   user-message id, and `agent_runtime_turn.turn_id` all agree (mismatch
+   renders historical recovery with no button); the action id is keyed by
+   `request_message_id`; the ChatInterface click path resolves the replay
+   through `resolveRetryLastTurnReplay`, consuming the owning persisted
+   user message's content/action — tampered client text is never trusted
+   and a mismatched historical action replays nothing; legacy unbound
+   assistant-failure retries keep payload semantics. No new backend
+   ChatActionType or public-contract change was required.
+
+3. **Exact null-safe CAS terminal truth** — `5cc09b2`. Memory and SQL
+   no-op comparisons now compare complete effective truth: failure_code
+   exact and null-safe (`IS NOT DISTINCT FROM`), retryable effective with
+   omitted meaning false. Red-first: replays omitting or changing stored
+   failure_code or retryable=true conflict; exact evidence and
+   completed-with-effective-defaults replays stay no-ops; both backends
+   match.
+
+Complexity reassessment (pass 6): no new abstractions — admission lost
+its last carve-out (enabled is now unconditionally true), the retry
+binding is one resolver reusing existing helpers, and the CAS change is
+comparison-only.
+
+Verification at `5cc09b2`: hermetic runtime gate 1129/0; focused
+lifecycle/route-matrix/onboarding/retry/migration/reload battery 327/0
+(route matrix 12/12); contract + OpenAPI 103/0; mocked eval harness
+58 passed + 1 skipped; trajectory harness subset 17/0; web 412/0 with
+lint (0 errors, 1 pre-existing warning) and a green production build;
+modularity budget, ruff, and `git diff --check` clean; worktree clean.
+
+#### Unfinished local work (not external gates)
+
+These are locally executable and remain **not implemented** on this
+branch; they must not be conflated with external acceptance authority:
+
+- **#243 concrete runtime adapters** — the concrete adapter
+  implementations and trajectory flips beyond the recorded harness
+  remain unwritten (Train 6 was reached only for its test scaffolding).
+- **#233 local canary authoring** — the deterministic local canary
+  script/spec authoring remains unwritten.
+- **#251 local async bridge** — the in-lane async-bridge remainder
+  recorded at "#251 — remaining in-lane items" is still local work, not
+  a deploy gate.
+
+#### External gates (authority outside this laboratory)
+
+Disposable-Postgres real-database proof (migrations `20260718000001–4`,
+including the option-claim acceptance branches, exact-truth CAS
+branches, and reconciliation evidence copy); real-auth/RLS matrix;
+deployed-browser EN/ES QA (recovery row, cancel-turn transcript rows,
+onboarding-control transcript rendering, retry supersession and
+binding); GitHub Actions run; exact-SHA Render canary; the #244 paid
+probe; #251 live EN/ES QA.
