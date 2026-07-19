@@ -154,12 +154,12 @@ def test_pending_needs_normalize_across_checkpoint_and_public_payload() -> None:
 def test_typed_extra_parameters_change_the_fingerprint() -> None:
     monthly = _fp(
         _checkpoint(
-            strategy=_draft_strategy(extra_parameters={"rebalance_frequency": "monthly"})
+            strategy=_draft_strategy(extra_parameters={"recurring_cadence": "monthly"})
         )
     )
     weekly = _fp(
         _checkpoint(
-            strategy=_draft_strategy(extra_parameters={"rebalance_frequency": "weekly"})
+            strategy=_draft_strategy(extra_parameters={"recurring_cadence": "weekly"})
         )
     )
     assert monthly is not None
@@ -253,3 +253,136 @@ async def test_turn_deadline_diagnostics_report_turn_timing() -> None:
         assert diagnostics.get("elapsed_seconds") >= 0.05
     finally:
         turn_execution.reset_turn_execution(token)
+
+
+# ── Final finding: extra_parameters projects executable keys only ────────────
+#
+# Production stores raw wording, evidence, provenance, localization, and
+# provider context inside StrategySummary.extra_parameters. Only known,
+# currently supported executable configuration may participate in the
+# fingerprint; unknown keys never participate.
+
+
+_EXECUTABLE_EXTRAS = {
+    "fee_rate": 0.001,
+    "slippage": 0.0005,
+    "recurring_contribution": 250.0,
+    "recurring_cadence": "monthly",
+    "total_budget": 6000.0,
+    "indicator": "rsi",
+    "indicator_parameters": {"period": 14, "entry_threshold": 30.0},
+}
+
+_PROSE_EXTRAS_EN = {
+    "date_range_raw_text": "the last two years",
+    "date_range_intent": {
+        "kind": "relative_window",
+        "start": "2024-07-19",
+        "end": "2026-07-19",
+        "evidence": "user asked for the last two years",
+    },
+    "evidence_spans": [{"field": "date_range", "text": "last two years"}],
+    "field_provenance": {"date_range": "user_message"},
+    "raw_strategy_type": "dollar cost averaging",
+    "language": "en",
+    "provider_resolved_assets": [{"symbol": "AAPL", "provider": "alpaca"}],
+}
+
+_PROSE_EXTRAS_ES = {
+    "date_range_raw_text": "los últimos dos años",
+    "date_range_intent": {
+        "kind": "relative_window",
+        "start": "2024-07-19",
+        "end": "2026-07-19",
+        "evidence": "el usuario pidió los últimos dos años",
+    },
+    "evidence_spans": [{"field": "date_range", "text": "últimos dos años"}],
+    "field_provenance": {"date_range": "llm_interpretation"},
+    "raw_strategy_type": "promedio de costo en dólares",
+    "language": "es-419",
+    "provider_resolved_assets": [{"symbol": "AAPL", "provider": "polygon"}],
+}
+
+
+def test_prose_evidence_and_provenance_extras_keep_the_fingerprint() -> None:
+    """Identical typed state whose extras differ only in raw text, evidence,
+    spans, provenance, and display language is the same semantic state."""
+
+    english = _fp(
+        _checkpoint(
+            strategy=_draft_strategy(
+                extra_parameters={**_EXECUTABLE_EXTRAS, **_PROSE_EXTRAS_EN}
+            )
+        )
+    )
+    spanish = _fp(
+        _checkpoint(
+            strategy=_draft_strategy(
+                extra_parameters={**_EXECUTABLE_EXTRAS, **_PROSE_EXTRAS_ES}
+            )
+        )
+    )
+    assert english is not None
+    assert english == spanish
+
+
+def test_unknown_extra_parameter_keys_never_participate() -> None:
+    """Allowlist, not denylist: a future unknown key may carry prose and must
+    not silently join the fingerprint."""
+
+    base = _fp(
+        _checkpoint(strategy=_draft_strategy(extra_parameters=dict(_EXECUTABLE_EXTRAS)))
+    )
+    with_unknown = _fp(
+        _checkpoint(
+            strategy=_draft_strategy(
+                extra_parameters={
+                    **_EXECUTABLE_EXTRAS,
+                    "future_annotation": "free-form note that could be prose",
+                }
+            )
+        )
+    )
+    assert base is not None
+    assert base == with_unknown
+
+
+@pytest.mark.parametrize(
+    ("key", "changed"),
+    [
+        ("fee_rate", 0.002),
+        ("slippage", 0.001),
+        ("recurring_contribution", 500.0),
+        ("recurring_cadence", "weekly"),
+        ("total_budget", 12000.0),
+        ("indicator", "sma"),
+        ("indicator_parameters", {"period": 21, "entry_threshold": 30.0}),
+    ],
+)
+def test_supported_executable_extras_change_the_fingerprint(key, changed) -> None:
+    base = _fp(
+        _checkpoint(strategy=_draft_strategy(extra_parameters=dict(_EXECUTABLE_EXTRAS)))
+    )
+    updated = dict(_EXECUTABLE_EXTRAS)
+    updated[key] = changed
+    assert base is not None
+    assert base != _fp(_checkpoint(strategy=_draft_strategy(extra_parameters=updated)))
+
+
+def test_extra_parameter_models_and_dicts_normalize_identically() -> None:
+    checkpoint = _checkpoint(
+        strategy=_draft_strategy(
+            extra_parameters={**_EXECUTABLE_EXTRAS, **_PROSE_EXTRAS_EN}
+        )
+    )
+    serialized = {
+        "stage_outcome": "await_user_reply",
+        "run_state": checkpoint["run_state"].model_dump(mode="python"),
+        "latest_task_snapshot": checkpoint["latest_task_snapshot"].model_dump(
+            mode="python"
+        ),
+        "assistant_response": checkpoint["assistant_response"],
+    }
+    model_fp = _fp(checkpoint)
+    assert model_fp is not None
+    assert model_fp == _fp(serialized)

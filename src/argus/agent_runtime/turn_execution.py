@@ -255,7 +255,34 @@ _STRATEGY_TYPED_FIELDS = (
     "exit_rule",
     "rule_spec",
     "risk_rules",
-    "extra_parameters",
+)
+
+# StrategySummary.extra_parameters also carries raw wording, evidence spans,
+# field provenance, localization, and provider context. Only these known
+# executable configuration keys may participate; unknown keys never do.
+_EXECUTABLE_EXTRA_PARAMETER_KEYS = (
+    "asset_universe_operation",
+    "cadence",
+    "capital_amount",
+    "contribution_amount",
+    "effective_date_range",
+    "entry_rule",
+    "exit_rule",
+    "fee_rate",
+    "indicator",
+    "indicator_parameters",
+    "initial_capital",
+    "recurring_amount",
+    "recurring_cadence",
+    "recurring_contribution",
+    "requested_date_range",
+    "risk_rules",
+    "rule_spec",
+    "slippage",
+    "strategy_type",
+    "template",
+    "total_budget",
+    "total_capital",
 )
 
 # Typed identity keys a structured action's payload may carry. Everything
@@ -337,6 +364,14 @@ def _canonical_strategy(value: Any) -> dict[str, Any]:
         item = _canonical_structural_value(mapping.get(field_name))
         if not _is_empty_fingerprint_value(item):
             canonical[field_name] = item
+    extras = _as_state_mapping(mapping.get("extra_parameters")) or {}
+    executable: dict[str, Any] = {}
+    for key in _EXECUTABLE_EXTRA_PARAMETER_KEYS:
+        item = _canonical_structural_value(extras.get(key))
+        if not _is_empty_fingerprint_value(item):
+            executable[key] = item
+    if executable:
+        canonical["extra_parameters"] = executable
     return canonical
 
 
