@@ -55,6 +55,24 @@ describe("abandoned-turn recovery row", () => {
     expect(branch).not.toContain("turn-recovery-");
   });
 
+  test("the click path resolves the persisted owning message before replay", () => {
+    const source = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const handlerStart = source.indexOf('if (action.type === "retry_last_turn")');
+    const handlerEnd = source.indexOf(
+      'if (action.type === "retry_load_conversation")',
+      handlerStart,
+    );
+    const handler = source.slice(handlerStart, handlerEnd);
+    expect(handlerStart).toBeGreaterThan(-1);
+    // The bound replay consumes the owning request-message identity through
+    // the resolver; raw payload text is never sent directly.
+    expect(handler).toContain("resolveRetryLastTurnReplay(action, messages)");
+    expect(handler).not.toContain("retryLastTurnMessageFromAction(action)");
+  });
+
   test("recovery copy is localized in both languages", () => {
     const en = JSON.parse(
       readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),

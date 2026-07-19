@@ -4,6 +4,7 @@ import {
   conversationLoadRetryActionFromConversationId,
   failedActionRetryActionFromMetadata,
   hasFailedActionMetadata,
+  resolveRetryLastTurnReplay,
   retryLastTurnActionFromMetadata,
   retryLastTurnActionFromMessage,
   retryLastTurnChatActionFromAction,
@@ -177,6 +178,62 @@ describe("failed-action retry UI contract", () => {
         failed_assistant_id: "assistant-failed-persisted",
       },
     });
+  });
+
+  test("replay resolves only through the persisted owning message", () => {
+    // #240: a bound retry consumes its owning request-message identity — the
+    // persisted user message is the only replay source, and client-supplied
+    // replacement text is never trusted over it.
+    const transcript = [
+      { id: "user-turn-1", role: "user", content: "persisted truth" },
+      { id: "assistant-1", role: "ai", content: "answer" },
+    ];
+    const boundAction = {
+      id: "retry-last-turn-user-turn-1",
+      label: "Retry",
+      value: "Retry",
+      type: "retry_last_turn",
+      payload: {
+        request_message_id: "user-turn-1",
+        message: "tampered client text",
+      },
+    };
+
+    const replay = resolveRetryLastTurnReplay(boundAction, transcript);
+    expect(replay?.message).toBe("persisted truth");
+
+    // A mismatched or missing owning identity cannot replay anything.
+    const mismatched = resolveRetryLastTurnReplay(
+      {
+        ...boundAction,
+        payload: { request_message_id: "user-gone", message: "tampered" },
+      },
+      transcript,
+    );
+    expect(mismatched).toBeNull();
+
+    // An id that resolves to a non-user message cannot replay either.
+    const wrongRole = resolveRetryLastTurnReplay(
+      {
+        ...boundAction,
+        payload: { request_message_id: "assistant-1", message: "tampered" },
+      },
+      transcript,
+    );
+    expect(wrongRole).toBeNull();
+
+    // Legacy unbound assistant-failure retries keep payload semantics.
+    const legacy = resolveRetryLastTurnReplay(
+      {
+        id: "retry-last-turn",
+        label: "Retry",
+        value: "Retry",
+        type: "retry_last_turn",
+        payload: { message: "legacy replay text" },
+      },
+      transcript,
+    );
+    expect(legacy?.message).toBe("legacy replay text");
   });
 
   test("keys the retry action by the persisted request_message_id", () => {

@@ -112,16 +112,77 @@ describe("chat message hydration", () => {
       code: "turn_abandoned",
       values: undefined,
     });
-    expect(message.abandonedRecovery?.action.type).toBe("retry_last_turn");
-    expect(message.abandonedRecovery?.action.payload?.request_message_id).toBe(
+    expect(message.abandonedRecovery?.action?.type).toBe("retry_last_turn");
+    // The action carries a stable identity keyed by its owning message.
+    expect(message.abandonedRecovery?.action?.id).toBe(
+      "retry-last-turn-user-turn-1",
+    );
+    expect(message.abandonedRecovery?.action?.payload?.request_message_id).toBe(
       "user-turn-1",
     );
-    expect(message.abandonedRecovery?.action.payload?.message).toBe(
+    expect(message.abandonedRecovery?.action?.payload?.message).toBe(
       "test AAPL momentum",
     );
-    expect(message.abandonedRecovery?.action.payload?.chat_action).toEqual(
+    expect(message.abandonedRecovery?.action?.payload?.chat_action).toEqual(
       chatAction,
     );
+  });
+
+  test("a retry whose identity does not match its message exposes no action", () => {
+    // #240 binding: the retry is exposed only when request_message_id, the
+    // API message id, and agent_runtime_turn.turn_id all agree; a mismatched
+    // historical overlay renders recovery state with no button.
+    const mismatched = hydrateTextMessageFromApi(
+      apiMessage({
+        id: "user-turn-2",
+        role: "user",
+        content: "stalled idea",
+        metadata: {
+          agent_runtime_turn: {
+            turn_id: "user-turn-2",
+            request_id: "req-2",
+            status: "abandoned",
+            terminal: true,
+            reconciled_outcome: null,
+            failure_code: "turn_abandoned",
+            retryable: true,
+          },
+          recovery: { code: "turn_abandoned", retryable: true },
+          retry_last_turn: {
+            request_message_id: "user-turn-OTHER",
+            message: "stalled idea",
+          },
+        },
+      }),
+    );
+    expect(mismatched.abandonedRecovery?.display).toBeDefined();
+    expect(mismatched.abandonedRecovery?.action).toBeNull();
+
+    const wrongTurnId = hydrateTextMessageFromApi(
+      apiMessage({
+        id: "user-turn-3",
+        role: "user",
+        content: "stalled idea",
+        metadata: {
+          agent_runtime_turn: {
+            turn_id: "user-turn-OTHER",
+            request_id: "req-3",
+            status: "abandoned",
+            terminal: true,
+            reconciled_outcome: null,
+            failure_code: "turn_abandoned",
+            retryable: true,
+          },
+          recovery: { code: "turn_abandoned", retryable: true },
+          retry_last_turn: {
+            request_message_id: "user-turn-3",
+            message: "stalled idea",
+          },
+        },
+      }),
+    );
+    expect(wrongTurnId.abandonedRecovery?.display).toBeDefined();
+    expect(wrongTurnId.abandonedRecovery?.action).toBeNull();
   });
 
   test("superseded abandoned recovery keeps its display but loses its action", () => {

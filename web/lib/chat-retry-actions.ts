@@ -1,4 +1,4 @@
-import type { ChatActionOption } from "@/components/chat/types";
+import type { ChatActionOption, Message } from "@/components/chat/types";
 
 function recordOrNull(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -137,7 +137,10 @@ export function retryLastTurnActionFromMessage(
   const failedAssistantId = options?.assistantMessageId?.trim();
   const requestMessageId = options?.requestMessageId?.trim();
   return {
-    id: "retry-last-turn",
+    // Stable identity keyed by the owning request message when bound.
+    id: requestMessageId
+      ? `retry-last-turn-${requestMessageId}`
+      : "retry-last-turn",
     label: "Retry",
     labelKey: "common.retry",
     value: "Retry",
@@ -149,6 +152,52 @@ export function retryLastTurnActionFromMessage(
       ...(options?.chatAction ? { chat_action: options.chatAction } : {}),
     },
   };
+}
+
+export function retryLastTurnRequestMessageIdFromAction(
+  action: ChatActionOption | null | undefined,
+): string | null {
+  if (action?.type !== "retry_last_turn") {
+    return null;
+  }
+  return stringOrNull(action.payload?.request_message_id)?.trim() || null;
+}
+
+type RetryLastTurnReplay = {
+  message: string;
+  chatAction: ChatActionOption | null;
+  failedAssistantId: string | null;
+};
+
+export function resolveRetryLastTurnReplay(
+  action: ChatActionOption | null | undefined,
+  messages: Message[],
+): RetryLastTurnReplay | null {
+  if (action?.type !== "retry_last_turn") {
+    return null;
+  }
+  const chatAction = retryLastTurnChatActionFromAction(action);
+  const failedAssistantId = retryLastTurnFailedAssistantIdFromAction(action);
+  const requestMessageId = retryLastTurnRequestMessageIdFromAction(action);
+  if (requestMessageId) {
+    // #240 binding: a bound retry replays only the persisted owning user
+    // message — a missing or mismatched identity replays nothing, and
+    // client-supplied replacement text is never trusted over it.
+    const owner = messages.find(
+      (message) =>
+        message.id === requestMessageId && message.role === "user",
+    );
+    const ownerText = owner?.content?.trim();
+    if (!ownerText) {
+      return null;
+    }
+    return { message: ownerText, chatAction, failedAssistantId };
+  }
+  const message = retryLastTurnMessageFromAction(action);
+  if (!message) {
+    return null;
+  }
+  return { message, chatAction, failedAssistantId };
 }
 
 export function retryLastTurnActionFromMetadata(

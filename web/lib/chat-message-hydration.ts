@@ -39,6 +39,7 @@ function recordOrNull(value: unknown): Record<string, unknown> | null {
 // the recovery state renders with no actionable retry.
 function abandonedRecoveryFromMetadata(
   metadata: Record<string, unknown>,
+  messageId: string,
 ): Message["abandonedRecovery"] {
   const turn = recordOrNull(metadata.agent_runtime_turn);
   if (turn?.status !== "abandoned" || turn?.terminal !== true) {
@@ -48,7 +49,19 @@ function abandonedRecoveryFromMetadata(
   if (!display) {
     return undefined;
   }
-  return { display, action: retryLastTurnActionFromMetadata(metadata) };
+  // The retry is actionable only when its owning identity is exact:
+  // request_message_id, the API message id, and the turn_id must all agree.
+  const retryLastTurn = recordOrNull(metadata.retry_last_turn);
+  const requestMessageId =
+    typeof retryLastTurn?.request_message_id === "string"
+      ? retryLastTurn.request_message_id
+      : null;
+  const identityBound =
+    requestMessageId === messageId && turn.turn_id === messageId;
+  return {
+    display,
+    action: identityBound ? retryLastTurnActionFromMetadata(metadata) : null,
+  };
 }
 
 export function hydrateTextMessageFromApi(
@@ -89,7 +102,7 @@ export function hydrateTextMessageFromApi(
       : undefined,
     abandonedRecovery: isAssistant
       ? undefined
-      : abandonedRecoveryFromMetadata(metadata),
+      : abandonedRecoveryFromMetadata(metadata, message.id),
   };
 }
 

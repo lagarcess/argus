@@ -316,13 +316,15 @@ describe("Argus Alpha frontend contract", () => {
     expect(hydration).toContain("retryLastTurnActionFromMetadata(metadata");
     expect(chat).toContain("retryLastTurnActionFromMessage(trimmed,");
     expect(chat).toContain("assistantMessageId: assistantId");
-    expect(chat).toContain("retryLastTurnFailedAssistantIdFromAction(action)");
-    expect(chat).toContain("retryLastTurnMessageFromAction(action)");
+    // #240 binding: the retry click path resolves the persisted owning
+    // message before replay instead of trusting the action payload text.
+    expect(chat).toContain("resolveRetryLastTurnReplay(action, messages)");
+    expect(retry).toContain("retryLastTurnMessageFromAction(action)");
     expect(chat).toContain(
       "appendOrReplacePendingAssistantMessage(baseMessages",
     );
     expect(chat).toContain(
-      "replacementAssistantId: failedAssistantId ?? undefined",
+      "replacementAssistantId: replay.failedAssistantId ?? undefined",
     );
     expect(chat).toContain(
       "const persistedErrorMessageId = event.data.message_id?.trim()",

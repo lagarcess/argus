@@ -68,11 +68,9 @@ import {
   failedActionRetryActionFromMetadata,
   hasFailedActionMetadata,
   isRetryAction,
+  resolveRetryLastTurnReplay,
   retryLastTurnActionFromMetadata,
   retryLastTurnActionFromMessage,
-  retryLastTurnChatActionFromAction,
-  retryLastTurnFailedAssistantIdFromAction,
-  retryLastTurnMessageFromAction,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
 import {
@@ -1886,13 +1884,13 @@ export default function ChatInterface() {
       return;
     }
     if (action.type === "retry_last_turn") {
-      const retryText = retryLastTurnMessageFromAction(action);
-      const retryChatAction = retryLastTurnChatActionFromAction(action);
-      const failedAssistantId = retryLastTurnFailedAssistantIdFromAction(action);
-      if (retryText) {
-        void handleSend(retryText, retryChatAction ?? [], undefined, {
+      // #240 binding: resolve the replay through the persisted owning
+      // message; a mismatched or missing identity replays nothing.
+      const replay = resolveRetryLastTurnReplay(action, messages);
+      if (replay) {
+        void handleSend(replay.message, replay.chatAction ?? [], undefined, {
           renderUserMessage: false,
-          replacementAssistantId: failedAssistantId ?? undefined,
+          replacementAssistantId: replay.failedAssistantId ?? undefined,
         });
       }
       return;
