@@ -1190,7 +1190,19 @@ def test_chat_stream_onboarding_goal_selection_sets_ready_stage() -> None:
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert messages.status_code == 200
     items = messages.json()["items"]
-    assert all(not message["content"].startswith("__ONBOARDING_") for message in items)
+    # #240: the control message is a durable accepted turn. The raw token
+    # persists (the frontend renders it localized) but never leaks into the
+    # conversation preview surface.
+    control_turns = [
+        message
+        for message in items
+        if message["role"] == "user"
+        and message["content"].startswith("__ONBOARDING_")
+    ]
+    assert len(control_turns) == 1
+    conversations = client.get("/api/v1/conversations").json()["items"]
+    active = next(item for item in conversations if item["id"] == conversation["id"])
+    assert "__ONBOARDING" not in str(active.get("last_message_preview") or "")
 
 
 def test_first_successful_backtest_transitions_onboarding_to_completed() -> None:

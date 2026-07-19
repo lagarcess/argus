@@ -427,10 +427,10 @@ async def chat_stream(
         conversation_id=conversation.id,
         display_message=display_message,
         mention_provenance=mention_provenance,
-        # Every ordinary structured action participates in lifecycle
-        # admission, including cancel_confirmation; only the onboarding
-        # goal-selection control message is a non-accepted protocol path.
-        enabled=onboarding_goal is None,
+        # Every supported request is an ordinary accepted turn — plain
+        # messages, structured actions including cancel_confirmation, and the
+        # onboarding control messages alike.
+        enabled=True,
         language=language,
     )
     runtime_fallback = RuntimeFallbackContext()
@@ -794,6 +794,19 @@ async def chat_stream(
                 conversation_id=conversation.id,
                 role="assistant",
                 content=follow_up,
+                metadata=(
+                    {
+                        "agent_runtime_turn": (
+                            turn_lifecycle_hooks.terminal_turn_metadata(
+                                conversation_id=conversation.id,
+                                request_id=accepted_turn_request_id,
+                                status="completed",
+                            )
+                        )
+                    }
+                    if accepted_turn_request_id is not None
+                    else None
+                ),
             )
             yield sse_data({"type": "stage_start", "stage": "next_step"})
             yield sse_data({"type": "token", "content": follow_up})

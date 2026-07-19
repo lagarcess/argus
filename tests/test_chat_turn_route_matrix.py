@@ -10,6 +10,7 @@ stays excluded because backtest_jobs owns that action's durable state.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
@@ -197,6 +198,106 @@ def test_onboarding_prompt_completes_the_accepted_turn() -> None:
     assert turn["status"] == "completed"
     assert turn["terminal"] is True
     assert turn["turn_id"] == turns[0].id
+
+
+# ── Path 2b: onboarding control messages (goal selection and skip) ───────────
+
+
+@pytest.mark.parametrize(
+    "control_message",
+    ["__ONBOARDING_GOAL__:learn_basics", "__ONBOARDING_SKIP__"],
+    ids=["goal_selection", "skip"],
+)
+def test_onboarding_controls_are_durable_accepted_turns(
+    control_message: str,
+) -> None:
+    """Path 2b: goal selection and skip are supported message-only requests —
+    they accept atomically (user message + lifecycle) and complete through
+    the durable assistant response, with no raw control token leaking into
+    the conversation preview."""
+
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    conversation_id = _conversation(user_id)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "message": control_message,
+            "language": "en",
+        },
+    )
+    assert response.status_code == 200
+    events = _stream_events(response.text)
+    assert any(event.get("type") == "final" for event in events)
+
+    turns = _user_turns(conversation_id)
+    assert len(turns) == 1
+    control_turn = turns[0]
+    assert control_turn.content == control_message
+    row = api_state.store.chat_turn_lifecycles.get(control_turn.id)
+    assert row is not None
+    assert row["status"] == "completed"
+
+    assistant = api_state.store.messages[conversation_id][-1]
+    assert assistant.role == "assistant"
+    turn = (assistant.metadata or {})["agent_runtime_turn"]
+    assert turn["status"] == "completed"
+    assert turn["terminal"] is True
+    assert turn["turn_id"] == control_turn.id
+
+    conversation = api_state.store.conversations[conversation_id]
+    assert "__ONBOARDING" not in str(conversation.last_message_preview or "")
+
+
+def test_onboarding_goal_interruption_leaves_reconcilable_acceptance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Path 2b interruption: if the assistant response never persists, the
+    accepted lifecycle remains — reconcilable, never an untracked response."""
+
+    from argus.api.routers import agent as agent_router
+
+    def _boom(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("onboarding persistence interrupted")
+
+    monkeypatch.setattr(agent_router, "persist_onboarding_update", _boom)
+
+    _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    conversation_id = _conversation(user_id)
+
+    failure_client = TestClient(app, raise_server_exceptions=False)
+    try:
+        failure_client.post(
+            "/api/v1/chat/stream",
+            json={
+                "conversation_id": conversation_id,
+                "message": "__ONBOARDING_GOAL__:learn_basics",
+                "language": "en",
+            },
+        )
+    except RuntimeError:
+        pass
+
+    turns = _user_turns(conversation_id)
+    assert len(turns) == 1
+    row = api_state.store.chat_turn_lifecycles.get(turns[0].id)
+    assert row is not None
+    assert row["status"] == "accepted"
+
+    # The stale reconciler can settle the orphan.
+    from argus.domain.chat_turn_lifecycle import reconcile_stale_turns_memory
+
+    row["accepted_at"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=30)
+    ).isoformat()
+    reconciled = reconcile_stale_turns_memory(
+        api_state.store, conversation_id=conversation_id, user_id=user_id
+    )
+    assert len(reconciled) == 1
+    assert reconciled[0]["status"] == "abandoned"
 
 
 # ── Path 3: runtime-fallback early response ──────────────────────────────────

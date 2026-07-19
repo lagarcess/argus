@@ -37,6 +37,10 @@ def message_preview(
         metadata=metadata,
     ):
         return None
+    # Onboarding control tokens are localized at render time and must never
+    # surface raw in the conversation preview.
+    if role == "user" and content.startswith("__ONBOARDING_"):
+        return None
     return plain_text_preview(content, max_length=max_length)
 
 
