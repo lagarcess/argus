@@ -2111,7 +2111,12 @@ def test_canceled_confirmation_blocks_stale_checkpoint_run_action(monkeypatch) -
         },
     )
 
-    assert stale_run_response.status_code == 409
+    # #238: cancellation invalidates the confirmation, so the stale run
+    # action's explicit identity can no longer be validated — it fails closed
+    # with typed recovery and the runtime is never invoked.
+    assert stale_run_response.status_code == 200
+    stale_final = _stream_payloads(stale_run_response.text, "final")[0]
+    assert stale_final["recovery"]["code"] == "confirmation_action_stale_card"
     assert runtime_calls == 0
 
 

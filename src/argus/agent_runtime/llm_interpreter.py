@@ -25,7 +25,6 @@ from argus.agent_runtime.benchmark_evidence import (
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: F401
     ARTIFACT_EDIT_PENDING_FIELDS,
-    _apply_legacy_flat_edit_fields,
     _apply_resolved_edit_to_draft,
     _current_artifact_asset_universe,
     _current_artifact_strategy,

@@ -1822,10 +1822,12 @@ async def test_llm_interpreter_plans_active_artifact_asset_append_after_model_fa
     assert result is not None
     assert result.intent == "backtest_execution"
     assert result.semantic_turn_act == "answer_pending_need"
-    assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
+    # #238: one merge corridor — legacy flat plans emit the resolved final
+    # set as a replace, the same typed patch the operations path emits.
+    assert result.candidate_strategy_draft.asset_universe == ["AAPL", "MSFT"]
     assert result.candidate_strategy_draft.extra_parameters[
         "asset_universe_operation"
-    ] == "append"
+    ] == "replace"
     assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
         "asset_universe": "explicit_user"
     }
@@ -2901,10 +2903,18 @@ async def test_llm_interpreter_plans_active_artifact_asset_operation_when_model_
     assert result is not None
     assert result.intent == "backtest_execution"
     assert result.semantic_turn_act == "answer_pending_need"
-    assert result.candidate_strategy_draft.asset_universe == ["GOOGL", "NVDA"]
+    # #238: the flat append resolves against the pending set into one
+    # canonical replace of the final universe.
+    assert result.candidate_strategy_draft.asset_universe == [
+        "AAPL",
+        "MSFT",
+        "TSLA",
+        "GOOGL",
+        "NVDA",
+    ]
     assert result.candidate_strategy_draft.extra_parameters[
         "asset_universe_operation"
-    ] == "append"
+    ] == "replace"
     assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
         "asset_universe": "explicit_user"
     }
@@ -3208,8 +3218,9 @@ def test_artifact_assumption_edit_plan_maps_asset_operation() -> None:
     )
 
     draft = response.candidate_strategy_draft
-    assert draft.asset_universe == ["MSFT"]
-    assert draft.extra_parameters["asset_universe_operation"] == "append"
+    # #238: the flat append converts to the canonical resolved replace.
+    assert draft.asset_universe == ["AAPL", "MSFT"]
+    assert draft.extra_parameters["asset_universe_operation"] == "replace"
     assert draft.field_provenance == {"asset_universe": "explicit_user"}
 
 

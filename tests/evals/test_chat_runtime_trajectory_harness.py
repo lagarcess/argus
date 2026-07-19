@@ -264,6 +264,14 @@ def test_run_actions_use_confirmation_id_as_the_exact_idempotency_identity() -> 
     assert run_action_steps
     for step, envelope in run_action_steps:
         action = envelope["action"]
+        if step.expectation.recovery_code == "confirmation_action_missing_identity":
+            # #238 fail-closed probe: the identity's absence is the subject —
+            # the step must expect typed recovery and zero executions.
+            assert "confirmation_id" not in action["payload"]
+            assert step.expectation.checkpoints.get(
+                "stale_action.execution_count"
+            ) == 0
+            continue
         confirmation_id = action["payload"]["confirmation_id"]
         assert envelope["headers"] == {"Idempotency-Key": confirmation_id}
         assert step.expectation.action_identity == confirmation_id

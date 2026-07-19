@@ -2,41 +2,25 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
-from argus.agent_runtime.artifact_edit_planner import ResolvedArtifactEdit
+from argus.agent_runtime.artifact_edit_planner import (
+    ResolvedArtifactEdit,
+    asset_edit_symbol_resolver,
+)
 from argus.agent_runtime.interpreter.shared import (
     _date_window_intent_bound_to_latest_result,
     _supported_dca_cadence_value,
 )
-from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
 )
 from argus.agent_runtime.state.models import StrategySummary
 from argus.nlp.natural_time import resolve_date_range_intent
 
-ResolveAssetCandidate = Callable[..., AssetResolution | None]
-
-
-def asset_edit_symbol_resolver(
-    resolve_asset_candidate: ResolveAssetCandidate,
-) -> Callable[[str], str | None]:
-    def _resolve(raw_symbol: str) -> str | None:
-        resolution = resolve_asset_candidate(
-            raw_symbol,
-            field="asset_edit",
-            source="user_mention",
-        )
-        if (
-            resolution is not None
-            and resolution.status == "resolved"
-            and resolution.asset
-        ):
-            return resolution.asset.canonical_symbol
-        return None
-
-    return _resolve
+__all__ = [
+    "apply_resolved_artifact_edit_to_strategy_summary",
+    "asset_edit_symbol_resolver",
+    "strategy_summary_uses_rsi",
+]
 
 
 def apply_resolved_artifact_edit_to_strategy_summary(

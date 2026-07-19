@@ -342,13 +342,19 @@ def stale_confirmation_action_message(
         return None
     action_confirmation_id = _confirmation_id_from_action_payload(payload.action.payload)
     if action_confirmation_id is None:
+        # An id-less chip binds to the visible latest card (the designed
+        # chip-clarify corridor); only explicit identities are validated here.
         return None
     latest_confirmation_id = latest_active_confirmation_id(
         user_id=user_id,
         conversation_id=conversation_id,
         recent_messages=recent_messages,
     )
-    if latest_confirmation_id is None or latest_confirmation_id == action_confirmation_id:
+    if latest_confirmation_id is None:
+        # #238 fail closed: an explicit confirmation identity that cannot be
+        # validated against a visible latest card must never execute.
+        return recovery_message("confirmation_action_stale_card", language=language)
+    if latest_confirmation_id == action_confirmation_id:
         return None
     return recovery_message("confirmation_action_stale_card", language=language)
 

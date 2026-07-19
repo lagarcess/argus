@@ -13,10 +13,36 @@ from argus.agent_runtime.artifacts.asset_edits import (
     same_asset_universe,
 )
 from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+from argus.agent_runtime.resolution import AssetResolution
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema,
     openrouter_structured_model_candidates,
 )
+
+ResolveAssetCandidate = Callable[..., "AssetResolution | None"]
+
+
+def asset_edit_symbol_resolver(
+    resolve_asset_candidate: ResolveAssetCandidate,
+) -> Callable[[str], str | None]:
+    """The one symbol resolver for edit operations — both the interpreter and
+    interpret-stage corridors import it from here so they cannot drift."""
+
+    def _resolve(raw_symbol: str) -> str | None:
+        resolution = resolve_asset_candidate(
+            raw_symbol,
+            field="asset_edit",
+            source="user_mention",
+        )
+        if (
+            resolution is not None
+            and resolution.status == "resolved"
+            and resolution.asset
+        ):
+            return resolution.asset.canonical_symbol
+        return None
+
+    return _resolve
 
 
 class EditOperation(BaseModel):

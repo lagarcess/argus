@@ -7,10 +7,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from argus.agent_runtime.artifact_edit_planner import (
+from argus.agent_runtime.artifact_edit_planner import (  # noqa: F401 — re-export
     ArtifactAssumptionEditPlan,
+    EditOperation,
     ResolvedArtifactEdit,
     apply_edit_operations,
+    asset_edit_symbol_resolver,
 )
 from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
 from argus.agent_runtime.interpreter.shared import (
@@ -149,26 +151,6 @@ def _current_artifact_strategy(request: InterpretationRequest) -> StrategySummar
     return prior
 
 
-def asset_edit_symbol_resolver(
-    resolve_asset_candidate: ResolveAssetCandidate,
-) -> Callable[[str], str | None]:
-    def _resolve(raw_symbol: str) -> str | None:
-        resolution = resolve_asset_candidate(
-            raw_symbol,
-            field="asset_edit",
-            source="user_mention",
-        )
-        if (
-            resolution is not None
-            and resolution.status == "resolved"
-            and resolution.asset
-        ):
-            return resolution.asset.canonical_symbol
-        return None
-
-    return _resolve
-
-
 def _apply_resolved_edit_to_draft(
     resolved: ResolvedArtifactEdit,
     *,
@@ -246,52 +228,65 @@ def _apply_resolved_edit_to_draft(
         field_provenance["indicator_parameters"] = "explicit_user"
 
 
-def _apply_legacy_flat_edit_fields(
+def _operations_from_flat_plan(
     plan: ArtifactAssumptionEditPlan,
-    *,
-    draft: LLMStrategyDraft,
-    field_provenance: dict[str, str],
-    extra_parameters: dict[str, Any],
-) -> None:
-    if plan.asset_universe:
-        operation = normalized_asset_universe_operation(
-            plan.asset_universe_operation
+) -> list[EditOperation]:
+    """Convert a legacy flat plan (no operations) into the typed operation
+    list, so every entry point flows through the single canonical merge.
+
+    A flat asset set WITHOUT an explicit operation is the model restating the
+    current universe, never an edit — it emits no asset operation, matching
+    the historical merge behavior."""
+
+    operations: list[EditOperation] = []
+    asset_operation = normalized_asset_universe_operation(
+        plan.asset_universe_operation
+    )
+    if plan.asset_universe and asset_operation is not None:
+        operations.append(
+            EditOperation(
+                op="add" if asset_operation == "append" else "replace",
+                target="asset",
+                symbols=list(plan.asset_universe),
+            )
         )
-        draft.asset_universe = list(plan.asset_universe)
-        if operation is not None:
-            draft.asset_universe_operation = operation
-            extra_parameters["asset_universe_operation"] = operation
-        field_provenance["asset_universe"] = "explicit_user"
-    if plan.comparison_baseline is not None:
-        benchmark = str(plan.comparison_baseline or "").strip().upper()
-        if benchmark:
-            draft.comparison_baseline = benchmark
-            field_provenance["comparison_baseline"] = "explicit_user"
+    if plan.comparison_baseline is not None and str(
+        plan.comparison_baseline or ""
+    ).strip():
+        operations.append(
+            EditOperation(
+                op="set", target="benchmark", value=plan.comparison_baseline
+            )
+        )
     if plan.initial_capital is not None:
-        draft.initial_capital = plan.initial_capital
-        field_provenance["initial_capital"] = "starting_capital"
+        operations.append(
+            EditOperation(op="set", target="capital", number=plan.initial_capital)
+        )
     if plan.recurring_contribution_amount is not None:
-        recurring_amount = float(plan.recurring_contribution_amount)
-        draft.capital_amount = recurring_amount
-        draft.recurring_contribution = recurring_amount
-        field_provenance["capital_amount"] = "recurring_contribution"
-        field_provenance["recurring_contribution"] = "recurring_contribution"
-        extra_parameters["recurring_contribution"] = recurring_amount
+        operations.append(
+            EditOperation(
+                op="set",
+                target="recurring_contribution",
+                number=plan.recurring_contribution_amount,
+            )
+        )
     if plan.cadence is not None:
-        cadence = _supported_dca_cadence_value(plan.cadence)
-        if cadence is not None:
-            draft.cadence = cadence
-            field_provenance["cadence"] = "explicit_user"
-            extra_parameters["recurring_cadence"] = cadence
+        operations.append(
+            EditOperation(op="set", target="cadence", value=plan.cadence)
+        )
     if plan.timeframe is not None:
-        draft.timeframe = plan.timeframe
-        field_provenance["timeframe"] = "explicit_user"
+        operations.append(
+            EditOperation(op="set", target="timeframe", value=plan.timeframe)
+        )
     if plan.fee_rate is not None:
-        extra_parameters["fee_rate"] = plan.fee_rate
-        field_provenance["fee_rate"] = "explicit_user"
+        operations.append(
+            EditOperation(op="set", target="fees", number=plan.fee_rate)
+        )
     if plan.slippage is not None:
-        extra_parameters["slippage"] = plan.slippage
-        field_provenance["slippage"] = "explicit_user"
+        operations.append(
+            EditOperation(op="set", target="slippage", number=plan.slippage)
+        )
+    return operations
 
 
 def _edit_plan_reshapes_non_recurring_strategy(
@@ -348,10 +343,13 @@ def _response_from_artifact_assumption_edit_plan(
         draft.strategy_type = current_strategy.strategy_type
     field_provenance: dict[str, str] = {}
     extra_parameters: dict[str, Any] = {}
-    if plan.operations:
+    # One merge corridor: legacy flat plans convert to the same typed
+    # operations, so every entry point applies through the canonical planner.
+    operations = plan.operations or _operations_from_flat_plan(plan)
+    if operations:
         allow_indicator_parameters = _current_artifact_uses_rsi(request)
         resolved = apply_edit_operations(
-            plan.operations,
+            operations,
             current_asset_universe=_current_artifact_asset_universe(request),
             asset_symbol_resolver=asset_symbol_resolver,
         )
@@ -362,13 +360,6 @@ def _response_from_artifact_assumption_edit_plan(
             extra_parameters=extra_parameters,
             allow_indicator_parameters=allow_indicator_parameters,
             latest_result_window=_latest_result_date_window(request),
-        )
-    else:
-        _apply_legacy_flat_edit_fields(
-            plan,
-            draft=draft,
-            field_provenance=field_provenance,
-            extra_parameters=extra_parameters,
         )
     if extra_parameters:
         draft.extra_parameters.update(extra_parameters)

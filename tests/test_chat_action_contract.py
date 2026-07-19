@@ -269,3 +269,76 @@ def test_change_dates_action_asks_natural_date_window_question() -> None:
     assert assistant_message["metadata"]["pending_strategy"]["requested_field"] == (
         "date_range"
     )
+
+
+def test_stale_guard_fails_closed_when_latest_identity_is_missing() -> None:
+    """#238: an action carrying an explicit confirmation_id whose identity
+    cannot be validated (no visible latest confirmation) must fail closed
+    with typed recovery — never fall through toward execution."""
+
+    from argus.api.chat.actions import stale_confirmation_action_message
+    from argus.api.schemas import ChatStreamRequest
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+
+    payload = ChatStreamRequest.model_validate(
+        {
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "change_dates",
+                "label": "Change dates",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-unverifiable"},
+            },
+            "language": "en",
+        }
+    )
+
+    message = stale_confirmation_action_message(
+        payload=payload,
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        recent_messages=[],
+        language="en",
+    )
+    assert message is not None
+
+
+def test_unverifiable_confirmation_id_executes_nothing(monkeypatch) -> None:
+    """#238 route corridor: with a checkpoint claiming a pending confirmation
+    but no visible latest identity, an explicit-id action returns typed
+    recovery and the runtime is never invoked."""
+
+    from argus.api.routers import agent as agent_router
+
+    async def _must_not_run(**kwargs: Any):
+        raise AssertionError("unverifiable confirmation ids must not execute")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _must_not_run)
+    monkeypatch.setattr(
+        agent_router, "checkpoint_has_pending_confirmation", lambda values: True
+    )
+
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "change_dates",
+                "label": "Change dates",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-unverifiable"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["recovery"]["code"] == "confirmation_action_stale_card"
