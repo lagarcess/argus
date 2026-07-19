@@ -15,6 +15,15 @@ from argus.agent_runtime.recovery_messages import recovery_message, recovery_sta
 from argus.agent_runtime.resolution import mention_to_provenance
 from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
+from argus.agent_runtime.turn_execution import (
+    InternalTurnOutcome,
+    begin_turn_execution,
+    claim_turn_terminal,
+    record_exit_fingerprint,
+    reset_turn_execution,
+    semantic_turn_fingerprint,
+    turn_execution_summary,
+)
 from argus.api import state as api_state
 from argus.api.chat import retry as chat_retry
 from argus.api.chat import turn_lifecycle_hooks
@@ -220,6 +229,16 @@ def _runtime_event_boundary(runtime_event: dict[str, Any]) -> dict[str, str]:
 def _runtime_failure_diagnostics(exc: BaseException) -> dict[str, Any] | None:
     diagnostics = getattr(exc, "diagnostics", None)
     return dict(diagnostics) if isinstance(diagnostics, dict) else None
+
+
+def _internal_turn_outcome_for_stage(stage_status: str) -> InternalTurnOutcome:
+    if stage_status == "execution_succeeded":
+        return "completed"
+    if stage_status == "execution_failed_terminally":
+        return "terminal_failed"
+    if stage_status in {"execution_failed_recoverably", "agent_runtime_failure"}:
+        return "recoverable_failed"
+    return "answered"
 
 
 def _strategies_enabled() -> bool:
@@ -940,6 +959,11 @@ async def chat_stream(
                 to_status="running",
             )
 
+        # #239: one internal execution budget per accepted runtime turn —
+        # deadline, shared provider-call allowance, fingerprint, one terminal.
+        turn_execution_token = begin_turn_execution(
+            entry_fingerprint=semantic_turn_fingerprint(checkpoint_values),
+        )
         receipt_token = begin_openrouter_route_receipt_capture()
         shadow_context_token = set_backtest_job_shadow_context(
             BacktestJobShadowContext(
@@ -1318,6 +1342,20 @@ async def chat_stream(
                 if result_action_type is not None:
                     receipt_metadata["chat_action"] = result_action_type
 
+                fingerprint_transition = record_exit_fingerprint(
+                    semantic_turn_fingerprint(runtime_result)
+                )
+                internal_outcome = _internal_turn_outcome_for_stage(stage_status)
+                if fingerprint_transition == "unchanged" and internal_outcome in {
+                    "answered",
+                    "completed",
+                }:
+                    # Equivalent typed state may not recur as success without
+                    # advancement: it terminates as no_progress instead.
+                    claim_turn_terminal("no_progress", reason="unchanged_fingerprint")
+                else:
+                    claim_turn_terminal(internal_outcome, reason=stage_status)
+
                 runtime_result["message_id"] = (
                     assistant_message.id if assistant_message is not None else None
                 )
@@ -1357,6 +1395,7 @@ async def chat_stream(
                 if finalization_failed
                 else "agent_runtime_failure"
             )
+            claim_turn_terminal("recoverable_failed", reason=failure_code)
             runtime_diagnostics = _runtime_failure_diagnostics(exc)
             logger.exception(
                 "Agent runtime chat streaming failed",
@@ -1447,8 +1486,16 @@ async def chat_stream(
             return
         finally:
             reset_backtest_job_shadow_context(shadow_context_token)
+            # First claim wins: this backstop only lands when the stream was
+            # severed before any outcome path could claim the turn terminal.
+            claim_turn_terminal("recoverable_failed", reason="stream_severed")
+            route_receipts = end_openrouter_route_receipt_capture(receipt_token)
+            receipt_metadata["turn_execution"] = turn_execution_summary(
+                route_receipts
+            )
+            reset_turn_execution(turn_execution_token)
             persist_route_receipts(
-                receipts=end_openrouter_route_receipt_capture(receipt_token),
+                receipts=route_receipts,
                 user_id=user.id,
                 conversation_id=conversation.id,
                 run_id=receipt_run_id,

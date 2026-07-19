@@ -8,7 +8,7 @@ import asyncio
 import json
 import time
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from loguru import logger
@@ -355,6 +355,10 @@ from argus.agent_runtime.strategy_contract import (
     normalize_date_range_candidate,
     resolve_date_range,
 )
+from argus.agent_runtime.turn_execution import (
+    reserve_provider_call,
+    turn_budget_block_reason,
+)
 from argus.agent_runtime.turn_execution_evidence import (
     current_turn_has_material_execution_evidence,
 )
@@ -494,51 +498,17 @@ class OpenRouterStructuredInterpreter:
             self.last_status = "failed"
             return None
 
-        # 1. Try Primary Model
         model = build_openrouter_model("interpretation", model_name=self.model_name)
-        if model:
-            started_at = time.perf_counter()
-            try:
-                structured = model.with_structured_output(LLMInterpretationResponse)
-                response = await asyncio.wait_for(
-                    structured.ainvoke(messages),
-                    timeout=openrouter_task_timeout_seconds("interpretation"),
-                )
-                if isinstance(response, LLMInterpretationResponse):
-                    record_openrouter_route_receipt(
-                        task="interpretation",
-                        model_name=self.model_name,
-                        mode="chat_model",
-                        schema_name="LLMInterpretationResponse",
-                        latency_ms=_elapsed_ms(started_at),
-                        outcome="succeeded",
-                    )
-                    response = await _response_ready_for_runtime(
-                        response=response,
-                        preferred_model=self.model_name,
-                        request=request,
-                        asset_resolution_context=asset_resolution_context,
-                    )
-                    self.last_status = "used"
-                    return self._to_runtime_interpretation(response, request=request)
-            except Exception as exc:
-                record_openrouter_route_receipt(
-                    task="interpretation",
-                    model_name=self.model_name,
-                    mode="chat_model",
-                    schema_name="LLMInterpretationResponse",
-                    latency_ms=_elapsed_ms(started_at),
-                    outcome="failed",
-                    failure_mode=type(exc).__name__,
-                )
-                log_openrouter_failure(
-                    task="interpretation",
-                    model_name=self.model_name,
-                    exc=exc,
-                    message="Primary LLM interpretation failed; attempting fallback",
-                )
+        if interpretation := await self._direct_model_attempt(
+            model=model,
+            model_name=self.model_name,
+            messages=messages,
+            request=request,
+            asset_resolution_context=asset_resolution_context,
+            role="primary",
+        ):
+            return interpretation
 
-        # 2. Try Fallback Model (if primary failed or was unavailable)
         from argus.llm.openrouter import resolve_openrouter_model
 
         fallback_model_name = resolve_openrouter_model(
@@ -558,50 +528,15 @@ class OpenRouterStructuredInterpreter:
         fallback_model = build_openrouter_model(
             "interpretation", model_name=fallback_model_name
         )
-        if fallback_model:
-            started_at = time.perf_counter()
-            try:
-                structured = fallback_model.with_structured_output(
-                    LLMInterpretationResponse
-                )
-                response = await asyncio.wait_for(
-                    structured.ainvoke(messages),
-                    timeout=openrouter_task_timeout_seconds("interpretation"),
-                )
-                if isinstance(response, LLMInterpretationResponse):
-                    record_openrouter_route_receipt(
-                        task="interpretation",
-                        model_name=fallback_model_name,
-                        mode="chat_model",
-                        schema_name="LLMInterpretationResponse",
-                        latency_ms=_elapsed_ms(started_at),
-                        outcome="succeeded",
-                    )
-                    response = await _response_ready_for_runtime(
-                        response=response,
-                        preferred_model=fallback_model_name,
-                        request=request,
-                        asset_resolution_context=asset_resolution_context,
-                    )
-                    self.last_status = "fallback_used"
-                    return self._to_runtime_interpretation(response, request=request)
-            except Exception as exc:
-                self.last_status = "failed"
-                record_openrouter_route_receipt(
-                    task="interpretation",
-                    model_name=fallback_model_name,
-                    mode="chat_model",
-                    schema_name="LLMInterpretationResponse",
-                    latency_ms=_elapsed_ms(started_at),
-                    outcome="failed",
-                    failure_mode=type(exc).__name__,
-                )
-                log_openrouter_failure(
-                    task="interpretation",
-                    model_name=fallback_model_name,
-                    exc=exc,
-                    message="Fallback LLM interpretation failed",
-                )
+        if interpretation := await self._direct_model_attempt(
+            model=fallback_model,
+            model_name=fallback_model_name,
+            messages=messages,
+            request=request,
+            asset_resolution_context=asset_resolution_context,
+            role="fallback",
+        ):
+            return interpretation
 
         repaired_response = await _plan_pending_artifact_assumption_edit(
             request=request,
@@ -626,6 +561,72 @@ class OpenRouterStructuredInterpreter:
             return self._to_runtime_interpretation(
                 repaired_response,
                 request=request,
+            )
+        return None
+
+    async def _direct_model_attempt(
+        self,
+        *,
+        model: Any,
+        model_name: str,
+        messages: list[BaseMessage],
+        request: InterpretationRequest,
+        asset_resolution_context: str | None,
+        role: Literal["primary", "fallback"],
+    ) -> StructuredInterpretation | None:
+        """One budget-reserved direct structured attempt against ``model``.
+        Exhaustion records a skipped receipt and never reaches the provider."""
+        if model is None:
+            return None
+
+        def _receipt(latency_ms: int, outcome: Any, failure_mode: str | None) -> None:
+            record_openrouter_route_receipt(
+                task="interpretation",
+                model_name=model_name,
+                mode="chat_model",
+                schema_name="LLMInterpretationResponse",
+                latency_ms=latency_ms,
+                outcome=outcome,
+                failure_mode=failure_mode,
+            )
+
+        permit = reserve_provider_call(
+            "interpretation",
+            task_timeout_seconds=openrouter_task_timeout_seconds("interpretation"),
+        )
+        if permit is None:
+            _receipt(0, "skipped", turn_budget_block_reason())
+            return None
+        started_at = time.perf_counter()
+        try:
+            structured = model.with_structured_output(LLMInterpretationResponse)
+            response = await asyncio.wait_for(
+                structured.ainvoke(messages),
+                timeout=permit.timeout_seconds,
+            )
+            if isinstance(response, LLMInterpretationResponse):
+                _receipt(_elapsed_ms(started_at), "succeeded", None)
+                response = await _response_ready_for_runtime(
+                    response=response,
+                    preferred_model=model_name,
+                    request=request,
+                    asset_resolution_context=asset_resolution_context,
+                )
+                self.last_status = "fallback_used" if role == "fallback" else "used"
+                return self._to_runtime_interpretation(response, request=request)
+        except Exception as exc:
+            if role == "fallback":
+                self.last_status = "failed"
+            _receipt(_elapsed_ms(started_at), "failed", type(exc).__name__)
+            log_openrouter_failure(
+                task="interpretation",
+                model_name=model_name,
+                exc=exc,
+                message=(
+                    "Fallback LLM interpretation failed"
+                    if role == "fallback"
+                    else "Primary LLM interpretation failed; attempting fallback"
+                ),
             )
         return None
 
