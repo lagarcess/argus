@@ -206,3 +206,112 @@ def test_both_edit_surfaces_share_one_asset_symbol_resolver() -> None:
         artifact_assumption_edit.asset_edit_symbol_resolver
         is confirmation_artifact_edits.asset_edit_symbol_resolver
     )
+
+
+def _flat_append_plan() -> ArtifactAssumptionEditPlan:
+    return ArtifactAssumptionEditPlan(
+        outcome="ready_to_confirm",
+        asset_universe=["MSFT"],
+        asset_universe_operation="append",
+    )
+
+
+def test_unavailable_corridor_emits_the_same_patch_as_the_main_corridor() -> None:
+    """#238: the interpreter-unavailable corridor and the normal interpreter
+    corridor must emit the identical typed patch for the same flat plan —
+    the resolved final asset set as one canonical replace."""
+
+    import asyncio
+
+    from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (  # noqa: E501
+        planned_pending_confirmation_edit_interpretation,
+    )
+
+    async def _plan_stub(**kwargs: object) -> ArtifactAssumptionEditPlan:
+        return _flat_append_plan()
+
+    def _resolve_stub(symbol: str, **kwargs: object) -> object:
+        from types import SimpleNamespace
+
+        cleaned = str(symbol).strip().upper()
+        return SimpleNamespace(
+            status="resolved",
+            asset=SimpleNamespace(canonical_symbol=cleaned),
+        )
+
+    offline = asyncio.run(
+        planned_pending_confirmation_edit_interpretation(
+            snapshot=TaskSnapshot(pending_strategy_summary=_pending_aapl()),
+            current_user_message="add microsoft",
+            requested_field="assumption",
+            resolve_asset_candidate=_resolve_stub,
+            plan_artifact_assumption_edit_fn=_plan_stub,
+        )
+    )
+    online = _response_from_artifact_assumption_edit_plan(
+        plan=_flat_append_plan(),
+        request=_request_with_pending(_pending_aapl()),
+    )
+
+    assert offline is not None
+    offline_draft = offline.candidate_strategy_draft
+    online_draft = online.candidate_strategy_draft
+    assert online_draft.asset_universe == ["AAPL", "MSFT"]
+    assert offline_draft.asset_universe == online_draft.asset_universe
+    assert offline_draft.extra_parameters.get("asset_universe_operation") == (
+        "replace"
+    )
+    assert online_draft.extra_parameters.get("asset_universe_operation") == (
+        "replace"
+    )
+
+
+def test_inapplicable_flat_edit_cannot_become_executable() -> None:
+    """#238 fail closed: a flat plan whose converted operations produce no
+    applicable patch (unsupported cadence) must return typed clarification —
+    never an executable intent with an empty patch."""
+
+    plan = ArtifactAssumptionEditPlan(
+        outcome="ready_to_confirm",
+        cadence="yearly",
+    )
+
+    response = _response_from_artifact_assumption_edit_plan(
+        plan=plan,
+        request=_request_with_pending(_pending_aapl()),
+    )
+
+    assert response.intent != "backtest_execution"
+    assert response.requires_clarification is True
+    draft = response.candidate_strategy_draft
+    assert draft.field_provenance in (None, {})
+    assert draft.cadence is None
+
+
+def test_inapplicable_flat_edit_fails_closed_offline_too() -> None:
+    """The unavailable corridor rejects the same inapplicable flat edit
+    instead of emitting an executable empty patch."""
+
+    import asyncio
+
+    from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (  # noqa: E501
+        planned_pending_confirmation_edit_interpretation,
+    )
+
+    async def _plan_stub(**kwargs: object) -> ArtifactAssumptionEditPlan:
+        return ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            cadence="yearly",
+        )
+
+    offline = asyncio.run(
+        planned_pending_confirmation_edit_interpretation(
+            snapshot=TaskSnapshot(pending_strategy_summary=_pending_aapl()),
+            current_user_message="make it yearly",
+            requested_field="assumption",
+            resolve_asset_candidate=lambda *args, **kwargs: None,
+            plan_artifact_assumption_edit_fn=_plan_stub,
+        )
+    )
+
+    assert offline is None

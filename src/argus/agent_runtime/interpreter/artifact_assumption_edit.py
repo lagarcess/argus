@@ -9,12 +9,11 @@ from typing import Any
 
 from argus.agent_runtime.artifact_edit_planner import (  # noqa: F401 — re-export
     ArtifactAssumptionEditPlan,
-    EditOperation,
     ResolvedArtifactEdit,
     apply_edit_operations,
     asset_edit_symbol_resolver,
+    effective_edit_operations,
 )
-from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
 from argus.agent_runtime.interpreter.shared import (
     _date_window_intent_bound_to_latest_result,
     _field_path_base,
@@ -228,67 +227,6 @@ def _apply_resolved_edit_to_draft(
         field_provenance["indicator_parameters"] = "explicit_user"
 
 
-def _operations_from_flat_plan(
-    plan: ArtifactAssumptionEditPlan,
-) -> list[EditOperation]:
-    """Convert a legacy flat plan (no operations) into the typed operation
-    list, so every entry point flows through the single canonical merge.
-
-    A flat asset set WITHOUT an explicit operation is the model restating the
-    current universe, never an edit — it emits no asset operation, matching
-    the historical merge behavior."""
-
-    operations: list[EditOperation] = []
-    asset_operation = normalized_asset_universe_operation(
-        plan.asset_universe_operation
-    )
-    if plan.asset_universe and asset_operation is not None:
-        operations.append(
-            EditOperation(
-                op="add" if asset_operation == "append" else "replace",
-                target="asset",
-                symbols=list(plan.asset_universe),
-            )
-        )
-    if plan.comparison_baseline is not None and str(
-        plan.comparison_baseline or ""
-    ).strip():
-        operations.append(
-            EditOperation(
-                op="set", target="benchmark", value=plan.comparison_baseline
-            )
-        )
-    if plan.initial_capital is not None:
-        operations.append(
-            EditOperation(op="set", target="capital", number=plan.initial_capital)
-        )
-    if plan.recurring_contribution_amount is not None:
-        operations.append(
-            EditOperation(
-                op="set",
-                target="recurring_contribution",
-                number=plan.recurring_contribution_amount,
-            )
-        )
-    if plan.cadence is not None:
-        operations.append(
-            EditOperation(op="set", target="cadence", value=plan.cadence)
-        )
-    if plan.timeframe is not None:
-        operations.append(
-            EditOperation(op="set", target="timeframe", value=plan.timeframe)
-        )
-    if plan.fee_rate is not None:
-        operations.append(
-            EditOperation(op="set", target="fees", number=plan.fee_rate)
-        )
-    if plan.slippage is not None:
-        operations.append(
-            EditOperation(op="set", target="slippage", number=plan.slippage)
-        )
-    return operations
-
-
 def _edit_plan_reshapes_non_recurring_strategy(
     plan: ArtifactAssumptionEditPlan,
     *,
@@ -345,7 +283,7 @@ def _response_from_artifact_assumption_edit_plan(
     extra_parameters: dict[str, Any] = {}
     # One merge corridor: legacy flat plans convert to the same typed
     # operations, so every entry point applies through the canonical planner.
-    operations = plan.operations or _operations_from_flat_plan(plan)
+    operations = effective_edit_operations(plan)
     if operations:
         allow_indicator_parameters = _current_artifact_uses_rsi(request)
         resolved = apply_edit_operations(
@@ -367,7 +305,7 @@ def _response_from_artifact_assumption_edit_plan(
         draft.field_provenance = field_provenance
 
     if plan.outcome == "ready_to_confirm":
-        if plan.operations and not field_provenance and not extra_parameters:
+        if not field_provenance and not extra_parameters:
             return LLMInterpretationResponse(
                 intent="conversation_followup",
                 task_relation="continue",
@@ -379,7 +317,8 @@ def _response_from_artifact_assumption_edit_plan(
                 candidate_strategy_draft=draft,
                 assistant_response=(
                     plan.assistant_response
-                    or "I can change RSI thresholds only on an active RSI confirmation card."
+                    or "I could not apply that change to the current card. "
+                    "Tell me the exact value you want to change."
                 ),
                 confidence=plan.confidence,
                 reason_codes=["artifact_assumption_edit_planned"],

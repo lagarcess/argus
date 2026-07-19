@@ -8,13 +8,13 @@ from typing import Any
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     apply_edit_operations,
+    effective_edit_operations,
 )
 from argus.agent_runtime.artifact_edit_planner import (
     plan_artifact_assumption_edit as _plan_artifact_assumption_edit,
 )
 from argus.agent_runtime.artifacts.asset_edits import (
     normalized_asset_universe_operation,
-    same_asset_universe,
 )
 from argus.agent_runtime.asset_text_grounding import provider_ticker_mentions_from_text
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (
@@ -27,7 +27,6 @@ from argus.agent_runtime.interpreter.pending_option import (
 )
 from argus.agent_runtime.interpreter.shared import (
     _latest_result_date_window_from_snapshot,
-    _supported_dca_cadence_value,
 )
 from argus.agent_runtime.interpreter.strategy_builder import _strategy_from_llm
 from argus.agent_runtime.resolution import AssetResolution
@@ -406,10 +405,14 @@ async def _planned_artifact_edit_interpretation(
         # draft itself; an edit never changes the anchor's family.
         candidate.strategy_type = prior_strategy.strategy_type
     field_provenance: dict[str, str] = {}
-    if plan.operations:
+    # One merge corridor (#238): flat plans convert to the same typed
+    # operations, so the offline path applies the identical canonical patch
+    # the online interpreter corridor emits.
+    operations = effective_edit_operations(plan)
+    if operations:
         apply_resolved_artifact_edit_to_strategy_summary(
             apply_edit_operations(
-                plan.operations,
+                operations,
                 current_asset_universe=prior_strategy.asset_universe,
                 asset_symbol_resolver=asset_edit_symbol_resolver(resolve_asset_candidate),
             ),
@@ -418,35 +421,6 @@ async def _planned_artifact_edit_interpretation(
             allow_indicator_parameters=strategy_summary_uses_rsi(prior_strategy),
             latest_result_window=latest_result_window,
         )
-    elif plan.asset_universe:
-        operation = normalized_asset_universe_operation(plan.asset_universe_operation)
-        if operation is None:
-            if not same_asset_universe(
-                plan.asset_universe,
-                prior_strategy.asset_universe,
-            ):
-                return None
-        else:
-            candidate.asset_universe = list(plan.asset_universe)
-            candidate.extra_parameters["asset_universe_operation"] = operation
-            field_provenance["asset_universe"] = "explicit_user"
-    if plan.comparison_baseline is not None:
-        baseline = str(plan.comparison_baseline or "").strip().upper()
-        if baseline:
-            candidate.comparison_baseline = baseline
-            field_provenance["comparison_baseline"] = "explicit_user"
-    if plan.initial_capital is not None:
-        candidate.capital_amount = float(plan.initial_capital)
-        field_provenance["capital_amount"] = "starting_capital"
-    if plan.cadence is not None and not plan.operations:
-        cadence = _supported_dca_cadence_value(plan.cadence)
-        if cadence is not None:
-            candidate.cadence = cadence
-            candidate.extra_parameters["recurring_cadence"] = cadence
-            field_provenance["cadence"] = "explicit_user"
-    if plan.timeframe is not None:
-        candidate.timeframe = str(plan.timeframe)
-        field_provenance["timeframe"] = "explicit_user"
     if (
         field_provenance.get("capital_amount") == "starting_capital"
         and canonical_strategy_type(prior_strategy.strategy_type) == "dca_accumulation"

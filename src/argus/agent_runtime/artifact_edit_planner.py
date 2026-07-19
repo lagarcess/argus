@@ -90,6 +90,76 @@ class ArtifactAssumptionEditPlan(BaseModel):
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
 
+def edit_operations_from_flat_plan(
+    plan: ArtifactAssumptionEditPlan,
+) -> list[EditOperation]:
+    """Convert a legacy flat plan (no operations) into the typed operation
+    list, so every corridor flows through the single canonical merge.
+
+    A flat asset set WITHOUT an explicit operation is the model restating the
+    current universe, never an edit — it emits no asset operation, matching
+    the historical merge behavior."""
+
+    operations: list[EditOperation] = []
+    asset_operation = normalized_asset_universe_operation(
+        plan.asset_universe_operation
+    )
+    if plan.asset_universe and asset_operation is not None:
+        operations.append(
+            EditOperation(
+                op="add" if asset_operation == "append" else "replace",
+                target="asset",
+                symbols=list(plan.asset_universe),
+            )
+        )
+    if plan.comparison_baseline is not None and str(
+        plan.comparison_baseline or ""
+    ).strip():
+        operations.append(
+            EditOperation(
+                op="set", target="benchmark", value=plan.comparison_baseline
+            )
+        )
+    if plan.initial_capital is not None:
+        operations.append(
+            EditOperation(op="set", target="capital", number=plan.initial_capital)
+        )
+    if plan.recurring_contribution_amount is not None:
+        operations.append(
+            EditOperation(
+                op="set",
+                target="recurring_contribution",
+                number=plan.recurring_contribution_amount,
+            )
+        )
+    if plan.cadence is not None:
+        operations.append(
+            EditOperation(op="set", target="cadence", value=plan.cadence)
+        )
+    if plan.timeframe is not None:
+        operations.append(
+            EditOperation(op="set", target="timeframe", value=plan.timeframe)
+        )
+    if plan.fee_rate is not None:
+        operations.append(
+            EditOperation(op="set", target="fees", number=plan.fee_rate)
+        )
+    if plan.slippage is not None:
+        operations.append(
+            EditOperation(op="set", target="slippage", number=plan.slippage)
+        )
+    return operations
+
+
+def effective_edit_operations(
+    plan: ArtifactAssumptionEditPlan,
+) -> list[EditOperation]:
+    """The plan's typed operations, converting legacy flat fields when the
+    model produced none — the one entry into apply_edit_operations."""
+
+    return list(plan.operations) or edit_operations_from_flat_plan(plan)
+
+
 async def plan_artifact_assumption_edit(
     *,
     current_user_message: str,
