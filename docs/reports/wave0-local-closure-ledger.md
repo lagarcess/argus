@@ -826,3 +826,64 @@ deployed-browser EN/ES QA (recovery row, cancel-turn transcript rows,
 onboarding-control transcript rendering, retry supersession and
 binding); GitHub Actions run; exact-SHA Render canary; the #244 paid
 probe; #251 live EN/ES QA.
+
+### Seventh correction pass (2026-07-18, verified #240 hydration + protocol gaps)
+
+Bounded to #240 only; #243/#233/#251 untouched. **13 code/test files**
+(+287/−36 at `505e0af`) plus this ledger update. All red-first.
+
+1. **Abandoned recovery survives canonical action hydration** — `0a464c7`.
+   `hydrateMessagesFromApi` short-circuited user messages carrying a
+   structured `chat_action` into bare action rows, dropping the abandoned
+   recovery that the lower-level text hydrator attached. The action branch
+   now composes the exported `abandonedRecoveryFromApiMessage` (the same
+   derivation the text hydrator uses — no duplicated retry/recovery
+   parsing), and ChatMessage's two user branches merged so the recovery row
+   renders beneath both the action chip and the plain bubble. Red-first: a
+   canonical-hydration behavior suite proving an abandoned `change_dates`
+   action keeps its action-row presentation, carries its identity-bound
+   retry (`retry-last-turn-<id>`), and renders recovery with no button on a
+   mismatched identity; plus a structural pin that no early action-kind
+   return can bypass the row.
+
+2. **Typed onboarding protocol state; clean runtime history; live/reload
+   parity** — `505e0af`. Acceptance stamps
+   `metadata.onboarding_control = {kind, goal}` (typed
+   `onboarding_control_state` parser) on the durable control turn;
+   `load_runtime_thread_history` filters user turns by that owned state so
+   `__ONBOARDING_*` tokens never become LLM conversation context (localized
+   assistant responses remain); both preview writers switched from the raw
+   prefix check to the typed state. The skip choice now renders its
+   localized user bubble live exactly like goal selections, and live/reload
+   share the same i18n keys in English and Spanish (four goal cards +
+   `onboarding.skip`; `surprise_me` is only reachable through skip).
+   Red-first: durable-control tests extended to require the typed metadata;
+   a runtime-history test driving goal + skip through the accepted route
+   and proving zero protocol tokens in history; a frontend parity pin
+   (skip bubble live, shared keys, EN/ES locale coverage); and the
+   interruption test extended to prove the abandoned control remains
+   retryable through its owning durable message (the overlay replays the
+   exact persisted token). No new public ChatActionType; no onboarding
+   redesign.
+
+Complexity reassessment (pass 7): compositional only — one exported
+hydration entry reused by both transcript shapes, one typed parser that
+the legacy goal parser now delegates to, and filters keyed off owned
+metadata replacing prefix heuristics. No new writer, action type, or
+abstraction.
+
+Verification at `505e0af`: focused
+lifecycle/route-matrix/onboarding/retry/migration/reload battery 328/0
+(route matrix 14/14); hermetic runtime gate 1129/0; mocked eval harness
+58 + 1 skipped; trajectory harness 17/0; web 416/0 from `web/` with lint
+(0 errors, 1 pre-existing warning) and a green production build;
+modularity budget, ruff, and `git diff --check` clean; worktree clean.
+
+Unfinished local work and external gates are unchanged from the sixth
+pass: **local** — #243 concrete runtime adapters, #233 local canary
+authoring, #251 local async bridge; **external** — disposable-Postgres
+proof (migrations `20260718000001–4` with the extended acceptance/CAS/
+reconciliation branches), real-auth/RLS matrix, deployed-browser EN/ES
+QA (now also covering the abandoned-action recovery row and onboarding
+live/reload parity), GitHub Actions run, exact-SHA Render canary, #244
+paid probe, #251 live EN/ES QA.
