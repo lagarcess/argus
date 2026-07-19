@@ -887,3 +887,19 @@ reconciliation branches), real-auth/RLS matrix, deployed-browser EN/ES
 QA (now also covering the abandoned-action recovery row and onboarding
 live/reload parity), GitHub Actions run, exact-SHA Render canary, #244
 paid probe, #251 live EN/ES QA.
+
+### Inventory correction (2026-07-18, post-seventh-pass)
+
+The seventh-pass "remaining work" summary was incomplete: it omitted the
+entire **Train 4 interpreter spine**, which lines 324–329 correctly record
+as never reached. The complete unfinished-local-work inventory is:
+
+- **Train 4 — protected interpreter spine: #238, #239, #241, and the
+  gated #244 runtime.** No code exists on this branch for any of them.
+- **#243 concrete runtime adapters** (Train 6 remainder).
+- **#233 local canary authoring** (Train 6 remainder).
+- **#251 local async bridge** (in-lane remainder).
+
+This branch is **not** a complete local Wave 0 candidate and must not be
+described as one while any of the above remains unwritten. External gates
+are unchanged from the seventh-pass entry.
