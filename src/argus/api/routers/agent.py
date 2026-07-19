@@ -14,11 +14,11 @@ from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.agent_runtime.turn_execution import (
     InternalTurnOutcome,
-    begin_turn_execution,
+    active_turn_execution,
     claim_turn_terminal,
     record_exit_fingerprint,
-    reset_turn_execution,
     semantic_turn_fingerprint,
+    turn_execution_scope,
     turn_execution_summary,
 )
 from argus.api import state as api_state
@@ -379,7 +379,9 @@ async def chat_stream(
             conversation_id=conversation.id,
         )
         request_admission.persist()
-        language = payload.language or conversation.language or current_user_profile.language
+        language = (
+            payload.language or conversation.language or current_user_profile.language
+        )
         assistant_text = recovery_message("runtime_failure", language=language)
         retry_metadata = chat_retry.retry_last_turn_metadata(
             payload=payload,
@@ -427,21 +429,27 @@ async def chat_stream(
         )
 
         async def initialization_failure_events() -> AsyncIterator[str]:
-            yield sse_data(
-                {
-                    "type": "error",
-                    "code": "agent_runtime_failure",
-                    "message": assistant_text,
-                    "message_id": assistant_message.id,
-                    "recovery": recovery,
-                    **(
-                        {"retry_last_turn": retry_last_turn}
-                        if isinstance(retry_last_turn, dict)
-                        else {}
-                    ),
-                }
-            )
-            yield sse_done()
+            # Admission already persisted this accepted turn, so it owns an
+            # execution scope and one internal terminal like every other path.
+            with turn_execution_scope():
+                claim_turn_terminal(
+                    "recoverable_failed", reason="agent_runtime_init_failure"
+                )
+                yield sse_data(
+                    {
+                        "type": "error",
+                        "code": "agent_runtime_failure",
+                        "message": assistant_text,
+                        "message_id": assistant_message.id,
+                        "recovery": recovery,
+                        **(
+                            {"retry_last_turn": retry_last_turn}
+                            if isinstance(retry_last_turn, dict)
+                            else {}
+                        ),
+                    }
+                )
+                yield sse_done()
 
         return StreamingResponse(
             initialization_failure_events(),
@@ -597,7 +605,7 @@ async def chat_stream(
         in {"language_selection", "primary_goal_selection"}
     )
 
-    async def events() -> AsyncIterator[str]:
+    async def accepted_turn_events() -> AsyncIterator[str]:
         active_finalization_execution_identity: str | None = None
         naming_language = (
             payload.language
@@ -642,9 +650,7 @@ async def chat_stream(
                 or current_user_profile.language
                 or "en"
             )
-            msg = onboarding_prompt_text(
-                is_spanish=resolve_language(lang) == "es-419"
-            )
+            msg = onboarding_prompt_text(is_spanish=resolve_language(lang) == "es-419")
             yield sse_data({"type": "stage_start", "stage": "clarify"})
             assistant_message = create_message(
                 user_id=user.id,
@@ -663,6 +669,7 @@ async def chat_stream(
                     else None
                 ),
             )
+            claim_turn_terminal("answered", reason="onboarding_prompt")
             yield sse_data({"type": "token", "content": msg})
             yield sse_data(
                 {
@@ -716,6 +723,7 @@ async def chat_stream(
                     else None
                 ),
             )
+            claim_turn_terminal("answered", reason="onboarding_control")
             yield sse_data({"type": "stage_start", "stage": "next_step"})
             yield sse_data({"type": "token", "content": follow_up})
             yield sse_data(
@@ -741,10 +749,12 @@ async def chat_stream(
             if accepted_turn_request_id is not None:
                 # Deterministic early responder: no graph work ran, so the
                 # accepted turn completes with this durable recovery answer.
-                metadata["agent_runtime_turn"] = turn_lifecycle_hooks.terminal_turn_metadata(
-                    conversation_id=conversation.id,
-                    request_id=accepted_turn_request_id,
-                    status="completed",
+                metadata["agent_runtime_turn"] = (
+                    turn_lifecycle_hooks.terminal_turn_metadata(
+                        conversation_id=conversation.id,
+                        request_id=accepted_turn_request_id,
+                        status="completed",
+                    )
                 )
             if payload.action is not None:
                 metadata["chat_action"] = persisted_chat_action(payload)
@@ -757,6 +767,13 @@ async def chat_stream(
                 content=assistant_text,
                 metadata=metadata,
             )
+            recovery_code = (
+                str(runtime_fallback.recovery.get("code"))
+                if isinstance(runtime_fallback.recovery, dict)
+                and runtime_fallback.recovery.get("code")
+                else "deterministic_recovery"
+            )
+            claim_turn_terminal("answered", reason=recovery_code)
             yield sse_data({"type": "stage_start", "stage": "clarify"})
             if runtime_fallback.recovery is None:
                 yield sse_data({"type": "token", "content": assistant_text})
@@ -804,10 +821,12 @@ async def chat_stream(
             if accepted_turn_request_id is not None:
                 # Deterministic early responder: no graph work ran, so the
                 # accepted turn completes with this durable artifact.
-                metadata["agent_runtime_turn"] = turn_lifecycle_hooks.terminal_turn_metadata(
-                    conversation_id=conversation.id,
-                    request_id=accepted_turn_request_id,
-                    status="completed",
+                metadata["agent_runtime_turn"] = (
+                    turn_lifecycle_hooks.terminal_turn_metadata(
+                        conversation_id=conversation.id,
+                        request_id=accepted_turn_request_id,
+                        status="completed",
+                    )
                 )
             assistant_message = create_message(
                 user_id=user.id,
@@ -816,6 +835,7 @@ async def chat_stream(
                 content="",
                 metadata=metadata,
             )
+            claim_turn_terminal("completed", reason="cancel_confirmation")
             yield sse_data(
                 {
                     "type": "final",
@@ -844,11 +864,6 @@ async def chat_stream(
                 to_status="running",
             )
 
-        # #239: one internal execution budget per accepted runtime turn —
-        # deadline, shared provider-call allowance, fingerprint, one terminal.
-        turn_execution_token = begin_turn_execution(
-            entry_fingerprint=semantic_turn_fingerprint(checkpoint_values),
-        )
         receipt_token = begin_openrouter_route_receipt_capture()
         shadow_context_token = set_backtest_job_shadow_context(
             BacktestJobShadowContext(
@@ -864,6 +879,7 @@ async def chat_stream(
             )
         )
         try:
+
             def runtime_event_source(
                 active_workflow: Any,
             ) -> AsyncIterator[dict[str, Any]]:
@@ -960,13 +976,11 @@ async def chat_stream(
                 if result_card is not None:
                     from argus.api.chat.persistence import persist_runtime_backtest_run
 
-                    active_finalization_execution_identity = (
-                        chat_retry.backtest_finalization_execution_identity(
-                            backtest_job=backtest_job,
-                            retry_execution_identity=retry_finalization_execution_identity,
-                            idempotency_key=clean_idempotency_key,
-                            request_id=request.state.request_id,
-                        )
+                    active_finalization_execution_identity = chat_retry.backtest_finalization_execution_identity(
+                        backtest_job=backtest_job,
+                        retry_execution_identity=retry_finalization_execution_identity,
+                        idempotency_key=clean_idempotency_key,
+                        request_id=request.state.request_id,
                     )
                     run = persist_runtime_backtest_run(
                         user=user,
@@ -1276,11 +1290,20 @@ async def chat_stream(
         except Exception as exc:
             finalization_failed = isinstance(exc, BacktestFinalizationError)
             failure_code = (
-                "finalization_failed"
-                if finalization_failed
-                else "agent_runtime_failure"
+                "finalization_failed" if finalization_failed else "agent_runtime_failure"
             )
-            claim_turn_terminal("recoverable_failed", reason=failure_code)
+            active_execution = active_turn_execution()
+            claim_turn_terminal(
+                "recoverable_failed",
+                # Internal reason only: the durable #240 failure vocabulary
+                # for the recovery path stays unchanged.
+                reason=(
+                    "turn_deadline_exhausted"
+                    if active_execution is not None
+                    and active_execution.deadline_exhausted
+                    else failure_code
+                ),
+            )
             runtime_diagnostics = _runtime_failure_diagnostics(exc)
             logger.exception(
                 "Agent runtime chat streaming failed",
@@ -1371,14 +1394,12 @@ async def chat_stream(
             return
         finally:
             reset_backtest_job_shadow_context(shadow_context_token)
-            # First claim wins: this backstop only lands when the stream was
-            # severed before any outcome path could claim the turn terminal.
+            # The severed backstop must land before the summary is computed so
+            # a client-severed stream persists its terminal with the receipts;
+            # the surrounding scope's backstop then no-ops.
             claim_turn_terminal("recoverable_failed", reason="stream_severed")
             route_receipts = end_openrouter_route_receipt_capture(receipt_token)
-            receipt_metadata["turn_execution"] = turn_execution_summary(
-                route_receipts
-            )
-            reset_turn_execution(turn_execution_token)
+            receipt_metadata["turn_execution"] = turn_execution_summary(route_receipts)
             persist_route_receipts(
                 receipts=route_receipts,
                 user_id=user.id,
@@ -1387,6 +1408,23 @@ async def chat_stream(
                 message_id=receipt_message_id,
                 metadata=receipt_metadata,
             )
+
+    async def events() -> AsyncIterator[str]:
+        # #239: one execution scope per accepted turn. Every path inside —
+        # onboarding prompt/control, deterministic recovery, cancel, and the
+        # runtime corridor — claims exactly one internal terminal; the scope
+        # backstops severed exits and always releases the context. The inner
+        # generator is closed explicitly so its receipt persistence runs
+        # while the scope is still active.
+        with turn_execution_scope(
+            entry_fingerprint=semantic_turn_fingerprint(checkpoint_values)
+        ):
+            accepted_events = accepted_turn_events()
+            try:
+                async for chunk in accepted_events:
+                    yield chunk
+            finally:
+                await accepted_events.aclose()
 
     return StreamingResponse(
         events(),

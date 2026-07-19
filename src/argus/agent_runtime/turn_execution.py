@@ -33,7 +33,8 @@ import hashlib
 import json
 import os
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from enum import Enum
@@ -149,6 +150,43 @@ def active_turn_execution() -> TurnExecutionContext | None:
     return _ACTIVE_TURN_EXECUTION.get()
 
 
+@contextmanager
+def turn_execution_scope(
+    *,
+    entry_fingerprint: str | None = None,
+) -> Iterator[TurnExecutionContext | None]:
+    """One accepted-turn execution scope.
+
+    Begins the context, guarantees exactly one internal terminal (paths claim
+    their own; a severed exit lands the backstop), and always releases the
+    context so nothing leaks into the next turn.
+    """
+
+    token = begin_turn_execution(entry_fingerprint=entry_fingerprint)
+    try:
+        yield _ACTIVE_TURN_EXECUTION.get()
+    finally:
+        claim_turn_terminal("recoverable_failed", reason="stream_severed")
+        reset_turn_execution(token)
+
+
+def detach_turn_execution() -> None:
+    """Detach the current task from any inherited turn context.
+
+    After-stream work is created before the route releases its scope, so the
+    spawned task inherits the finished turn's mutable context; it must not
+    share that turn's budget or evidence.
+    """
+
+    _ACTIVE_TURN_EXECUTION.set(None)
+
+
+def mark_turn_deadline_exhausted() -> None:
+    context = _ACTIVE_TURN_EXECUTION.get()
+    if context is not None:
+        context.deadline_exhausted = True
+
+
 def reserve_provider_call(
     task: str,
     *,
@@ -188,91 +226,72 @@ def reserve_provider_call(
     return ProviderCallPermit(task=task, timeout_seconds=timeout)
 
 
-# Typed containers whose contents are projected with the same allowlist.
-_FINGERPRINT_CONTAINER_KEYS = frozenset(
-    {
-        "run_state",
-        "latest_task_snapshot",
-        "pending_strategy",
-        "strategy",
-        "candidate_strategy_draft",
-        "pending_strategy_summary",
-        "confirmed_strategy_summary",
-        "structured_action",
-        "confirmation_payload",
-        "response_intent",
-        "clarification",
-        "recovery",
-        "artifact_references",
-        "active_draft_reference",
-        "active_confirmation_reference",
-        "latest_backtest_result_reference",
-        "latest_collection_action_reference",
-        "latest_failed_action_reference",
-        "saved_strategy_reference",
-    }
+# The canonical strategy shape: typed configuration fields only. Prose
+# carriers (strategy_thesis, raw_user_phrasing, entry/exit prose) never
+# participate.
+_STRATEGY_TYPED_FIELDS = (
+    "strategy_type",
+    "asset_universe",
+    "asset_class",
+    "timeframe",
+    "cadence",
+    "date_range",
+    "sizing_mode",
+    "capital_amount",
+    "position_size",
+    "comparison_baseline",
+    "refinement_of",
+    "entry_rule",
+    "exit_rule",
+    "rule_spec",
+    "risk_rules",
 )
 
-# Typed leaves included structurally. Prose carriers (strategy_thesis,
-# raw_user_phrasing, assistant_response/prompt, labels, messages, history)
-# are excluded by omission: the projection is allowlist-only.
-_FINGERPRINT_TYPED_LEAF_KEYS = frozenset(
-    {
-        # typed stage / route
-        "stage_outcome",
-        "intent",
-        "task_relation",
-        "semantic_turn_act",
-        "failure_classification",
-        "kind",
-        "conversation_mode",
-        # pending need
-        "requested_field",
-        "missing_required_fields",
-        "pending_needs",
-        "semantic_needs",
-        "requested_fields",
-        "requires_clarification",
-        "retryable",
-        # canonical strategy fields
-        "strategy_type",
-        "asset_universe",
-        "asset_class",
-        "timeframe",
-        "cadence",
-        "date_range",
-        "sizing_mode",
-        "capital_amount",
-        "position_size",
-        "comparison_baseline",
-        "refinement_of",
-        "entry_rule",
-        "exit_rule",
-        "rule_spec",
-        "risk_rules",
-        "optional_parameters",
-        # structured action + artifact identity
-        "type",
-        "action_type",
-        "payload",
-        "status",
-        "artifact_kind",
-        "artifact_id",
-        "artifact_status",
-        "version",
-        # result identity
-        "latest_run_id",
-        "result_run_id",
-        "result_strategy_id",
-    }
+# Typed identity keys a structured action's payload may carry. Everything
+# else in the payload (message text, labels, replacement prose) is excluded.
+_ACTION_IDENTITY_KEYS = (
+    "confirmation_id",
+    "failed_action_id",
+    "option_id",
+    "selected_option_id",
+    "action_identity",
+    "artifact_id",
+    "strategy_id",
+    "run_id",
+    "message_id",
 )
+
+_NAMED_ARTIFACT_REFERENCE_KEYS = (
+    "active_draft_reference",
+    "active_confirmation_reference",
+    "latest_backtest_result_reference",
+    "latest_collection_action_reference",
+    "latest_failed_action_reference",
+    "saved_strategy_reference",
+)
+
+_RESULT_IDENTITY_KEYS = ("latest_run_id", "result_run_id", "result_strategy_id")
 
 
 def _is_empty_fingerprint_value(value: Any) -> bool:
     return value is None or value is False or value == "" or value == [] or value == {}
 
 
-def _canonical_typed_value(value: Any) -> Any:
+def _as_state_mapping(value: Any) -> dict[str, Any] | None:
+    if hasattr(value, "model_dump"):
+        value = value.model_dump(mode="python")
+    return value if isinstance(value, dict) else None
+
+
+def _scalar_fingerprint_value(value: Any) -> Any:
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    return None
+
+
+def _canonical_structural_value(value: Any) -> Any:
     if isinstance(value, Enum):
         return value.value
     if hasattr(value, "model_dump"):
@@ -280,14 +299,14 @@ def _canonical_typed_value(value: Any) -> Any:
     if isinstance(value, dict):
         canonical: dict[str, Any] = {}
         for key in sorted(value, key=str):
-            item = _canonical_typed_value(value[key])
+            item = _canonical_structural_value(value[key])
             if not _is_empty_fingerprint_value(item):
                 canonical[str(key)] = item
         return canonical
     if isinstance(value, (list, tuple)):
         items = [
             item
-            for item in (_canonical_typed_value(entry) for entry in value)
+            for item in (_canonical_structural_value(entry) for entry in value)
             if not _is_empty_fingerprint_value(item)
         ]
         if items and all(isinstance(item, str) for item in items):
@@ -298,41 +317,177 @@ def _canonical_typed_value(value: Any) -> Any:
     return str(value)
 
 
-def _typed_projection(value: Any) -> Any:
-    if isinstance(value, Enum):
-        return value.value
-    if hasattr(value, "model_dump"):
-        value = value.model_dump(mode="python")
-    if isinstance(value, (list, tuple)):
-        return [
-            item
-            for item in (_typed_projection(entry) for entry in value)
-            if not _is_empty_fingerprint_value(item)
-        ]
-    if not isinstance(value, dict):
-        return None
-    projection: dict[str, Any] = {}
-    for key in sorted(value, key=str):
-        if key in _FINGERPRINT_CONTAINER_KEYS:
-            item = _typed_projection(value[key])
-        elif key in _FINGERPRINT_TYPED_LEAF_KEYS:
-            item = _canonical_typed_value(value[key])
-        else:
-            continue
+def _canonical_strategy(value: Any) -> dict[str, Any]:
+    mapping = _as_state_mapping(value)
+    if not mapping:
+        return {}
+    canonical: dict[str, Any] = {}
+    for field_name in _STRATEGY_TYPED_FIELDS:
+        item = _canonical_structural_value(mapping.get(field_name))
         if not _is_empty_fingerprint_value(item):
-            projection[str(key)] = item
-    return projection
+            canonical[field_name] = item
+    return canonical
+
+
+def _first_canonical_strategy(*candidates: Any) -> dict[str, Any]:
+    for candidate in candidates:
+        canonical = _canonical_strategy(candidate)
+        if canonical:
+            return canonical
+    return {}
+
+
+def _first_scalar(*candidates: Any) -> Any:
+    for candidate in candidates:
+        scalar = _scalar_fingerprint_value(candidate)
+        if not _is_empty_fingerprint_value(scalar):
+            return scalar
+    return None
+
+
+def _first_string_list(*candidates: Any) -> list[str]:
+    for candidate in candidates:
+        if isinstance(candidate, (list, tuple)):
+            values = [str(item) for item in candidate if isinstance(item, str) and item]
+            if values:
+                return sorted(values)
+    return []
+
+
+def _action_identity(value: Any) -> dict[str, Any]:
+    mapping = _as_state_mapping(value)
+    if not mapping:
+        return {}
+    identity: dict[str, Any] = {}
+    action_type = _scalar_fingerprint_value(mapping.get("type"))
+    if not _is_empty_fingerprint_value(action_type):
+        identity["type"] = action_type
+    payload = _as_state_mapping(mapping.get("payload")) or {}
+    for key in _ACTION_IDENTITY_KEYS:
+        scalar = _scalar_fingerprint_value(payload.get(key))
+        if not _is_empty_fingerprint_value(scalar):
+            identity[key] = scalar
+    return identity
+
+
+def _artifact_identity(value: Any) -> dict[str, Any] | None:
+    mapping = _as_state_mapping(value)
+    if not mapping:
+        return None
+    identity: dict[str, Any] = {}
+    for key in ("artifact_kind", "artifact_id", "artifact_status"):
+        scalar = _scalar_fingerprint_value(mapping.get(key))
+        if not _is_empty_fingerprint_value(scalar):
+            identity[key] = scalar
+    metadata = _as_state_mapping(mapping.get("metadata")) or {}
+    version = _scalar_fingerprint_value(metadata.get("version"))
+    if not _is_empty_fingerprint_value(version):
+        identity["version"] = version
+    return identity or None
+
+
+def _artifact_identities(
+    root: dict[str, Any],
+    snapshot: dict[str, Any],
+) -> list[dict[str, Any]]:
+    candidates: list[Any] = []
+    for source in (root.get("artifact_references"), snapshot.get("artifact_references")):
+        if isinstance(source, (list, tuple)):
+            candidates.extend(source)
+    for key in _NAMED_ARTIFACT_REFERENCE_KEYS:
+        candidates.append(snapshot.get(key))
+        candidates.append(root.get(key))
+    seen: set[str] = set()
+    identities: list[dict[str, Any]] = []
+    for candidate in candidates:
+        identity = _artifact_identity(candidate)
+        if identity is None:
+            continue
+        canonical = json.dumps(identity, sort_keys=True, separators=(",", ":"))
+        if canonical in seen:
+            continue
+        seen.add(canonical)
+        identities.append(identity)
+    identities.sort(key=lambda item: json.dumps(item, sort_keys=True))
+    return identities
 
 
 def semantic_turn_fingerprint(state: Any) -> str | None:
-    """Deterministic hash of the turn's typed semantic state, or None when
-    the state carries no typed material. Prose, localized copy, raw user
-    text, model names, and timestamps never participate."""
+    """Deterministic hash of the turn's canonical typed semantic state.
 
-    if state is None:
+    One projection covers every real representation of the same semantics:
+    the runtime checkpoint (``run_state.candidate_strategy_draft``,
+    ``latest_task_snapshot.pending_strategy_summary``, model objects) and the
+    public result payload (``pending_strategy.strategy``, serialized dicts)
+    normalize to the same canonical shape. Prose, localized copy, raw user
+    text, structured-action message text, model names, and timestamps never
+    participate. Returns None when the state carries no typed material.
+    """
+
+    root = _as_state_mapping(state)
+    if root is None:
         return None
-    projection = _typed_projection(state)
-    if not isinstance(projection, dict) or not projection:
+    run_state = _as_state_mapping(root.get("run_state")) or {}
+    snapshot = _as_state_mapping(root.get("latest_task_snapshot")) or {}
+    pending = _as_state_mapping(root.get("pending_strategy")) or {}
+
+    projection: dict[str, Any] = {}
+
+    stage = _first_scalar(root.get("stage_outcome"))
+    if stage is not None:
+        projection["stage"] = stage
+
+    requested_field = _first_scalar(
+        root.get("requested_field"),
+        pending.get("requested_field"),
+        run_state.get("requested_field"),
+    )
+    if requested_field is not None:
+        projection["requested_field"] = requested_field
+
+    missing_required = _first_string_list(
+        root.get("missing_required_fields"),
+        pending.get("missing_required_fields"),
+        run_state.get("missing_required_fields"),
+    )
+    if missing_required:
+        projection["missing_required_fields"] = missing_required
+
+    strategy = _first_canonical_strategy(
+        pending.get("strategy"),
+        snapshot.get("pending_strategy_summary"),
+        run_state.get("candidate_strategy_draft"),
+    )
+    if strategy:
+        projection["strategy"] = strategy
+
+    confirmed = _first_canonical_strategy(
+        snapshot.get("confirmed_strategy_summary"),
+        (_as_state_mapping(root.get("confirmation_payload")) or {}).get("strategy"),
+        (_as_state_mapping(run_state.get("confirmation_payload")) or {}).get("strategy"),
+    )
+    if confirmed:
+        projection["confirmed_strategy"] = confirmed
+
+    action = _action_identity(
+        root.get("structured_action") or run_state.get("structured_action")
+    )
+    if action:
+        projection["action"] = action
+
+    artifacts = _artifact_identities(root, snapshot)
+    if artifacts:
+        projection["artifacts"] = artifacts
+
+    results = {
+        key: _scalar_fingerprint_value(root.get(key))
+        for key in _RESULT_IDENTITY_KEYS
+        if not _is_empty_fingerprint_value(_scalar_fingerprint_value(root.get(key)))
+    }
+    if results:
+        projection["results"] = results
+
+    if not projection:
         return None
     canonical = json.dumps(
         projection,
@@ -407,9 +562,7 @@ def turn_execution_summary(receipts: Iterable[Any]) -> dict[str, Any]:
             int(getattr(receipt, "latency_ms", 0)) for receipt in receipt_list
         ),
         "tasks": [str(getattr(receipt, "task", "")) for receipt in receipt_list],
-        "outcomes": [
-            str(getattr(receipt, "outcome", "")) for receipt in receipt_list
-        ],
+        "outcomes": [str(getattr(receipt, "outcome", "")) for receipt in receipt_list],
     }
     if context is not None:
         summary.update(
