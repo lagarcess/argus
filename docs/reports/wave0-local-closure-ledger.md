@@ -1222,3 +1222,58 @@ runtime-event/worker/route/lifecycle/recovery/onboarding/artifact-naming
 violations**; `ruff check` clean; touched files `ruff format` clean;
 `git diff --check` clean; worktree clean. Sanctioned live eval NOT run
 (external gate, unchanged). Nothing pushed.
+
+### Thirteenth pass (2026-07-19, #239 final correction — two verified findings)
+
+Final bounded #239 correction. The four twelfth-pass fixes are accepted
+and untouched. Two remaining findings were reproduced red-first (7 reds
+failing at `84ec61f` for exactly the stated reasons, plus one
+prose-exclusion guard that already held) and closed. **#241 and gated
+#244 remain NOT REACHED.**
+
+- **The canonical fingerprint omitted typed pending progress.** At
+  `84ec61f`, checkpoints differing only in `TaskSnapshot.pending_needs`
+  (`["period"]` vs `["asset_target"]`), in `ResponseIntent` kind /
+  `semantic_needs` / `requested_fields`, or in typed
+  `StrategySummary.extra_parameters` all hashed to the same value
+  (six reds failed as `X != X` on one identical digest). The canonical
+  projection now includes: `intent_kind` (first of public
+  `response_intent` then checkpoint `run_state.response_intent`),
+  `pending_needs` as the normalized union of `snapshot.pending_needs`
+  and the intent's `semantic_needs` (one pending-state shape across the
+  checkpoint and public representations), the intent's
+  `requested_fields`, and `extra_parameters` inside the canonical
+  strategy fields. The intent's prose carriers (`facts`, `options`
+  labels) stay excluded — pinned by a guard that already held and still
+  holds — and no generic recursive hashing, raw-text matching, phrase
+  tables, or language gates returned. Equivalent model and serialized
+  forms normalize identically, and the accepted twelfth-pass
+  checkpoint/public strategy equality and artifact-version tests remain
+  green.
+- **Turn-deadline diagnostics reported false timing.** The absolute wall
+  fired correctly, but its diagnostic carried the per-event limit and
+  the current-event elapsed (red at `84ec61f`: configured 0.05s turn
+  deadline reported `timeout_seconds == 120.0`, `assert 120.0 == 0.05`).
+  The context now records its own start and configured duration at
+  begin (same monotonic source — no second clock or deadline owner),
+  and the turn-deadline diagnostic reports
+  `timeout_seconds == deadline_seconds` and total turn
+  `elapsed_seconds >= deadline`. The per-event timeout diagnostic is
+  byte-identical and its guard stays green; the internal reason and the
+  durable #240/public failure vocabulary are unchanged.
+
+Complexity reassessment (pass 13): additions are two dataclass timing
+fields plus an `elapsed_seconds()` accessor, a shared `_string_items`
+helper (now also backing `_first_string_list`), one pending-progress
+block in the projection, and one field added to the canonical strategy
+tuple. Nothing else changed; nothing became public or durable.
+
+Verification at the pass tip: final-correction suite **8/8** (7 reds
+green + 1 pinned guard); all #239 suites **40/0**; hermetic
+runtime/spine sweep (provider keys blanked) **1177/0**; combined
+runtime-event/worker/route/lifecycle/recovery/onboarding/artifact-naming
+/receipts/state-machine + mocked eval + stream-contract battery
+**514 passed, 1 sanctioned live-skip**; modularity budget **no
+violations**; `ruff check` clean; touched files `ruff format` clean;
+`git diff --check` clean; worktree clean. Sanctioned live eval NOT run
+(external gate, unchanged). Nothing pushed.
