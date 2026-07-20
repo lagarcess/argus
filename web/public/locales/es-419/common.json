@@ -487,6 +487,35 @@
       "markers": {
         "entry": "Comprar",
         "exit": "Vender"
+      },
+      "range": {
+        "group_label": "Rango del gráfico",
+        "presets": {
+          "1D": "1D",
+          "1W": "1S",
+          "1M": "1M",
+          "3M": "3M",
+          "YTD": "Este año",
+          "1Y": "1A",
+          "ALL": "Todo"
+        },
+        "custom": "Personalizado",
+        "apply": "Aplicar",
+        "cancel": "Cancelar",
+        "reset": "Restablecer",
+        "start_date": "Fecha de inicio",
+        "end_date": "Fecha de fin",
+        "error_missing_date": "Elige una fecha de inicio y una de fin.",
+        "error_start_after_end": "La fecha de inicio debe ser anterior a la fecha de fin.",
+        "error_insufficient_observations": "Ese rango necesita al menos dos observaciones.",
+        "visible_period": "Período visible: {{start}} al {{end}}.",
+        "peak_label": "Valor visible más alto",
+        "low_label": "Valor visible más bajo",
+        "event_count_one": "{{count}} operación ejecutada mostrada en este rango.",
+        "event_count_other": "{{count}} operaciones ejecutadas mostradas en este rango.",
+        "no_events": "No hay operaciones ejecutadas mostradas en este rango.",
+        "event_sampling": "Mostrando {{shown}} de {{total}} eventos disponibles.",
+        "marker_cap": "Argus guardó {{included}} de {{total}} grupos de operaciones ejecutadas para este resultado."
       }
     },
     "strategy_type": {

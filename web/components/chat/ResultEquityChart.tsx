@@ -11,10 +11,20 @@ import {
   createSeriesMarkers,
   type BaselineData,
   type ISeriesApi,
+  type ITimeScaleApi,
   type LogicalRange,
   type SeriesMarker,
   type Time,
 } from "lightweight-charts";
+import {
+  deriveResultChartRanges,
+  resolveCustomResultChartRange,
+  summarizeVisibleResultChartRange,
+  type ResultChartCustomError,
+  type ResultChartRangeOption,
+  type ResultChartSelection,
+} from "@/lib/result-chart-range";
+import ResultChartExploration from "./ResultChartExploration";
 import { type ResultChartMarker, type ResultChartPayload } from "./types";
 
 type ResultEquityChartProps = {
@@ -29,6 +39,11 @@ type TooltipState = {
   time: string;
   value: number;
   event?: string;
+};
+
+type VisibleWindow = {
+  from: number;
+  to: number;
 };
 
 export type MarkerLabelSet = {
@@ -72,6 +87,17 @@ export default function ResultEquityChart({
   const { resolvedTheme } = useTheme();
   const { i18n, t } = useTranslation();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [selection, setSelection] = useState<ResultChartSelection>("ALL");
+  const [visibleWindow, setVisibleWindow] = useState<VisibleWindow | null>(null);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customError, setCustomError] = useState<ResultChartCustomError | null>(
+    null,
+  );
+  const timeScaleRef = useRef<ITimeScaleApi<Time> | null>(null);
+  // Marks the next visible-range notification as programmatic so it is not
+  // interpreted as a manual pan/zoom that should switch the selection to Custom.
+  const programmaticMoveRef = useRef<ResultChartSelection | null>(null);
+  const visibleWindowRef = useRef<VisibleWindow | null>(null);
   const isDark = appearanceOverride
     ? appearanceOverride === "dark"
     : resolvedTheme === "dark";
@@ -117,6 +143,97 @@ export default function ResultEquityChart({
     });
     return map;
   }, [chart.series]);
+  const rangeOptions = useMemo(
+    () => deriveResultChartRanges(chart.series, chart.exploration_policy),
+    [chart.series, chart.exploration_policy],
+  );
+  const allWindow = useMemo<VisibleWindow>(() => {
+    const allOption = rangeOptions[rangeOptions.length - 1];
+    if (allOption?.key === "ALL") {
+      return { from: allOption.startIndex, to: allOption.endIndex };
+    }
+    return { from: 0, to: Math.max(0, chart.series.length - 1) };
+  }, [chart.series, rangeOptions]);
+  const effectiveWindow = visibleWindow ?? allWindow;
+  const visibleSummary = useMemo(
+    () =>
+      summarizeVisibleResultChartRange({
+        series: chart.series,
+        markers: chart.markers,
+        markerSummary: chart.marker_summary,
+        startIndex: effectiveWindow.from,
+        endIndex: effectiveWindow.to,
+      }),
+    [chart, effectiveWindow.from, effectiveWindow.to],
+  );
+
+  // A different immutable chart payload is a different result: restart at ALL.
+  useEffect(() => {
+    setSelection("ALL");
+    setVisibleWindow(null);
+    visibleWindowRef.current = null;
+    setCustomOpen(false);
+    setCustomError(null);
+  }, [chart]);
+
+  const selectRange = (option: ResultChartRangeOption) => {
+    setCustomError(null);
+    if (option.key === "ALL") {
+      resetToAll();
+      return;
+    }
+    programmaticMoveRef.current = option.key;
+    timeScaleRef.current?.setVisibleLogicalRange({
+      from: option.startIndex,
+      to: option.endIndex,
+    });
+    setSelection(option.key);
+    const window = { from: option.startIndex, to: option.endIndex };
+    visibleWindowRef.current = window;
+    setVisibleWindow(window);
+  };
+
+  const resetToAll = () => {
+    setCustomError(null);
+    programmaticMoveRef.current = "ALL";
+    timeScaleRef.current?.fitContent();
+    setSelection("ALL");
+    visibleWindowRef.current = allWindow;
+    setVisibleWindow(allWindow);
+  };
+
+  const toggleCustom = () => {
+    setCustomError(null);
+    setCustomOpen((open) => !open);
+  };
+
+  const cancelCustom = () => {
+    setCustomError(null);
+    setCustomOpen(false);
+  };
+
+  const applyCustom = (startDate: string, endDate: string) => {
+    const result = resolveCustomResultChartRange(
+      chart.series,
+      startDate,
+      endDate,
+    );
+    if (!result.ok) {
+      setCustomError(result.error);
+      return;
+    }
+    setCustomError(null);
+    setCustomOpen(false);
+    programmaticMoveRef.current = "CUSTOM";
+    timeScaleRef.current?.setVisibleLogicalRange({
+      from: result.range.startIndex,
+      to: result.range.endIndex,
+    });
+    setSelection("CUSTOM");
+    const window = { from: result.range.startIndex, to: result.range.endIndex };
+    visibleWindowRef.current = window;
+    setVisibleWindow(window);
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -219,7 +336,8 @@ export default function ResultEquityChart({
       series as ISeriesApi<"Baseline", Time>,
       buildVisibleSeriesMarkers(visibleMarkerInput),
     );
-    chartApi.timeScale().fitContent();
+    const timeScale = chartApi.timeScale();
+    timeScaleRef.current = timeScale;
     const updateVisibleMarkers = (visibleRange: LogicalRange | null) => {
       markersApi.setMarkers(
         buildVisibleSeriesMarkers({
@@ -232,7 +350,40 @@ export default function ResultEquityChart({
         }),
       );
     };
-    chartApi.timeScale().subscribeVisibleLogicalRangeChange(updateVisibleMarkers);
+    timeScale.subscribeVisibleLogicalRangeChange(updateVisibleMarkers);
+    const notifyVisibleWindow = (visibleRange: LogicalRange | null) => {
+      if (!visibleRange || data.length === 0) return;
+      const lastIndex = data.length - 1;
+      const from = Math.min(lastIndex, Math.max(0, Math.floor(visibleRange.from)));
+      const to = Math.min(lastIndex, Math.max(0, Math.ceil(visibleRange.to)));
+      visibleWindowRef.current = { from, to };
+      setVisibleWindow({ from, to });
+      if (programmaticMoveRef.current != null) {
+        programmaticMoveRef.current = null;
+        return;
+      }
+      setSelection((previous) => {
+        if (previous === "CUSTOM" || rangeOptions.length === 0) return previous;
+        const expected = rangeOptions.find((option) => option.key === previous);
+        if (expected && expected.startIndex === from && expected.endIndex === to) {
+          return previous;
+        }
+        return "CUSTOM";
+      });
+    };
+    timeScale.subscribeVisibleLogicalRangeChange(notifyVisibleWindow);
+    // Recreations for theme/locale/size keep the explored viewport; only a new
+    // immutable chart payload resets it (see the chart-change effect above).
+    const restoredWindow = visibleWindowRef.current;
+    if (restoredWindow) {
+      programmaticMoveRef.current = "CUSTOM";
+      timeScale.setVisibleLogicalRange({
+        from: restoredWindow.from,
+        to: restoredWindow.to,
+      });
+    } else {
+      timeScale.fitContent();
+    }
 
     chartApi.subscribeCrosshairMove((param) => {
       if (!param.point || param.time == null) {
@@ -256,7 +407,9 @@ export default function ResultEquityChart({
 
     return () => {
       setTooltip(null);
-      chartApi.timeScale().unsubscribeVisibleLogicalRangeChange(updateVisibleMarkers);
+      timeScale.unsubscribeVisibleLogicalRangeChange(updateVisibleMarkers);
+      timeScale.unsubscribeVisibleLogicalRangeChange(notifyVisibleWindow);
+      if (timeScaleRef.current === timeScale) timeScaleRef.current = null;
       chartApi.remove();
     };
   }, [
@@ -270,6 +423,7 @@ export default function ResultEquityChart({
     isDark,
     isHeroDeltaEvidence,
     markerLabels,
+    rangeOptions,
   ]);
 
   if (data.length === 0) return null;
@@ -305,6 +459,20 @@ export default function ResultEquityChart({
           {attributionLabel}
         </a>
       </div>
+      <ResultChartExploration
+        options={rangeOptions}
+        selection={selection}
+        summary={visibleSummary}
+        currency={chart.currency}
+        locale={i18n.language}
+        customOpen={customOpen}
+        customError={customError}
+        onSelect={selectRange}
+        onOpenCustom={toggleCustom}
+        onApplyCustom={applyCustom}
+        onCancelCustom={cancelCustom}
+        onReset={resetToAll}
+      />
       {tooltip && (
         <div
           className="pointer-events-none absolute z-10 min-w-[148px] rounded-[10px] border border-black/10 bg-white/95 px-3 py-2 text-[11px] leading-snug text-black/70 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white/75"
