@@ -18,6 +18,7 @@ from argus.domain.backtesting.execution import (
 from argus.domain.backtesting.metrics import portfolio_value_summary
 from argus.domain.backtesting.signals import _build_signals
 from argus.domain.market_data import fetch_ohlcv
+from argus.domain.strategy_capabilities import resolve_result_chart_exploration_policy
 
 
 def build_result_chart(
@@ -91,11 +92,18 @@ def build_result_chart(
         {"time": _chart_time_key(ts), "value": round(float(value), 2)}
         for ts, value in aggregate_equity.items()
     ]
-    markers = _thin_chart_markers(_chart_markers_from_events(events), limit=80)
+    all_markers = _chart_markers_from_events(events)
+    markers = _thin_chart_markers(all_markers, limit=80)
     chart = {
         "kind": "portfolio_equity",
         "series": series,
         "markers": markers,
+        "marker_summary": {
+            "total_groups": len(all_markers),
+            "included_groups": len(markers),
+            "sampled": len(markers) < len(all_markers),
+        },
+        "exploration_policy": resolve_result_chart_exploration_policy(config),
         "currency": "USD",
         "base_value": series[0]["value"] if series else None,
         "attribution": "TradingView Lightweight Charts",
