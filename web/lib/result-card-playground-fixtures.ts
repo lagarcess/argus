@@ -498,6 +498,65 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
     },
   },
   {
+    id: "short-series-result",
+    name: "Short-series result",
+    note: "Five observations qualify no range switch; semantic facts stay readable.",
+    result: {
+      strategyName: "AAPL One-Week Hold",
+      strategyLabel: "Buy and hold",
+      symbols: ["AAPL"],
+      assetClass: "equity",
+      configSnapshot: {
+        template: "buy_and_hold",
+        timeframe: "1D",
+        benchmark_symbol: "SPY",
+      },
+      period: "June 2, 2025 to June 6, 2025",
+      dateRange: {
+        start: "2025-06-02",
+        end: "2025-06-06",
+        display: "June 2, 2025 to June 6, 2025",
+      },
+      statusLabel: "Simulation Complete",
+      metrics: [
+        { label: "Ending value", value: "$1,000 -> $1,010" },
+        { label: "Total return", value: "+1.0%" },
+        { label: "Compared with SPY", value: "In line with SPY" },
+        { label: "Worst drop", value: "-0.4%" },
+      ],
+      assumptions: defaultAssumptions,
+      actions: resultActions,
+      chart: {
+        kind: "portfolio_equity",
+        currency: "USD",
+        base_value: 1000,
+        series: [
+          { time: "2025-06-02", value: 1000 },
+          { time: "2025-06-03", value: 1004 },
+          { time: "2025-06-04", value: 996 },
+          { time: "2025-06-05", value: 1006 },
+          { time: "2025-06-06", value: 1010 },
+        ],
+        markers: [
+          {
+            time: "2025-06-02",
+            type: "entry",
+            label: "Buy AAPL",
+            symbols: ["AAPL"],
+          },
+        ],
+        marker_summary: {
+          total_groups: 1,
+          included_groups: 1,
+          sampled: false,
+        },
+        exploration_policy: {
+          minimum_visible_observations: 6,
+        },
+      },
+    },
+  },
+  {
     id: "multi-symbol-same-asset",
     name: "Multi-symbol same-asset result",
     note: "Uses existing symbol chip behavior for an equal-weight equity basket.",

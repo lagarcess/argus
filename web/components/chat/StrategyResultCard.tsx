@@ -145,8 +145,8 @@ export default function StrategyResultCard({
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {/* Passive status, not an action: plain muted text so it cannot be
-              mistaken for another clickable pill. */}
-          <span className="text-[11px] font-medium tracking-[0.16px] text-[#8d969e] dark:text-white/45">
+              mistaken for another clickable pill (kept readable at 4.5:1). */}
+          <span className="text-[11px] font-medium tracking-[0.16px] text-[#505a63] dark:text-white/65">
             {t(
               "chat.simulation_complete",
               result.statusLabel || "Simulation Complete",

@@ -35,15 +35,15 @@ const CANONICAL_NON_ALL_ORDER: ResultChartRangeKey[] = [
 const switcherButtonClassName =
   "group inline-flex min-h-11 cursor-pointer items-center rounded-[10px] text-[11px] tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/30";
 const switcherLabelIdleClassName =
-  "rounded-[8px] px-2 py-[5px] font-medium text-black/42 transition-colors group-hover:text-black/72 dark:text-white/42 dark:group-hover:text-white/72";
+  "rounded-[8px] px-2 py-[5px] font-medium text-black/60 transition-colors group-hover:text-black/80 dark:text-white/65 dark:group-hover:text-white/85";
 const switcherLabelSelectedClassName =
   "rounded-[8px] bg-black/[0.07] px-2 py-[5px] font-semibold text-black/85 dark:bg-white/[0.11] dark:text-white/90";
 const quietActionClassName =
-  "inline-flex min-h-11 cursor-pointer items-center px-1.5 text-[11px] font-medium text-black/45 underline-offset-2 transition-colors hover:text-black/75 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:text-white/45 dark:hover:text-white/75 dark:focus-visible:ring-white/30";
+  "inline-flex min-h-11 cursor-pointer items-center px-1.5 text-[11px] font-medium text-black/60 underline-offset-2 transition-colors hover:text-black/80 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:text-white/65 dark:hover:text-white/85 dark:focus-visible:ring-white/30";
 const summaryLineClassName =
   "text-[11px] leading-snug tracking-[0.16px] text-black/55 dark:text-white/55";
 const formButtonClassName =
-  "inline-flex min-h-9 cursor-pointer items-center rounded-full px-3 py-1 text-[11px] font-medium tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/30";
+  "inline-flex min-h-11 cursor-pointer items-center rounded-full px-3 py-1 text-[11px] font-medium tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/30";
 const CUSTOM_ERROR_COPY_KEY: Record<ResultChartCustomError, string> = {
   missing_date: "chat.result_chart.range.error_missing_date",
   start_after_end: "chat.result_chart.range.error_start_after_end",
@@ -96,7 +96,10 @@ export default function ResultChartExploration({
     );
   }, [selection, summary, locale, showTimes, t]);
 
-  if (options.length === 0) return null;
+  // Fewer than the minimum observations: range switching is not useful, but a
+  // valid summary still earns a quiet read-only Range details disclosure.
+  const showSwitcher = options.length > 0;
+  if (!showSwitcher && !summary) return null;
 
   const visibleEventCount = summary?.suppliedEventCount ?? 0;
 
@@ -107,30 +110,31 @@ export default function ResultChartExploration({
         aria-label={t("chat.result_chart.range.group_label", "Chart range")}
         className="flex flex-wrap items-center gap-0.5"
       >
-        {orderedOptions.map((option) => {
-          const selected = selection === option.key;
-          return (
-            <button
-              key={option.key}
-              type="button"
-              aria-pressed={selected}
-              data-testid={`result-chart-range-${option.key}`}
-              className={switcherButtonClassName}
-              onClick={() => onSelect(option)}
-            >
-              <span
-                className={
-                  selected
-                    ? switcherLabelSelectedClassName
-                    : switcherLabelIdleClassName
-                }
+        {showSwitcher &&
+          orderedOptions.map((option) => {
+            const selected = selection === option.key;
+            return (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={selected}
+                data-testid={`result-chart-range-${option.key}`}
+                className={switcherButtonClassName}
+                onClick={() => onSelect(option)}
               >
-                {t(`chat.result_chart.range.presets.${option.key}`, option.key)}
-              </span>
-            </button>
-          );
-        })}
-        {selection === "CUSTOM" && (
+                <span
+                  className={
+                    selected
+                      ? switcherLabelSelectedClassName
+                      : switcherLabelIdleClassName
+                  }
+                >
+                  {t(`chat.result_chart.range.presets.${option.key}`, option.key)}
+                </span>
+              </button>
+            );
+          })}
+        {showSwitcher && selection === "CUSTOM" && (
           <span
             data-testid="result-chart-custom-indicator"
             className="inline-flex items-center rounded-[8px] bg-black/[0.07] px-2 py-[5px] text-[11px] font-semibold tracking-tight text-black/85 dark:bg-white/[0.11] dark:text-white/90"
@@ -138,7 +142,7 @@ export default function ResultChartExploration({
             {t("chat.result_chart.range.custom", "Custom")}
           </span>
         )}
-        {selection !== "ALL" && (
+        {showSwitcher && selection !== "ALL" && (
           <button
             type="button"
             data-testid="result-chart-reset"
@@ -170,6 +174,7 @@ export default function ResultChartExploration({
           id={panelId}
           className="mb-1 mt-1.5 flex flex-col gap-2 rounded-[12px] bg-black/[0.018] px-3 py-2.5 dark:bg-white/[0.025]"
         >
+          {showSwitcher && (
           <form
             className="flex flex-col gap-1.5"
             onSubmit={(event) => {
@@ -190,7 +195,7 @@ export default function ResultChartExploration({
                   aria-invalid={customError != null}
                   aria-describedby={customError ? errorId : undefined}
                   data-testid="result-chart-custom-start"
-                  className="min-h-9 rounded-[10px] border border-black/12 bg-white px-2.5 text-[16px] text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/14 dark:bg-white/[0.05] dark:text-white dark:focus-visible:ring-white/30 sm:text-[12px]"
+                  className="min-h-11 rounded-[10px] border border-black/12 bg-white px-2.5 text-[16px] text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/14 dark:bg-white/[0.05] dark:text-white dark:focus-visible:ring-white/30"
                 />
               </label>
               <label className="flex flex-col gap-1 text-[11px] font-medium tracking-tight text-black/55 dark:text-white/55">
@@ -202,7 +207,7 @@ export default function ResultChartExploration({
                   aria-invalid={customError != null}
                   aria-describedby={customError ? errorId : undefined}
                   data-testid="result-chart-custom-end"
-                  className="min-h-9 rounded-[10px] border border-black/12 bg-white px-2.5 text-[16px] text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/14 dark:bg-white/[0.05] dark:text-white dark:focus-visible:ring-white/30 sm:text-[12px]"
+                  className="min-h-11 rounded-[10px] border border-black/12 bg-white px-2.5 text-[16px] text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/14 dark:bg-white/[0.05] dark:text-white dark:focus-visible:ring-white/30"
                 />
               </label>
               <div className="flex items-center gap-1">
@@ -216,7 +221,7 @@ export default function ResultChartExploration({
                 <button
                   type="button"
                   data-testid="result-chart-custom-cancel"
-                  className={`${formButtonClassName} text-black/50 hover:text-black/75 dark:text-white/50 dark:hover:text-white/75`}
+                  className={`${formButtonClassName} text-black/60 hover:text-black/80 dark:text-white/65 dark:hover:text-white/85`}
                   onClick={onCancelCustom}
                 >
                   {t("chat.result_chart.range.cancel", "Cancel")}
@@ -233,9 +238,12 @@ export default function ResultChartExploration({
               </p>
             )}
           </form>
+          )}
 
           {summary && (
-            <div className="flex flex-col gap-1 border-t border-black/[0.05] pt-2 dark:border-white/[0.07]">
+            <div
+              className={`flex flex-col gap-1 ${showSwitcher ? "border-t border-black/[0.05] pt-2 dark:border-white/[0.07]" : ""}`}
+            >
               <p
                 className={summaryLineClassName}
                 data-testid="result-chart-visible-period"

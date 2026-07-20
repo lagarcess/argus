@@ -96,10 +96,11 @@ export default function ResultEquityChart({
   );
   const timeScaleRef = useRef<ITimeScaleApi<Time> | null>(null);
   // Range notifications also fire for initial layout, autosize, and
-  // programmatic preset moves. Only a change shortly after a pointer/wheel
-  // gesture on the chart itself counts as a manual pan/zoom that should switch
-  // the selection to Custom.
+  // programmatic preset moves. Only a change shortly after real chart
+  // manipulation — a pressed drag, wheel zoom, or touch drag — may switch the
+  // selection to Custom. Hover and passive pointer movement never count.
   const lastChartGestureAtRef = useRef(Number.NEGATIVE_INFINITY);
+  const chartPointerDownRef = useRef(false);
   const visibleWindowRef = useRef<VisibleWindow | null>(null);
   const isDark = appearanceOverride
     ? appearanceOverride === "dark"
@@ -376,30 +377,41 @@ export default function ResultEquityChart({
       });
     };
     timeScale.subscribeVisibleLogicalRangeChange(notifyVisibleWindow);
-    const recordChartGesture = () => {
+    const armChartGesture = () => {
       lastChartGestureAtRef.current = performance.now();
     };
-    // Capture phase: the chart library's own canvas handlers may stop
-    // propagation, and the gesture timestamp must still be recorded.
+    // Explicit gesture state: a press begins a potential drag; only pressed
+    // movement or a wheel zoom is manipulation. Capture phase because the
+    // chart library's own canvas handlers may stop propagation.
     const gestureListenerOptions = { passive: true, capture: true } as const;
+    const beginChartPress = () => {
+      chartPointerDownRef.current = true;
+    };
+    const trackChartDrag = (event: PointerEvent) => {
+      if (chartPointerDownRef.current || event.buttons !== 0) armChartGesture();
+    };
+    const releaseChartPress = () => {
+      chartPointerDownRef.current = false;
+    };
     container.addEventListener(
       "pointerdown",
-      recordChartGesture,
+      beginChartPress,
       gestureListenerOptions,
     );
     container.addEventListener(
       "pointermove",
-      recordChartGesture,
+      trackChartDrag,
       gestureListenerOptions,
     );
     container.addEventListener(
       "wheel",
-      recordChartGesture,
+      armChartGesture,
       gestureListenerOptions,
     );
-    container.addEventListener(
-      "touchstart",
-      recordChartGesture,
+    window.addEventListener("pointerup", releaseChartPress, gestureListenerOptions);
+    window.addEventListener(
+      "pointercancel",
+      releaseChartPress,
       gestureListenerOptions,
     );
     // Recreations for theme/locale/size keep the explored viewport; only a new
@@ -442,22 +454,27 @@ export default function ResultEquityChart({
       setTooltip(null);
       container.removeEventListener(
         "pointerdown",
-        recordChartGesture,
+        beginChartPress,
         gestureListenerOptions,
       );
       container.removeEventListener(
         "pointermove",
-        recordChartGesture,
+        trackChartDrag,
         gestureListenerOptions,
       );
       container.removeEventListener(
         "wheel",
-        recordChartGesture,
+        armChartGesture,
         gestureListenerOptions,
       );
-      container.removeEventListener(
-        "touchstart",
-        recordChartGesture,
+      window.removeEventListener(
+        "pointerup",
+        releaseChartPress,
+        gestureListenerOptions,
+      );
+      window.removeEventListener(
+        "pointercancel",
+        releaseChartPress,
         gestureListenerOptions,
       );
       timeScale.unsubscribeVisibleLogicalRangeChange(updateVisibleMarkers);

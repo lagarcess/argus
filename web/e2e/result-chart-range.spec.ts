@@ -330,6 +330,216 @@ test("visible evidence tracks the viewport with separate sampling disclosures", 
   expect(watch.pageErrors).toEqual([]);
 });
 
+test("hover and resize never fabricate a Custom selection", async ({
+  page,
+}) => {
+  const watch = watchFeatureNetwork(page);
+  await openPlayground(page);
+  const card = adaptiveCard(page);
+  await card.scrollIntoViewIfNeeded();
+  watch.start();
+
+  // Select 1D, hover across the chart without pressing, then resize.
+  await card.getByTestId("result-chart-range-1D").click();
+  await expect(card.getByTestId("result-chart-range-1D")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  const canvas = card.getByTestId("result-equity-chart");
+  await canvas.scrollIntoViewIfNeeded();
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  if (box) {
+    const centerY = box.y + box.height / 2;
+    await page.mouse.move(box.x + box.width * 0.2, centerY);
+    await page.mouse.move(box.x + box.width * 0.8, centerY, { steps: 6 });
+  }
+  await page.setViewportSize({ width: 900, height: 720 });
+  await expect(card.getByTestId("result-chart-range-1D")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(card.getByTestId("result-chart-custom-indicator")).toHaveCount(0);
+
+  // Resize again without any pointer contact at all.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(card.getByTestId("result-chart-range-1D")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(card.getByTestId("result-chart-custom-indicator")).toHaveCount(0);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(card.getByTestId("result-chart-range-1D")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  // A real wheel zoom is chart manipulation and becomes Custom.
+  await canvas.scrollIntoViewIfNeeded();
+  const zoomBox = await canvas.boundingBox();
+  if (zoomBox) {
+    await page.mouse.move(
+      zoomBox.x + zoomBox.width / 2,
+      zoomBox.y + zoomBox.height / 2,
+    );
+    await page.mouse.wheel(0, -240);
+  }
+  await expect(card.getByTestId("result-chart-custom-indicator")).toBeVisible();
+  await card.getByTestId("result-chart-reset").click();
+  await expect(card.getByTestId("result-chart-range-ALL")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(watch.featureRequests).toEqual([]);
+  expect(watch.pageErrors).toEqual([]);
+});
+
+test("range controls meet hit-area, input-size, and contrast minimums", async ({
+  page,
+}) => {
+  await openPlayground(page);
+
+  // Compose a text color over the real ancestor background stack by painting
+  // pixels — color-space agnostic (oklab/color-mix safe) — then check WCAG AA.
+  const contrastOf = async (target: Locator) =>
+    target.evaluate((element) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) return 0;
+      const paint = (color: string) => {
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+      };
+      const readPixel = () => {
+        const data = context.getImageData(0, 0, 1, 1).data;
+        return { r: data[0]!, g: data[1]!, b: data[2]! };
+      };
+      const ancestorBackgrounds: string[] = [];
+      let node: Element | null = element;
+      while (node) {
+        ancestorBackgrounds.push(getComputedStyle(node).backgroundColor);
+        node = node.parentElement;
+      }
+      paint("#ffffff");
+      for (const background of ancestorBackgrounds.reverse()) paint(background);
+      const backgroundPixel = readPixel();
+      paint(getComputedStyle(element).color);
+      const foregroundPixel = readPixel();
+      const luminance = (color: { r: number; g: number; b: number }) => {
+        const channel = (value: number) => {
+          const scaled = value / 255;
+          return scaled <= 0.03928
+            ? scaled / 12.92
+            : ((scaled + 0.055) / 1.055) ** 2.4;
+        };
+        return (
+          0.2126 * channel(color.r) +
+          0.7152 * channel(color.g) +
+          0.0722 * channel(color.b)
+        );
+      };
+      const fgLuminance = luminance(foregroundPixel);
+      const bgLuminance = luminance(backgroundPixel);
+      const lighter = Math.max(fgLuminance, bgLuminance);
+      const darker = Math.min(fgLuminance, bgLuminance);
+      return (lighter + 0.05) / (darker + 0.05);
+    });
+
+  for (const frame of [0, 1]) {
+    const card = page
+      .getByTestId("result-card-fixture-adaptive-intraday-result")
+      .nth(frame);
+    await card.scrollIntoViewIfNeeded();
+    await openRangeDetails(card);
+
+    for (const testId of [
+      "result-chart-range-1D",
+      "result-chart-details-toggle",
+      "result-chart-custom-apply",
+      "result-chart-custom-cancel",
+    ]) {
+      const height = await card
+        .getByTestId(testId)
+        .evaluate((element) => element.getBoundingClientRect().height);
+      expect(height, `${testId} hit area in frame ${frame}`).toBeGreaterThanOrEqual(
+        44,
+      );
+    }
+    const inputMetrics = await card
+      .getByTestId("result-chart-custom-start")
+      .evaluate((element) => ({
+        height: element.getBoundingClientRect().height,
+        fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+      }));
+    expect(inputMetrics.height).toBeGreaterThanOrEqual(44);
+    expect(inputMetrics.fontSize).toBeGreaterThanOrEqual(16);
+
+    const idleLabel = card
+      .getByTestId("result-chart-range-1W")
+      .locator("span")
+      .first();
+    expect(await contrastOf(idleLabel)).toBeGreaterThanOrEqual(4.5);
+    expect(
+      await contrastOf(card.getByTestId("result-chart-custom-cancel")),
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(
+      await contrastOf(card.getByText("Simulation Complete", { exact: true })),
+    ).toBeGreaterThanOrEqual(4.5);
+    await card.getByTestId("result-chart-range-1D").click();
+    expect(
+      await contrastOf(card.getByTestId("result-chart-reset")),
+    ).toBeGreaterThanOrEqual(4.5);
+    await card.getByTestId("result-chart-reset").click();
+  }
+
+  // Mobile keeps the 16px input floor (no accidental iOS zoom).
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileCard = page
+    .getByTestId("result-card-fixture-adaptive-intraday-result")
+    .first();
+  await mobileCard.scrollIntoViewIfNeeded();
+  const mobileFont = await mobileCard
+    .getByTestId("result-chart-custom-start")
+    .evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+  expect(mobileFont).toBeGreaterThanOrEqual(16);
+});
+
+test("short series keeps read-only range details without switch controls", async ({
+  page,
+}) => {
+  const watch = watchFeatureNetwork(page);
+  await openPlayground(page);
+  const card = page
+    .getByTestId("result-card-fixture-short-series-result")
+    .first();
+  await card.scrollIntoViewIfNeeded();
+  watch.start();
+
+  await expect(card.getByTestId("result-equity-chart")).toBeVisible();
+  await expect(card.locator('[data-testid^="result-chart-range-"]')).toHaveCount(
+    0,
+  );
+  await expect(card.getByTestId("result-chart-custom-indicator")).toHaveCount(0);
+  await expect(card.getByTestId("result-chart-reset")).toHaveCount(0);
+
+  await openRangeDetails(card);
+  await expect(card.getByTestId("result-chart-visible-period")).toContainText(
+    "Jun 2, 2025",
+  );
+  await expect(card.getByTestId("result-chart-peak")).toContainText("$1,010");
+  await expect(card.getByTestId("result-chart-low")).toContainText("$996");
+  await expect(card.getByTestId("result-chart-event-count")).toContainText(
+    "1 displayed executed-fill event",
+  );
+  // Read-only: no Custom inputs for a series that cannot switch ranges.
+  await expect(card.getByTestId("result-chart-custom-start")).toHaveCount(0);
+  await expect(card.getByTestId("result-chart-custom-apply")).toHaveCount(0);
+  expect(watch.featureRequests).toEqual([]);
+  expect(watch.pageErrors).toEqual([]);
+});
+
 test("Spanish mobile keyboard journey keeps localized accessible controls", async ({
   page,
 }) => {

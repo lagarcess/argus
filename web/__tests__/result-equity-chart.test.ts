@@ -256,6 +256,11 @@ describe("ResultEquityChart adaptive range integration", () => {
     expect(explorationSource).toContain("result-chart-event-list");
     expect(explorationSource).toContain("result-chart-event-sampling");
     expect(explorationSource).toContain("result-chart-marker-cap");
+    // Accessibility floors: 16px date inputs at every breakpoint and no
+    // sub-4.5:1 idle/quiet text tokens on the range surface.
+    expect(explorationSource).not.toContain("sm:text-[12px]");
+    expect(explorationSource).not.toContain("text-black/42");
+    expect(explorationSource).not.toContain("text-black/45");
     // Accessible copy comes from typed marker fields, never backend prose.
     expect(explorationSource).not.toContain("marker.label");
     expect(explorationSource).not.toContain("buy_and_hold");

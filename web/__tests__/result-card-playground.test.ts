@@ -44,6 +44,7 @@ describe("result card playground", () => {
       "dca-result",
       "trade-based-strategy",
       "adaptive-intraday-result",
+      "short-series-result",
       "multi-symbol-same-asset",
       "old-persisted-card-shape",
     ]);
@@ -123,6 +124,19 @@ describe("result card playground", () => {
     expect(dca.series[0]?.time).toBe("2022-01-03");
     expect(dca.series.at(-1)).toEqual({ time: "2023-12-29", value: 1000 });
     expect(dca.markers?.every((marker) => marker.type === "entry")).toBe(true);
+
+    const shortSeries = resultCardPlaygroundFixtures.find(
+      (fixture) => fixture.id === "short-series-result",
+    )!.result.chart!;
+    expect(shortSeries.series).toHaveLength(5);
+    expect(shortSeries.exploration_policy).toEqual({
+      minimum_visible_observations: 6,
+    });
+    expect(shortSeries.marker_summary).toEqual({
+      total_groups: 1,
+      included_groups: 1,
+      sampled: false,
+    });
 
     expect(
       legacyPersistedRunFixture.conversation_result_card.chart,
