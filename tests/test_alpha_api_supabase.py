@@ -451,8 +451,17 @@ def mock_gateway():
         yield gateway
 
 
-def test_run_backtest_quota_exceeded(mock_gateway):
-    mock_gateway.check_and_increment_usage_limits.side_effect = QuotaExceededError(
+def test_run_backtest_quota_exceeded_before_provider_preflight(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+) -> None:
+    from argus.api import backtest_service
+
+    provider_preflight = MagicMock(
+        side_effect=AssertionError("provider preflight must not run over quota")
+    )
+    monkeypatch.setattr(backtest_service, "prepare_market_data", provider_preflight)
+    mock_gateway.check_usage_limits.side_effect = QuotaExceededError(
         "Quota exceeded for backtest_runs (day)"
     )
 
@@ -469,6 +478,112 @@ def test_run_backtest_quota_exceeded(mock_gateway):
     assert data["code"] == "too_many_requests"
     assert "Quota exceeded for backtest_runs" in data["detail"]
     assert response.headers.get("Retry-After") == "60"
+    provider_preflight.assert_not_called()
+    mock_gateway.check_usage_limits.assert_called_once()
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
+
+
+def test_run_backtest_coverage_rejection_does_not_consume_allowance(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+) -> None:
+    from argus.api import backtest_service
+    from argus.domain.backtesting.coverage import MarketDataCoverageError
+
+    monkeypatch.setattr(
+        backtest_service,
+        "prepare_market_data",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            MarketDataCoverageError("no_common_data_window")
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL", "MSFT"],
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-05",
+        },
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "coverage-rejected-before-quota",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "no_common_data_window"
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
+    mock_gateway.finalize_backtest_completion.assert_not_called()
+
+
+def test_direct_run_persists_requested_and_effective_data_windows(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+) -> None:
+    from argus.domain import engine as domain_engine
+
+    def fetch_with_leading_gap(symbol: str, **_: object) -> pd.DataFrame:
+        days = (
+            ["2024-01-03", "2024-01-04", "2024-01-05"]
+            if symbol == "AAPL"
+            else [
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-04",
+                "2024-01-05",
+            ]
+        )
+        index = pd.to_datetime(days, utc=True)
+        close = pd.Series(range(100, 100 + len(index)), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(domain_engine, "fetch_ohlcv", fetch_with_leading_gap)
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-05",
+        },
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "direct-effective-window",
+        },
+    )
+
+    assert response.status_code == 200
+    run = response.json()["run"]
+    assert run["config_snapshot"]["requested_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-01-05",
+    }
+    assert run["config_snapshot"]["effective_date_range"] == {
+        "start": "2024-01-03",
+        "end": "2024-01-05",
+    }
+    assert run["conversation_result_card"]["date_range"] == {
+        "start": "2024-01-03",
+        "end": "2024-01-05",
+        "display": "January 3, 2024 to January 5, 2024",
+    }
+    assert run["chart"]["series"][0]["time"] == "2024-01-03"
+    assert run["chart"]["series"][-1]["time"] == "2024-01-05"
+    mock_gateway.check_and_increment_usage_limits.assert_called_once()
 
 
 def test_chat_stream_quota_exceeded(mock_gateway):
@@ -859,6 +974,85 @@ def test_chat_stream_supabase_persists_backtest_run(mock_gateway):
     assert final_payload["run"]["conversation_result_card"]["title"] == (
         "TSLA RSI Mean Reversion"
     )
+
+
+def test_chat_stream_succeeds_when_cost_ledger_table_is_unavailable(
+    mock_gateway,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+    from argus.llm.openrouter import (
+        clear_openrouter_route_receipts,
+        record_openrouter_route_receipt,
+    )
+
+    async def runtime_events_with_receipt(**kwargs: Any):
+        record_openrouter_route_receipt(
+            task="interpretation",
+            model_name="unit-test-model",
+            mode="json_schema",
+            schema_name="LLMInterpretationResponse",
+            latency_ms=15,
+            outcome="succeeded",
+            token_usage={
+                "prompt_tokens": 20,
+                "completion_tokens": 10,
+                "total_tokens": 30,
+            },
+            usage_cost_usd=0.0005,
+        )
+        async for event in _runtime_success_events(**kwargs):
+            yield event
+
+    clear_openrouter_route_receipts()
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        runtime_events_with_receipt,
+    )
+    now = utcnow()
+    conversation = Conversation(
+        id="conv-ledger-unavailable",
+        title="New conversation",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview=None,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.create_message.side_effect = lambda **kwargs: Message(
+        id="msg-ledger-unavailable",
+        conversation_id=kwargs["conversation_id"],
+        role=kwargs["role"],  # type: ignore[arg-type]
+        content=kwargs["content"],
+        metadata=kwargs.get("metadata") or {},
+        created_at=utcnow(),
+    )
+    mock_gateway.create_route_receipt.return_value = {"id": "receipt-1"}
+    mock_gateway.create_cost_ledger_entry.side_effect = RuntimeError(
+        "PGRST205: cost_ledger_entries is unavailable"
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation.id,
+            "message": "Test TSLA dip idea",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.text.count("data: [DONE]") == 1
+    assert _final_payload(response.text)["run"]["status"] == "completed"
+    assert "PGRST205" not in response.text
+    assert "cost_ledger_entries" not in response.text
+    mock_gateway.create_route_receipt.assert_called_once()
+    mock_gateway.create_cost_ledger_entry.assert_called_once()
 
 
 def test_chat_stream_finalization_failure_returns_retryable_error(mock_gateway):

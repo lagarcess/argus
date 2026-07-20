@@ -294,7 +294,23 @@
       "unsupported_recovery": "That rule does not define when to buy or sell on its own. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_for_asset": "That rule does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_with_raw_value": "{{rawValue}} does not define when to buy or sell on its own. Which supported direction should I use: {{options}}?",
-      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?"
+      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?",
+      "unsupported_timeframe": "That bar size is not supported. Choose daily or 1-hour bars.",
+      "unsupported_timeframe_with_raw_value": "{{rawValue}} is not a supported bar size. Choose daily or 1-hour bars.",
+      "timeframe_actions": {
+        "daily": "Retry with daily bars",
+        "hour_1": "Retry with 1-hour bars"
+      }
+    },
+    "coverage_recovery": {
+      "no_common_data_window": "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
+      "insufficient_common_data": "The assets and benchmark share too little history for one trustworthy test. Change the dates, an asset, or the benchmark.",
+      "market_data_unavailable": "The shared history is not available for one trustworthy test right now. Change the dates, an asset, or the benchmark.",
+      "actions": {
+        "change_dates": "Change dates",
+        "change_asset": "Change asset",
+        "change_benchmark": "Change benchmark"
+      }
     },
     "simplification_options": {
       "rsi_threshold": "Use a supported RSI threshold rule",
@@ -472,6 +488,37 @@
       "markers": {
         "entry": "Buy",
         "exit": "Sell"
+      },
+      "range": {
+        "group_label": "Chart range",
+        "details": "Range details",
+        "presets": {
+          "1D": "1D",
+          "1W": "1W",
+          "1M": "1M",
+          "3M": "3M",
+          "YTD": "YTD",
+          "1Y": "1Y",
+          "ALL": "All"
+        },
+        "custom": "Custom",
+        "custom_heading": "Custom range",
+        "apply": "Apply",
+        "cancel": "Cancel",
+        "reset": "Reset",
+        "start_date": "Start date",
+        "end_date": "End date",
+        "error_missing_date": "Choose a start and end date.",
+        "error_start_after_end": "Start date must be before end date.",
+        "error_insufficient_observations": "That range needs at least two observations.",
+        "visible_period": "Visible period: {{start}} to {{end}}.",
+        "peak_label": "Highest visible value",
+        "low_label": "Lowest visible value",
+        "event_count_one": "{{count}} displayed executed-fill event in this range.",
+        "event_count_other": "{{count}} displayed executed-fill events in this range.",
+        "no_events": "No displayed executed-fill events in this range.",
+        "event_sampling": "Showing {{shown}} of {{total}} supplied events.",
+        "marker_cap": "Argus stored {{included}} of {{total}} executed-fill groups for this result."
       }
     },
     "strategy_type": {
@@ -534,6 +581,7 @@
     "confirmation": {
       "asset_count": "{{count}} assets",
       "selected_asset": "Selected asset",
+      "period_adjustment": "I adjusted the test period to {{period}} because every asset and the benchmark need a shared data window.",
       "status": {
         "ready_to_run": "Ready to run",
         "needs_change": "Needs change",

@@ -67,6 +67,7 @@ SYNTHETIC_UNIT_ASSETS: dict[str, tuple[AssetClass, str, str]] = {
 
 _ASSET_ALIAS_MAP: dict[str, ResolvedAsset] | None = None
 _ASSET_CACHE_TS: float = 0.0
+_ASSET_CACHE_MODE: AssetProviderMode | None = None
 _ASSET_EXACT_LOOKUP_CACHE: dict[str, ResolvedAsset] = {}
 _ASSET_CACHE_LOCK = threading.Lock()
 KRAKEN_PUBLIC_API_BASE = "https://api.kraken.com/0"
@@ -93,7 +94,11 @@ def _asset_universe_loader_timeout_seconds() -> float:
 
 
 def _asset_provider_mode() -> AssetProviderMode:
-    raw = (os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider").strip()
+    raw = (
+        os.getenv("ARGUS_ASSET_PROVIDER_MODE")
+        or os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE")
+        or "live_provider"
+    ).strip()
     if raw in {
         "live_provider",
         "recorded_provider_fixture",
@@ -504,19 +509,24 @@ def _run_live_provider_call(
 
 
 def _refresh_asset_cache_if_needed(*, force: bool = False) -> None:
-    global _ASSET_ALIAS_MAP, _ASSET_CACHE_TS
+    global _ASSET_ALIAS_MAP, _ASSET_CACHE_MODE, _ASSET_CACHE_TS
 
     now = time.time()
     ttl = _cache_ttl_seconds()
     expired = (now - _ASSET_CACHE_TS) >= ttl
-    if not (force or _ASSET_ALIAS_MAP is None or expired):
+    provider_mode = _asset_provider_mode()
+    mode_changed = _ASSET_CACHE_MODE != provider_mode
+    if not (force or _ASSET_ALIAS_MAP is None or expired or mode_changed):
         return
     with _ASSET_CACHE_LOCK:
         now = time.time()
         expired = (now - _ASSET_CACHE_TS) >= ttl
-        if force or _ASSET_ALIAS_MAP is None or expired:
+        provider_mode = _asset_provider_mode()
+        mode_changed = _ASSET_CACHE_MODE != provider_mode
+        if force or _ASSET_ALIAS_MAP is None or expired or mode_changed:
             _ASSET_ALIAS_MAP = _load_asset_universe()
             _ASSET_CACHE_TS = now
+            _ASSET_CACHE_MODE = provider_mode
 
 
 def resolve_asset(symbol: str) -> ResolvedAsset:
@@ -737,8 +747,10 @@ def _name_match_score(query: str, record: ResolvedAsset) -> int:
 
 
 def clear_asset_cache() -> None:
-    global _ASSET_ALIAS_MAP, _ASSET_CACHE_TS, _ASSET_EXACT_LOOKUP_CACHE
+    global _ASSET_ALIAS_MAP, _ASSET_CACHE_MODE, _ASSET_CACHE_TS
+    global _ASSET_EXACT_LOOKUP_CACHE
     with _ASSET_CACHE_LOCK:
         _ASSET_ALIAS_MAP = None
         _ASSET_CACHE_TS = 0.0
+        _ASSET_CACHE_MODE = None
         _ASSET_EXACT_LOOKUP_CACHE = {}

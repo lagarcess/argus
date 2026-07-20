@@ -3,8 +3,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  coverageRecoveryActionsFromMetadata,
   recoveryDisplayFromMetadata,
   recoveryDisplayText,
+  unsupportedTimeframeActionsFromMetadata,
 } from "../lib/chat-recovery-display";
 
 const root = join(import.meta.dir, "..");
@@ -86,6 +88,7 @@ describe("chat recovery display", () => {
       clarification: {
         kind: "clarification",
         reason_code: "missing_period",
+        prompt_source: "degraded_fallback",
         requested_field: "date_range",
         semantic_needs: ["period"],
         payload: {
@@ -147,6 +150,7 @@ describe("chat recovery display", () => {
       clarification: {
         kind: "unsupported_recovery",
         reason_code: "unsupported_strategy_logic",
+        prompt_source: "degraded_fallback",
         requested_field: "unsupported_constraints",
         semantic_needs: ["simplification_choice"],
         payload: {
@@ -177,10 +181,203 @@ describe("chat recovery display", () => {
     );
   });
 
+  test("renders degraded timeframe recovery truthfully in English and Spanish", () => {
+    const display = recoveryDisplayFromMetadata({
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "unsupported_time_granularity",
+        prompt_source: "degraded_fallback",
+        requested_field: "timeframe",
+        requested_fields: ["timeframe"],
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          raw_value: "5m",
+          strategy: { asset_universe: ["AAPL"], timeframe: "5m" },
+        },
+        options: [
+          {
+            id: "option_0",
+            replacement_values: { timeframe: "1D" },
+          },
+          {
+            id: "option_1",
+            replacement_values: { timeframe: "1h" },
+          },
+        ],
+      },
+    });
+
+    expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe(
+      "5m is not a supported bar size. Choose daily or 1-hour bars.",
+    );
+    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
+      "5m no es un tamaño de barra compatible. Elige barras diarias o de 1 hora.",
+    );
+  });
+
+  test("renders provider-neutral coverage recovery in English and Spanish", () => {
+    const metadata = {
+      clarification: {
+        kind: "coverage_recovery",
+        reason_code: "no_common_data_window",
+        prompt_source: "degraded_fallback",
+        requested_field: null,
+        requested_fields: [
+          "date_range",
+          "asset_universe",
+          "comparison_baseline",
+        ],
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          strategy: { asset_universe: ["AAPL"] },
+          coverage: {
+            code: "no_common_data_window",
+            benchmark_symbol: "SPY",
+          },
+        },
+        options: [
+          {
+            id: "change_dates",
+            replacement_values: { requested_field: "date_range" },
+          },
+          {
+            id: "change_asset",
+            replacement_values: { requested_field: "asset_universe" },
+          },
+          {
+            id: "change_benchmark",
+            replacement_values: { requested_field: "comparison_baseline" },
+          },
+        ],
+      },
+    };
+    const display = recoveryDisplayFromMetadata(metadata);
+
+    expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe(
+      "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
+    );
+    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
+      "Esos activos y la referencia no comparten un rango de datos utilizable para una prueba confiable. Cambia las fechas, un activo o la referencia.",
+    );
+    expect(
+      coverageRecoveryActionsFromMetadata(metadata, "assistant-coverage"),
+    ).toEqual([
+      {
+        id: "coverage-change-dates",
+        label: "Change dates",
+        labelKey: "chat.coverage_recovery.actions.change_dates",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-coverage",
+          option_id: "change_dates",
+          replacement_values: { requested_field: "date_range" },
+        },
+      },
+      {
+        id: "coverage-change-asset",
+        label: "Change asset",
+        labelKey: "chat.coverage_recovery.actions.change_asset",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-coverage",
+          option_id: "change_asset",
+          replacement_values: { requested_field: "asset_universe" },
+        },
+      },
+      {
+        id: "coverage-change-benchmark",
+        label: "Change benchmark",
+        labelKey: "chat.coverage_recovery.actions.change_benchmark",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-coverage",
+          option_id: "change_benchmark",
+          replacement_values: { requested_field: "comparison_baseline" },
+        },
+      },
+    ]);
+  });
+
+  test("hydrates only safe typed unsupported-timeframe actions", () => {
+    const metadata = {
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "unsupported_time_granularity",
+        prompt_source: "llm_generated",
+        requested_field: "timeframe",
+        requested_fields: ["timeframe"],
+        semantic_needs: ["simplification_choice"],
+        payload: { raw_value: "5m", strategy: { asset_universe: ["AAPL"] } },
+        options: [
+          {
+            id: "option_0",
+            compatibility_label: "Retry with daily bars",
+            replacement_values: { timeframe: "1D" },
+          },
+          {
+            id: "option_1",
+            compatibility_label: "Retry with 1-hour bars",
+            replacement_values: { timeframe: "1h" },
+          },
+          {
+            id: "option_unsafe",
+            compatibility_label: "Unsafe",
+            replacement_values: { timeframe: "5m", provider: "internal" },
+          },
+        ],
+      },
+    };
+
+    expect(
+      unsupportedTimeframeActionsFromMetadata(metadata, "assistant-timeframe"),
+    ).toEqual([
+      {
+        id: "unsupported-timeframe-option-0",
+        label: "Retry with daily bars",
+        labelKey: "chat.clarification.timeframe_actions.daily",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-timeframe",
+          option_id: "option_0",
+          replacement_values: { timeframe: "1D" },
+        },
+      },
+      {
+        id: "unsupported-timeframe-option-1",
+        label: "Retry with 1-hour bars",
+        labelKey: "chat.clarification.timeframe_actions.hour_1",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-timeframe",
+          option_id: "option_1",
+          replacement_values: { timeframe: "1h" },
+        },
+      },
+    ]);
+    expect(
+      recoveryDisplayFromMetadata({
+        ...metadata,
+        response_intent: {
+          kind: "unsupported_recovery",
+          options: metadata.clarification.options,
+          facts: {
+            unsupported_constraints: [
+              {
+                category: "unsupported_time_granularity",
+                raw_value: "5m",
+              },
+            ],
+          },
+        },
+      }),
+    ).toBeNull();
+  });
+
   test("recovery locale keys stay in parity", () => {
     for (const namespace of [
       "chat.recovery",
       "chat.clarification",
+      "chat.coverage_recovery",
       "chat.simplification_options",
     ]) {
       const enKeys = flattenedKeys(

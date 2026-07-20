@@ -50,6 +50,17 @@ export type ApiMetricRow = {
   value: string;
 };
 
+export type ResultChartExplorationPolicy = {
+  minimum_visible_observations?: number;
+  minimum_meaningful_duration?: string | null;
+};
+
+export type ResultChartMarkerSummary = {
+  total_groups: number;
+  included_groups: number;
+  sampled: boolean;
+};
+
 export type ResultChartPayload = {
   kind: "portfolio_equity";
   series: Array<{ time: string; value: number }>;
@@ -71,6 +82,8 @@ export type ResultChartPayload = {
     peak?: { time: string; value: number } | null;
     lowest?: { time: string; value: number } | null;
   } | null;
+  exploration_policy?: ResultChartExplorationPolicy | null;
+  marker_summary?: ResultChartMarkerSummary | null;
   attribution?: string;
 };
 

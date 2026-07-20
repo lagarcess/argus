@@ -53,7 +53,7 @@ def default_benchmark(asset_class: AssetClass, symbols: list[str] | None = None)
 
 
 def _normalize_timeframe(timeframe: str | None) -> str:
-    return _config._normalize_timeframe(timeframe)
+    return _config.normalize_timeframe(timeframe)
 
 
 def _to_date(value: str | date | datetime) -> date:
@@ -229,6 +229,7 @@ def compute_alpha_metrics(
     *,
     fetch_ohlcv_func: Callable[..., Any] | None = None,
     fetch_price_series_func: Callable[..., Any] | None = None,
+    prepared_market_data: Any | None = None,
 ) -> dict[str, Any]:
     # Compatibility note: the underlying runner still uses Portfolio.from_signals.
     def benchmark_curve(
@@ -246,6 +247,7 @@ def compute_alpha_metrics(
         fetch_ohlcv_func=fetch_ohlcv_func or fetch_ohlcv,
         build_signals_func=_build_signals,
         build_benchmark_curve_func=benchmark_curve,
+        prepared_market_data=prepared_market_data,
     )
 
 
@@ -253,11 +255,13 @@ def build_result_chart(
     config: dict[str, Any],
     *,
     fetch_ohlcv_func: Callable[..., Any] | None = None,
+    prepared_market_data: Any | None = None,
 ) -> dict[str, Any]:
     return _charts.build_result_chart(
         config,
         fetch_ohlcv_func=fetch_ohlcv_func or fetch_ohlcv,
         build_signals_func=_build_signals,
+        prepared_market_data=prepared_market_data,
     )
 
 

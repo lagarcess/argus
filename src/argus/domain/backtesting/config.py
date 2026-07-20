@@ -44,7 +44,7 @@ def default_benchmark(asset_class: AssetClass, symbols: list[str] | None = None)
     return "BTC"
 
 
-def _normalize_timeframe(timeframe: str | None) -> str:
+def normalize_timeframe(timeframe: str | None) -> str:
     if timeframe is None:
         return "1D"
     normalized = timeframe.strip().lower()
@@ -168,7 +168,7 @@ def normalize_backtest_config(
         raise ValueError("asset_class_conflict")
 
     symbols = [c.symbol for c in classified]
-    timeframe = _normalize_timeframe(payload.get("timeframe"))
+    timeframe = normalize_timeframe(payload.get("timeframe"))
 
     benchmark_input = payload.get("benchmark_symbol")
     if benchmark_input:

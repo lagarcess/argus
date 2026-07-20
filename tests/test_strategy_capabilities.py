@@ -1,6 +1,11 @@
+import pytest
 from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 from argus.domain.slot_normalizer import normalize_template_name
-from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
+from argus.domain.strategy_capabilities import (
+    STRATEGY_CAPABILITIES,
+    ResultChartExplorationSpec,
+    resolve_result_chart_exploration_policy,
+)
 
 
 def test_registry_contains_all_alpha_templates():
@@ -62,3 +67,80 @@ def test_buy_and_hold_canonical_template():
     assert normalize_template_name("buy and hold") is None
     assert normalize_template_name("hold") is None
     assert normalize_template_name("comprar y mantener") is None
+
+
+def test_exploration_spec_defaults_are_the_safe_observation_only_policy():
+    spec = ResultChartExplorationSpec()
+    assert spec.minimum_visible_observations == 6
+    assert spec.minimum_meaningful_duration is None
+    assert spec.cycle_parameter is None
+    assert spec.cycle_duration_by_value == {}
+    assert spec.minimum_visible_cycles == 2
+
+
+def test_buy_and_hold_resolves_one_month_chart_duration():
+    assert resolve_result_chart_exploration_policy(
+        {"template": "buy_and_hold", "parameters": {}}
+    ) == {
+        "minimum_visible_observations": 6,
+        "minimum_meaningful_duration": "P1M",
+    }
+
+
+@pytest.mark.parametrize(
+    ("cadence", "duration"),
+    [
+        ("daily", "P2D"),
+        ("weekly", "P2W"),
+        ("biweekly", "P4W"),
+        ("monthly", "P2M"),
+        ("quarterly", "P6M"),
+    ],
+)
+def test_dca_resolves_two_typed_cadence_cycles(cadence, duration):
+    assert resolve_result_chart_exploration_policy(
+        {
+            "template": "dca_accumulation",
+            "parameters": {"dca_cadence": cadence},
+        }
+    ) == {
+        "minimum_visible_observations": 6,
+        "minimum_meaningful_duration": duration,
+    }
+
+
+def test_dca_with_unknown_cadence_degrades_to_observation_only():
+    assert resolve_result_chart_exploration_policy(
+        {
+            "template": "dca_accumulation",
+            "parameters": {"dca_cadence": "fortnightly"},
+        }
+    ) == {"minimum_visible_observations": 6}
+
+
+def test_signal_capability_uses_observation_only_policy():
+    assert resolve_result_chart_exploration_policy(
+        {"template": "rsi_mean_reversion", "parameters": {}}
+    ) == {"minimum_visible_observations": 6}
+
+
+def test_unknown_capability_uses_safe_observation_only_policy():
+    assert resolve_result_chart_exploration_policy(
+        {"template": "future_strategy", "parameters": {"future_cycle": "fortnight"}}
+    ) == {"minimum_visible_observations": 6}
+
+
+def test_resolver_tolerates_missing_template_and_malformed_parameters():
+    assert resolve_result_chart_exploration_policy({}) == {
+        "minimum_visible_observations": 6
+    }
+    assert resolve_result_chart_exploration_policy(
+        {"template": "dca_accumulation", "parameters": "monthly"}
+    ) == {"minimum_visible_observations": 6}
+
+
+def test_exploration_metadata_contains_no_display_or_provider_fields():
+    forbidden = {"display_name", "label", "provider", "asset_class", "timeframe"}
+    for capability in STRATEGY_CAPABILITIES.values():
+        dumped = capability.result_chart_exploration.model_dump()
+        assert forbidden.isdisjoint(dumped)

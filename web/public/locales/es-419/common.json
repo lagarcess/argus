@@ -294,7 +294,23 @@
       "unsupported_recovery": "Esa regla no define por sí sola cuándo comprar o vender. ¿Qué camino quieres usar: {{options}}?",
       "unsupported_recovery_for_asset": "Esa regla no define por sí sola cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
       "unsupported_recovery_with_raw_value": "{{rawValue}} no define por sí solo cuándo comprar o vender. ¿Qué camino quieres usar: {{options}}?",
-      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} no define por sí solo cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?"
+      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} no define por sí solo cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_timeframe": "Ese tamaño de barra no es compatible. Elige barras diarias o de 1 hora.",
+      "unsupported_timeframe_with_raw_value": "{{rawValue}} no es un tamaño de barra compatible. Elige barras diarias o de 1 hora.",
+      "timeframe_actions": {
+        "daily": "Usar barras diarias",
+        "hour_1": "Usar barras de 1 hora"
+      }
+    },
+    "coverage_recovery": {
+      "no_common_data_window": "Esos activos y la referencia no comparten un rango de datos utilizable para una prueba confiable. Cambia las fechas, un activo o la referencia.",
+      "insufficient_common_data": "Los activos y la referencia comparten muy poco historial para una prueba confiable. Cambia las fechas, un activo o la referencia.",
+      "market_data_unavailable": "El historial compartido no está disponible para una prueba confiable en este momento. Cambia las fechas, un activo o la referencia.",
+      "actions": {
+        "change_dates": "Cambiar fechas",
+        "change_asset": "Cambiar activo",
+        "change_benchmark": "Cambiar referencia"
+      }
     },
     "simplification_options": {
       "rsi_threshold": "Usar una regla RSI compatible",
@@ -472,6 +488,37 @@
       "markers": {
         "entry": "Comprar",
         "exit": "Vender"
+      },
+      "range": {
+        "group_label": "Rango del gráfico",
+        "details": "Detalles del rango",
+        "presets": {
+          "1D": "1D",
+          "1W": "1S",
+          "1M": "1M",
+          "3M": "3M",
+          "YTD": "Este año",
+          "1Y": "1A",
+          "ALL": "Todo"
+        },
+        "custom": "Personalizado",
+        "custom_heading": "Rango personalizado",
+        "apply": "Aplicar",
+        "cancel": "Cancelar",
+        "reset": "Restablecer",
+        "start_date": "Fecha de inicio",
+        "end_date": "Fecha de fin",
+        "error_missing_date": "Elige una fecha de inicio y una de fin.",
+        "error_start_after_end": "La fecha de inicio debe ser anterior a la fecha de fin.",
+        "error_insufficient_observations": "Ese rango necesita al menos dos observaciones.",
+        "visible_period": "Período visible: {{start}} al {{end}}.",
+        "peak_label": "Valor visible más alto",
+        "low_label": "Valor visible más bajo",
+        "event_count_one": "{{count}} operación ejecutada mostrada en este rango.",
+        "event_count_other": "{{count}} operaciones ejecutadas mostradas en este rango.",
+        "no_events": "No hay operaciones ejecutadas mostradas en este rango.",
+        "event_sampling": "Mostrando {{shown}} de {{total}} eventos disponibles.",
+        "marker_cap": "Argus guardó {{included}} de {{total}} grupos de operaciones ejecutadas para este resultado."
       }
     },
     "strategy_type": {
@@ -534,6 +581,7 @@
     "confirmation": {
       "asset_count": "{{count}} activos",
       "selected_asset": "Activo seleccionado",
+      "period_adjustment": "Ajusté el período de la prueba a {{period}} porque cada activo y la referencia necesitan un rango de datos compartido.",
       "status": {
         "ready_to_run": "Listo para ejecutar",
         "needs_change": "Necesita ajuste",

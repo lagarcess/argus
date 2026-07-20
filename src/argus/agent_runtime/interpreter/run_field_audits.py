@@ -40,6 +40,13 @@ from argus.agent_runtime.interpreter.shared import (
 from argus.agent_runtime.interpreter.signal_rule import (
     _asset_recovery_query_is_explicit_ticker,
 )
+from argus.agent_runtime.interpreter.unsupported_admission import (
+    CAPABILITY_CONFLICT_KEEP_DIRECTION_PROMPT,
+    inverse_capability_conflict_messages,
+    inverse_promotion_reason_codes,
+    response_has_only_unsupported_strategy_logic_constraints,
+    response_needs_inverse_capability_conflict_audit,
+)
 from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
     LLMStrategyDraft,
@@ -64,10 +71,7 @@ def _structured_supported_strategy_capability_conflict_fallback(
 ) -> LLMInterpretationResponse | None:
     if not _response_needs_supported_strategy_capability_conflict_audit(response):
         return None
-    if any(
-        item.category != "unsupported_strategy_logic"
-        for item in response.unsupported_constraints
-    ):
+    if not response_has_only_unsupported_strategy_logic_constraints(response):
         return None
     draft = response.candidate_strategy_draft
     strategy_type = canonical_strategy_type(draft.strategy_type)
@@ -125,7 +129,7 @@ def _response_needs_supported_strategy_capability_conflict_audit(
     ):
         return False
     if not has_unsupported_strategy_logic:
-        return False
+        return response_needs_inverse_capability_conflict_audit(response)
     draft = response.candidate_strategy_draft
     if canonical_strategy_type(draft.strategy_type) in {
         "buy_and_hold",
@@ -148,6 +152,8 @@ def _supported_strategy_capability_conflict_messages(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> list[dict[str, str]]:
+    if response_needs_inverse_capability_conflict_audit(response):
+        return inverse_capability_conflict_messages(response=response, request=request)
     constraints = [
         item.model_dump(mode="json")
         for item in response.unsupported_constraints
@@ -156,32 +162,7 @@ def _supported_strategy_capability_conflict_messages(
     return [
         {
             "role": "system",
-            "content": (
-                "You are Argus's capability-conflict audit. The primary interpreter "
-                "returned both a supported canonical strategy and an "
-                "unsupported_strategy_logic constraint, or returned a raw natural-"
-                "language strategy phrase as unsupported while preserving executable "
-                "field evidence. Decide whether the current user message semantically "
-                "selects a supported Alpha strategy or asks for real unsupported "
-                "custom logic. Use semantic meaning, not keyword or phrase matching. "
-                "Supported Alpha strategy families include buy_and_hold and "
-                "dca_accumulation when the user is only asking to test holding or "
-                "recurring fixed-dollar buys over a period. A plain performance, "
-                "return, or benchmark comparison between one primary asset and a "
-                "reference asset over a stated window is a supported buy_and_hold "
-                "comparison with comparison_baseline; it is not unsupported custom "
-                "strategy logic unless the user adds a separate unsupported rule. "
-                "Keep the unsupported "
-                "constraint when the current message adds an extra unsupported entry "
-                "condition, exit condition, fundamental rule, sentiment/news/event "
-                "rule, custom script, brokerage action, shorting, or other logic "
-                "beyond the supported strategy family. Drop it only when the message "
-                "semantically asks for the supported strategy itself and no extra "
-                "unsupported rule. Set selected_strategy_type to the canonical "
-                "supported family when dropping the constraint. Reason from the "
-                "current message and structured draft meaning. Return only JSON "
-                "matching the schema."
-            ),
+            "content": CAPABILITY_CONFLICT_KEEP_DIRECTION_PROMPT,
         },
         {
             "role": "system",
@@ -234,6 +215,7 @@ def _response_with_supported_strategy_capability_conflict_removed(
             [
                 *repaired.reason_codes,
                 "supported_strategy_capability_conflict_audit",
+                *inverse_promotion_reason_codes(response),
             ]
         )
     )
@@ -268,6 +250,8 @@ def _clear_rule_or_indicator_fields(draft: LLMStrategyDraft) -> None:
 def _response_with_executable_fields_preferred_over_clarification_prose(
     response: LLMInterpretationResponse,
 ) -> LLMInterpretationResponse:
+    # An unsupported verdict on either typed field is not clarification noise;
+    # only the inverse capability audit may normalize it into a supported run.
     draft = response.candidate_strategy_draft
     if not (
         response.requires_clarification
@@ -276,7 +260,6 @@ def _response_with_executable_fields_preferred_over_clarification_prose(
         in {
             "strategy_drafting",
             "backtest_execution",
-            "unsupported_or_out_of_scope",
         }
         and response.semantic_turn_act
         not in {
@@ -286,6 +269,7 @@ def _response_with_executable_fields_preferred_over_clarification_prose(
             "refine_current_idea",
             "result_followup",
             "retry_failed_action",
+            "unsupported_request",
         }
         and response.capability_question_focus is None
         and response.context_question_focus is None

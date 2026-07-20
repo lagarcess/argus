@@ -807,6 +807,49 @@ def test_backtest_accepts_supported_timeframes(timeframe: str) -> None:
     assert response.json()["run"]["config_snapshot"]["timeframe"] == timeframe
 
 
+def test_backtest_rejects_coverage_adjustment_to_same_calendar_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain import engine as domain_engine
+
+    def same_day_intraday_bars(**_: Any) -> pd.DataFrame:
+        index = pd.date_range(
+            start="2024-01-03T14:30:00Z",
+            periods=7,
+            freq="1h",
+        )
+        close = pd.Series(range(100, 107), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(domain_engine, "fetch_ohlcv", same_day_intraday_bars)
+    client = _client()
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        headers={"Idempotency-Key": "same-day-adjusted-window"},
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "timeframe": "1h",
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-05",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "invalid_chronological_date_range"
+
+
 def test_backtest_rejects_stablecoin_symbol() -> None:
     client = _client()
     response = client.post(

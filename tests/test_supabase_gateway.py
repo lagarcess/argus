@@ -1,4 +1,7 @@
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
 from pathlib import Path
+from threading import Event, RLock
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -12,11 +15,25 @@ from argus.domain.backtest_finalization import (
 from argus.domain.evidence import build_backtest_evidence_capture, build_decision_note
 from argus.domain.search_text import search_text_matches_query
 from argus.domain.store import utcnow
+from argus.domain.supabase_conversation_messages import (
+    ConversationMessagePersistenceMixin,
+)
 from argus.domain.supabase_gateway import (
     DecisionCaptureIntegrityError,
     QuotaExceededError,
     SupabaseGateway,
 )
+
+
+def test_gateway_inherits_focused_conversation_message_persistence() -> None:
+    assert issubclass(SupabaseGateway, ConversationMessagePersistenceMixin)
+    for method_name in (
+        "get_message",
+        "latest_message",
+        "create_message",
+        "claim_response_option_action",
+    ):
+        assert method_name not in SupabaseGateway.__dict__
 
 
 def test_batched_fetch_helper_exists_for_unbounded_queries():
@@ -88,6 +105,128 @@ def test_list_messages_projects_completed_workflow_result_for_reload() -> None:
     gateway.get_backtest_run.assert_called_once_with(user_id="user-1", run_id="run-1")
 
 
+def _message_query_mock(*, row: dict[str, Any]) -> tuple[MagicMock, MagicMock]:
+    client = MagicMock()
+    query = MagicMock()
+    client.table.return_value = query
+    query.select.return_value = query
+    query.eq.return_value = query
+    query.order.return_value = query
+    query.limit.return_value = query
+    query.execute.return_value = SimpleNamespace(data=[row])
+    return client, query
+
+
+def test_get_message_scopes_lookup_to_owner_conversation_and_message_id() -> None:
+    client, query = _message_query_mock(
+        row={
+            "id": "assistant-1",
+            "conversation_id": "conversation-1",
+            "role": "assistant",
+            "content": "Choose a timeframe.",
+            "metadata": {},
+            "created_at": "2026-07-17T10:00:00+00:00",
+        }
+    )
+    gateway = SupabaseGateway(client=client)
+
+    message = gateway.get_message(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        message_id="assistant-1",
+    )
+
+    assert message is not None
+    assert message.id == "assistant-1"
+    assert query.eq.call_args_list == [
+        (("user_id", "user-1"),),
+        (("conversation_id", "conversation-1"),),
+        (("id", "assistant-1"),),
+    ]
+    query.limit.assert_called_once_with(1)
+
+
+def test_latest_message_uses_owner_scope_and_descending_bounded_query() -> None:
+    client, query = _message_query_mock(
+        row={
+            "id": "assistant-latest",
+            "conversation_id": "conversation-1",
+            "role": "assistant",
+            "content": "Latest recovery.",
+            "metadata": {},
+            "created_at": "2026-07-17T10:01:00+00:00",
+        }
+    )
+    gateway = SupabaseGateway(client=client)
+
+    message = gateway.latest_message(
+        user_id="user-1",
+        conversation_id="conversation-1",
+    )
+
+    assert message is not None
+    assert message.id == "assistant-latest"
+    assert query.eq.call_args_list == [
+        (("user_id", "user-1"),),
+        (("conversation_id", "conversation-1"),),
+    ]
+    assert query.order.call_args_list == [
+        (("created_at",), {"desc": True}),
+        (("id",), {"desc": True}),
+    ]
+    query.limit.assert_called_once_with(1)
+
+
+def test_conversation_message_append_migration_is_one_locked_service_role_boundary() -> (
+    None
+):
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "supabase/migrations/20260717000001_serialize_conversation_message_append.sql"
+    )
+
+    assert migration_path.exists()
+    sql = " ".join(migration_path.read_text().lower().split())
+    assert "create or replace function public.append_conversation_message" in sql
+    assert "for update" in sql
+    assert "order by m.created_at desc, m.id desc" in sql
+    assert "m.created_at < v_existing.created_at" in sql
+    assert "m.id < v_existing.id" in sql
+    assert "interval '1 microsecond'" in sql
+    assert "greatest" in sql
+    assert "c.user_id = p_user_id" in sql
+    assert "m.conversation_id = p_conversation_id" in sql
+    assert "jsonb_array_elements" in sql
+    assert "p_expected_source_assistant_id" in sql
+    assert "p_expected_source_metadata" in sql
+    assert "p_option_id" in sql
+    assert "p_replacement_values" in sql
+    assert "revoke all on function public.append_conversation_message" in sql
+    for role in ("public", "anon", "authenticated"):
+        assert f"from {role}" in sql
+    assert "grant execute on function public.append_conversation_message" in sql
+    assert "to service_role" in sql
+    assert "revoke insert, update, delete on public.messages" in sql
+    assert "from anon, authenticated" in sql
+
+    gateway_source = (
+        Path(__file__).resolve().parents[1]
+        / "src/argus/domain/supabase_gateway.py"
+    ).read_text()
+    message_persistence_source = (
+        Path(__file__).resolve().parents[1]
+        / "src/argus/domain/supabase_conversation_messages.py"
+    ).read_text()
+    assert 'table("messages").insert' not in gateway_source
+    assert 'table("messages").insert' not in message_persistence_source
+    assert (
+        'self.client.rpc(\n            "append_conversation_message"'
+        in message_persistence_source
+    )
+    assert gateway_source.count('table("messages").update') == 1
+    assert 'table("messages").update({"metadata": metadata})' in gateway_source
+
+
 def test_supabase_search_matcher_handles_punctuation_and_multi_token_queries():
     assert search_text_matches_query(
         query="AAPL MSFT TSLA",
@@ -147,6 +286,41 @@ class _RecordingSupabaseClient:
     def table(self, table_name: str):
         return _RecordingTable(self, table_name)
 
+    def rpc(self, function_name: str, params: dict[str, object]):
+        assert function_name == "append_conversation_message"
+        self.inserted_message = {
+            "user_id": params["p_user_id"],
+            "conversation_id": params["p_conversation_id"],
+            "role": params["p_role"],
+            "content": params["p_content"],
+            "metadata": params["p_metadata"],
+            "created_at": params["p_created_at"],
+        }
+        return _RecordingMessageRpc(params)
+
+
+class _RecordingMessageRpc:
+    def __init__(self, params: dict[str, object]) -> None:
+        self.params = params
+
+    def execute(self) -> SimpleNamespace:
+        return SimpleNamespace(
+            data=[
+                {
+                    "message": {
+                        "id": self.params["p_message_id"],
+                        "conversation_id": self.params["p_conversation_id"],
+                        "role": self.params["p_role"],
+                        "content": self.params["p_content"],
+                        "metadata": self.params["p_metadata"],
+                        "created_at": self.params["p_created_at"],
+                    },
+                    "source_message": None,
+                    "replayed": False,
+                }
+            ]
+        )
+
 
 class _RecordingTable:
     def __init__(self, client: _RecordingSupabaseClient, table_name: str) -> None:
@@ -172,6 +346,344 @@ class _RecordingTable:
         if self.table_name == "messages":
             return SimpleNamespace(data=[{"id": "msg-1", **self.payload}])
         return SimpleNamespace(data=[self.payload])
+
+
+class _SerializedMessageRpcCall:
+    def __init__(self, client: "_SerializedMessageRpcClient", params: dict[str, Any]):
+        self.client = client
+        self.params = params
+
+    def execute(self) -> SimpleNamespace:
+        with self.client.lock:
+            message_id = str(self.params["p_message_id"])
+            existing = next(
+                (
+                    message
+                    for message in self.client.messages
+                    if message["id"] == message_id
+                ),
+                None,
+            )
+            if existing is not None:
+                preceding = [
+                    message
+                    for message in self.client.messages
+                    if (message["created_at"], message["id"])
+                    < (existing["created_at"], existing["id"])
+                ]
+                source = (
+                    max(
+                        preceding,
+                        key=lambda message: (
+                            message["created_at"],
+                            message["id"],
+                        ),
+                    )
+                    if preceding
+                    else None
+                )
+                return SimpleNamespace(
+                    data=[
+                        {
+                            "message": existing,
+                            "source_message": source,
+                            "replayed": True,
+                        }
+                    ]
+                )
+
+            expected_source_id = self.params.get(
+                "p_expected_source_assistant_id"
+            )
+            source = None
+            if expected_source_id is not None:
+                latest = max(
+                    self.client.messages,
+                    key=lambda message: (message["created_at"], message["id"]),
+                )
+                source = next(
+                    (
+                        message
+                        for message in self.client.messages
+                        if message["id"] == expected_source_id
+                    ),
+                    None,
+                )
+                options = (
+                    source.get("metadata", {})
+                    .get("clarification", {})
+                    .get("options", [])
+                    if source is not None
+                    else []
+                )
+                if (
+                    latest["id"] != expected_source_id
+                    or source is None
+                    or source["role"] != "assistant"
+                    or (
+                        self.params.get("p_expected_source_metadata") is not None
+                        and source.get("metadata")
+                        != self.params.get("p_expected_source_metadata")
+                    )
+                    or not any(
+                        option.get("id") == self.params.get("p_option_id")
+                        and option.get("replacement_values")
+                        == self.params.get("p_replacement_values")
+                        for option in options
+                    )
+                ):
+                    return SimpleNamespace(data=[])
+
+            message = {
+                "id": message_id,
+                "conversation_id": self.params["p_conversation_id"],
+                "role": self.params["p_role"],
+                "content": self.params["p_content"],
+                "metadata": self.params["p_metadata"],
+                "created_at": self._next_created_at(),
+            }
+            self.client.messages.append(message)
+            if source is not None:
+                self.client.source_by_request[message_id] = source
+            return SimpleNamespace(
+                data=[
+                    {
+                        "message": message,
+                        "source_message": source,
+                        "replayed": False,
+                    }
+                ]
+            )
+
+    def _next_created_at(self) -> str:
+        requested = datetime.fromisoformat(str(self.params["p_created_at"]))
+        if not self.client.messages:
+            return requested.isoformat()
+        latest = max(
+            datetime.fromisoformat(str(message["created_at"]))
+            for message in self.client.messages
+        )
+        return max(requested, latest + timedelta(microseconds=1)).isoformat()
+
+
+class _SerializedMessageRpcClient:
+    def __init__(self, *, messages: list[dict[str, Any]]) -> None:
+        self.messages = list(messages)
+        self.source_by_request: dict[str, dict[str, Any]] = {}
+        self.lock = RLock()
+        self.claim_started = Event()
+        self.append_started = Event()
+
+    def rpc(self, function_name: str, params: dict[str, Any]):
+        assert function_name == "append_conversation_message"
+        if params.get("p_expected_source_assistant_id") is None:
+            self.append_started.set()
+        else:
+            self.claim_started.set()
+        return _SerializedMessageRpcCall(self, params)
+
+
+def _serialized_source_message() -> dict[str, Any]:
+    return {
+        "id": "00000000-0000-0000-0000-000000000301",
+        "conversation_id": "00000000-0000-0000-0000-000000000302",
+        "role": "assistant",
+        "content": "AAPL needs a supported timeframe.",
+        "metadata": {
+            "clarification": {
+                "options": [
+                    {
+                        "id": "option_0",
+                        "replacement_values": {"timeframe": "1D"},
+                    }
+                ]
+            }
+        },
+        "created_at": "2026-07-17T12:00:00+00:00",
+    }
+
+
+def _response_option_request(message_id: str) -> Message:
+    return Message(
+        id=message_id,
+        conversation_id="00000000-0000-0000-0000-000000000302",
+        role="user",
+        content="Retry with daily bars",
+        metadata={"chat_action": {"type": "select_response_option"}},
+        created_at=utcnow(),
+    )
+
+
+def _claim_response_option(
+    gateway: SupabaseGateway,
+    *,
+    request_message: Message,
+) -> tuple[Message, Message] | None:
+    claim = getattr(gateway, "claim_response_option_action", None)
+    assert callable(claim)
+    return claim(
+        user_id="00000000-0000-0000-0000-000000000303",
+        conversation_id=request_message.conversation_id,
+        source_assistant_id="00000000-0000-0000-0000-000000000301",
+        option_id="option_0",
+        replacement_values={"timeframe": "1D"},
+        request_message=request_message,
+    )
+
+
+def test_supabase_newer_message_wins_before_response_option_admission() -> None:
+    client = _SerializedMessageRpcClient(messages=[_serialized_source_message()])
+    gateway = SupabaseGateway(client=client)
+    request_message = _response_option_request(
+        "00000000-0000-0000-0000-000000000304"
+    )
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    client.lock.acquire()
+    try:
+        claimed = executor.submit(
+            _claim_response_option,
+            gateway,
+            request_message=request_message,
+        )
+        assert client.claim_started.wait(timeout=5)
+        gateway.create_message(
+            user_id="00000000-0000-0000-0000-000000000303",
+            conversation_id=request_message.conversation_id,
+            role="assistant",
+            content="NVDA needs a supported timeframe.",
+            metadata={"clarification": {"options": []}},
+        )
+    finally:
+        client.lock.release()
+
+    assert claimed.result(timeout=5) is None
+    executor.shutdown()
+
+
+def test_supabase_response_option_admission_wins_before_newer_message() -> None:
+    client = _SerializedMessageRpcClient(messages=[_serialized_source_message()])
+    gateway = SupabaseGateway(client=client)
+    request_message = _response_option_request(
+        "00000000-0000-0000-0000-000000000305"
+    )
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    client.lock.acquire()
+    try:
+        newer_message = executor.submit(
+            gateway.create_message,
+            user_id="00000000-0000-0000-0000-000000000303",
+            conversation_id=request_message.conversation_id,
+            role="assistant",
+            content="NVDA needs a supported timeframe.",
+            metadata={"clarification": {"options": []}},
+        )
+        assert client.append_started.wait(timeout=5)
+        accepted = _claim_response_option(
+            gateway,
+            request_message=request_message,
+        )
+    finally:
+        client.lock.release()
+
+    assert accepted is not None
+    source_message, accepted_request = accepted
+    assert source_message.id == "00000000-0000-0000-0000-000000000301"
+    assert accepted_request.id == request_message.id
+    assert newer_message.result(timeout=5).content == (
+        "NVDA needs a supported timeframe."
+    )
+    executor.shutdown()
+
+
+def test_supabase_duplicate_response_option_click_is_exactly_once_and_replay_safe() -> (
+    None
+):
+    client = _SerializedMessageRpcClient(messages=[_serialized_source_message()])
+    gateway = SupabaseGateway(client=client)
+    first_request = _response_option_request(
+        "00000000-0000-0000-0000-000000000306"
+    )
+    second_request = _response_option_request(
+        "00000000-0000-0000-0000-000000000307"
+    )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(
+            executor.map(
+                lambda request_message: _claim_response_option(
+                    gateway,
+                    request_message=request_message,
+                ),
+                (first_request, second_request),
+            )
+        )
+
+    accepted = [result for result in results if result is not None]
+    assert len(accepted) == 1
+    accepted_request = accepted[0][1]
+    replay = _claim_response_option(
+        gateway,
+        request_message=accepted_request,
+    )
+    assert replay is not None
+    assert replay[1].id == accepted_request.id
+    assert sum(message["id"] == accepted_request.id for message in client.messages) == 1
+
+
+def test_supabase_exact_replay_uses_source_immediately_before_request_after_later_messages() -> (
+    None
+):
+    client = _SerializedMessageRpcClient(messages=[_serialized_source_message()])
+    gateway = SupabaseGateway(client=client)
+    request = _response_option_request(
+        "00000000-0000-0000-0000-000000000309"
+    )
+
+    accepted = _claim_response_option(gateway, request_message=request)
+    assert accepted is not None
+    gateway.create_message(
+        user_id="00000000-0000-0000-0000-000000000303",
+        conversation_id=request.conversation_id,
+        role="assistant",
+        content="A later assistant turn.",
+        metadata={},
+    )
+
+    replay = _claim_response_option(gateway, request_message=request)
+
+    assert replay is not None
+    assert replay[0].id == "00000000-0000-0000-0000-000000000301"
+    assert replay[1].id == request.id
+    assert sum(message["id"] == request.id for message in client.messages) == 1
+
+
+def test_supabase_timestamp_tie_uses_id_and_next_append_is_strictly_newer() -> None:
+    first = _serialized_source_message()
+    tied_latest = {
+        **_serialized_source_message(),
+        "id": "00000000-0000-0000-0000-000000000399",
+        "content": "Tied but deterministically newer.",
+    }
+    client = _SerializedMessageRpcClient(messages=[first, tied_latest])
+    gateway = SupabaseGateway(client=client)
+
+    rejected = _claim_response_option(
+        gateway,
+        request_message=_response_option_request(
+            "00000000-0000-0000-0000-000000000308"
+        ),
+    )
+    appended = gateway.create_message(
+        user_id="00000000-0000-0000-0000-000000000303",
+        conversation_id=first["conversation_id"],
+        role="assistant",
+        content="Strictly newer after a tie.",
+    )
+
+    assert rejected is None
+    assert appended.created_at > datetime.fromisoformat(first["created_at"])
 
 
 def test_create_message_writes_empty_metadata_object_when_omitted():
@@ -490,6 +1002,30 @@ def test_usage_limits_check_all_windows_before_incrementing() -> None:
             limits=[("day", 200), ("hour", 60)],
         )
 
+    table.update.assert_not_called()
+
+
+def test_usage_limit_precheck_rejects_without_mutating_counter() -> None:
+    client = MagicMock()
+    table = MagicMock()
+    client.table.return_value = table
+    table.select.return_value = table
+    table.eq.return_value = table
+    table.limit.return_value = table
+    table.execute.side_effect = [
+        SimpleNamespace(data=[{"id": "day-counter", "used_count": 1}]),
+        SimpleNamespace(data=[{"id": "hour-counter", "used_count": 10}]),
+    ]
+    gateway = SupabaseGateway(client=client)
+
+    with pytest.raises(QuotaExceededError, match="backtest_runs \\(hour\\)"):
+        gateway.check_usage_limits(
+            user_id="user-1",
+            resource="backtest_runs",
+            limits=[("day", 50), ("hour", 10)],
+        )
+
+    table.insert.assert_not_called()
     table.update.assert_not_called()
 
 

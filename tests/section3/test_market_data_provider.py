@@ -9,7 +9,8 @@ from argus.domain.market_data.assets import ResolvedAsset
 
 
 @pytest.fixture(autouse=True)
-def clear_asset_cache_between_tests():
+def clear_asset_cache_between_tests(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     assets.clear_asset_cache()
     yield
     assets.clear_asset_cache()
@@ -182,7 +183,9 @@ def test_warm_asset_universe_fails_closed_when_cache_refresh_leaves_no_alias_map
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assets.clear_asset_cache()
-    monkeypatch.setattr(assets, "_refresh_asset_cache_if_needed", lambda *, force=False: None)
+    monkeypatch.setattr(
+        assets, "_refresh_asset_cache_if_needed", lambda *, force=False: None
+    )
 
     with pytest.raises(ValueError, match="asset_universe_unavailable"):
         assets.warm_asset_universe(force=True)
@@ -203,6 +206,40 @@ def test_synthetic_unit_fixture_is_explicitly_opted_in(
     assert nvidia.canonical_symbol == "NVDA"
     assert eurusd.canonical_symbol == "EURUSD"
     assert eurusd.asset_class == "currency_pair"
+
+
+def test_synthetic_unit_fixture_provides_deterministic_ohlcv_without_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.market_data import provider
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.delenv("ALPACA_API_KEY", raising=False)
+    monkeypatch.delenv("ALPACA_SECRET_KEY", raising=False)
+
+    first = provider.fetch_ohlcv(
+        symbol="AAPL",
+        asset_class="equity",
+        start_date=date(2024, 1, 1),
+        end_date=date(2024, 1, 5),
+        timeframe="1D",
+    )
+    second = provider.fetch_ohlcv(
+        symbol="AAPL",
+        asset_class="equity",
+        start_date=date(2024, 1, 1),
+        end_date=date(2024, 1, 5),
+        timeframe="1D",
+    )
+
+    pd.testing.assert_frame_equal(first, second)
+    assert list(first.index.strftime("%Y-%m-%d")) == [
+        "2024-01-01",
+        "2024-01-02",
+        "2024-01-03",
+        "2024-01-04",
+        "2024-01-05",
+    ]
 
 
 def test_recorded_provider_fixture_uses_provider_shaped_payloads(

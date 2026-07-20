@@ -84,6 +84,11 @@ def _validated_confirmation_payload(
 ) -> dict[str, Any]:
     symbol = strategy.asset_universe[0] if strategy.asset_universe else "AAPL"
     benchmark_symbol = "BTC" if strategy.asset_class == "crypto" else "SPY"
+    date_range = (
+        strategy.date_range
+        if isinstance(strategy.date_range, dict)
+        else {"start": "2025-05-14", "end": "2026-05-14"}
+    )
     return {
         "strategy": strategy.model_dump(mode="python"),
         "optional_parameters": optional_parameters or {},
@@ -92,11 +97,14 @@ def _validated_confirmation_payload(
             "symbol": symbol,
             "symbols": list(strategy.asset_universe or [symbol]),
             "timeframe": strategy.timeframe or "1D",
-            "date_range": (
-                strategy.date_range
-                if isinstance(strategy.date_range, dict)
-                else {"start": "2025-05-14", "end": "2026-05-14"}
-            ),
+            "date_range": date_range,
+            "requested_date_range": date_range,
+            "coverage_preflight": {
+                "outcome": "full_coverage",
+                "requested_date_range": date_range,
+                "effective_date_range": date_range,
+                "preflight_id": "sha256:test-coverage",
+            },
             "sizing_mode": strategy.sizing_mode or "capital_amount",
             "capital_amount": strategy.capital_amount or 1000,
             "benchmark_symbol": strategy.comparison_baseline or benchmark_symbol,

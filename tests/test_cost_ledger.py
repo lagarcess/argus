@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
 from argus.api.chat.route_receipts import persist_route_receipts
 from argus.llm.openrouter import OpenRouterRouteReceipt
+from argus.observability import cost_ledger as cost_ledger_module
 from argus.observability.cost_ledger import (
     openrouter_cost_ledger_entry_from_receipt,
     persist_openrouter_cost_ledger_entries,
@@ -44,6 +46,20 @@ class _FakeCostLedgerGateway:
         row = {"id": f"ledger-{len(self.cost_ledger_entries) + 1}", **entry}
         self.cost_ledger_entries.append(row)
         return row
+
+
+class _UnavailableCostLedgerGateway(_FakeCostLedgerGateway):
+    def create_cost_ledger_entry(self, *, entry: dict[str, Any]) -> dict[str, Any]:
+        del entry
+        raise RuntimeError("PGRST205: cost_ledger_entries is unavailable")
+
+
+class _WarningCapture:
+    def __init__(self) -> None:
+        self.records: list[tuple[str, dict[str, Any]]] = []
+
+    def warning(self, message: str, **context: Any) -> None:
+        self.records.append((message, context))
 
 
 def _receipt(**overrides: Any) -> OpenRouterRouteReceipt:
@@ -138,6 +154,34 @@ def test_persist_route_receipts_also_appends_cost_ledger_entries(monkeypatch) ->
     assert entry["cost_amount"] == 0.00042
 
 
+def test_chat_route_receipt_survives_telemetry_only_cost_ledger_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gateway = _UnavailableCostLedgerGateway()
+    warning_capture = _WarningCapture()
+    monkeypatch.setattr(cost_ledger_module, "logger", warning_capture)
+    monkeypatch.setattr(
+        "argus.api.chat.route_receipts.api_state.supabase_gateway",
+        gateway,
+    )
+
+    persist_route_receipts(
+        receipts=[_receipt()],
+        user_id="user-1",
+        conversation_id="conversation-1",
+        message_id="message-1",
+        metadata={"request_id": "req-1"},
+    )
+
+    assert len(gateway.route_receipts) == 1
+    assert gateway.cost_ledger_entries == []
+    assert len(warning_capture.records) == 1
+    message, context = warning_capture.records[0]
+    assert message == "Cost ledger persistence failed; continuing without spend row"
+    assert context["failure_classification"] == "telemetry_only"
+    assert context["correlation_id"] == "req-1:conversation-1:message-1"
+
+
 def test_eval_harness_receipts_can_append_cost_ledger_entries() -> None:
     gateway = _FakeCostLedgerGateway()
 
@@ -187,6 +231,12 @@ def test_cost_ledger_migration_is_append_only_and_revertible() -> None:
         "grant insert, select on table public.cost_ledger_entries to service_role"
         in migration_sql
     )
+    assert (
+        "revoke all on table public.cost_ledger_entries "
+        "from anon, authenticated, service_role" in migration_sql
+    )
+    assert "grant update on table public.cost_ledger_entries" not in migration_sql
+    assert "grant delete on table public.cost_ledger_entries" not in migration_sql
     assert "grant all privileges on table public.cost_ledger_entries" not in migration_sql
     assert "rollback: drop table if exists public.cost_ledger_entries" in migration_sql
 
