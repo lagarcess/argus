@@ -487,6 +487,37 @@
       "markers": {
         "entry": "Buy",
         "exit": "Sell"
+      },
+      "range": {
+        "group_label": "Chart range",
+        "details": "Range details",
+        "presets": {
+          "1D": "1D",
+          "1W": "1W",
+          "1M": "1M",
+          "3M": "3M",
+          "YTD": "YTD",
+          "1Y": "1Y",
+          "ALL": "All"
+        },
+        "custom": "Custom",
+        "custom_heading": "Custom range",
+        "apply": "Apply",
+        "cancel": "Cancel",
+        "reset": "Reset",
+        "start_date": "Start date",
+        "end_date": "End date",
+        "error_missing_date": "Choose a start and end date.",
+        "error_start_after_end": "Start date must be before end date.",
+        "error_insufficient_observations": "That range needs at least two observations.",
+        "visible_period": "Visible period: {{start}} to {{end}}.",
+        "peak_label": "Highest visible value",
+        "low_label": "Lowest visible value",
+        "event_count_one": "{{count}} displayed executed-fill event in this range.",
+        "event_count_other": "{{count}} displayed executed-fill events in this range.",
+        "no_events": "No displayed executed-fill events in this range.",
+        "event_sampling": "Showing {{shown}} of {{total}} supplied events.",
+        "marker_cap": "Argus stored {{included}} of {{total}} executed-fill groups for this result."
       }
     },
     "strategy_type": {

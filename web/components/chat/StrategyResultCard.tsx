@@ -144,9 +144,9 @@ export default function StrategyResultCard({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${artifactStatusToneClassName("neutral")}`}
-          >
+          {/* Passive status, not an action: plain muted text so it cannot be
+              mistaken for another clickable pill (kept readable at 4.5:1). */}
+          <span className="text-[11px] font-medium tracking-[0.16px] text-[#505a63] dark:text-white/65">
             {t(
               "chat.simulation_complete",
               result.statusLabel || "Simulation Complete",

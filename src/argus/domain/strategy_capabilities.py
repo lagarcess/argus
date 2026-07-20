@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -24,6 +25,17 @@ class ParameterSpec(BaseModel):
     value_aliases: dict[str, list[str]] = Field(default_factory=dict)
 
 
+class ResultChartExplorationSpec(BaseModel):
+    # Generic, display-free result-chart exploration semantics. The resolver turns
+    # these into plain chart hints; the frontend never sees strategy or parameter
+    # identity.
+    minimum_visible_observations: int = Field(default=6, ge=1)
+    minimum_meaningful_duration: str | None = None
+    cycle_parameter: str | None = None
+    cycle_duration_by_value: dict[str, str] = Field(default_factory=dict)
+    minimum_visible_cycles: int = Field(default=2, ge=1)
+
+
 class StrategyCapability(BaseModel):
     template: str
     display_name: str
@@ -38,6 +50,9 @@ class StrategyCapability(BaseModel):
     # True when the strategy runs with a fixed, non-user-tunable parameterization
     # (e.g. buy_the_dip's hardcoded -3% trigger), so copy never implies tunability.
     fixed_parameters: bool = False
+    result_chart_exploration: ResultChartExplorationSpec = Field(
+        default_factory=ResultChartExplorationSpec
+    )
 
     @model_validator(mode="after")
     def _validate_status_consistency(self) -> "StrategyCapability":
@@ -69,6 +84,9 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
         ],
         execution_strategy_type="buy_and_hold",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
+        result_chart_exploration=ResultChartExplorationSpec(
+            minimum_meaningful_duration="P1M"
+        ),
     ),
     "buy_the_dip": StrategyCapability(
         template="buy_the_dip",
@@ -152,6 +170,17 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
         ],
         execution_strategy_type="dca_accumulation",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
+        result_chart_exploration=ResultChartExplorationSpec(
+            cycle_parameter="dca_cadence",
+            cycle_duration_by_value={
+                "daily": "P1D",
+                "weekly": "P1W",
+                "biweekly": "P2W",
+                "monthly": "P1M",
+                "quarterly": "P3M",
+            },
+            minimum_visible_cycles=2,
+        ),
         parameters={
             "dca_cadence": ParameterSpec(
                 key="dca_cadence",
@@ -184,3 +213,58 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
         status="draft",
     ),
 }
+
+
+def _scaled_calendar_duration(duration: str, cycles: int) -> str | None:
+    # Only single-unit ISO-8601 calendar durations (P<number><D|W|M|Y>) are typed
+    # capability inputs; anything else degrades to the observation-only policy.
+    if not duration.startswith("P") or len(duration) < 3:
+        return None
+    unit = duration[-1]
+    if unit not in {"D", "W", "M", "Y"}:
+        return None
+    try:
+        amount = int(duration[1:-1])
+    except ValueError:
+        return None
+    if amount < 1 or cycles < 1:
+        return None
+    return f"P{amount * cycles}{unit}"
+
+
+def resolve_result_chart_exploration_policy(
+    config: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Resolve a capability's exploration spec to generic chart hints.
+
+    The returned mapping carries only display-free presentation hints
+    (`minimum_visible_observations`, optional `minimum_meaningful_duration`);
+    strategy identity, cadence parameter keys, and cycle math stay backend-only.
+    """
+    template = str(config.get("template") or "").strip()
+    capability = STRATEGY_CAPABILITIES.get(template)
+    spec = (
+        capability.result_chart_exploration
+        if capability is not None
+        else ResultChartExplorationSpec()
+    )
+    duration = spec.minimum_meaningful_duration
+    if spec.cycle_parameter:
+        parameters = config.get("parameters")
+        parameter_values = parameters if isinstance(parameters, Mapping) else {}
+        cycle_value = str(parameter_values.get(spec.cycle_parameter) or "").strip()
+        one_cycle = spec.cycle_duration_by_value.get(cycle_value)
+        resolved = (
+            _scaled_calendar_duration(one_cycle, spec.minimum_visible_cycles)
+            if one_cycle
+            else None
+        )
+        if resolved is not None:
+            duration = resolved
+
+    policy: dict[str, Any] = {
+        "minimum_visible_observations": spec.minimum_visible_observations
+    }
+    if duration:
+        policy["minimum_meaningful_duration"] = duration
+    return policy
