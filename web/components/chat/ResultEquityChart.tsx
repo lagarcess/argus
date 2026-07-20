@@ -94,9 +94,11 @@ export default function ResultEquityChart({
     null,
   );
   const timeScaleRef = useRef<ITimeScaleApi<Time> | null>(null);
-  // Marks the next visible-range notification as programmatic so it is not
-  // interpreted as a manual pan/zoom that should switch the selection to Custom.
-  const programmaticMoveRef = useRef<ResultChartSelection | null>(null);
+  // Range notifications also fire for initial layout, autosize, and
+  // programmatic preset moves. Only a change shortly after a pointer/wheel
+  // gesture on the chart itself counts as a manual pan/zoom that should switch
+  // the selection to Custom.
+  const lastChartGestureAtRef = useRef(Number.NEGATIVE_INFINITY);
   const visibleWindowRef = useRef<VisibleWindow | null>(null);
   const isDark = appearanceOverride
     ? appearanceOverride === "dark"
@@ -182,7 +184,6 @@ export default function ResultEquityChart({
       resetToAll();
       return;
     }
-    programmaticMoveRef.current = option.key;
     timeScaleRef.current?.setVisibleLogicalRange({
       from: option.startIndex,
       to: option.endIndex,
@@ -195,7 +196,6 @@ export default function ResultEquityChart({
 
   const resetToAll = () => {
     setCustomError(null);
-    programmaticMoveRef.current = "ALL";
     timeScaleRef.current?.fitContent();
     setSelection("ALL");
     visibleWindowRef.current = allWindow;
@@ -224,7 +224,6 @@ export default function ResultEquityChart({
     }
     setCustomError(null);
     setCustomOpen(false);
-    programmaticMoveRef.current = "CUSTOM";
     timeScaleRef.current?.setVisibleLogicalRange({
       from: result.range.startIndex,
       to: result.range.endIndex,
@@ -272,7 +271,9 @@ export default function ResultEquityChart({
         secondsVisible: false,
         rightOffset: 4,
         barSpacing: data.length > 240 ? 4 : 7,
-        minBarSpacing: 3,
+        // ALL/Reset promise the complete effective window, so dense series need
+        // a zoom-out floor below width/points; sparse series keep today's floor.
+        minBarSpacing: data.length > 240 ? 0.1 : 3,
       },
       crosshair: {
         mode: CrosshairMode.Magnet,
@@ -358,25 +359,48 @@ export default function ResultEquityChart({
       const to = Math.min(lastIndex, Math.max(0, Math.ceil(visibleRange.to)));
       visibleWindowRef.current = { from, to };
       setVisibleWindow({ from, to });
-      if (programmaticMoveRef.current != null) {
-        programmaticMoveRef.current = null;
-        return;
-      }
       setSelection((previous) => {
         if (previous === "CUSTOM" || rangeOptions.length === 0) return previous;
         const expected = rangeOptions.find((option) => option.key === previous);
         if (expected && expected.startIndex === from && expected.endIndex === to) {
           return previous;
         }
-        return "CUSTOM";
+        const manualGesture =
+          performance.now() - lastChartGestureAtRef.current < 1500;
+        return manualGesture ? "CUSTOM" : previous;
       });
     };
     timeScale.subscribeVisibleLogicalRangeChange(notifyVisibleWindow);
+    const recordChartGesture = () => {
+      lastChartGestureAtRef.current = performance.now();
+    };
+    // Capture phase: the chart library's own canvas handlers may stop
+    // propagation, and the gesture timestamp must still be recorded.
+    const gestureListenerOptions = { passive: true, capture: true } as const;
+    container.addEventListener(
+      "pointerdown",
+      recordChartGesture,
+      gestureListenerOptions,
+    );
+    container.addEventListener(
+      "pointermove",
+      recordChartGesture,
+      gestureListenerOptions,
+    );
+    container.addEventListener(
+      "wheel",
+      recordChartGesture,
+      gestureListenerOptions,
+    );
+    container.addEventListener(
+      "touchstart",
+      recordChartGesture,
+      gestureListenerOptions,
+    );
     // Recreations for theme/locale/size keep the explored viewport; only a new
     // immutable chart payload resets it (see the chart-change effect above).
     const restoredWindow = visibleWindowRef.current;
     if (restoredWindow) {
-      programmaticMoveRef.current = "CUSTOM";
       timeScale.setVisibleLogicalRange({
         from: restoredWindow.from,
         to: restoredWindow.to,
@@ -407,6 +431,26 @@ export default function ResultEquityChart({
 
     return () => {
       setTooltip(null);
+      container.removeEventListener(
+        "pointerdown",
+        recordChartGesture,
+        gestureListenerOptions,
+      );
+      container.removeEventListener(
+        "pointermove",
+        recordChartGesture,
+        gestureListenerOptions,
+      );
+      container.removeEventListener(
+        "wheel",
+        recordChartGesture,
+        gestureListenerOptions,
+      );
+      container.removeEventListener(
+        "touchstart",
+        recordChartGesture,
+        gestureListenerOptions,
+      );
       timeScale.unsubscribeVisibleLogicalRangeChange(updateVisibleMarkers);
       timeScale.unsubscribeVisibleLogicalRangeChange(notifyVisibleWindow);
       if (timeScaleRef.current === timeScale) timeScaleRef.current = null;
