@@ -490,6 +490,7 @@
       },
       "range": {
         "group_label": "Rango del gráfico",
+        "details": "Detalles del rango",
         "presets": {
           "1D": "1D",
           "1W": "1S",
@@ -500,6 +501,7 @@
           "ALL": "Todo"
         },
         "custom": "Personalizado",
+        "custom_heading": "Rango personalizado",
         "apply": "Aplicar",
         "cancel": "Cancelar",
         "reset": "Restablecer",

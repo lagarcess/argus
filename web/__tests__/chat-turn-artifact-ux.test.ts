@@ -212,7 +212,12 @@ describe("chat turn artifact UX", () => {
       "utf-8",
     );
 
-    expect(card).toContain('artifactStatusToneClassName("neutral")');
+    // Completion is passive muted text — never a success tone and no longer a
+    // button-shaped pill; only the explicit saved state keeps the success tone.
+    expect(card).not.toContain('artifactStatusToneClassName("neutral")');
+    expect(card).toContain(
+      "Passive status, not an action: plain muted text",
+    );
     expect(card).toContain('artifactStatusToneClassName("success")');
     expect(card).toContain("view.hero.tone === \"positive\"");
   });

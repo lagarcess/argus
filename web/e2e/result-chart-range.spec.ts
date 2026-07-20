@@ -66,6 +66,11 @@ async function fullRunTexts(card: Locator) {
   return { metric, period };
 }
 
+async function openRangeDetails(card: Locator) {
+  await card.getByTestId("result-chart-details-toggle").click();
+  await expect(card.getByTestId("result-chart-visible-period")).toBeVisible();
+}
+
 test("adaptive hourly result switches presets, custom range, pan, and reset without network", async ({
   page,
 }) => {
@@ -77,6 +82,28 @@ test("adaptive hourly result switches presets, custom range, pan, and reset with
     "aria-pressed",
     "true",
   );
+  // Quiet by default: no telemetry above the result, facts live in details.
+  await expect(card.getByTestId("result-chart-visible-period")).toHaveCount(0);
+  await expect(card.getByTestId("result-chart-details-toggle")).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  // Eligible presets render in the conventional sequence.
+  const order = await card
+    .locator('[data-testid^="result-chart-range-"]')
+    .evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute("data-testid")),
+    );
+  expect(order).toEqual([
+    "result-chart-range-1D",
+    "result-chart-range-1W",
+    "result-chart-range-ALL",
+  ]);
+  // Slim visible control, real 44px interactive target.
+  const buttonHeight = await card
+    .getByTestId("result-chart-range-ALL")
+    .evaluate((node) => node.getBoundingClientRect().height);
+  expect(buttonHeight).toBeGreaterThanOrEqual(44);
   const before = await fullRunTexts(card);
   await card.screenshot({ path: `${EVIDENCE_DIR}/e2e-01-adaptive-all.png` });
 
@@ -87,20 +114,24 @@ test("adaptive hourly result switches presets, custom range, pan, and reset with
     "aria-pressed",
     "true",
   );
+  expect(await fullRunTexts(card)).toEqual(before);
+  await openRangeDetails(card);
   await expect(card.getByTestId("result-chart-visible-period")).toContainText(
     "2026",
   );
-  expect(await fullRunTexts(card)).toEqual(before);
   await card.screenshot({ path: `${EVIDENCE_DIR}/e2e-02-adaptive-1d.png` });
 
-  await card.getByTestId("result-chart-custom-toggle").click();
+  // Custom lives inside the open disclosure; a valid apply closes it.
   await card.getByTestId("result-chart-custom-start").fill("2026-01-05");
   await card.getByTestId("result-chart-custom-end").fill("2026-01-08");
   await card.getByTestId("result-chart-custom-apply").click();
-  await expect(card.getByTestId("result-chart-custom-toggle")).toHaveAttribute(
-    "aria-pressed",
-    "true",
+  await expect(card.getByTestId("result-chart-custom-indicator")).toBeVisible();
+  await expect(card.getByTestId("result-chart-visible-period")).toHaveCount(0);
+  await expect(card.getByTestId("result-chart-details-toggle")).toHaveAttribute(
+    "aria-expanded",
+    "false",
   );
+  await openRangeDetails(card);
   await expect(card.getByTestId("result-chart-visible-period")).toContainText(
     "Jan 5, 2026",
   );
@@ -111,6 +142,7 @@ test("adaptive hourly result switches presets, custom range, pan, and reset with
     "aria-pressed",
     "true",
   );
+  await expect(card.getByTestId("result-chart-custom-indicator")).toHaveCount(0);
   expect(await fullRunTexts(card)).toEqual(before);
 
   // Manual pan flips the selection to Custom without touching run truth. Raw
@@ -128,10 +160,7 @@ test("adaptive hourly result switches presets, custom range, pan, and reset with
     });
     await page.mouse.up();
   }
-  await expect(card.getByTestId("result-chart-custom-toggle")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(card.getByTestId("result-chart-custom-indicator")).toBeVisible();
   expect(await fullRunTexts(card)).toEqual(before);
 
   await card.getByTestId("result-chart-reset").click();
@@ -157,6 +186,17 @@ test("monthly recurring result suppresses sub-cycle presets and keeps metrics", 
   await expect(card.getByTestId("result-chart-range-1D")).toHaveCount(0);
   await expect(card.getByTestId("result-chart-range-1W")).toHaveCount(0);
   await expect(card.getByTestId("result-chart-range-1M")).toHaveCount(0);
+  const order = await card
+    .locator('[data-testid^="result-chart-range-"]')
+    .evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute("data-testid")),
+    );
+  expect(order).toEqual([
+    "result-chart-range-3M",
+    "result-chart-range-YTD",
+    "result-chart-range-1Y",
+    "result-chart-range-ALL",
+  ]);
 
   const metric = card.getByText("$0 change · 0.0% total return", {
     exact: true,
@@ -174,8 +214,16 @@ test("monthly recurring result suppresses sub-cycle presets and keeps metrics", 
     "aria-pressed",
     "true",
   );
+  await openRangeDetails(card);
   await expect(card.getByTestId("result-chart-visible-period")).toContainText(
     "2023",
+  );
+  // Daily results present dates only — no session-time artifacts.
+  await expect(card.getByTestId("result-chart-visible-period")).not.toContainText(
+    /\d:\d{2}/,
+  );
+  await expect(card.getByTestId("result-chart-peak")).not.toContainText(
+    /\d:\d{2}/,
   );
   await expect(metric).toBeVisible();
   await expect(period).toBeVisible();
@@ -194,11 +242,13 @@ test("legacy persisted payload renders observation-qualified controls without op
     .first();
   await card.scrollIntoViewIfNeeded();
 
-  // Eight sparse points qualify no shorter preset; ALL and Custom remain.
+  // Eight sparse points qualify no shorter preset; ALL and details remain.
   await expect(card.getByTestId("result-chart-range-ALL")).toBeVisible();
   for (const key of ["1D", "1W", "1M", "3M", "YTD", "1Y"]) {
     await expect(card.getByTestId(`result-chart-range-${key}`)).toHaveCount(0);
   }
+  watch.start();
+  await openRangeDetails(card);
   // Without marker_summary the card must not claim sampling or completeness.
   await expect(card.getByTestId("result-chart-marker-cap")).toHaveCount(0);
   await expect(card.getByTestId("result-chart-event-sampling")).toHaveCount(0);
@@ -206,15 +256,10 @@ test("legacy persisted payload renders observation-qualified controls without op
     "No displayed executed-fill events",
   );
 
-  watch.start();
-  await card.getByTestId("result-chart-custom-toggle").click();
   await card.getByTestId("result-chart-custom-start").fill("2022-01-01");
   await card.getByTestId("result-chart-custom-end").fill("2024-01-01");
   await card.getByTestId("result-chart-custom-apply").click();
-  await expect(card.getByTestId("result-chart-custom-toggle")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(card.getByTestId("result-chart-custom-indicator")).toBeVisible();
   await card.getByTestId("result-chart-reset").click();
   await expect(card.getByTestId("result-chart-range-ALL")).toHaveAttribute(
     "aria-pressed",
@@ -232,12 +277,14 @@ test("visible evidence tracks the viewport with separate sampling disclosures", 
   await openPlayground(page);
   const card = adaptiveCard(page);
   await card.scrollIntoViewIfNeeded();
+  await openRangeDetails(card);
 
   const allPeriod = await card
     .getByTestId("result-chart-visible-period")
     .textContent();
-  const allPeak = await card.getByTestId("result-chart-peak").textContent();
   const allLow = await card.getByTestId("result-chart-low").textContent();
+  // Hourly observations keep meaningful time information.
+  expect(allPeriod).toContain("12:00");
   await expect(card.getByTestId("result-chart-event-row")).toHaveCount(20);
   const firstRow = card.getByTestId("result-chart-event-row").first();
   const lastRow = card.getByTestId("result-chart-event-row").last();
@@ -266,7 +313,6 @@ test("visible evidence tracks the viewport with separate sampling disclosures", 
   );
   // This fixture rises into its final observation, so the 1D peak legitimately
   // stays the run peak; the low must move to the visible window's floor.
-  expect(allPeak).toContain("$1,120");
   await expect(card.getByTestId("result-chart-peak")).toContainText("$1,120");
   await expect(card.getByTestId("result-chart-low")).not.toHaveText(
     allLow ?? "",
@@ -299,8 +345,8 @@ test("Spanish mobile keyboard journey keeps localized accessible controls", asyn
   await card.scrollIntoViewIfNeeded();
   await expect(card.getByTestId("result-chart-range-1W")).toHaveText("1S");
   await expect(card.getByTestId("result-chart-range-ALL")).toHaveText("Todo");
-  await expect(card.getByTestId("result-chart-custom-toggle")).toHaveText(
-    "Personalizado",
+  await expect(card.getByTestId("result-chart-details-toggle")).toContainText(
+    "Detalles del rango",
   );
 
   watch.start();
@@ -314,14 +360,12 @@ test("Spanish mobile keyboard journey keeps localized accessible controls", asyn
   const pillHeight = await card
     .getByTestId("result-chart-range-1W")
     .evaluate((element) => element.getBoundingClientRect().height);
-  expect(pillHeight).toBeGreaterThanOrEqual(36);
+  expect(pillHeight).toBeGreaterThanOrEqual(44);
 
   await page.keyboard.press("Tab");
   await expect(card.getByTestId("result-chart-range-ALL")).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(card.getByTestId("result-chart-custom-toggle")).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(card.getByTestId("result-chart-custom-start")).toBeVisible();
+  await openRangeDetails(card);
+  await expect(card.getByText("Rango personalizado")).toBeVisible();
 
   await card.getByTestId("result-chart-custom-start").fill("2026-01-08");
   await card.getByTestId("result-chart-custom-end").fill("2026-01-05");
@@ -329,19 +373,24 @@ test("Spanish mobile keyboard journey keeps localized accessible controls", asyn
   await expect(card.getByTestId("result-chart-custom-error")).toHaveText(
     "La fecha de inicio debe ser anterior a la fecha de fin.",
   );
+  // Invalid input keeps the disclosure open with entered values preserved.
+  await expect(card.getByTestId("result-chart-custom-start")).toHaveValue(
+    "2026-01-08",
+  );
 
   await card.getByTestId("result-chart-custom-start").fill("2026-01-05");
   await card.getByTestId("result-chart-custom-end").fill("2026-01-08");
   await card.getByTestId("result-chart-custom-apply").click();
-  await expect(card.getByTestId("result-chart-custom-toggle")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(card.getByTestId("result-chart-visible-period")).toContainText(
-    "ene",
+  await expect(card.getByTestId("result-chart-custom-indicator")).toBeVisible();
+  await expect(card.getByTestId("result-chart-custom-indicator")).toContainText(
+    "Personalizado",
   );
   await expect(card.getByTestId("result-chart-reset")).toHaveText(
     "Restablecer",
+  );
+  await openRangeDetails(card);
+  await expect(card.getByTestId("result-chart-visible-period")).toContainText(
+    "ene",
   );
   await card.screenshot({ path: `${EVIDENCE_DIR}/e2e-05-spanish-mobile.png` });
   expect(watch.featureRequests).toEqual([]);

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   deriveResultChartRanges,
+  hasIntradayObservations,
   resolveCustomResultChartRange,
   summarizeVisibleResultChartRange,
 } from "../lib/result-chart-range";
@@ -210,6 +211,51 @@ describe("resolveCustomResultChartRange", () => {
       ok: false,
       error: "insufficient_observations",
     });
+  });
+});
+
+describe("hasIntradayObservations", () => {
+  test("hourly observations share calendar dates and show times", () => {
+    expect(
+      hasIntradayObservations(timedSeries("2026-01-01T00:00:00Z", 48, 60)),
+    ).toBe(true);
+  });
+
+  test("date-only daily observations never show times", () => {
+    expect(hasIntradayObservations(dailySeries("2025-01-02", 90))).toBe(false);
+  });
+
+  test("daily bars stamped with session times are still daily", () => {
+    // One observation per calendar day even when the backend stamps a session
+    // hour (including a DST shift between 05:00 and 04:00).
+    const stamped = Array.from({ length: 60 }, (_, index) => {
+      const day = new Date(Date.parse("2025-01-02T00:00:00Z") + index * DAY);
+      const hour = index < 30 ? "05" : "04";
+      return {
+        time: `${day.toISOString().slice(0, 10)}T${hour}:00:00`,
+        value: 1000 + index,
+      };
+    });
+    expect(hasIntradayObservations(stamped)).toBe(false);
+  });
+
+  test("a second observation on the same date makes the series intraday", () => {
+    expect(
+      hasIntradayObservations([
+        { time: "2026-01-05T09:00:00", value: 1 },
+        { time: "2026-01-06T09:00:00", value: 2 },
+        { time: "2026-01-06T15:00:00", value: 3 },
+      ]),
+    ).toBe(true);
+  });
+
+  test("invalid timestamps are ignored", () => {
+    expect(
+      hasIntradayObservations([
+        { time: "garbage", value: 1 },
+        { time: "also garbage", value: 2 },
+      ]),
+    ).toBe(false);
   });
 });
 

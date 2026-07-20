@@ -490,6 +490,7 @@
       },
       "range": {
         "group_label": "Chart range",
+        "details": "Range details",
         "presets": {
           "1D": "1D",
           "1W": "1W",
@@ -497,9 +498,10 @@
           "3M": "3M",
           "YTD": "YTD",
           "1Y": "1Y",
-          "ALL": "ALL"
+          "ALL": "All"
         },
         "custom": "Custom",
+        "custom_heading": "Custom range",
         "apply": "Apply",
         "cancel": "Cancel",
         "reset": "Reset",

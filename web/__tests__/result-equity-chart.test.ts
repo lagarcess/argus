@@ -219,6 +219,7 @@ describe("ResultEquityChart adaptive range integration", () => {
     expect(chartSource).toContain("deriveResultChartRanges");
     expect(chartSource).toContain("resolveCustomResultChartRange");
     expect(chartSource).toContain("summarizeVisibleResultChartRange");
+    expect(chartSource).toContain("hasIntradayObservations");
     expect(chartSource).toContain("setVisibleLogicalRange");
     expect(chartSource).toContain("subscribeVisibleLogicalRangeChange");
     expect(chartSource).toContain("<ResultChartExploration");
@@ -235,9 +236,13 @@ describe("ResultEquityChart adaptive range integration", () => {
 
     expect(explorationSource).toContain("aria-pressed");
     expect(explorationSource).toContain('role="status"');
-    expect(explorationSource).toContain("min-h-9");
+    // Quiet segmented switcher: 44px hit targets in the conventional order.
+    expect(explorationSource).toContain("min-h-11");
+    expect(explorationSource).toContain('"1D", "1W", "1M", "3M", "YTD", "1Y"');
+    expect(explorationSource).toContain("showTimes");
     expect(explorationSource).toContain("result-chart-range-");
-    expect(explorationSource).toContain("result-chart-custom-toggle");
+    expect(explorationSource).toContain("result-chart-details-toggle");
+    expect(explorationSource).toContain("result-chart-custom-indicator");
     expect(explorationSource).toContain("result-chart-custom-start");
     expect(explorationSource).toContain("result-chart-custom-end");
     expect(explorationSource).toContain("result-chart-custom-apply");
@@ -268,7 +273,9 @@ describe("ResultEquityChart adaptive range integration", () => {
     const presetKeys = ["1D", "1W", "1M", "3M", "YTD", "1Y", "ALL"];
     const rangeKeys = [
       "group_label",
+      "details",
       "custom",
+      "custom_heading",
       "apply",
       "cancel",
       "reset",

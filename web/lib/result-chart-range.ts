@@ -229,6 +229,21 @@ export function summarizeVisibleResultChartRange(input: {
   };
 }
 
+// A series is intraday only when two valid observations share a UTC calendar
+// date. Daily bars stamped with a session hour (even across a DST shift) stay
+// daily, so date-time strings alone never force clock-time presentation.
+export function hasIntradayObservations(series: ResultChartPoint[]): boolean {
+  const seenDates = new Set<string>();
+  for (const point of series) {
+    const ms = parseChartTimeMs(point.time);
+    if (ms == null || !Number.isFinite(point.value)) continue;
+    const dayKey = new Date(ms).toISOString().slice(0, 10);
+    if (seenDates.has(dayKey)) return true;
+    seenDates.add(dayKey);
+  }
+  return false;
+}
+
 function resolveMinimumObservations(
   policy?: ResultChartExplorationPolicy | null,
 ): number {

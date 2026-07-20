@@ -18,6 +18,7 @@ import {
 } from "lightweight-charts";
 import {
   deriveResultChartRanges,
+  hasIntradayObservations,
   resolveCustomResultChartRange,
   summarizeVisibleResultChartRange,
   type ResultChartCustomError,
@@ -89,7 +90,7 @@ export default function ResultEquityChart({
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [selection, setSelection] = useState<ResultChartSelection>("ALL");
   const [visibleWindow, setVisibleWindow] = useState<VisibleWindow | null>(null);
-  const [customOpen, setCustomOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [customError, setCustomError] = useState<ResultChartCustomError | null>(
     null,
   );
@@ -149,6 +150,10 @@ export default function ResultEquityChart({
     () => deriveResultChartRanges(chart.series, chart.exploration_policy),
     [chart.series, chart.exploration_policy],
   );
+  const intradayTimes = useMemo(
+    () => hasIntradayObservations(chart.series),
+    [chart.series],
+  );
   const allWindow = useMemo<VisibleWindow>(() => {
     const allOption = rangeOptions[rangeOptions.length - 1];
     if (allOption?.key === "ALL") {
@@ -174,7 +179,7 @@ export default function ResultEquityChart({
     setSelection("ALL");
     setVisibleWindow(null);
     visibleWindowRef.current = null;
-    setCustomOpen(false);
+    setDetailsOpen(false);
     setCustomError(null);
   }, [chart]);
 
@@ -202,14 +207,14 @@ export default function ResultEquityChart({
     setVisibleWindow(allWindow);
   };
 
-  const toggleCustom = () => {
+  const toggleDetails = () => {
     setCustomError(null);
-    setCustomOpen((open) => !open);
+    setDetailsOpen((open) => !open);
   };
 
   const cancelCustom = () => {
     setCustomError(null);
-    setCustomOpen(false);
+    setDetailsOpen(false);
   };
 
   const applyCustom = (startDate: string, endDate: string) => {
@@ -223,7 +228,7 @@ export default function ResultEquityChart({
       return;
     }
     setCustomError(null);
-    setCustomOpen(false);
+    setDetailsOpen(false);
     timeScaleRef.current?.setVisibleLogicalRange({
       from: result.range.startIndex,
       to: result.range.endIndex,
@@ -423,7 +428,11 @@ export default function ResultEquityChart({
       setTooltip({
         x: param.point.x,
         y: param.point.y,
-        time: formatChartDateLabel(param.time, chartLocale),
+        // Daily series stamped with a session hour must read as dates, not
+        // implementation artifacts like "5:00 AM".
+        time: intradayTimes
+          ? formatChartDateLabel(param.time, chartLocale)
+          : formatChartDateLabel(time.slice(0, 10), chartLocale),
         value: datum.value,
         event: eventByTime.get(time)?.join(", "),
       });
@@ -464,6 +473,7 @@ export default function ResultEquityChart({
     data,
     dataIndexByTime,
     eventByTime,
+    intradayTimes,
     isDark,
     isHeroDeltaEvidence,
     markerLabels,
@@ -509,10 +519,11 @@ export default function ResultEquityChart({
         summary={visibleSummary}
         currency={chart.currency}
         locale={i18n.language}
-        customOpen={customOpen}
+        showTimes={intradayTimes}
+        detailsOpen={detailsOpen}
         customError={customError}
         onSelect={selectRange}
-        onOpenCustom={toggleCustom}
+        onToggleDetails={toggleDetails}
         onApplyCustom={applyCustom}
         onCancelCustom={cancelCustom}
         onReset={resetToAll}
