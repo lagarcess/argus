@@ -1078,6 +1078,15 @@ Ownership hardening:
         "currency": "USD",
         "source": "strategy_portfolio_equity_close"
       },
+      "exploration_policy": {
+        "minimum_visible_observations": 6,
+        "minimum_meaningful_duration": "P1M"
+      },
+      "marker_summary": {
+        "total_groups": 124,
+        "included_groups": 80,
+        "sampled": true
+      },
       "attribution": "TradingView Lightweight Charts"
     }
   },
@@ -1104,6 +1113,26 @@ commitment is represented by an explicit `DecisionNote`.
 - `chart.value_summary` mirrors aggregate strategy portfolio equity close values for result-card details. It is not an asset OHLC high/low and does not describe the benchmark.
 - Legacy persisted `chart.value_extrema` may be read as a fallback only; new writers must emit `chart.value_summary` as the canonical shape.
 - `chart.markers` contains capped entry/exit events derived from executed fills only. Raw strategy signals, blocked exits while flat, and duplicate blocked entries must not appear as chart markers.
+- `chart.exploration_policy` is an optional, additive object of generic
+  presentation hints resolved by the backend from the strategy capability and
+  canonical run config: `minimum_visible_observations` (positive integer,
+  default 6) and optional `minimum_meaningful_duration` (single-unit ISO-8601
+  calendar duration such as `P1M` or `P2W`, may be null or omitted). It carries
+  no strategy, template, provider, timeframe, language, or display identity;
+  the frontend derives range eligibility from actual `chart.series` timestamps
+  plus these hints only.
+- `chart.marker_summary` is an optional, additive object recording exact
+  executed-fill marker-cap evidence: `total_groups` counts typed executed-fill
+  marker groups before the backend cap, `included_groups` is the persisted
+  marker count, and `sampled` is true exactly when
+  `included_groups < total_groups`.
+- Chart range/viewport exploration is presentation-only. Selecting a preset or
+  custom range, panning, zooming, or resetting must not trigger any API call,
+  provider request, simulation, resampling, usage charge, or durable write, and
+  must not change full-run metrics or the result-card date period.
+- Legacy persisted charts omit `exploration_policy` and `marker_summary`;
+  readers fall back to observation-only range eligibility and make no claim
+  about marker completeness or sampling.
 - The frontend must keep TradingView attribution visible when rendering Lightweight Charts.
 
 **Result execution costs contract:**

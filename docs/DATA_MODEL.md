@@ -470,6 +470,14 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 - `benchmark_symbol` is derived from `asset_class` defaults in Alpha (`SPY` for equities, `BTC` for crypto, tested pair for currency pairs).
 - `metrics.aggregate.performance.portfolio_value_range` stores aggregate strategy portfolio equity close peak/lowest values for the run period.
 - `chart` stores the aggregate portfolio equity curve, its matching `value_summary`, and capped executed-fill markers used by the result card. Multi-symbol runs store the portfolio curve, not separate comparison series.
+- New chart writers also persist two optional additive objects inside the same
+  immutable `chart` JSON: `exploration_policy` (generic range-eligibility hints
+  resolved from the strategy capability: `minimum_visible_observations`,
+  optional `minimum_meaningful_duration`) and `marker_summary` (exact
+  `total_groups`/`included_groups`/`sampled` marker-cap evidence). Legacy rows
+  omit both fields and remain valid; readers degrade to observation-only range
+  behavior and make no marker-completeness claim. No migration is required, and
+  these fields never change execution, metrics, or the effective window.
 - Direct run rows store the normalized engine config directly in
   `config_snapshot`; chat-launched rows may include
   `config_snapshot.engine_config` with the exact normalized engine config

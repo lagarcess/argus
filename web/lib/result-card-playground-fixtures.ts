@@ -1,6 +1,10 @@
 import type { BacktestRun } from "./argus-api";
 import { resultCardFromRun } from "./argus-api";
-import type { StrategyResultPayload } from "@/components/chat/types";
+import type {
+  ResultChartMarker,
+  ResultChartPoint,
+  StrategyResultPayload,
+} from "@/components/chat/types";
 
 type ResultCardPlaygroundFixture = {
   id: string;
@@ -37,6 +41,72 @@ const defaultAssumptions = [
   "No fees/slippage",
   "Benchmark: SPY",
 ];
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+// Two weeks of hourly portfolio equity from $1,000 to exactly $1,120 (+12.0%).
+// The sin(pi * i / last) envelope zeroes the wiggle at both endpoints so the
+// metrics text stays exact while peak/low stay non-trivial for range summaries.
+function adaptiveHourlySeries(): ResultChartPoint[] {
+  const first = Date.parse("2026-01-01T00:00:00Z");
+  const last = 14 * 24;
+  return Array.from({ length: last + 1 }, (_, index) => {
+    const trend = 1000 + (120 * index) / last;
+    const wiggle = 8 * Math.sin((Math.PI * index) / last) * Math.sin(index / 6);
+    return {
+      time: new Date(first + index * HOUR_MS).toISOString().slice(0, 19),
+      value: Math.round((trend + wiggle) * 100) / 100,
+    };
+  });
+}
+
+// 80 persisted executed-fill groups evenly spread over the hourly series,
+// mirroring a backend cap of 124 pre-cap groups down to 80 stored markers.
+function adaptiveHourlyMarkers(series: ResultChartPoint[]): ResultChartMarker[] {
+  const lastIndex = series.length - 1;
+  return Array.from({ length: 80 }, (_, index) => {
+    const sourceIndex = Math.round((index * lastIndex) / 79);
+    const isEntry = index % 2 === 0;
+    return {
+      time: series[sourceIndex]!.time,
+      type: isEntry ? ("entry" as const) : ("exit" as const),
+      label: isEntry ? "Buy AAPL" : "Sell AAPL",
+      symbols: ["AAPL"],
+    };
+  });
+}
+
+// Two years of daily portfolio equity that ends exactly flat at $1,000 with a
+// gentle wave (about -2.2% worst drop), matching the DCA metrics text.
+function dcaDailySeries(): ResultChartPoint[] {
+  const first = Date.parse("2022-01-03T00:00:00Z");
+  const last = (Date.parse("2023-12-29T00:00:00Z") - first) / DAY_MS;
+  return Array.from({ length: last + 1 }, (_, index) => ({
+    time: new Date(first + index * DAY_MS).toISOString().slice(0, 10),
+    value:
+      Math.round((1000 + 11 * Math.sin((3 * Math.PI * index) / last)) * 100) /
+      100,
+  }));
+}
+
+// One accumulating buy per month across the two-year DCA series.
+function dcaMonthlyMarkers(series: ResultChartPoint[]): ResultChartMarker[] {
+  const byMonth = new Map<string, ResultChartPoint>();
+  for (const point of series) {
+    const month = point.time.slice(0, 7);
+    if (!byMonth.has(month)) byMonth.set(month, point);
+  }
+  return [...byMonth.values()].map((point) => ({
+    time: point.time,
+    type: "entry" as const,
+    label: "Buy AAPL",
+    symbols: ["AAPL"],
+  }));
+}
+
+const adaptiveHourlySeriesPoints = adaptiveHourlySeries();
+const dcaDailySeriesPoints = dcaDailySeries();
 
 export const legacyPersistedRunFixture: BacktestRun = {
   id: "playground-legacy-run",
@@ -307,15 +377,17 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
         kind: "portfolio_equity",
         currency: "USD",
         base_value: 1000,
-        series: [
-          { time: "2022-01-03", value: 1000 },
-          { time: "2022-04-01", value: 982 },
-          { time: "2022-08-01", value: 1012 },
-          { time: "2022-12-30", value: 978 },
-          { time: "2023-04-03", value: 1008 },
-          { time: "2023-08-01", value: 994 },
-          { time: "2023-12-29", value: 1000 },
-        ],
+        series: dcaDailySeriesPoints,
+        markers: dcaMonthlyMarkers(dcaDailySeriesPoints),
+        marker_summary: {
+          total_groups: 24,
+          included_groups: 24,
+          sampled: false,
+        },
+        exploration_policy: {
+          minimum_visible_observations: 6,
+          minimum_meaningful_duration: "P2M",
+        },
       },
     },
   },
@@ -363,6 +435,65 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
           { time: "2023-05-15", type: "exit", label: "Exited AAPL", symbols: ["AAPL"] },
           { time: "2023-09-18", type: "entry", label: "Entered AAPL", symbols: ["AAPL"] },
         ],
+      },
+    },
+  },
+  {
+    id: "adaptive-intraday-result",
+    name: "Adaptive intraday result",
+    note: "Two weeks of hourly data with capped executed-fill markers for range exploration.",
+    result: {
+      strategyName: "AAPL Two-Week Hold",
+      strategyLabel: "Buy and hold",
+      symbols: ["AAPL"],
+      assetClass: "equity",
+      configSnapshot: {
+        template: "buy_and_hold",
+        timeframe: "1h",
+        benchmark_symbol: "SPY",
+      },
+      period: "January 1, 2026 to January 15, 2026",
+      dateRange: {
+        start: "2026-01-01",
+        end: "2026-01-15",
+        display: "January 1, 2026 to January 15, 2026",
+      },
+      statusLabel: "Simulation Complete",
+      metrics: [
+        { label: "Ending value", value: "$1,000 -> $1,120" },
+        { label: "Total return", value: "+12.0%" },
+        { label: "Compared with SPY", value: "Beat SPY by 5.2 percentage points" },
+        { label: "Worst drop", value: "-1.8%" },
+      ],
+      assumptions: [
+        "Timeframe: 1h",
+        "Long-only",
+        "Equal weight",
+        "No fees/slippage",
+        "Benchmark: SPY",
+      ],
+      actions: resultActions,
+      chart: {
+        kind: "portfolio_equity",
+        currency: "USD",
+        base_value: 1000,
+        series: adaptiveHourlySeriesPoints,
+        markers: adaptiveHourlyMarkers(adaptiveHourlySeriesPoints),
+        marker_summary: {
+          total_groups: 124,
+          included_groups: 80,
+          sampled: true,
+        },
+        exploration_policy: {
+          minimum_visible_observations: 6,
+          minimum_meaningful_duration: "P1M",
+        },
+        value_summary: {
+          peak_value: 1120,
+          lowest_value: 1000,
+          currency: "USD",
+          source: "strategy_portfolio_equity_close",
+        },
       },
     },
   },
