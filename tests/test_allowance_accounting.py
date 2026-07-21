@@ -134,11 +134,6 @@ def _assistant_settlements(gateway: MagicMock) -> list[dict[str, Any]]:
     return settlements
 
 
-# ---------------------------------------------------------------------------
-# Message accounting: settle at the durable terminal product outcome.
-# ---------------------------------------------------------------------------
-
-
 def test_chat_entry_checks_but_never_consumes_message_allowance(mock_gateway):
     response = client.post(
         "/api/v1/chat/stream",
@@ -217,11 +212,6 @@ def test_message_quota_exhaustion_rejects_at_entry_without_charging(mock_gateway
     mock_gateway.create_message.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# Simulation accounting: charge exactly once at unique durable admission.
-# ---------------------------------------------------------------------------
-
-
 def test_gateway_owns_an_atomic_admission_operation():
     assert hasattr(SupabaseGateway, "admit_backtest_job"), (
         "Simulation charging must compose with one database-owned admission "
@@ -276,11 +266,6 @@ def test_direct_run_admits_durably_and_never_uses_legacy_increment(
     admission = mock_gateway.admit_backtest_job.call_args.kwargs
     assert admission["operation_scope"] == "backtests.run"
     assert admission["idempotency_key"] == "direct-admission-truth"
-
-
-# ---------------------------------------------------------------------------
-# /me/usage: hourly and daily backend truth for both resources.
-# ---------------------------------------------------------------------------
 
 
 def _usage_row(

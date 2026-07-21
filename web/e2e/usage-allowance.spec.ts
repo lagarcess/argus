@@ -29,8 +29,6 @@ function zeroAllowance(
   hourEnd: string,
   dayEnd: string,
 ): UsageAllowance {
-  // Matches real backend derivation: at equal usage the hourly window has
-  // the smaller remaining capacity, so it is the most restrictive window.
   return {
     hour: {
       limit: hourLimit,
@@ -182,7 +180,6 @@ test("Usage renders the quiet remaining-first gauge with one disclosure", async 
   });
 
   const dialog = page.getByRole("dialog", { name: "Usage" });
-  // The header is the title alone: no subtitle and no program branding.
   await expect(dialog).not.toContainText("reset automatically");
   await expect(dialog).not.toContainText("private-alpha");
   await expect(dialog).toContainText("200 left today");
@@ -193,12 +190,9 @@ test("Usage renders the quiet remaining-first gauge with one disclosure", async 
   await expect(
     dialog.locator(`time[datetime="${dayEnd}"]`).first(),
   ).not.toBeEmpty();
-  // Neutral zero state: no usage badges and no warning tint anywhere.
   await expect(dialog).not.toContainText("No usage yet");
   await expect(dialog.locator('.text-\\[\\#b94c55\\]')).toHaveCount(0);
 
-  // One What counts? disclosure owns both counting rules and its toggle
-  // never mutates usage or issues another request.
   const requestsBeforeToggle = usageRequests;
   const disclosure = dialog.getByRole("button", { name: "What counts?" });
   await expect(disclosure).toHaveAttribute("aria-expanded", "false");

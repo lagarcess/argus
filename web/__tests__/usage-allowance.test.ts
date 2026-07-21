@@ -75,9 +75,6 @@ describe("private-alpha usage allowance", () => {
     );
 
     expect(api).toContain('apiFetch<UsageAllowanceResponse>("/me/usage")');
-    // Run actions must reuse the confirmation identity as the
-    // Idempotency-Key so retries and reconnects replay the one durable
-    // admission instead of opening a second reservation.
     expect(api).toContain("runActionIdempotencyKey(input)");
     expect(usageLib).toContain('input.type !== "run_backtest"');
     expect(usageLib).toContain("confirmation_id");
@@ -91,8 +88,6 @@ describe("private-alpha usage allowance", () => {
     expect(modal).toContain("simulation_rule");
     expect(modal).toContain("showsHourlyWindow");
     expect(modal).not.toContain("Retry-After");
-    // The frontend renders backend truth; it must not restate quota limits
-    // or recompute reset times locally.
     expect(modal).not.toMatch(/limit:\s*\d/);
     expect(modal).not.toContain("setHours");
     expect(modal).not.toContain("Date.now() +");
@@ -164,8 +159,6 @@ describe("private-alpha usage allowance", () => {
     expect(en.simulation_rule).toBe(
       "New simulations count once. Retrying the same simulation doesn’t count again.",
     );
-    // The quiet gauge leads with what remains; the subtitle, used-count
-    // badges, and the zero-usage badge are retired.
     expect(en.description).toBeUndefined();
     expect(en.no_usage).toBeUndefined();
     expect(en.remaining).toBeUndefined();
@@ -184,8 +177,6 @@ describe("private-alpha usage allowance", () => {
     expect(es.no_usage).toBeUndefined();
     expect(es.remaining).toBeUndefined();
 
-    // Guidance stays plain product language: no program branding and no
-    // provider/API plumbing.
     for (const catalog of [en, es]) {
       for (const value of Object.values(catalog)) {
         expect(String(value)).not.toContain("private-alpha");
@@ -208,25 +199,18 @@ describe("private-alpha usage allowance", () => {
       "utf-8",
     );
 
-    // Remaining capacity is the primary value per section; the header
-    // carries no subtitle.
     expect(modal).toContain("left_today");
     expect(modal).toContain("day.remaining");
     expect(modal).not.toContain("usage_panel.description");
-    // One flat surface: no per-allowance bordered card tiles and no
-    // decorative icon tiles.
     expect(modal).not.toContain("rounded-2xl border");
     expect(modal).not.toContain("MessageSquareText");
     expect(modal).not.toContain("LineChart");
-    // No usage-state badges; healthy and zero states stay neutral.
     expect(modal).not.toContain("no_usage");
     expect(modal).not.toContain("usage_panel.remaining");
-    // Exactly one progressive disclosure owns both counting rules.
     expect(modal.match(/what_counts/g)?.length).toBeGreaterThanOrEqual(1);
     expect(modal.match(/aria-expanded/g)?.length).toBe(1);
     expect(modal).toContain("message_rule");
     expect(modal).toContain("simulation_rule");
-    // Warning styling exists only behind genuine exhaustion checks.
     expect(modal).toContain("classifyAllowance");
   });
 });

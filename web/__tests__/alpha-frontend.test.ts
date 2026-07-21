@@ -1765,7 +1765,6 @@ describe("Argus Alpha frontend contract", () => {
     expect(en.settings.data.security).toBeTruthy();
     expect(es.settings.data.security).toBeTruthy();
 
-    // The #247 lane activates Usage without regressing the #248 Security entry.
     const usageLabel = menu.indexOf('t("settings.data.usage"');
     expect(usageLabel).toBeGreaterThan(-1);
     const usageButton = menu.slice(

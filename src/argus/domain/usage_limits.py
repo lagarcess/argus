@@ -11,8 +11,6 @@ class QuotaExceededError(Exception):
 
 USAGE_COUNTER_LOCK = threading.Lock()
 
-# One backend-owned allowance policy. Routers, admission, settlement, and the
-# usage read surface must reference these windows instead of local literals.
 MESSAGE_ALLOWANCE_LIMITS: list[tuple[str, int]] = [("hour", 60), ("day", 200)]
 SIMULATION_ALLOWANCE_LIMITS: list[tuple[str, int]] = [("hour", 10), ("day", 50)]
 

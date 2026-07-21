@@ -21,9 +21,6 @@ export type UsageAllowanceResponse = {
 
 export type AllowanceState = "zero" | "active" | "hourly_limited" | "exhausted";
 
-// Presentation state only: every input is backend-derived truth. The daily
-// window owns the primary story; the hourly window explains availability
-// whenever the backend marks it limiting.
 export function classifyAllowance(allowance: {
   available_now: boolean;
   day: { used: number; remaining: number };
@@ -40,9 +37,6 @@ export function showsHourlyWindow(allowance: {
   return allowance.limiting_window === "hour";
 }
 
-// The approved contract requires run_backtest actions to carry
-// Idempotency-Key equal to the confirmation identity, so retries and
-// reconnects replay the one durable admission instead of charging again.
 export function runActionIdempotencyKey(input: {
   type: string;
   payload?: Record<string, unknown>;
