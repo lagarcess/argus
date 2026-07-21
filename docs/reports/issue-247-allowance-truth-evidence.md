@@ -233,9 +233,82 @@ errors. Proofs (11 passed):
 | 16 | Focused API, migration, concurrency, lifecycle, workflow, frontend, OpenAPI, hermetic gates | PASS — table above |
 | 17 | Final diff proportionality: no billing machinery, duplicate counters, frontend quota logic, unrelated refactors | PASS — complexity reassessment above |
 
-## Live product QA
+## Live product QA — completed on the isolated local Supabase stack
 
-BLOCKED at READY FOR QA CONFIG. `.github/qa.sh` fails closed without a
+Executed 2026-07-21 after founder-authorized configuration. Hosted
+Supabase was never mutated; the connected cloud database predates the
+required migration chain (PGRST202 on the serialized append function), so
+the functional matrix ran against the local `argus-qa` Docker stack
+(Kong 54331 / Postgres 54332), brought forward with the repo migration
+flow (`supabase migration up --local`: exactly `20260722000001` and
+`20260722000002` applied; history was a clean prefix). Runtime-only env
+overrides isolated both processes to the local stack; the symlinked
+integration env files were untouched. The QA identity was a fresh normal
+local user (`is_admin = false`) created through real local Supabase Auth
+signup (allowlist row seeded locally).
+
+Functional matrix results (sanitized; counters verified in the UI, the
+`/me/usage` response, and the local database):
+
+1. Initial truth: zero state read from zero rows; UI matched the server
+   JSON exactly (hour end 21:00Z → 4:00 PM CDT, day end 00:00Z → 7:00 PM
+   CDT; `available_now` true; `limiting_window` "hour").
+2. One completed chat response settled exactly one unit in both windows
+   (hour 0→1, day 0→1) and persisted across reload.
+3. Injected pre-terminal runtime failure (test-only
+   `ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS` on the local process) rendered
+   the honest recovery message and consumed zero (counters unchanged).
+4. The persisted Retry completed and settled one unit for the one
+   delivered outcome (no double charge across the failed attempt).
+5. Simulation admission (durable-jobs flag on): one run action charged
+   hour 0→1 and day 0→1 with one durable `chat.run_backtest` job,
+   identity hash, and linked run; the run action itself consumed no
+   message unit.
+6. Two concurrent same-key run posts (client-derived confirmation key)
+   produced one durable job, one linked run, and exactly one unit; a
+   same-key different-payload probe returned the non-disclosing conflict
+   with zero charge; a post-completion action replay rejected
+   pre-admission (`confirmation_required`) with zero charge.
+7. Provider preflight rejection (AAPL 1990) returned the honest
+   boundary clarification: one message unit, zero simulations.
+8. Read purity: an md5 fingerprint over all counter rows (including
+   `updated_at`) was identical before and after repeated panel opens,
+   closes, reloads, and disclosure toggles; the panel issues GETs only.
+9. Genuine hourly exhaustion (controlled local fixture, restored to the
+   organic value afterward): rose "limit reached" presentation and a
+   429-at-entry send that consumed nothing. Healthy and zero states are
+   neutral.
+10. Security page fully reachable and rendered in EN and ES.
+11. EN and es-419 rendered identical backend truth with locale-correct
+    reset formatting; desktop and mobile clean.
+12. No 401-after-login occurred on the local stack.
+
+Two live findings were corrected in `ac90500` (rose hourly line at zero
+usage; run actions sent random idempotency keys instead of the
+confirmation identity, leaving the concurrent-retry window able to
+double-admit). Environment gates recorded for rollout: production must
+run with `ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=true` (with the flag off,
+chat runs take the legacy uncharged in-process path), and the deployed
+database must carry the migration chain through `20260722000002`. In
+synchronous no-dispatch mode a concurrent replay can re-execute compute
+(accounting stays exactly-once; the finalizer dedupes the run identity).
+
+## Approved presentation (Phase B, `28ccdf9`)
+
+The Usage modal is one flat surface: per allowance, backend remaining
+capacity leads ("193 left today"), a thin daily bar carries truthful
+ARIA values, the reset instant renders through the existing localized
+formatter, and hourly capacity is secondary text. Badges, icon tiles,
+and repeated explanations were removed; one "What counts?" disclosure
+owns both counting rules. Live-verified on real post-matrix counts in
+EN/ES, desktop/mobile, dark/light, with zero mutations from panel
+interactions. Red-before-fix evidence: the rewritten presentation pins
+failed 2/8 against the prior card-based modal (badges present, bordered
+tiles, no disclosure) before the implementation turned them green.
+
+## Historical note — first hosted attempt
+
+The original live pass was BLOCKED at READY FOR QA CONFIG. `.github/qa.sh` fails closed without a
 root `.env` carrying real Supabase/OpenRouter/Alpaca credentials and
 `DATABASE_URL`. This worktree has no `.env` and no `web/.env.local`, and
 copying credentials from another worktree is out of bounds for this lane.
