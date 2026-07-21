@@ -158,10 +158,15 @@ describe("private-alpha usage allowance", () => {
     expect(en.left_today).toContain("{{count}}");
     expect(en.hourly_available).toContain("{{count}}");
     expect(en.what_counts).toBe("What counts?");
-    expect(en.message_rule.length).toBeGreaterThan(0);
-    expect(en.simulation_rule.length).toBeGreaterThan(0);
-    // The quiet gauge leads with what remains; used-count badges and the
-    // zero-usage badge are retired.
+    expect(en.message_rule).toBe(
+      "Messages count when Argus completes a response. Failed or interrupted responses don’t count.",
+    );
+    expect(en.simulation_rule).toBe(
+      "New simulations count once. Retrying the same simulation doesn’t count again.",
+    );
+    // The quiet gauge leads with what remains; the subtitle, used-count
+    // badges, and the zero-usage badge are retired.
+    expect(en.description).toBeUndefined();
     expect(en.no_usage).toBeUndefined();
     expect(en.remaining).toBeUndefined();
     expect(es.messages).toBe("Mensajes");
@@ -169,8 +174,25 @@ describe("private-alpha usage allowance", () => {
     expect(es.left_today).toContain("{{count}}");
     expect(es.hourly_available).toContain("{{count}}");
     expect(es.what_counts.length).toBeGreaterThan(0);
+    expect(es.message_rule).toBe(
+      "Los mensajes cuentan cuando Argus completa una respuesta. Las respuestas fallidas o interrumpidas no cuentan.",
+    );
+    expect(es.simulation_rule).toBe(
+      "Las simulaciones nuevas cuentan una vez. Reintentar la misma simulación no vuelve a contar.",
+    );
+    expect(es.description).toBeUndefined();
     expect(es.no_usage).toBeUndefined();
     expect(es.remaining).toBeUndefined();
+
+    // Guidance stays plain product language: no program branding and no
+    // provider/API plumbing.
+    for (const catalog of [en, es]) {
+      for (const value of Object.values(catalog)) {
+        expect(String(value)).not.toContain("private-alpha");
+        expect(String(value)).not.toContain("alfa privada");
+        expect(String(value)).not.toContain("API");
+      }
+    }
 
     for (const key of Object.keys(en)) {
       expect(es[key]).toBeDefined();
@@ -186,9 +208,11 @@ describe("private-alpha usage allowance", () => {
       "utf-8",
     );
 
-    // Remaining capacity is the primary value per section.
+    // Remaining capacity is the primary value per section; the header
+    // carries no subtitle.
     expect(modal).toContain("left_today");
     expect(modal).toContain("day.remaining");
+    expect(modal).not.toContain("usage_panel.description");
     // One flat surface: no per-allowance bordered card tiles and no
     // decorative icon tiles.
     expect(modal).not.toContain("rounded-2xl border");

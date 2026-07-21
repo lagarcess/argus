@@ -773,7 +773,6 @@
       "usage": "Uso",
       "usage_panel": {
         "title": "Uso",
-        "description": "Tus cupos de alfa privada se restablecen automáticamente.",
         "messages": "Mensajes",
         "simulations": "Simulaciones",
         "left_today": "Quedan {{count}} hoy",
@@ -785,8 +784,8 @@
         "load_error": "No se pudo cargar el uso.",
         "retry": "Intentar de nuevo",
         "close": "Cerrar uso",
-        "message_rule": "Cada respuesta de chat que Argus completa usa un mensaje. Los turnos fallidos o interrumpidos no cuentan.",
-        "simulation_rule": "Cada simulación única que inicias usa una simulación, desde el chat o la API. Repetir la misma ejecución no cuenta."
+        "message_rule": "Los mensajes cuentan cuando Argus completa una respuesta. Las respuestas fallidas o interrumpidas no cuentan.",
+        "simulation_rule": "Las simulaciones nuevas cuentan una vez. Reintentar la misma simulación no vuelve a contar."
       }
     },
     "help": {

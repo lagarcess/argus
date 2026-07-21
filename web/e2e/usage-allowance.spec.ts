@@ -182,9 +182,9 @@ test("Usage renders the quiet remaining-first gauge with one disclosure", async 
   });
 
   const dialog = page.getByRole("dialog", { name: "Usage" });
-  await expect(dialog).toContainText(
-    "Your private-alpha allowances reset automatically.",
-  );
+  // The header is the title alone: no subtitle and no program branding.
+  await expect(dialog).not.toContainText("reset automatically");
+  await expect(dialog).not.toContainText("private-alpha");
   await expect(dialog).toContainText("200 left today");
   await expect(dialog).toContainText("50 left today");
   await expect(dialog).toContainText("60 available this hour");
@@ -206,11 +206,12 @@ test("Usage renders the quiet remaining-first gauge with one disclosure", async 
   await disclosure.click();
   await expect(disclosure).toHaveAttribute("aria-expanded", "true");
   await expect(dialog).toContainText(
-    "Each chat response Argus completes uses one message.",
+    "Messages count when Argus completes a response. Failed or interrupted responses don’t count.",
   );
   await expect(dialog).toContainText(
-    "Each unique simulation you start uses one simulation",
+    "New simulations count once. Retrying the same simulation doesn’t count again.",
   );
+  await expect(dialog).not.toContainText("API");
   await disclosure.click();
   await expect(disclosure).toHaveAttribute("aria-expanded", "false");
   expect(usageRequests).toBe(requestsBeforeToggle);
@@ -278,15 +279,19 @@ test("Usage renders the Spanish daily-exhausted state and backend reset", async 
   });
 
   const dialog = page.getByRole("dialog", { name: "Uso" });
-  await expect(dialog).toContainText(
-    "Tus cupos de alfa privada se restablecen automáticamente.",
-  );
+  await expect(dialog).not.toContainText("alfa privada");
   await expect(dialog).toContainText("Quedan 0 hoy");
   await expect(dialog).toContainText("Quedan 50 hoy");
   await expect(dialog).toContainText("Se restablece");
-  await expect(
-    dialog.getByRole("button", { name: "¿Qué cuenta?" }),
-  ).toBeVisible();
+  const disclosure = dialog.getByRole("button", { name: "¿Qué cuenta?" });
+  await disclosure.click();
+  await expect(dialog).toContainText(
+    "Los mensajes cuentan cuando Argus completa una respuesta. Las respuestas fallidas o interrumpidas no cuentan.",
+  );
+  await expect(dialog).toContainText(
+    "Las simulaciones nuevas cuentan una vez. Reintentar la misma simulación no vuelve a contar.",
+  );
+  await expect(dialog).not.toContainText("API");
   await expect(
     dialog.locator(`time[datetime="${dayEnd}"]`).first(),
   ).not.toBeEmpty();

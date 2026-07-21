@@ -215,18 +215,13 @@ export default function UsageModal({
         aria-modal="true"
         aria-labelledby="argus-usage-modal-title"
       >
-        <header className="flex items-start justify-between gap-4 px-5 pt-4 pb-3">
-          <div>
-            <h2
-              id="argus-usage-modal-title"
-              className="font-display text-[17px] font-medium text-black dark:text-white"
-            >
-              {t("settings.data.usage_panel.title")}
-            </h2>
-            <p className="mt-1 text-[12px] text-black/45 dark:text-white/45">
-              {t("settings.data.usage_panel.description")}
-            </p>
-          </div>
+        <header className="flex items-center justify-between gap-4 px-5 pt-3 pb-1">
+          <h2
+            id="argus-usage-modal-title"
+            className="font-display text-[17px] font-medium text-black dark:text-white"
+          >
+            {t("settings.data.usage_panel.title")}
+          </h2>
           <button
             onClick={onClose}
             className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/[0.08] dark:hover:text-white"

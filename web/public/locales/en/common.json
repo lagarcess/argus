@@ -773,7 +773,6 @@
       "usage": "Usage",
       "usage_panel": {
         "title": "Usage",
-        "description": "Your private-alpha allowances reset automatically.",
         "messages": "Messages",
         "simulations": "Simulations",
         "left_today": "{{count}} left today",
@@ -785,8 +784,8 @@
         "load_error": "Usage couldn’t be loaded.",
         "retry": "Try again",
         "close": "Close usage",
-        "message_rule": "Each chat response Argus completes uses one message. Failed or interrupted turns don’t count.",
-        "simulation_rule": "Each unique simulation you start uses one simulation, from chat or the API. Replaying the same run doesn’t count."
+        "message_rule": "Messages count when Argus completes a response. Failed or interrupted responses don’t count.",
+        "simulation_rule": "New simulations count once. Retrying the same simulation doesn’t count again."
       }
     },
     "help": {
