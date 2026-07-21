@@ -108,6 +108,10 @@ def _settle_message(connection, owner, message_id: str, *, limits=None):
 
 
 def _admit(connection, owner, **overrides):
+    # Capacity ceilings default high so every proof stays deterministic
+    # against a reused disposable database whose earlier runs left durable
+    # jobs behind; capacity behavior is proven through the per-user ceiling
+    # on a fresh user.
     arguments = {
         "user_id": owner["user_id"],
         "operation_scope": "chat.run_backtest",
@@ -117,10 +121,10 @@ def _admit(connection, owner, **overrides):
         "launch_payload": json.dumps({"kind": "proof"}),
         "initial_status": "queued",
         "conversation_id": owner["conversation_id"],
-        "user_running_limit": 1,
-        "user_queued_limit": 2,
-        "global_running_limit": 5,
-        "global_queued_limit": 10,
+        "user_running_limit": 1000,
+        "user_queued_limit": 1000,
+        "global_running_limit": 1000000,
+        "global_queued_limit": 1000000,
         "allowance_limits": json.dumps(SIMULATION_LIMITS),
     }
     arguments.update(overrides)
@@ -237,7 +241,7 @@ def test_concurrent_distinct_identities_respect_capacity_atomically(owner):
     def admit(_: int) -> str:
         with _connect() as connection:
             barrier.wait(timeout=30)
-            return _admit(connection, owner)["decision"]
+            return _admit(connection, owner, user_queued_limit=2)["decision"]
 
     with ThreadPoolExecutor(max_workers=10) as pool:
         decisions = list(pool.map(admit, range(10)))
