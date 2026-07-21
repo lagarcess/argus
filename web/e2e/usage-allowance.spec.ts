@@ -29,6 +29,8 @@ function zeroAllowance(
   hourEnd: string,
   dayEnd: string,
 ): UsageAllowance {
+  // Matches real backend derivation: at equal usage the hourly window has
+  // the smaller remaining capacity, so it is the most restrictive window.
   return {
     hour: {
       limit: hourLimit,
@@ -38,7 +40,7 @@ function zeroAllowance(
     },
     day: { limit: dayLimit, used: 0, remaining: dayLimit, period_end: dayEnd },
     available_now: true,
-    limiting_window: "day",
+    limiting_window: "hour",
   };
 }
 
@@ -190,8 +192,12 @@ test("Usage renders English message and simulation truth with backend resets", a
   await expect(
     dialog.locator(`time[datetime="${dayEnd}"]`).first(),
   ).not.toBeEmpty();
-  // Fully available: the hourly window stays out of the story.
-  await expect(dialog.locator(`time[datetime="${hourEnd}"]`)).toHaveCount(0);
+  // Fully available: the hourly context line renders muted, never in the
+  // limited rose tint.
+  await expect(dialog).toContainText("0 of 60 used this hour");
+  await expect(
+    dialog.locator('p.text-\\[\\#b94c55\\], p.dark\\:text-\\[\\#e7a2a8\\]'),
+  ).toHaveCount(0);
 });
 
 test("Usage reveals the hourly window when the backend marks it limiting", async ({

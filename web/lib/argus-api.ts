@@ -1047,11 +1047,23 @@ export async function streamChatMessage(
     }
   }
 
+  // The approved contract requires run_backtest actions to carry
+  // Idempotency-Key equal to the confirmation identity, so retries and
+  // reconnects replay the one durable admission instead of charging again.
+  const confirmationId =
+    typeof input !== "string" && input.type === "run_backtest"
+      ? input.payload?.confirmation_id
+      : undefined;
+  const idempotencyKey =
+    typeof confirmationId === "string" && confirmationId.trim()
+      ? confirmationId.trim()
+      : crypto.randomUUID();
+
   const response = await fetch(`${API_BASE}/chat/stream`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Idempotency-Key": crypto.randomUUID(),
+      "Idempotency-Key": idempotencyKey,
       ...authHeaders,
     },
     body: JSON.stringify({

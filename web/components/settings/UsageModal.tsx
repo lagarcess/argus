@@ -126,7 +126,13 @@ function AllowanceCard({
       </div>
 
       {showsHourlyWindow(allowance) ? (
-        <p className="mt-2 flex items-start gap-2 text-[11px] leading-relaxed text-[#b94c55] dark:text-[#e7a2a8]">
+        <p
+          className={`mt-2 flex items-start gap-2 text-[11px] leading-relaxed ${
+            allowance.available_now
+              ? "text-black/45 dark:text-white/45"
+              : "text-[#b94c55] dark:text-[#e7a2a8]"
+          }`}
+        >
           <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
             {t("settings.data.usage_panel.hourly_status", {

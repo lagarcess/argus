@@ -75,6 +75,12 @@ describe("private-alpha usage allowance", () => {
     );
 
     expect(api).toContain('apiFetch<UsageAllowanceResponse>("/me/usage")');
+    // Run actions must reuse the confirmation identity as the
+    // Idempotency-Key so retries and reconnects replay the one durable
+    // admission instead of opening a second reservation.
+    expect(api).toContain('input.type === "run_backtest"');
+    expect(api).toContain("input.payload?.confirmation_id");
+    expect(api).toContain('"Idempotency-Key": idempotencyKey');
     expect(usageLib).toContain("backtests: UsageAllowance");
     expect(usageLib).toContain('limiting_window: "hour" | "day"');
     expect(profileMenu).toContain('openModal("usage")');
