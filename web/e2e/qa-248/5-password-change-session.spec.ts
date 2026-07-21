@@ -9,20 +9,12 @@ import {
   supabaseSessionId,
 } from "./helpers";
 
-// Session-integrity pins for the normal password-change path.
-//
-// The current implementation proves the current password with a real
-// signInWithPassword call, which persists a fresh session in the browser
-// client. A failed update therefore leaves the browser on a different
-// session id and an extra auth.sessions row. The provider-native contract
-// (updateUser({password, current_password}) enforced by
-// GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD) would avoid
-// that, but Supabase CLI v2.109.0 exposes no config key for it, so these
-// assertions are pinned as expected failures. Set
-// QA_EXPECT_NATIVE_CURRENT_PASSWORD=1 once enforcement exists: the pins
-// then run as hard assertions and the expected-failure marker trips.
-const NATIVE_ENFORCEMENT = process.env.QA_EXPECT_NATIVE_CURRENT_PASSWORD === "1";
-
+// Session-integrity pins for the normal password-change path: the change is
+// one native updateUser({password, current_password}) request, so a rejected
+// update must leave the browser on its original session, keep the Argus
+// cookies, and add no auth.sessions row. The same-password rejection drives
+// the failure deterministically without depending on the hosted
+// current-password policy.
 async function loginFresh(browser: Browser, email: string, password: string) {
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -36,10 +28,6 @@ test.describe("issue-248 password-change session integrity (local)", () => {
   test("a failed update preserves the original session and adds no auth.sessions row", async ({
     browser,
   }) => {
-    test.fail(
-      !NATIVE_ENFORCEMENT,
-      "signInWithPassword verification persists a session; CLI v2.109.0 cannot enable provider-native current_password enforcement",
-    );
     const { recoveryEmail } = identities();
     const password = currentRecoveryPassword();
     const { context, page } = await loginFresh(browser, recoveryEmail, password);
@@ -49,9 +37,8 @@ test.describe("issue-248 password-change session integrity (local)", () => {
     const rowsBefore = authSessionsCount(recoveryEmail);
 
     await page.goto("/account/security");
-    // Same-password update passes every client check and the credential
-    // verification, then the provider rejects it — the update fails after a
-    // successful current-password check.
+    // Same-password update passes every client check, then the provider
+    // rejects it — a failed update after a legitimate attempt.
     await page.getByLabel("Current password", { exact: true }).fill(password);
     await page.getByLabel("New password", { exact: true }).fill(password);
     await page.getByLabel("Confirm new password", { exact: true }).fill(password);
@@ -65,6 +52,12 @@ test.describe("issue-248 password-change session integrity (local)", () => {
     if (rowsBefore !== null) {
       expect(authSessionsCount(recoveryEmail)).toBe(rowsBefore);
     }
+
+    // The browser stays signed in: the security page still loads normally.
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Account security" })).toBeVisible({
+      timeout: 20_000,
+    });
     await context.close();
   });
 });

@@ -21,8 +21,10 @@ HttpOnly cookie transport is real in local QA.
 The runner executes six Playwright phases from `web/e2e/qa-248/`:
 
 1. `1-recovery.spec.ts` — enumeration safety, Mailpit delivery, single PKCE
-   exchange, reset, reuse/malformed/expired links, wrong/correct current
-   password.
+   exchange, reset, reuse/malformed/expired links, correct-current-password
+   change. The wrong-current-password rejection is enforced by the hosted
+   `security_update_password_require_current_password` policy, which the
+   local CLI cannot enable, so that journey lives in the hosted live matrix.
 2. `2-sessions.spec.ts` — two-context revoke-others/revoke-all, ordinary
    logout scope, revoked-bearer rejection, partial cookie-cleanup honesty.
 3. `3-es-mobile.spec.ts` — Spanish + mobile surfaces, cross-user isolation.

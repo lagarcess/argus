@@ -16,26 +16,16 @@ import {
 
 function authPort(options?: {
   exchangeError?: Error;
-  verifyError?: Error;
   updateError?: Error;
   signOutError?: Error;
-  userEmail?: string | null;
 }) {
   const exchangedCodes: string[] = [];
-  const verifications: Array<{ email: string; password: string }> = [];
   const updates: Array<Record<string, string>> = [];
   const scopes: string[] = [];
   const auth: AuthSecurityPort = {
     async exchangeCodeForSession(code) {
       exchangedCodes.push(code);
       return { error: options?.exchangeError ?? null };
-    },
-    async getUserEmail() {
-      return options?.userEmail === undefined ? "user@qa.local" : options.userEmail;
-    },
-    async signInWithPassword(credentials) {
-      verifications.push(credentials);
-      return { error: options?.verifyError ?? null };
     },
     async updateUser(attributes) {
       updates.push(attributes);
@@ -46,7 +36,7 @@ function authPort(options?: {
       return { error: options?.signOutError ?? null };
     },
   };
-  return { auth, exchangedCodes, verifications, updates, scopes };
+  return { auth, exchangedCodes, updates, scopes };
 }
 
 describe("account security actions", () => {
@@ -173,10 +163,9 @@ describe("account security actions", () => {
       newPassword: "new-password",
     });
 
-    expect(port.verifications).toEqual([
-      { email: "user@qa.local", password: "old-password" },
+    expect(port.updates).toEqual([
+      { password: "new-password", current_password: "old-password" },
     ]);
-    expect(port.updates).toEqual([{ password: "new-password" }]);
     expect(port.scopes).toEqual(["global"]);
     expect(cookieClears).toBe(1);
     expect(result).toEqual({
@@ -187,9 +176,23 @@ describe("account security actions", () => {
     });
   });
 
-  test("a wrong current password never reaches the provider password update", async () => {
-    const port = authPort({ verifyError: new Error("invalid credentials") });
-    const actions = createAuthSecurityActions(port.auth, async () => undefined);
+  test("the change path is one native provider update with no sign-in verification", () => {
+    const source = readFileSync(
+      join(import.meta.dir, "../lib/auth-security.ts"),
+      "utf-8",
+    );
+    expect(source).toContain("current_password");
+    expect(source).not.toContain("signInWithPassword");
+  });
+
+  test("a rejected current password leaves the session and cookies untouched", async () => {
+    const port = authPort({
+      updateError: new Error("Current password required when setting new password."),
+    });
+    let cookieClears = 0;
+    const actions = createAuthSecurityActions(port.auth, async () => {
+      cookieClears += 1;
+    });
 
     expect(
       actions.changePassword({
@@ -197,11 +200,11 @@ describe("account security actions", () => {
         newPassword: "new-password",
       }),
     ).rejects.toThrow();
-    expect(port.verifications).toEqual([
-      { email: "user@qa.local", password: "wrong-password" },
+    expect(port.updates).toEqual([
+      { password: "new-password", current_password: "wrong-password" },
     ]);
-    expect(port.updates).toEqual([]);
     expect(port.scopes).toEqual([]);
+    expect(cookieClears).toBe(0);
   });
 
   test("normal password change reports a successful update when revoke-all fails", async () => {
@@ -216,10 +219,9 @@ describe("account security actions", () => {
       newPassword: "new-password",
     });
 
-    expect(port.verifications).toEqual([
-      { email: "user@qa.local", password: "old-password" },
+    expect(port.updates).toEqual([
+      { password: "new-password", current_password: "old-password" },
     ]);
-    expect(port.updates).toEqual([{ password: "new-password" }]);
     expect(port.scopes).toEqual(["global"]);
     expect(cookieClears).toBe(1);
     expect(result).toEqual({
