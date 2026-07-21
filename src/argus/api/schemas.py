@@ -106,7 +106,7 @@ class UserResponse(BaseModel):
     user: User
 
 
-class UsageAllowance(BaseModel):
+class UsageWindow(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     limit: int = Field(ge=0)
@@ -115,10 +115,23 @@ class UsageAllowance(BaseModel):
     period_end: datetime
 
 
+class UsageAllowance(BaseModel):
+    """Backend-derived allowance truth for one resource: both active UTC
+    windows plus availability and the most restrictive window."""
+
+    model_config = ConfigDict(frozen=True)
+
+    hour: UsageWindow
+    day: UsageWindow
+    available_now: bool
+    limiting_window: Literal["hour", "day"]
+
+
 class UsageAllowances(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     messages: UsageAllowance
+    backtests: UsageAllowance
 
 
 class UsageAllowanceResponse(BaseModel):

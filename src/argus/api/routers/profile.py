@@ -13,16 +13,25 @@ from argus.api.schemas import (
     UsageAllowance,
     UsageAllowanceResponse,
     UsageAllowances,
+    UsageWindow,
     User,
     UserResponse,
 )
 from argus.domain.store import utcnow
 from argus.domain.usage_counter_reader import align_usage_period
+from argus.domain.usage_limits import (
+    MESSAGE_ALLOWANCE_LIMITS,
+    MESSAGE_USAGE_RESOURCE,
+    SIMULATION_ALLOWANCE_LIMITS,
+    SIMULATION_USAGE_RESOURCE,
+    read_memory_usage,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["profile"])
 
-_DAILY_ALLOWANCE_POLICIES = {
-    "messages": ("chat_messages", 200),
+_ALLOWANCE_POLICIES: dict[str, tuple[str, dict[str, int]]] = {
+    "messages": (MESSAGE_USAGE_RESOURCE, dict(MESSAGE_ALLOWANCE_LIMITS)),
+    "backtests": (SIMULATION_USAGE_RESOURCE, dict(SIMULATION_ALLOWANCE_LIMITS)),
 }
 
 
@@ -50,18 +59,18 @@ def get_me_usage(
     user: User = Depends(current_user),  # noqa: B008
 ) -> UsageAllowanceResponse:
     now = datetime.now(timezone.utc)
-    _, default_period_end = align_usage_period(now, "day")
-    rows: list[dict] = []
+    resources = tuple(resource for resource, _ in _ALLOWANCE_POLICIES.values())
+    rows_by_period: dict[str, dict[str, dict]] = {"hour": {}, "day": {}}
     if api_state.supabase_gateway is not None:
         try:
-            rows = api_state.supabase_gateway.list_current_usage_counters(
-                user_id=user.id,
-                resources=tuple(
-                    resource for resource, _ in _DAILY_ALLOWANCE_POLICIES.values()
-                ),
-                period="day",
-                at=now,
-            )
+            for period in ("hour", "day"):
+                rows = api_state.supabase_gateway.list_current_usage_counters(
+                    user_id=user.id,
+                    resources=resources,
+                    period=period,
+                    at=now,
+                )
+                rows_by_period[period] = {str(row.get("resource")): row for row in rows}
         except Exception as exc:
             if not dev_memory_fallback_enabled():
                 logger.error(
@@ -81,24 +90,51 @@ def get_me_usage(
                 error=str(exc),
                 user_id=user.id,
             )
+    else:
+        for resource in resources:
+            for period in ("hour", "day"):
+                row = read_memory_usage(
+                    api_state.store.usage_counters,
+                    user_id=user.id,
+                    resource=resource,
+                    period=period,
+                    at=now,
+                )
+                if row is not None:
+                    rows_by_period[period][resource] = {
+                        "resource": resource,
+                        "used_count": row.get("used_count", 0),
+                        "limit_count": row.get("limit_count"),
+                        "period_end": row.get("period_end"),
+                    }
 
-    rows_by_resource = {str(row.get("resource")): row for row in rows}
-
-    def allowance(policy_key: str) -> UsageAllowance:
-        resource, default_limit = _DAILY_ALLOWANCE_POLICIES[policy_key]
-        row = rows_by_resource.get(resource, {})
-        limit = max(int(row.get("limit_count", default_limit)), 0)
+    def window(resource: str, period: str, policy_limit: int) -> UsageWindow:
+        row = rows_by_period[period].get(resource, {})
+        _, default_period_end = align_usage_period(now, period)
+        limit = max(int(row.get("limit_count") or policy_limit), 0)
         used = max(int(row.get("used_count", 0)), 0)
-        return UsageAllowance(
+        return UsageWindow(
             limit=limit,
             used=used,
             remaining=max(limit - used, 0),
             period_end=row.get("period_end") or default_period_end,
         )
 
+    def allowance(policy_key: str) -> UsageAllowance:
+        resource, limits = _ALLOWANCE_POLICIES[policy_key]
+        hour = window(resource, "hour", limits["hour"])
+        day = window(resource, "day", limits["day"])
+        return UsageAllowance(
+            hour=hour,
+            day=day,
+            available_now=hour.remaining > 0 and day.remaining > 0,
+            limiting_window="hour" if hour.remaining < day.remaining else "day",
+        )
+
     return UsageAllowanceResponse(
         allowances=UsageAllowances(
             messages=allowance("messages"),
+            backtests=allowance("backtests"),
         )
     )
 

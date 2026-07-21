@@ -45,10 +45,10 @@ paths:
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/me/usage:
     get:
-      description: Return the authenticated user's current daily private-alpha message allowance truth.
+      description: Return the authenticated user's current private-alpha message and simulation allowance truth for both UTC windows.
       responses:
         "200":
-          description: Backend-owned message limit, usage, remaining capacity, and reset time.
+          description: Backend-owned hourly and daily limit, usage, remaining capacity, exact reset times, availability, and the most restrictive window per resource.
           content:
             application/json:
               schema:
@@ -763,7 +763,7 @@ components:
           type:
             - string
             - "null"
-    UsageAllowance:
+    UsageWindow:
       type: object
       required:
         - limit
@@ -783,12 +783,35 @@ components:
         period_end:
           type: string
           format: date-time
+    UsageAllowance:
+      type: object
+      description: Backend-derived allowance truth for one resource, covering both active UTC windows plus availability and the most restrictive window.
+      required:
+        - hour
+        - day
+        - available_now
+        - limiting_window
+      properties:
+        hour:
+          $ref: "#/components/schemas/UsageWindow"
+        day:
+          $ref: "#/components/schemas/UsageWindow"
+        available_now:
+          type: boolean
+        limiting_window:
+          type: string
+          enum:
+            - hour
+            - day
     UsageAllowances:
       type: object
       required:
         - messages
+        - backtests
       properties:
         messages:
+          $ref: "#/components/schemas/UsageAllowance"
+        backtests:
           $ref: "#/components/schemas/UsageAllowance"
     UsageAllowanceResponse:
       type: object
