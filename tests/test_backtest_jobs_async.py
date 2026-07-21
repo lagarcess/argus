@@ -50,6 +50,21 @@ class _Gateway:
         self.jobs.append(job)
         return job
 
+    def admit_backtest_job(self, **payload: object) -> dict[str, object]:
+        payload.pop("identity_hash", None)
+        payload.pop("operation_scope", None)
+        payload.pop("initial_status", None)
+        return {"decision": "admitted", "job": self.create_backtest_job(**payload)}
+
+    def list_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, object]]:
+        return []
+
     def merge_backtest_job_execution_metadata(
         self, **payload: object
     ) -> dict[str, object]:

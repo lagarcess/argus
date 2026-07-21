@@ -51,6 +51,24 @@ class _Gateway:
         self.jobs.append(payload)
         return {"id": "job-1", **payload}
 
+    def admit_backtest_job(self, **payload: object) -> dict[str, object]:
+        self.events.append("job")
+        if self.should_raise:
+            raise RuntimeError("write failed")
+        if self.create_result is not None:
+            return {"decision": "replay", "job": dict(self.create_result)}
+        self.jobs.append(payload)
+        return {"decision": "admitted", "job": {"id": "job-1", **payload}}
+
+    def list_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, object]]:
+        return []
+
     def merge_backtest_job_execution_metadata(
         self, **payload: object
     ) -> dict[str, object]:
@@ -111,6 +129,11 @@ class _BackpressureReconciliationGateway(_Gateway):
         self.blocking_failed = False
         self.failed_updates: list[dict[str, object]] = []
 
+    def admit_backtest_job(self, **payload: object) -> dict[str, object]:
+        if not self.blocking_failed:
+            return {"decision": "per_user_capacity"}
+        return super().admit_backtest_job(**payload)
+
     def count_backtest_jobs(
         self,
         *,
@@ -164,6 +187,11 @@ class _ProofBackpressureGateway(_Gateway):
         super().__init__(events)
         self.blocking_failed = False
         self.failed_updates: list[dict[str, object]] = []
+
+    def admit_backtest_job(self, **payload: object) -> dict[str, object]:
+        if not self.blocking_failed:
+            return {"decision": "per_user_capacity"}
+        return super().admit_backtest_job(**payload)
 
     def count_backtest_jobs(
         self,
@@ -520,13 +548,32 @@ def test_shadow_backtest_job_tool_does_not_redispatch_existing_job(
     assert gateway.metadata_updates == []
 
 
-def test_shadow_backtest_job_tool_skips_job_when_backpressure_limit_hit(
+class _CapacityRejectingGateway(_Gateway):
+    def __init__(self, events: list[str], *, decision: str) -> None:
+        super().__init__(events)
+        self.decision = decision
+
+    def admit_backtest_job(self, **payload: object) -> dict[str, object]:
+        return {"decision": self.decision}
+
+
+@pytest.mark.parametrize(
+    ("decision", "expected_failure_code"),
+    [
+        ("per_user_capacity", "backtest_capacity_exceeded"),
+        ("global_capacity", "backtest_capacity_exceeded"),
+        ("allowance_exhausted", "simulation_allowance_exhausted"),
+    ],
+)
+def test_shadow_backtest_job_tool_rejects_unadmitted_run_without_free_execution(
     monkeypatch,
+    decision: str,
+    expected_failure_code: str,
 ) -> None:
     monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
     monkeypatch.setenv("ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED", "true")
     events: list[str] = []
-    gateway = _Gateway(events, backpressure_counts={("running", "user-1"): 1})
+    gateway = _CapacityRejectingGateway(events, decision=decision)
     dispatcher = _Dispatcher(events)
     delegate = _DelegateTool(events)
     tool = ShadowBacktestJobTool(
@@ -541,12 +588,15 @@ def test_shadow_backtest_job_tool_skips_job_when_backpressure_limit_hit(
     with backtest_job_shadow_context(context):
         result = tool.run(payload)
 
-    assert result == {"success": True, "payload": {"result": "ok"}}
-    assert events == ["delegate"]
+    assert result["success"] is False
+    assert result["retryable"] is False
+    assert result["capability_context"]["execution_status"] == "rejected"
+    assert result["capability_context"]["failure_code"] == expected_failure_code
+    assert events == []
     assert gateway.jobs == []
     assert dispatcher.calls == []
     assert context.created_job_id is None
-    assert delegate.calls == [payload]
+    assert delegate.calls == []
 
 
 def test_shadow_backtest_job_tool_reconciles_terminal_blocker_before_backpressure(

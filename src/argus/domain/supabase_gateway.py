@@ -936,6 +936,25 @@ class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
         created = self.client.table("backtest_jobs").insert(payload).execute()
         return dict(_row_one(created) or {})
 
+    def admit_backtest_job(self, **kwargs: Any) -> dict[str, Any]:
+        from argus.domain import backtest_admission_gateway
+
+        return backtest_admission_gateway.admit_backtest_job(self.client, **kwargs)
+
+    def get_backtest_job_reservation(self, **kwargs: Any) -> dict[str, Any] | None:
+        from argus.domain import backtest_admission_gateway
+
+        return backtest_admission_gateway.get_backtest_job_reservation(
+            self.client, **kwargs
+        )
+
+    def finalize_direct_backtest_job(self, **kwargs: Any) -> dict[str, Any] | None:
+        from argus.domain import backtest_admission_gateway
+
+        return backtest_admission_gateway.finalize_direct_backtest_job(
+            self.client, **kwargs
+        )
+
     def get_backtest_job(self, *, user_id: str, job_id: str) -> dict[str, Any] | None:
         result = (
             self.client.table("backtest_jobs")

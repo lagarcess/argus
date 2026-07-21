@@ -16,7 +16,8 @@ import pytest
 from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.schemas import Conversation, Message, OnboardingState, User
-from argus.domain.store import utcnow
+from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
+from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
 from fastapi.testclient import TestClient
 
@@ -85,6 +86,36 @@ def mock_gateway():
         created_at=utcnow(),
         metadata=kwargs.get("metadata"),
     )
+    gateway.get_backtest_job_reservation.return_value = None
+    gateway.admit_backtest_job.return_value = {
+        "decision": "admitted",
+        "job": {"id": "job-admitted-1", "status": "running"},
+    }
+    gateway.finalize_direct_backtest_job.return_value = None
+    gateway.get_backtest_job.return_value = None
+    finalization_store = AlphaStore()
+    gateway.finalize_backtest_completion.side_effect = (
+        lambda *, finalization: MemoryBacktestFinalizationGateway(
+            finalization_store
+        ).finalize_backtest_completion(finalization=finalization)
+    )
+    gateway.get_evidence_capture_by_run.return_value = None
+    gateway.create_backtest_evidence_capture.side_effect = (
+        lambda *, user_id, captured: captured
+    )
+    gateway.create_idea.side_effect = lambda *, user_id, idea: idea
+    gateway.create_idea_version.side_effect = lambda *, user_id, version: version
+    gateway.create_evidence_artifact.side_effect = lambda *, user_id, artifact: artifact
+    gateway.get_decision_note_by_artifact.return_value = None
+    gateway.update_backtest_run_result_card.side_effect = (
+        lambda *,
+        user_id,
+        run_id,
+        conversation_result_card: api_state.store.backtest_runs[run_id].model_copy(
+            update={"conversation_result_card": conversation_result_card}
+        )
+    )
+    gateway.mark_result_card_decision_for_run.return_value = None
     with (
         patch("argus.api.state.supabase_gateway", gateway),
         patch("argus.api.dependencies.auth_session_is_active", return_value=True),
@@ -286,12 +317,12 @@ def test_me_usage_returns_hourly_and_daily_truth_for_both_resources(mock_gateway
     _mock_usage_rows(
         mock_gateway,
         hour_rows=[
-            _usage_row("chat_messages", "hour", 3, 60, "2026-07-21T15:00:00+00:00"),
-            _usage_row("backtest_runs", "hour", 1, 10, "2026-07-21T15:00:00+00:00"),
+            _usage_row("chat_messages", "hour", 3, 60, "2026-07-21T15:00:00Z"),
+            _usage_row("backtest_runs", "hour", 1, 10, "2026-07-21T15:00:00Z"),
         ],
         day_rows=[
-            _usage_row("chat_messages", "day", 12, 200, "2026-07-22T00:00:00+00:00"),
-            _usage_row("backtest_runs", "day", 4, 50, "2026-07-22T00:00:00+00:00"),
+            _usage_row("chat_messages", "day", 12, 200, "2026-07-22T00:00:00Z"),
+            _usage_row("backtest_runs", "day", 4, 50, "2026-07-22T00:00:00Z"),
         ],
     )
 
@@ -308,13 +339,13 @@ def test_me_usage_returns_hourly_and_daily_truth_for_both_resources(mock_gateway
         "limit": 60,
         "used": 3,
         "remaining": 57,
-        "period_end": "2026-07-21T15:00:00+00:00",
+        "period_end": "2026-07-21T15:00:00Z",
     }
     assert messages["day"] == {
         "limit": 200,
         "used": 12,
         "remaining": 188,
-        "period_end": "2026-07-22T00:00:00+00:00",
+        "period_end": "2026-07-22T00:00:00Z",
     }
     assert messages["available_now"] is True
     assert messages["limiting_window"] == "hour"
@@ -354,10 +385,10 @@ def test_me_usage_hourly_limited_while_daily_available(mock_gateway):
     _mock_usage_rows(
         mock_gateway,
         hour_rows=[
-            _usage_row("chat_messages", "hour", 60, 60, "2026-07-21T15:00:00+00:00"),
+            _usage_row("chat_messages", "hour", 60, 60, "2026-07-21T15:00:00Z"),
         ],
         day_rows=[
-            _usage_row("chat_messages", "day", 90, 200, "2026-07-22T00:00:00+00:00"),
+            _usage_row("chat_messages", "day", 90, 200, "2026-07-22T00:00:00Z"),
         ],
     )
 
@@ -378,7 +409,7 @@ def test_me_usage_daily_exhaustion_limits_across_fresh_hourly_window(mock_gatewa
         mock_gateway,
         hour_rows=[],
         day_rows=[
-            _usage_row("chat_messages", "day", 200, 200, "2026-07-22T00:00:00+00:00"),
+            _usage_row("chat_messages", "day", 200, 200, "2026-07-22T00:00:00Z"),
         ],
     )
 
@@ -399,7 +430,7 @@ def test_me_usage_used_beyond_limit_clamps_remaining_to_zero(mock_gateway):
         mock_gateway,
         hour_rows=[],
         day_rows=[
-            _usage_row("backtest_runs", "day", 53, 50, "2026-07-22T00:00:00+00:00"),
+            _usage_row("backtest_runs", "day", 53, 50, "2026-07-22T00:00:00Z"),
         ],
     )
 

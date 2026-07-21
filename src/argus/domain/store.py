@@ -61,6 +61,15 @@ class AlphaStore:
     usage_counters: dict[tuple[str, str, str], dict[str, Any]] = field(
         default_factory=dict
     )
+    backtest_jobs: dict[str, dict[str, Any]] = field(default_factory=dict)
+    backtest_job_reservations: dict[tuple[str, str, str], str] = field(
+        default_factory=dict
+    )
+    backtest_admission_lock: Any = field(
+        default_factory=RLock,
+        repr=False,
+        compare=False,
+    )
 
     def reset(self) -> None:
         self.users.clear()
@@ -86,6 +95,8 @@ class AlphaStore:
         self.idempotency.clear()
         self.feedback.clear()
         self.usage_counters.clear()
+        self.backtest_jobs.clear()
+        self.backtest_job_reservations.clear()
 
     def get_or_create_dev_user(self) -> User:
         user_id = "00000000-0000-0000-0000-000000000001"

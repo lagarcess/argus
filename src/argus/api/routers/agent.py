@@ -30,6 +30,10 @@ from argus.api.chat.actions import (
     run_for_result_action,
     stale_confirmation_action_message,
 )
+from argus.api.chat.allowance import (
+    check_message_allowance,
+    ordinary_turn_settlement,
+)
 from argus.api.chat.artifacts import (
     result_fact_bank,
     result_followup_metadata_from_run,
@@ -90,11 +94,7 @@ from argus.api.schemas import (
     User,
 )
 from argus.domain.backtest_finalization import BacktestFinalizationError
-from argus.domain.supabase_gateway import QuotaExceededError
-from argus.domain.usage_limits import (
-    MESSAGE_ALLOWANCE_LIMITS,
-    message_usage_settlement,
-)
+from argus.domain.usage_limits import message_usage_settlement
 from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
     end_openrouter_route_receipt_capture,
@@ -347,37 +347,11 @@ async def chat_stream(
         "X-Request-Id": request.state.request_id,
         "X-Accel-Buffering": "no",
     }
-    # Run actions consume the simulation allowance at durable admission, not
-    # the message allowance; ordinary turns settle one message unit only at
-    # their durable terminal product outcome.
     is_run_backtest_turn = (
         payload.action is not None and payload.action.type == "run_backtest"
     )
-    if api_state.supabase_gateway is not None and not is_run_backtest_turn:
-        try:
-            api_state.supabase_gateway.check_usage_limits(
-                user_id=user.id,
-                resource="chat_messages",
-                limits=MESSAGE_ALLOWANCE_LIMITS,
-            )
-        except QuotaExceededError as exc:
-            raise problem(
-                request,
-                status_code=429,
-                code="too_many_requests",
-                title="Quota Exceeded",
-                detail=str(exc),
-                headers={"Retry-After": "60"},
-            ) from exc
-        except Exception as exc:
-            if not dev_memory_fallback_enabled():
-                raise
-            logger.warning(
-                "Supabase usage counter failed; using dev memory fallback",
-                error=str(exc),
-                user_id=user.id,
-                resource="chat_messages",
-            )
+    if not is_run_backtest_turn:
+        check_message_allowance(request, user)
 
     current_user_profile = None
     if api_state.supabase_gateway is not None:
@@ -1312,10 +1286,8 @@ async def chat_stream(
                         role="assistant",
                         content=persisted_text,
                         metadata=metadata,
-                        settle_usage=(
-                            None
-                            if is_run_backtest_turn
-                            else message_usage_settlement()
+                        settle_usage=ordinary_turn_settlement(
+                            is_run_backtest_turn=is_run_backtest_turn
                         ),
                     )
                     receipt_message_id = assistant_message.id

@@ -446,6 +446,13 @@ def mock_gateway():
         )
     )
     gateway.mark_result_card_decision_for_run.return_value = None
+    gateway.get_backtest_job_reservation.return_value = None
+    gateway.admit_backtest_job.return_value = {
+        "decision": "admitted",
+        "job": {"id": "job-admitted-1", "status": "running"},
+    }
+    gateway.finalize_direct_backtest_job.return_value = None
+    gateway.get_backtest_job.return_value = None
     with (
         patch("argus.api.state.supabase_gateway", gateway),
         patch("argus.api.dependencies.auth_session_is_active", return_value=True),
@@ -585,7 +592,8 @@ def test_direct_run_persists_requested_and_effective_data_windows(
     }
     assert run["chart"]["series"][0]["time"] == "2024-01-03"
     assert run["chart"]["series"][-1]["time"] == "2024-01-05"
-    mock_gateway.check_and_increment_usage_limits.assert_called_once()
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
+    mock_gateway.admit_backtest_job.assert_called_once()
 
 
 def test_chat_stream_quota_exceeded(mock_gateway):
@@ -664,42 +672,60 @@ def test_me_reads_profile_from_supabase_gateway(mock_gateway):
     assert mock_gateway.get_user.call_count >= 1
 
 
-def test_me_usage_returns_exact_owner_scoped_message_allowance_truth(mock_gateway):
-    mock_gateway.list_current_usage_counters.return_value = [
-        {
-            "resource": "chat_messages",
-            "limit_count": 200,
-            "used_count": 12,
-            "period_end": "2026-07-17T00:00:00+00:00",
-        },
-        {
-            "resource": "backtest_runs",
-            "limit_count": 50,
-            "used_count": 53,
-            "period_end": "2026-07-17T00:00:00+00:00",
-        },
-    ]
+def test_me_usage_returns_exact_owner_scoped_allowance_truth(mock_gateway):
+    def _list(*, user_id, resources, period, at):
+        assert user_id == "00000000-0000-0000-0000-000000000001"
+        assert set(resources) == {"chat_messages", "backtest_runs"}
+        if period == "hour":
+            return [
+                {
+                    "resource": "chat_messages",
+                    "limit_count": 60,
+                    "used_count": 2,
+                    "period_end": "2026-07-17T15:00:00+00:00",
+                },
+            ]
+        return [
+            {
+                "resource": "chat_messages",
+                "limit_count": 200,
+                "used_count": 12,
+                "period_end": "2026-07-18T00:00:00+00:00",
+            },
+            {
+                "resource": "backtest_runs",
+                "limit_count": 50,
+                "used_count": 53,
+                "period_end": "2026-07-18T00:00:00+00:00",
+            },
+        ]
+
+    mock_gateway.list_current_usage_counters.side_effect = _list
 
     response = client.get(
         "/api/v1/me/usage", headers={"Authorization": "Bearer test-token"}
     )
 
     assert response.status_code == 200
-    assert response.json() == {
-        "allowances": {
-            "messages": {
-                "limit": 200,
-                "used": 12,
-                "remaining": 188,
-                "period_end": "2026-07-17T00:00:00Z",
-            },
-        }
+    allowances = response.json()["allowances"]
+    assert allowances["messages"]["hour"] == {
+        "limit": 60,
+        "used": 2,
+        "remaining": 58,
+        "period_end": "2026-07-17T15:00:00Z",
     }
-    assert "backtests" not in response.json()["allowances"]
-    call_kwargs = mock_gateway.list_current_usage_counters.call_args.kwargs
-    assert call_kwargs["user_id"] == "00000000-0000-0000-0000-000000000001"
-    assert call_kwargs["resources"] == ("chat_messages",)
-    assert call_kwargs["period"] == "day"
+    assert allowances["messages"]["day"] == {
+        "limit": 200,
+        "used": 12,
+        "remaining": 188,
+        "period_end": "2026-07-18T00:00:00Z",
+    }
+    assert allowances["messages"]["available_now"] is True
+    assert allowances["messages"]["limiting_window"] == "hour"
+    assert allowances["backtests"]["day"]["used"] == 53
+    assert allowances["backtests"]["day"]["remaining"] == 0
+    assert allowances["backtests"]["available_now"] is False
+    assert allowances["backtests"]["limiting_window"] == "day"
 
 
 def test_me_usage_zero_state_does_not_create_or_increment_counters(mock_gateway):
@@ -711,13 +737,17 @@ def test_me_usage_zero_state_does_not_create_or_increment_counters(mock_gateway)
 
     assert response.status_code == 200
     allowances = response.json()["allowances"]
-    assert allowances["messages"]["used"] == 0
-    assert allowances["messages"]["remaining"] == 200
-    assert "backtests" not in allowances
+    assert allowances["messages"]["hour"]["used"] == 0
+    assert allowances["messages"]["hour"]["remaining"] == 60
+    assert allowances["messages"]["day"]["remaining"] == 200
+    assert allowances["backtests"]["hour"]["remaining"] == 10
+    assert allowances["backtests"]["day"]["remaining"] == 50
+    assert allowances["messages"]["available_now"] is True
+    assert allowances["backtests"]["available_now"] is True
     mock_gateway.check_and_increment_usage_limits.assert_not_called()
 
 
-def test_me_usage_openapi_contract_does_not_publish_backtest_allowance():
+def test_me_usage_openapi_contract_publishes_both_windowed_allowances():
     generated_schema = app.openapi()["components"]["schemas"]["UsageAllowances"]
     checked_openapi = yaml.safe_load(
         (
@@ -727,8 +757,18 @@ def test_me_usage_openapi_contract_does_not_publish_backtest_allowance():
     checked_schema = checked_openapi["components"]["schemas"]["UsageAllowances"]
 
     for schema in (generated_schema, checked_schema):
-        assert schema["required"] == ["messages"]
-        assert set(schema["properties"]) == {"messages"}
+        assert schema["required"] == ["messages", "backtests"]
+        assert set(schema["properties"]) == {"messages", "backtests"}
+
+    generated_allowance = app.openapi()["components"]["schemas"]["UsageAllowance"]
+    checked_allowance = checked_openapi["components"]["schemas"]["UsageAllowance"]
+    for schema in (generated_allowance, checked_allowance):
+        assert set(schema["properties"]) == {
+            "hour",
+            "day",
+            "available_now",
+            "limiting_window",
+        }
 
 
 def test_me_usage_requires_authentication(mock_gateway, monkeypatch):
