@@ -58,6 +58,9 @@ class AlphaStore:
     decision_note_owners: dict[str, str] = field(default_factory=dict)
     idempotency: dict[tuple[str, str, str], Any] = field(default_factory=dict)
     feedback: list[dict[str, Any]] = field(default_factory=list)
+    usage_counters: dict[tuple[str, str, str], dict[str, Any]] = field(
+        default_factory=dict
+    )
 
     def reset(self) -> None:
         self.users.clear()
@@ -82,6 +85,7 @@ class AlphaStore:
         self.decision_note_owners.clear()
         self.idempotency.clear()
         self.feedback.clear()
+        self.usage_counters.clear()
 
     def get_or_create_dev_user(self) -> User:
         user_id = "00000000-0000-0000-0000-000000000001"

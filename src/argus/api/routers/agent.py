@@ -91,6 +91,10 @@ from argus.api.schemas import (
 )
 from argus.domain.backtest_finalization import BacktestFinalizationError
 from argus.domain.supabase_gateway import QuotaExceededError
+from argus.domain.usage_limits import (
+    MESSAGE_ALLOWANCE_LIMITS,
+    message_usage_settlement,
+)
 from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
     end_openrouter_route_receipt_capture,
@@ -343,12 +347,18 @@ async def chat_stream(
         "X-Request-Id": request.state.request_id,
         "X-Accel-Buffering": "no",
     }
-    if api_state.supabase_gateway is not None:
+    # Run actions consume the simulation allowance at durable admission, not
+    # the message allowance; ordinary turns settle one message unit only at
+    # their durable terminal product outcome.
+    is_run_backtest_turn = (
+        payload.action is not None and payload.action.type == "run_backtest"
+    )
+    if api_state.supabase_gateway is not None and not is_run_backtest_turn:
         try:
-            api_state.supabase_gateway.check_and_increment_usage_limits(
+            api_state.supabase_gateway.check_usage_limits(
                 user_id=user.id,
                 resource="chat_messages",
-                limits=[("day", 200), ("hour", 60)],
+                limits=MESSAGE_ALLOWANCE_LIMITS,
             )
         except QuotaExceededError as exc:
             raise problem(
@@ -751,6 +761,7 @@ async def chat_stream(
                 conversation_id=conversation.id,
                 role="assistant",
                 content=msg,
+                settle_usage=message_usage_settlement(),
             )
             yield sse_data({"type": "token", "content": msg})
             yield sse_data(
@@ -826,6 +837,7 @@ async def chat_stream(
                 conversation_id=conversation.id,
                 role="assistant",
                 content=follow_up,
+                settle_usage=message_usage_settlement(),
             )
             yield sse_data({"type": "stage_start", "stage": "next_step"})
             yield sse_data({"type": "token", "content": follow_up})
@@ -910,6 +922,7 @@ async def chat_stream(
                 role="assistant",
                 content="",
                 metadata=metadata,
+                settle_usage=message_usage_settlement(),
             )
             yield sse_data(
                 {
@@ -1299,6 +1312,11 @@ async def chat_stream(
                         role="assistant",
                         content=persisted_text,
                         metadata=metadata,
+                        settle_usage=(
+                            None
+                            if is_run_backtest_turn
+                            else message_usage_settlement()
+                        ),
                     )
                     receipt_message_id = assistant_message.id
                 receipt_metadata = {

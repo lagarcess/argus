@@ -589,7 +589,7 @@ def test_direct_run_persists_requested_and_effective_data_windows(
 
 
 def test_chat_stream_quota_exceeded(mock_gateway):
-    mock_gateway.check_and_increment_usage_limits.side_effect = QuotaExceededError(
+    mock_gateway.check_usage_limits.side_effect = QuotaExceededError(
         "Quota exceeded for chat_messages (day)"
     )
 
@@ -603,6 +603,7 @@ def test_chat_stream_quota_exceeded(mock_gateway):
     assert data["code"] == "too_many_requests"
     assert "Quota exceeded for chat_messages" in data["detail"]
     assert response.headers.get("Retry-After") == "60"
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
 
 
 def test_chat_stream_checks_daily_and_hourly_quotas(mock_gateway):
@@ -635,11 +636,12 @@ def test_chat_stream_checks_daily_and_hourly_quotas(mock_gateway):
     )
 
     assert response.status_code == 200
-    mock_gateway.check_and_increment_usage_limits.assert_called_once_with(
+    mock_gateway.check_usage_limits.assert_called_once_with(
         user_id="00000000-0000-0000-0000-000000000001",
         resource="chat_messages",
-        limits=[("day", 200), ("hour", 60)],
+        limits=[("hour", 60), ("day", 200)],
     )
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
 
 
 def test_successful_api_response_omits_static_rate_limit_headers(mock_gateway):
