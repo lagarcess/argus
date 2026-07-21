@@ -119,6 +119,8 @@ services:
     buildCommand: npm install -g bun && bun install --frozen-lockfile && bun run build
     startCommand: bun run start -- -p $PORT
     envVars:
+      - key: ARGUS_APP_ORIGIN
+        value: https://argus-app-suz5.onrender.com
       - key: NEXT_PUBLIC_APP_ENV
         value: production
       - key: NEXT_PUBLIC_SUPABASE_URL

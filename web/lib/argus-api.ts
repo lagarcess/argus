@@ -719,16 +719,43 @@ export async function loginWithEmail(payload: {
   return response;
 }
 
+export async function clearArgusSessionCookies() {
+  return unauthenticatedApiFetch<{ success: boolean }>("/auth/logout", {
+    method: "POST",
+  });
+}
+
+export type CurrentBrowserLogoutResult = {
+  revocation: "complete" | "failed";
+  cookieSync: "cleared" | "failed";
+};
+
+export async function synchronizeCurrentBrowserLogout<T>(
+  revokeCurrentSession: () => Promise<{ error: unknown | null }>,
+  clearCookies: () => Promise<T>,
+): Promise<CurrentBrowserLogoutResult> {
+  const [revocation, cookieSync] = await Promise.allSettled([
+    Promise.resolve().then(revokeCurrentSession),
+    Promise.resolve().then(clearCookies),
+  ]);
+  return {
+    revocation:
+      revocation.status === "fulfilled" && !revocation.value.error
+        ? "complete"
+        : "failed",
+    cookieSync: cookieSync.status === "fulfilled" ? "cleared" : "failed",
+  };
+}
+
 export async function logoutFromApi() {
-  try {
-    return await apiFetch<{ success: boolean }>("/auth/logout", {
-      method: "POST",
-    });
-  } finally {
-    await getSupabaseClient()
-      ?.auth.signOut()
-      .catch(() => null);
-  }
+  return synchronizeCurrentBrowserLogout(
+    async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return { error: null };
+      return supabase.auth.signOut({ scope: "local" });
+    },
+    clearArgusSessionCookies,
+  );
 }
 
 export async function createConversation(language?: string | null) {

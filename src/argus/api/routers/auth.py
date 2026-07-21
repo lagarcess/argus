@@ -114,11 +114,7 @@ def _enforce_auth_attempt_limit(
     action: _AuthAction,
     email: str,
 ) -> None:
-    limit = (
-        AUTH_LOGIN_ATTEMPT_LIMIT
-        if action == "login"
-        else AUTH_SIGNUP_ATTEMPT_LIMIT
-    )
+    limit = AUTH_LOGIN_ATTEMPT_LIMIT if action == "login" else AUTH_SIGNUP_ATTEMPT_LIMIT
     retry_after = _AUTH_ATTEMPT_LIMITER.record_or_retry_after(
         keys=(
             f"{action}:ip:{_client_identity(request)}",
@@ -134,9 +130,7 @@ def _enforce_auth_attempt_limit(
         status_code=429,
         code="too_many_requests",
         title="Too Many Requests",
-        detail=(
-            "Too many authentication attempts. Please wait before trying again."
-        ),
+        detail=("Too many authentication attempts. Please wait before trying again."),
         headers={"Retry-After": str(retry_after)},
     )
 
@@ -205,8 +199,26 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
         raise _login_auth_problem(request) from None
 
 
+def _enforce_browser_auth_origin(request: Request) -> None:
+    origin = request.headers.get("origin")
+    if not origin:
+        return
+    from argus.api.app_setup import cors_allow_origins
+
+    if origin in cors_allow_origins():
+        return
+    raise problem(
+        request,
+        status_code=403,
+        code="csrf_origin_rejected",
+        title="Request Rejected",
+        detail="This authentication request did not come from an allowed origin.",
+    )
+
+
 @router.post("/auth/logout")
-def logout() -> JSONResponse:
+def logout(request: Request) -> JSONResponse:
+    _enforce_browser_auth_origin(request)
     response = JSONResponse({"success": True})
     response.delete_cookie("sb-auth-token", path="/")
     response.delete_cookie("sb-refresh-token", path="/")

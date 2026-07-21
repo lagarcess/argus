@@ -21,47 +21,67 @@ paths:
       responses:
         "200":
           description: Session cleared.
+        "403":
+          description: Untrusted browser origin rejected.
   /api/v1/auth/session:
     get:
       responses:
         "200":
           description: Current authentication state and user.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/me:
     get:
       responses:
         "200":
           description: Current user profile and preferences.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     patch:
       responses:
         "200":
           description: Updated user profile and preferences.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/conversations:
     get:
       responses:
         "200":
           description: Cursor-paginated conversations.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     post:
       responses:
         "200":
           description: Created conversation.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     delete:
       responses:
         "200":
           description: Soft-deleted all non-deleted conversations for the user.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/conversations/{id}:
     patch:
       responses:
         "200":
           description: Updated conversation title, pin, or archive state.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     delete:
       responses:
         "200":
           description: Soft-deleted conversation.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/conversations/{id}/messages:
     get:
       responses:
         "200":
           description: Cursor-paginated messages.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/chat/stream:
     post:
       responses:
@@ -85,52 +105,74 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/strategies:
     get:
       responses:
         "200":
           description: Cursor-paginated strategies with strategy_surface_metrics.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     post:
       responses:
         "200":
           description: Created executable strategy.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/strategies/{id}:
     patch:
       responses:
         "200":
           description: Updated strategy metadata or metric preferences.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     delete:
       responses:
         "200":
           description: Soft-deleted strategy.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/collections:
     get:
       responses:
         "200":
           description: Cursor-paginated collections.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     post:
       responses:
         "200":
           description: Created organizational collection.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/collections/{id}:
     patch:
       responses:
         "200":
           description: Updated collection name or pin state.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     delete:
       responses:
         "200":
           description: Soft-deleted collection.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/collections/{id}/strategies:
     post:
       responses:
         "200":
           description: Attached strategies to a collection.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/collections/{id}/strategies/{strategy_id}:
     delete:
       responses:
         "200":
           description: Detached strategy from collection.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/backtests/run:
     post:
       parameters:
@@ -164,7 +206,14 @@ paths:
         "409":
           description: The data window changed after approval and must be reviewed again.
         "503":
-          description: Market data is temporarily unavailable.
+          description: >
+            Problem Details when bounded auth-session verification is temporarily
+            unavailable (`auth_session_verification_unavailable`) or market data
+            is temporarily unavailable (`market_data_unavailable`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/backtest-jobs/{id}:
     get:
       responses:
@@ -172,21 +221,29 @@ paths:
           description: Durable async backtest job state, with linked run when available.
         "404":
           description: Job not found or inaccessible.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/backtests/{id}:
     get:
       responses:
         "200":
           description: Backtest run detail including chart and trades.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/history:
     get:
       responses:
         "200":
           description: Mixed recent activity feed.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/search:
     get:
       responses:
         "200":
           description: Global keyword search across chats, strategies, collections, runs, and typed P1 recall objects.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/evidence-artifacts/{id}/decision:
     post:
       description: Create or update the one current decision for a user-owned evidence artifact.
@@ -244,6 +301,8 @@ paths:
                 detail: Argus could not safely record that decision. Please retry in a moment.
                 code: decision_capture_failed
                 request_id: req_123
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/feedback:
     post:
       requestBody:
@@ -272,7 +331,23 @@ paths:
       responses:
         "200":
           description: Feedback accepted.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
 components:
+  responses:
+    AuthSessionVerificationUnavailable:
+      description: Bounded Supabase session verification is temporarily unavailable; retry without redirecting to login.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            type: https://api.argus.app/problems/auth-session-verification-unavailable
+            title: Session Verification Unavailable
+            status: 503
+            detail: Argus could not verify this session. Please try again.
+            code: auth_session_verification_unavailable
+            request_id: req_123
   schemas:
     ChatClarification:
       type: object

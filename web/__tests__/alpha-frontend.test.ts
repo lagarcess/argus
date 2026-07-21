@@ -1710,6 +1710,72 @@ describe("Argus Alpha frontend contract", () => {
     expect(signup).toContain('redirect("/?auth=signup")');
   });
 
+  test("account recovery and session controls expose localized dedicated surfaces", () => {
+    const landing = readFileSync(join(root, "app/page.tsx"), "utf-8");
+    const forgot = join(root, "app/auth/forgot-password/page.tsx");
+    const recovery = join(root, "app/auth/recovery/page.tsx");
+    const security = join(root, "app/account/security/page.tsx");
+    const recoveryRoute = join(root, "app/api/auth/recovery/route.ts");
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    expect(landing).toContain('/auth/forgot-password');
+    expect(existsSync(forgot)).toBe(true);
+    expect(existsSync(recovery)).toBe(true);
+    expect(existsSync(security)).toBe(true);
+    expect(existsSync(recoveryRoute)).toBe(true);
+    expect(en.auth.recovery.generic_sent).toBeTruthy();
+    expect(es.auth.recovery.generic_sent).toBeTruthy();
+    expect(en.account_security.sessions.sign_out_others).toBeTruthy();
+    expect(es.account_security.sessions.sign_out_others).toBeTruthy();
+    expect(en.common.confirm).toBe("Confirm");
+    expect(es.common.confirm).toBe("Confirmar");
+    expect(en.account_security.session_check_unavailable).toBeTruthy();
+    expect(es.account_security.session_check_unavailable).toBeTruthy();
+  });
+
+  test("profile menu Security row navigates to account security and closes the menu", () => {
+    const menu = readFileSync(
+      join(root, "components/sidebar/ProfileMenu.tsx"),
+      "utf-8",
+    );
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    const securityLabel = menu.indexOf('t("settings.data.security"');
+    expect(securityLabel).toBeGreaterThan(-1);
+    const securityButton = menu.slice(
+      menu.lastIndexOf("<button", securityLabel),
+      securityLabel,
+    );
+    expect(securityButton).toContain(
+      'window.location.href = "/account/security"',
+    );
+    expect(securityButton).toContain("onClose()");
+    expect(securityButton).not.toContain("disabled");
+    expect(securityButton).not.toContain("cursor-not-allowed");
+    expect(en.settings.data.security).toBeTruthy();
+    expect(es.settings.data.security).toBeTruthy();
+
+    // The Usage row stays disabled; it belongs to the #247 lane.
+    const usageLabel = menu.indexOf('t("settings.data.usage"');
+    expect(usageLabel).toBeGreaterThan(-1);
+    const usageButton = menu.slice(
+      menu.lastIndexOf("<button", usageLabel),
+      usageLabel,
+    );
+    expect(usageButton).toContain("disabled");
+    expect(usageButton).toContain("cursor-not-allowed");
+  });
+
   test("landing onboarding continues into chat after completion", () => {
     const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
 
@@ -1753,6 +1819,24 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain('window.location.href = "/"');
     expect(chat).not.toContain('window.location.href = "/?auth=login"');
     expect(chat).not.toContain('window.location.href = "/login"');
+  });
+
+  test("ordinary logout leaves only after provider revocation and clears private state", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const logoutHandler = chat.slice(
+      chat.indexOf("const handleLogout = async () =>"),
+      chat.indexOf("const handleCancelConfirmationAction"),
+    );
+
+    expect(logoutHandler).toContain("settings.logout_error");
+    expect(logoutHandler).toContain('result.revocation === "failed"');
+    expect(logoutHandler).toContain("resetToEmptyChatSurface()");
+    expect(logoutHandler).toContain("setHistoryItems([])");
+    expect(logoutHandler.indexOf("resetToEmptyChatSurface()"))
+      .toBeLessThan(logoutHandler.indexOf('window.location.href = "/"'));
   });
 
   test("onboarding api error keeps the argus wordmark centered", () => {

@@ -618,6 +618,7 @@ Errors follow RFC 9457 Problem Details.
 - **413 Content Too Large**: Raw request body exceeds the endpoint ingress limit
 - **422 Unprocessable**: Valid JSON but invalid domain request
 - **429 Too Many Requests**: Rate limit exceeded
+- **503 Service Unavailable**: A required fail-closed dependency is temporarily unavailable
 - **500 Server Error**: Unexpected failure
 - **503 Service Unavailable**: Temporary server capacity or required dependency unavailable
 
@@ -1421,6 +1422,66 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - Cookies must be `Secure` for HTTPS requests, trusted `x-forwarded-proto:
   https` requests, and production-like backend environments such as
   `APP_ENV=production`.
+- Supabase's browser client owns password recovery, password changes, and
+  scoped session revocation. Argus must not add a parallel recovery-session
+  API or store session history in product tables.
+- Every non-mock Argus API request validates the signed access token and then
+  verifies that its `session_id` still exists for that user in Supabase Auth.
+  A missing or revoked session is unauthorized, including when an otherwise
+  unexpired token remains in an Argus `HttpOnly` cookie.
+- If Argus cannot complete the bounded `auth.sessions` verification because its
+  database connection, pool acquisition, or statement times out, every
+  authenticated endpoint fails closed with `503
+  auth_session_verification_unavailable`. Clients must keep the user on the
+  current surface and offer retry; they must not reinterpret this transient
+  failure as `401` or redirect to login.
+
+**Account recovery:**
+- `POST /api/auth/recovery` is a same-origin web route, not an Argus
+  `/api/v1` endpoint. It always returns the same accepted response for a valid
+  email-shaped request, whether or not the account exists.
+- The web-route request and accepted response are:
+  ```json
+  { "email": "user@email.com" }
+  ```
+  ```json
+  { "accepted": true }
+  ```
+  The accepted status is `202`. Malformed JSON returns `400`; a declared or
+  streamed request body larger than 4,096 bytes returns `413 Payload Too Large`;
+  a request whose media type is not `application/json` returns
+  `415 Unsupported Media Type`; an unapproved browser origin returns `403`;
+  missing production origin configuration returns `503`; and a local rate-limit
+  returns `429` with `Retry-After`. These failures do not vary based on account
+  existence.
+- The recovery destination is the fixed `/auth/recovery` path on the configured
+  Argus app origin. The request must not accept a client-supplied redirect URL;
+  production uses one exact configured origin while local development allows
+  the documented localhost origins.
+- Supabase PKCE owns the recovery verifier. `/auth/recovery` exchanges the
+  returned code once in the same browser, handles missing, expired, malformed,
+  and reused codes with the same safe recovery message, and never logs the code.
+- A successful reset signs out all sessions, clears both the Supabase browser
+  session and Argus's mirrored cookies, and requires a fresh login.
+- Recovery requests are rate-limited by normalized email and client address in
+  addition to provider protections. Rate-limit responses remain
+  enumeration-safe.
+
+**Password and session controls:**
+- Normal password changes require the current password. Recovery-mode password
+  changes require the one-time recovery code instead. These paths must not be
+  silently substituted for one another.
+- A successful normal password change signs out all sessions, clears both
+  cookie owners, and requires a fresh login.
+- Session scope labels map exactly to Supabase Auth scopes:
+  `this browser` -> `local`, `other sessions` -> `others`, and
+  `all sessions` -> `global`.
+- `other sessions` requires confirmation and keeps the current Supabase and
+  Argus cookies. `all sessions` requires confirmation, clears both cookie
+  owners, and requires a fresh login.
+- Browser-owned auth mutations rely on Supabase's authenticated client. The
+  Argus cookie-clear bridge accepts only same-origin or configured CORS origins
+  when an `Origin` header is present.
 
 **Potential later modes:**
 - username + password mapped to email-backed identity
@@ -1514,6 +1575,13 @@ with wrong passwords.
 ```
 
 ## `POST /auth/logout`
+
+Clear Argus's mirrored cookies after the browser client has revoked its local
+or global Supabase session. This endpoint does not choose a revocation scope
+and must not be treated as a second session owner.
+
+An untrusted browser `Origin` returns the standard `403
+csrf_origin_rejected` problem response and does not clear cookies.
 
 **Response:**
 ```json

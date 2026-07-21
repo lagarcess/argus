@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -295,6 +297,62 @@ def test_backtests_run_openapi_requires_idempotency_key() -> None:
     assert "name: Idempotency-Key" in backtest_run_contract
     assert "in: header" in backtest_run_contract
     assert "required: true" in backtest_run_contract
+
+
+def test_logout_openapi_declares_browser_origin_rejection() -> None:
+    openapi = ROOT / "docs" / "api" / "openapi.yaml"
+
+    text = openapi.read_text(encoding="utf-8")
+    start = text.index("  /api/v1/auth/logout:")
+    end = text.index("  /api/v1/auth/session:")
+    logout_contract = text[start:end]
+
+    assert '"403":' in logout_contract
+    assert "untrusted browser origin" in logout_contract.lower()
+
+
+def test_authenticated_openapi_declares_session_verification_unavailable() -> None:
+    openapi = ROOT / "docs" / "api" / "openapi.yaml"
+
+    text = openapi.read_text(encoding="utf-8")
+    assert "AuthSessionVerificationUnavailable" in text
+    assert "auth_session_verification_unavailable" in text
+    contract = yaml.safe_load(text)
+    unauthenticated_paths = {
+        "/api/v1/auth/signup",
+        "/api/v1/auth/login",
+        "/api/v1/auth/logout",
+    }
+    for path, path_contract in contract["paths"].items():
+        if path in unauthenticated_paths:
+            continue
+        for method in ("get", "post", "patch", "put", "delete"):
+            operation = path_contract.get(method)
+            if operation is None:
+                continue
+            if path == "/api/v1/backtests/run":
+                response = operation["responses"]["503"]
+                assert "auth_session_verification_unavailable" in response["description"]
+                assert "market_data_unavailable" in response["description"]
+                assert response["content"]["application/problem+json"]["schema"] == {
+                    "$ref": "#/components/schemas/Error"
+                }
+                continue
+            assert operation["responses"]["503"] == {
+                "$ref": "#/components/responses/AuthSessionVerificationUnavailable"
+            }
+
+
+def test_api_contract_documents_recovery_transport_rejections() -> None:
+    contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+    start = contract.index("**Account recovery:**")
+    end = contract.index("**Password and session controls:**")
+    recovery_contract = contract[start:end]
+
+    assert "`413 Payload Too Large`" in recovery_contract
+    assert "4,096 bytes" in recovery_contract
+    assert "`415 Unsupported Media Type`" in recovery_contract
+    assert "`application/json`" in recovery_contract
 
 
 def test_chat_stream_openapi_declares_stale_action_problem_response() -> None:
