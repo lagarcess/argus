@@ -50,7 +50,9 @@ bash scripts/qa/setup-local-identities.sh
 
 # One backend per spec file keeps the product's in-memory 8-attempts-per-email
 # login limiter from throttling later journeys in the same run.
-for spec in e2e/qa-248/1-recovery.spec.ts e2e/qa-248/2-sessions.spec.ts e2e/qa-248/3-es-mobile.spec.ts; do
+for spec in e2e/qa-248/1-recovery.spec.ts e2e/qa-248/2-sessions.spec.ts \
+  e2e/qa-248/3-es-mobile.spec.ts e2e/qa-248/5-password-change-session.spec.ts \
+  e2e/qa-248/6-argus-cookie-path.spec.ts; do
   start_backend
   (cd web && NEXT_PUBLIC_MOCK_AUTH=false bunx playwright test \
     --config=playwright.qa.config.ts "$spec" "$@")

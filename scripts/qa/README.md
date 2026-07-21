@@ -7,21 +7,32 @@ branch) and is blocked from production by `assert-nonprod-target.sh`.
 ## One-shot run
 
 ```bash
-supabase start -x vector,edge-runtime,functions,imgproxy   # once per machine boot
-supabase db reset --local                                  # migrations from zero + seed
-bash scripts/qa/write-local-env.sh                         # untracked .env + web/.env.local
-bash scripts/qa/run-local-auth-qa.sh                       # guard -> backend -> identities -> journeys
+supabase start -x vector,edge-runtime,imgproxy   # once per machine boot
+supabase db reset --local                        # migrations from zero + seed
+bash scripts/qa/write-local-env.sh               # untracked .env + web/.env.local
+bash scripts/qa/run-local-auth-qa.sh             # guard -> backend -> identities -> journeys
 ```
 
-The runner executes four Playwright phases from `web/e2e/qa-248/`:
+The local stack uses the stable `project_id = "argus-qa"` (containers such as
+`supabase_db_argus-qa`) and a same-site topology — app on
+`http://localhost:3000`, API on `http://localhost:8000` — so the Argus
+HttpOnly cookie transport is real in local QA.
+
+The runner executes six Playwright phases from `web/e2e/qa-248/`:
 
 1. `1-recovery.spec.ts` — enumeration safety, Mailpit delivery, single PKCE
    exchange, reset, reuse/malformed/expired links, wrong/correct current
    password.
 2. `2-sessions.spec.ts` — two-context revoke-others/revoke-all, ordinary
-   logout scope, stale-token rejection, partial cookie-cleanup honesty.
+   logout scope, revoked-bearer rejection, partial cookie-cleanup honesty.
 3. `3-es-mobile.spec.ts` — Spanish + mobile surfaces, cross-user isolation.
-4. `4-verification-outage.spec.ts` — retryable 503 while the verification
+4. `5-password-change-session.spec.ts` — session-integrity pins for the
+   password-change path (expected-fail tripwire until provider-native
+   `current_password` enforcement exists; see the spec header).
+5. `6-argus-cookie-path.spec.ts` — the Argus HttpOnly cookie transport:
+   cookie-only auth, stale-cookie rejection after revocation, cookie
+   clearing on successful logout.
+6. `4-verification-outage.spec.ts` — retryable 503 while the verification
    database is down and the auth provider stays healthy (runner-orchestrated).
 
 Evidence (screenshots, HTML report, backend log, current-password state) lands
@@ -46,6 +57,9 @@ in `temp/qa-evidence-248/`.
 `setup-local-identities.sh` creates two disposable users through the real
 Argus signup path (allowlist rows come from `supabase/seed.sql`), verifies
 login, and writes runtime credentials to untracked `.qa-identities.env`.
+It talks only to the stack's HTTP surface (auth admin + PostgREST), so it
+needs no Docker access; only the `auth.sessions` row-count assertions in
+spec 5 shell into the local db container and skip when Docker is absent.
 `--teardown` removes users, profiles, and the credential file. Passwords are
 generated per setup run and never committed; recovery journeys persist the
 current password in `temp/qa-evidence-248/qa-state.json`.
