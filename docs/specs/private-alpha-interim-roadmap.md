@@ -572,13 +572,34 @@ live QA appropriate to the changed surface before merge or closure.
 
 ### Simulation allowance (#247)
 
+- Current Alpha enforcement has two backend-owned UTC calendar windows per
+  resource: messages are limited to 60 per hour and 200 per day; simulations
+  are limited to 10 per hour and 50 per day. These are operating limits, not
+  pricing or a monetization model.
+- The authenticated read contract returns both windows, their exact
+  `period_end` values, and backend-derived `available_now`/limiting-window
+  truth. The UI emphasizes daily usage and reveals the hourly window whenever
+  it is more restrictive. The frontend never hardcodes, estimates, or derives
+  quota truth.
+- Count one message only when an authenticated accepted turn reaches a durable
+  user-visible terminal product outcome. Normal answers, clarifications, and
+  honest supported/unsupported boundary responses count. Malformed,
+  unauthenticated, duplicate-replay, abandoned, or Argus infrastructure-failed
+  turns count zero.
 - Count exactly one simulation when a unique execution is successfully and
   durably admitted.
 - Replaying the same idempotency identity counts zero additional simulations.
 - Requests rejected before admission count zero.
 - Chat and direct API launches use the same rule.
-- The reset timestamp comes from the backend quota period (`period_end`), not a
-  client timer or the current generic `Retry-After` value.
+- A simulation admitted successfully and then failed during execution still
+  counts once.
+- Data-window and other preflight work before admission counts zero.
+- Reset timestamps come from the backend quota periods (`period_end`), not a
+  client timer or the current generic `Retry-After` value, and are presented in
+  the user's locale.
+- Usage is Alpha capacity, fairness, abuse-prevention, and transparency
+  machinery. Billing, prices, plans, overages, provider/model tokens, and
+  internal CostLedger data remain out of scope.
 
 ### Incomplete data windows (#251)
 
@@ -775,13 +796,21 @@ slice brief.
 ### #247 — Allowance and reset truth
 
 - Outcome: authenticated users see real limits, remaining unique admissions,
-  what counts, and the backend-owned reset time.
-- Status: **open**. PR #259 contains partial prior work but is not the accepted
-  completion boundary; the Usage row remains disabled on integration.
+  what counts, which hourly or daily window is currently limiting, and the
+  backend-owned reset times.
+- Status: **open**. PR #259 is a Draft donor/implementation lane, not the
+  accepted completion boundary; the Usage row remains disabled on integration.
 - Start: from the current `a639566` checkpoint after revalidating the locked
-  accounting decision and the exact PR #259 salvage boundary.
+  accounting decisions and rebasing PR #259's branch. The read/UI work already
+  present in PR #259 and commits `29cc1e9`, `84fc0d6`, and `a7238b1` on
+  `claude/argus-alpha-audit-c2d919` are code leverage only, not acceptance
+  evidence or permission for a broad cherry-pick.
 - Serialization: #248 landed first. Rebase any Profile-menu work on the current
   checkpoint and do not regress the working Settings -> Security entry point.
+- Required composition: #230's unique durable simulation admission identity,
+  #240's durable terminal chat outcome, and #251's pre-admission data-window
+  behavior supply narrow accounting facts. Their unrelated remaining scope is
+  not an automatic blocker for the user-visible Usage slice.
 
 <a id="issue-248"></a>
 ### #248 — Account recovery and session controls
