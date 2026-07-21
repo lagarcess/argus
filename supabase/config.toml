@@ -2,7 +2,8 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "issue-248-account-recovery-sessions"
+# Stable Argus QA identity; container names and volumes derive from this.
+project_id = "argus-qa"
 
 [api]
 enabled = true
