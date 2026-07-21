@@ -10,6 +10,7 @@ import {
   normalizeEnabledLanguage,
   type ArgusLocale,
 } from "./language-features";
+import type { UsageAllowanceResponse } from "./usage-allowance";
 import {
   displayResultActionLabel,
   displayResultBenchmarkNote,
@@ -185,19 +186,6 @@ export type ApiUser = {
     stage: OnboardingStage;
     language_confirmed: boolean;
     primary_goal: PrimaryGoal | null;
-  };
-};
-
-export type UsageAllowance = {
-  limit: number;
-  used: number;
-  remaining: number;
-  period_end: string;
-};
-
-export type UsageAllowanceResponse = {
-  allowances: {
-    messages: UsageAllowance;
   };
 };
 

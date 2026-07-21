@@ -1,3 +1,16 @@
+export type UsageAllowance = {
+  limit: number;
+  used: number;
+  remaining: number;
+  period_end: string;
+};
+
+export type UsageAllowanceResponse = {
+  allowances: {
+    messages: UsageAllowance;
+  };
+};
+
 export type AllowanceState = "zero" | "active" | "exhausted";
 
 export function classifyAllowance(allowance: {

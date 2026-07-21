@@ -10,14 +10,12 @@ import {
 } from "react";
 import { Clock3, Loader2, MessageSquareText, RefreshCw, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import {
-  getUsageAllowances,
-  type UsageAllowance,
-  type UsageAllowanceResponse,
-} from "@/lib/argus-api";
+import { getUsageAllowances } from "@/lib/argus-api";
 import {
   classifyAllowance,
   formatAllowancePeriodEnd,
+  type UsageAllowance,
+  type UsageAllowanceResponse,
 } from "@/lib/usage-allowance";
 import { dialogTabTarget } from "@/lib/dialog-focus";
 
