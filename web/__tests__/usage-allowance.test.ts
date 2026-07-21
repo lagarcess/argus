@@ -78,9 +78,9 @@ describe("private-alpha usage allowance", () => {
     // Run actions must reuse the confirmation identity as the
     // Idempotency-Key so retries and reconnects replay the one durable
     // admission instead of opening a second reservation.
-    expect(api).toContain('input.type === "run_backtest"');
-    expect(api).toContain("input.payload?.confirmation_id");
-    expect(api).toContain('"Idempotency-Key": idempotencyKey');
+    expect(api).toContain("runActionIdempotencyKey(input)");
+    expect(usageLib).toContain('input.type !== "run_backtest"');
+    expect(usageLib).toContain("confirmation_id");
     expect(usageLib).toContain("backtests: UsageAllowance");
     expect(usageLib).toContain('limiting_window: "hour" | "day"');
     expect(profileMenu).toContain('openModal("usage")');
@@ -149,28 +149,28 @@ describe("private-alpha usage allowance", () => {
     expect(usageButton).toContain("min-h-11");
   });
 
-  test("localizes message and simulation allowance truth in both languages", () => {
+  test("localizes remaining-primary allowance truth in both languages", () => {
     const en = readLocale("en").settings.data.usage_panel;
     const es = readLocale("es-419").settings.data.usage_panel;
 
     expect(en.messages).toBe("Messages");
     expect(en.simulations).toBe("Simulations");
-    expect(en.no_usage).toBe("No usage yet");
-    expect(en.exhausted).toBe("Daily allowance used");
-    expect(en.hourly_limited).toBe("Hourly limit reached");
-    expect(en.hourly_status).toContain("{{used}} of {{limit}}");
+    expect(en.left_today).toContain("{{count}}");
+    expect(en.hourly_available).toContain("{{count}}");
+    expect(en.what_counts).toBe("What counts?");
     expect(en.message_rule.length).toBeGreaterThan(0);
     expect(en.simulation_rule.length).toBeGreaterThan(0);
-    expect(en.description).not.toContain("temporarily unavailable");
+    // The quiet gauge leads with what remains; used-count badges and the
+    // zero-usage badge are retired.
+    expect(en.no_usage).toBeUndefined();
+    expect(en.remaining).toBeUndefined();
     expect(es.messages).toBe("Mensajes");
     expect(es.simulations).toBe("Simulaciones");
-    expect(es.no_usage).toBe("Aún no hay uso");
-    expect(es.exhausted).toBe("Cupo diario agotado");
-    expect(es.hourly_limited).toBe("Límite por hora alcanzado");
-    expect(es.hourly_status).toContain("{{used}} de {{limit}}");
-    expect(es.message_rule.length).toBeGreaterThan(0);
-    expect(es.simulation_rule.length).toBeGreaterThan(0);
-    expect(es.description).not.toContain("no está disponible temporalmente");
+    expect(es.left_today).toContain("{{count}}");
+    expect(es.hourly_available).toContain("{{count}}");
+    expect(es.what_counts.length).toBeGreaterThan(0);
+    expect(es.no_usage).toBeUndefined();
+    expect(es.remaining).toBeUndefined();
 
     for (const key of Object.keys(en)) {
       expect(es[key]).toBeDefined();
@@ -178,5 +178,31 @@ describe("private-alpha usage allowance", () => {
     for (const key of Object.keys(es)) {
       expect(en[key]).toBeDefined();
     }
+  });
+
+  test("presents a flat quiet gauge with one What counts disclosure", () => {
+    const modal = readFileSync(
+      join(root, "components/settings/UsageModal.tsx"),
+      "utf-8",
+    );
+
+    // Remaining capacity is the primary value per section.
+    expect(modal).toContain("left_today");
+    expect(modal).toContain("day.remaining");
+    // One flat surface: no per-allowance bordered card tiles and no
+    // decorative icon tiles.
+    expect(modal).not.toContain("rounded-2xl border");
+    expect(modal).not.toContain("MessageSquareText");
+    expect(modal).not.toContain("LineChart");
+    // No usage-state badges; healthy and zero states stay neutral.
+    expect(modal).not.toContain("no_usage");
+    expect(modal).not.toContain("usage_panel.remaining");
+    // Exactly one progressive disclosure owns both counting rules.
+    expect(modal.match(/what_counts/g)?.length).toBeGreaterThanOrEqual(1);
+    expect(modal.match(/aria-expanded/g)?.length).toBe(1);
+    expect(modal).toContain("message_rule");
+    expect(modal).toContain("simulation_rule");
+    // Warning styling exists only behind genuine exhaustion checks.
+    expect(modal).toContain("classifyAllowance");
   });
 });

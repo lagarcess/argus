@@ -159,11 +159,15 @@ test("Usage dialog traps focus and restores the Settings trigger", async ({
   await expect(settingsTrigger).toBeFocused();
 });
 
-test("Usage renders English message and simulation truth with backend resets", async ({
+test("Usage renders the quiet remaining-first gauge with one disclosure", async ({
   page,
 }) => {
   const hourEnd = "2026-07-17T15:00:00Z";
   const dayEnd = "2026-07-18T00:00:00Z";
+  let usageRequests = 0;
+  page.on("request", (request) => {
+    if (request.url().includes("/api/v1/me/usage")) usageRequests += 1;
+  });
   await mockUsageShell(page, {
     allowances: {
       messages: zeroAllowance(60, 200, hourEnd, dayEnd),
@@ -179,25 +183,42 @@ test("Usage renders English message and simulation truth with backend resets", a
 
   const dialog = page.getByRole("dialog", { name: "Usage" });
   await expect(dialog).toContainText(
-    "Your current message and simulation allowances.",
+    "Your private-alpha allowances reset automatically.",
   );
-  await expect(dialog.getByRole("heading", { name: "Messages" })).toBeVisible();
-  await expect(
-    dialog.getByRole("heading", { name: "Simulations" }),
-  ).toBeVisible();
-  await expect(dialog).toContainText("0 of 200 used today");
-  await expect(dialog).toContainText("0 of 50 used today");
-  await expect(dialog).toContainText("No usage yet");
+  await expect(dialog).toContainText("200 left today");
+  await expect(dialog).toContainText("50 left today");
+  await expect(dialog).toContainText("60 available this hour");
+  await expect(dialog).toContainText("10 available this hour");
   await expect(dialog).toContainText("Resets");
   await expect(
     dialog.locator(`time[datetime="${dayEnd}"]`).first(),
   ).not.toBeEmpty();
-  // Fully available: the hourly context line renders muted, never in the
-  // limited rose tint.
-  await expect(dialog).toContainText("0 of 60 used this hour");
-  await expect(
-    dialog.locator('p.text-\\[\\#b94c55\\], p.dark\\:text-\\[\\#e7a2a8\\]'),
-  ).toHaveCount(0);
+  // Neutral zero state: no usage badges and no warning tint anywhere.
+  await expect(dialog).not.toContainText("No usage yet");
+  await expect(dialog.locator('.text-\\[\\#b94c55\\]')).toHaveCount(0);
+
+  // One What counts? disclosure owns both counting rules and its toggle
+  // never mutates usage or issues another request.
+  const requestsBeforeToggle = usageRequests;
+  const disclosure = dialog.getByRole("button", { name: "What counts?" });
+  await expect(disclosure).toHaveAttribute("aria-expanded", "false");
+  await expect(dialog).not.toContainText("Failed or interrupted turns");
+  await disclosure.click();
+  await expect(disclosure).toHaveAttribute("aria-expanded", "true");
+  await expect(dialog).toContainText(
+    "Each chat response Argus completes uses one message.",
+  );
+  await expect(dialog).toContainText(
+    "Each unique simulation you start uses one simulation",
+  );
+  await disclosure.click();
+  await expect(disclosure).toHaveAttribute("aria-expanded", "false");
+  expect(usageRequests).toBe(requestsBeforeToggle);
+
+  const bars = dialog.getByRole("progressbar");
+  await expect(bars).toHaveCount(2);
+  await expect(bars.first()).toHaveAttribute("aria-valuenow", "0");
+  await expect(bars.first()).toHaveAttribute("aria-valuemax", "200");
 });
 
 test("Usage reveals the hourly window when the backend marks it limiting", async ({
@@ -224,9 +245,8 @@ test("Usage reveals the hourly window when the backend marks it limiting", async
   });
 
   const dialog = page.getByRole("dialog", { name: "Usage" });
-  await expect(dialog).toContainText("90 of 200 used today");
-  await expect(dialog).toContainText("Hourly limit reached");
-  await expect(dialog).toContainText("60 of 60 used this hour");
+  await expect(dialog).toContainText("110 left today");
+  await expect(dialog).toContainText("0 available this hour");
   await expect(
     dialog.locator(`time[datetime="${hourEnd}"]`).first(),
   ).not.toBeEmpty();
@@ -259,15 +279,14 @@ test("Usage renders the Spanish daily-exhausted state and backend reset", async 
 
   const dialog = page.getByRole("dialog", { name: "Uso" });
   await expect(dialog).toContainText(
-    "Tus cupos actuales de mensajes y simulaciones.",
+    "Tus cupos de alfa privada se restablecen automáticamente.",
   );
-  await expect(dialog.getByRole("heading", { name: "Mensajes" })).toBeVisible();
-  await expect(
-    dialog.getByRole("heading", { name: "Simulaciones" }),
-  ).toBeVisible();
-  await expect(dialog).toContainText("200 de 200 usados hoy");
-  await expect(dialog).toContainText("Cupo diario agotado");
+  await expect(dialog).toContainText("Quedan 0 hoy");
+  await expect(dialog).toContainText("Quedan 50 hoy");
   await expect(dialog).toContainText("Se restablece");
+  await expect(
+    dialog.getByRole("button", { name: "¿Qué cuenta?" }),
+  ).toBeVisible();
   await expect(
     dialog.locator(`time[datetime="${dayEnd}"]`).first(),
   ).not.toBeEmpty();

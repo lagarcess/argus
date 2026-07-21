@@ -773,22 +773,20 @@
       "usage": "Uso",
       "usage_panel": {
         "title": "Uso",
-        "description": "Tus cupos actuales de mensajes y simulaciones.",
+        "description": "Tus cupos de alfa privada se restablecen automáticamente.",
         "messages": "Mensajes",
         "simulations": "Simulaciones",
+        "left_today": "Quedan {{count}} hoy",
         "used_of_limit": "{{used}} de {{limit}} usados hoy",
-        "remaining": "Quedan {{count}}",
         "resets": "Se restablece {{time}}",
-        "no_usage": "Aún no hay uso",
-        "exhausted": "Cupo diario agotado",
-        "hourly_limited": "Límite por hora alcanzado",
-        "hourly_status": "{{used}} de {{limit}} usados esta hora · se restablece {{time}}",
+        "hourly_available": "{{count}} disponibles esta hora · se restablece {{time}}",
+        "what_counts": "¿Qué cuenta?",
         "loading": "Cargando uso…",
         "load_error": "No se pudo cargar el uso.",
         "retry": "Intentar de nuevo",
         "close": "Cerrar uso",
         "message_rule": "Cada respuesta de chat que Argus completa usa un mensaje. Los turnos fallidos o interrumpidos no cuentan.",
-        "simulation_rule": "Cada simulación única que inicias usa una, desde el chat o la API. Repetir la misma ejecución no cuenta."
+        "simulation_rule": "Cada simulación única que inicias usa una simulación, desde el chat o la API. Repetir la misma ejecución no cuenta."
       }
     },
     "help": {

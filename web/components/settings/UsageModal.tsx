@@ -5,17 +5,9 @@ import {
   useEffect,
   useRef,
   useState,
-  type ReactNode,
   type RefObject,
 } from "react";
-import {
-  Clock3,
-  LineChart,
-  Loader2,
-  MessageSquareText,
-  RefreshCw,
-  X,
-} from "lucide-react";
+import { ChevronDown, Loader2, RefreshCw, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getUsageAllowances } from "@/lib/argus-api";
 import {
@@ -36,120 +28,82 @@ type UsageModalProps = {
   returnFocusRef?: RefObject<HTMLElement | null>;
 };
 
-type AllowanceCardProps = {
+type AllowanceSectionProps = {
   allowance: UsageAllowance;
-  icon: ReactNode;
   label: string;
   locale: "en-US" | "es-419";
-  rules: ReactNode;
 };
 
-function AllowanceCard({
-  allowance,
-  icon,
-  label,
-  locale,
-  rules,
-}: AllowanceCardProps) {
+function AllowanceSection({ allowance, label, locale }: AllowanceSectionProps) {
   const { t } = useTranslation();
   const state = classifyAllowance(allowance);
   const day = allowance.day;
+  const dayExhausted = state === "exhausted";
+  const hourLimited = state === "hourly_limited";
   const progress =
     day.limit === 0
       ? 100
       : Math.min(100, Math.round((day.used / day.limit) * 100));
-  const stateLabel =
-    state === "zero"
-      ? t("settings.data.usage_panel.no_usage")
-      : state === "exhausted"
-        ? t("settings.data.usage_panel.exhausted")
-        : state === "hourly_limited"
-          ? t("settings.data.usage_panel.hourly_limited")
-          : t("settings.data.usage_panel.remaining", {
-              count: day.remaining,
-            });
   const resetDisplay = formatAllowancePeriodEnd(day.period_end, locale);
-  const limited = state === "exhausted" || state === "hourly_limited";
 
   return (
-    <section className="rounded-2xl border border-black/[0.06] bg-black/[0.025] p-4 dark:border-white/[0.08] dark:bg-white/[0.035]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-black/55 dark:bg-white/[0.08] dark:text-white/65">
-            {icon}
-          </span>
-          <div>
-            <h3 className="text-[14px] font-medium text-black dark:text-white">
-              {label}
-            </h3>
-            <p className="mt-0.5 text-[12px] text-black/45 dark:text-white/45">
-              {t("settings.data.usage_panel.used_of_limit", {
-                used: day.used,
-                limit: day.limit,
-              })}
-            </p>
-          </div>
-        </div>
-        <span
-          className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-            limited
-              ? "bg-[#d66d75]/10 text-[#b94c55] dark:text-[#e7a2a8]"
-              : "bg-black/[0.05] text-black/50 dark:bg-white/[0.07] dark:text-white/55"
+    <section aria-label={label}>
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-[14px] font-medium text-black dark:text-white">
+          {label}
+        </h3>
+        <p
+          className={`text-[13px] font-medium ${
+            dayExhausted
+              ? "text-[#b94c55] dark:text-[#e7a2a8]"
+              : "text-black/70 dark:text-white/75"
           }`}
         >
-          {stateLabel}
-        </span>
+          {t("settings.data.usage_panel.left_today", { count: day.remaining })}
+        </p>
       </div>
 
       <div
-        className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/[0.07] dark:bg-white/[0.08]"
+        className="mt-2.5 h-1 overflow-hidden rounded-full bg-black/[0.07] dark:bg-white/[0.08]"
         role="progressbar"
-        aria-label={label}
+        aria-label={t("settings.data.usage_panel.used_of_limit", {
+          used: day.used,
+          limit: day.limit,
+        })}
         aria-valuemin={0}
         aria-valuemax={day.limit}
         aria-valuenow={Math.min(day.used, day.limit)}
       >
         <div
           className={`h-full rounded-full transition-[width] ${
-            state === "exhausted" ? "bg-[#d66d75]" : "bg-[#5d7f72]"
+            dayExhausted ? "bg-[#d66d75]" : "bg-[#5d7f72]"
           }`}
           style={{ width: `${progress}%` }}
         />
       </div>
 
-      <div className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-black/45 dark:text-white/45">
-        <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>
-          {t("settings.data.usage_panel.resets", { time: "" })}
-          <time dateTime={day.period_end}>{resetDisplay}</time>
-        </span>
-      </div>
+      <p className="mt-2 text-[12px] text-black/45 dark:text-white/45">
+        {t("settings.data.usage_panel.resets", { time: "" })}
+        <time dateTime={day.period_end}>{resetDisplay}</time>
+      </p>
 
       {showsHourlyWindow(allowance) ? (
         <p
-          className={`mt-2 flex items-start gap-2 text-[11px] leading-relaxed ${
-            allowance.available_now
-              ? "text-black/45 dark:text-white/45"
-              : "text-[#b94c55] dark:text-[#e7a2a8]"
+          className={`mt-1 text-[12px] ${
+            hourLimited
+              ? "text-[#b94c55] dark:text-[#e7a2a8]"
+              : "text-black/45 dark:text-white/45"
           }`}
         >
-          <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>
-            {t("settings.data.usage_panel.hourly_status", {
-              used: allowance.hour.used,
-              limit: allowance.hour.limit,
-              time: "",
-            })}
-            <time dateTime={allowance.hour.period_end}>
-              {formatAllowancePeriodEnd(allowance.hour.period_end, locale)}
-            </time>
-          </span>
+          {t("settings.data.usage_panel.hourly_available", {
+            count: allowance.hour.remaining,
+            time: "",
+          })}
+          <time dateTime={allowance.hour.period_end}>
+            {formatAllowancePeriodEnd(allowance.hour.period_end, locale)}
+          </time>
         </p>
       ) : null}
-
-      <div className="mt-3 border-t border-black/[0.05] pt-3 text-[11px] leading-relaxed text-black/45 dark:border-white/[0.06] dark:text-white/45">
-        {rules}
-      </div>
     </section>
   );
 }
@@ -165,6 +119,7 @@ export default function UsageModal({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [requestVersion, setRequestVersion] = useState(0);
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   const retry = useCallback(() => {
     setRequestVersion((current) => current + 1);
@@ -260,7 +215,7 @@ export default function UsageModal({
         aria-modal="true"
         aria-labelledby="argus-usage-modal-title"
       >
-        <header className="flex items-start justify-between gap-4 border-b border-black/[0.05] px-5 py-4 dark:border-white/[0.06]">
+        <header className="flex items-start justify-between gap-4 px-5 pt-4 pb-3">
           <div>
             <h2
               id="argus-usage-modal-title"
@@ -281,7 +236,7 @@ export default function UsageModal({
           </button>
         </header>
 
-        <div className="overflow-y-auto px-5 py-4" aria-live="polite">
+        <div className="overflow-y-auto px-5 pb-5" aria-live="polite">
           {isLoading ? (
             <div
               className="flex min-h-56 flex-col items-center justify-center gap-3 text-[13px] text-black/40 dark:text-white/40"
@@ -305,22 +260,47 @@ export default function UsageModal({
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
-              <AllowanceCard
-                allowance={usage.allowances.messages}
-                icon={<MessageSquareText className="h-4 w-4" />}
-                label={t("settings.data.usage_panel.messages")}
-                locale={locale}
-                rules={t("settings.data.usage_panel.message_rule")}
-              />
-              <AllowanceCard
-                allowance={usage.allowances.backtests}
-                icon={<LineChart className="h-4 w-4" />}
-                label={t("settings.data.usage_panel.simulations")}
-                locale={locale}
-                rules={t("settings.data.usage_panel.simulation_rule")}
-              />
-            </div>
+            <>
+              <div className="pt-2">
+                <AllowanceSection
+                  allowance={usage.allowances.messages}
+                  label={t("settings.data.usage_panel.messages")}
+                  locale={locale}
+                />
+                <div className="my-4 border-t border-black/[0.05] dark:border-white/[0.06]" />
+                <AllowanceSection
+                  allowance={usage.allowances.backtests}
+                  label={t("settings.data.usage_panel.simulations")}
+                  locale={locale}
+                />
+              </div>
+
+              <div className="mt-5">
+                <button
+                  type="button"
+                  onClick={() => setRulesOpen((open) => !open)}
+                  aria-expanded={rulesOpen}
+                  aria-controls="argus-usage-what-counts"
+                  className="flex min-h-11 items-center gap-1.5 rounded-lg text-[12px] font-medium text-black/55 hover:text-black dark:text-white/55 dark:hover:text-white"
+                >
+                  {t("settings.data.usage_panel.what_counts")}
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform ${
+                      rulesOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {rulesOpen ? (
+                  <div
+                    id="argus-usage-what-counts"
+                    className="space-y-2 pb-1 text-[12px] leading-relaxed text-black/45 dark:text-white/45"
+                  >
+                    <p>{t("settings.data.usage_panel.message_rule")}</p>
+                    <p>{t("settings.data.usage_panel.simulation_rule")}</p>
+                  </div>
+                ) : null}
+              </div>
+            </>
           )}
         </div>
       </div>

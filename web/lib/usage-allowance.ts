@@ -40,6 +40,20 @@ export function showsHourlyWindow(allowance: {
   return allowance.limiting_window === "hour";
 }
 
+// The approved contract requires run_backtest actions to carry
+// Idempotency-Key equal to the confirmation identity, so retries and
+// reconnects replay the one durable admission instead of charging again.
+export function runActionIdempotencyKey(input: {
+  type: string;
+  payload?: Record<string, unknown>;
+}): string | null {
+  if (input.type !== "run_backtest") return null;
+  const confirmationId = input.payload?.confirmation_id;
+  return typeof confirmationId === "string" && confirmationId.trim()
+    ? confirmationId.trim()
+    : null;
+}
+
 export function formatAllowancePeriodEnd(
   periodEnd: string,
   locale: string,
