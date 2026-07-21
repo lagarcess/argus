@@ -4,16 +4,20 @@ Status: **ACTIVE — founder-outcome and live-QA execution source**
 
 Original roadmap date: 2026-07-16
 
-Last reconciled: 2026-07-19
+Last reconciled: 2026-07-21
 
 Original planning baseline: `codex/private-alpha-next` at
 `2642b514225b61a852e7c6786de4d84d2ea96456`
 
-Stable integration product-code checkpoint entering vertical-slice salvage:
-`codex/private-alpha-next` at
-`390d57294cf9911becdb14ced126770d0124e4cb`. Each repair PR must record the exact
-current integration base it actually uses; this document does not attempt to
-self-reference its own future commit SHA.
+Current stable integration product-code checkpoint: `codex/private-alpha-next`
+at `a6395669472eb1d6f9b855feecef06abee54cf0c`. It contains two
+founder-accepted, independently revertible vertical slices: adaptive
+result-chart range switching from PR #264 at
+`0c0d4812a1082354b4461a3c5f05d28dc2f53068`, and account recovery/session
+controls from PR #261 at `a6395669472eb1d6f9b855feecef06abee54cf0c`.
+Each later repair PR must record the exact current integration base it actually
+uses; this document does not attempt to self-reference its own future commit
+SHA.
 
 Read-only audit donor: `claude/argus-alpha-audit-c2d919` at
 `f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`
@@ -68,6 +72,24 @@ this small private-alpha circle.
    with truthful previews and actionable results rather than a shallow search
    box.
 
+### Current Completion Ledger
+
+This ledger records complete user-visible slices, not issue activity or a
+deterministic green signal by itself.
+
+| Founder outcome | Current state | Exact completion evidence |
+| --- | --- | --- |
+| 1. Argus always progresses | Not yet accepted complete | No founder-accepted vertical slice yet proves the representative conversational journeys against the current integration checkpoint. |
+| 2. Security and usage are unlocked | **Partial — account security complete; Usage remains open** | #248 is closed. PR #261 landed at `a639566` with Settings -> Security navigation, recovery, password change, current/other/all-session controls, stale-cookie rejection, EN/ES coverage, and real Supabase Auth browser proof. #247 remains open and the Usage row remains disabled. |
+| 3. Graphs have range switching | **Complete** | #250 is closed. PR #264 landed at `0c0d481` with adaptive presets, Custom/Reset, daily/intraday presentation, EN/ES desktop/mobile browser proof, reload-to-ALL, immutable full-run truth, and zero range-interaction network calls. |
+| 4. Argus knows what it can and cannot do | Not yet accepted complete | No founder-accepted vertical slice yet proves the supported/unsupported journey end to end on the current checkpoint. |
+| 5. Discovery is grounded and Argus can suggest | Not yet accepted complete | No founder-accepted vertical slice yet proves grounded suggestions end to end on the current checkpoint. |
+| 6. Omnisearch lives up to its full capability | Not yet accepted complete | No founder-accepted vertical slice yet proves the full Omnisearch journey end to end on the current checkpoint. |
+
+Completing #248 closes the account-security half of outcome 2; it does not make
+the combined Security-and-Usage outcome complete while #247 is open. Completing
+#250 does satisfy outcome 3 and that slice must not be redispatched.
+
 ### Product Relationships, Not An Issue Order
 
 ```mermaid
@@ -89,7 +111,9 @@ Capability truth is a product prerequisite for grounded suggestions, and
 grounded discovery is a product prerequisite for the complete Omnisearch
 experience. Security/usage and graph range switching are independent product
 outcomes and may be chosen earlier when they offer the best user value. This
-diagram does not recreate an issue-level implementation graph.
+diagram does not recreate an issue-level implementation graph. As of
+2026-07-21, graph range switching is complete and the account-security half of
+Security/usage is complete; truthful Usage remains open.
 
 ### Vertical-Slice Delivery Contract
 
@@ -223,11 +247,11 @@ issue status, permission to merge, or a requirement to implement every issue.
 | --- | --- | --- |
 | 1. Reliable conversations | Submit, refine, approve, cancel, and replace ideas without loops, lost state, or magic wording. | #237, #238, #239 |
 | 2. Safe backtest execution | Admit, retry, poll, and reconcile work without duplication, invented outcomes, or unbounded requests. | #228, #229, #230, #231, #235, #236, #242 |
-| 3. Truthful data and results | Keep effective periods, charts, metrics, summaries, and result actions honest and aligned. | #249, #250, #251 |
+| 3. Truthful data and results | Keep effective periods, charts, metrics, summaries, and result actions honest and aligned. | #249, #250 (complete), #251 |
 | 4. Durable continuity | Preserve terminal turn truth, recovery state, transcripts, reload, and navigation behavior. | #240, #252 |
 | 5. Clear capabilities and limits | Explain supported actions, grounded discovery, allowance usage, and reset truth. | #241, #244, #247 |
 | 6. Useful history and recall | Keep history, Recents, pagination, decisions, and evidence bounded, ordered, and retrievable. | #232, #245, #253 |
-| 7. Secure account controls | Provide enumeration-safe recovery and explicit session management. | #248 |
+| 7. Secure account controls | Provide enumeration-safe recovery and explicit session management. | #248 (complete) |
 | 8. Real end-to-end proof | Verify API compatibility, trajectory behavior, QA evidence, and the exact-candidate browser journey. | #233, #234, #243, #246 |
 
 ## Historical Issue Dependency Vocabulary — Reference Only
@@ -284,7 +308,7 @@ flowchart TB
 
     subgraph DATA["Data, results, and allowance truth"]
         W251["[3] #251 Requested/effective windows"]
-        V250["[3] #250 Adaptive chart range"]
+        V250["[3] #250 Adaptive chart range — complete"]
         U247["[5] #247 Allowance and reset truth"]
     end
 
@@ -296,7 +320,7 @@ flowchart TB
     end
 
     subgraph ACCOUNT["Account and QA operations"]
-        A248["[7] #248 Recovery and session controls"]
+        A248["[7] #248 Recovery and session controls — complete"]
         G246["[8] #246 QA cost-ledger visibility"]
     end
 
@@ -408,7 +432,9 @@ arrows recorded serialization, conditional handoff, or permitted early work.
 
 These waves are preserved only to explain earlier branch activity. Do not
 dispatch from them. Current work begins with a founder-selected user journey
-under the vertical-slice delivery contract above.
+under the vertical-slice delivery contract above. #248 and #250 were later
+completed as full vertical slices and must not be redispatched from this
+historical plan.
 
 ### Wave 0 — contracts, probes, and test scaffolding
 
@@ -438,8 +464,9 @@ Run these lanes in parallel with one owner per lane:
 3. **Result-data truth:** #251 may run independently.
 4. **Bounded reads:** #232 may build its query contract independently; serialize
    final gateway/migration integration after #230.
-5. **Account/allowance:** #247 and #248 backend work may proceed independently;
-   serialize shared Profile-menu integration as #247 then #248.
+5. **Account/allowance:** the old plan allowed #247 and #248 backend work to
+   proceed independently. #248 has now landed first. Any later #247 work must
+   rebase on `a639566` and preserve the working Security entry point.
 6. **QA observability:** #246 may diagnose in parallel. Any database repair
    waits until #230/#240 release migration ownership.
 
@@ -451,7 +478,7 @@ Run these lanes in parallel with one owner per lane:
   of #249. Provider evaluation from Wave 0 may already be complete; #244 runtime
   activation still requires the founder to accept the provider, grounding,
   cost, latency, and failure-policy result.
-- Result UX lane: #251 -> #250.
+- Result UX lane (former order): #251 -> #250. #250 is now complete.
 - Recall lane: #232 -> #253.
 - The visible Quick take heading and Explain-result cleanup in #249 may land
   before #241 because those slices do not touch interpreter routing.
@@ -464,9 +491,9 @@ Serialize final `ChatInterface.tsx`/sidebar ownership in this order:
 2. #252 adds conversation cache and navigation race protection.
 3. #245 adds explicit Recents expansion and older-chat paging.
 
-#249 and #250 should use their narrower result components and rebase if they
-touch transcript mounting. #247 and #248 likewise serialize only their shared
-Profile-menu portion.
+#250 is complete; #249 should use its narrower result components and rebase if
+it touches transcript mounting. #248 is complete; #247 owns the remaining Usage
+work and must preserve the landed Profile-menu Security behavior.
 
 ### Wave 4 — former closure evidence
 
@@ -484,8 +511,8 @@ the next slice.
 | Backtest admission/read path | #230 -> #231 -> #242 | admission identity before polling and client reconciliation |
 | Supabase gateway/migrations | #230 -> #232 slices -> #240 -> proven #246 repair | keep database changes reviewable and forward-safe |
 | Chat shell | #242 -> #252 -> #245 | recovery truth before cache, cache before disclosure integration |
-| Result surface | #251 -> #250; #249 narrow UI may run beside them | canonical effective period before ALL; presentation ownership is separate |
-| Profile menu/auth | #247 -> #248 | avoid two owners changing the same menu and session controls |
+| Result surface | #250 complete; #249/#251 remaining work rebases as needed | preserve the completed viewport-only range contract; presentation ownership is separate |
+| Profile menu/auth | #248 landed first; #247 rebases later | preserve the working Security route while enabling Usage |
 | Search/Omnisearch | #232 -> #253 | bounded query truth before richer preview projection |
 | Public API/OpenAPI | #229 -> #234 -> later API issues | contract decisions and drift gate first |
 
@@ -536,7 +563,7 @@ live QA appropriate to the changed surface before merge or closure.
 | Pillar | Potential | Safe salvage boundary |
 | --- | --- | --- |
 | 8. Real end-to-end proof | High for early work | #234 is the first contract/CI salvage candidate. #246 may remain bounded diagnosis or a proven isolated repair; #243 and #233 stay last. |
-| 7. Secure account controls | High | #248 is outside the conversational runtime, but real Supabase auth, recovery, revocation, localization, and browser QA remain required. Keep direct `/account/security` access independent; serialize shared Profile-menu integration with #247. |
+| 7. Secure account controls | Complete | #248 landed at `a639566` with real Supabase auth, recovery, revocation, localization, a working Settings -> Security entry point, and browser QA. Do not redispatch it; #247 must preserve it. |
 | 6. Useful history and recall | Medium | #232 -> #253 can form an independent bounded lane when database ownership permits. #245 waits for #252. Do not assume an issue-complete donor slice without revalidating its diff. |
 | 5. Clear capabilities and limits | Low to medium | #241 and #244 are runtime/provider work. #247's read/UI slice is narrower, but truthful simulation counts require #230 and zero-cost preflight proof remains with #251. |
 | 4. Durable continuity | Low | #240 owns central runtime/database lifecycle truth and #252 owns the shared chat shell. Treat both as regression-sensitive integration work, not quick wins. |
@@ -749,16 +776,26 @@ slice brief.
 
 - Outcome: authenticated users see real limits, remaining unique admissions,
   what counts, and the backend-owned reset time.
-- Start: contract/backend work in parallel after applying the locked decision.
-- Serialization: Profile-menu integration before #248.
+- Status: **open**. PR #259 contains partial prior work but is not the accepted
+  completion boundary; the Usage row remains disabled on integration.
+- Start: from the current `a639566` checkpoint after revalidating the locked
+  accounting decision and the exact PR #259 salvage boundary.
+- Serialization: #248 landed first. Rebase any Profile-menu work on the current
+  checkpoint and do not regress the working Settings -> Security entry point.
 
 <a id="issue-248"></a>
 ### #248 — Account recovery and session controls
 
 - Outcome: enumeration-safe password recovery plus explicit current/other/all
   session actions that keep Argus cookies and Supabase sessions aligned.
-- Start: security contract first; backend may run beside #247.
-- Serialization: shared Profile-menu integration after #247.
+- Status: **complete and closed**. PR #261 landed at `a639566`.
+- Closure evidence: generic recovery responses; one-use, expired, malformed,
+  and reused-link handling; native current-password verification under the
+  enabled hosted policy; current/other/all-session revocation; stale-cookie
+  rejection; English/Spanish behavior; Settings -> Security navigation; and
+  real Supabase Auth browser QA all passed at the accepted head.
+- Remaining implementation: none for #248. Later #247 work must preserve this
+  behavior.
 
 <a id="issue-249"></a>
 ### #249 — Quick take, Explain result, and Try next ownership
@@ -772,10 +809,17 @@ slice brief.
 <a id="issue-250"></a>
 ### #250 — Adaptive chart range
 
-- Outcome: viewport-only 3M/1Y/ALL, conditional YTD, custom/reset controls, and
-  a bounded accessible event summary.
-- Start: after #251 makes ALL mean the full effective canonical series.
-- Boundary: backend marker payload remains capped unless a separate contract is
+- Outcome: viewport-only adaptive `1D`/`1W`/`1M`/`3M`/YTD/`1Y`/ALL presets,
+  Custom/Reset controls, and a bounded accessible event summary.
+- Status: **complete and closed**. PR #264 landed at `0c0d481`.
+- Closure evidence: adaptive short and long presets, Custom validation and
+  session clamping, pan/zoom and Reset, daily/intraday date presentation,
+  English/Spanish desktop/mobile QA, reload-to-ALL, zero range-interaction
+  network calls, and unchanged full-run metrics all passed on a real persisted
+  result.
+- Boundary retained: the controls change only the viewport; they do not
+  resample, refetch, rerun, persist, spend usage, or alter the canonical result.
+  The backend marker payload remains capped unless a separate contract is
   approved.
 
 <a id="issue-251"></a>
@@ -784,7 +828,9 @@ slice brief.
 - Outcome: transparently correct to one viable common window before approval,
   then use it everywhere.
 - Start: independent high-priority trust lane.
-- Handoff: #250 and the applicable #243 trajectory.
+- Handoff: #250 is already complete. Any later #251 change must preserve the
+  viewport-only chart contract and rerun the applicable range and #243
+  trajectory evidence.
 
 <a id="issue-252"></a>
 ### #252 — Transcript cache and race safety
