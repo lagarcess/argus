@@ -212,7 +212,7 @@ def runtime_confirmation_card(
                 "payload": action_payload,
             },
         )
-    card = {
+    card: dict[str, Any] = {
         "confirmation_id": active_confirmation_id,
         "confirmation_state": "active",
         "title": title,
@@ -238,7 +238,37 @@ def runtime_confirmation_card(
         card["asset_class"] = asset_class
     if canonical_date_range is not None:
         card["date_range"] = canonical_date_range
+    period_adjustment = _period_adjustment_from_launch_payload(launch_payload)
+    if period_adjustment is not None:
+        card["period_adjustment"] = period_adjustment
     return card
+
+
+def _period_adjustment_from_launch_payload(
+    launch_payload: dict[str, Any],
+) -> dict[str, Any] | None:
+    coverage = launch_payload.get("coverage_preflight")
+    if not isinstance(coverage, dict) or coverage.get("outcome") != "adjusted_coverage":
+        return None
+    requested = _date_range_payload(coverage.get("requested_date_range"))
+    effective = _date_range_payload(coverage.get("effective_date_range"))
+    if requested is None or effective is None:
+        return None
+    return {
+        "code": "effective_window_adjusted",
+        "requested_date_range": dict(requested),
+        "effective_date_range": dict(effective),
+    }
+
+
+def _date_range_payload(value: Any) -> dict[str, str] | None:
+    if not (
+        isinstance(value, dict)
+        and isinstance(value.get("start"), str)
+        and isinstance(value.get("end"), str)
+    ):
+        return None
+    return {"start": value["start"], "end": value["end"]}
 
 
 def _confirmation_asset_class(strategy: dict[str, Any]) -> str | None:
@@ -359,9 +389,7 @@ def _confirmation_assumptions(
         launch_payload=launch_payload or {},
     )
     if execution_costs is not None:
-        assumptions.append(
-            _execution_cost_assumption(execution_costs, language=language)
-        )
+        assumptions.append(_execution_cost_assumption(execution_costs, language=language))
     else:
         fees = _optional_parameter_value(optional_parameters, "fees")
         if fees in (0, 0.0, "0", "0.0"):

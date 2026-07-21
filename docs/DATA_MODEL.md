@@ -61,6 +61,7 @@ private_alpha_allowlist
 profiles
 conversations
 messages
+chat_turn_lifecycles
 strategies
 collections
 collection_strategies
@@ -92,6 +93,7 @@ auth.users
 profiles
    ├── conversations
    │      ├── messages
+   │      ├── chat_turn_lifecycles
    │      ├── backtest_jobs
    │      └── backtest_runs
    │
@@ -228,14 +230,43 @@ Represents individual messages within a conversation.
 - **role**: `user`, `assistant`, `system`, `tool`
 
 ### Notes
-- Messages are immutable in Alpha.
+- Message identity, owner, conversation, role, content, and ordering are
+  immutable in Alpha. Narrow artifact metadata enrichments may update
+  `metadata`, but they must not change message identity or ordering.
+- Every durable message append uses the service-role-only
+  `append_conversation_message` RPC. The function locks the owned conversation
+  row, inserts the message, and updates `last_message_preview` in one
+  transaction. `PUBLIC`, `anon`, and `authenticated` cannot execute the
+  function or mutate `messages` directly.
+- Conversation message order is deterministic by `(created_at DESC, id DESC)`.
+  Under the conversation lock, a new append receives `created_at` at least one
+  microsecond newer than the current maximum. Metadata-only updates do not
+  change `created_at` or `id`, so they cannot promote an older message into the
+  latest response-option source.
+- A response-option request uses the same RPC as an atomic admission boundary.
+  It matches the owner, conversation, exact latest assistant id, canonical
+  metadata snapshot, option id, and replacement values before inserting the
+  preallocated request id. An exact replay returns the existing request and the
+  source immediately preceding it without inserting a duplicate; a stale or
+  mismatched claim returns no row.
 - `metadata` stores token usage, model identifiers, latency, and tool execution traces.
+- Every terminal assistant message for an ordinary non-backtest chat turn stores
+  immutable `metadata.agent_runtime_turn.turn_id`, `request_id`, `terminal`, and
+  terminal `status`. These values match its `chat_turn_lifecycles` row and make
+  terminal evidence discoverable if the lifecycle CAS does not complete.
 - Message metadata may contain reloadable chat artifacts such as
   `pending_strategy`, `confirmation_card`, `confirmation_payload`,
   `result_card`, result identifiers, `chat_action`, `failed_action`,
   `retry_last_turn`, `recovery`, and `clarification`. These fields hydrate the
   transcript, action affordances, and localized degraded-fallback UI; they do
   not make free-form transcript text the source of truth for strategy state.
+  A typed `clarification.prompt_source` distinguishes exact LLM-authored prose
+  (`llm_generated`) from frontend-localized deterministic fallback
+  (`degraded_fallback`); structured options remain reloadable in both cases.
+  Degraded fallback `content` remains stored only as compatibility transport;
+  it is not projected into later model history or `last_message_preview`, so
+  Recents and conversation search do not expose the fallback language. Exact
+  `llm_generated` prose remains eligible for those continuity surfaces.
 - When a turn follows an artifact-backed setup, the runtime must reconstruct the
   working draft from canonical artifact state before applying the new user
   message as a patch. Canonical artifact state comes from, in order of
@@ -246,6 +277,93 @@ Represents individual messages within a conversation.
   references. Later turns that create a new draft, active confirmation,
   completed result, or explicit cancellation should supersede stale retry
   affordances during hydration.
+---
+
+## 8.1 chat_turn_lifecycles
+
+Represents one mutable current-state recovery record for each accepted ordinary
+chat turn: any `POST /api/v1/chat/stream` request not admitted as
+`chat.run_backtest`. Run actions use `backtest_jobs` instead. This table is not a
+second job queue, transcript, event ledger, or LangGraph state store. Messages
+remain immutable; message reads project the current lifecycle row into
+`metadata.agent_runtime_turn` without rewriting the message.
+
+### Fields
+- `turn_id`: `uuid` (Primary Key and reference to the accepted user
+  `messages.id`; this is also the `request_message_id`)
+- `user_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
+- `conversation_id`: `uuid` (References `conversations.id` ON DELETE CASCADE)
+- `assistant_message_id`: `uuid` (Nullable, unique, references `messages.id` ON
+  DELETE SET NULL)
+- `request_id`: `text` (The request correlation id used by responses, logs, and
+  route-receipt metadata)
+- `status`: `text`
+- `reconciled_outcome`: `text` (Nullable)
+- `failure_code`: `text` (Nullable, stable and user-safe)
+- `retryable`: `boolean` (Default: `false`)
+- `accepted_at`: `timestamptz`
+- `running_at`: `timestamptz` (Nullable)
+- `terminal_at`: `timestamptz` (Nullable)
+- `reconciled_at`: `timestamptz` (Nullable)
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+### Enums and constraints
+- **status**: `accepted`, `running`, `completed`, `recoverable_failed`,
+  `abandoned`, `reconciled`.
+- **reconciled_outcome**: `completed` or `recoverable_failed`; required only
+  when `status = reconciled` and null otherwise. No-proof recovery uses
+  `status = abandoned` directly.
+- `turn_id` makes lifecycle creation idempotent for the accepted user message.
+- `assistant_message_id` is unique when present so one terminal assistant
+  message cannot settle two turns.
+- `abandoned` requires `assistant_message_id = null`; by definition no
+  qualifying terminal assistant message settled that turn.
+- Terminal statuses are `completed`, `recoverable_failed`, `abandoned`, and
+  `reconciled`.
+
+### Transition ownership and idempotency
+- The user message and `accepted` row are created in one database-owned
+  transaction after request admission succeeds.
+- One database compare-and-set function locks the lifecycle row and permits only
+  the transitions named in `docs/API_CONTRACT.md` under
+  `contract-chat-turn-lifecycle`.
+- Repeating the same target status, assistant-message link, failure code, and
+  reconciliation outcome returns the current row as a no-op. A different
+  terminal target is rejected.
+- Route receipts correlate through the same `user_id`, `conversation_id`,
+  `request_id`, and message ids; the lifecycle row does not duplicate receipt
+  payloads.
+- Owner-scoped RLS uses `auth.uid() = user_id`, and `authenticated` receives `SELECT` only. `INSERT`, `UPDATE`, and `DELETE` are revoked from `anon` and
+  `authenticated`; lifecycle creation and transitions use the server-side
+  transaction/CAS boundary only. Any database function used for that boundary
+  also revokes execution from `PUBLIC`, `anon`, and `authenticated`. The
+  frontend cannot mutate lifecycle state directly.
+
+### Reconciliation boundary
+- `accepted`/`running` rows become stale after 15 minutes according to database
+  time and `stale_since = COALESCE(running_at, accepted_at)`.
+- The next chat POST and conversation-message read reconcile at most 20 stale
+  rows for that conversation in `stale_since ASC, turn_id ASC` order. Private
+  alpha does not add a background sweeper.
+- Qualifying terminal evidence is an immutable assistant message whose
+  `user_id`, `conversation_id`, `metadata.agent_runtime_turn.turn_id`, and
+  `metadata.agent_runtime_turn.request_id` match the lifecycle row, whose
+  terminal flag is true, and whose terminal status is `completed` or
+  `recoverable_failed`.
+- Candidates use `created_at ASC, outcome_precedence ASC, id ASC`, with failure
+  precedence 0 and completed precedence 1. The first candidate wins and becomes
+  `assistant_message_id`; its status becomes `reconciled_outcome`. Checkpointer
+  state may corroborate that message but cannot prove a terminal user-visible
+  outcome alone. With no qualifying message, the row becomes `abandoned` with
+  `failure_code = turn_abandoned`.
+- For `abandoned`, the read-time projection belongs to the accepted user message
+  whose `id = turn_id`. It overlays terminal lifecycle, `turn_abandoned`
+  recovery, and typed `retry_last_turn` metadata without changing the immutable
+  message row. The frontend places the presentation-only recovery row directly
+  after that user message; the API does not create or persist an assistant
+  message for this projection.
+
 ---
 
 # 9. strategies
@@ -352,6 +470,14 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 - `benchmark_symbol` is derived from `asset_class` defaults in Alpha (`SPY` for equities, `BTC` for crypto, tested pair for currency pairs).
 - `metrics.aggregate.performance.portfolio_value_range` stores aggregate strategy portfolio equity close peak/lowest values for the run period.
 - `chart` stores the aggregate portfolio equity curve, its matching `value_summary`, and capped executed-fill markers used by the result card. Multi-symbol runs store the portfolio curve, not separate comparison series.
+- New chart writers also persist two optional additive objects inside the same
+  immutable `chart` JSON: `exploration_policy` (generic range-eligibility hints
+  resolved from the strategy capability: `minimum_visible_observations`,
+  optional `minimum_meaningful_duration`) and `marker_summary` (exact
+  `total_groups`/`included_groups`/`sampled` marker-cap evidence). Legacy rows
+  omit both fields and remain valid; readers degrade to observation-only range
+  behavior and make no marker-completeness claim. No migration is required, and
+  these fields never change execution, metrics, or the effective window.
 - Direct run rows store the normalized engine config directly in
   `config_snapshot`; chat-launched rows may include
   `config_snapshot.engine_config` with the exact normalized engine config
@@ -661,9 +787,9 @@ Cost model notes:
 
 ## 12.2 backtest_jobs
 
-Represents durable lifecycle state for an asynchronous backtest execution job.
-Jobs are the bridge between the chat/API control plane and the Render Workflow
-execution plane.
+Represents durable lifecycle state for a backtest execution job. Jobs bridge
+the chat/API control plane to asynchronous Render Workflow execution and also
+own the admitted synchronous direct compatibility path.
 
 `backtest_jobs` is not the canonical result record. Successful jobs write a
 canonical immutable `backtest_runs` row and reference it through
@@ -672,17 +798,24 @@ canonical immutable `backtest_runs` row and reference it through
 ### Fields
 - `id`: `uuid` (Primary Key)
 - `user_id`: `uuid` (References `profiles.id`)
-- `conversation_id`: `uuid` (References `conversations.id`)
+- `conversation_id`: `uuid` (Nullable only for direct `backtests.run` admission;
+  otherwise references `conversations.id`)
 - `request_message_id`: `uuid` (Nullable, references `messages.id`)
-- `confirmation_message_id`: `uuid` (Nullable, references `messages.id`)
-- `idempotency_key`: `text` (Nullable)
-- `payload_hash`: `text`
+- `confirmation_message_id`: `uuid` (Required for `chat.run_backtest`, null for
+  `backtests.run`; references the retained immutable confirmation `messages.id`)
+- `operation_scope`: `text` (`chat.run_backtest` or `backtests.run`)
+- `idempotency_key`: `text` (Required, 1-128 visible ASCII characters)
+- `identity_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
+  operation's canonical identity object)
+- `payload_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
+  full normalized `LaunchBacktestRequest` payload)
 - `launch_payload`: `jsonb`
 - `status`: `text`
 - `priority`: `text` (Default: `'normal'`)
 - `attempts`: `integer` (Default: `0`)
 - `max_attempts`: `integer` (Default: `1`)
-- `queued_at`: `timestamptz`
+- `queued_at`: `timestamptz` (Required for chat jobs; null for conforming direct
+  jobs that never enter `queued`)
 - `started_at`: `timestamptz` (Nullable)
 - `finished_at`: `timestamptz` (Nullable)
 - `result_run_id`: `uuid` (Nullable, references `backtest_runs.id`)
@@ -695,8 +828,15 @@ canonical immutable `backtest_runs` row and reference it through
 
 ### Enums
 - **status**: `queued`, `running`, `succeeded`, `failed`, `canceled`, `expired`
+- **operation_scope**: `chat.run_backtest`, `backtests.run`
 - **priority**: `normal` initially; future values may support admin or canary
   jobs.
+- A new `chat.run_backtest` row starts `queued` with `queued_at` set and
+  `started_at` null. Its `confirmation_message_id` is non-null and the linked
+  message owns the confirmed `confirmation_id` and full `launch_payload_hash`
+  for the job record's lifetime. A new `backtests.run` row starts `running` with
+  `queued_at` and `confirmation_message_id` null and `started_at` set to the
+  admission transaction timestamp.
 
 ### Failure Semantics
 Job lifecycle status is separate from engine/runtime failure semantics.
@@ -722,8 +862,35 @@ Unknown failures default to `failed`, `failed_internal` semantics,
 `retryable=false`, and a safe generic user message until a new stable
 `failure_code` is intentionally added.
 
+A direct `backtests.run` row becomes stale when it remains `running` through
+`started_at + interval '15 minutes'`. Before new direct admission and before an
+owner-scoped direct-job read, the database-owned recovery path checks the stable
+job-derived identity for a fully finalized Run/evidence tuple. A complete tuple
+reconciles the job to `succeeded`. With no complete tuple, the same transaction
+sets `status = failed`, `failure_code = direct_execution_abandoned`,
+`failure_detail = execution_interrupted`, and `retryable = true`. Both terminal
+transitions release running capacity immediately. The finalizer and stale
+reconciler serialize on the same locked job row; after the stale failure wins,
+late finalization cannot create or attach a public Run or replace the terminal
+outcome.
+
 ### Notes
-- Jobs are idempotent by user and payload/idempotency key.
+- Jobs are idempotent at
+  `UNIQUE(user_id, operation_scope, idempotency_key)`. Exact retries return the
+  current row before capacity/usage checks; a different `identity_hash` is a
+  collision and never returns the old row.
+- The reservation lasts for the durable job record's lifetime. A caller does
+  not reuse the same key for a new execution after an elapsed retention window.
+- Chat Run actions use `confirmation_id` as `idempotency_key`. Direct jobs may
+  omit `conversation_id` so the existing direct request shape remains
+  compatible, but they remain owner-scoped by `user_id`.
+- `confirmation_message_id` is required for `chat.run_backtest` and the linked
+  immutable confirmation artifact is retained for the job record's lifetime;
+  direct `backtests.run` jobs keep this field null.
+- For chat jobs, the confirmation artifact's `launch_payload_hash` is exactly
+  the persisted `payload_hash`, not a shortened confirmation fingerprint.
+- Direct admissions atomically start in `running` after both queued and running
+  ceilings pass; new conforming direct jobs never enter `queued`.
 - The UI must hydrate queued/running/succeeded/failed/canceled/expired state
   from durable rows, not frontend-invented state.
 - The current private-alpha UI hydrates status through the API polling endpoint;
@@ -863,10 +1030,21 @@ Semantic search using embeddings is deferred until post-Alpha.
 Every user-owned table must enforce strict Row Level Security (RLS).
 
 ### Primary Rule
-- Users may only `SELECT`, `UPDATE`, or `DELETE` rows where `user_id = auth.uid()`.
+- Unless a table-specific rule below is stricter, users may only `SELECT`,
+  `UPDATE`, or `DELETE` rows where `user_id = auth.uid()`. Server-owned or
+  immutable tables may revoke some of those operations; this default never
+  grants a client write that a table-specific rule forbids.
+
+### Chat-turn lifecycle
+- `chat_turn_lifecycles` grants authenticated owners `SELECT` only. No client
+  role may insert, update, delete, or execute its server transition function;
+  the server-side persistence boundary owns every write.
 
 ### Tables Requiring RLS
-- `private_alpha_allowlist`, `profiles`, `conversations`, `messages`, `strategies`, `collections`, `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`, `usage_counters`.
+- `private_alpha_allowlist`, `profiles`, `conversations`, `messages`,
+  `chat_turn_lifecycles`, `strategies`, `collections`,
+  `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
+  `usage_counters`.
 
 ### Private Alpha Allowlist
 - No `anon` or `authenticated` role access is required.
@@ -881,13 +1059,18 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - **profiles**: `(id)`, `(username)`
 - **conversations**: `(user_id, updated_at DESC)`, `(user_id, archived, deleted_at)`, `(user_id, pinned)`
 - **messages**: `(conversation_id, created_at DESC)`
+- **chat_turn_lifecycles**: `(conversation_id, status, updated_at)`,
+  `(user_id, status, updated_at)`, unique `(assistant_message_id)` where not null
 - **strategies**: `(user_id, updated_at DESC)`, `(user_id, pinned)`, `(user_id, deleted_at)`
 - **strategies (gin)**: `USING gin(symbols)`
 - **collections**: `(user_id, updated_at DESC)`, `(user_id, pinned)`, `(user_id, deleted_at)`
 - **collection_strategies**: `(collection_id)`, `(strategy_id)`
 - **backtest_jobs**: `(user_id, status, queued_at DESC)`, `(conversation_id, created_at DESC)`, `(result_run_id)`
-- **backtest_jobs unique/idempotency**: `(user_id, idempotency_key)` where `idempotency_key is not null`
+- **backtest_jobs unique/idempotency**:
+  `UNIQUE(user_id, operation_scope, idempotency_key)`
 - **backtest_jobs payload lookup**: `(user_id, payload_hash, created_at DESC)`
+- **backtest_jobs identity lookup**:
+  `(user_id, operation_scope, identity_hash, created_at DESC)`
 - **backtest_runs**: `(user_id, created_at DESC)`, `(conversation_id)`, `(strategy_id)`
 - **backtest_runs (gin)**: `USING gin(symbols)`
 - **feedback**: `(user_id, created_at DESC)`
@@ -933,8 +1116,13 @@ Short-window protection against abuse or runaway UI loops.
 Durable job backpressure protects the chat API from compute spikes.
 - **Per user**: 1 running backtest, 2 queued backtests.
 - **Global**: 5 running backtests, 10 queued backtests.
-- **Mechanism**: Enforced against `backtest_jobs` before creating or starting a
-  new workflow job.
+- **Mechanism**: The database-owned admission operation resolves idempotency,
+  checks both scopes, charges one unique admission, and inserts the job
+  atomically. Chat admission inserts `queued`; the synchronous direct path
+  checks both queued and running ceilings and inserts `running`. Per-user
+  exhaustion is evaluated before global exhaustion and returns
+  `429 backtest_capacity_exceeded`; global exhaustion returns
+  `503 backtest_capacity_exceeded`; both include `Retry-After: 15`.
 
 ### Layer 3: Daily / Rolling Quotas
 Generous usage boundaries tracked via the `usage_counters` table.
@@ -949,17 +1137,24 @@ Generous usage boundaries tracked via the `usage_counters` table.
 ### Enforcement Flow
 1. **Authenticate**: Resolve `user_id` from session.
 2. **Hard Constraints**: Validate `backtest_run` inputs against Engine Constraints.
-3. **Check Counters**: Query `usage_counters` for applicable resource/period.
-4. **Check Job Backpressure**: Query `backtest_jobs` for per-user and global
-   queued/running limits before creating a workflow job.
-5. **Exceedance Policy**:
+3. **Atomic Admission**: In one database operation, resolve exact replay versus
+   identity collision, check the applicable usage period plus per-user/global
+   queued/running capacity, charge one unique simulation, and insert the job.
+   Chat admission starts `queued`; direct admission starts `running`. The exact
+   order is replay/collision, usage allowance, per-user capacity, global
+   capacity, then insert plus charge.
+4. **Exceedance Policy**:
    - If rate limit exceeded: Return `429 Too Many Requests`.
    - If daily quota exhausted: Return `429` (Alpha policy).
-   - If job backpressure limit is hit: return a product-safe queued/try-later
-     response instead of starting unbounded compute.
-6. **Execute**: Create a durable job and trigger workflow execution.
-7. **Increment**: Update/Insert the `usage_counters` row.
-8. **Response**: Return result or job state. Include rate-limit headers only
+   - If per-user capacity is exhausted: return
+     `429 backtest_capacity_exceeded` with `Retry-After: 15`.
+   - If global capacity is exhausted: return
+     `503 backtest_capacity_exceeded` with `Retry-After: 15`.
+   - If the same reservation key carries a different identity: return
+     `409 idempotency_conflict` without returning the old job.
+5. **Execute**: Dispatch workflow execution, or run the admitted direct
+   compatibility path synchronously, against the durable job.
+6. **Response**: Return result or job state. Include rate-limit headers only
    when they are backed by an active limiter; do not emit placeholder quota
    values.
 

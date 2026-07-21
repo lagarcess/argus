@@ -50,6 +50,17 @@ export type ApiMetricRow = {
   value: string;
 };
 
+export type ResultChartExplorationPolicy = {
+  minimum_visible_observations?: number;
+  minimum_meaningful_duration?: string | null;
+};
+
+export type ResultChartMarkerSummary = {
+  total_groups: number;
+  included_groups: number;
+  sampled: boolean;
+};
+
 export type ResultChartPayload = {
   kind: "portfolio_equity";
   series: Array<{ time: string; value: number }>;
@@ -71,6 +82,8 @@ export type ResultChartPayload = {
     peak?: { time: string; value: number } | null;
     lowest?: { time: string; value: number } | null;
   } | null;
+  exploration_policy?: ResultChartExplorationPolicy | null;
+  marker_summary?: ResultChartMarkerSummary | null;
   attribution?: string;
 };
 
@@ -723,16 +736,43 @@ export async function loginWithEmail(payload: {
   return response;
 }
 
+export async function clearArgusSessionCookies() {
+  return unauthenticatedApiFetch<{ success: boolean }>("/auth/logout", {
+    method: "POST",
+  });
+}
+
+export type CurrentBrowserLogoutResult = {
+  revocation: "complete" | "failed";
+  cookieSync: "cleared" | "failed";
+};
+
+export async function synchronizeCurrentBrowserLogout<T>(
+  revokeCurrentSession: () => Promise<{ error: unknown | null }>,
+  clearCookies: () => Promise<T>,
+): Promise<CurrentBrowserLogoutResult> {
+  const [revocation, cookieSync] = await Promise.allSettled([
+    Promise.resolve().then(revokeCurrentSession),
+    Promise.resolve().then(clearCookies),
+  ]);
+  return {
+    revocation:
+      revocation.status === "fulfilled" && !revocation.value.error
+        ? "complete"
+        : "failed",
+    cookieSync: cookieSync.status === "fulfilled" ? "cleared" : "failed",
+  };
+}
+
 export async function logoutFromApi() {
-  try {
-    return await apiFetch<{ success: boolean }>("/auth/logout", {
-      method: "POST",
-    });
-  } finally {
-    await getSupabaseClient()
-      ?.auth.signOut()
-      .catch(() => null);
-  }
+  return synchronizeCurrentBrowserLogout(
+    async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return { error: null };
+      return supabase.auth.signOut({ scope: "local" });
+    },
+    clearArgusSessionCookies,
+  );
 }
 
 export async function createConversation(language?: string | null) {

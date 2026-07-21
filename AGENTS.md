@@ -145,6 +145,19 @@ Integration guardrails:
   `codex/private-alpha-next`.
 - Codex reviews worker diffs before merging or cherry-picking them into the
   integration branch.
+- Apply review proportionality to local, cloud, subagent, acceptance, and
+  pre-merge review. Before changing code, confirm that the finding is real,
+  reachable, and relevant to the active lane; weigh its severity, likelihood,
+  affected users or artifacts, and risk to correctness, security, privacy,
+  evidence integrity, or durable state against the complexity the fix adds.
+  Choose the smallest safe fix. After implementation, reassess the actual diff
+  and remove or simplify machinery the validated finding does not justify.
+  Discard speculative or disproportionate scope, and revisit only risk surfaces
+  materially changed by the latest fix; unchanged code must not become a new
+  source of requirements merely to continue a review loop. If the smallest safe
+  fix for a confirmed correctness, security, privacy, evidence-integrity, or
+  durable-state requirement exceeds the lane, escalate instead of weakening or
+  waiving the requirement because the fix is difficult.
 - For Argus multi-agent work, the main Codex thread is the release captain and
   owns subagent cleanup. Every spawned agent must have a bounded goal, expected
   output, and cleanup expectation. After the run, the parent agent must

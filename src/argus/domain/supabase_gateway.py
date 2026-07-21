@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import threading
 import time
 from collections.abc import Callable
 from contextlib import suppress
@@ -12,7 +11,6 @@ from uuid import uuid4
 
 import httpx
 
-from argus.api.chat.previews import plain_text_preview
 from argus.api.schemas import (
     BacktestRun,
     Collection,
@@ -39,20 +37,27 @@ from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_ca
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
 from argus.domain.supabase_backtest_finalization import finalize_backtest
+from argus.domain.supabase_conversation_messages import (
+    ConversationMessagePersistenceMixin,
+)
 from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
+from argus.domain.usage_limits import (
+    USAGE_COUNTER_LOCK as _USAGE_COUNTER_LOCK,
+)
+from argus.domain.usage_limits import (
+    QuotaExceededError,
+)
+from argus.domain.usage_limits import (
+    check_usage_limits as _check_usage_limits,
+)
 from argus.observability.cost_ledger import normalize_cost_ledger_entry
 from supabase import Client, ClientOptions, create_client
-
-
-class QuotaExceededError(Exception):
-    pass
 
 
 class DecisionCaptureIntegrityError(RuntimeError):
     """Raised when the decision RPC does not return the committed object spine."""
 
 
-_USAGE_COUNTER_LOCK = threading.Lock()
 _PROFILE_LOCALE_BY_LANGUAGE: dict[Language, Locale] = {
     "en": "en-US",
     "es-419": "es-419",
@@ -70,10 +75,6 @@ def _row_one(result: Any) -> dict[str, Any] | None:
     if isinstance(data, list):
         return data[0] if data else None
     return data
-
-
-def _message_preview(content: str, max_length: int = 180) -> str | None:
-    return plain_text_preview(content, max_length=max_length)
 
 
 def _filter_history_runs_by_conversation_state(
@@ -139,12 +140,13 @@ def _supabase_client_options() -> ClientOptions:
 
 
 @dataclass
-class SupabaseGateway(UsageCounterReader):
+class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
     client: Client
     auth_client: Client | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
     mock_user_password: str | None = os.getenv("MOCK_USER_PASSWORD")
     _cached_mock_user: User | None = None
+    check_usage_limits = _check_usage_limits
 
     @classmethod
     def from_env(cls) -> SupabaseGateway:
@@ -463,42 +465,14 @@ class SupabaseGateway(UsageCounterReader):
         return hydrate_completed_backtest_job_messages(
             messages,
             load_job=lambda job_id: self.get_backtest_job(
-                user_id=user_id, job_id=job_id,
+                user_id=user_id,
+                job_id=job_id,
             ),
             load_run=lambda run_id: self.get_backtest_run(
-                user_id=user_id, run_id=run_id,
+                user_id=user_id,
+                run_id=run_id,
             ),
         )
-
-    def create_message(
-        self,
-        *,
-        user_id: str,
-        conversation_id: str,
-        role: str,
-        content: str,
-        metadata: dict[str, Any] | None = None,
-    ) -> Message:
-        conversation = self.get_conversation(
-            user_id=user_id, conversation_id=conversation_id
-        )
-        if not conversation:
-            raise ValueError("Conversation not found or not owned by user.")
-        payload = {
-            "user_id": user_id,
-            "conversation_id": conversation_id,
-            "role": role,
-            "content": content,
-            "metadata": metadata if metadata is not None else {},
-            "created_at": _now_iso(),
-        }
-        created = self.client.table("messages").insert(payload).execute()
-        preview = _message_preview(content)
-        if preview:
-            self.client.table("conversations").update(
-                {"last_message_preview": preview, "updated_at": _now_iso()}
-            ).eq("id", conversation_id).eq("user_id", user_id).execute()
-        return Message.model_validate(_row_one(created))
 
     def create_backtest_run(self, *, user_id: str, run: BacktestRun) -> BacktestRun:
         self._require_owned_conversation(

@@ -4,13 +4,19 @@ import time
 from dataclasses import dataclass, field
 from datetime import date
 from math import isfinite
-from typing import Any
+from typing import Any, Literal
 
 from loguru import logger
 
 from argus.domain.backtesting.config import (
     _execution_realism_feature_enabled,
     _normalize_execution_realism,
+)
+from argus.domain.backtesting.coverage import (
+    MarketDataCoverageError,
+    PreparedMarketData,
+    apply_coverage_to_config,
+    prepare_market_data,
 )
 from argus.domain.engine import (
     build_result_card,
@@ -44,7 +50,16 @@ from argus.domain.engine_launch.strategies import (
     rule_spec_from_request,
     validate_launch_supported,
 )
-from argus.domain.market_data import fetch_ohlcv, fetch_price_series
+from argus.domain.market_data import fetch_ohlcv, fetch_price_series, search_assets
+from argus.domain.market_data.capabilities import fetch_alpaca_market_calendar
+
+_DEFAULT_FETCH_OHLC = fetch_ohlcv
+
+
+def _market_calendar_for_preflight():
+    if fetch_ohlcv is not _DEFAULT_FETCH_OHLC:
+        return None
+    return fetch_alpaca_market_calendar
 
 
 @dataclass(frozen=True)
@@ -53,6 +68,22 @@ class LaunchExecutionAdapterResult:
     result_card: dict[str, Any] | None = None
     explanation_context: dict[str, Any] | None = None
     timings_ms: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class RequestSymbolValidationResult:
+    outcome: Literal["resolved", "conflict", "invalid", "unavailable"]
+    symbols: tuple[str, ...] = ()
+    asset_class: str | None = None
+    error_code: str | None = None
+
+
+@dataclass(frozen=True)
+class BenchmarkSymbolValidationResult:
+    outcome: Literal["resolved", "conflict", "invalid", "unavailable"]
+    benchmark_symbol: str | None = None
+    asset_class: str | None = None
+    error_code: str | None = None
 
 
 def run_launch_backtest(
@@ -76,29 +107,37 @@ def run_launch_backtest(
         )
 
     try:
+        prepared_market_data = _prepared_market_data_for_request(
+            request,
+            recorder=recorder,
+        )
         if request.strategy_type == "dca_accumulation":
             result = _run_dca_accumulation(
                 request,
                 language=language,
                 recorder=recorder,
+                prepared_market_data=prepared_market_data,
             )
         elif request.strategy_type == "signal_strategy":
             result = _run_signal_strategy(
                 request,
                 language=language,
                 recorder=recorder,
+                prepared_market_data=prepared_market_data,
             )
         elif request.strategy_type == "indicator_threshold":
             result = _run_indicator_threshold(
                 request,
                 language=language,
                 recorder=recorder,
+                prepared_market_data=prepared_market_data,
             )
         else:
             result = _run_buy_and_hold(
                 request,
                 language=language,
                 recorder=recorder,
+                prepared_market_data=prepared_market_data,
             )
     except ValueError as exc:
         failure_reason = str(exc)
@@ -153,13 +192,19 @@ class _LaunchTimingRecorder:
         finally:
             self.record_elapsed("provider_fetch_total", started)
 
-    def compute_alpha_metrics(self, config: dict[str, Any]) -> dict[str, Any]:
+    def compute_alpha_metrics(
+        self,
+        config: dict[str, Any],
+        *,
+        prepared_market_data: PreparedMarketData | None = None,
+    ) -> dict[str, Any]:
         started = time.perf_counter()
         try:
             return compute_alpha_metrics(
                 config,
                 fetch_ohlcv_func=self.fetch_ohlcv,
                 fetch_price_series_func=self.fetch_price_series,
+                prepared_market_data=prepared_market_data,
             )
         finally:
             self.record_elapsed("engine_compute_total", started)
@@ -189,9 +234,15 @@ def _run_indicator_threshold(
     *,
     language: str,
     recorder: _LaunchTimingRecorder,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> LaunchExecutionAdapterResult:
     symbols, asset_class = _resolve_request_symbols(request)
-    initial_price = _initial_price(request, asset_class=asset_class, recorder=recorder)
+    initial_price = _initial_price(
+        request,
+        asset_class=asset_class,
+        recorder=recorder,
+        prepared_market_data=prepared_market_data,
+    )
     starting_capital = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -204,14 +255,19 @@ def _run_indicator_threshold(
         starting_capital=starting_capital,
         indicator_parameters=indicator_parameters,
     )
+    config = _with_prepared_coverage(config, prepared_market_data)
     validate_backtest_config(config)
 
-    metrics = recorder.compute_alpha_metrics(config)
+    metrics = recorder.compute_alpha_metrics(
+        config,
+        prepared_market_data=prepared_market_data,
+    )
     result_card = _build_launch_result_card(
         config,
         metrics,
         language=language,
         recorder=recorder,
+        prepared_market_data=prepared_market_data,
     )
     benchmark_metrics = build_benchmark_metrics(
         request=request,
@@ -244,6 +300,7 @@ def _run_indicator_threshold(
             "exit_threshold": indicator_parameters["exit_threshold"],
             "rule_spec": indicator_parameters["rule_spec"],
             "engine_config": dict(config),
+            **_coverage_resolved_parameters(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -284,9 +341,15 @@ def _run_signal_strategy(
     *,
     language: str,
     recorder: _LaunchTimingRecorder,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> LaunchExecutionAdapterResult:
     symbols, asset_class = _resolve_request_symbols(request)
-    initial_price = _initial_price(request, asset_class=asset_class, recorder=recorder)
+    initial_price = _initial_price(
+        request,
+        asset_class=asset_class,
+        recorder=recorder,
+        prepared_market_data=prepared_market_data,
+    )
     starting_capital = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -299,14 +362,19 @@ def _run_signal_strategy(
         starting_capital=starting_capital,
         rule_spec=rule_spec,
     )
+    config = _with_prepared_coverage(config, prepared_market_data)
     validate_backtest_config(config)
 
-    metrics = recorder.compute_alpha_metrics(config)
+    metrics = recorder.compute_alpha_metrics(
+        config,
+        prepared_market_data=prepared_market_data,
+    )
     result_card = _build_launch_result_card(
         config,
         metrics,
         language=language,
         recorder=recorder,
+        prepared_market_data=prepared_market_data,
     )
     benchmark_metrics = build_benchmark_metrics(
         request=request,
@@ -336,6 +404,7 @@ def _run_signal_strategy(
             "template": config["template"],
             "rule_spec": rule_spec,
             "engine_config": dict(config),
+            **_coverage_resolved_parameters(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -373,9 +442,15 @@ def _run_dca_accumulation(
     *,
     language: str,
     recorder: _LaunchTimingRecorder,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> LaunchExecutionAdapterResult:
     symbols, asset_class = _resolve_request_symbols(request)
-    initial_price = _initial_price(request, asset_class=asset_class, recorder=recorder)
+    initial_price = _initial_price(
+        request,
+        asset_class=asset_class,
+        recorder=recorder,
+        prepared_market_data=prepared_market_data,
+    )
     recurring_allocation = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -388,14 +463,19 @@ def _run_dca_accumulation(
         recurring_contribution=recurring_allocation,
         cadence=cadence,
     )
+    config = _with_prepared_coverage(config, prepared_market_data)
     _validate_launch_config(config)
 
-    metrics = recorder.compute_alpha_metrics(config)
+    metrics = recorder.compute_alpha_metrics(
+        config,
+        prepared_market_data=prepared_market_data,
+    )
     result_card = _build_launch_result_card(
         config,
         metrics,
         language=language,
         recorder=recorder,
+        prepared_market_data=prepared_market_data,
     )
     benchmark_metrics = build_benchmark_metrics(
         request=request,
@@ -424,6 +504,7 @@ def _run_dca_accumulation(
             "position_size": request.position_size,
             "cadence": cadence,
             "engine_config": dict(config),
+            **_coverage_resolved_parameters(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -453,9 +534,15 @@ def _run_buy_and_hold(
     *,
     language: str,
     recorder: _LaunchTimingRecorder,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> LaunchExecutionAdapterResult:
     symbols, asset_class = _resolve_request_symbols(request)
-    initial_price = _initial_price(request, asset_class=asset_class, recorder=recorder)
+    initial_price = _initial_price(
+        request,
+        asset_class=asset_class,
+        recorder=recorder,
+        prepared_market_data=prepared_market_data,
+    )
     starting_capital = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -466,14 +553,19 @@ def _run_buy_and_hold(
         symbols=symbols,
         starting_capital=starting_capital,
     )
+    config = _with_prepared_coverage(config, prepared_market_data)
     validate_backtest_config(config)
 
-    metrics = recorder.compute_alpha_metrics(config)
+    metrics = recorder.compute_alpha_metrics(
+        config,
+        prepared_market_data=prepared_market_data,
+    )
     result_card = _build_launch_result_card(
         config,
         metrics,
         language=language,
         recorder=recorder,
+        prepared_market_data=prepared_market_data,
     )
     benchmark_metrics = build_benchmark_metrics(
         request=request,
@@ -500,6 +592,7 @@ def _run_buy_and_hold(
             "position_size": request.position_size,
             "cadence": request.cadence,
             "engine_config": dict(config),
+            **_coverage_resolved_parameters(config),
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -576,9 +669,10 @@ def _build_periodic_config(
     recurring_contribution: float,
     cadence: str,
 ) -> dict[str, Any]:
-    benchmark_asset = classify_symbol(request.benchmark_symbol)
-    if benchmark_asset.asset_class != asset_class:
-        raise ValueError("invalid_benchmark_symbol")
+    benchmark_symbol = _resolve_request_benchmark(
+        request,
+        asset_class=asset_class,
+    )
 
     config = {
         "template": "dca_accumulation",
@@ -592,7 +686,7 @@ def _build_periodic_config(
         # for DCA. Keep product-facing names in parameters/envelopes.
         "starting_capital": recurring_contribution,
         "allocation_method": "equal_weight",
-        "benchmark_symbol": benchmark_asset.symbol,
+        "benchmark_symbol": benchmark_symbol,
         "parameters": {"dca_cadence": cadence},
         "recurring_contribution": recurring_contribution,
         "starting_principal": 0.0,
@@ -606,15 +700,20 @@ def _build_launch_result_card(
     *,
     language: str,
     recorder: _LaunchTimingRecorder | None = None,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     try:
         if recorder is None:
-            chart = build_result_chart(config)
+            chart = build_result_chart(
+                config,
+                prepared_market_data=prepared_market_data,
+            )
         else:
             chart = build_result_chart(
                 config,
                 fetch_ohlcv_func=recorder.fetch_ohlcv,
+                prepared_market_data=prepared_market_data,
             )
     except Exception as exc:
         logger.warning("Result chart build failed", error=str(exc))
@@ -651,9 +750,10 @@ def _build_buy_and_hold_config(
     symbols: list[str],
     starting_capital: float,
 ) -> dict[str, Any]:
-    benchmark_asset = classify_symbol(request.benchmark_symbol)
-    if benchmark_asset.asset_class != asset_class:
-        raise ValueError("invalid_benchmark_symbol")
+    benchmark_symbol = _resolve_request_benchmark(
+        request,
+        asset_class=asset_class,
+    )
 
     config = {
         "template": "buy_and_hold",
@@ -665,7 +765,7 @@ def _build_buy_and_hold_config(
         "side": "long",
         "starting_capital": starting_capital,
         "allocation_method": "equal_weight",
-        "benchmark_symbol": benchmark_asset.symbol,
+        "benchmark_symbol": benchmark_symbol,
         "parameters": {},
     }
     return _with_execution_realism(config, request)
@@ -679,9 +779,10 @@ def _build_indicator_threshold_config(
     starting_capital: float,
     indicator_parameters: dict[str, Any],
 ) -> dict[str, Any]:
-    benchmark_asset = classify_symbol(request.benchmark_symbol)
-    if benchmark_asset.asset_class != asset_class:
-        raise ValueError("invalid_benchmark_symbol")
+    benchmark_symbol = _resolve_request_benchmark(
+        request,
+        asset_class=asset_class,
+    )
 
     config = {
         "template": normalize_template_name(request),
@@ -693,7 +794,7 @@ def _build_indicator_threshold_config(
         "side": "long",
         "starting_capital": starting_capital,
         "allocation_method": "equal_weight",
-        "benchmark_symbol": benchmark_asset.symbol,
+        "benchmark_symbol": benchmark_symbol,
         "parameters": indicator_parameters,
     }
     return _with_execution_realism(config, request)
@@ -707,9 +808,10 @@ def _build_signal_strategy_config(
     starting_capital: float,
     rule_spec: dict[str, Any],
 ) -> dict[str, Any]:
-    benchmark_asset = classify_symbol(request.benchmark_symbol)
-    if benchmark_asset.asset_class != asset_class:
-        raise ValueError("invalid_benchmark_symbol")
+    benchmark_symbol = _resolve_request_benchmark(
+        request,
+        asset_class=asset_class,
+    )
 
     config = {
         "template": normalize_template_name(request),
@@ -721,7 +823,7 @@ def _build_signal_strategy_config(
         "side": "long",
         "starting_capital": starting_capital,
         "allocation_method": "equal_weight",
-        "benchmark_symbol": benchmark_asset.symbol,
+        "benchmark_symbol": benchmark_symbol,
         "parameters": {"rule_spec": rule_spec},
     }
     return _with_execution_realism(config, request)
@@ -746,36 +848,282 @@ def _initial_price(
     *,
     asset_class: str,
     recorder: _LaunchTimingRecorder,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> float | None:
     if request.sizing_mode != "position_size":
         return None
     if len(request.symbols) > 1:
         raise ValueError("unsupported_multi_symbol_position_size")
 
-    series = recorder.fetch_price_series(
-        symbol=request.symbol,
-        asset_class=asset_class,
-        start_date=date.fromisoformat(request.date_range.start),
-        end_date=date.fromisoformat(request.date_range.end),
-        timeframe=request.timeframe,
-    )
+    if prepared_market_data is None:
+        series = recorder.fetch_price_series(
+            symbol=request.symbol,
+            asset_class=asset_class,
+            start_date=date.fromisoformat(request.date_range.start),
+            end_date=date.fromisoformat(request.date_range.end),
+            timeframe=request.timeframe,
+        )
+    else:
+        resolved_symbols, _ = _resolve_request_symbols(request)
+        series = prepared_market_data.price_series_for(resolved_symbols[0])
     if series.empty:
         raise ValueError("market_data_unavailable")
     return float(series.iloc[0])
 
 
-def _resolve_request_symbols(request: LaunchBacktestRequest) -> tuple[list[str], str]:
-    assets = [classify_symbol(symbol) for symbol in request.symbols]
-    if not assets:
-        raise ValueError("invalid_symbol_count")
+def _prepared_market_data_for_request(
+    request: LaunchBacktestRequest,
+    *,
+    recorder: _LaunchTimingRecorder,
+) -> PreparedMarketData | None:
+    if request.coverage_preflight is None:
+        return None
+    symbols, asset_class = _resolve_request_symbols(request)
+    benchmark_symbol = _resolve_request_benchmark(
+        request,
+        asset_class=asset_class,
+    )
+    config = {
+        "asset_class": asset_class,
+        "symbols": symbols,
+        "timeframe": request.timeframe,
+        "start_date": request.date_range.start,
+        "end_date": request.date_range.end,
+        "requested_date_range": request.requested_date_range.model_dump()
+        if request.requested_date_range is not None
+        else request.date_range.model_dump(),
+        "benchmark_symbol": benchmark_symbol,
+    }
+    try:
+        return prepare_market_data(
+            config,
+            fetch_ohlcv_func=recorder.fetch_ohlcv,
+            fetch_market_calendar_func=_market_calendar_for_preflight(),
+            approved_coverage=request.coverage_preflight.model_dump(),
+        )
+    except MarketDataCoverageError as exc:
+        if exc.code in {"no_common_data_window", "insufficient_common_data"}:
+            raise MarketDataCoverageError("approved_data_window_unavailable") from exc
+        raise
+
+
+def _with_prepared_coverage(
+    config: dict[str, Any],
+    prepared_market_data: PreparedMarketData | None,
+) -> dict[str, Any]:
+    if prepared_market_data is None:
+        return config
+    return apply_coverage_to_config(config, prepared_market_data)
+
+
+def _coverage_resolved_parameters(config: dict[str, Any]) -> dict[str, Any]:
+    requested = config.get("requested_date_range")
+    effective = config.get("effective_date_range")
+    coverage = config.get("data_coverage")
+    if (
+        not isinstance(requested, dict)
+        or not isinstance(effective, dict)
+        or not isinstance(coverage, dict)
+    ):
+        return {}
+    return {
+        "requested_date_range": dict(requested),
+        "effective_date_range": dict(effective),
+        "data_coverage": dict(coverage),
+    }
+
+
+def validate_request_symbols(
+    request: LaunchBacktestRequest,
+) -> RequestSymbolValidationResult:
+    """Resolve every requested symbol and classify validation failures."""
+    resolved_symbols: list[str] = []
+    resolved_asset_classes: list[str] = []
+    has_unresolved_symbol = False
+
+    for symbol in request.symbols:
+        try:
+            asset = classify_symbol(symbol)
+        except ValueError as exc:
+            error_code = str(exc)
+            if error_code == "asset_universe_unavailable":
+                return RequestSymbolValidationResult(
+                    outcome="unavailable",
+                    error_code=error_code,
+                )
+            if error_code == "invalid_symbol":
+                has_unresolved_symbol = True
+                resolved_symbols.append(symbol)
+                continue
+            if error_code == "asset_class_conflict":
+                return RequestSymbolValidationResult(
+                    outcome="conflict",
+                    error_code=error_code,
+                )
+            return RequestSymbolValidationResult(
+                outcome="invalid",
+                error_code=error_code,
+            )
+        resolved_symbol = asset.symbol
+        resolved_asset_class = asset.asset_class
+        if (
+            request.asset_class is not None
+            and resolved_asset_class != request.asset_class
+        ):
+            try:
+                provider_symbol = _provider_symbol_for_declared_asset_class(
+                    symbol,
+                    asset_class=request.asset_class,
+                )
+            except ValueError as exc:
+                if str(exc) == "asset_universe_unavailable":
+                    return RequestSymbolValidationResult(
+                        outcome="unavailable",
+                        error_code=str(exc),
+                    )
+                provider_symbol = None
+            if provider_symbol is not None:
+                resolved_symbol = provider_symbol
+                resolved_asset_class = request.asset_class
+        resolved_symbols.append(resolved_symbol)
+        resolved_asset_classes.append(resolved_asset_class)
+
+    if not resolved_symbols:
+        return RequestSymbolValidationResult(
+            outcome="invalid",
+            error_code="invalid_symbol_count",
+        )
+
     if request.asset_class is not None:
-        if any(asset.asset_class != request.asset_class for asset in assets):
-            raise ValueError("asset_class_conflict")
-        return [asset.symbol for asset in assets], request.asset_class
-    asset_class = assets[0].asset_class
-    if any(asset.asset_class != asset_class for asset in assets):
-        raise ValueError("asset_class_conflict")
-    return [asset.symbol for asset in assets], asset_class
+        if any(
+            asset_class != request.asset_class
+            for asset_class in resolved_asset_classes
+        ):
+            return RequestSymbolValidationResult(
+                outcome="conflict",
+                error_code="asset_class_conflict",
+            )
+        # The declared class is sufficient for unresolved symbols' same-asset
+        # check; coverage remains the authority on their data availability.
+        return RequestSymbolValidationResult(
+            outcome="resolved",
+            symbols=tuple(resolved_symbols),
+            asset_class=request.asset_class,
+        )
+
+    if has_unresolved_symbol or not resolved_asset_classes:
+        return RequestSymbolValidationResult(
+            outcome="invalid",
+            error_code="invalid_symbol",
+        )
+
+    asset_class = resolved_asset_classes[0]
+    if any(value != asset_class for value in resolved_asset_classes):
+        return RequestSymbolValidationResult(
+            outcome="conflict",
+            error_code="asset_class_conflict",
+        )
+    return RequestSymbolValidationResult(
+        outcome="resolved",
+        symbols=tuple(resolved_symbols),
+        asset_class=asset_class,
+    )
+
+
+def validate_request_benchmark(
+    request: LaunchBacktestRequest,
+    *,
+    asset_class: str,
+) -> BenchmarkSymbolValidationResult:
+    """Resolve the benchmark once and enforce the request's asset class."""
+    try:
+        benchmark = classify_symbol(request.benchmark_symbol)
+    except ValueError as exc:
+        error_code = str(exc)
+        if error_code == "asset_universe_unavailable":
+            return BenchmarkSymbolValidationResult(
+                outcome="unavailable",
+                error_code=error_code,
+            )
+        if error_code == "asset_class_conflict":
+            return BenchmarkSymbolValidationResult(
+                outcome="conflict",
+                error_code="invalid_benchmark_symbol",
+            )
+        return BenchmarkSymbolValidationResult(
+            outcome="invalid",
+            error_code=(
+                "invalid_benchmark_symbol"
+                if error_code == "invalid_symbol"
+                else error_code
+            ),
+        )
+
+    benchmark_symbol = benchmark.symbol
+    benchmark_asset_class = benchmark.asset_class
+    if benchmark_asset_class != asset_class:
+        try:
+            provider_symbol = _provider_symbol_for_declared_asset_class(
+                request.benchmark_symbol,
+                asset_class=asset_class,
+            )
+        except ValueError as exc:
+            if str(exc) == "asset_universe_unavailable":
+                return BenchmarkSymbolValidationResult(
+                    outcome="unavailable",
+                    error_code=str(exc),
+                )
+            provider_symbol = None
+        if provider_symbol is not None:
+            benchmark_symbol = provider_symbol
+            benchmark_asset_class = asset_class
+    if benchmark_asset_class != asset_class:
+        return BenchmarkSymbolValidationResult(
+            outcome="conflict",
+            error_code="invalid_benchmark_symbol",
+        )
+    return BenchmarkSymbolValidationResult(
+        outcome="resolved",
+        benchmark_symbol=benchmark_symbol,
+        asset_class=benchmark_asset_class,
+    )
+
+
+def _provider_symbol_for_declared_asset_class(
+    symbol: str,
+    *,
+    asset_class: str,
+) -> str | None:
+    normalized_symbol = symbol.strip().upper()
+    matches = {
+        asset.canonical_symbol
+        for asset in search_assets(symbol, limit=12)
+        if asset.asset_class == asset_class
+        and asset.canonical_symbol.strip().upper() == normalized_symbol
+    }
+    if len(matches) != 1:
+        return None
+    return next(iter(matches))
+
+
+def _resolve_request_benchmark(
+    request: LaunchBacktestRequest,
+    *,
+    asset_class: str,
+) -> str:
+    validation = validate_request_benchmark(request, asset_class=asset_class)
+    if validation.outcome == "unavailable":
+        raise MarketDataCoverageError("market_data_unavailable")
+    if validation.outcome != "resolved" or validation.benchmark_symbol is None:
+        raise ValueError(validation.error_code or "invalid_benchmark_symbol")
+    return validation.benchmark_symbol
+
+
+def _resolve_request_symbols(request: LaunchBacktestRequest) -> tuple[list[str], str]:
+    validation = validate_request_symbols(request)
+    if validation.outcome != "resolved" or validation.asset_class is None:
+        raise ValueError(validation.error_code or "invalid_symbol")
+    return list(validation.symbols), validation.asset_class
 
 
 def _blocked_result(
@@ -808,6 +1156,7 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "invalid_symbol_count",
         "position_price_required",
         "asset_class_conflict",
+        "invalid_benchmark_symbol",
         "indicator_data_insufficient",
         "invalid_indicator_parameter",
         "indicator_period_out_of_bounds",
@@ -832,8 +1181,15 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "unsupported_rule_operator",
         "provider_timeframe_unavailable",
     }
-    if error_code in {"market_data_unavailable", "benchmark_data_unavailable"}:
+    if error_code in {
+        "market_data_unavailable",
+        "benchmark_data_unavailable",
+        "no_common_data_window",
+        "insufficient_common_data",
+    }:
         return "upstream_dependency_error", "failed_upstream"
+    if error_code == "approved_data_window_unavailable":
+        return "parameter_validation_error", "blocked_invalid_input"
     if error_code in invalid_inputs or error_code.startswith(
         "invalid_execution_realism_"
     ):

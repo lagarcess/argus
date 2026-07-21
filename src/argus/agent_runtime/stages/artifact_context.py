@@ -238,6 +238,12 @@ def validated_approval_confirmation_payload(
     payload: dict[str, Any],
     approved_strategy: StrategySummary,
 ) -> dict[str, Any] | None:
+    launch_payload = payload.get("launch_payload")
+    if not isinstance(launch_payload, dict) or not isinstance(
+        launch_payload.get("coverage_preflight"),
+        dict,
+    ):
+        return None
     if not confirmation_payload_matches_visible_strategy(payload, approved_strategy):
         return None
     if not confirmation_payload_is_validated_executable(payload):

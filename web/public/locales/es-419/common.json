@@ -20,6 +20,7 @@
     "retry": "Reintentar",
     "error_occurred": "Ha ocurrido un error",
     "save": "Guardar",
+    "confirm": "Confirmar",
     "cancel": "Cancelar",
     "done": "Listo",
     "search": "Buscar",
@@ -293,7 +294,23 @@
       "unsupported_recovery": "Esa regla no define por sí sola cuándo comprar o vender. ¿Qué camino quieres usar: {{options}}?",
       "unsupported_recovery_for_asset": "Esa regla no define por sí sola cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
       "unsupported_recovery_with_raw_value": "{{rawValue}} no define por sí solo cuándo comprar o vender. ¿Qué camino quieres usar: {{options}}?",
-      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} no define por sí solo cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?"
+      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} no define por sí solo cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_timeframe": "Ese tamaño de barra no es compatible. Elige barras diarias o de 1 hora.",
+      "unsupported_timeframe_with_raw_value": "{{rawValue}} no es un tamaño de barra compatible. Elige barras diarias o de 1 hora.",
+      "timeframe_actions": {
+        "daily": "Usar barras diarias",
+        "hour_1": "Usar barras de 1 hora"
+      }
+    },
+    "coverage_recovery": {
+      "no_common_data_window": "Esos activos y la referencia no comparten un rango de datos utilizable para una prueba confiable. Cambia las fechas, un activo o la referencia.",
+      "insufficient_common_data": "Los activos y la referencia comparten muy poco historial para una prueba confiable. Cambia las fechas, un activo o la referencia.",
+      "market_data_unavailable": "El historial compartido no está disponible para una prueba confiable en este momento. Cambia las fechas, un activo o la referencia.",
+      "actions": {
+        "change_dates": "Cambiar fechas",
+        "change_asset": "Cambiar activo",
+        "change_benchmark": "Cambiar referencia"
+      }
     },
     "simplification_options": {
       "rsi_threshold": "Usar una regla RSI compatible",
@@ -471,6 +488,37 @@
       "markers": {
         "entry": "Comprar",
         "exit": "Vender"
+      },
+      "range": {
+        "group_label": "Rango del gráfico",
+        "details": "Detalles del rango",
+        "presets": {
+          "1D": "1D",
+          "1W": "1S",
+          "1M": "1M",
+          "3M": "3M",
+          "YTD": "Este año",
+          "1Y": "1A",
+          "ALL": "Todo"
+        },
+        "custom": "Personalizado",
+        "custom_heading": "Rango personalizado",
+        "apply": "Aplicar",
+        "cancel": "Cancelar",
+        "reset": "Restablecer",
+        "start_date": "Fecha de inicio",
+        "end_date": "Fecha de fin",
+        "error_missing_date": "Elige una fecha de inicio y una de fin.",
+        "error_start_after_end": "La fecha de inicio debe ser anterior a la fecha de fin.",
+        "error_insufficient_observations": "Ese rango necesita al menos dos observaciones.",
+        "visible_period": "Período visible: {{start}} al {{end}}.",
+        "peak_label": "Valor visible más alto",
+        "low_label": "Valor visible más bajo",
+        "event_count_one": "{{count}} operación ejecutada mostrada en este rango.",
+        "event_count_other": "{{count}} operaciones ejecutadas mostradas en este rango.",
+        "no_events": "No hay operaciones ejecutadas mostradas en este rango.",
+        "event_sampling": "Mostrando {{shown}} de {{total}} eventos disponibles.",
+        "marker_cap": "Argus guardó {{included}} de {{total}} grupos de operaciones ejecutadas para este resultado."
       }
     },
     "strategy_type": {
@@ -533,6 +581,7 @@
     "confirmation": {
       "asset_count": "{{count}} activos",
       "selected_asset": "Activo seleccionado",
+      "period_adjustment": "Ajusté el período de la prueba a {{period}} porque cada activo y la referencia necesitan un rango de datos compartido.",
       "status": {
         "ready_to_run": "Listo para ejecutar",
         "needs_change": "Necesita ajuste",
@@ -753,6 +802,7 @@
       "feedback": "Comentarios generales"
     },
     "logout": "Cerrar sesión",
+    "logout_error": "No pudimos cerrar la sesión en este navegador. Inténtalo de nuevo.",
     "dev": {
       "reset_onboarding": "Restablecer onboarding (dev)"
     },
@@ -894,8 +944,73 @@
       "show": "Mostrar contrasena",
       "hide": "Ocultar contrasena"
     },
+    "recovery": {
+      "forgot": "¿Olvidaste tu contraseña?",
+      "title": "Recupera tu cuenta",
+      "description": "Ingresa tu correo y enviaremos instrucciones de recuperación si la cuenta es elegible.",
+      "email_label": "Correo electrónico",
+      "send": "Enviar instrucciones",
+      "sending": "Enviando...",
+      "generic_sent": "Si existe una cuenta elegible para ese correo, las instrucciones llegarán pronto.",
+      "request_error": "No pudimos iniciar la recuperación. Espera un momento e inténtalo de nuevo.",
+      "back_to_sign_in": "Volver a iniciar sesión",
+      "reset_title": "Elige una contraseña nueva",
+      "checking": "Verificando tu enlace de recuperación...",
+      "invalid_link": "Este enlace de recuperación falta, venció o ya fue usado.",
+      "request_new": "Solicitar un enlace nuevo",
+      "new_password": "Contraseña nueva",
+      "confirm_password": "Confirmar contraseña nueva",
+      "password_mismatch": "Las contraseñas no coinciden.",
+      "update_password": "Actualizar contraseña",
+      "updating": "Actualizando...",
+      "reset_error": "Este enlace ya no es válido. Solicita uno nuevo.",
+      "password_rejected": "No pudimos actualizar la contraseña. Revisa los requisitos o solicita un enlace de recuperación nuevo.",
+      "password_updated": "Tu contraseña fue actualizada.",
+      "reset_complete": "Tu contraseña fue actualizada. Inicia sesión de nuevo en cada navegador.",
+      "revocation_warning": "Argus no pudo confirmar que todas las sesiones se cerraron. Vuelve a intentarlo antes de iniciar sesión de nuevo.",
+      "retry_revocation": "Reintentar cerrar todas las sesiones",
+      "retrying_revocation": "Reintentando...",
+      "revocation_retry_error": "Argus aún no pudo confirmar que todas las sesiones se cerraron. Inténtalo de nuevo.",
+      "cleanup_warning": "Las sesiones fueron revocadas, pero este navegador no pudo confirmar la limpieza de cookies. Aún necesitas iniciar sesión de nuevo."
+    },
     "errors": {
       "generic": "Algo salio mal. Intentalo de nuevo."
+    }
+  },
+  "account_security": {
+    "title": "Seguridad de la cuenta",
+    "description": "Cambia tu contraseña o elige exactamente qué sesiones cerrar.",
+    "back": "Volver a Argus",
+    "loading": "Verificando tu sesión...",
+    "session_check_unavailable": "Argus no pudo verificar tu sesión en este momento. Inténtalo de nuevo.",
+    "retry": "Reintentar",
+    "cookie_sync_warning": "Las sesiones fueron revocadas, pero no se pudo confirmar la limpieza local de cookies.",
+    "password": {
+      "title": "Cambiar contraseña",
+      "description": "Ingresa tu contraseña actual. Después del cambio, cada navegador deberá iniciar sesión de nuevo.",
+      "current": "Contraseña actual",
+      "new": "Contraseña nueva",
+      "confirm": "Confirmar contraseña nueva",
+      "submit": "Cambiar contraseña",
+      "changing": "Cambiando...",
+      "changed": "Contraseña cambiada. Inicia sesión de nuevo en cada navegador.",
+      "revocation_warning": "La contraseña cambió, pero Argus no pudo confirmar que todas las sesiones se cerraron. Vuelve a intentar Cerrar todas las sesiones.",
+      "error": "No pudimos cambiar la contraseña. Verifica la contraseña actual e inténtalo de nuevo."
+    },
+    "sessions": {
+      "title": "Sesiones",
+      "description": "Elige si deseas mantener la sesión de este navegador.",
+      "sign_out_this": "Cerrar sesión en este navegador",
+      "sign_out_others": "Cerrar otras sesiones",
+      "sign_out_all": "Cerrar todas las sesiones",
+      "others_complete": "Las otras sesiones se cerraron. Este navegador sigue conectado.",
+      "signed_out": "Las sesiones seleccionadas se cerraron.",
+      "revocation_warning": "Argus no pudo confirmar que las sesiones seleccionadas se cerraron. Intenta de nuevo la acción de sesión.",
+      "error": "No pudimos completar ese cambio de sesión. Inténtalo de nuevo.",
+      "confirm_others_title": "¿Cerrar las otras sesiones?",
+      "confirm_others_description": "Los otros navegadores perderán acceso. Este navegador seguirá conectado.",
+      "confirm_all_title": "¿Cerrar sesión en todas partes?",
+      "confirm_all_description": "Cada navegador, incluido este, necesitará iniciar sesión de nuevo."
     }
   },
   "landing": {

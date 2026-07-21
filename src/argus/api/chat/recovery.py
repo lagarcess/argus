@@ -345,136 +345,145 @@ def pending_strategy_metadata_fallback_context(
         if _metadata_invalidates_pending_strategy(metadata):
             return None
         pending_payload = metadata.get("pending_strategy")
-        if (
-            not isinstance(pending_payload, dict)
-            and _metadata_is_latest_result_fact_reply(metadata)
-        ):
+        if not isinstance(
+            pending_payload, dict
+        ) and _metadata_is_latest_result_fact_reply(metadata):
             continue
         if not isinstance(pending_payload, dict):
             return None
-        strategy_payload = pending_payload.get("strategy")
-        if not isinstance(strategy_payload, dict):
-            continue
-        try:
-            pending_strategy = StrategySummary.model_validate(strategy_payload)
-        except Exception:
-            continue
-        requested_field = pending_payload.get("requested_field")
-        stage_outcome = str(
-            metadata.get("agent_runtime_stage_outcome") or "await_user_reply"
+        context = pending_strategy_metadata_fallback_context_from_message(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            source_message=message,
+            messages_through_source=messages[: message_index + 1],
         )
-        selected_thread_metadata: dict[str, Any] = {
-            "latest_task_type": "backtest_execution",
-            "last_stage_outcome": stage_outcome,
-            "fallback_source": "pending_strategy_metadata",
-        }
-        if isinstance(requested_field, str) and requested_field:
-            selected_thread_metadata["requested_field"] = requested_field
-        pending_resolution = pending_payload.get("pending_resolution")
-        if isinstance(pending_resolution, dict):
-            selected_thread_metadata["pending_resolution"] = dict(pending_resolution)
-        response_intent = pending_payload.get("response_intent")
-        if isinstance(response_intent, dict):
-            selected_thread_metadata["response_intent"] = dict(response_intent)
-        source_reference: ArtifactReference | None = None
-        source_result = pending_payload.get("source_result")
-        response_intent_facts = (
-            response_intent.get("facts") if isinstance(response_intent, dict) else None
-        )
-        chat_action = metadata.get("chat_action")
-        chat_action_payload = (
-            chat_action.get("payload") if isinstance(chat_action, dict) else None
-        )
-        raw_source_run_id = (
-            (source_result.get("run_id") if isinstance(source_result, dict) else None)
-            or metadata.get("source_result_run_id")
-            or (
-                response_intent_facts.get("latest_run_id")
-                if isinstance(response_intent_facts, dict)
-                else None
-            )
-            or (
-                chat_action_payload.get("run_id")
-                if isinstance(chat_action_payload, dict)
-                else None
-            )
-        )
-        if raw_source_run_id is not None:
-            run = _run_by_id_for_user(
-                user_id=user_id,
-                run_id=str(raw_source_run_id),
-            )
-            if (
-                run is not None
-                and run.conversation_id == conversation_id
-                and run.status == "completed"
-            ):
-                source_reference = _result_reference_with_response_metadata(
-                    run,
-                    message_metadata=metadata,
-                )
-                selected_thread_metadata["source_result_run_id"] = run.id
-                if run.strategy_id is not None:
-                    selected_thread_metadata["source_result_strategy_id"] = (
-                        run.strategy_id
-                    )
-        if (
-            source_reference is None
-            and str(requested_field or "").strip() == "refinement"
-        ):
-            # Older metadata may lack source_result (e.g. a fact answer sits
-            # between the Refine prompt and the edit). Recover the result from
-            # messages at or before this prompt — never a newer run or a
-            # run-store guess.
-            result_lookup = _latest_completed_result_reference(
-                user_id=user_id,
-                conversation_id=conversation_id,
-                messages=messages[: message_index + 1],
-                allow_run_store_fallback=False,
-            )
-            if result_lookup is not None:
-                source_reference = result_lookup[0]
-                source_run_id = str(
-                    source_reference.metadata.get("result_run_id")
-                    or source_reference.metadata.get("run_id")
-                    or source_reference.artifact_id
-                )
-                if source_run_id:
-                    selected_thread_metadata["source_result_run_id"] = source_run_id
-                source_strategy_id = source_reference.metadata.get(
-                    "result_strategy_id"
-                )
-                if isinstance(source_strategy_id, str) and source_strategy_id:
-                    selected_thread_metadata["source_result_strategy_id"] = (
-                        source_strategy_id
-                    )
-        return RuntimeFallbackContext(
-            latest_task_snapshot=TaskSnapshot(
-                latest_task_type="backtest_execution",
-                completed=False,
-                pending_strategy_summary=pending_strategy,
-                latest_backtest_result_reference=source_reference,
-                last_unresolved_follow_up=(
-                    pending_strategy.raw_user_phrasing
-                    or pending_strategy.strategy_thesis
-                    or pending_strategy.strategy_type
-                ),
-                resolution_provenance=list(pending_strategy.resolution_provenance),
-                artifact_references=(
-                    [source_reference] if source_reference is not None else []
-                ),
-            ),
-            selected_thread_metadata=selected_thread_metadata,
-            artifact_references=(
-                [source_reference] if source_reference is not None else []
-            ),
-            confirmation_payload=(
-                metadata.get("confirmation_payload")
-                if isinstance(metadata.get("confirmation_payload"), dict)
-                else None
-            ),
-        )
+        if context is not None:
+            return context
     return None
+
+
+def pending_strategy_metadata_fallback_context_from_message(
+    *,
+    user_id: str,
+    conversation_id: str,
+    source_message: Message,
+    messages_through_source: list[Message] | None = None,
+) -> RuntimeFallbackContext | None:
+    metadata = source_message.metadata
+    if (
+        source_message.role != "assistant"
+        or source_message.conversation_id != conversation_id
+        or not isinstance(metadata, dict)
+        or _metadata_invalidates_pending_strategy(metadata)
+    ):
+        return None
+    pending_payload = metadata.get("pending_strategy")
+    if not isinstance(pending_payload, dict):
+        return None
+    strategy_payload = pending_payload.get("strategy")
+    if not isinstance(strategy_payload, dict):
+        return None
+    try:
+        pending_strategy = StrategySummary.model_validate(strategy_payload)
+    except Exception:
+        return None
+    requested_field = pending_payload.get("requested_field")
+    stage_outcome = str(metadata.get("agent_runtime_stage_outcome") or "await_user_reply")
+    selected_thread_metadata: dict[str, Any] = {
+        "latest_task_type": "backtest_execution",
+        "last_stage_outcome": stage_outcome,
+        "fallback_source": "pending_strategy_metadata",
+    }
+    if isinstance(requested_field, str) and requested_field:
+        selected_thread_metadata["requested_field"] = requested_field
+    pending_resolution = pending_payload.get("pending_resolution")
+    if isinstance(pending_resolution, dict):
+        selected_thread_metadata["pending_resolution"] = dict(pending_resolution)
+    response_intent = pending_payload.get("response_intent")
+    if isinstance(response_intent, dict):
+        selected_thread_metadata["response_intent"] = dict(response_intent)
+    clarification = metadata.get("clarification")
+    if isinstance(clarification, dict):
+        selected_thread_metadata["clarification"] = dict(clarification)
+    source_reference: ArtifactReference | None = None
+    source_result = pending_payload.get("source_result")
+    response_intent_facts = (
+        response_intent.get("facts") if isinstance(response_intent, dict) else None
+    )
+    chat_action = metadata.get("chat_action")
+    chat_action_payload = (
+        chat_action.get("payload") if isinstance(chat_action, dict) else None
+    )
+    raw_source_run_id = (
+        (source_result.get("run_id") if isinstance(source_result, dict) else None)
+        or metadata.get("source_result_run_id")
+        or (
+            response_intent_facts.get("latest_run_id")
+            if isinstance(response_intent_facts, dict)
+            else None
+        )
+        or (
+            chat_action_payload.get("run_id")
+            if isinstance(chat_action_payload, dict)
+            else None
+        )
+    )
+    if raw_source_run_id is not None:
+        run = _run_by_id_for_user(user_id=user_id, run_id=str(raw_source_run_id))
+        if (
+            run is not None
+            and run.conversation_id == conversation_id
+            and run.status == "completed"
+        ):
+            source_reference = _result_reference_with_response_metadata(
+                run,
+                message_metadata=metadata,
+            )
+            selected_thread_metadata["source_result_run_id"] = run.id
+            if run.strategy_id is not None:
+                selected_thread_metadata["source_result_strategy_id"] = run.strategy_id
+    if source_reference is None and str(requested_field or "").strip() == "refinement":
+        result_lookup = _latest_completed_result_reference(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            messages=messages_through_source or [source_message],
+            allow_run_store_fallback=False,
+        )
+        if result_lookup is not None:
+            source_reference = result_lookup[0]
+            source_run_id = str(
+                source_reference.metadata.get("result_run_id")
+                or source_reference.metadata.get("run_id")
+                or source_reference.artifact_id
+            )
+            if source_run_id:
+                selected_thread_metadata["source_result_run_id"] = source_run_id
+            source_strategy_id = source_reference.metadata.get("result_strategy_id")
+            if isinstance(source_strategy_id, str) and source_strategy_id:
+                selected_thread_metadata["source_result_strategy_id"] = source_strategy_id
+    artifact_references = [source_reference] if source_reference is not None else []
+    return RuntimeFallbackContext(
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="backtest_execution",
+            completed=False,
+            pending_strategy_summary=pending_strategy,
+            latest_backtest_result_reference=source_reference,
+            last_unresolved_follow_up=(
+                pending_strategy.raw_user_phrasing
+                or pending_strategy.strategy_thesis
+                or pending_strategy.strategy_type
+            ),
+            resolution_provenance=list(pending_strategy.resolution_provenance),
+            artifact_references=artifact_references,
+        ),
+        selected_thread_metadata=selected_thread_metadata,
+        artifact_references=artifact_references,
+        confirmation_payload=(
+            metadata.get("confirmation_payload")
+            if isinstance(metadata.get("confirmation_payload"), dict)
+            else None
+        ),
+    )
 
 
 def _metadata_invalidates_pending_strategy(metadata: dict[str, Any]) -> bool:
@@ -525,8 +534,7 @@ def _metadata_has_pending_response_intent(metadata: dict[str, Any]) -> bool:
     needs = response_intent.get("semantic_needs")
     options = response_intent.get("options")
     return bool(
-        (isinstance(needs, list) and needs)
-        or (isinstance(options, list) and options)
+        (isinstance(needs, list) and needs) or (isinstance(options, list) and options)
     )
 
 

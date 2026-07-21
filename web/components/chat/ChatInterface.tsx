@@ -78,7 +78,11 @@ import {
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
-import { recoveryDisplayFromMetadata } from "@/lib/chat-recovery-display";
+import {
+  coverageRecoveryActionsFromMetadata,
+  recoveryDisplayFromMetadata,
+  unsupportedTimeframeActionsFromMetadata,
+} from "@/lib/chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
 import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
@@ -1431,12 +1435,23 @@ export default function ChatInterface() {
             ? finalPayload.message_id
             : undefined;
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
+        const finalCoverageActions = finalMessageId
+          ? coverageRecoveryActionsFromMetadata(finalPayload, finalMessageId)
+          : [];
+        const finalUnsupportedTimeframeActions = finalMessageId
+          ? unsupportedTimeframeActionsFromMetadata(finalPayload, finalMessageId)
+          : [];
         const finalRetryActions = [
           failedActionRetryActionFromMetadata(finalPayload),
           retryLastTurnActionFromMetadata(finalPayload, {
             assistantMessageId: finalMessageId,
           }),
         ].filter((retryAction): retryAction is ChatActionOption => Boolean(retryAction));
+        const finalTextActions = [
+          ...finalCoverageActions,
+          ...finalUnsupportedTimeframeActions,
+          ...finalRetryActions,
+        ];
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
         const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
         const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
@@ -1530,6 +1545,10 @@ export default function ChatInterface() {
           );
         } else if (finalText) {
           const finalFactHeadingKey = resultFactHeadingKeyFromMetadata(finalPayload);
+          setInputActions([
+            ...finalCoverageActions,
+            ...finalUnsupportedTimeframeActions,
+          ]);
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
@@ -1537,7 +1556,7 @@ export default function ChatInterface() {
                 mergeFinalTextMessage(m, {
                   assistantId,
                   finalText,
-                  finalActions: finalRetryActions,
+                  finalActions: finalTextActions,
                   recoveryDisplay: finalRecoveryDisplay,
                   contentPresentation:
                     action?.type === "show_breakdown"
@@ -1552,7 +1571,7 @@ export default function ChatInterface() {
                 role: "ai",
                 kind: "text",
                 content: finalText,
-                actions: finalRetryActions.length > 0 ? finalRetryActions : undefined,
+                actions: finalTextActions.length > 0 ? finalTextActions : undefined,
                 recoveryDisplay: finalRecoveryDisplay,
                 contentPresentation:
                   action?.type === "show_breakdown"
@@ -1569,7 +1588,7 @@ export default function ChatInterface() {
               return normalizeRetryActionHistory(
                 settleOpenConfirmationsAfterTextFinal(nextMessages, {
                   action,
-                  finalActions: finalRetryActions,
+                  finalActions: finalTextActions,
                   hasFailedAction: finalHasFailedAction,
                   stageOutcome: finalStageOutcome,
                 }),
@@ -1837,11 +1856,28 @@ export default function ChatInterface() {
 
   const handleLogout = async () => {
     try {
-      await logoutFromApi();
-    } catch {
-      // Even if the network is unavailable, leave the authenticated surface.
-    } finally {
+      const result = await logoutFromApi();
+      if (result.revocation === "failed") {
+        showToast(
+          t(
+            "settings.logout_error",
+            "We couldn’t sign out this browser. Try again.",
+          ),
+        );
+        return;
+      }
+      resetToEmptyChatSurface();
+      setHistoryItems([]);
+      setHistoryNextCursor(null);
+      setSearchText("");
       window.location.href = "/";
+    } catch {
+      showToast(
+        t(
+          "settings.logout_error",
+          "We couldn’t sign out this browser. Try again.",
+        ),
+      );
     }
   };
 

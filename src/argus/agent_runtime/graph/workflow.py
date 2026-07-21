@@ -215,6 +215,7 @@ def build_workflow(
         WorkflowNode.EXECUTE.value,
         _route_from_stage_outcome,
         {
+            WorkflowRoute.CONFIRM.value: WorkflowNode.CONFIRM.value,
             WorkflowRoute.EXPLAIN.value: WorkflowNode.EXPLAIN.value,
             WorkflowRoute.END.value: END,
         },

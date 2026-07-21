@@ -36,6 +36,17 @@ export type ResultChartValuePoint = {
   value: number;
 };
 
+export type ResultChartExplorationPolicy = {
+  minimum_visible_observations?: number;
+  minimum_meaningful_duration?: string | null;
+};
+
+export type ResultChartMarkerSummary = {
+  total_groups: number;
+  included_groups: number;
+  sampled: boolean;
+};
+
 export type ResultChartPayload = {
   kind: "portfolio_equity";
   series: ResultChartPoint[];
@@ -47,6 +58,8 @@ export type ResultChartPayload = {
     peak?: ResultChartValuePoint | null;
     lowest?: ResultChartValuePoint | null;
   } | null;
+  exploration_policy?: ResultChartExplorationPolicy | null;
+  marker_summary?: ResultChartMarkerSummary | null;
   attribution?: string;
 };
 
@@ -175,6 +188,12 @@ export type StrategyConfirmationDateRange = {
   display?: string;
 };
 
+export type StrategyConfirmationPeriodAdjustment = {
+  code: string;
+  requested_date_range: StrategyConfirmationDateRange;
+  effective_date_range: StrategyConfirmationDateRange;
+};
+
 export type StrategyConfirmationPayload = {
   confirmation_id?: string;
   confirmation_state?: "active" | "superseded" | "cancelled";
@@ -192,6 +211,7 @@ export type StrategyConfirmationPayload = {
   display_facts?: ConfirmationDisplayFacts;
   capabilities?: StrategyConfirmationCapabilities;
   date_range?: StrategyConfirmationDateRange;
+  period_adjustment?: StrategyConfirmationPeriodAdjustment;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];

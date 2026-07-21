@@ -20,6 +20,7 @@
     "retry": "Retry",
     "error_occurred": "An error occurred",
     "save": "Save",
+    "confirm": "Confirm",
     "cancel": "Cancel",
     "done": "Done",
     "search": "Search",
@@ -293,7 +294,23 @@
       "unsupported_recovery": "That rule does not define when to buy or sell on its own. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_for_asset": "That rule does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_with_raw_value": "{{rawValue}} does not define when to buy or sell on its own. Which supported direction should I use: {{options}}?",
-      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?"
+      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?",
+      "unsupported_timeframe": "That bar size is not supported. Choose daily or 1-hour bars.",
+      "unsupported_timeframe_with_raw_value": "{{rawValue}} is not a supported bar size. Choose daily or 1-hour bars.",
+      "timeframe_actions": {
+        "daily": "Retry with daily bars",
+        "hour_1": "Retry with 1-hour bars"
+      }
+    },
+    "coverage_recovery": {
+      "no_common_data_window": "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
+      "insufficient_common_data": "The assets and benchmark share too little history for one trustworthy test. Change the dates, an asset, or the benchmark.",
+      "market_data_unavailable": "The shared history is not available for one trustworthy test right now. Change the dates, an asset, or the benchmark.",
+      "actions": {
+        "change_dates": "Change dates",
+        "change_asset": "Change asset",
+        "change_benchmark": "Change benchmark"
+      }
     },
     "simplification_options": {
       "rsi_threshold": "Use a supported RSI threshold rule",
@@ -471,6 +488,37 @@
       "markers": {
         "entry": "Buy",
         "exit": "Sell"
+      },
+      "range": {
+        "group_label": "Chart range",
+        "details": "Range details",
+        "presets": {
+          "1D": "1D",
+          "1W": "1W",
+          "1M": "1M",
+          "3M": "3M",
+          "YTD": "YTD",
+          "1Y": "1Y",
+          "ALL": "All"
+        },
+        "custom": "Custom",
+        "custom_heading": "Custom range",
+        "apply": "Apply",
+        "cancel": "Cancel",
+        "reset": "Reset",
+        "start_date": "Start date",
+        "end_date": "End date",
+        "error_missing_date": "Choose a start and end date.",
+        "error_start_after_end": "Start date must be before end date.",
+        "error_insufficient_observations": "That range needs at least two observations.",
+        "visible_period": "Visible period: {{start}} to {{end}}.",
+        "peak_label": "Highest visible value",
+        "low_label": "Lowest visible value",
+        "event_count_one": "{{count}} displayed executed-fill event in this range.",
+        "event_count_other": "{{count}} displayed executed-fill events in this range.",
+        "no_events": "No displayed executed-fill events in this range.",
+        "event_sampling": "Showing {{shown}} of {{total}} supplied events.",
+        "marker_cap": "Argus stored {{included}} of {{total}} executed-fill groups for this result."
       }
     },
     "strategy_type": {
@@ -533,6 +581,7 @@
     "confirmation": {
       "asset_count": "{{count}} assets",
       "selected_asset": "Selected asset",
+      "period_adjustment": "I adjusted the test period to {{period}} because every asset and the benchmark need a shared data window.",
       "status": {
         "ready_to_run": "Ready to run",
         "needs_change": "Needs change",
@@ -753,6 +802,7 @@
       "feedback": "General feedback"
     },
     "logout": "Log out",
+    "logout_error": "We couldn’t sign out this browser. Try again.",
     "dev": {
       "reset_onboarding": "Reset onboarding (dev)"
     },
@@ -894,8 +944,73 @@
       "show": "Show password",
       "hide": "Hide password"
     },
+    "recovery": {
+      "forgot": "Forgot password?",
+      "title": "Recover your account",
+      "description": "Enter your email and we’ll send recovery instructions if the account is eligible.",
+      "email_label": "Email address",
+      "send": "Send recovery instructions",
+      "sending": "Sending...",
+      "generic_sent": "If an eligible account exists for that email, recovery instructions will arrive shortly.",
+      "request_error": "We couldn’t start recovery. Wait a moment and try again.",
+      "back_to_sign_in": "Back to sign in",
+      "reset_title": "Choose a new password",
+      "checking": "Checking your recovery link...",
+      "invalid_link": "This recovery link is missing, expired, or already used.",
+      "request_new": "Request a new link",
+      "new_password": "New password",
+      "confirm_password": "Confirm new password",
+      "password_mismatch": "Passwords do not match.",
+      "update_password": "Update password",
+      "updating": "Updating...",
+      "reset_error": "This recovery link is no longer valid. Request a new one.",
+      "password_rejected": "We couldn’t update the password. Check the requirements or request a new recovery link.",
+      "password_updated": "Your password is updated.",
+      "reset_complete": "Your password is updated. Sign in again on every browser.",
+      "revocation_warning": "Argus could not confirm that every session was signed out. Retry before signing in again.",
+      "retry_revocation": "Retry sign out all sessions",
+      "retrying_revocation": "Retrying...",
+      "revocation_retry_error": "Argus still couldn’t confirm that every session was signed out. Try again.",
+      "cleanup_warning": "Sessions were revoked, but this browser could not confirm local cookie cleanup. A fresh sign-in is still required."
+    },
     "errors": {
       "generic": "Something went wrong. Please try again."
+    }
+  },
+  "account_security": {
+    "title": "Account security",
+    "description": "Change your password or choose exactly which sessions to sign out.",
+    "back": "Back to Argus",
+    "loading": "Checking your session...",
+    "session_check_unavailable": "Argus couldn’t verify your session right now. Try again.",
+    "retry": "Retry",
+    "cookie_sync_warning": "Sessions were revoked, but local cookie cleanup could not be confirmed.",
+    "password": {
+      "title": "Change password",
+      "description": "Enter your current password. After the change, every browser must sign in again.",
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Confirm new password",
+      "submit": "Change password",
+      "changing": "Changing...",
+      "changed": "Password changed. Sign in again on every browser.",
+      "revocation_warning": "Password changed, but Argus could not confirm every session was signed out. Retry Sign out all sessions.",
+      "error": "We couldn’t change the password. Check your current password and try again."
+    },
+    "sessions": {
+      "title": "Sessions",
+      "description": "Choose whether to keep this browser signed in.",
+      "sign_out_this": "Sign out this browser",
+      "sign_out_others": "Sign out other sessions",
+      "sign_out_all": "Sign out all sessions",
+      "others_complete": "Other sessions are signed out. This browser remains signed in.",
+      "signed_out": "The selected sessions are signed out.",
+      "revocation_warning": "Argus could not confirm the selected sessions were signed out. Try the session action again.",
+      "error": "We couldn’t complete that session change. Try again.",
+      "confirm_others_title": "Sign out other sessions?",
+      "confirm_others_description": "Other browsers will lose access. This browser stays signed in.",
+      "confirm_all_title": "Sign out everywhere?",
+      "confirm_all_description": "Every browser, including this one, will need a fresh login."
     }
   },
   "landing": {

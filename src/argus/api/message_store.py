@@ -1,14 +1,19 @@
 from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Any, cast
 
 from loguru import logger
 
 from argus.agent_runtime.state.models import ConversationMessage
 from argus.api import state as api_state
-from argus.api.chat.previews import plain_text_preview
+from argus.api.chat.previews import (
+    is_degraded_clarification_compatibility_text,
+    plain_text_preview,
+)
 from argus.api.dependencies import dev_memory_fallback_enabled
-from argus.api.schemas import Conversation, Message
+from argus.api.schemas import Conversation, Message, MessageRole
 from argus.domain.store import utcnow
 
 _AUTHORITATIVE_ARTIFACT_KEYS = {
@@ -22,6 +27,12 @@ _AUTHORITATIVE_ARTIFACT_KEYS = {
     "result_run_id",
 }
 _RUNTIME_FAILURE_SUPERSEDED_KEY = "agent_runtime_failure_superseded"
+
+
+@dataclass(frozen=True)
+class ResponseOptionActionClaim:
+    source_message: Message
+    request_message: Message
 
 
 def memory_conversation(
@@ -47,7 +58,18 @@ def memory_conversation(
     return conversation
 
 
-def message_preview(content: str, max_length: int = 180) -> str | None:
+def message_preview(
+    content: str,
+    max_length: int = 180,
+    *,
+    role: str = "assistant",
+    metadata: dict[str, Any] | None = None,
+) -> str | None:
+    if is_degraded_clarification_compatibility_text(
+        role=role,
+        metadata=metadata,
+    ):
+        return None
     return plain_text_preview(content, max_length=max_length)
 
 
@@ -58,22 +80,221 @@ def memory_message(
     content: str,
     metadata: dict[str, Any] | None = None,
 ) -> Message:
-    message = Message(
+    return _append_memory_message(
+        prepare_message(
+            conversation_id=conversation_id,
+            role=role,
+            content=content,
+            metadata=metadata,
+        )
+    )
+
+
+def prepare_message(
+    *,
+    conversation_id: str,
+    role: str,
+    content: str,
+    metadata: dict[str, Any] | None = None,
+) -> Message:
+    return Message(
         id=api_state.store.new_id(),
         conversation_id=conversation_id,
-        role=role,
+        role=cast(MessageRole, role),
         content=content,
         created_at=utcnow(),
-        metadata=metadata,
+        metadata=metadata if metadata is not None else {},
     )
-    api_state.store.messages.setdefault(conversation_id, []).append(message)
-    preview = message_preview(content)
-    conversation = api_state.store.conversations.get(conversation_id)
-    if conversation and preview:
-        api_state.store.conversations[conversation_id] = conversation.model_copy(
-            update={"last_message_preview": preview, "updated_at": utcnow()}
+
+
+def _append_memory_message(message: Message) -> Message:
+    with api_state.store.conversation_message_lock:
+        messages = api_state.store.messages.setdefault(message.conversation_id, [])
+        if messages:
+            latest_created_at = max(item.created_at for item in messages)
+            if message.created_at <= latest_created_at:
+                message = message.model_copy(
+                    update={"created_at": latest_created_at + timedelta(microseconds=1)}
+                )
+        messages.append(message)
+        preview = message_preview(
+            message.content,
+            role=message.role,
+            metadata=message.metadata,
         )
-    return message
+        conversation = api_state.store.conversations.get(message.conversation_id)
+        if conversation and preview:
+            api_state.store.conversations[message.conversation_id] = (
+                conversation.model_copy(
+                    update={"last_message_preview": preview, "updated_at": utcnow()}
+                )
+            )
+        return message
+
+
+def claim_response_option_action(
+    *,
+    user_id: str,
+    conversation_id: str,
+    source_assistant_id: str,
+    option_id: str,
+    replacement_values: dict[str, Any],
+    request_message: Message,
+    expected_source_metadata: dict[str, Any] | None = None,
+) -> ResponseOptionActionClaim | None:
+    gateway = api_state.supabase_gateway
+    if gateway is not None:
+        claimed = gateway.claim_response_option_action(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            source_assistant_id=source_assistant_id,
+            option_id=option_id,
+            replacement_values=replacement_values,
+            request_message=request_message,
+            expected_source_metadata=expected_source_metadata,
+        )
+        if claimed is None:
+            return None
+        source_message, accepted_request = claimed
+        return ResponseOptionActionClaim(
+            source_message=source_message,
+            request_message=accepted_request,
+        )
+
+    with api_state.store.conversation_message_lock:
+        if api_state.store.conversation_owners.get(conversation_id) != user_id:
+            return None
+        if request_message.conversation_id != conversation_id:
+            raise ValueError("Request message conversation does not match claim.")
+
+        existing = next(
+            (
+                message
+                for messages in api_state.store.messages.values()
+                for message in messages
+                if message.id == request_message.id
+            ),
+            None,
+        )
+        conversation_messages = api_state.store.messages.get(conversation_id, [])
+        if existing is not None:
+            if not _same_immutable_message(existing, request_message):
+                raise ValueError(
+                    "Message identity collided with different immutable payload."
+                )
+            preceding = [
+                message
+                for message in conversation_messages
+                if (message.created_at, message.id)
+                < (existing.created_at, existing.id)
+            ]
+            replay_source = (
+                max(preceding, key=lambda item: (item.created_at, item.id))
+                if preceding
+                else None
+            )
+            if not _is_exact_response_option_source(
+                replay_source,
+                source_assistant_id=source_assistant_id,
+                option_id=option_id,
+                replacement_values=replacement_values,
+                expected_source_metadata=expected_source_metadata,
+            ):
+                return None
+            assert replay_source is not None
+            return ResponseOptionActionClaim(
+                source_message=replay_source,
+                request_message=existing,
+            )
+
+        latest = (
+            max(conversation_messages, key=lambda item: (item.created_at, item.id))
+            if conversation_messages
+            else None
+        )
+        if not _is_exact_response_option_source(
+            latest,
+            source_assistant_id=source_assistant_id,
+            option_id=option_id,
+            replacement_values=replacement_values,
+            expected_source_metadata=expected_source_metadata,
+        ):
+            return None
+        assert latest is not None
+        accepted_request = _append_memory_message(request_message)
+        return ResponseOptionActionClaim(
+            source_message=latest,
+            request_message=accepted_request,
+        )
+
+
+def _same_immutable_message(existing: Message, requested: Message) -> bool:
+    return (
+        existing.conversation_id == requested.conversation_id
+        and existing.role == requested.role
+        and existing.content == requested.content
+        and (existing.metadata or {}) == (requested.metadata or {})
+    )
+
+
+def _is_exact_response_option_source(
+    source_message: Message | None,
+    *,
+    source_assistant_id: str,
+    option_id: str,
+    replacement_values: dict[str, Any],
+    expected_source_metadata: dict[str, Any] | None = None,
+) -> bool:
+    if (
+        source_message is None
+        or source_message.id != source_assistant_id
+        or source_message.role != "assistant"
+        or not isinstance(source_message.metadata, dict)
+    ):
+        return False
+    if (
+        expected_source_metadata is not None
+        and source_message.metadata != expected_source_metadata
+    ):
+        return False
+    clarification = source_message.metadata.get("clarification")
+    if not isinstance(clarification, dict):
+        return False
+    options = clarification.get("options")
+    if not isinstance(options, list):
+        return False
+    return any(
+        isinstance(option, dict)
+        and option.get("id") == option_id
+        and option.get("replacement_values") == replacement_values
+        for option in options
+    )
+
+
+def owned_conversation_message(
+    *,
+    user_id: str,
+    conversation_id: str,
+    message_id: str,
+) -> Message | None:
+    gateway = api_state.supabase_gateway
+    if gateway is not None:
+        return gateway.get_message(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=message_id,
+        )
+    with api_state.store.conversation_message_lock:
+        if api_state.store.conversation_owners.get(conversation_id) != user_id:
+            return None
+        return next(
+            (
+                message
+                for message in api_state.store.messages.get(conversation_id, [])
+                if message.id == message_id
+            ),
+            None,
+        )
 
 
 def _ephemeral_suppressed_message(
@@ -210,6 +431,11 @@ def load_runtime_thread_history(
     history: list[ConversationMessage] = []
     for message in messages:
         if message.role not in {"user", "assistant", "system", "tool"}:
+            continue
+        if is_degraded_clarification_compatibility_text(
+            role=message.role,
+            metadata=message.metadata,
+        ):
             continue
         history.append(ConversationMessage(role=message.role, content=message.content))
     return history

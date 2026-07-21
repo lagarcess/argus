@@ -8,6 +8,10 @@ from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from argus.api import state as api_state
+from argus.api.auth_sessions import (
+    AuthSessionVerificationUnavailable,
+    auth_session_is_active,
+)
 from argus.api.schemas import User
 
 
@@ -172,6 +176,30 @@ def current_user(request: Request) -> User:
             title="Unauthorized",
             detail="Invalid or expired access token.",
         ) from None
+
+    auth_user_id = str(auth_user.get("id") or "")
+    try:
+        session_is_active = auth_session_is_active(
+            database_url=api_state.DATABASE_URL,
+            token=token,
+            user_id=auth_user_id,
+        )
+    except AuthSessionVerificationUnavailable:
+        raise problem(
+            request,
+            status_code=503,
+            code="auth_session_verification_unavailable",
+            title="Session Verification Unavailable",
+            detail="Argus could not verify this session. Please try again.",
+        ) from None
+    if not session_is_active:
+        raise problem(
+            request,
+            status_code=401,
+            code="unauthorized",
+            title="Unauthorized",
+            detail="Invalid or expired access token.",
+        )
 
     auth_email = str(auth_user.get("email") or "")
     if not api_state.supabase_gateway.private_alpha_email_allowed(auth_email):

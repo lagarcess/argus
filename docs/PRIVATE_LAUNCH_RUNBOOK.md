@@ -126,18 +126,23 @@ cd ..
 mkdir -p temp/release-evidence
 ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
 ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json \
+ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-capture.json \
 .github/canary-render.sh
 ```
 
 If a canary fails after warmup passed, do not redeploy one-off fixes in a loop.
-Set `ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-failed-capture.json`,
-rerun it once to write a sanitized failed-capture artifact, then replay the
-captured payload locally before redeploying:
+The first authoritative run writes the sanitized capture beside the human-safe
+evidence. Do not rerun the charged journey to collect a capture. When that
+capture contains a final response, replay it locally before redeploying:
 
 ```bash
 poetry run python scripts/ops/canary_capture_replay.py \
-  temp/release-evidence/canary-es-419-failed-capture.json
+  temp/release-evidence/canary-es-419-capture.json
 ```
+
+If the failure happened before any final response existed, keep the capture as
+diagnostic evidence and inspect the hashed labels, failure stage, API logs, and
+route-receipt summary instead of forcing a replay or spending a second journey.
 
 If the exact candidate reaches the API but returns the normal interpreter
 recovery response, keep the failed capture and evidence. Record the safe HTTP
@@ -243,6 +248,11 @@ dispatch/execution and removes the Render API key from `argus-api`.
 `render.yaml` is allowed to sync non-secret launch configuration: mode flags,
 public service URLs, public Supabase URL/anon key values, feature flags, paper
 trading mode, CORS origins, and model routing IDs.
+
+The `argus-app` service must also set the server-only `ARGUS_APP_ORIGIN` to the
+exact HTTPS app origin. It builds password-recovery redirects and must never use
+a `NEXT_PUBLIC_` name. Local development may use the documented localhost
+origins; production must not use HTTP.
 
 Keep true secrets manual in Render:
 

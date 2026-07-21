@@ -44,6 +44,22 @@ cases:
         date_range:
           start: "2024-01-01"
           end: "2024-12-31"
+        requested_date_range:
+          start: "2024-01-01"
+          end: "2024-12-31"
+        coverage_preflight:
+          schema_version: market_data_coverage_v1
+          outcome: full_coverage
+          requested_date_range:
+            start: "2024-01-01"
+            end: "2024-12-31"
+          effective_date_range:
+            start: "2024-01-01"
+            end: "2024-12-31"
+          preflight_id: eval-aapl-spy-2024-v1
+          observations_by_symbol:
+            AAPL: 252
+            SPY: 252
         entry_rule: null
         exit_rule: null
         rule_spec: null

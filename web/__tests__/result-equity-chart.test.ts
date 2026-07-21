@@ -209,6 +209,123 @@ describe("ResultEquityChart attribution", () => {
   });
 });
 
+describe("ResultEquityChart adaptive range integration", () => {
+  const chartSource = readFileSync(
+    join(root, "components/chat/ResultEquityChart.tsx"),
+    "utf-8",
+  );
+
+  test("wires the pure range policy into the chart adapter", () => {
+    expect(chartSource).toContain("deriveResultChartRanges");
+    expect(chartSource).toContain("resolveCustomResultChartRange");
+    expect(chartSource).toContain("summarizeVisibleResultChartRange");
+    expect(chartSource).toContain("hasIntradayObservations");
+    expect(chartSource).toContain("setVisibleLogicalRange");
+    expect(chartSource).toContain("subscribeVisibleLogicalRangeChange");
+    expect(chartSource).toContain("<ResultChartExploration");
+    expect(chartSource).not.toContain("buy_and_hold");
+    expect(chartSource).not.toContain("dca_accumulation");
+    expect(chartSource).not.toContain("fetch(");
+  });
+
+  test("keeps the semantic exploration component typed and display-label free", () => {
+    const explorationSource = readFileSync(
+      join(root, "components/chat/ResultChartExploration.tsx"),
+      "utf-8",
+    );
+
+    expect(explorationSource).toContain("aria-pressed");
+    expect(explorationSource).toContain('role="status"');
+    // Quiet segmented switcher: 44px hit targets in the conventional order.
+    expect(explorationSource).toContain("min-h-11");
+    expect(explorationSource).toContain('"1D", "1W", "1M", "3M", "YTD", "1Y"');
+    expect(explorationSource).toContain("showTimes");
+    expect(explorationSource).toContain("result-chart-range-");
+    expect(explorationSource).toContain("result-chart-details-toggle");
+    expect(explorationSource).toContain("result-chart-custom-indicator");
+    expect(explorationSource).toContain("result-chart-custom-start");
+    expect(explorationSource).toContain("result-chart-custom-end");
+    expect(explorationSource).toContain("result-chart-custom-apply");
+    expect(explorationSource).toContain("result-chart-custom-cancel");
+    expect(explorationSource).toContain("result-chart-custom-error");
+    expect(explorationSource).toContain("result-chart-reset");
+    expect(explorationSource).toContain("result-chart-visible-period");
+    expect(explorationSource).toContain("result-chart-peak");
+    expect(explorationSource).toContain("result-chart-low");
+    expect(explorationSource).toContain("result-chart-event-count");
+    expect(explorationSource).toContain("result-chart-event-list");
+    expect(explorationSource).toContain("result-chart-event-sampling");
+    expect(explorationSource).toContain("result-chart-marker-cap");
+    // Accessibility floors: 16px date inputs at every breakpoint and no
+    // sub-4.5:1 idle/quiet text tokens on the range surface.
+    expect(explorationSource).not.toContain("sm:text-[12px]");
+    expect(explorationSource).not.toContain("text-black/42");
+    expect(explorationSource).not.toContain("text-black/45");
+    // Accessible copy comes from typed marker fields, never backend prose.
+    expect(explorationSource).not.toContain("marker.label");
+    expect(explorationSource).not.toContain("buy_and_hold");
+    expect(explorationSource).not.toContain("dca_accumulation");
+    expect(explorationSource).not.toContain("fetch(");
+  });
+
+  test("localizes every range control and summary string in English and Spanish", () => {
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+    const presetKeys = ["1D", "1W", "1M", "3M", "YTD", "1Y", "ALL"];
+    const rangeKeys = [
+      "group_label",
+      "details",
+      "custom",
+      "custom_heading",
+      "apply",
+      "cancel",
+      "reset",
+      "start_date",
+      "end_date",
+      "error_missing_date",
+      "error_start_after_end",
+      "error_insufficient_observations",
+      "visible_period",
+      "peak_label",
+      "low_label",
+      "event_count_one",
+      "event_count_other",
+      "no_events",
+      "event_sampling",
+      "marker_cap",
+    ];
+
+    for (const catalog of [en, es]) {
+      const range = catalog.chat.result_chart.range;
+      for (const preset of presetKeys) {
+        expect(typeof range.presets[preset]).toBe("string");
+        expect(range.presets[preset].length).toBeGreaterThan(0);
+      }
+      for (const key of rangeKeys) {
+        expect(typeof range[key]).toBe("string");
+        expect(range[key].length).toBeGreaterThan(0);
+      }
+    }
+
+    // Spanish prose must be translated, not English fallback copy.
+    for (const key of rangeKeys) {
+      expect(es.chat.result_chart.range[key]).not.toBe(
+        en.chat.result_chart.range[key],
+      );
+    }
+    expect(en.chat.result_chart.range.visible_period).toContain("{{start}}");
+    expect(es.chat.result_chart.range.visible_period).toContain("{{start}}");
+    expect(en.chat.result_chart.range.event_sampling).toContain("{{shown}}");
+    expect(es.chat.result_chart.range.event_sampling).toContain("{{shown}}");
+    expect(en.chat.result_chart.range.marker_cap).toContain("{{included}}");
+    expect(es.chat.result_chart.range.marker_cap).toContain("{{included}}");
+  });
+});
+
 describe("ResultEquityChart intraday timestamps", () => {
   test("preserves intraday chart timestamps as UTC timestamp values", () => {
     const intradayMarker: ResultChartMarker = {

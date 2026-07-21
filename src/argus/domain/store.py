@@ -43,6 +43,11 @@ class AlphaStore:
         repr=False,
         compare=False,
     )
+    conversation_message_lock: Any = field(
+        default_factory=RLock,
+        repr=False,
+        compare=False,
+    )
     ideas: dict[str, Idea] = field(default_factory=dict)
     idea_owners: dict[str, str] = field(default_factory=dict)
     idea_versions: dict[str, IdeaVersion] = field(default_factory=dict)

@@ -54,6 +54,8 @@ function completedRunConfirmationStatus(
   message: Message,
   index: number,
   lastResultIndex: number,
+  latestConfirmationArtifactIndex: number,
+  owningActiveJobStatus: StrategyConfirmationStatus | null,
 ): StrategyConfirmationStatus {
   const status = message.confirmation
     ? confirmationStatusFromPayload(message.confirmation)
@@ -66,13 +68,18 @@ function completedRunConfirmationStatus(
   ) {
     return "run_complete";
   }
+  if (owningActiveJobStatus) {
+    return owningActiveJobStatus;
+  }
+  if (
+    index < latestConfirmationArtifactIndex &&
+    message.confirmation?.confirmation_state === "superseded" &&
+    status &&
+    IN_PROGRESS_RUN_STATUSES.has(status)
+  ) {
+    return "updated";
+  }
   return status ?? (index < lastResultIndex ? "run_complete" : "updated");
-}
-
-function completedRunConfirmationStatusLabel(message: Message, index: number, lastResultIndex: number) {
-  return confirmationStatusLabel(
-    completedRunConfirmationStatus(message, index, lastResultIndex),
-  );
 }
 
 export function confirmationActionEffectFromAction(
@@ -293,6 +300,21 @@ export function consumeResultActionOnMessages(
 }
 
 export function normalizeConfirmationHistory(messages: Message[]): Message[] {
+  const activeJobConfirmationMessageIds = new Set<string>();
+  for (const message of messages) {
+    const job = message.backtestJob;
+    if (
+      message.kind !== "backtest_job" ||
+      !job ||
+      (job.status !== "queued" && job.status !== "running")
+    ) {
+      continue;
+    }
+    const confirmationMessageId = job.confirmation_message_id?.trim();
+    if (confirmationMessageId) {
+      activeJobConfirmationMessageIds.add(confirmationMessageId);
+    }
+  }
   const lastResultIndex = messages.reduce(
     (latest, message, index) =>
       message.kind === "strategy_result" ? index : latest,
@@ -307,12 +329,29 @@ export function normalizeConfirmationHistory(messages: Message[]): Message[] {
         : latest,
     -1,
   );
+  const latestConfirmationArtifactIndex = messages.reduce(
+    (latest, message, index) =>
+      message.kind === "strategy_confirmation" && index > lastResultIndex
+        ? index
+        : latest,
+    -1,
+  );
   return messages.map((message, index) => {
     if (message.kind !== "strategy_confirmation" || !message.confirmation) {
       return message;
     }
+    const owningActiveJobStatus = activeJobConfirmationStatus(
+      message,
+      activeJobConfirmationMessageIds,
+    );
     if (isTerminalConfirmation(message)) {
-      const status = completedRunConfirmationStatus(message, index, lastResultIndex);
+      const status = completedRunConfirmationStatus(
+        message,
+        index,
+        lastResultIndex,
+        latestConfirmationArtifactIndex,
+        owningActiveJobStatus,
+      );
       return {
         ...message,
         confirmation: {
@@ -340,9 +379,31 @@ export function normalizeConfirmationHistory(messages: Message[]): Message[] {
     }
     return supersedePriorConfirmations(
       message,
-      index < lastResultIndex ? "run_complete" : "updated",
+      index < lastResultIndex
+        ? "run_complete"
+        : owningActiveJobStatus ?? "updated",
     );
   });
+}
+
+function activeJobConfirmationStatus(
+  message: Message,
+  activeJobConfirmationMessageIds: Set<string>,
+): StrategyConfirmationStatus | null {
+  if (
+    !message.confirmation ||
+    !activeJobConfirmationMessageIds.has(message.id)
+  ) {
+    return null;
+  }
+  const status = confirmationStatusFromPayload(message.confirmation);
+  if (IN_PROGRESS_RUN_STATUSES.has(status)) {
+    return status;
+  }
+  if (status === "ready_to_run" || status === "updated") {
+    return "request_sent";
+  }
+  return null;
 }
 
 export function supersedePriorConfirmations(

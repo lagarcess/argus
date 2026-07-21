@@ -108,6 +108,40 @@ function queuedJobMessage(): Message {
   return message;
 }
 
+function confirmationCardMessage(
+  messageId = "confirmation-message-1",
+  confirmationId = "confirmation-1",
+): Message {
+  const actions = [
+    {
+      type: "run_backtest" as const,
+      label: "Run backtest",
+      presentation: "confirmation" as const,
+      payload: { confirmation_id: confirmationId },
+    },
+  ];
+  return {
+    id: messageId,
+    role: "ai",
+    kind: "strategy_confirmation",
+    confirmation: {
+      confirmation_id: confirmationId,
+      confirmation_state: "active",
+      title: "AAPL buy and hold",
+      status: "ready_to_run",
+      statusLabel: "Ready to run",
+      summary: "Ready to test AAPL.",
+      rows: [],
+      actions,
+    },
+    actions,
+  };
+}
+
+function freshConfirmationCard(): Message {
+  return confirmationCardMessage("confirmation-message-2", "confirmation-2");
+}
+
 describe("chat backtest jobs", () => {
   test("hydrates persisted job metadata into a durable job message", () => {
     const message = backtestJobMessageFromApi(apiMessageWithJob(job()));
@@ -144,6 +178,137 @@ describe("chat backtest jobs", () => {
       "running",
       "succeeded",
     ]);
+  });
+
+  test("normalization preserves a superseded running card owned by a matching queued job", () => {
+    const runningConfirmation = supersedePriorConfirmations(
+      confirmationCardMessage(),
+      "running",
+    );
+
+    const [ownedConfirmation, activeJob, freshConfirmation] =
+      normalizeConfirmationHistory([
+        runningConfirmation,
+        queuedJobMessage(),
+        freshConfirmationCard(),
+      ]);
+
+    expect(ownedConfirmation.confirmation?.confirmation_state).toBe("superseded");
+    expect(ownedConfirmation.confirmation?.status).toBe("running");
+    expect(ownedConfirmation.confirmation?.statusLabel).toBe("Running");
+    expect(ownedConfirmation.confirmation?.actions).toEqual([]);
+    expect(activeJob.backtestJob?.status).toBe("queued");
+    expect(freshConfirmation.confirmation?.confirmation_state).toBe("active");
+    expect(freshConfirmation.confirmation?.status).toBe("ready_to_run");
+  });
+
+  test("polling restores an owned updated card when the matching job is running", () => {
+    const incorrectlySettledConfirmation = supersedePriorConfirmations(
+      confirmationCardMessage(),
+      "updated",
+    );
+
+    const [ownedConfirmation, activeJob, freshConfirmation] =
+      normalizeConfirmationHistory(
+        applyBacktestJobUpdate(
+          [
+            incorrectlySettledConfirmation,
+            queuedJobMessage(),
+            freshConfirmationCard(),
+          ],
+          {
+            job: job({
+              status: "running",
+              started_at: "2026-06-06T12:00:01Z",
+            }),
+            run: null,
+          },
+        ),
+      );
+
+    expect(ownedConfirmation.confirmation?.confirmation_state).toBe("superseded");
+    expect(ownedConfirmation.confirmation?.status).toBe("request_sent");
+    expect(ownedConfirmation.confirmation?.statusLabel).toBe("Request sent");
+    expect(activeJob.backtestJob?.status).toBe("running");
+    expect(freshConfirmation.confirmation?.confirmation_state).toBe("active");
+    expect(freshConfirmation.confirmation?.status).toBe("ready_to_run");
+  });
+
+  test("polling does not settle an in-progress confirmation owned by another job", () => {
+    const runningConfirmation = supersedePriorConfirmations(
+      confirmationCardMessage(),
+      "running",
+    );
+    const unrelatedJob = job({
+      confirmation_message_id: "confirmation-message-other",
+      status: "queued",
+    });
+    const unrelatedJobMessage: Message = {
+      ...queuedJobMessage(),
+      backtestJob: unrelatedJob,
+    };
+
+    const [unrelatedConfirmation] = applyBacktestJobUpdate(
+      [runningConfirmation, unrelatedJobMessage],
+      { job: unrelatedJob, run: null },
+    );
+
+    expect(unrelatedConfirmation.confirmation?.status).toBe("running");
+    expect(unrelatedConfirmation.confirmation?.statusLabel).toBe("Running");
+  });
+
+  test("reload normalization uses hydrated queued-job provenance before activating a fresh card", () => {
+    const hydratedJob = backtestJobMessageFromApi(
+      apiMessageWithJob(job({ status: "queued" })),
+    );
+    if (!hydratedJob) {
+      throw new Error("Expected hydrated backtest job message.");
+    }
+
+    const [ownedConfirmation, activeJob, freshConfirmation] =
+      normalizeConfirmationHistory([
+        confirmationCardMessage(),
+        hydratedJob,
+        freshConfirmationCard(),
+      ]);
+
+    expect(ownedConfirmation.confirmation?.confirmation_state).toBe("superseded");
+    expect(ownedConfirmation.confirmation?.status).toBe("request_sent");
+    expect(ownedConfirmation.confirmation?.statusLabel).toBe("Request sent");
+    expect(ownedConfirmation.confirmation?.actions).toEqual([]);
+    expect(activeJob.backtestJob?.confirmation_message_id).toBe(
+      "confirmation-message-1",
+    );
+    expect(freshConfirmation.confirmation?.confirmation_state).toBe("active");
+    expect(freshConfirmation.confirmation?.status).toBe("ready_to_run");
+  });
+
+  test("a completed owned job still settles the earlier confirmation as run complete", () => {
+    const runningConfirmation = supersedePriorConfirmations(
+      confirmationCardMessage(),
+      "running",
+    );
+
+    const [ownedConfirmation, result, freshConfirmation] =
+      normalizeConfirmationHistory(
+        applyBacktestJobUpdate(
+          [runningConfirmation, queuedJobMessage(), freshConfirmationCard()],
+          {
+            job: job({
+              status: "succeeded",
+              result_run_id: "run-1",
+              finished_at: "2026-06-06T12:00:04Z",
+            }),
+            run: run(),
+          },
+        ),
+      );
+
+    expect(ownedConfirmation.confirmation?.status).toBe("run_complete");
+    expect(ownedConfirmation.confirmation?.statusLabel).toBe("Run complete");
+    expect(result.kind).toBe("strategy_result");
+    expect(freshConfirmation.confirmation?.confirmation_state).toBe("active");
+    expect(freshConfirmation.confirmation?.status).toBe("ready_to_run");
   });
 
   test("failed durable job update replaces a local running state", () => {

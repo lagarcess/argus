@@ -21,20 +21,28 @@ paths:
       responses:
         "200":
           description: Session cleared.
+        "403":
+          description: Untrusted browser origin rejected.
   /api/v1/auth/session:
     get:
       responses:
         "200":
           description: Current authentication state and user.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/me:
     get:
       responses:
         "200":
           description: Current user profile and preferences.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     patch:
       responses:
         "200":
           description: Updated user profile and preferences.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/me/usage:
     get:
       description: Return the authenticated user's current daily private-alpha message allowance truth.
@@ -63,33 +71,47 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/conversations:
     get:
       responses:
         "200":
           description: Cursor-paginated conversations.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     post:
       responses:
         "200":
           description: Created conversation.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     delete:
       responses:
         "200":
           description: Soft-deleted all non-deleted conversations for the user.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/conversations/{id}:
     patch:
       responses:
         "200":
           description: Updated conversation title, pin, or archive state.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     delete:
       responses:
         "200":
           description: Soft-deleted conversation.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/conversations/{id}/messages:
     get:
       responses:
         "200":
           description: Cursor-paginated messages.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/chat/stream:
     post:
       responses:
@@ -104,52 +126,83 @@ paths:
             text/event-stream:
               schema:
                 type: string
+        "409":
+          description: >
+            The selected response option is missing, mismatched, foreign to the
+            owner or conversation, or no longer attached to the latest active
+            assistant message.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/strategies:
     get:
       responses:
         "200":
           description: Cursor-paginated strategies with strategy_surface_metrics.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     post:
       responses:
         "200":
           description: Created executable strategy.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/strategies/{id}:
     patch:
       responses:
         "200":
           description: Updated strategy metadata or metric preferences.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     delete:
       responses:
         "200":
           description: Soft-deleted strategy.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/collections:
     get:
       responses:
         "200":
           description: Cursor-paginated collections.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     post:
       responses:
         "200":
           description: Created organizational collection.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/collections/{id}:
     patch:
       responses:
         "200":
           description: Updated collection name or pin state.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
     delete:
       responses:
         "200":
           description: Soft-deleted collection.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/collections/{id}/strategies:
     post:
       responses:
         "200":
           description: Attached strategies to a collection.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/collections/{id}/strategies/{strategy_id}:
     delete:
       responses:
         "200":
           description: Detached strategy from collection.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/backtests/run:
     post:
       parameters:
@@ -159,13 +212,38 @@ paths:
           description: Stable client key for deduplicating direct backtest runs.
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BacktestRunRequest"
       responses:
         "200":
           description: Completed Alpha backtest run.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [run]
+                properties:
+                  run:
+                    $ref: "#/components/schemas/BacktestRun"
         "400":
           description: Missing required Idempotency-Key header.
         "422":
-          description: Problem Details for unsupported Alpha requests.
+          description: Problem Details for unsupported Alpha requests or unusable common data coverage. Coverage rejection occurs before quota admission.
+        "409":
+          description: The data window changed after approval and must be reviewed again.
+        "503":
+          description: >
+            Problem Details when bounded auth-session verification is temporarily
+            unavailable (`auth_session_verification_unavailable`) or market data
+            is temporarily unavailable (`market_data_unavailable`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/backtest-jobs/{id}:
     get:
       responses:
@@ -173,21 +251,29 @@ paths:
           description: Durable async backtest job state, with linked run when available.
         "404":
           description: Job not found or inaccessible.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/backtests/{id}:
     get:
       responses:
         "200":
           description: Backtest run detail including chart and trades.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/history:
     get:
       responses:
         "200":
           description: Mixed recent activity feed.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/search:
     get:
       responses:
         "200":
           description: Global keyword search across chats, strategies, collections, runs, and typed P1 recall objects.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/evidence-artifacts/{id}/decision:
     post:
       description: Create or update the one current decision for a user-owned evidence artifact.
@@ -245,6 +331,8 @@ paths:
                 detail: Argus could not safely record that decision. Please retry in a moment.
                 code: decision_capture_failed
                 request_id: req_123
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/feedback:
     post:
       requestBody:
@@ -273,11 +361,27 @@ paths:
       responses:
         "200":
           description: Feedback accepted.
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
 components:
+  responses:
+    AuthSessionVerificationUnavailable:
+      description: Bounded Supabase session verification is temporarily unavailable; retry without redirecting to login.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            type: https://api.argus.app/problems/auth-session-verification-unavailable
+            title: Session Verification Unavailable
+            status: 503
+            detail: Argus could not verify this session. Please try again.
+            code: auth_session_verification_unavailable
+            request_id: req_123
   schemas:
     ChatClarification:
       type: object
-      description: Typed degraded clarification or unsupported-recovery sidecar for chat final payloads and assistant metadata.
+      description: Typed degraded clarification, coverage-recovery, or unsupported-recovery sidecar for chat final payloads and assistant metadata.
       required:
         - kind
         - reason_code
@@ -286,10 +390,11 @@ components:
         - options
       properties:
         kind:
-          enum: [clarification, unsupported_recovery]
+          type: string
+          enum: [clarification, coverage_recovery, unsupported_recovery]
         reason_code:
           type: string
-          examples: [missing_period, unsupported_strategy_logic]
+          examples: [missing_period, no_common_data_window, unsupported_strategy_logic]
         requested_field:
           type:
             - string
@@ -323,6 +428,87 @@ components:
         replacement_values:
           type: object
           additionalProperties: true
+    DateRange:
+      type: object
+      required: [start, end]
+      properties:
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+    MarketDataCoverage:
+      type: object
+      required:
+        - schema_version
+        - outcome
+        - requested_date_range
+        - effective_date_range
+        - dataset_id
+      properties:
+        schema_version:
+          const: market_data_coverage_v1
+        outcome:
+          enum: [full_coverage, adjusted_coverage]
+        requested_date_range:
+          $ref: "#/components/schemas/DateRange"
+        effective_date_range:
+          $ref: "#/components/schemas/DateRange"
+        dataset_id:
+          type: string
+          description: Stable identity of the prepared bars shared by metrics, benchmark alignment, chart construction, and finalization.
+        observations_by_symbol:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+    ConfirmationPeriodAdjustment:
+      type: object
+      required: [code, requested_date_range, effective_date_range]
+      properties:
+        code:
+          const: effective_window_adjusted
+        requested_date_range:
+          $ref: "#/components/schemas/DateRange"
+        effective_date_range:
+          $ref: "#/components/schemas/DateRange"
+    BacktestRunRequest:
+      type: object
+      properties:
+        strategy_id:
+          type: string
+        conversation_id:
+          type: string
+        template:
+          type: string
+        asset_class:
+          enum: [equity, crypto, currency_pair]
+        symbols:
+          type: array
+          minItems: 1
+          maxItems: 5
+          items:
+            type: string
+        timeframe:
+          enum: [1h, 2h, 4h, 6h, 12h, 1D]
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        side:
+          type: string
+        starting_capital:
+          type: number
+        allocation_method:
+          const: equal_weight
+        parameters:
+          type: object
+          additionalProperties: true
+        benchmark_symbol:
+          type: string
     BacktestRun:
       type: object
       required:
@@ -357,7 +543,7 @@ components:
           description: Canonical aggregate and by-symbol backtest metrics.
         config_snapshot:
           type: object
-          description: Reproducible normalized runtime configuration.
+          description: Reproducible normalized runtime configuration. New runs include requested_date_range, effective_date_range, and data_coverage; execution and display use the effective range while the requested range remains provenance.
         conversation_result_card:
           type: object
           description: Beginner-friendly inline chat result card. Completed chat runs may include P1 sidecar ids, decision state, and optional structured execution_costs evidence when the engine modeled fees/slippage.

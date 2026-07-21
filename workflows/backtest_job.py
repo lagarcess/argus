@@ -699,12 +699,25 @@ def _mark_failed_from_tool_result(
     workflow_run_id: str | None,
     timings: _WorkflowTimingRecorder,
 ) -> dict[str, Any]:
-    failure_code = str(result.get("error_type") or "failed_internal")
+    failure_category = str(result.get("error_type") or "failed_internal")
+    failure_code = failure_category
     capability_context = result.get("capability_context")
     failure_detail = None
     if isinstance(capability_context, dict):
+        from argus.domain.engine_launch.results import (
+            is_user_safe_failure_code,
+            is_user_safe_failure_detail,
+        )
+
+        raw_failure_code = capability_context.get("failure_code")
+        if isinstance(raw_failure_code, str) and is_user_safe_failure_code(
+            raw_failure_code
+        ):
+            failure_code = raw_failure_code.strip()
         raw_failure_detail = capability_context.get("failure_detail")
-        if isinstance(raw_failure_detail, str) and raw_failure_detail.strip():
+        if isinstance(raw_failure_detail, str) and is_user_safe_failure_detail(
+            raw_failure_detail
+        ):
             failure_detail = raw_failure_detail.strip()
     from argus.domain.engine_launch.results import user_safe_failure_detail
 
@@ -721,6 +734,7 @@ def _mark_failed_from_tool_result(
         failure_detail=failure_detail,
         retryable=bool(result.get("retryable")),
         workflow_run_id=workflow_run_id,
+        failure_category=failure_category,
         timings=timings,
     )
 
@@ -735,6 +749,7 @@ def _mark_failed(
     failure_detail: str,
     retryable: bool,
     workflow_run_id: str | None,
+    failure_category: str | None = None,
     source_error: Exception | None = None,
     timings: _WorkflowTimingRecorder | None = None,
 ) -> dict[str, Any]:
@@ -743,7 +758,7 @@ def _mark_failed(
         "kind": REAL_BACKTEST_JOB_KIND,
         "workflow_run_id": workflow_run_id,
         "finished_at": finished_at,
-        "failure_category": failure_code,
+        "failure_category": failure_category or failure_code,
         "failure_detail": failure_detail,
         "retryable": retryable,
     }

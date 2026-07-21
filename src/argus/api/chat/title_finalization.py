@@ -9,6 +9,7 @@ from argus.api.artifact_naming import (
     maybe_generate_conversation_title,
     maybe_generate_saved_strategy_name,
 )
+from argus.api.chat.previews import is_degraded_clarification_compatibility_text
 from argus.api.chat.route_receipts import persist_route_receipts
 from argus.api.schemas import BacktestRun
 from argus.llm.openrouter import (
@@ -26,6 +27,7 @@ def finalize_conversation_title_after_turn(
     current_run: BacktestRun | None = None,
     user_message: str | None = None,
     assistant_message: str | None = None,
+    assistant_metadata: dict[str, object] | None = None,
     message_id: str | None = None,
     run_id: str | None = None,
 ) -> str | None:
@@ -41,7 +43,10 @@ def finalize_conversation_title_after_turn(
             language=language,
             current_run=current_run,
             user_message=user_message,
-            assistant_message=assistant_message,
+            assistant_message=artifact_naming_assistant_message(
+                assistant_message,
+                metadata=assistant_metadata,
+            ),
         )
         if title is not None:
             fallback_failure_mode = None
@@ -126,6 +131,7 @@ def schedule_artifact_naming_after_stream(
     saved_strategy_id: str | None = None,
     user_message: str | None = None,
     assistant_message: str | None = None,
+    assistant_metadata: dict[str, object] | None = None,
     message_id: str | None = None,
     run_id: str | None = None,
 ) -> None:
@@ -143,6 +149,7 @@ def schedule_artifact_naming_after_stream(
             current_run=current_run,
             user_message=user_message,
             assistant_message=assistant_message,
+            assistant_metadata=assistant_metadata,
             message_id=message_id,
             run_id=run_id,
         )
@@ -166,6 +173,21 @@ def schedule_artifact_naming_after_stream(
             conversation_id=conversation_id,
             saved_strategy_id=saved_strategy_id,
         )
+
+
+def artifact_naming_assistant_message(
+    assistant_message: str | None,
+    *,
+    metadata: dict[str, object] | None,
+) -> str | None:
+    """Keep compatibility fallback copy out of model-backed artifact naming."""
+
+    if is_degraded_clarification_compatibility_text(
+        role="assistant",
+        metadata=metadata,
+    ):
+        return None
+    return assistant_message
 
 
 def _artifact_naming_disabled_for_pytest() -> bool:

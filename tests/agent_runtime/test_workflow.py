@@ -4,6 +4,7 @@ from datetime import date
 from typing import Any
 
 import pytest
+from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.graph.workflow import (
     WorkflowStageOutcome,
     _apply_stage_result,
@@ -16,11 +17,15 @@ from argus.agent_runtime.runtime import (
     run_agent_turn,
     stream_agent_turn_events,
 )
+from argus.agent_runtime.stages.clarify import clarify_stage_async
 from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
     InterpretDecision,
     StageResult,
     StructuredInterpretation,
+)
+from argus.agent_runtime.stages.interpret_actions import (
+    structured_action_stage_result_if_applicable,
 )
 from argus.agent_runtime.stages.next_step import next_step_stage
 from argus.agent_runtime.state.models import (
@@ -55,6 +60,60 @@ class RecordingClarifier:
     def __call__(self, request: Any) -> str:
         self.requests.append(request)
         return self.response
+
+
+class UnexpectedInterpreter:
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        del request
+        raise AssertionError("typed recovery action must not call the interpreter")
+
+
+def test_response_option_rejects_an_unvalidated_source_marker_before_mutation() -> None:
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["NVDA"],
+        asset_class="equity",
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    state = RunState.new(
+        current_user_message="Retry with daily bars",
+        recent_thread_history=[],
+        action_context={
+            "type": "select_response_option",
+            "payload": {
+                "source_assistant_id": "assistant-old",
+                "validated_source_assistant_id": "assistant-old",
+                "option_id": "option_0",
+                "replacement_values": {"timeframe": "1D"},
+            },
+        },
+    )
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "facts": {
+            "unsupported_constraints": [
+                {
+                    "category": "unsupported_time_granularity",
+                    "raw_value": "5m",
+                }
+            ]
+        },
+        "options": [{"id": "option_0", "replacement_values": {"timeframe": "1D"}}],
+    }
+
+    result = structured_action_stage_result_if_applicable(
+        state=state,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-current",
+            "response_intent": response_intent,
+        },
+    )
+
+    assert result is not None
+    assert result.outcome == "ready_to_respond"
+    assert result.patch["candidate_strategy_draft"]["timeframe"] == "5m"
 
 
 def test_task_snapshot_clears_failed_action_after_new_confirmation() -> None:
@@ -942,6 +1001,194 @@ def test_workflow_publishes_pending_response_intent_options_for_recovery() -> No
 
 
 @pytest.mark.asyncio
+async def test_timeframe_recovery_action_rehydrates_assumptions_and_strategy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import confirm as confirm_module
+
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+        capital_amount=5_000,
+        comparison_baseline="SPY",
+    )
+    clarify_state = RunState.new(
+        current_user_message="Use five-minute bars.",
+        recent_thread_history=[],
+    )
+    clarify_state.intent = "unsupported_or_out_of_scope"
+    clarify_state.candidate_strategy_draft = pending
+    clarify_state.requested_field = "timeframe"
+    clarify_state.missing_required_fields = ["timeframe"]
+    clarify_state.optional_parameter_status = {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "5m",
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_time_granularity",
+                "raw_value": "5m",
+                "explanation": "Choose a supported timeframe.",
+                "simplification_options": [
+                    {
+                        "label": "Retry with daily bars",
+                        "replacement_values": {"timeframe": "1D"},
+                    },
+                    {
+                        "label": "Retry with 1-hour bars",
+                        "replacement_values": {"timeframe": "1h"},
+                    },
+                ],
+            }
+        ],
+    }
+    clarification = await clarify_stage_async(
+        state=clarify_state,
+        contract=build_default_capability_contract(),
+        clarification_generator=RecordingClarifier(
+            "Five-minute bars are not supported. Choose daily or one-hour bars."
+        ),
+    )
+
+    def prepared_coverage(
+        launch_payload: dict[str, Any],
+        *,
+        optional_parameter_status: dict[str, Any],
+    ) -> dict[str, Any]:
+        assert optional_parameter_status == {
+            "initial_capital": 5_000,
+            "fees": 0.001,
+            "slippage": 0.0005,
+            "timeframe": "1D",
+        }
+        return {"outcome": "ready_to_confirm", "launch_payload": launch_payload}
+
+    monkeypatch.setattr(confirm_module, "_coverage_preflight", prepared_coverage)
+    response_intent = clarification.patch["response_intent"]
+    action_option = response_intent["options"][0]
+    workflow = build_workflow(
+        structured_interpreter=UnexpectedInterpreter(),
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id="thread-timeframe-recovery",
+        message="Retry with daily bars",
+        action_context={
+            "type": "select_response_option",
+            "label": "Retry with daily bars",
+            "payload": {
+                "source_assistant_id": "assistant-timeframe-recovery",
+                "validated_source_assistant_id": "assistant-timeframe-recovery",
+                "option_id": action_option["id"],
+                "replacement_values": action_option["replacement_values"],
+            },
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-timeframe-recovery",
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "timeframe",
+            "response_intent": response_intent,
+            "clarification": clarification.patch["clarification"],
+        },
+    )
+
+    assert result["stage_outcome"] == "await_approval"
+    confirmation = result["confirmation_payload"]
+    assert confirmation["strategy"]["timeframe"] == "1D"
+    assert confirmation["launch_payload"]["timeframe"] == "1D"
+    assert confirmation["optional_parameters"]["initial_capital"]["value"] == 5_000
+    assert confirmation["optional_parameters"]["initial_capital"]["source"] == "user"
+    assert confirmation["optional_parameters"]["fees"]["value"] == 0.001
+    assert confirmation["optional_parameters"]["slippage"]["value"] == 0.0005
+    assert result["pending_strategy"]["strategy"]["timeframe"] == "1D"
+
+
+@pytest.mark.asyncio
+async def test_coverage_recovery_keeps_source_identity_out_of_clarification_context() -> (
+    None
+):
+    from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
+
+    source_assistant_id = "00000000-0000-0000-0000-000000000202"
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    response_intent = {
+        "kind": "coverage_recovery",
+        "semantic_needs": ["simplification_choice"],
+        "requested_fields": [
+            "date_range",
+            "asset_universe",
+            "comparison_baseline",
+        ],
+        "facts": {},
+        "options": [
+            {
+                "id": "change_asset",
+                "replacement_values": {"requested_field": "asset_universe"},
+            }
+        ],
+    }
+    clarifier = RecordingClarifier("Which asset should I use instead?")
+    workflow = build_workflow(
+        structured_interpreter=UnexpectedInterpreter(),
+        clarification_generator=clarifier,
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1"),
+        thread_id="thread-coverage-recovery-identity",
+        message="Change asset",
+        action_context={
+            "type": "select_response_option",
+            "payload": {
+                "source_assistant_id": source_assistant_id,
+                "validated_source_assistant_id": source_assistant_id,
+                "option_id": "change_asset",
+                "replacement_values": {"requested_field": "asset_universe"},
+            },
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={
+            "validated_source_assistant_id": source_assistant_id,
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": response_intent,
+        },
+    )
+
+    assert result["stage_outcome"] == "await_user_reply"
+    assert clarifier.requests
+    request = clarifier.requests[0]
+    assert source_assistant_id not in repr(request.response_intent)
+    openrouter_messages = OpenRouterClarificationGenerator()._messages(request)
+    assert source_assistant_id not in repr(
+        [message.content for message in openrouter_messages]
+    )
+    assert source_assistant_id not in repr(
+        result["pending_strategy"]["response_intent"]
+    )
+
+
+@pytest.mark.asyncio
 async def test_workflow_requires_confirmation_before_execute(monkeypatch) -> None:
     from argus.agent_runtime import resolution as resolution_module
 
@@ -1067,11 +1314,168 @@ async def test_workflow_preserves_confirmation_validation_prompt(monkeypatch) ->
         == "data_window_too_short_for_rule"
     )
     assert clarifier.requests[0].response_intent["options"] == [
-        {"label": "Use a longer date range"},
-        {"label": "Use a shorter indicator period"},
-        {"label": "Choose a simpler supported rule"},
+        {"label": "Use a longer date range", "id": "option_0"},
+        {"label": "Use a shorter indicator period", "id": "option_1"},
+        {"label": "Choose a simpler supported rule", "id": "option_2"},
     ]
     assert "confirmation_payload" not in result
+
+
+UNSUPPORTED_REFUSAL_PROSE_EN = (
+    "I can't run options strategies yet — I can test plain holding of TSLA instead."
+)
+UNSUPPORTED_REFUSAL_PROSE_ES = (
+    "Todavía no puedo ejecutar estrategias de opciones — sí puedo probar "
+    "mantener TSLA durante ese período."
+)
+
+
+class OptionsRefusalInterpreter:
+    def __init__(self, *, refusal: str, language: str | None = None) -> None:
+        self.refusal = refusal
+        self.language = language
+
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="unsupported_or_out_of_scope",
+            task_relation="new_task",
+            requires_clarification=True,
+            user_goal_summary="User asked to backtest an options idea on TSLA.",
+            detected_user_language=self.language,
+            assistant_response=self.refusal,
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                strategy_type="buy_and_hold",
+                asset_universe=["TSLA"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            ),
+            semantic_turn_act="unsupported_request",
+        )
+
+
+async def _unsupported_recovery_prose_two_turn_proof(
+    *,
+    refusal: str,
+    user: UserState,
+    thread_id: str,
+    first_message: str,
+    selection_message: str,
+) -> None:
+    clarifier = RecordingClarifier("generated prose that must never replace the model's")
+    workflow = build_workflow(
+        structured_interpreter=OptionsRefusalInterpreter(
+            refusal=refusal,
+            language=user.language_preference,
+        ),
+        clarification_generator=clarifier,
+        checkpointer=MemorySaver(),
+    )
+
+    first = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message=first_message,
+    )
+
+    assert first["stage_outcome"] == "await_user_reply"
+    assert first["assistant_prompt"] == refusal
+    assert first["assistant_response"] == refusal
+    assert clarifier.requests == []
+    clarification = first["clarification"]
+    assert clarification["kind"] == "unsupported_recovery"
+    assert clarification["prompt_source"] == "llm_generated"
+    pending = first["pending_strategy"]
+    assert pending["strategy"]["asset_universe"] == ["TSLA"]
+    assert pending["strategy"]["date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-12-31",
+    }
+    response_intent = pending["response_intent"]
+    assert response_intent["kind"] == "unsupported_recovery"
+    buy_and_hold_option = next(
+        option
+        for option in response_intent["options"]
+        if option.get("replacement_values") == {"strategy_type": "buy_and_hold"}
+    )
+    assert "confirmation_payload" not in first
+
+    source_id = f"assistant-{thread_id}"
+    second = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message=selection_message,
+        action_context={
+            "type": "select_response_option",
+            "label": str(buy_and_hold_option.get("label") or selection_message),
+            "payload": {
+                "source_assistant_id": source_id,
+                "validated_source_assistant_id": source_id,
+                "option_id": buy_and_hold_option["id"],
+                "replacement_values": buy_and_hold_option["replacement_values"],
+            },
+        },
+        fallback_selected_thread_metadata={
+            "validated_source_assistant_id": source_id,
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "unsupported_constraints",
+            "response_intent": response_intent,
+            "clarification": clarification,
+        },
+    )
+
+    assert second["stage_outcome"] == "await_approval"
+    confirmed = second["confirmation_payload"]["strategy"]
+    assert confirmed["strategy_type"] == "buy_and_hold"
+    assert confirmed["asset_universe"] == ["TSLA"]
+    assert second.get("assistant_prompt") is None
+    assert clarifier.requests == []
+
+
+@pytest.mark.asyncio
+async def test_unsupported_recovery_preserves_interpreter_prose_full_graph_en(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+    await _unsupported_recovery_prose_two_turn_proof(
+        refusal=UNSUPPORTED_REFUSAL_PROSE_EN,
+        user=UserState(user_id="u1", expertise_level="beginner"),
+        thread_id="thread-unsupported-prose-en",
+        first_message=(
+            "can you run an options straddle on TSLA from 2024-01-01 "
+            "through 2024-12-31?"
+        ),
+        selection_message="Compare with buy and hold",
+    )
+
+
+@pytest.mark.asyncio
+async def test_unsupported_recovery_preserves_interpreter_prose_full_graph_es(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+    await _unsupported_recovery_prose_two_turn_proof(
+        refusal=UNSUPPORTED_REFUSAL_PROSE_ES,
+        user=UserState(user_id="u1", language_preference="es-419"),
+        thread_id="thread-unsupported-prose-es",
+        first_message=(
+            "puedes probar un straddle de opciones sobre TSLA desde 2024-01-01 "
+            "hasta 2024-12-31?"
+        ),
+        selection_message="Comparar con comprar y mantener",
+    )
 
 
 @pytest.mark.asyncio

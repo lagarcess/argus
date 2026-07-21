@@ -1,21 +1,29 @@
 from __future__ import annotations
 
 import warnings
+from collections import Counter
+from datetime import date, datetime
 from typing import Any
 
 import pandas as pd
 import pytest
+from argus.domain.backtesting.coverage import _dataset_id
 from argus.domain.engine import _build_signals
 from argus.domain.engine_launch.adapter import (
     _provider_metadata,
     _resolve_request_symbols,
     run_launch_backtest,
+    validate_request_benchmark,
+    validate_request_symbols,
 )
 from argus.domain.engine_launch.models import (
     LaunchBacktestRequest,
     LaunchExecutionEnvelope,
 )
 from argus.domain.engine_launch.results import user_safe_failure_message
+from argus.domain.engine_launch.strategies import validate_launch_supported
+from argus.domain.market_data.assets import ResolvedAsset
+from argus.domain.market_data.capabilities import EquityMarketSession
 
 
 def test_launch_request_supports_three_strategy_types() -> None:
@@ -72,6 +80,462 @@ def test_launch_request_supports_three_strategy_types() -> None:
     assert dca_request.strategy_type == "dca_accumulation"
     assert dca_request.cadence == "monthly"
     assert threshold_request.strategy_type == "indicator_threshold"
+
+
+@pytest.mark.parametrize(
+    "strategy_type",
+    [
+        "buy_and_hold",
+        "dca_accumulation",
+        "indicator_threshold",
+        "signal_strategy",
+    ],
+)
+def test_launch_validation_rejects_unsupported_timeframe_for_every_strategy(
+    strategy_type: str,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type=strategy_type,
+        symbol="AAPL",
+        symbols=["AAPL"],
+        asset_class="equity",
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=10_000.0,
+        position_size=None,
+        cadence="monthly" if strategy_type == "dca_accumulation" else None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    with pytest.raises(ValueError, match="unsupported_timeframe"):
+        validate_launch_supported(request)
+
+
+def test_approved_launch_uses_one_prepared_dataset_for_metrics_and_chart(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: Counter[str] = Counter()
+    index = pd.to_datetime(["2024-01-03", "2024-01-04", "2024-01-05"], utc=True)
+    close = pd.Series([100.0, 101.0, 102.0], index=index)
+    bars = pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": 1_000.0,
+        },
+        index=index,
+    )
+
+    def fake_fetch(symbol: str, **_: Any) -> pd.DataFrame:
+        calls[symbol] += 1
+        return bars.copy(deep=True)
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.fetch_ohlcv",
+        fake_fetch,
+    )
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="AAPL",
+        symbols=["AAPL"],
+        asset_class="equity",
+        timeframe="1D",
+        date_range={"start": "2024-01-03", "end": "2024-01-05"},
+        requested_date_range={"start": "2024-01-01", "end": "2024-01-05"},
+        coverage_preflight={
+            "outcome": "adjusted_coverage",
+            "requested_date_range": {
+                "start": "2024-01-01",
+                "end": "2024-01-05",
+            },
+            "effective_date_range": {
+                "start": "2024-01-03",
+                "end": "2024-01-05",
+            },
+            "preflight_id": _dataset_id({"AAPL": bars, "SPY": bars}),
+        },
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=10_000,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    assert calls == Counter({"AAPL": 1, "SPY": 1})
+    resolved = result.envelope.resolved_parameters
+    assert resolved["requested_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-01-05",
+    }
+    assert resolved["effective_date_range"] == {
+        "start": "2024-01-03",
+        "end": "2024-01-05",
+    }
+    assert resolved["engine_config"]["data_coverage"]["dataset_id"].startswith("sha256:")
+    assert result.result_card is not None
+    assert result.result_card["chart"]["series"][0]["time"] == "2024-01-03"
+    assert result.result_card["chart"]["series"][-1]["time"] == "2024-01-05"
+
+    from argus.domain.backtest_run_builder import build_backtest_run_from_result
+
+    run = build_backtest_run_from_result(
+        conversation_id="conversation-effective-window",
+        result_card=result.result_card,
+        envelope=result.envelope.model_dump(mode="python"),
+        run_id_factory=lambda: "run-effective-window",
+        classify_symbol_func=lambda _symbol: type(
+            "ResolvedAsset", (), {"asset_class": "equity"}
+        )(),
+        default_benchmark_func=lambda _asset_class, _symbols: "SPY",
+    )
+    assert run is not None
+    assert run.config_snapshot["requested_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-01-05",
+    }
+    assert run.config_snapshot["effective_date_range"] == {
+        "start": "2024-01-03",
+        "end": "2024-01-05",
+    }
+
+
+def test_approved_launch_uses_one_calendar_for_a_complete_holiday_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    dates = [
+        "2024-12-24",
+        "2024-12-26",
+        "2024-12-27",
+        "2024-12-30",
+        "2024-12-31",
+        "2025-01-02",
+    ]
+    index = pd.to_datetime(dates, utc=True)
+    close = pd.Series(range(100, 106), index=index, dtype=float)
+    bars = pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": 1_000.0,
+        },
+        index=index,
+    )
+    calendar_calls: list[tuple[date, date]] = []
+
+    def fake_calendar(*, start_date: date, end_date: date):
+        calendar_calls.append((start_date, end_date))
+        return tuple(
+            EquityMarketSession(
+                provider="alpaca",
+                session_date=date.fromisoformat(day),
+                opens_at=datetime.fromisoformat(f"{day}T09:30:00-05:00"),
+                closes_at=datetime.fromisoformat(
+                    f"{day}T{'13:00' if day == '2024-12-24' else '16:00'}:00-05:00"
+                ),
+            )
+            for day in dates
+        )
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.fetch_ohlcv",
+        lambda **_: bars.copy(deep=True),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter._market_calendar_for_preflight",
+        lambda: fake_calendar,
+    )
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="AAPL",
+        symbols=["AAPL"],
+        asset_class="equity",
+        timeframe="1D",
+        date_range={"start": dates[0], "end": dates[-1]},
+        requested_date_range={"start": dates[0], "end": dates[-1]},
+        coverage_preflight={
+            "outcome": "full_coverage",
+            "requested_date_range": {"start": dates[0], "end": dates[-1]},
+            "effective_date_range": {"start": dates[0], "end": dates[-1]},
+            "preflight_id": _dataset_id({"AAPL": bars, "SPY": bars}),
+        },
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=10_000,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    assert calendar_calls == [(date(2024, 12, 24), date(2025, 1, 2))]
+
+
+def test_approved_launch_fails_upstream_when_live_calendar_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dates = [
+        "2024-12-24",
+        "2024-12-26",
+        "2024-12-27",
+        "2024-12-30",
+        "2024-12-31",
+        "2025-01-02",
+    ]
+    index = pd.to_datetime(dates, utc=True)
+    close = pd.Series(range(100, 106), index=index, dtype=float)
+    bars = pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": 1_000.0,
+        },
+        index=index,
+    )
+    requested = {"start": dates[0], "end": dates[-1]}
+    calendar_calls = 0
+    artifact_calls: Counter[str] = Counter()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.fetch_ohlcv",
+        lambda **_: bars.copy(deep=True),
+    )
+
+    def unavailable_calendar(**_: object) -> tuple[EquityMarketSession, ...]:
+        nonlocal calendar_calls
+        calendar_calls += 1
+        raise ValueError("provider-specific calendar failure")
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter._market_calendar_for_preflight",
+        lambda: unavailable_calendar,
+        raising=False,
+    )
+
+    def unexpected_artifact_call(kind: str):
+        def fail(*_: object, **__: object):
+            artifact_calls[kind] += 1
+            raise AssertionError(f"{kind} must not run after calendar failure")
+
+        return fail
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        unexpected_artifact_call("metrics"),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_chart",
+        unexpected_artifact_call("chart"),
+    )
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="AAPL",
+        symbols=["AAPL"],
+        asset_class="equity",
+        timeframe="1D",
+        date_range=requested,
+        requested_date_range=requested,
+        coverage_preflight={
+            "outcome": "full_coverage",
+            "requested_date_range": requested,
+            "effective_date_range": requested,
+            "preflight_id": _dataset_id({"AAPL": bars, "SPY": bars}),
+        },
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=10_000,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "failed_upstream"
+    assert result.envelope.failure_reason == "market_data_unavailable"
+    assert result.result_card is None
+    assert calendar_calls == 1
+    assert artifact_calls == Counter()
+
+
+def test_approved_launch_reuses_canonical_benchmark_alias_without_duplicate_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: Counter[str] = Counter()
+    index = pd.to_datetime(
+        ["2024-01-03", "2024-01-04", "2024-01-05"],
+        utc=True,
+    )
+    close = pd.Series([100.0, 101.0, 102.0], index=index)
+    bars = pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": 1_000.0,
+        },
+        index=index,
+    )
+
+    def fake_fetch(symbol: str, **_: Any) -> pd.DataFrame:
+        calls[symbol] += 1
+        return bars.copy(deep=True)
+
+    def classify_stub(symbol: str):
+        canonical = "BTC" if symbol in {"BTC", "BTC/USD"} else symbol
+        return type(
+            "ResolvedAsset",
+            (),
+            {
+                "canonical_symbol": canonical,
+                "asset_class": "crypto",
+                "symbol": canonical,
+            },
+        )()
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        classify_stub,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.fetch_ohlcv",
+        fake_fetch,
+    )
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="ETH",
+        symbols=["ETH"],
+        asset_class="crypto",
+        timeframe="1D",
+        date_range={"start": "2024-01-03", "end": "2024-01-05"},
+        requested_date_range={"start": "2024-01-03", "end": "2024-01-05"},
+        coverage_preflight={
+            "outcome": "full_coverage",
+            "requested_date_range": {
+                "start": "2024-01-03",
+                "end": "2024-01-05",
+            },
+            "effective_date_range": {
+                "start": "2024-01-03",
+                "end": "2024-01-05",
+            },
+            "preflight_id": _dataset_id({"ETH": bars, "BTC": bars}),
+        },
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=1_000,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="BTC/USD",
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    assert result.envelope.resolved_parameters["benchmark_symbol"] == "BTC"
+    assert calls == Counter({"ETH": 1, "BTC": 1})
+
+
+def test_approved_launch_preserves_transient_market_data_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested = {"start": "2024-01-01", "end": "2024-01-05"}
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="AAPL",
+        symbols=["AAPL"],
+        asset_class="equity",
+        timeframe="1D",
+        date_range=requested,
+        requested_date_range=requested,
+        coverage_preflight={
+            "outcome": "full_coverage",
+            "requested_date_range": requested,
+            "effective_date_range": requested,
+            "preflight_id": "sha256:approved-window",
+        },
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=10_000,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.fetch_ohlcv",
+        lambda **_: (_ for _ in ()).throw(ValueError("provider timeout")),
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "failed_upstream"
+    assert result.envelope.failure_category == "upstream_dependency_error"
+    assert result.envelope.failure_reason == "market_data_unavailable"
 
 
 @pytest.mark.parametrize(
@@ -347,6 +811,104 @@ def test_launch_request_explicit_asset_class_rejects_provider_class_conflict(
 
     with pytest.raises(ValueError, match="asset_class_conflict"):
         _resolve_request_symbols(request)
+
+
+def test_declared_crypto_class_disambiguates_equity_ticker_collision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.engine_launch import adapter
+
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="ETH",
+        symbols=["ETH"],
+        asset_class="crypto",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-03-31"},
+        sizing_mode="capital_amount",
+        capital_amount=1_000.0,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="BTC",
+    )
+    monkeypatch.setattr(
+        adapter,
+        "classify_symbol",
+        lambda _: type(
+            "SymbolAsset",
+            (),
+            {"symbol": "ETH", "canonical_symbol": "ETH", "asset_class": "equity"},
+        )(),
+    )
+    monkeypatch.setattr(
+        adapter,
+        "search_assets",
+        lambda *_args, **_kwargs: [
+            ResolvedAsset(
+                canonical_symbol="ETH",
+                asset_class="crypto",
+                name="Ethereum / US Dollar",
+                raw_symbol="ETH/USD",
+                provider="alpaca",
+            )
+        ],
+        raising=False,
+    )
+
+    result = validate_request_symbols(request)
+
+    assert result.outcome == "resolved"
+    assert result.symbols == ("ETH",)
+    assert result.asset_class == "crypto"
+
+
+def test_crypto_benchmark_disambiguates_equity_ticker_collision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.engine_launch import adapter
+
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="ETH",
+        symbols=["ETH"],
+        asset_class="crypto",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-03-31"},
+        sizing_mode="capital_amount",
+        capital_amount=1_000.0,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="BTC",
+    )
+    monkeypatch.setattr(
+        adapter,
+        "classify_symbol",
+        lambda _: type(
+            "SymbolAsset",
+            (),
+            {"symbol": "BTC", "canonical_symbol": "BTC", "asset_class": "equity"},
+        )(),
+    )
+    monkeypatch.setattr(
+        adapter,
+        "search_assets",
+        lambda *_args, **_kwargs: [
+            ResolvedAsset(
+                canonical_symbol="BTC",
+                asset_class="crypto",
+                name="Bitcoin / US Dollar",
+                raw_symbol="BTC/USD",
+                provider="alpaca",
+            )
+        ],
+        raising=False,
+    )
+
+    result = validate_request_benchmark(request, asset_class="crypto")
+
+    assert result.outcome == "resolved"
+    assert result.benchmark_symbol == "BTC"
+    assert result.asset_class == "crypto"
 
 
 def test_buy_and_hold_adapter_returns_envelope_card_and_context(
@@ -736,8 +1298,9 @@ def test_persisted_config_snapshot_replays_key_metrics(
         assert replayed_performance[metric_key] == pytest.approx(
             original_performance[metric_key],
         )
-    assert replayed["aggregate"]["efficiency"]["total_trades"] == (
-        run.metrics["aggregate"]["efficiency"]["total_trades"]
+    assert (
+        replayed["aggregate"]["efficiency"]["total_trades"]
+        == (run.metrics["aggregate"]["efficiency"]["total_trades"])
     )
 
 
@@ -1134,8 +1697,7 @@ def test_adapter_accepts_registry_bounded_indicator_threshold_shape(
         in result.envelope.caveats
     )
     assert not any(
-        "executable indicator registry" in caveat
-        for caveat in result.envelope.caveats
+        "executable indicator registry" in caveat for caveat in result.envelope.caveats
     )
     assert captured["config"]["parameters"]["entry_threshold"] == 25.0
     assert "rule_spec" in captured["config"]["parameters"]
@@ -1210,9 +1772,12 @@ def test_adapter_uses_indicator_period_from_threshold_rules(
     assert result.envelope.execution_status == "succeeded"
     assert result.envelope.resolved_parameters["indicator_period"] == 7
     assert captured["config"]["parameters"]["indicator_period"] == 7
-    assert captured["config"]["parameters"]["rule_spec"]["entry"]["conditions"][0][
-        "left"
-    ]["period"] == 7
+    assert (
+        captured["config"]["parameters"]["rule_spec"]["entry"]["conditions"][0]["left"][
+            "period"
+        ]
+        == 7
+    )
 
 
 def test_adapter_adds_no_trade_note_to_signal_result_card(
@@ -1483,9 +2048,7 @@ def test_adapter_explains_symbol_level_equity_data_window_unavailability(
     )
     monkeypatch.setattr(
         "argus.domain.engine_launch.adapter.compute_alpha_metrics",
-        lambda config, **_: (_ for _ in ()).throw(
-            ValueError("market_data_unavailable")
-        ),
+        lambda config, **_: (_ for _ in ()).throw(ValueError("market_data_unavailable")),
     )
 
     result = run_launch_backtest(request)

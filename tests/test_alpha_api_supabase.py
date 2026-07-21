@@ -419,21 +419,17 @@ def mock_gateway():
     gateway.create_evidence_artifact.side_effect = lambda *, user_id, artifact: artifact
     gateway.get_decision_note_by_artifact.return_value = None
     gateway.upsert_decision_note.side_effect = lambda *, user_id, decision: decision
-    gateway.capture_current_decision_note.side_effect = (
-        lambda *,
-        user_id,
-        decision: (
-            decision,
-            api_state.store.evidence_artifacts[decision.evidence_artifact_id].model_copy(
-                update={"lifecycle": "decided"}
-            ),
-            api_state.store.ideas[decision.idea_id].model_copy(
-                update={"lifecycle": "decided"}
-            ),
-            api_state.store.idea_versions[decision.idea_version_id].model_copy(
-                update={"lifecycle": "decided"}
-            ),
-        )
+    gateway.capture_current_decision_note.side_effect = lambda *, user_id, decision: (
+        decision,
+        api_state.store.evidence_artifacts[decision.evidence_artifact_id].model_copy(
+            update={"lifecycle": "decided"}
+        ),
+        api_state.store.ideas[decision.idea_id].model_copy(
+            update={"lifecycle": "decided"}
+        ),
+        api_state.store.idea_versions[decision.idea_version_id].model_copy(
+            update={"lifecycle": "decided"}
+        ),
     )
     gateway.create_decision_note.side_effect = lambda *, user_id, decision: decision
     gateway.mark_evidence_artifact_lifecycle.side_effect = (
@@ -450,12 +446,24 @@ def mock_gateway():
         )
     )
     gateway.mark_result_card_decision_for_run.return_value = None
-    with patch("argus.api.state.supabase_gateway", gateway):
+    with (
+        patch("argus.api.state.supabase_gateway", gateway),
+        patch("argus.api.dependencies.auth_session_is_active", return_value=True),
+    ):
         yield gateway
 
 
-def test_run_backtest_quota_exceeded(mock_gateway):
-    mock_gateway.check_and_increment_usage_limits.side_effect = QuotaExceededError(
+def test_run_backtest_quota_exceeded_before_provider_preflight(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+) -> None:
+    from argus.api import backtest_service
+
+    provider_preflight = MagicMock(
+        side_effect=AssertionError("provider preflight must not run over quota")
+    )
+    monkeypatch.setattr(backtest_service, "prepare_market_data", provider_preflight)
+    mock_gateway.check_usage_limits.side_effect = QuotaExceededError(
         "Quota exceeded for backtest_runs (day)"
     )
 
@@ -472,6 +480,112 @@ def test_run_backtest_quota_exceeded(mock_gateway):
     assert data["code"] == "too_many_requests"
     assert "Quota exceeded for backtest_runs" in data["detail"]
     assert response.headers.get("Retry-After") == "60"
+    provider_preflight.assert_not_called()
+    mock_gateway.check_usage_limits.assert_called_once()
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
+
+
+def test_run_backtest_coverage_rejection_does_not_consume_allowance(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+) -> None:
+    from argus.api import backtest_service
+    from argus.domain.backtesting.coverage import MarketDataCoverageError
+
+    monkeypatch.setattr(
+        backtest_service,
+        "prepare_market_data",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            MarketDataCoverageError("no_common_data_window")
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL", "MSFT"],
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-05",
+        },
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "coverage-rejected-before-quota",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "no_common_data_window"
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
+    mock_gateway.finalize_backtest_completion.assert_not_called()
+
+
+def test_direct_run_persists_requested_and_effective_data_windows(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+) -> None:
+    from argus.domain import engine as domain_engine
+
+    def fetch_with_leading_gap(symbol: str, **_: object) -> pd.DataFrame:
+        days = (
+            ["2024-01-03", "2024-01-04", "2024-01-05"]
+            if symbol == "AAPL"
+            else [
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-04",
+                "2024-01-05",
+            ]
+        )
+        index = pd.to_datetime(days, utc=True)
+        close = pd.Series(range(100, 100 + len(index)), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(domain_engine, "fetch_ohlcv", fetch_with_leading_gap)
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-05",
+        },
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "direct-effective-window",
+        },
+    )
+
+    assert response.status_code == 200
+    run = response.json()["run"]
+    assert run["config_snapshot"]["requested_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-01-05",
+    }
+    assert run["config_snapshot"]["effective_date_range"] == {
+        "start": "2024-01-03",
+        "end": "2024-01-05",
+    }
+    assert run["conversation_result_card"]["date_range"] == {
+        "start": "2024-01-03",
+        "end": "2024-01-05",
+        "display": "January 3, 2024 to January 5, 2024",
+    }
+    assert run["chart"]["series"][0]["time"] == "2024-01-03"
+    assert run["chart"]["series"][-1]["time"] == "2024-01-05"
+    mock_gateway.check_and_increment_usage_limits.assert_called_once()
 
 
 def test_chat_stream_quota_exceeded(mock_gateway):
@@ -1171,9 +1285,12 @@ def test_chat_stream_finalization_retry_reuses_original_execution_identity(
         },
     )
 
-    assert next(
-        event for event in _stream_events(first.text) if event.get("type") == "error"
-    )["code"] == "finalization_failed"
+    assert (
+        next(
+            event for event in _stream_events(first.text) if event.get("type") == "error"
+        )["code"]
+        == "finalization_failed"
+    )
     assert _final_payload(second.text)["run"]["id"] == next(
         iter(finalization_store.backtest_runs)
     )
@@ -1331,6 +1448,59 @@ def test_unauthorized_invalid_token(mock_gateway):
     assert response.status_code == 401
 
 
+def test_unauthorized_revoked_supabase_session(mock_gateway, monkeypatch):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    monkeypatch.setattr(api_state, "DATABASE_URL", "postgresql://auth-pool/argus")
+    mock_gateway.get_auth_user_from_token.return_value = {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "email": "developer@argus.local",
+    }
+    mock_gateway.private_alpha_email_allowed.return_value = True
+
+    with patch(
+        "argus.api.dependencies.auth_session_is_active", return_value=False
+    ) as is_active:
+        response = client.get(
+            "/api/v1/me",
+            cookies={"sb-auth-token": "revoked-but-unexpired-token"},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "unauthorized"
+    is_active.assert_called_once_with(
+        database_url="postgresql://auth-pool/argus",
+        token="revoked-but-unexpired-token",
+        user_id="00000000-0000-0000-0000-000000000001",
+    )
+    mock_gateway.get_or_create_profile_for_auth_user.assert_not_called()
+
+
+def test_auth_session_verification_failure_fails_closed(mock_gateway, monkeypatch):
+    from argus.api.auth_sessions import AuthSessionVerificationUnavailable
+
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    monkeypatch.setattr(api_state, "DATABASE_URL", "postgresql://auth-pool/argus")
+    mock_gateway.get_auth_user_from_token.return_value = {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "email": "developer@argus.local",
+    }
+
+    with patch(
+        "argus.api.dependencies.auth_session_is_active",
+        side_effect=AuthSessionVerificationUnavailable,
+    ):
+        response = client.get(
+            "/api/v1/me",
+            headers={"Authorization": "Bearer valid-but-unverifiable-token"},
+        )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "auth_session_verification_unavailable"
+    mock_gateway.get_or_create_profile_for_auth_user.assert_not_called()
+
+
 def test_profile_creation_on_first_login(mock_gateway):
     import os
 
@@ -1428,6 +1598,26 @@ def test_login_forces_secure_session_cookies_in_production(mock_gateway, monkeyp
     assert "sb-auth-token" in set_cookie
     assert "sb-refresh-token" in set_cookie
     assert "secure" in set_cookie
+
+
+def test_logout_rejects_untrusted_browser_origin() -> None:
+    response = client.post(
+        "/api/v1/auth/logout",
+        headers={"Origin": "https://attacker.example"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "csrf_origin_rejected"
+
+
+def test_logout_accepts_configured_browser_origin() -> None:
+    response = client.post(
+        "/api/v1/auth/logout",
+        headers={"Origin": "http://localhost:3000"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"success": True}
 
 
 def test_feedback_submission_persists_with_user_ownership(mock_gateway):
@@ -2181,14 +2371,14 @@ def test_search_supabase_orders_p1_artifacts_before_source_conversation(
     now = utcnow()
     newer = (now + timedelta(minutes=5)).replace(microsecond=0)
     mock_gateway.search_rows.return_value = {
-            "conversations": [
-                {
-                    "id": "conversation-1",
-                    "title": "AAPL MSFT TSLA source wrapper",
-                    "last_message_preview": "AAPL MSFT TSLA chat wrapper",
-                    "updated_at": newer.isoformat(),
-                    "pinned": False,
-                }
+        "conversations": [
+            {
+                "id": "conversation-1",
+                "title": "AAPL MSFT TSLA source wrapper",
+                "last_message_preview": "AAPL MSFT TSLA chat wrapper",
+                "updated_at": newer.isoformat(),
+                "pinned": False,
+            }
         ],
         "strategies": [],
         "collections": [],
