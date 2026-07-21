@@ -52,7 +52,9 @@ cat > web/.env.local <<EOF
 NEXT_PUBLIC_SUPABASE_URL=$API_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY
 NEXT_PUBLIC_MOCK_AUTH=false
-NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
+# Same-site host (localhost:3000 -> localhost:8000) so the Argus HttpOnly
+# cookie transport is real in local QA, matching a same-site deployment.
+NEXT_PUBLIC_ARGUS_API_URL=http://localhost:8000/api/v1
 ARGUS_APP_ORIGIN=http://localhost:3000
 NEXT_PUBLIC_ENABLE_SPANISH=true
 NEXT_PUBLIC_STRATEGIES_ENABLED=false

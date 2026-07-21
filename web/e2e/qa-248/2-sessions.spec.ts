@@ -20,9 +20,11 @@ async function loginNewContext(
 }
 
 // Journeys 10-17 of the issue-248 acceptance matrix: independent sessions,
-// scoped revocation, stale-cookie rejection, honest degraded states.
+// scoped revocation, revoked-bearer rejection, honest degraded states.
+// The Argus HttpOnly cookie transport is proven separately in
+// 6-argus-cookie-path.spec.ts.
 test.describe("issue-248 session scope journeys (local real auth)", () => {
-  test("revoke-others keeps this browser and rejects the other's stale cookies", async ({
+  test("revoke-others keeps this browser and rejects the other's revoked bearer token", async ({
     browser,
   }) => {
     const { recoveryEmail } = identities();
@@ -133,8 +135,9 @@ test.describe("issue-248 session scope journeys (local real auth)", () => {
     await screenshot(a.page, "28-partial-cookie-cleanup-warning");
     await a.context.unroute("**/auth/logout");
 
-    // Supabase revocation succeeded, so the surviving Argus cookies are stale
-    // and the sessions check must reject them.
+    // Supabase revocation succeeded; replaying this context's revoked bearer
+    // token must be rejected by the auth.sessions check (cookie-path proof
+    // lives in 6-argus-cookie-path.spec.ts).
     await expect.poll(() => protectedMeStatus(a.context), { timeout: 20_000 }).toBe(401);
     await a.context.close();
   });

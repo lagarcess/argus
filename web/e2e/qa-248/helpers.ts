@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
@@ -6,7 +7,7 @@ export const ROOT = path.resolve(__dirname, "../../..");
 export const EVIDENCE_DIR = path.join(ROOT, "temp", "qa-evidence-248");
 export const SHOTS_DIR = path.join(EVIDENCE_DIR, "shots");
 export const MAILPIT_URL = process.env.QA_MAILPIT_URL ?? "http://127.0.0.1:54334";
-export const ARGUS_API = process.env.QA_ARGUS_API ?? "http://127.0.0.1:8000/api/v1";
+export const ARGUS_API = process.env.QA_ARGUS_API ?? "http://localhost:8000/api/v1";
 export const HOSTED_MODE = Boolean(process.env.ARGUS_QA_APPROVED_SUPABASE_REF);
 
 const IDENTITY_FILE = path.join(ROOT, ".qa-identities.env");
@@ -121,11 +122,12 @@ export async function expectLoginRejected(page: Page, email: string, password: s
   expect(page.url()).not.toContain("/chat");
 }
 
-// The app authenticates Argus API calls with a bearer token taken from the
-// browser Supabase session (argus-api.ts apiFetch); mirrored cookies cannot
-// cross the localhost:3000 -> 127.0.0.1:8000 site boundary. Replaying the
-// context's current token models both normal calls and stale-token replay
-// after revocation.
+// The app sends both credentials on API calls: an Authorization bearer from
+// the browser Supabase session (argus-api.ts apiFetch) and, in same-site
+// topologies, the Argus HttpOnly cookies. The helpers below keep the two
+// transports separate so each claim stays honest:
+//   protectedMe / protectedMeStatus  -> BEARER-TOKEN replay
+//   argusCookieNames / cookie probes -> Argus HttpOnly COOKIE path
 async function supabaseAccessToken(context: BrowserContext): Promise<string | null> {
   const cookies = await context.cookies("http://localhost:3000");
   const chunks = cookies
@@ -165,6 +167,76 @@ export async function protectedMe(
 
 export async function protectedMeStatus(context: BrowserContext): Promise<number> {
   return (await protectedMe(context)).status;
+}
+
+export async function supabaseSessionId(context: BrowserContext): Promise<string | null> {
+  const token = await supabaseAccessToken(context);
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const claims = JSON.parse(Buffer.from(payload, "base64").toString("utf8")) as {
+      session_id?: string;
+    };
+    return claims.session_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ---- Argus HttpOnly cookie transport (same-site local topology) ----------
+
+export async function argusCookieNames(context: BrowserContext): Promise<string[]> {
+  const cookies = await context.cookies(ARGUS_API);
+  return cookies.map((cookie) => cookie.name).sort();
+}
+
+// In-page fetch without headers: the only credential is the HttpOnly cookie.
+// Returns -1 on transient fetch failures so expect.poll can retry.
+export async function cookieOnlyMeStatus(page: Page): Promise<number> {
+  return page.evaluate(async (api) => {
+    try {
+      return (await fetch(`${api}/me`, { credentials: "include" })).status;
+    } catch {
+      return -1;
+    }
+  }, ARGUS_API);
+}
+
+// Jar replay without an Authorization header, for post-revocation checks
+// that must not depend on the page still being usable.
+export async function cookieReplayMeStatus(context: BrowserContext): Promise<number> {
+  const res = await context.request.get(`${ARGUS_API}/me`);
+  return res.status();
+}
+
+// ---- Local database truth (auth.sessions) --------------------------------
+
+const LOCAL_DB_CONTAINER = "supabase_db_argus-qa";
+
+// Local-spec-only: a local Supabase stack implies Docker, and psql ships in
+// the db container. Returns null when unavailable so callers can skip.
+export function authSessionsCount(email: string): number | null {
+  try {
+    const out = execFileSync(
+      "docker",
+      [
+        "exec",
+        LOCAL_DB_CONTAINER,
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "postgres",
+        "-tAc",
+        `select count(*) from auth.sessions s join auth.users u on u.id = s.user_id where u.email = '${email}'`,
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+    const count = Number(out.trim());
+    return Number.isFinite(count) ? count : null;
+  } catch {
+    return null;
+  }
 }
 
 // GoTrue enforces [auth.email].max_frequency (1s here) between sends per user;
