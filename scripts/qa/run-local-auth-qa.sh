@@ -18,7 +18,14 @@ EVIDENCE_DIR="$ROOT_DIR/temp/qa-evidence-248"
 mkdir -p "$EVIDENCE_DIR"
 
 BACKEND_PID=""
-cleanup() { [ -n "$BACKEND_PID" ] && kill "$BACKEND_PID" 2>/dev/null || true; }
+# Reap the old process fully so a health probe can never hit a dying server.
+cleanup() {
+  if [ -n "$BACKEND_PID" ]; then
+    kill "$BACKEND_PID" 2>/dev/null || true
+    wait "$BACKEND_PID" 2>/dev/null || true
+    BACKEND_PID=""
+  fi
+}
 trap cleanup EXIT
 
 start_backend() {

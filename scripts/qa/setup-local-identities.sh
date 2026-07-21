@@ -71,6 +71,9 @@ verify_login() {
   fi
 }
 
+# Fresh identities invalidate any persisted password state from prior runs.
+rm -f "$ROOT_DIR/temp/qa-evidence-248/qa-state.json"
+
 RECOVERY_PASSWORD="Qa!$(openssl rand -hex 12)"
 SECOND_PASSWORD="Qa!$(openssl rand -hex 12)"
 
