@@ -1,25 +1,43 @@
-export type UsageAllowance = {
+export type UsageWindow = {
   limit: number;
   used: number;
   remaining: number;
   period_end: string;
 };
 
+export type UsageAllowance = {
+  hour: UsageWindow;
+  day: UsageWindow;
+  available_now: boolean;
+  limiting_window: "hour" | "day";
+};
+
 export type UsageAllowanceResponse = {
   allowances: {
     messages: UsageAllowance;
+    backtests: UsageAllowance;
   };
 };
 
-export type AllowanceState = "zero" | "active" | "exhausted";
+export type AllowanceState = "zero" | "active" | "hourly_limited" | "exhausted";
 
+// Presentation state only: every input is backend-derived truth. The daily
+// window owns the primary story; the hourly window explains availability
+// whenever the backend marks it limiting.
 export function classifyAllowance(allowance: {
-  used: number;
-  remaining: number;
+  available_now: boolean;
+  day: { used: number; remaining: number };
 }): AllowanceState {
-  if (allowance.remaining === 0) return "exhausted";
-  if (allowance.used === 0) return "zero";
+  if (allowance.day.remaining === 0) return "exhausted";
+  if (!allowance.available_now) return "hourly_limited";
+  if (allowance.day.used === 0) return "zero";
   return "active";
+}
+
+export function showsHourlyWindow(allowance: {
+  limiting_window: "hour" | "day";
+}): boolean {
+  return allowance.limiting_window === "hour";
 }
 
 export function formatAllowancePeriodEnd(

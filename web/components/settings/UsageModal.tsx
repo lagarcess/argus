@@ -8,12 +8,20 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { Clock3, Loader2, MessageSquareText, RefreshCw, X } from "lucide-react";
+import {
+  Clock3,
+  LineChart,
+  Loader2,
+  MessageSquareText,
+  RefreshCw,
+  X,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getUsageAllowances } from "@/lib/argus-api";
 import {
   classifyAllowance,
   formatAllowancePeriodEnd,
+  showsHourlyWindow,
   type UsageAllowance,
   type UsageAllowanceResponse,
 } from "@/lib/usage-allowance";
@@ -45,19 +53,23 @@ function AllowanceCard({
 }: AllowanceCardProps) {
   const { t } = useTranslation();
   const state = classifyAllowance(allowance);
+  const day = allowance.day;
   const progress =
-    allowance.limit === 0
+    day.limit === 0
       ? 100
-      : Math.min(100, Math.round((allowance.used / allowance.limit) * 100));
+      : Math.min(100, Math.round((day.used / day.limit) * 100));
   const stateLabel =
     state === "zero"
       ? t("settings.data.usage_panel.no_usage")
       : state === "exhausted"
         ? t("settings.data.usage_panel.exhausted")
-        : t("settings.data.usage_panel.remaining", {
-            count: allowance.remaining,
-          });
-  const resetDisplay = formatAllowancePeriodEnd(allowance.period_end, locale);
+        : state === "hourly_limited"
+          ? t("settings.data.usage_panel.hourly_limited")
+          : t("settings.data.usage_panel.remaining", {
+              count: day.remaining,
+            });
+  const resetDisplay = formatAllowancePeriodEnd(day.period_end, locale);
+  const limited = state === "exhausted" || state === "hourly_limited";
 
   return (
     <section className="rounded-2xl border border-black/[0.06] bg-black/[0.025] p-4 dark:border-white/[0.08] dark:bg-white/[0.035]">
@@ -72,15 +84,15 @@ function AllowanceCard({
             </h3>
             <p className="mt-0.5 text-[12px] text-black/45 dark:text-white/45">
               {t("settings.data.usage_panel.used_of_limit", {
-                used: allowance.used,
-                limit: allowance.limit,
+                used: day.used,
+                limit: day.limit,
               })}
             </p>
           </div>
         </div>
         <span
           className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-            state === "exhausted"
+            limited
               ? "bg-[#d66d75]/10 text-[#b94c55] dark:text-[#e7a2a8]"
               : "bg-black/[0.05] text-black/50 dark:bg-white/[0.07] dark:text-white/55"
           }`}
@@ -94,8 +106,8 @@ function AllowanceCard({
         role="progressbar"
         aria-label={label}
         aria-valuemin={0}
-        aria-valuemax={allowance.limit}
-        aria-valuenow={Math.min(allowance.used, allowance.limit)}
+        aria-valuemax={day.limit}
+        aria-valuenow={Math.min(day.used, day.limit)}
       >
         <div
           className={`h-full rounded-full transition-[width] ${
@@ -109,9 +121,25 @@ function AllowanceCard({
         <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         <span>
           {t("settings.data.usage_panel.resets", { time: "" })}
-          <time dateTime={allowance.period_end}>{resetDisplay}</time>
+          <time dateTime={day.period_end}>{resetDisplay}</time>
         </span>
       </div>
+
+      {showsHourlyWindow(allowance) ? (
+        <p className="mt-2 flex items-start gap-2 text-[11px] leading-relaxed text-[#b94c55] dark:text-[#e7a2a8]">
+          <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            {t("settings.data.usage_panel.hourly_status", {
+              used: allowance.hour.used,
+              limit: allowance.hour.limit,
+              time: "",
+            })}
+            <time dateTime={allowance.hour.period_end}>
+              {formatAllowancePeriodEnd(allowance.hour.period_end, locale)}
+            </time>
+          </span>
+        </p>
+      ) : null}
 
       <div className="mt-3 border-t border-black/[0.05] pt-3 text-[11px] leading-relaxed text-black/45 dark:border-white/[0.06] dark:text-white/45">
         {rules}
@@ -278,6 +306,13 @@ export default function UsageModal({
                 label={t("settings.data.usage_panel.messages")}
                 locale={locale}
                 rules={t("settings.data.usage_panel.message_rule")}
+              />
+              <AllowanceCard
+                allowance={usage.allowances.backtests}
+                icon={<LineChart className="h-4 w-4" />}
+                label={t("settings.data.usage_panel.simulations")}
+                locale={locale}
+                rules={t("settings.data.usage_panel.simulation_rule")}
               />
             </div>
           )}

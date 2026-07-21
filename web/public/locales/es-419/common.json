@@ -773,18 +773,22 @@
       "usage": "Uso",
       "usage_panel": {
         "title": "Uso",
-        "description": "Tu cupo actual de mensajes. El uso de simulaciones no está disponible temporalmente.",
+        "description": "Tus cupos actuales de mensajes y simulaciones.",
         "messages": "Mensajes",
-        "used_of_limit": "{{used}} de {{limit}} usados",
+        "simulations": "Simulaciones",
+        "used_of_limit": "{{used}} de {{limit}} usados hoy",
         "remaining": "Quedan {{count}}",
         "resets": "Se restablece {{time}}",
         "no_usage": "Aún no hay uso",
-        "exhausted": "Cupo agotado para este periodo",
+        "exhausted": "Cupo diario agotado",
+        "hourly_limited": "Límite por hora alcanzado",
+        "hourly_status": "{{used}} de {{limit}} usados esta hora · se restablece {{time}}",
         "loading": "Cargando uso…",
         "load_error": "No se pudo cargar el uso.",
         "retry": "Intentar de nuevo",
         "close": "Cerrar uso",
-        "message_rule": "Cada mensaje que Argus acepta usa un mensaje."
+        "message_rule": "Cada respuesta de chat que Argus completa usa un mensaje. Los turnos fallidos o interrumpidos no cuentan.",
+        "simulation_rule": "Cada simulación única que inicias usa una, desde el chat o la API. Repetir la misma ejecución no cuenta."
       }
     },
     "help": {

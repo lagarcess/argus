@@ -1,19 +1,50 @@
 import { expect, test, type Page } from "@playwright/test";
 
+type UsageWindow = {
+  limit: number;
+  used: number;
+  remaining: number;
+  period_end: string;
+};
+
+type UsageAllowance = {
+  hour: UsageWindow;
+  day: UsageWindow;
+  available_now: boolean;
+  limiting_window: "hour" | "day";
+};
+
 type UsageShellOptions = {
   language?: "en" | "es-419";
   locale?: "en-US" | "es-419";
-  messages?: {
-    limit: number;
-    used: number;
-    remaining: number;
-    period_end: string;
+  allowances?: {
+    messages: UsageAllowance;
+    backtests: UsageAllowance;
   };
 };
 
+function zeroAllowance(
+  hourLimit: number,
+  dayLimit: number,
+  hourEnd: string,
+  dayEnd: string,
+): UsageAllowance {
+  return {
+    hour: {
+      limit: hourLimit,
+      used: 0,
+      remaining: hourLimit,
+      period_end: hourEnd,
+    },
+    day: { limit: dayLimit, used: 0, remaining: dayLimit, period_end: dayEnd },
+    available_now: true,
+    limiting_window: "day",
+  };
+}
+
 async function mockUsageShell(
   page: Page,
-  { language = "en", locale = "en-US", messages }: UsageShellOptions = {},
+  { language = "en", locale = "en-US", allowances }: UsageShellOptions = {},
 ) {
   await page.route("**/api/v1/me", async (route) =>
     route.fulfill({
@@ -38,15 +69,11 @@ async function mockUsageShell(
     }),
   );
   await page.route("**/api/v1/me/usage", async (route) =>
-    messages
+    allowances
       ? route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify({
-            allowances: {
-              messages,
-            },
-          }),
+          body: JSON.stringify({ allowances }),
         })
       : route.fulfill({
           status: 500,
@@ -130,12 +157,16 @@ test("Usage dialog traps focus and restores the Settings trigger", async ({
   await expect(settingsTrigger).toBeFocused();
 });
 
-test("Usage renders the English zero state and backend reset", async ({
+test("Usage renders English message and simulation truth with backend resets", async ({
   page,
 }) => {
-  const periodEnd = "2026-07-18T00:00:00Z";
+  const hourEnd = "2026-07-17T15:00:00Z";
+  const dayEnd = "2026-07-18T00:00:00Z";
   await mockUsageShell(page, {
-    messages: { limit: 50, used: 0, remaining: 50, period_end: periodEnd },
+    allowances: {
+      messages: zeroAllowance(60, 200, hourEnd, dayEnd),
+      backtests: zeroAllowance(10, 50, hourEnd, dayEnd),
+    },
   });
   await page.goto("/chat", { waitUntil: "networkidle" });
   await openUsageDialog(page, {
@@ -146,24 +177,72 @@ test("Usage renders the English zero state and backend reset", async ({
 
   const dialog = page.getByRole("dialog", { name: "Usage" });
   await expect(dialog).toContainText(
-    "Your current message allowance. Simulation usage is temporarily unavailable.",
+    "Your current message and simulation allowances.",
   );
   await expect(dialog.getByRole("heading", { name: "Messages" })).toBeVisible();
-  await expect(dialog).toContainText("0 of 50 used");
+  await expect(
+    dialog.getByRole("heading", { name: "Simulations" }),
+  ).toBeVisible();
+  await expect(dialog).toContainText("0 of 200 used today");
+  await expect(dialog).toContainText("0 of 50 used today");
   await expect(dialog).toContainText("No usage yet");
   await expect(dialog).toContainText("Resets");
-  await expect(dialog.locator(`time[datetime="${periodEnd}"]`)).not.toBeEmpty();
-  await expect(dialog.getByText("Simulations", { exact: true })).toHaveCount(0);
+  await expect(
+    dialog.locator(`time[datetime="${dayEnd}"]`).first(),
+  ).not.toBeEmpty();
+  // Fully available: the hourly window stays out of the story.
+  await expect(dialog.locator(`time[datetime="${hourEnd}"]`)).toHaveCount(0);
 });
 
-test("Usage renders the Spanish exhausted state and backend reset", async ({
+test("Usage reveals the hourly window when the backend marks it limiting", async ({
   page,
 }) => {
-  const periodEnd = "2026-07-18T00:00:00Z";
+  const hourEnd = "2026-07-17T15:00:00Z";
+  const dayEnd = "2026-07-18T00:00:00Z";
+  await mockUsageShell(page, {
+    allowances: {
+      messages: {
+        hour: { limit: 60, used: 60, remaining: 0, period_end: hourEnd },
+        day: { limit: 200, used: 90, remaining: 110, period_end: dayEnd },
+        available_now: false,
+        limiting_window: "hour",
+      },
+      backtests: zeroAllowance(10, 50, hourEnd, dayEnd),
+    },
+  });
+  await page.goto("/chat", { waitUntil: "networkidle" });
+  await openUsageDialog(page, {
+    settings: "Settings",
+    data: "Data Controls",
+    usage: "Usage",
+  });
+
+  const dialog = page.getByRole("dialog", { name: "Usage" });
+  await expect(dialog).toContainText("90 of 200 used today");
+  await expect(dialog).toContainText("Hourly limit reached");
+  await expect(dialog).toContainText("60 of 60 used this hour");
+  await expect(
+    dialog.locator(`time[datetime="${hourEnd}"]`).first(),
+  ).not.toBeEmpty();
+});
+
+test("Usage renders the Spanish daily-exhausted state and backend reset", async ({
+  page,
+}) => {
+  const hourEnd = "2026-07-17T15:00:00Z";
+  const dayEnd = "2026-07-18T00:00:00Z";
   await mockUsageShell(page, {
     language: "es-419",
     locale: "es-419",
-    messages: { limit: 50, used: 50, remaining: 0, period_end: periodEnd },
+    allowances: {
+      messages: {
+        hour: { limit: 60, used: 0, remaining: 60, period_end: hourEnd },
+        day: { limit: 200, used: 200, remaining: 0, period_end: dayEnd },
+        available_now: false,
+        limiting_window: "day",
+      },
+      backtests: zeroAllowance(10, 50, hourEnd, dayEnd),
+    },
   });
   await page.goto("/chat", { waitUntil: "networkidle" });
   await openUsageDialog(page, {
@@ -174,14 +253,16 @@ test("Usage renders the Spanish exhausted state and backend reset", async ({
 
   const dialog = page.getByRole("dialog", { name: "Uso" });
   await expect(dialog).toContainText(
-    "Tu cupo actual de mensajes. El uso de simulaciones no está disponible temporalmente.",
+    "Tus cupos actuales de mensajes y simulaciones.",
   );
   await expect(dialog.getByRole("heading", { name: "Mensajes" })).toBeVisible();
-  await expect(dialog).toContainText("50 de 50 usados");
-  await expect(dialog).toContainText("Cupo agotado para este periodo");
+  await expect(
+    dialog.getByRole("heading", { name: "Simulaciones" }),
+  ).toBeVisible();
+  await expect(dialog).toContainText("200 de 200 usados hoy");
+  await expect(dialog).toContainText("Cupo diario agotado");
   await expect(dialog).toContainText("Se restablece");
-  await expect(dialog.locator(`time[datetime="${periodEnd}"]`)).not.toBeEmpty();
-  await expect(dialog.getByText("Simulaciones", { exact: true })).toHaveCount(
-    0,
-  );
+  await expect(
+    dialog.locator(`time[datetime="${dayEnd}"]`).first(),
+  ).not.toBeEmpty();
 });
