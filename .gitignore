@@ -1,6 +1,7 @@
 # Environment files with secrets
 # Root: Backend secrets (Alpaca, Supabase service role, JWT)
 .env
+.qa-identities.env
 # Frontend: Next.js frontend secrets
 web/.env.local
 web/.env.*.local
