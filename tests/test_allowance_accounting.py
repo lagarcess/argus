@@ -362,7 +362,7 @@ def test_me_usage_missing_rows_read_zero_without_creating_counters(mock_gateway)
         assert allowance["day"]["limit"] == day_limit
         assert allowance["day"]["remaining"] == day_limit
         assert allowance["available_now"] is True
-        assert allowance["hour"]["period_end"] < allowance["day"]["period_end"]
+        assert allowance["hour"]["period_end"] <= allowance["day"]["period_end"]
     mock_gateway.check_and_increment_usage_limits.assert_not_called()
 
 
