@@ -1738,6 +1738,44 @@ describe("Argus Alpha frontend contract", () => {
     expect(es.account_security.session_check_unavailable).toBeTruthy();
   });
 
+  test("profile menu Security row navigates to account security and closes the menu", () => {
+    const menu = readFileSync(
+      join(root, "components/sidebar/ProfileMenu.tsx"),
+      "utf-8",
+    );
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    const securityLabel = menu.indexOf('t("settings.data.security"');
+    expect(securityLabel).toBeGreaterThan(-1);
+    const securityButton = menu.slice(
+      menu.lastIndexOf("<button", securityLabel),
+      securityLabel,
+    );
+    expect(securityButton).toContain(
+      'window.location.href = "/account/security"',
+    );
+    expect(securityButton).toContain("onClose()");
+    expect(securityButton).not.toContain("disabled");
+    expect(securityButton).not.toContain("cursor-not-allowed");
+    expect(en.settings.data.security).toBeTruthy();
+    expect(es.settings.data.security).toBeTruthy();
+
+    // The Usage row stays disabled; it belongs to the #247 lane.
+    const usageLabel = menu.indexOf('t("settings.data.usage"');
+    expect(usageLabel).toBeGreaterThan(-1);
+    const usageButton = menu.slice(
+      menu.lastIndexOf("<button", usageLabel),
+      usageLabel,
+    );
+    expect(usageButton).toContain("disabled");
+    expect(usageButton).toContain("cursor-not-allowed");
+  });
+
   test("landing onboarding continues into chat after completion", () => {
     const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
 
