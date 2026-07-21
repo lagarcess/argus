@@ -5,6 +5,11 @@ export type AuthSecurityPort = {
   exchangeCodeForSession: (
     code: string,
   ) => Promise<{ error: unknown | null }>;
+  getUserEmail: () => Promise<string | null>;
+  signInWithPassword: (credentials: {
+    email: string;
+    password: string;
+  }) => Promise<{ error: unknown | null }>;
   updateUser: (
     attributes: Record<string, string>,
   ) => Promise<{ error: unknown | null }>;
@@ -102,10 +107,16 @@ export function createAuthSecurityActions(
     }): Promise<SessionActionResult> {
       if (!currentPassword) throw new Error("Current password is required.");
       if (newPassword.length < 8) throw new Error("Password is too short.");
-      const { error } = await auth.updateUser({
-        password: newPassword,
-        current_password: currentPassword,
+      const email = await auth.getUserEmail();
+      if (!email) throw new Error("Authentication required.");
+      // The provider ignores unknown update attributes, so the current
+      // password must be proven by a real credential check before mutating.
+      const { error: verifyError } = await auth.signInWithPassword({
+        email,
+        password: currentPassword,
       });
+      throwOnAuthError(verifyError);
+      const { error } = await auth.updateUser({ password: newPassword });
       throwOnAuthError(error);
       return signOut("global");
     },
@@ -123,6 +134,10 @@ export function getAuthSecurityActions() {
   }
   const auth: AuthSecurityPort = {
     exchangeCodeForSession: (code) => supabase.auth.exchangeCodeForSession(code),
+    getUserEmail: async () =>
+      (await supabase.auth.getUser()).data.user?.email ?? null,
+    signInWithPassword: (credentials) =>
+      supabase.auth.signInWithPassword(credentials),
     updateUser: (attributes) => supabase.auth.updateUser(attributes),
     signOut: (options) => supabase.auth.signOut(options),
   };
