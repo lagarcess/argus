@@ -300,7 +300,9 @@
       "timeframe_actions": {
         "daily": "Usar barras diarias",
         "hour_1": "Usar barras de 1 hora"
-      }
+      },
+      "future_performance": "No puedo predecir el rendimiento futuro. Puedo probar cómo se comportó la misma idea en un período histórico. ¿Qué período histórico quieres examinar?",
+      "future_performance_with_options": "No puedo predecir el rendimiento futuro. Puedo probar cómo se comportó la misma idea en un período histórico: {{options}}?"
     },
     "coverage_recovery": {
       "no_common_data_window": "Esos activos y la referencia no comparten un rango de datos utilizable para una prueba confiable. Cambia las fechas, un activo o la referencia.",
@@ -315,7 +317,8 @@
     "simplification_options": {
       "rsi_threshold": "Usar una regla RSI compatible",
       "buy_and_hold": "Comparar con comprar y mantener",
-      "moving_average_crossover": "Usar un cruce de medias móviles compatible"
+      "moving_average_crossover": "Usar un cruce de medias móviles compatible",
+      "historical_period": "Probarlo en un período histórico"
     },
     "result_breakdown": {
       "aria_label": "Desglose del resultado",

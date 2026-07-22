@@ -135,6 +135,17 @@ export function recoveryDisplayText(
           })
         : t("chat.clarification.unsupported_timeframe");
     }
+    if (display.values.reasonCode === "future_performance") {
+      const optionsText = joinLocalizedOptions(
+        display.values.options.map((option) => optionDisplayText(option, t)),
+        t,
+      );
+      return optionsText
+        ? t("chat.clarification.future_performance_with_options", {
+            options: optionsText,
+          })
+        : t("chat.clarification.future_performance");
+    }
     const optionsText = joinLocalizedOptions(
       display.values.options.map((option) => optionDisplayText(option, t)),
       t,
@@ -540,6 +551,9 @@ function simplificationOptionKey(
   }
   if (values.strategy_type === "buy_and_hold") {
     return "buy_and_hold";
+  }
+  if (values.requested_field === "date_range") {
+    return "historical_period";
   }
   return null;
 }

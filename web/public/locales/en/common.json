@@ -300,7 +300,9 @@
       "timeframe_actions": {
         "daily": "Retry with daily bars",
         "hour_1": "Retry with 1-hour bars"
-      }
+      },
+      "future_performance": "I can't predict future performance. I can test how the same idea performed over a historical period instead. What historical period would you like to examine?",
+      "future_performance_with_options": "I can't predict future performance. I can test how the same idea performed over a historical period instead: {{options}}?"
     },
     "coverage_recovery": {
       "no_common_data_window": "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
@@ -315,7 +317,8 @@
     "simplification_options": {
       "rsi_threshold": "Use a supported RSI threshold rule",
       "buy_and_hold": "Compare with buy and hold",
-      "moving_average_crossover": "Use a supported moving-average crossover"
+      "moving_average_crossover": "Use a supported moving-average crossover",
+      "historical_period": "Test it over a historical period"
     },
     "result_breakdown": {
       "aria_label": "Result breakdown",

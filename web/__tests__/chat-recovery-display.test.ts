@@ -215,6 +215,43 @@ describe("chat recovery display", () => {
     );
   });
 
+  test("renders degraded future-performance recovery truthfully in English and Spanish", () => {
+    const display = recoveryDisplayFromMetadata({
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "future_performance",
+        prompt_source: "degraded_fallback",
+        requested_field: "unsupported_constraints",
+        requested_fields: ["unsupported_constraints"],
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          raw_value: "in ten years",
+          strategy: { asset_universe: ["NVDA"], capital_amount: 10000 },
+        },
+        options: [
+          {
+            id: "historical_period",
+            replacement_values: { requested_field: "date_range" },
+          },
+          {
+            id: "buy_and_hold",
+            replacement_values: {
+              strategy_type: "buy_and_hold",
+              requested_field: "date_range",
+            },
+          },
+        ],
+      },
+    });
+
+    expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe(
+      "I can't predict future performance. I can test how the same idea performed over a historical period instead: Test it over a historical period or Compare with buy and hold?",
+    );
+    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
+      "No puedo predecir el rendimiento futuro. Puedo probar cómo se comportó la misma idea en un período histórico: Probarlo en un período histórico o Comparar con comprar y mantener?",
+    );
+  });
+
   test("renders provider-neutral coverage recovery in English and Spanish", () => {
     const metadata = {
       clarification: {
