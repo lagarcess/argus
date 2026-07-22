@@ -15,6 +15,7 @@ from argus.api.chat.previews import (
 from argus.api.dependencies import dev_memory_fallback_enabled
 from argus.api.schemas import Conversation, Message, MessageRole
 from argus.domain.store import utcnow
+from argus.domain.usage_limits import settle_memory_usage
 
 _AUTHORITATIVE_ARTIFACT_KEYS = {
     "active_confirmation_reference",
@@ -321,6 +322,7 @@ def create_message(
     role: str,
     content: str,
     metadata: dict[str, Any] | None = None,
+    settle_usage: dict[str, Any] | None = None,
 ) -> Message:
     if _should_suppress_late_success_artifact(
         user_id=user_id,
@@ -351,6 +353,7 @@ def create_message(
                 role=role,
                 content=content,
                 metadata=metadata,
+                settle_usage=settle_usage,
             )
         except Exception as exc:
             if not dev_memory_fallback_enabled():
@@ -360,6 +363,13 @@ def create_message(
                 error=str(exc),
                 conversation_id=conversation_id,
             )
+    if settle_usage is not None:
+        settle_memory_usage(
+            api_state.store.usage_counters,
+            user_id=user_id,
+            resource=settle_usage["resource"],
+            limits=settle_usage["limits"],
+        )
     return memory_message(
         conversation_id=conversation_id,
         role=role,

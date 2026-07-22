@@ -30,6 +30,10 @@ from argus.api.chat.actions import (
     run_for_result_action,
     stale_confirmation_action_message,
 )
+from argus.api.chat.allowance import (
+    check_message_allowance,
+    ordinary_turn_settlement,
+)
 from argus.api.chat.artifacts import (
     result_fact_bank,
     result_followup_metadata_from_run,
@@ -89,8 +93,9 @@ from argus.api.schemas import (
     StarterPromptsResponse,
     User,
 )
+from argus.domain import backtest_admission
 from argus.domain.backtest_finalization import BacktestFinalizationError
-from argus.domain.supabase_gateway import QuotaExceededError
+from argus.domain.usage_limits import message_usage_settlement
 from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
     end_openrouter_route_receipt_capture,
@@ -222,11 +227,23 @@ def _strategies_enabled() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
-def _clean_optional_header(value: str | None) -> str | None:
-    if value is None:
-        return None
-    stripped = value.strip()
-    return stripped or None
+def _validated_optional_idempotency_key(request: Request, raw: str | None) -> str | None:
+    """#229 grammar on the original bytes: a present key must be 1-128
+    visible ASCII with no whitespace and is never normalized."""
+
+    state, key = backtest_admission.validate_idempotency_key(raw)
+    if state == "invalid":
+        raise problem(
+            request,
+            status_code=422,
+            code="validation_error",
+            title="Validation Error",
+            detail=(
+                "Idempotency-Key must be 1-128 visible ASCII characters "
+                "with no whitespace."
+            ),
+        )
+    return key
 
 
 def _confirmation_artifact_id_from_runtime_result(
@@ -338,36 +355,16 @@ async def chat_stream(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     user: User = Depends(current_user),  # noqa: B008
 ) -> StreamingResponse:
-    clean_idempotency_key = _clean_optional_header(idempotency_key)
+    clean_idempotency_key = _validated_optional_idempotency_key(request, idempotency_key)
     headers = {
         "X-Request-Id": request.state.request_id,
         "X-Accel-Buffering": "no",
     }
-    if api_state.supabase_gateway is not None:
-        try:
-            api_state.supabase_gateway.check_and_increment_usage_limits(
-                user_id=user.id,
-                resource="chat_messages",
-                limits=[("day", 200), ("hour", 60)],
-            )
-        except QuotaExceededError as exc:
-            raise problem(
-                request,
-                status_code=429,
-                code="too_many_requests",
-                title="Quota Exceeded",
-                detail=str(exc),
-                headers={"Retry-After": "60"},
-            ) from exc
-        except Exception as exc:
-            if not dev_memory_fallback_enabled():
-                raise
-            logger.warning(
-                "Supabase usage counter failed; using dev memory fallback",
-                error=str(exc),
-                user_id=user.id,
-                resource="chat_messages",
-            )
+    is_run_backtest_turn = (
+        payload.action is not None and payload.action.type == "run_backtest"
+    )
+    if not is_run_backtest_turn:
+        check_message_allowance(request, user)
 
     current_user_profile = None
     if api_state.supabase_gateway is not None:
@@ -485,7 +482,9 @@ async def chat_stream(
             conversation_id=conversation.id,
         )
         request_admission.persist()
-        language = payload.language or conversation.language or current_user_profile.language
+        language = (
+            payload.language or conversation.language or current_user_profile.language
+        )
         assistant_text = recovery_message("runtime_failure", language=language)
         retry_metadata = chat_retry.retry_last_turn_metadata(
             payload=payload,
@@ -751,6 +750,7 @@ async def chat_stream(
                 conversation_id=conversation.id,
                 role="assistant",
                 content=msg,
+                settle_usage=message_usage_settlement(),
             )
             yield sse_data({"type": "token", "content": msg})
             yield sse_data(
@@ -826,6 +826,7 @@ async def chat_stream(
                 conversation_id=conversation.id,
                 role="assistant",
                 content=follow_up,
+                settle_usage=message_usage_settlement(),
             )
             yield sse_data({"type": "stage_start", "stage": "next_step"})
             yield sse_data({"type": "token", "content": follow_up})
@@ -910,6 +911,7 @@ async def chat_stream(
                 role="assistant",
                 content="",
                 metadata=metadata,
+                settle_usage=message_usage_settlement(),
             )
             yield sse_data(
                 {
@@ -946,6 +948,7 @@ async def chat_stream(
             )
         )
         try:
+
             def runtime_event_source(
                 active_workflow: Any,
             ) -> AsyncIterator[dict[str, Any]]:
@@ -1042,13 +1045,11 @@ async def chat_stream(
                 if result_card is not None:
                     from argus.api.chat.persistence import persist_runtime_backtest_run
 
-                    active_finalization_execution_identity = (
-                        chat_retry.backtest_finalization_execution_identity(
-                            backtest_job=backtest_job,
-                            retry_execution_identity=retry_finalization_execution_identity,
-                            idempotency_key=clean_idempotency_key,
-                            request_id=request.state.request_id,
-                        )
+                    active_finalization_execution_identity = chat_retry.backtest_finalization_execution_identity(
+                        backtest_job=backtest_job,
+                        retry_execution_identity=retry_finalization_execution_identity,
+                        idempotency_key=clean_idempotency_key,
+                        request_id=request.state.request_id,
                     )
                     run = persist_runtime_backtest_run(
                         user=user,
@@ -1299,6 +1300,9 @@ async def chat_stream(
                         role="assistant",
                         content=persisted_text,
                         metadata=metadata,
+                        settle_usage=ordinary_turn_settlement(
+                            is_run_backtest_turn=is_run_backtest_turn
+                        ),
                     )
                     receipt_message_id = assistant_message.id
                 receipt_metadata = {
@@ -1345,9 +1349,7 @@ async def chat_stream(
         except Exception as exc:
             finalization_failed = isinstance(exc, BacktestFinalizationError)
             failure_code = (
-                "finalization_failed"
-                if finalization_failed
-                else "agent_runtime_failure"
+                "finalization_failed" if finalization_failed else "agent_runtime_failure"
             )
             runtime_diagnostics = _runtime_failure_diagnostics(exc)
             logger.exception(

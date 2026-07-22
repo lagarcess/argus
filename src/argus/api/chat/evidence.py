@@ -16,12 +16,14 @@ from argus.api.schemas import (
     IdeaVersion,
     User,
 )
+from argus.domain.backtest_admission import finalize_direct_job_memory
 from argus.domain.backtest_finalization import (
     BacktestFinalizationInput,
     FinalizedBacktest,
     MemoryBacktestFinalizationGateway,
     cache_finalized_backtest,
     finalize_backtest_completion,
+    finalize_direct_backtest_completion,
 )
 from argus.domain.evidence import (
     CapturedEvidence,
@@ -140,6 +142,80 @@ def finalize_completed_backtest(
     return finalized
 
 
+def finalize_completed_direct_backtest(
+    *,
+    user_id: str,
+    conversation_id: str | None,
+    run: BacktestRun,
+    execution_identity: str,
+    job_id: str,
+) -> FinalizedBacktest | None:
+    """``None`` means stale reconciliation already settled the job; no run,
+    evidence, or job state was committed."""
+
+    finalization = BacktestFinalizationInput(
+        user_id=user_id,
+        execution_identity=execution_identity,
+        run=run,
+        result_card=dict(run.conversation_result_card),
+        idea_id=api_state.store.new_id(),
+        idea_version_id=api_state.store.new_id(),
+        evidence_artifact_id=api_state.store.new_id(),
+        finalized_at=utcnow(),
+    )
+    if api_state.supabase_gateway is not None:
+        finalized = finalize_direct_backtest_completion(
+            api_state.supabase_gateway,
+            finalization,
+            job_id=job_id,
+        )
+        if finalized is None:
+            return None
+        try:
+            cache_finalized_backtest(
+                api_state.store,
+                user_id=user_id,
+                finalized=finalized,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Durable backtest finalized but memory cache refresh failed",
+                error=str(exc),
+                run_id=finalized.run.id,
+            )
+    else:
+        with api_state.store.backtest_admission_lock:
+            job = api_state.store.backtest_jobs.get(job_id)
+            if job is None or job.get("status") != "running":
+                return None
+            finalized = finalize_backtest_completion(
+                MemoryBacktestFinalizationGateway(api_state.store),
+                finalization,
+            )
+            finalize_direct_job_memory(
+                api_state.store,
+                job_id=job_id,
+                status="succeeded",
+                result_run_id=finalized.run.id,
+            )
+    _emit_product_event(
+        "evidence_capture",
+        user_id=user_id,
+        conversation_id=conversation_id,
+        backtest_run_id=finalized.run.id,
+        status="completed",
+        attributes={
+            "asset_class": finalized.run.asset_class,
+            "symbol_count": len(finalized.run.symbols),
+            "benchmark_present": bool(finalized.run.benchmark_symbol),
+            "persistence": (
+                "supabase" if api_state.supabase_gateway is not None else "memory"
+            ),
+        },
+    )
+    return finalized
+
+
 def create_decision_for_evidence_artifact(
     *,
     user: User,
@@ -154,7 +230,9 @@ def create_decision_for_evidence_artifact(
     )
     decision = build_decision_note(
         evidence_artifact=artifact,
-        decision_id=existing_decision.id if existing_decision else api_state.store.new_id(),
+        decision_id=existing_decision.id
+        if existing_decision
+        else api_state.store.new_id(),
         decision_state=payload.decision_state,
         note=payload.note,
         now=now,

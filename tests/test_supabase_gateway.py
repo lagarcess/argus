@@ -1,10 +1,10 @@
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Event, RLock
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 from argus.api.schemas import BacktestRun, Message
@@ -1003,6 +1003,56 @@ def test_usage_limits_check_all_windows_before_incrementing() -> None:
         )
 
     table.update.assert_not_called()
+
+
+def test_list_current_usage_counters_is_owner_scoped_and_bounded() -> None:
+    client = MagicMock()
+    table = MagicMock()
+    client.table.return_value = table
+    table.select.return_value = table
+    table.eq.return_value = table
+    table.in_.return_value = table
+    table.limit.return_value = table
+    table.execute.return_value = SimpleNamespace(
+        data=[
+            {
+                "resource": "chat_messages",
+                "limit_count": 200,
+                "used_count": 12,
+                "period_end": "2026-07-17T00:00:00+00:00",
+            },
+            {
+                "resource": "backtest_runs",
+                "limit_count": 50,
+                "used_count": 3,
+                "period_end": "2026-07-17T00:00:00+00:00",
+            },
+        ]
+    )
+    gateway = SupabaseGateway(client=client)
+    at = datetime(2026, 7, 16, 15, 30, tzinfo=timezone.utc)
+
+    rows = gateway.list_current_usage_counters(
+        user_id="user-1",
+        resources=("chat_messages", "backtest_runs"),
+        period="day",
+        at=at,
+    )
+
+    assert rows == table.execute.return_value.data
+    client.table.assert_called_once_with("usage_counters")
+    table.select.assert_called_once_with(
+        "resource,limit_count,used_count,period_end"
+    )
+    assert table.eq.call_args_list == [
+        call("user_id", "user-1"),
+        call("period", "day"),
+        call("period_start", "2026-07-16T00:00:00+00:00"),
+    ]
+    table.in_.assert_called_once_with(
+        "resource", ["chat_messages", "backtest_runs"]
+    )
+    table.limit.assert_called_once_with(2)
 
 
 def test_usage_limit_precheck_rejects_without_mutating_counter() -> None:

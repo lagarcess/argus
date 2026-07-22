@@ -1556,7 +1556,7 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(dataBlock).toContain("settings.data.security");
     expect(dataBlock).toContain("settings.data.usage");
-    expect(dataBlock).toContain("disabled");
+    expect(dataBlock).not.toContain("cursor-not-allowed");
     expect(dataBlock).toContain("settings.profile.delete_account");
     expect(dataBlock).toContain("settings.profile.delete_account_note");
     expect(dataBlock).toContain("handleOpenDeleteRequest");
@@ -1765,15 +1765,15 @@ describe("Argus Alpha frontend contract", () => {
     expect(en.settings.data.security).toBeTruthy();
     expect(es.settings.data.security).toBeTruthy();
 
-    // The Usage row stays disabled; it belongs to the #247 lane.
     const usageLabel = menu.indexOf('t("settings.data.usage"');
     expect(usageLabel).toBeGreaterThan(-1);
     const usageButton = menu.slice(
       menu.lastIndexOf("<button", usageLabel),
       usageLabel,
     );
-    expect(usageButton).toContain("disabled");
-    expect(usageButton).toContain("cursor-not-allowed");
+    expect(usageButton).toContain('openModal("usage")');
+    expect(usageButton).not.toContain("disabled");
+    expect(usageButton).not.toContain("cursor-not-allowed");
   });
 
   test("landing onboarding continues into chat after completion", () => {

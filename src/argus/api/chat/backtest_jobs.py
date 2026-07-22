@@ -14,6 +14,14 @@ from typing import Any
 import httpx
 from loguru import logger
 
+from argus.domain.backtest_admission import (
+    DEFAULT_GLOBAL_QUEUED_LIMIT,
+    DEFAULT_GLOBAL_RUNNING_LIMIT,
+    DEFAULT_USER_QUEUED_LIMIT,
+    DEFAULT_USER_RUNNING_LIMIT,
+    chat_run_identity_hash,
+)
+
 TRUE_VALUES = {"1", "true", "yes", "on"}
 SHADOW_JOB_SCHEMA_VERSION = "backtest_job_launch/v1"
 DEFAULT_WORKFLOW_TASK = "argus-backtests/workflow_proof"
@@ -22,10 +30,6 @@ PROOF_JOB_KIND = "render_workflow_proof"
 REAL_BACKTEST_JOB_KIND = "run_backtest_job"
 RENDER_TASK_RUNS_URL = "https://api.render.com/v1/task-runs"
 WORKFLOW_METADATA_KEY = "workflow_backtest"
-DEFAULT_USER_RUNNING_LIMIT = 1
-DEFAULT_USER_QUEUED_LIMIT = 2
-DEFAULT_GLOBAL_RUNNING_LIMIT = 5
-DEFAULT_GLOBAL_QUEUED_LIMIT = 10
 DEFAULT_STALE_QUEUED_SECONDS = 15 * 60
 DEFAULT_STALE_RUNNING_SECONDS = 15 * 60
 
@@ -765,7 +769,9 @@ class ShadowBacktestJobTool:
         )
 
     def run(self, payload: dict[str, Any]) -> dict[str, Any]:
-        job = self._maybe_create_shadow_job(payload)
+        job, rejection = self._maybe_create_shadow_job(payload)
+        if rejection is not None:
+            return rejection
         if self._should_return_async_job(job):
             return async_backtest_job_envelope(job)
         if self._delegate is None:
@@ -775,16 +781,18 @@ class ShadowBacktestJobTool:
             )
         return self._delegate.run(payload)
 
-    def _maybe_create_shadow_job(self, payload: dict[str, Any]) -> dict[str, Any] | None:
+    def _maybe_create_shadow_job(
+        self, payload: dict[str, Any]
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         if not backtest_jobs_shadow_enabled():
-            return None
+            return None, None
 
         context = current_backtest_job_shadow_context()
         if context is None:
             logger.warning(
                 "Backtest job shadow flag enabled without request context; skipping",
             )
-            return None
+            return None, None
 
         try:
             gateway = self._gateway_getter()
@@ -792,38 +800,32 @@ class ShadowBacktestJobTool:
                 raise RuntimeError(
                     "Supabase persistence is required for shadow backtest jobs."
                 )
-            backpressure_reason = _backpressure_reason(
-                gateway=gateway,
-                user_id=context.user_id,
-                limits=backtest_job_backpressure_limits(),
-            )
-            if backpressure_reason is not None:
-                logger.warning(
-                    "Shadow backtest job backpressure hit; skipping durable job",
-                    reason=backpressure_reason,
-                    user_id=context.user_id,
-                    conversation_id=context.conversation_id,
-                )
-                return None
             payload_digest = payload_hash(payload)
-            job = gateway.create_backtest_job(
-                user_id=context.user_id,
+            confirmation_id = None
+            if isinstance(context.chat_action, dict):
+                raw_confirmation = context.chat_action.get("confirmation_id")
+                if isinstance(raw_confirmation, str) and raw_confirmation.strip():
+                    confirmation_id = raw_confirmation.strip()
+            identity_hash = chat_run_identity_hash(
                 conversation_id=context.conversation_id,
-                request_message_id=context.request_message_id,
-                confirmation_message_id=context.confirmation_message_id,
-                idempotency_key=context.idempotency_key,
-                payload_hash=payload_digest,
+                confirmation_id=confirmation_id or context.idempotency_key,
+                launch_payload_hash=payload_digest,
+            )
+            admission = self._admit_durable_job(
+                gateway=gateway,
+                context=context,
+                identity_hash=identity_hash,
+                payload_digest=payload_digest,
                 launch_payload=shadow_launch_payload(
                     payload=payload,
                     context=context,
                 ),
-                execution_metadata={
-                    "shadow_mode": True,
-                    "source": "api_chat",
-                    "request_id": context.request_id,
-                    "payload_hash": payload_digest,
-                },
             )
+            if admission.decision not in ("admitted", "replay"):
+                return None, _admission_rejection_envelope(admission.decision)
+            job = admission.job
+            if job is None:
+                return None, _admission_rejection_envelope("missing_job")
             job_id = str(job.get("id") or "").strip()
             if job_id:
                 context.created_job_id = job_id
@@ -834,7 +836,7 @@ class ShadowBacktestJobTool:
                     job=job,
                     payload_digest=payload_digest,
                 )
-                return dict(job)
+                return dict(job), None
         except Exception as exc:
             if not self._dev_memory_fallback_getter():
                 raise
@@ -844,7 +846,27 @@ class ShadowBacktestJobTool:
                 user_id=context.user_id,
                 conversation_id=context.conversation_id,
             )
-        return None
+        return None, None
+
+    def _admit_durable_job(
+        self,
+        *,
+        gateway: Any,
+        context: BacktestJobShadowContext,
+        identity_hash: str,
+        payload_digest: str,
+        launch_payload: dict[str, Any],
+    ):
+        from argus.api.chat.backtest_admission_flow import admit_durable_chat_job
+
+        return admit_durable_chat_job(
+            gateway=gateway,
+            context=context,
+            identity_hash=identity_hash,
+            payload_digest=payload_digest,
+            launch_payload=launch_payload,
+            reconcile_blockers=_reconcile_backpressure_blockers,
+        )
 
     @staticmethod
     def _should_return_async_job(job: dict[str, Any] | None) -> bool:
@@ -971,6 +993,35 @@ def async_backtest_job_envelope(job: dict[str, Any]) -> dict[str, Any]:
         "retryable": False,
         "capability_context": {
             "execution_status": str(job.get("status") or "queued"),
+        },
+    }
+
+
+def _admission_rejection_envelope(decision: str) -> dict[str, Any]:
+    """Typed rejection: an unadmitted run must fail honestly, never execute
+    for free or charge the allowance."""
+
+    if decision == "allowance_exhausted":
+        error_type = "rate_limited"
+        failure_code = "simulation_allowance_exhausted"
+    elif decision in ("per_user_capacity", "global_capacity"):
+        error_type = "service_overloaded"
+        failure_code = "backtest_capacity_exceeded"
+    elif decision == "conflict":
+        error_type = "tool_execution_error"
+        failure_code = "idempotency_conflict"
+    else:
+        error_type = "tool_execution_error"
+        failure_code = "backtest_admission_unavailable"
+    return {
+        "success": False,
+        "payload": None,
+        "error_type": error_type,
+        "error_message": None,
+        "retryable": False,
+        "capability_context": {
+            "execution_status": "rejected",
+            "failure_code": failure_code,
         },
     }
 

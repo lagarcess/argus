@@ -10,6 +10,8 @@ import {
   normalizeEnabledLanguage,
   type ArgusLocale,
 } from "./language-features";
+import { runActionIdempotencyKey } from "./usage-allowance";
+import type { UsageAllowanceResponse } from "./usage-allowance";
 import {
   displayResultActionLabel,
   displayResultBenchmarkNote,
@@ -670,6 +672,10 @@ export async function getMe() {
   return apiFetch<{ user: ApiUser }>("/me");
 }
 
+export async function getUsageAllowances() {
+  return apiFetch<UsageAllowanceResponse>("/me/usage");
+}
+
 export async function patchMe(patch: ProfilePatch) {
   return apiFetch<{ user: ApiUser }>("/me", {
     method: "PATCH",
@@ -1046,7 +1052,9 @@ export async function streamChatMessage(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Idempotency-Key": crypto.randomUUID(),
+      "Idempotency-Key":
+        (typeof input !== "string" && runActionIdempotencyKey(input)) ||
+        crypto.randomUUID(),
       ...authHeaders,
     },
     body: JSON.stringify({

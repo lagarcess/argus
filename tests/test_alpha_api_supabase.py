@@ -1,10 +1,12 @@
 import json
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+import yaml
 from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.schemas import (
@@ -408,6 +410,11 @@ def mock_gateway():
             finalization_store
         ).finalize_backtest_completion(finalization=finalization)
     )
+    gateway.finalize_direct_backtest_success.side_effect = (
+        lambda *, job_id, finalization: MemoryBacktestFinalizationGateway(
+            finalization_store
+        ).finalize_backtest_completion(finalization=finalization)
+    )
     gateway.get_evidence_capture_by_run.return_value = None
     gateway.create_backtest_evidence_capture.side_effect = (
         lambda *, user_id, captured: captured
@@ -444,6 +451,16 @@ def mock_gateway():
         )
     )
     gateway.mark_result_card_decision_for_run.return_value = None
+    gateway.get_backtest_job_reservation.return_value = None
+    gateway.admit_backtest_job.return_value = {
+        "decision": "admitted",
+        "job": {"id": "job-admitted-1", "status": "running"},
+    }
+    gateway.finalize_direct_backtest_job.return_value = {
+        "id": "job-admitted-1",
+        "status": "succeeded",
+    }
+    gateway.get_backtest_job.return_value = None
     with (
         patch("argus.api.state.supabase_gateway", gateway),
         patch("argus.api.dependencies.auth_session_is_active", return_value=True),
@@ -583,11 +600,12 @@ def test_direct_run_persists_requested_and_effective_data_windows(
     }
     assert run["chart"]["series"][0]["time"] == "2024-01-03"
     assert run["chart"]["series"][-1]["time"] == "2024-01-05"
-    mock_gateway.check_and_increment_usage_limits.assert_called_once()
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
+    mock_gateway.admit_backtest_job.assert_called_once()
 
 
 def test_chat_stream_quota_exceeded(mock_gateway):
-    mock_gateway.check_and_increment_usage_limits.side_effect = QuotaExceededError(
+    mock_gateway.check_usage_limits.side_effect = QuotaExceededError(
         "Quota exceeded for chat_messages (day)"
     )
 
@@ -601,6 +619,7 @@ def test_chat_stream_quota_exceeded(mock_gateway):
     assert data["code"] == "too_many_requests"
     assert "Quota exceeded for chat_messages" in data["detail"]
     assert response.headers.get("Retry-After") == "60"
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
 
 
 def test_chat_stream_checks_daily_and_hourly_quotas(mock_gateway):
@@ -633,11 +652,12 @@ def test_chat_stream_checks_daily_and_hourly_quotas(mock_gateway):
     )
 
     assert response.status_code == 200
-    mock_gateway.check_and_increment_usage_limits.assert_called_once_with(
+    mock_gateway.check_usage_limits.assert_called_once_with(
         user_id="00000000-0000-0000-0000-000000000001",
         resource="chat_messages",
-        limits=[("day", 200), ("hour", 60)],
+        limits=[("hour", 60), ("day", 200)],
     )
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
 
 
 def test_successful_api_response_omits_static_rate_limit_headers(mock_gateway):
@@ -658,6 +678,146 @@ def test_me_reads_profile_from_supabase_gateway(mock_gateway):
     assert response.status_code == 200
     assert response.json()["user"]["language"] == "es-419"
     assert mock_gateway.get_user.call_count >= 1
+
+
+def test_me_usage_returns_exact_owner_scoped_allowance_truth(mock_gateway):
+    def _list(*, user_id, resources, period, at):
+        assert user_id == "00000000-0000-0000-0000-000000000001"
+        assert set(resources) == {"chat_messages", "backtest_runs"}
+        if period == "hour":
+            return [
+                {
+                    "resource": "chat_messages",
+                    "limit_count": 60,
+                    "used_count": 2,
+                    "period_end": "2026-07-17T15:00:00+00:00",
+                },
+            ]
+        return [
+            {
+                "resource": "chat_messages",
+                "limit_count": 200,
+                "used_count": 12,
+                "period_end": "2026-07-18T00:00:00+00:00",
+            },
+            {
+                "resource": "backtest_runs",
+                "limit_count": 50,
+                "used_count": 53,
+                "period_end": "2026-07-18T00:00:00+00:00",
+            },
+        ]
+
+    mock_gateway.list_current_usage_counters.side_effect = _list
+
+    response = client.get(
+        "/api/v1/me/usage", headers={"Authorization": "Bearer test-token"}
+    )
+
+    assert response.status_code == 200
+    allowances = response.json()["allowances"]
+    assert allowances["messages"]["hour"] == {
+        "limit": 60,
+        "used": 2,
+        "remaining": 58,
+        "period_end": "2026-07-17T15:00:00Z",
+    }
+    assert allowances["messages"]["day"] == {
+        "limit": 200,
+        "used": 12,
+        "remaining": 188,
+        "period_end": "2026-07-18T00:00:00Z",
+    }
+    assert allowances["messages"]["available_now"] is True
+    assert allowances["messages"]["limiting_window"] == "hour"
+    assert allowances["backtests"]["day"]["used"] == 53
+    assert allowances["backtests"]["day"]["remaining"] == 0
+    assert allowances["backtests"]["available_now"] is False
+    assert allowances["backtests"]["limiting_window"] == "day"
+
+
+def test_me_usage_zero_state_does_not_create_or_increment_counters(mock_gateway):
+    mock_gateway.list_current_usage_counters.return_value = []
+
+    response = client.get(
+        "/api/v1/me/usage", headers={"Authorization": "Bearer test-token"}
+    )
+
+    assert response.status_code == 200
+    allowances = response.json()["allowances"]
+    assert allowances["messages"]["hour"]["used"] == 0
+    assert allowances["messages"]["hour"]["remaining"] == 60
+    assert allowances["messages"]["day"]["remaining"] == 200
+    assert allowances["backtests"]["hour"]["remaining"] == 10
+    assert allowances["backtests"]["day"]["remaining"] == 50
+    assert allowances["messages"]["available_now"] is True
+    assert allowances["backtests"]["available_now"] is True
+    mock_gateway.check_and_increment_usage_limits.assert_not_called()
+
+
+def test_me_usage_openapi_contract_publishes_both_windowed_allowances():
+    generated_schema = app.openapi()["components"]["schemas"]["UsageAllowances"]
+    checked_openapi = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / "docs" / "api" / "openapi.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    checked_schema = checked_openapi["components"]["schemas"]["UsageAllowances"]
+
+    for schema in (generated_schema, checked_schema):
+        assert schema["required"] == ["messages", "backtests"]
+        assert set(schema["properties"]) == {"messages", "backtests"}
+
+    generated_allowance = app.openapi()["components"]["schemas"]["UsageAllowance"]
+    checked_allowance = checked_openapi["components"]["schemas"]["UsageAllowance"]
+    for schema in (generated_allowance, checked_allowance):
+        assert set(schema["properties"]) == {
+            "hour",
+            "day",
+            "available_now",
+            "limiting_window",
+        }
+
+
+def test_me_usage_requires_authentication(mock_gateway, monkeypatch):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+
+    response = client.get("/api/v1/me/usage")
+
+    assert response.status_code == 401
+    mock_gateway.list_current_usage_counters.assert_not_called()
+
+
+def test_me_usage_returns_problem_details_when_durable_truth_is_unavailable(
+    mock_gateway,
+    monkeypatch,
+):
+    mock_gateway.list_current_usage_counters.side_effect = RuntimeError(
+        "supabase unavailable"
+    )
+    monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
+    failure_client = TestClient(app, raise_server_exceptions=False)
+
+    response = failure_client.get(
+        "/api/v1/me/usage",
+        headers={
+            "Authorization": "Bearer test-token",
+            "X-Request-Id": "usage-read-failure",
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json() == {
+        "type": "https://api.argus.app/problems/usage-read-failed",
+        "title": "Usage Read Failed",
+        "status": 500,
+        "detail": "Current allowance information is unavailable.",
+        "code": "usage_read_failed",
+        "request_id": "usage-read-failure",
+    }
+    assert response.headers["X-Request-Id"] == "usage-read-failure"
 
 
 def test_patch_me_supabase_merges_onboarding_and_persists(mock_gateway):
@@ -799,8 +959,8 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(
     assert "No fees/slippage" in run["conversation_result_card"]["assumptions"]
     assert run["conversation_result_card"]["assumptions"][-1] == "Benchmark: SPY"
     assert run["conversation_result_card"]["benchmark_note"] is None
-    mock_gateway.finalize_backtest_completion.assert_called_once()
-    called_run = mock_gateway.finalize_backtest_completion.call_args.kwargs[
+    mock_gateway.finalize_direct_backtest_success.assert_called_once()
+    called_run = mock_gateway.finalize_direct_backtest_success.call_args.kwargs[
         "finalization"
     ].run
     assert isinstance(called_run, BacktestRun)
@@ -831,8 +991,8 @@ def test_run_backtest_supabase_kill_switch_restores_legacy_snapshot(
     run = response.json()["run"]
     assert "_execution_realism" not in run["config_snapshot"]
     assert "No fees/slippage" in run["conversation_result_card"]["assumptions"]
-    mock_gateway.finalize_backtest_completion.assert_called_once()
-    called_run = mock_gateway.finalize_backtest_completion.call_args.kwargs[
+    mock_gateway.finalize_direct_backtest_success.assert_called_once()
+    called_run = mock_gateway.finalize_direct_backtest_success.call_args.kwargs[
         "finalization"
     ].run
     assert isinstance(called_run, BacktestRun)
@@ -840,7 +1000,7 @@ def test_run_backtest_supabase_kill_switch_restores_legacy_snapshot(
 
 
 def test_run_backtest_finalization_failure_is_explicit_and_retryable(mock_gateway):
-    mock_gateway.finalize_backtest_completion.side_effect = RuntimeError(
+    mock_gateway.finalize_direct_backtest_success.side_effect = RuntimeError(
         "database unavailable"
     )
 

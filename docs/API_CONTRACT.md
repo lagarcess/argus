@@ -1632,6 +1632,91 @@ Retrieve the current authenticated user profile and preferences.
 }
 ```
 
+## `GET /me/usage`
+
+Return the authenticated user's current private-alpha message and simulation
+allowance truth. This is an owner-only read surface. The backend returns
+zero-state windows when a counter row does not exist; reading usage does not
+create or increment a counter.
+
+**Response:**
+```json
+{
+  "allowances": {
+    "messages": {
+      "hour": {
+        "limit": 60,
+        "used": 3,
+        "remaining": 57,
+        "period_end": "2026-07-21T15:00:00Z"
+      },
+      "day": {
+        "limit": 200,
+        "used": 12,
+        "remaining": 188,
+        "period_end": "2026-07-22T00:00:00Z"
+      },
+      "available_now": true,
+      "limiting_window": "hour"
+    },
+    "backtests": {
+      "hour": {
+        "limit": 10,
+        "used": 1,
+        "remaining": 9,
+        "period_end": "2026-07-21T15:00:00Z"
+      },
+      "day": {
+        "limit": 50,
+        "used": 4,
+        "remaining": 46,
+        "period_end": "2026-07-22T00:00:00Z"
+      },
+      "available_now": true,
+      "limiting_window": "hour"
+    }
+  }
+}
+```
+
+**Allowance semantics:**
+- `messages` reports the `chat_messages` counters; `backtests` reports the
+  `backtest_runs` counters charged by unique durable simulation admission.
+- Both active UTC calendar windows are returned per resource with exact
+  backend-owned `period_end` reset timestamps. Clients may localize their
+  display, but must not infer or replace them with a countdown, local timer,
+  or `Retry-After` value.
+- `remaining` is computed by the backend as `max(limit - used, 0)`. Settlement
+  is truthful accounting, not a ceiling: `used` may exceed `limit` after
+  concurrent in-flight turns settle, and `remaining` clamps at zero.
+- `available_now` is backend-derived: true exactly when both windows have
+  remaining capacity.
+- `limiting_window` is backend-derived: the window with the smaller remaining
+  capacity (`day` on ties). The frontend must not compute, estimate, or
+  hardcode quota truth; it renders these derived fields.
+- The UI emphasizes the daily allowance and reveals the hourly window whenever
+  `limiting_window` is `hour` or the hourly window is exhausted.
+
+**Accounting semantics:**
+- One message unit settles atomically with the first durable insert of an
+  ordinary turn's terminal product message (normal answers, clarifications,
+  honest supported/unsupported boundary responses, and structured-action
+  acknowledgments). Malformed, unauthenticated, duplicate-replay, abandoned,
+  and Argus infrastructure-failed turns settle zero. A committed terminal
+  response followed by transport disconnect remains exactly one unit.
+- `chat.run_backtest` action turns consume the simulation allowance at unique
+  durable admission instead of a message unit; replays and pre-admission
+  rejections (including data-window preflight) consume zero, and a
+  post-admission execution or finalization failure still counts exactly one.
+  Chat and direct API launches follow the same rule.
+
+**Error rules:**
+- `401 Unauthorized`: authentication is missing or invalid.
+- `403 Forbidden`: the authenticated identity no longer has private-alpha
+  access.
+- `500 Server Error`: durable usage truth is unavailable outside the explicit
+  development fallback mode.
+
 ## `PATCH /me`
 
 Update profile preferences and onboarding state. Partial update semantics are supported; clients do not need to resend the full onboarding object.

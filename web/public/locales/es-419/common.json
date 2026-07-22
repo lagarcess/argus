@@ -770,7 +770,23 @@
       "delete_all_empty": "No hay conversaciones para eliminar.",
       "delete_all_error": "No se pudieron eliminar las conversaciones. Inténtalo de nuevo.",
       "security": "Seguridad",
-      "usage": "Uso"
+      "usage": "Uso",
+      "usage_panel": {
+        "title": "Uso",
+        "messages": "Mensajes",
+        "simulations": "Simulaciones",
+        "left_today": "Quedan {{count}} hoy",
+        "used_of_limit": "{{used}} de {{limit}} usados hoy",
+        "resets": "Se restablece {{time}}",
+        "hourly_available": "{{count}} disponibles esta hora · se restablece {{time}}",
+        "what_counts": "¿Qué cuenta?",
+        "loading": "Cargando uso…",
+        "load_error": "No se pudo cargar el uso.",
+        "retry": "Intentar de nuevo",
+        "close": "Cerrar uso",
+        "message_rule": "Los mensajes cuentan cuando Argus completa una respuesta. Las respuestas fallidas o interrumpidas no cuentan.",
+        "simulation_rule": "Las simulaciones nuevas cuentan una vez. Reintentar la misma simulación no vuelve a contar."
+      }
     },
     "help": {
       "title": "Ayuda y legal",

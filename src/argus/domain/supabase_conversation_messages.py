@@ -89,6 +89,7 @@ class ConversationMessagePersistenceMixin:
         role: str,
         content: str,
         metadata: dict[str, Any] | None = None,
+        settle_usage: dict[str, Any] | None = None,
     ) -> Message:
         message = Message(
             id=str(uuid4()),
@@ -102,6 +103,7 @@ class ConversationMessagePersistenceMixin:
             user_id=user_id,
             message=message,
             preview=_message_preview(content, role=role, metadata=metadata),
+            settle_usage=settle_usage,
         )
         return appended
 
@@ -145,7 +147,38 @@ class ConversationMessagePersistenceMixin:
         option_id: str | None = None,
         replacement_values: dict[str, Any] | None = None,
         expected_source_metadata: dict[str, Any] | None = None,
+        settle_usage: dict[str, Any] | None = None,
     ) -> tuple[Message, Message | None, bool]:
+        if settle_usage is not None:
+            if expected_source_assistant_id is not None or option_id is not None:
+                raise ValueError(
+                    "Usage settlement cannot combine with response-option claims."
+                )
+            result = self.client.rpc(
+                "append_conversation_message_settling_usage",
+                {
+                    "p_user_id": user_id,
+                    "p_conversation_id": message.conversation_id,
+                    "p_message_id": message.id,
+                    "p_role": message.role,
+                    "p_content": message.content,
+                    "p_metadata": (
+                        message.metadata if message.metadata is not None else {}
+                    ),
+                    "p_created_at": message.created_at.isoformat(),
+                    "p_preview": preview,
+                    "p_usage_resource": settle_usage["resource"],
+                    "p_usage_limits": [
+                        {"period": period, "limit": limit_count}
+                        for period, limit_count in settle_usage["limits"]
+                    ],
+                },
+            ).execute()
+            row = _row_one(result)
+            if row is None:
+                return message, None, False
+            appended = Message.model_validate(row["message"])
+            return appended, None, bool(row.get("replayed", False))
         result = self.client.rpc(
             "append_conversation_message",
             {

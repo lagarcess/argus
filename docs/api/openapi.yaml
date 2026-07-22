@@ -43,6 +43,36 @@ paths:
           description: Updated user profile and preferences.
         "503":
           $ref: "#/components/responses/AuthSessionVerificationUnavailable"
+  /api/v1/me/usage:
+    get:
+      description: Return the authenticated user's current private-alpha message and simulation allowance truth for both UTC windows.
+      responses:
+        "200":
+          description: Backend-owned hourly and daily limit, usage, remaining capacity, exact reset times, availability, and the most restrictive window per resource.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageAllowanceResponse"
+        "401":
+          description: Missing or invalid authentication.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Private-alpha access is unavailable for this identity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Durable allowance truth is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/AuthSessionVerificationUnavailable"
   /api/v1/conversations:
     get:
       responses:
@@ -639,7 +669,6 @@ components:
       type: object
       required:
         - id
-        - conversation_id
         - status
         - retryable
       properties:
@@ -647,7 +676,9 @@ components:
           type: string
           format: uuid
         conversation_id:
-          type: string
+          type:
+            - string
+            - "null"
           format: uuid
         request_message_id:
           type:
@@ -733,6 +764,63 @@ components:
           type:
             - string
             - "null"
+    UsageWindow:
+      type: object
+      required:
+        - limit
+        - used
+        - remaining
+        - period_end
+      properties:
+        limit:
+          type: integer
+          minimum: 0
+        used:
+          type: integer
+          minimum: 0
+        remaining:
+          type: integer
+          minimum: 0
+        period_end:
+          type: string
+          format: date-time
+    UsageAllowance:
+      type: object
+      description: Backend-derived allowance truth for one resource, covering both active UTC windows plus availability and the most restrictive window.
+      required:
+        - hour
+        - day
+        - available_now
+        - limiting_window
+      properties:
+        hour:
+          $ref: "#/components/schemas/UsageWindow"
+        day:
+          $ref: "#/components/schemas/UsageWindow"
+        available_now:
+          type: boolean
+        limiting_window:
+          type: string
+          enum:
+            - hour
+            - day
+    UsageAllowances:
+      type: object
+      required:
+        - messages
+        - backtests
+      properties:
+        messages:
+          $ref: "#/components/schemas/UsageAllowance"
+        backtests:
+          $ref: "#/components/schemas/UsageAllowance"
+    UsageAllowanceResponse:
+      type: object
+      required:
+        - allowances
+      properties:
+        allowances:
+          $ref: "#/components/schemas/UsageAllowances"
     Collection:
       type: object
       description: Lightweight organizational grouping of strategies.

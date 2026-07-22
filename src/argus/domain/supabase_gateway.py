@@ -40,14 +40,12 @@ from argus.domain.supabase_backtest_finalization import finalize_backtest
 from argus.domain.supabase_conversation_messages import (
     ConversationMessagePersistenceMixin,
 )
+from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
 from argus.domain.usage_limits import (
     USAGE_COUNTER_LOCK as _USAGE_COUNTER_LOCK,
 )
 from argus.domain.usage_limits import (
     QuotaExceededError,
-)
-from argus.domain.usage_limits import (
-    align_usage_period as _align_period,
 )
 from argus.domain.usage_limits import (
     check_usage_limits as _check_usage_limits,
@@ -142,7 +140,7 @@ def _supabase_client_options() -> ClientOptions:
 
 
 @dataclass
-class SupabaseGateway(ConversationMessagePersistenceMixin):
+class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
     client: Client
     auth_client: Client | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
@@ -496,6 +494,20 @@ class SupabaseGateway(ConversationMessagePersistenceMixin):
         finalization: PreparedBacktestFinalization,
     ) -> FinalizedBacktest:
         return finalize_backtest(self.client, finalization=finalization)
+
+    def finalize_direct_backtest_success(
+        self,
+        *,
+        job_id: str,
+        finalization: PreparedBacktestFinalization,
+    ) -> FinalizedBacktest | None:
+        from argus.domain.supabase_backtest_finalization import (
+            finalize_direct_backtest,
+        )
+
+        return finalize_direct_backtest(
+            self.client, job_id=job_id, finalization=finalization
+        )
 
     def update_backtest_run_result_card(
         self,
@@ -938,6 +950,25 @@ class SupabaseGateway(ConversationMessagePersistenceMixin):
         created = self.client.table("backtest_jobs").insert(payload).execute()
         return dict(_row_one(created) or {})
 
+    def admit_backtest_job(self, **kwargs: Any) -> dict[str, Any]:
+        from argus.domain import backtest_admission_gateway
+
+        return backtest_admission_gateway.admit_backtest_job(self.client, **kwargs)
+
+    def get_backtest_job_reservation(self, **kwargs: Any) -> dict[str, Any] | None:
+        from argus.domain import backtest_admission_gateway
+
+        return backtest_admission_gateway.get_backtest_job_reservation(
+            self.client, **kwargs
+        )
+
+    def finalize_direct_backtest_job(self, **kwargs: Any) -> dict[str, Any] | None:
+        from argus.domain import backtest_admission_gateway
+
+        return backtest_admission_gateway.finalize_direct_backtest_job(
+            self.client, **kwargs
+        )
+
     def get_backtest_job(self, *, user_id: str, job_id: str) -> dict[str, Any] | None:
         result = (
             self.client.table("backtest_jobs")
@@ -1083,9 +1114,9 @@ class SupabaseGateway(ConversationMessagePersistenceMixin):
             .eq("status", existing_status)
         )
         if can_retry_finalization:
-            update_query = update_query.eq(
-                "failure_code", "finalization_failed"
-            ).eq("retryable", True)
+            update_query = update_query.eq("failure_code", "finalization_failed").eq(
+                "retryable", True
+            )
         updated = update_query.execute()
         row = _row_one(updated)
         if row is None:
@@ -1920,9 +1951,7 @@ class SupabaseGateway(ConversationMessagePersistenceMixin):
                 )
                 current_used = int(row.get("used_count", 0))
                 if current_used >= limit_count:
-                    raise QuotaExceededError(
-                        f"Quota exceeded for {resource} ({period})"
-                    )
+                    raise QuotaExceededError(f"Quota exceeded for {resource} ({period})")
                 checked_rows.append((row, current_used, limit_count, period))
 
             for row, current_used, limit_count, period in checked_rows:
@@ -1955,7 +1984,7 @@ class SupabaseGateway(ConversationMessagePersistenceMixin):
         limit_count: int,
         now: datetime,
     ) -> dict[str, Any]:
-        start, end = _align_period(now, period)
+        start, end = align_usage_period(now, period)
         start_iso = start.isoformat()
         end_iso = end.isoformat()
         for _ in range(5):
@@ -2017,13 +2046,9 @@ class SupabaseGateway(ConversationMessagePersistenceMixin):
 
         now = _now_iso()
         raw_user_metadata = auth_user.get("user_metadata")
-        user_metadata = (
-            raw_user_metadata if isinstance(raw_user_metadata, dict) else {}
-        )
+        user_metadata = raw_user_metadata if isinstance(raw_user_metadata, dict) else {}
         metadata_language = user_metadata.get("language")
-        language: Language = (
-            "es-419" if metadata_language == "es-419" else "en"
-        )
+        language: Language = "es-419" if metadata_language == "es-419" else "en"
         # Canonical defaults per requirements
         payload = {
             "id": user_id,

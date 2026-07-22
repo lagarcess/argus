@@ -42,6 +42,8 @@ EvidenceArtifactType = Literal["backtest"]
 DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
+
+
 # Single source of truth: executable templates live only in the capability registry
 # (derived from each StrategyCapability's status). StrategyTemplate validates against that
 # set at runtime and publishes its OpenAPI enum from it, so there is no second hardcoded
@@ -104,6 +106,40 @@ class User(BaseModel):
 
 class UserResponse(BaseModel):
     user: User
+
+
+class UsageWindow(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    limit: int = Field(ge=0)
+    used: int = Field(ge=0)
+    remaining: int = Field(ge=0)
+    period_end: datetime
+
+
+class UsageAllowance(BaseModel):
+    """Backend-derived allowance truth for one resource: both active UTC
+    windows plus availability and the most restrictive window."""
+
+    model_config = ConfigDict(frozen=True)
+
+    hour: UsageWindow
+    day: UsageWindow
+    available_now: bool
+    limiting_window: Literal["hour", "day"]
+
+
+class UsageAllowances(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    messages: UsageAllowance
+    backtests: UsageAllowance
+
+
+class UsageAllowanceResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    allowances: UsageAllowances
 
 
 class ProfilePatch(BaseModel):
@@ -298,7 +334,7 @@ class BacktestRunResponse(BaseModel):
 
 class BacktestJob(BaseModel):
     id: str
-    conversation_id: str
+    conversation_id: str | None = None
     request_message_id: str | None = None
     confirmation_message_id: str | None = None
     status: BacktestJobStatus

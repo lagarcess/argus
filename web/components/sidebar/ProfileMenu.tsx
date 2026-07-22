@@ -38,6 +38,7 @@ import AppearanceModal from "@/components/settings/AppearanceModal";
 import LanguageModal from "@/components/settings/LanguageModal";
 import ArchivedChatsView from "@/components/settings/ArchivedChatsView";
 import DeletedItemsView from "@/components/settings/DeletedItemsView";
+import UsageModal from "@/components/settings/UsageModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ type ActiveModal =
   | "language"
   | "archived"
   | "deleted"
+  | "usage"
   | "profile";
 
 type SubMenu = null | "data" | "settings" | "help" | "feedback";
@@ -516,6 +518,17 @@ export default function ProfileMenu({
       />
     );
   }
+  if (activeModal === "usage") {
+    return (
+      <UsageModal
+        locale={localeForLanguage(
+          normalizeEnabledLanguage(i18n.resolvedLanguage),
+        )}
+        onClose={() => setActiveModal(null)}
+        returnFocusRef={anchorRef}
+      />
+    );
+  }
   if (activeModal === "profile") {
     return (
       <>
@@ -787,10 +800,10 @@ export default function ProfileMenu({
               {t("settings.data.security", "Security")}
             </button>
             <button
-              disabled
-              className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25"
+              onClick={() => openModal("usage")}
+              className="flex min-h-11 w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
-              <Activity className="h-3.5 w-3.5 text-black/25 dark:text-white/25" />
+              <Activity className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.data.usage", "Usage")}
             </button>
             <button
