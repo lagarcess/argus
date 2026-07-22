@@ -410,6 +410,11 @@ def mock_gateway():
             finalization_store
         ).finalize_backtest_completion(finalization=finalization)
     )
+    gateway.finalize_direct_backtest_success.side_effect = (
+        lambda *, job_id, finalization: MemoryBacktestFinalizationGateway(
+            finalization_store
+        ).finalize_backtest_completion(finalization=finalization)
+    )
     gateway.get_evidence_capture_by_run.return_value = None
     gateway.create_backtest_evidence_capture.side_effect = (
         lambda *, user_id, captured: captured
@@ -753,9 +758,9 @@ def test_me_usage_zero_state_does_not_create_or_increment_counters(mock_gateway)
 def test_me_usage_openapi_contract_publishes_both_windowed_allowances():
     generated_schema = app.openapi()["components"]["schemas"]["UsageAllowances"]
     checked_openapi = yaml.safe_load(
-        (
-            Path(__file__).resolve().parents[1] / "docs" / "api" / "openapi.yaml"
-        ).read_text(encoding="utf-8")
+        (Path(__file__).resolve().parents[1] / "docs" / "api" / "openapi.yaml").read_text(
+            encoding="utf-8"
+        )
     )
     checked_schema = checked_openapi["components"]["schemas"]["UsageAllowances"]
 
@@ -954,8 +959,8 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(
     assert "No fees/slippage" in run["conversation_result_card"]["assumptions"]
     assert run["conversation_result_card"]["assumptions"][-1] == "Benchmark: SPY"
     assert run["conversation_result_card"]["benchmark_note"] is None
-    mock_gateway.finalize_backtest_completion.assert_called_once()
-    called_run = mock_gateway.finalize_backtest_completion.call_args.kwargs[
+    mock_gateway.finalize_direct_backtest_success.assert_called_once()
+    called_run = mock_gateway.finalize_direct_backtest_success.call_args.kwargs[
         "finalization"
     ].run
     assert isinstance(called_run, BacktestRun)
@@ -986,8 +991,8 @@ def test_run_backtest_supabase_kill_switch_restores_legacy_snapshot(
     run = response.json()["run"]
     assert "_execution_realism" not in run["config_snapshot"]
     assert "No fees/slippage" in run["conversation_result_card"]["assumptions"]
-    mock_gateway.finalize_backtest_completion.assert_called_once()
-    called_run = mock_gateway.finalize_backtest_completion.call_args.kwargs[
+    mock_gateway.finalize_direct_backtest_success.assert_called_once()
+    called_run = mock_gateway.finalize_direct_backtest_success.call_args.kwargs[
         "finalization"
     ].run
     assert isinstance(called_run, BacktestRun)
@@ -995,7 +1000,7 @@ def test_run_backtest_supabase_kill_switch_restores_legacy_snapshot(
 
 
 def test_run_backtest_finalization_failure_is_explicit_and_retryable(mock_gateway):
-    mock_gateway.finalize_backtest_completion.side_effect = RuntimeError(
+    mock_gateway.finalize_direct_backtest_success.side_effect = RuntimeError(
         "database unavailable"
     )
 

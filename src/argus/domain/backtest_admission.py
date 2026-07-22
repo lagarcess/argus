@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Literal
 
+from argus.domain.backtesting.config import normalize_timeframe
 from argus.domain.usage_limits import (
     SIMULATION_USAGE_RESOURCE,
     read_memory_usage,
@@ -193,7 +194,7 @@ _DIRECT_PAYLOAD_FIELDS = (
 
 
 def normalize_direct_launch_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Materialize the direct-run request: declared fields, explicit nulls,
+    """Materialize the direct-run request: declared fields, executor defaults,
     trimmed/uppercased/de-duplicated symbols preserving first occurrence."""
 
     normalized: dict[str, Any] = {}
@@ -212,6 +213,22 @@ def normalize_direct_launch_payload(payload: dict[str, Any]) -> dict[str, Any]:
     benchmark = payload.get("benchmark_symbol")
     if isinstance(benchmark, str):
         normalized["benchmark_symbol"] = benchmark.strip().upper() or None
+
+    # Omitted fields and spelled-out executor defaults are one identity;
+    # values the executor rejects stay as-is and are never admitted.
+    normalized["template"] = normalized["template"] or "rsi_mean_reversion"
+    normalized["side"] = normalized["side"] or "long"
+    normalized["allocation_method"] = normalized["allocation_method"] or "equal_weight"
+    capital = normalized["starting_capital"] or 1000
+    if isinstance(capital, (int, float)) and not isinstance(capital, bool):
+        capital = float(capital)
+    normalized["starting_capital"] = capital
+    timeframe = normalized["timeframe"]
+    if timeframe is None or isinstance(timeframe, str):
+        try:
+            normalized["timeframe"] = normalize_timeframe(timeframe)
+        except ValueError:
+            pass
     return normalized
 
 

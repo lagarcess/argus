@@ -495,6 +495,20 @@ class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
     ) -> FinalizedBacktest:
         return finalize_backtest(self.client, finalization=finalization)
 
+    def finalize_direct_backtest_success(
+        self,
+        *,
+        job_id: str,
+        finalization: PreparedBacktestFinalization,
+    ) -> FinalizedBacktest | None:
+        from argus.domain.supabase_backtest_finalization import (
+            finalize_direct_backtest,
+        )
+
+        return finalize_direct_backtest(
+            self.client, job_id=job_id, finalization=finalization
+        )
+
     def update_backtest_run_result_card(
         self,
         *,
@@ -1100,9 +1114,9 @@ class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
             .eq("status", existing_status)
         )
         if can_retry_finalization:
-            update_query = update_query.eq(
-                "failure_code", "finalization_failed"
-            ).eq("retryable", True)
+            update_query = update_query.eq("failure_code", "finalization_failed").eq(
+                "retryable", True
+            )
         updated = update_query.execute()
         row = _row_one(updated)
         if row is None:
@@ -1937,9 +1951,7 @@ class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
                 )
                 current_used = int(row.get("used_count", 0))
                 if current_used >= limit_count:
-                    raise QuotaExceededError(
-                        f"Quota exceeded for {resource} ({period})"
-                    )
+                    raise QuotaExceededError(f"Quota exceeded for {resource} ({period})")
                 checked_rows.append((row, current_used, limit_count, period))
 
             for row, current_used, limit_count, period in checked_rows:
@@ -2034,13 +2046,9 @@ class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
 
         now = _now_iso()
         raw_user_metadata = auth_user.get("user_metadata")
-        user_metadata = (
-            raw_user_metadata if isinstance(raw_user_metadata, dict) else {}
-        )
+        user_metadata = raw_user_metadata if isinstance(raw_user_metadata, dict) else {}
         metadata_language = user_metadata.get("language")
-        language: Language = (
-            "es-419" if metadata_language == "es-419" else "en"
-        )
+        language: Language = "es-419" if metadata_language == "es-419" else "en"
         # Canonical defaults per requirements
         payload = {
             "id": user_id,

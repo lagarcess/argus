@@ -669,7 +669,6 @@ components:
       type: object
       required:
         - id
-        - conversation_id
         - status
         - retryable
       properties:
@@ -677,7 +676,9 @@ components:
           type: string
           format: uuid
         conversation_id:
-          type: string
+          type:
+            - string
+            - "null"
           format: uuid
         request_message_id:
           type:

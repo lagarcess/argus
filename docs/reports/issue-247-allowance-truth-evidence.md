@@ -289,7 +289,7 @@ confirmation identity, leaving the concurrent-retry window able to
 double-admit). Environment gates recorded for rollout: production must
 run with `ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=true` (with the flag off,
 chat runs take the legacy uncharged in-process path), and the deployed
-database must carry the migration chain through `20260722000002`. In
+database must carry the migration chain through `20260722000004`. In
 synchronous no-dispatch mode a concurrent replay can re-execute compute
 (accounting stays exactly-once; the finalizer dedupes the run identity).
 

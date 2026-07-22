@@ -422,6 +422,23 @@ def test_admission_functions_are_service_role_only():
         assert anon is False
         assert authenticated is False
         assert service_role is True
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select"
+                " has_function_privilege('anon',"
+                "  'public.finalize_direct_backtest_success(uuid,uuid,text,"
+                "jsonb,jsonb,jsonb,jsonb)', 'execute'),"
+                " has_function_privilege('authenticated',"
+                "  'public.finalize_direct_backtest_success(uuid,uuid,text,"
+                "jsonb,jsonb,jsonb,jsonb)', 'execute'),"
+                " has_function_privilege('service_role',"
+                "  'public.finalize_direct_backtest_success(uuid,uuid,text,"
+                "jsonb,jsonb,jsonb,jsonb)', 'execute')"
+            )
+            anon, authenticated, service_role = cursor.fetchone()
+        assert anon is False
+        assert authenticated is False
+        assert service_role is True
 
 
 def test_legacy_reservation_replays_on_exact_payload_and_adopts_identity(owner):
@@ -503,7 +520,53 @@ def test_legacy_reservation_with_different_payload_conflicts(owner):
         assert _usage_rows(connection, owner["user_id"], "backtest_runs") == {}
 
 
-def test_direct_finalization_sql_guard_requires_running_status(owner):
+def _finalize_direct_success(connection, owner, *, job_id: str, run_id: str):
+    idea_id = str(uuid.uuid4())
+    idea_version_id = str(uuid.uuid4())
+    artifact_id = str(uuid.uuid4())
+    run = {
+        "id": run_id,
+        "status": "completed",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "metrics": {"total_return": 0.1},
+        "config_snapshot": {"template": "buy_and_hold"},
+        "conversation_result_card": {},
+    }
+    idea = {"id": idea_id, "title": "Proof idea"}
+    idea_version = {
+        "id": idea_version_id,
+        "idea_id": idea_id,
+        "source_run_id": run_id,
+        "title": "Proof idea",
+    }
+    artifact = {
+        "id": artifact_id,
+        "idea_id": idea_id,
+        "idea_version_id": idea_version_id,
+        "source_run_id": run_id,
+        "title": "Proof evidence",
+    }
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select public.finalize_direct_backtest_success("
+            " %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb)",
+            (
+                owner["user_id"],
+                job_id,
+                f"direct:{job_id}",
+                json.dumps(run),
+                json.dumps(idea),
+                json.dumps(idea_version),
+                json.dumps(artifact),
+            ),
+        )
+        return cursor.fetchone()[0]
+
+
+def test_direct_success_commits_tuple_and_job_flip_in_one_boundary(owner):
     with _connect() as connection:
         admitted = _admit(
             connection,
@@ -513,6 +576,41 @@ def test_direct_finalization_sql_guard_requires_running_status(owner):
             conversation_id=None,
         )
         job_id = admitted["job"]["id"]
+        run_id = str(uuid.uuid4())
+
+        finalized = _finalize_direct_success(
+            connection, owner, job_id=job_id, run_id=run_id
+        )
+
+        assert finalized is not None
+        assert finalized["run"]["id"] == run_id
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select status, result_run_id from public.backtest_jobs" " where id = %s",
+                (job_id,),
+            )
+            status, result_run_id = cursor.fetchone()
+            cursor.execute(
+                "select count(*) from public.backtest_runs where id = %s",
+                (run_id,),
+            )
+            run_rows = cursor.fetchone()[0]
+        assert status == "succeeded"
+        assert str(result_run_id) == run_id
+        assert run_rows == 1
+
+
+def test_reconciled_direct_job_blocks_late_success_without_a_tuple(owner):
+    with _connect() as connection:
+        admitted = _admit(
+            connection,
+            owner,
+            operation_scope="backtests.run",
+            initial_status="running",
+            conversation_id=None,
+        )
+        job_id = admitted["job"]["id"]
+        run_id = str(uuid.uuid4())
         with connection.cursor() as cursor:
             cursor.execute(
                 "update public.backtest_jobs set status='failed',"
@@ -520,20 +618,25 @@ def test_direct_finalization_sql_guard_requires_running_status(owner):
                 " finished_at=now() where id = %s",
                 (job_id,),
             )
-            # The Python finalizer adds status='running' to its predicate;
-            # this is the exact conditional it issues.
+
+        finalized = _finalize_direct_success(
+            connection, owner, job_id=job_id, run_id=run_id
+        )
+
+        assert finalized is None
+        with connection.cursor() as cursor:
             cursor.execute(
-                "update public.backtest_jobs set status='succeeded',"
-                " result_run_id=null, finished_at=now()"
-                " where user_id = %s and id = %s and status = 'running'"
-                " returning id",
-                (owner["user_id"], job_id),
-            )
-            assert cursor.fetchone() is None
-            cursor.execute(
-                "select status, failure_code from public.backtest_jobs" " where id = %s",
+                "select status, failure_code, result_run_id"
+                " from public.backtest_jobs where id = %s",
                 (job_id,),
             )
-            status, failure_code = cursor.fetchone()
+            status, failure_code, result_run_id = cursor.fetchone()
+            cursor.execute(
+                "select count(*) from public.backtest_runs where id = %s",
+                (run_id,),
+            )
+            run_rows = cursor.fetchone()[0]
         assert status == "failed"
         assert failure_code == "direct_execution_abandoned"
+        assert result_run_id is None
+        assert run_rows == 0

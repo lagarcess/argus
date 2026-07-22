@@ -102,6 +102,11 @@ def mock_gateway():
             finalization_store
         ).finalize_backtest_completion(finalization=finalization)
     )
+    gateway.finalize_direct_backtest_success.side_effect = (
+        lambda *, job_id, finalization: MemoryBacktestFinalizationGateway(
+            finalization_store
+        ).finalize_backtest_completion(finalization=finalization)
+    )
     gateway.get_evidence_capture_by_run.return_value = None
     gateway.create_backtest_evidence_capture.side_effect = (
         lambda *, user_id, captured: captured
@@ -269,6 +274,10 @@ def test_direct_run_admits_durably_and_never_uses_legacy_increment(
     admission = mock_gateway.admit_backtest_job.call_args.kwargs
     assert admission["operation_scope"] == "backtests.run"
     assert admission["idempotency_key"] == "direct-admission-truth"
+    mock_gateway.finalize_direct_backtest_success.assert_called_once()
+    success = mock_gateway.finalize_direct_backtest_success.call_args.kwargs
+    assert success["job_id"] == "job-admitted-1"
+    mock_gateway.finalize_direct_backtest_job.assert_not_called()
 
 
 def _usage_row(
@@ -462,13 +471,52 @@ def test_direct_identity_covers_every_execution_field():
     baseline = identity(base)
     for field, changed in (
         ("starting_capital", 250_000),
-        ("side", "long"),
-        ("allocation_method", "equal_weight"),
+        ("side", "short"),
+        ("allocation_method", "risk_parity"),
     ):
         assert identity({**base, field: changed}) != baseline, (
             f"{field} must participate in the direct-run identity; reusing a "
             "key with a changed execution field is a collision, not a replay."
         )
+
+
+def test_direct_identity_treats_explicit_defaults_as_the_same_execution():
+    from argus.domain.backtest_admission import (
+        direct_run_identity_hash,
+        normalize_direct_launch_payload,
+    )
+
+    base = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "start_date": "2024-01-02",
+        "end_date": "2024-06-28",
+    }
+
+    def identity(payload):
+        return direct_run_identity_hash(
+            conversation_id=None,
+            strategy_id=None,
+            normalized_payload=normalize_direct_launch_payload(payload),
+        )
+
+    baseline = identity(base)
+    for field, explicit_default in (
+        ("side", "long"),
+        ("starting_capital", 1000),
+        ("starting_capital", 1000.0),
+        ("allocation_method", "equal_weight"),
+        ("timeframe", "1D"),
+        ("timeframe", "1d"),
+    ):
+        assert identity({**base, field: explicit_default}) == baseline, (
+            f"Spelling out the executor default for {field} does not change "
+            "what runs, so it must not mint a second chargeable identity."
+        )
+    assert identity({**base, "starting_capital": 2500}) == identity(
+        {**base, "starting_capital": 2500.0}
+    )
 
 
 def test_late_direct_success_cannot_rewrite_reconciled_failure(
@@ -495,10 +543,10 @@ def test_late_direct_success_cannot_rewrite_reconciled_failure(
         )
 
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fetch)
-    # The reconciler already settled this job as a terminal failure while the
-    # slow execution was still running: the conditional finalize finds no
-    # running row.
-    mock_gateway.finalize_direct_backtest_job.return_value = None
+    # The reconciler already settled this job while the slow execution was
+    # still running: the serialized finalize finds no running row.
+    mock_gateway.finalize_direct_backtest_success.side_effect = None
+    mock_gateway.finalize_direct_backtest_success.return_value = None
 
     response = client.post(
         "/api/v1/backtests/run",
@@ -518,6 +566,7 @@ def test_late_direct_success_cannot_rewrite_reconciled_failure(
     assert response.status_code == 503
     assert response.json()["code"] == "direct_execution_abandoned"
     assert "run" not in response.json()
+    mock_gateway.finalize_direct_backtest_job.assert_not_called()
 
 
 def test_memory_direct_finalization_requires_a_running_job():
@@ -549,3 +598,83 @@ def test_memory_direct_finalization_requires_a_running_job():
     assert result is None
     assert store.backtest_jobs[job_id]["status"] == "failed"
     assert store.backtest_jobs[job_id]["failure_code"] == "direct_execution_abandoned"
+
+
+def test_unexpected_direct_failure_still_settles_the_job_terminally(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+):
+    import pandas as pd
+    from argus.api import backtest_service
+    from argus.domain import engine as domain_engine
+
+    def _fetch(symbol: str, **_: object) -> pd.DataFrame:
+        index = pd.to_datetime(
+            ["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"], utc=True
+        )
+        close = pd.Series(range(100, 100 + len(index)), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fetch)
+
+    def _explode(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("engine crashed mid-run")
+
+    monkeypatch.setattr(backtest_service, "create_run_from_payload", _explode)
+
+    with pytest.raises(RuntimeError, match="engine crashed mid-run"):
+        client.post(
+            "/api/v1/backtests/run",
+            json={
+                "template": "buy_and_hold",
+                "asset_class": "equity",
+                "symbols": ["AAPL"],
+                "start_date": "2024-01-02",
+                "end_date": "2024-01-05",
+            },
+            headers={
+                "Authorization": "Bearer test-token",
+                "Idempotency-Key": "unexpected-crash",
+            },
+        )
+
+    mock_gateway.finalize_direct_backtest_job.assert_called_once()
+    settled = mock_gateway.finalize_direct_backtest_job.call_args.kwargs
+    assert settled["job_id"] == "job-admitted-1"
+    assert settled["status"] == "failed"
+    assert settled["failure_code"] == "execution_failed"
+    assert settled["failure_detail"] == "unexpected_error"
+    assert settled["retryable"] is False
+    mock_gateway.finalize_direct_backtest_success.assert_not_called()
+
+
+def test_backtest_job_contract_allows_direct_jobs_without_a_conversation(
+    mock_gateway,
+):
+    mock_gateway.get_backtest_job.return_value = {
+        "id": "9f0a3f31-6f57-49f8-b8f5-2ff8e6b0b0aa",
+        "conversation_id": None,
+        "status": "failed",
+        "failure_code": "direct_execution_abandoned",
+        "failure_detail": "direct_execution_abandoned",
+        "retryable": True,
+    }
+
+    response = client.get(
+        "/api/v1/backtest-jobs/9f0a3f31-6f57-49f8-b8f5-2ff8e6b0b0aa",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()["job"]
+    assert body["conversation_id"] is None
+    assert body["status"] == "failed"

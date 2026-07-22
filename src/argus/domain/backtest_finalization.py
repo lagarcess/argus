@@ -96,6 +96,32 @@ def finalize_backtest_completion(
     return finalized
 
 
+def finalize_direct_backtest_completion(
+    gateway: Any,
+    finalization: BacktestFinalizationInput,
+    *,
+    job_id: str,
+) -> FinalizedBacktest | None:
+    """Tuple commit and the succeeded job flip in one serialized boundary.
+
+    ``None`` means the job is no longer running and nothing was committed.
+    """
+    prepared = _prepare_finalization(finalization)
+    try:
+        finalized = gateway.finalize_direct_backtest_success(
+            job_id=job_id,
+            finalization=prepared,
+        )
+    except BacktestFinalizationError:
+        raise
+    except Exception as exc:
+        raise BacktestFinalizationError("Backtest finalization failed.") from exc
+    if finalized is None:
+        return None
+    _validate_finalized_backtest(finalized)
+    return finalized
+
+
 class MemoryBacktestFinalizationGateway:
     def __init__(self, store: AlphaStore) -> None:
         self.store = store
@@ -119,9 +145,7 @@ class MemoryBacktestFinalizationGateway:
 
             existing_owner = self.store.backtest_run_owners.get(run_id)
             if existing_owner is not None and existing_owner != finalization.user_id:
-                raise BacktestFinalizationError(
-                    "Backtest run is owned by another user."
-                )
+                raise BacktestFinalizationError("Backtest run is owned by another user.")
 
             stored_run = self.store.backtest_runs.get(run_id)
             if stored_run is not None and not _same_immutable_run(
@@ -294,9 +318,7 @@ def _prepare_finalization(
             "Backtest finalization execution identity must not be blank."
         )
     if finalization.run.status != "completed":
-        raise BacktestFinalizationError(
-            "Backtest finalization requires a completed run."
-        )
+        raise BacktestFinalizationError("Backtest finalization requires a completed run.")
     if not finalization.run.id.strip():
         raise BacktestFinalizationError("Backtest finalization run id must not be blank.")
 

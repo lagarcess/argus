@@ -42,6 +42,8 @@ EvidenceArtifactType = Literal["backtest"]
 DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
+
+
 # Single source of truth: executable templates live only in the capability registry
 # (derived from each StrategyCapability's status). StrategyTemplate validates against that
 # set at runtime and publishes its OpenAPI enum from it, so there is no second hardcoded
@@ -332,7 +334,7 @@ class BacktestRunResponse(BaseModel):
 
 class BacktestJob(BaseModel):
     id: str
-    conversation_id: str
+    conversation_id: str | None = None
     request_message_id: str | None = None
     confirmation_message_id: str | None = None
     status: BacktestJobStatus

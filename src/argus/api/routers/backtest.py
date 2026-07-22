@@ -99,7 +99,7 @@ def run_backtest(
         create_run_from_payload,
         prepare_run_from_payload,
     )
-    from argus.api.chat.evidence import finalize_completed_backtest
+    from argus.api.chat.evidence import finalize_completed_direct_backtest
 
     _validate_direct_payload_shape(data, request)
     normalized_payload = backtest_admission.normalize_direct_launch_payload(data)
@@ -170,12 +170,13 @@ def run_backtest(
             run_id=stable_backtest_run_id(user.id, execution_identity),
             prepared_execution=prepared_execution,
         )
-        run = finalize_completed_backtest(
+        finalized = finalize_completed_direct_backtest(
             user_id=user.id,
             conversation_id=run.conversation_id,
             run=run,
             execution_identity=execution_identity,
-        ).run
+            job_id=job_id,
+        )
     except BacktestFinalizationError as exc:
         _finalize_direct_job(
             user=user,
@@ -207,17 +208,20 @@ def run_backtest(
             failure_status=exc.status_code,
         )
         raise
+    except Exception:
+        _finalize_direct_job(
+            user=user,
+            job_id=job_id,
+            status="failed",
+            failure_code="execution_failed",
+            failure_detail="unexpected_error",
+            retryable=False,
+            failure_status=500,
+        )
+        raise
 
-    finalized = _finalize_direct_job(
-        user=user,
-        job_id=job_id,
-        status="succeeded",
-        result_run_id=run.id,
-    )
-    if job_id and finalized is None:
-        # Stale reconciliation already settled this job as a terminal
-        # failure while the execution was still running; that outcome is
-        # final and this process must not deliver its obsolete success.
+    if finalized is None:
+        # A reconciled terminal outcome is final; a late success is discarded.
         raise problem(
             request,
             status_code=503,
@@ -230,7 +234,7 @@ def run_backtest(
             ),
             context={"backtest_job_id": job_id, "retryable": True},
         )
-    return BacktestRunResponse(run=run)
+    return BacktestRunResponse(run=finalized.run)
 
 
 def _clean_required_idempotency_key(
