@@ -126,21 +126,28 @@ already red on the untouched branch head because `web/lib/argus-api.ts`
 exceeded its budget by 9 lines after the #259 merge; fixed by moving the
 usage types onto `web/lib/usage-allowance.ts` (`b31723e`).
 
-## Deterministic verification (exact counts)
+Closure-pass red: the dated-direct-request regression test failed with
+the production `TypeError: Object of type date is not JSON serializable`
+before the `40769aa` fix and passes after; the typed-vs-string-date
+identity test was green on both sides, proving the fix changed no
+identity.
+
+## Deterministic verification (exact counts, refreshed at the closure pass)
 
 All backend runs hermetic: provider keys blanked,
 `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture`, Python 3.10.20
-(pinned runtime).
+(pinned runtime). Counts below were re-run 2026-07-22 at the review-fixed
+heads (`f6fb982` and the dated-payload fix `40769aa`); the web tree is
+byte-identical across those commits, so the frontend rows hold for the
+final SHA.
 
 | Gate | Result |
 | --- | --- |
-| Focused backend set (alpha API, gateway, jobs, finalization, admission, artifacts, allowance, chat stream, import boundary) | 296 passed |
-| Hermetic agent-runtime sweep + spine guardrails | 1129 passed |
-| Mocked eval harness + i18n coverage + localization | 43 passed |
-| Disposable-Postgres proofs (`tests/test_allowance_accounting_postgres.py`) | 11 passed, three consecutive runs (skip cleanly without the gate URL) |
-| Full backend suite `tests/` at the final candidate | 2276 passed, 1 failed (pre-existing), 2 skipped, 38.19s |
-| Ruff check (`src`, `tests`) | clean |
-| Frontend unit suite (`bun test __tests__/`) | 421 passed |
+| Focused backend set (allowance accounting, alpha API memory+supabase, finalization, jobs shadow/async, evidence spine, chat state machine) | 235 passed at `f6fb982`; 155-test focused rerun green after the dated-payload fix |
+| Full backend suite `tests/` | 2273 passed, 1 failed (pre-existing, below), 17 skipped at `40769aa` (2271/1/17 at `f6fb982`) |
+| Disposable-Postgres proofs (`tests/test_allowance_accounting_postgres.py`) | 15 passed; four runs across two fresh containers, including reuse-safety back-to-back runs (skip cleanly without the gate URL) |
+| Ruff check + format (`src`, touched tests) | clean |
+| Frontend unit suite (`bun test __tests__/`) | 422 passed |
 | Frontend lint (`eslint`) | clean |
 | Frontend production build (`next build`) | success |
 | Playwright usage journeys (mock-auth, Chromium) | 4 passed |
@@ -156,10 +163,10 @@ outside CI's fixed file list. It is not normalized into this lane.
 
 ## Disposable-Postgres and ownership evidence
 
-Container: `public.ecr.aws/supabase/postgres:17.6.1.140` (fresh, disposable,
-port 54999; the founder's `supabase_db_argus-qa` stack untouched). All 17
+Container: `public.ecr.aws/supabase/postgres:17.6.1.140` (fresh,
+disposable; the founder's `supabase_db_argus-qa` stack untouched). All 19
 `supabase/migrations` files applied in order with `ON_ERROR_STOP`, zero
-errors. Proofs (11 passed):
+errors. Proofs (15 passed):
 
 - settlement charges hour and day exactly once with exact UTC period
   boundaries, replays zero, and rolls back atomically with its message;
@@ -170,21 +177,32 @@ errors. Proofs (11 passed):
   capacity (2) and reject the rest with zero extra charge;
 - same key with a different identity conflicts without disclosure or
   mutation;
+- a legacy null-identity reservation replays on an exact payload match and
+  adopts the canonical identity; any other reuse of its key conflicts;
 - hourly and daily exhaustion reject before any charge or insert;
 - a post-admission failure keeps exactly one unit and its replay returns
   the durable failed job without charging;
 - a stale running direct job reconciles to a retryable
   `direct_execution_abandoned` failure on the next admission;
+- direct success commits the run/evidence tuple and the succeeded job flip
+  in one serialized transaction (`finalize_direct_backtest_success`);
+- a reconciled direct job blocks a late success with a SQL null and zero
+  committed tuple rows;
 - reservations and counters are owner-isolated across users sharing a key;
-- both functions are executable by `service_role` only.
+- the admission and direct-success functions are executable by
+  `service_role` only.
 
 ## Complexity reassessment
 
-- Added: two forward migrations (one settling wrapper, one admission
-  function), one policy module extension, one small chat allowance helper,
-  the admission domain module with its memory twin, the gateway adapter,
-  and the chat admission flow. Each maps to a locked contract requirement
-  (atomic charge boundaries, one policy source, typed rejection).
+- Added: four forward migrations — the settling append wrapper
+  (`20260722000001`), the atomic admission function (`20260722000002`),
+  the legacy null-identity replay repair (`20260722000003`), and the
+  serialized direct-success finalization (`20260722000004`) — plus one
+  policy module extension, one small chat allowance helper, the admission
+  domain module with its memory twin, the gateway adapters, and the chat
+  admission flow. Each maps to a locked contract requirement (atomic
+  charge boundaries, one policy source, typed rejection, one serialized
+  success boundary).
 - Removed/avoided: the process-local direct-route idempotency map (durable
   mode), the count-then-insert chat backpressure bypass, duplicated limit
   literals across routers, and the donor's full #234 OpenAPI gate and #240
@@ -217,7 +235,7 @@ errors. Proofs (11 passed):
 | --- | --- | --- |
 | 1 | Hourly and daily `limit`/`used`/`remaining`/exact `period_end` for messages and simulations | PASS — `tests/test_allowance_accounting.py` window tests; PG proof of exact UTC bounds |
 | 2 | Backend-derived `available_now` and limiting-window truth; frontend never computes quota truth | PASS — router derivation tests; frontend source pins reject quota constants and reset math |
-| 3 | Normal answers, clarifications, supported/unsupported responses consume one unit at durable terminal completion | PASS — settlement seam tests; PG same-transaction proof (live-browser confirmation pending) |
+| 3 | Normal answers, clarifications, supported/unsupported responses consume one unit at durable terminal completion | PASS — settlement seam tests; PG same-transaction proof; live-proven in both browser passes |
 | 4 | Malformed, unauthenticated, abandoned, duplicate-replay, infrastructure-failed turns consume zero | PASS — FastAPI validation/auth reject pre-handler; runtime-failure zero test; replay-zero PG proof; abandoned turns never reach the settling append (generator cancellation precedes terminal persistence) |
 | 5 | Committed terminal response + transport disconnect = exactly one unit | PASS (structural) — the charge commits with the terminal message transaction, independent of delivery; disconnect drill remains for live QA |
 | 6 | First unique durable admission = one unit | PASS — PG proof |
@@ -226,26 +244,30 @@ errors. Proofs (11 passed):
 | 9 | Pre-admission rejection including #251 preflight = zero | PASS — coverage-rejection and quota-precheck tests unchanged and green; admission runs after preflight |
 | 10 | Post-admission execution/finalization failure = one unit + truthful durable terminal job | PASS — PG proof + direct-route failure finalization tests |
 | 11 | Direct and chat/workflow launches share the rule | PASS — both routes call the same `admit_backtest_job`; chat rejection envelopes prevent free execution |
-| 12 | Settings → Usage enabled, Security preserved, daily-primary + contextual hourly, EN and es-419 | PASS deterministically — unit + Playwright journeys; alpha-frontend pins prove the Security route untouched (live browser pass pending) |
-| 13 | Zero, available, hourly-limited, daily-exhausted, loading, unavailable, reload, keyboard, focus, desktop, mobile states | PASS deterministically — unit + Playwright (zero, hourly-limited, exhausted EN/ES, focus trap); live matrix pending |
+| 12 | Settings → Usage enabled, Security preserved, daily-primary + contextual hourly, EN and es-419 | PASS — unit + Playwright journeys; Security page live-rendered in both browser passes |
+| 13 | Zero, available, hourly-limited, daily-exhausted, loading, unavailable, reload, keyboard, focus, desktop, mobile states | PASS — unit + Playwright (zero, hourly-limited, exhausted EN/ES, focus trap); live matrix run in both browser passes |
 | 14 | Owner isolation and missing-counter behavior on real Postgres | PASS — PG owner-isolation and zero-state proofs; service-role-only function grants |
-| 15 | Production-parity local browser QA with real auth proving before/after counters | BLOCKED — worktree-local QA configuration absent (root `.env`); see below |
+| 15 | Production-parity local browser QA with real auth proving before/after counters | PASS — two live passes on the isolated local stack: the first functional+presentation pass (first-pass section below) and the exact-head closure pass at `40769aa` (closure section below); the original hosted attempt remains recorded in the historical note |
 | 16 | Focused API, migration, concurrency, lifecycle, workflow, frontend, OpenAPI, hermetic gates | PASS — table above |
 | 17 | Final diff proportionality: no billing machinery, duplicate counters, frontend quota logic, unrelated refactors | PASS — complexity reassessment above |
 
-## Live product QA — completed on the isolated local Supabase stack
+## Live product QA — first pass on the isolated local Supabase stack
 
-Executed 2026-07-21 after founder-authorized configuration. Hosted
-Supabase was never mutated; the connected cloud database predates the
-required migration chain (PGRST202 on the serialized append function), so
-the functional matrix ran against the local `argus-qa` Docker stack
-(Kong 54331 / Postgres 54332), brought forward with the repo migration
-flow (`supabase migration up --local`: exactly `20260722000001` and
-`20260722000002` applied; history was a clean prefix). Runtime-only env
-overrides isolated both processes to the local stack; the symlinked
-integration env files were untouched. The QA identity was a fresh normal
-local user (`is_admin = false`) created through real local Supabase Auth
-signup (allowlist row seeded locally).
+Executed 2026-07-21 at pre-review-fix heads (functional matrix through
+`ac90500`, presentation at `97a552f`) after founder-authorized
+configuration; it is presentation and functional evidence for those
+commits, not exact-head evidence for the review-fixed candidate (the
+closure-pass section below covers that). Hosted Supabase was never
+mutated; the connected cloud database predates the required migration
+chain (PGRST202 on the serialized append function), so the functional
+matrix ran against the local `argus-qa` Docker stack (Kong 54331 /
+Postgres 54332), brought forward with the repo migration flow
+(`supabase migration up --local`: at that time `20260722000001` and
+`20260722000002`; history was a clean prefix). Runtime-only env overrides
+isolated both processes to the local stack; the symlinked integration env
+files were untouched. The QA identity was a fresh normal local user
+(`is_admin = false`) created through real local Supabase Auth signup
+(allowlist row seeded locally).
 
 Functional matrix results (sanitized; counters verified in the UI, the
 `/me/usage` response, and the local database):
@@ -305,6 +327,72 @@ EN/ES, desktop/mobile, dark/light, with zero mutations from panel
 interactions. Red-before-fix evidence: the rewritten presentation pins
 failed 2/8 against the prior card-based modal (badges present, bordered
 tiles, no disclosure) before the implementation turned them green.
+
+## Exact-head closure pass (2026-07-22, `40769aa`)
+
+The review rounds added migrations `20260722000003`/`20260722000004` and
+reworked direct admission/finalization after the first live pass, so the
+matrix was re-run at the exact candidate on the same isolated local
+stack. `supabase migration up --local` applied exactly `20260722000003`
+and `20260722000004`; the verified history is the full 19-file chain with
+zero pending. The QA identity was the existing local normal user through
+real local Supabase Auth (fresh UTC day, so all four windows started from
+zero rows).
+
+The pass immediately surfaced a release blocker: every durable-mode
+direct `POST /backtests/run` with dates returned 500 at admission —
+`BacktestRunRequest` parses dates as Python `date` objects,
+`model_dump` keeps them typed, and the PostgREST client cannot
+JSON-encode the launch payload. The failure was fail-closed (it preceded
+the RPC: zero charge, zero job, zero tuple) and invisible to every
+deterministic gate (mock gateways never serialize; the Postgres proofs
+serialize string dates). Fixed in `40769aa`: typed dates canonicalize to
+ISO day strings in `normalize_direct_launch_payload`, pinned by a
+route-level regression whose gateway stub JSON-encodes the payload the
+way PostgREST does, with identity proven byte-stable across typed and
+string dates (canonical hashing already read dates as ISO).
+
+Matrix results at `40769aa` (counters verified in the UI, the `/me/usage`
+response, and the local database at every step; chat/settlement paths are
+byte-identical to `f6fb982`, where items 1–4 executed):
+
+1. Three-way zero-state parity: UI "200/60/50/10 remaining" == JSON zeros
+   with exact UTC `period_end`s == zero database rows (reads create no
+   counters).
+2. One completed chat response settled exactly one unit in both windows
+   (0→1, 0→1).
+3. Injected pre-terminal infrastructure failure
+   (`ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS=1` on the local process only)
+   rendered the honest recovery and consumed zero; the persisted Retry
+   after restoring the clean process settled exactly one unit (1→2) for
+   the one delivered outcome.
+4. One confirmed chat simulation charged exactly one unit (0→1) with one
+   durable succeeded `chat.run_backtest` job and one identity; the run
+   action itself consumed no message unit.
+5. A dated direct run succeeded (200 with the run in 3.2s) and charged
+   exactly one unit (1→2); its exact replay returned the same durable run
+   id in 41ms with zero additional charge.
+6. Same key with a different payload returned the non-disclosing 409
+   `idempotency_conflict` (no payload details in the response) with zero
+   charge.
+7. Provider preflight rejection (1990 window) returned 422
+   `provider_history_start_unavailable` with zero simulations and zero
+   messages.
+8. Full reload preserved the truthful counts (197/57 messages,
+   48/8 simulations).
+9. Settings → Security fully rendered (password change and session
+   controls).
+10. The reconciliation race that cannot be forced safely through a
+    browser is proven on real Postgres: the serialized success function
+    returns null for a reconciled job and commits zero tuple rows
+    (15-proof suite, re-run at `40769aa`).
+11. The conversation-less direct job polled with 200,
+    `conversation_id: null`, status succeeded, and `result_run_id` linked
+    to the exact run the direct call returned.
+12. Read purity: the md5 fingerprint over all counter rows (including
+    `updated_at`) was identical before and after panel opens, the
+    "What counts?" toggle, close, reload, and reopen; the panel issues
+    GETs only. The approved disclosure copy rendered verbatim.
 
 ## Historical note — first hosted attempt
 
