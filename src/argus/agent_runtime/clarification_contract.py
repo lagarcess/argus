@@ -173,6 +173,17 @@ def _unsupported_recovery_fallback(
     strategy: StrategySummary | dict[str, Any] | None,
 ) -> str | None:
     _ = language
+    if _unsupported_reason_code(response_intent) == "future_performance":
+        options = _option_labels(response_intent)
+        offer = (
+            f" Which direction should I take: {_join_options(options)}?"
+            if options
+            else " What historical period would you like to examine?"
+        )
+        return (
+            "I cannot predict future performance. I can test how the same idea "
+            f"performed over a historical period instead.{offer}"
+        )
     if _unsupported_reason_code(response_intent) == "unsupported_time_granularity":
         raw_value = _unsupported_raw_value(response_intent)
         if raw_value:

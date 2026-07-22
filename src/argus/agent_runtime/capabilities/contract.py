@@ -403,6 +403,22 @@ def build_default_capability_contract() -> CapabilityContract:
                     ),
                 ),
             ),
+            "future_performance": SimplificationTemplate(
+                category="future_performance",
+                options=(
+                    SimplificationOption(
+                        label="Test this idea over a historical period",
+                        replacement_values={"requested_field": "date_range"},
+                    ),
+                    SimplificationOption(
+                        label="Compare with buy and hold historically",
+                        replacement_values={
+                            "strategy_type": "buy_and_hold",
+                            "requested_field": "date_range",
+                        },
+                    ),
+                ),
+            ),
             "unsupported_strategy_logic": SimplificationTemplate(
                 category="unsupported_strategy_logic",
                 options=(

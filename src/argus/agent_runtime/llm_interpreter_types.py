@@ -73,6 +73,7 @@ class LLMDateRangeIntent(BaseModel):
             "since",
             "endpoint_patch",
             "same_as_latest_result",
+            "future_window",
         ]
         | None
     ) = Field(
@@ -82,7 +83,13 @@ class LLMDateRangeIntent(BaseModel):
             "or semantic windows such as last 12 months or year to date instead "
             "of asking deterministic code to parse localized prose. Use "
             "same_as_latest_result when the user references the latest completed "
-            "test's window; the runtime binds the dates from the canonical run."
+            "test's window; the runtime binds the dates from the canonical run. "
+            "Use future_window whenever the user's period points forward from "
+            "today — in ten years, over the next 3 years, by 2031, dentro de "
+            "diez años — with count/unit or year filled and the exact phrase as "
+            "evidence. A future_window is never a historical test window: do "
+            "not emit rolling_window or calendar dates for a forward-looking "
+            "period."
         ),
     )
     start: str | None = Field(

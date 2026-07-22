@@ -1,0 +1,314 @@
+"""Issue #241 future-performance executable boundary.
+
+Invariant under test: a typed future-anchored horizon
+(``date_range_intent.kind == "future_window"``) on a strategy-shaped turn can
+never become an executable confirmation, a resolved historical date range, or
+inherited dates after an explicit supported-alternative selection. The future
+horizon survives only as original-intent evidence; compatible asset, capital,
+and strategy facts are preserved.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date
+from typing import Any
+
+import pytest
+from argus.agent_runtime.interpreter.pending_option import (
+    _apply_pending_response_option_replacement,
+    _llm_draft_from_strategy_summary,
+)
+from argus.agent_runtime.interpreter.unsupported_admission import (
+    FUTURE_HORIZON_EVIDENCE_KEY,
+    FUTURE_PERFORMANCE_ADMISSION_BLOCKED,
+    FUTURE_PERFORMANCE_CATEGORY,
+)
+from argus.agent_runtime.stages.interpret import (
+    StructuredInterpretation,
+    interpret_stage,
+)
+from argus.agent_runtime.state.models import (
+    RunState,
+    StrategySummary,
+    UserState,
+)
+from argus.nlp.natural_time import resolve_date_range_intent
+
+EN_FUTURE_MESSAGE = (
+    "If I invest $10,000 in NVDA using a golden cross strategy, how much will "
+    "it be worth in ten years?"
+)
+ES_FUTURE_MESSAGE = (
+    "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto "
+    "tendré dentro de diez años?"
+)
+
+
+@dataclass(frozen=True)
+class ResolvedAssetStub:
+    canonical_symbol: str
+    asset_class: str
+    name: str = ""
+    raw_symbol: str = ""
+
+
+class RecordingInterpreter:
+    def __init__(self, response: StructuredInterpretation | None) -> None:
+        self.response = response
+        self.requests = []
+
+    def __call__(self, request):
+        self.requests.append(request)
+        return self.response
+
+
+def _stub_equity_asset_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def resolve_stub(symbol: str, **_: Any) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
+
+
+def _run_interpret(*, message: str, response: StructuredInterpretation):
+    interpreter = RecordingInterpreter(response)
+    result = interpret_stage(
+        state=RunState.new(current_user_message=message, recent_thread_history=[]),
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=interpreter,
+    )
+    return result
+
+
+def _future_window_intent(evidence: str) -> dict[str, Any]:
+    return {
+        "kind": "future_window",
+        "count": 10,
+        "unit": "year",
+        "anchor": "today",
+        "confidence": 0.9,
+        "evidence": evidence,
+    }
+
+
+def _future_interpretation(
+    *,
+    intent: str,
+    evidence: str,
+    semantic_turn_act: str = "new_idea",
+    assistant_response: str | None = None,
+    detected_user_language: str | None = None,
+) -> StructuredInterpretation:
+    return StructuredInterpretation(
+        intent=intent,
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User asked what a golden-cross NVDA investment becomes in the future.",
+        detected_user_language=detected_user_language,
+        assistant_response=assistant_response,
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="signal_strategy",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            capital_amount=10000,
+            entry_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+            extra_parameters={"date_range_intent": _future_window_intent(evidence)},
+        ),
+        semantic_turn_act=semantic_turn_act,
+    )
+
+
+def _assert_future_blocked(result, *, evidence: str) -> None:
+    assert result.outcome == "needs_clarification"
+    decision = result.decision
+    assert decision is not None
+    assert decision.requires_clarification is True
+    assert FUTURE_PERFORMANCE_ADMISSION_BLOCKED in decision.reason_codes
+    categories = [item.category for item in decision.unsupported_constraints]
+    assert FUTURE_PERFORMANCE_CATEGORY in categories
+    constraint = next(
+        item
+        for item in decision.unsupported_constraints
+        if item.category == FUTURE_PERFORMANCE_CATEGORY
+    )
+    replacement_fields = [
+        option.replacement_values.get("requested_field")
+        for option in constraint.simplification_options
+    ]
+    assert replacement_fields and all(
+        field == "date_range" for field in replacement_fields
+    )
+    strategy = decision.candidate_strategy_draft
+    # Compatible facts survive; the horizon does not become executable dates.
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.capital_amount == 10000
+    assert strategy.date_range in (None, "", {}, [])
+    extra = strategy.extra_parameters or {}
+    assert "date_range_intent" not in extra
+    horizon = extra.get(FUTURE_HORIZON_EVIDENCE_KEY)
+    assert isinstance(horizon, dict)
+    assert horizon.get("kind") == "future_window"
+    assert horizon.get("evidence") == evidence
+    assert "date_range" in decision.missing_required_fields
+    patch = result.patch
+    assert patch.get("confirmation_payload") is None
+
+
+def test_backtest_execution_with_future_window_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The reproduced J4 shape: supported strategy named inside a future ask."""
+
+    _stub_equity_asset_resolution(monkeypatch)
+    result = _run_interpret(
+        message=EN_FUTURE_MESSAGE,
+        response=_future_interpretation(
+            intent="backtest_execution",
+            evidence="in ten years",
+        ),
+    )
+    _assert_future_blocked(result, evidence="in ten years")
+
+
+def test_spanish_future_window_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_equity_asset_resolution(monkeypatch)
+    result = _run_interpret(
+        message=ES_FUTURE_MESSAGE,
+        response=_future_interpretation(
+            intent="backtest_execution",
+            evidence="dentro de diez años",
+            detected_user_language="es-419",
+        ),
+    )
+    _assert_future_blocked(result, evidence="dentro de diez años")
+
+
+def test_unsupported_verdict_with_future_window_uses_future_category(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A model that already refused still gets the typed future boundary."""
+
+    _stub_equity_asset_resolution(monkeypatch)
+    refusal = "I cannot predict future performance, but I can test it historically."
+    result = _run_interpret(
+        message=EN_FUTURE_MESSAGE,
+        response=_future_interpretation(
+            intent="unsupported_or_out_of_scope",
+            semantic_turn_act="unsupported_request",
+            evidence="in ten years",
+            assistant_response=refusal,
+        ),
+    )
+    _assert_future_blocked(result, evidence="in ten years")
+    assert result.patch.get("assistant_response") == refusal
+
+
+def test_strategy_drafting_with_future_window_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_equity_asset_resolution(monkeypatch)
+    result = _run_interpret(
+        message=EN_FUTURE_MESSAGE,
+        response=_future_interpretation(
+            intent="strategy_drafting",
+            evidence="in ten years",
+        ),
+    )
+    _assert_future_blocked(result, evidence="in ten years")
+
+
+def test_future_window_intent_never_resolves_to_dates() -> None:
+    resolution = resolve_date_range_intent(
+        _future_window_intent("in ten years"),
+        today=date(2026, 7, 22),
+    )
+    assert resolution is None
+
+
+def test_rolling_window_still_resolves_historically() -> None:
+    resolution = resolve_date_range_intent(
+        {
+            "kind": "rolling_window",
+            "count": 10,
+            "unit": "year",
+            "anchor": "today",
+            "confidence": 0.9,
+            "evidence": "last ten years",
+        },
+        today=date(2026, 7, 22),
+    )
+    assert resolution is not None
+    assert resolution.payload == {"start": "2016-07-22", "end": "2026-07-22"}
+
+
+def test_selection_after_future_recovery_asks_for_period() -> None:
+    """Explicit alternative selection conserves facts and re-asks the period."""
+
+    pending = StrategySummary(
+        strategy_type="signal_strategy",
+        asset_universe=["NVDA"],
+        asset_class="equity",
+        capital_amount=10000,
+        entry_rule={
+            "type": "moving_average_crossover",
+            "fast_indicator": "sma",
+            "fast_period": 50,
+            "slow_indicator": "sma",
+            "slow_period": 200,
+            "direction": "bullish",
+        },
+        extra_parameters={
+            FUTURE_HORIZON_EVIDENCE_KEY: _future_window_intent("in ten years"),
+        },
+    )
+    draft = _llm_draft_from_strategy_summary(pending)
+    replaced = _apply_pending_response_option_replacement(
+        draft=draft,
+        replacement_values={"requested_field": "date_range"},
+        current_missing=[],
+    )
+    repaired = replaced["draft"]
+    assert repaired.asset_universe == ["NVDA"]
+    assert repaired.capital_amount == 10000
+    assert repaired.date_range in (None, "", {}, [])
+    assert "date_range" in replaced["missing_fields"]
+
+
+def test_selection_to_buy_and_hold_conserves_capital_and_asks_period() -> None:
+    pending = StrategySummary(
+        strategy_type="signal_strategy",
+        asset_universe=["NVDA"],
+        asset_class="equity",
+        capital_amount=10000,
+        extra_parameters={
+            FUTURE_HORIZON_EVIDENCE_KEY: _future_window_intent("in ten years"),
+        },
+    )
+    draft = _llm_draft_from_strategy_summary(pending)
+    replaced = _apply_pending_response_option_replacement(
+        draft=draft,
+        replacement_values={
+            "strategy_type": "buy_and_hold",
+            "requested_field": "date_range",
+        },
+        current_missing=[],
+    )
+    repaired = replaced["draft"]
+    assert repaired.strategy_type == "buy_and_hold"
+    assert repaired.asset_universe == ["NVDA"]
+    assert repaired.capital_amount == 10000
+    assert repaired.date_range in (None, "", {}, [])
+    assert "date_range" in replaced["missing_fields"]

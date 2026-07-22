@@ -28,6 +28,43 @@ from argus.agent_runtime.strategy_contract import canonical_strategy_type
 UNSUPPORTED_INTENT_ADMISSION_BLOCKED = "unsupported_intent_confirmation_blocked"
 CAPABILITY_CONFLICT_INVERSE_REASON = "supported_strategy_capability_conflict_inverse"
 
+# Issue #241: a typed forward-looking horizon can never admit as an executable
+# historical window; it survives only as original-intent evidence.
+FUTURE_PERFORMANCE_CATEGORY = "future_performance"
+FUTURE_PERFORMANCE_ADMISSION_BLOCKED = "future_performance_admission_blocked"
+FUTURE_HORIZON_EVIDENCE_KEY = "future_horizon_intent"
+
+_FUTURE_PERFORMANCE_EXPLANATION = (
+    "Argus cannot predict future performance. It can test how the same idea "
+    "performed over a historical period instead."
+)
+
+
+def future_performance_capability_clause() -> str:
+    """Interpreter-prompt contract for the future-performance boundary."""
+
+    return (
+        "Future-performance questions are a general class in any language and "
+        "for any asset, basket, strategy, or amount: what something will be "
+        "worth, return, become, or do over a future period ('in ten years', "
+        "'over the next 3 years', 'by 2031', 'dentro de diez años'). Argus "
+        "cannot predict future performance, so classify the request as "
+        "unsupported_or_out_of_scope with semantic_turn_act="
+        "unsupported_request, even when the user names a supported strategy "
+        "such as a golden cross; a supported strategy does not make the "
+        "requested future result executable. Set date_range_intent.kind="
+        "future_window with the exact phrase as evidence; never convert the "
+        "future horizon into rolling_window, calendar dates, or any "
+        "historical date_range. Still extract the compatible facts — "
+        "asset_universe, capital_amount, strategy_type, cadence — with "
+        "evidence_spans so a later explicit historical test can reuse them. "
+        "Author assistant_response with two separate facts in the user's "
+        "language: Argus cannot predict future performance, and it can test "
+        "how the same idea performed over a historical period the user "
+        "chooses. Offer that historical test without selecting it for the "
+        "user and without presenting any historical result as a forecast.\n\n"
+    )
+
 # Byte-identical to the constraint-present audit framing previously inlined in
 # run_field_audits._supported_strategy_capability_conflict_messages.
 CAPABILITY_CONFLICT_KEEP_DIRECTION_PROMPT = (
@@ -228,6 +265,84 @@ def admitted_or_blocked_confirmation_result(
     )
 
 
+def _typed_future_horizon(decision: InterpretDecision) -> dict[str, Any] | None:
+    extra_parameters = decision.candidate_strategy_draft.extra_parameters or {}
+    intent = extra_parameters.get("date_range_intent")
+    if (
+        isinstance(intent, dict)
+        and str(intent.get("kind") or "").strip() == "future_window"
+    ):
+        return dict(intent)
+    return None
+
+
+def future_performance_admission_result(
+    *,
+    decision: InterpretDecision,
+    contract: Any,
+    optional_parameter_values: dict[str, Any],
+    assistant_response: str | None,
+) -> StageResult | None:
+    """Fail closed when the typed horizon points forward from today.
+
+    The horizon moves to original-intent evidence, compatible facts stay on the
+    draft, and the historical period is re-requested after an explicit
+    supported-alternative selection."""
+
+    horizon = _typed_future_horizon(decision)
+    if horizon is None:
+        return None
+    draft = decision.candidate_strategy_draft
+    extra_parameters = dict(draft.extra_parameters or {})
+    extra_parameters.pop("date_range_intent", None)
+    extra_parameters.pop("requested_date_range", None)
+    extra_parameters.pop("effective_date_range", None)
+    extra_parameters[FUTURE_HORIZON_EVIDENCE_KEY] = horizon
+    stripped_draft = draft.model_copy(
+        update={"date_range": None, "extra_parameters": extra_parameters}
+    )
+    constraint = UnsupportedConstraint(
+        category=FUTURE_PERFORMANCE_CATEGORY,
+        raw_value=str(
+            horizon.get("evidence")
+            or decision.user_goal_summary
+            or "future performance"
+        ),
+        explanation=_FUTURE_PERFORMANCE_EXPLANATION,
+        simplification_options=contract.get_simplification_options(
+            FUTURE_PERFORMANCE_CATEGORY
+        ),
+    )
+    blocked_decision = decision.model_copy(
+        update={
+            "candidate_strategy_draft": stripped_draft,
+            "requires_clarification": True,
+            "unsupported_constraints": [*decision.unsupported_constraints, constraint],
+            "missing_required_fields": list(
+                dict.fromkeys([*decision.missing_required_fields, "date_range"])
+            ),
+            "reason_codes": list(
+                dict.fromkeys(
+                    [*decision.reason_codes, FUTURE_PERFORMANCE_ADMISSION_BLOCKED]
+                )
+            ),
+        }
+    )
+    blocked_patch = dict(
+        _optional_parameter_stage_patch(
+            decision=blocked_decision,
+            values=optional_parameter_values,
+        )
+    )
+    if assistant_response:
+        blocked_patch["assistant_response"] = assistant_response
+    return StageResult(
+        outcome="needs_clarification",
+        decision=blocked_decision,
+        stage_patch=blocked_patch,
+    )
+
+
 def strategy_route_admission_result(
     *,
     expects_strategy_route: bool,
@@ -241,6 +356,14 @@ def strategy_route_admission_result(
 
     if not expects_strategy_route:
         return None
+    future_result = future_performance_admission_result(
+        decision=decision,
+        contract=contract,
+        optional_parameter_values=optional_parameter_values,
+        assistant_response=assistant_response,
+    )
+    if future_result is not None:
+        return future_result
     has_unsupported_verdict = (
         decision.intent == "unsupported_or_out_of_scope"
         or decision.semantic_turn_act == "unsupported_request"
