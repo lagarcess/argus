@@ -34,12 +34,33 @@ def response_with_runtime_context_assets(
     )
 
 
+def _response_without_model_authored_provider_records(
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse:
+    """`provider_resolved_assets` is runtime-owned.
+
+    The model can write anything into `extra_parameters`; a hallucinated
+    record must never masquerade as provider truth. The reserved key is
+    cleared here, before enrichment, so only the actual runtime
+    provider-context rows can populate it on every path."""
+
+    extra_parameters = response.candidate_strategy_draft.extra_parameters or {}
+    if _PROVIDER_RESOLVED_ASSETS_KEY not in extra_parameters:
+        return response
+    draft = response.candidate_strategy_draft.model_copy(deep=True)
+    cleaned = dict(draft.extra_parameters or {})
+    cleaned.pop(_PROVIDER_RESOLVED_ASSETS_KEY, None)
+    draft.extra_parameters = cleaned
+    return response.model_copy(update={"candidate_strategy_draft": draft})
+
+
 def response_with_provider_context_assets(
     response: LLMInterpretationResponse,
     *,
     asset_resolution_context: str | None,
     include_unsupported_request: bool = False,
 ) -> LLMInterpretationResponse:
+    response = _response_without_model_authored_provider_records(response)
     supported_intents = {"strategy_drafting", "backtest_execution"}
     if include_unsupported_request:
         supported_intents.add("unsupported_or_out_of_scope")
