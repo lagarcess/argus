@@ -214,6 +214,15 @@ def normalize_direct_launch_payload(payload: dict[str, Any]) -> dict[str, Any]:
             normalized["timeframe"] = normalize_timeframe(timeframe)
         except ValueError:
             pass
+
+    # The durable launch payload travels as wire JSON; typed dates
+    # canonicalize to ISO day strings, matching identity hashing.
+    for field in ("start_date", "end_date"):
+        value = normalized[field]
+        if isinstance(value, datetime):
+            normalized[field] = value.date().isoformat()
+        elif isinstance(value, date):
+            normalized[field] = value.isoformat()
     return normalized
 
 

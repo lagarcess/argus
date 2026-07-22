@@ -9,6 +9,7 @@ for both messages and simulations.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -478,6 +479,92 @@ def test_direct_identity_covers_every_execution_field():
             f"{field} must participate in the direct-run identity; reusing a "
             "key with a changed execution field is a collision, not a replay."
         )
+
+
+def test_dated_direct_request_survives_wire_serialization_of_the_payload(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+):
+    import pandas as pd
+    from argus.domain import engine as domain_engine
+
+    def _fetch(symbol: str, **_: object) -> pd.DataFrame:
+        index = pd.to_datetime(
+            ["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"], utc=True
+        )
+        close = pd.Series(range(100, 100 + len(index)), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fetch)
+
+    def _admit_serializing(**kwargs: Any) -> dict[str, Any]:
+        # The PostgREST client JSON-encodes the launch payload on the wire.
+        json.dumps(kwargs["launch_payload"])
+        return {
+            "decision": "admitted",
+            "job": {"id": "job-admitted-1", "status": "running"},
+        }
+
+    mock_gateway.admit_backtest_job.side_effect = _admit_serializing
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2024-01-02",
+            "end_date": "2024-01-05",
+        },
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "dated-wire-serialization",
+        },
+    )
+
+    assert response.status_code == 200
+    admitted = mock_gateway.admit_backtest_job.call_args.kwargs["launch_payload"]
+    assert admitted["start_date"] == "2024-01-02"
+    assert admitted["end_date"] == "2024-01-05"
+
+
+def test_direct_identity_stable_across_typed_and_string_dates():
+    from datetime import date
+
+    from argus.domain.backtest_admission import (
+        direct_run_identity_hash,
+        normalize_direct_launch_payload,
+    )
+
+    def identity(payload):
+        return direct_run_identity_hash(
+            conversation_id=None,
+            strategy_id=None,
+            normalized_payload=normalize_direct_launch_payload(payload),
+        )
+
+    typed = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "start_date": date(2024, 1, 2),
+        "end_date": date(2024, 6, 28),
+    }
+    stringly = {
+        **typed,
+        "start_date": "2024-01-02",
+        "end_date": "2024-06-28",
+    }
+    assert identity(typed) == identity(stringly)
 
 
 def test_direct_identity_treats_explicit_defaults_as_the_same_execution():
