@@ -443,7 +443,7 @@ def test_me_usage_used_beyond_limit_clamps_remaining_to_zero(mock_gateway):
 
 
 # ---------------------------------------------------------------------------
-# Direct-run identity and terminal finalization (#229/#230 review findings).
+# Direct-run identity and terminal finalization.
 # ---------------------------------------------------------------------------
 
 

@@ -1,9 +1,8 @@
 """Chat-entry allowance checks and terminal settlement policy (#247).
 
 Ordinary turns are checked non-consumingly at entry and settle exactly one
-message unit with their durable terminal product outcome. Run actions consume
-the simulation allowance at durable admission instead, so they skip both the
-message check and the message settlement.
+message unit at their durable terminal outcome; run actions charge the
+simulation allowance at admission and skip message accounting.
 """
 
 from __future__ import annotations

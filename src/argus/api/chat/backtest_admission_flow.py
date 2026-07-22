@@ -1,11 +1,8 @@
-"""Chat-side atomic admission flow, kept out of the backtest_jobs mega-file.
+"""Chat-side durable admission flow.
 
-Routes durable chat job creation through the one database-owned admission
-decision (replay/collision, allowance, per-user then global capacity, insert
-plus the hour and day allowance charge). On a capacity rejection it runs one
-bounded blocker reconciliation pass, then retries admission exactly once.
-Rejections return typed outcomes; they must not fall through to free
-in-process execution.
+A capacity rejection triggers one bounded blocker-reconciliation pass and
+exactly one admission retry. Rejections are typed outcomes; they never fall
+through to free in-process execution.
 """
 
 from __future__ import annotations

@@ -1,9 +1,5 @@
-"""Supabase-backed atomic admission calls, kept out of the gateway mega-file.
-
-These functions take the PostgREST client owned by ``SupabaseGateway`` and call
-the database-owned admission operation added by
-``supabase/migrations/20260722000002_atomic_backtest_admission.sql``.
-"""
+"""Supabase adapter for the database-owned admission operation
+(migration ``20260722000002_atomic_backtest_admission.sql``)."""
 
 from __future__ import annotations
 
@@ -117,8 +113,8 @@ def finalize_direct_backtest_job(
     }
     if execution_metadata is not None:
         payload["execution_metadata"] = execution_metadata
-    # A reconciled terminal state is final: only a still-running job may be
-    # finalized, so a late process can never rewrite a stale failure.
+    # Only a still-running job may be finalized; a reconciled terminal
+    # state is final.
     updated = (
         client.table("backtest_jobs")
         .update(payload)

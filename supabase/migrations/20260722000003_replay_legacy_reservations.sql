@@ -1,10 +1,6 @@
--- #247 review follow-up: preserve exact replay for reservations created
--- before 20260722000002. Legacy rows have a null identity_hash, so the
--- strict identity comparison misreported their exact replays as conflicts.
--- A legacy reservation now replays exactly when its stored payload_hash
--- matches the incoming payload hash, adopting the canonical identity for
--- future replays; any other reuse of the key remains a collision. The rest
--- of the admission operation is unchanged.
+-- Legacy reservations (null identity_hash, pre-20260722000002) replay only
+-- on an exact payload_hash match and adopt the canonical identity; any
+-- other reuse of the key is a collision.
 
 create or replace function public.admit_backtest_job(
     p_user_id uuid,
@@ -51,9 +47,8 @@ begin
         raise exception 'allowance limits are required';
     end if;
 
-    -- Serialize admissions on one advisory lock so replay/collision, stale
-    -- reconciliation, capacity counting, insert, and allowance charge cannot
-    -- interleave between transactions.
+    -- One advisory lock serializes the whole decision: replay, stale
+    -- reconciliation, capacity, insert, and charge never interleave.
     perform pg_advisory_xact_lock(hashtext('backtest_admission'));
 
     -- 1. Exact replay or identity collision, before every other boundary.
@@ -65,10 +60,9 @@ begin
     for update;
     if found then
         if v_existing.identity_hash is null then
-            -- Pre-migration reservations carry only payload-hash evidence.
-            -- An exact payload match is the durable replay and adopts the
-            -- canonical identity; anything else, including unknowable
-            -- evidence, is a collision.
+            -- A null-identity reservation replays only on an exact payload
+            -- match, adopting the canonical identity; anything else is a
+            -- collision.
             if v_existing.payload_hash is not null
                and v_existing.payload_hash = p_payload_hash then
                 update public.backtest_jobs
@@ -149,9 +143,8 @@ begin
         end if;
     end loop;
 
-    -- 3-4. Per-user capacity before global capacity. Direct admissions must
-    -- clear the queued and running ceilings at both scopes because they claim
-    -- a running slot immediately.
+    -- 3-4. Per-user capacity before global capacity; a direct admission
+    -- claims a running slot immediately, so both ceilings apply.
     select
         count(*) filter (where status = 'running' and user_id = p_user_id),
         count(*) filter (where status = 'queued' and user_id = p_user_id),

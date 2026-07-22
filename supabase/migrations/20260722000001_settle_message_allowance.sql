@@ -1,9 +1,6 @@
--- #247: settle one message allowance unit atomically with the durable
--- terminal product message. The wrapper delegates to the serialized
--- append_conversation_message boundary and, only when that append durably
--- inserted a new row (not a replay), charges the hour and day usage windows
--- in the same transaction. A replayed or suppressed append charges nothing,
--- so replays and duplicate settlements cannot double-charge.
+-- Settle one message allowance unit in the same transaction as the durable
+-- terminal message append. Only a newly inserted row charges the hour and
+-- day windows; a replayed or suppressed append charges nothing.
 
 create or replace function public.append_conversation_message_settling_usage(
   p_user_id uuid,

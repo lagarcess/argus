@@ -108,10 +108,8 @@ def _settle_message(connection, owner, message_id: str, *, limits=None):
 
 
 def _admit(connection, owner, **overrides):
-    # Capacity ceilings default high so every proof stays deterministic
-    # against a reused disposable database whose earlier runs left durable
-    # jobs behind; capacity behavior is proven through the per-user ceiling
-    # on a fresh user.
+    # Ceilings default high for determinism on a reused disposable database;
+    # capacity is proven via the per-user ceiling on a fresh user.
     arguments = {
         "user_id": owner["user_id"],
         "operation_scope": "chat.run_backtest",

@@ -1,26 +1,11 @@
-"""Atomic backtest admission and idempotency identity (#230/#247).
+"""Backtest admission identity and allowance charging (#229/#247).
 
-Implements the approved #229 contract:
-
-- ``Idempotency-Key`` is 1-128 visible ASCII characters, never normalized;
-  empty/whitespace-only required values are missing, other whitespace is
-  invalid.
-- The unique reservation is ``(user_id, operation_scope, idempotency_key)``
-  with the two approved scopes ``chat.run_backtest`` and ``backtests.run``.
-- Identity hashes use one canonical JSON serializer (sorted keys, compact
-  separators, unescaped Unicode, explicit nulls, lowercase UUIDs, non-finite
-  numbers rejected) and the full ``sha256:`` + 64-lowercase-hex form.
-- One admission operation resolves, in this exact order: exact replay or
-  identity collision first, unique-simulation allowance second, per-user
-  capacity third, global capacity fourth; only then does it insert the job and
-  charge the hour and day allowance windows together.
-
-The in-memory backend below is the deterministic dev/test twin of the
-database-owned operation added by
-``supabase/migrations/20260722000002_atomic_backtest_admission.sql``. It is
-atomic for one process via ``AlphaStore.backtest_admission_lock``; cross-process
-atomicity is owned by the database function, which the real-Postgres barriered
-test exercises when a disposable database URL is configured.
+Identity uses one canonical JSON serializer and full ``sha256:`` hex hashes;
+the reservation key is ``(user_id, operation_scope, idempotency_key)``. One
+admission decision resolves replay/collision, then allowance, then capacity,
+and only then inserts the job and charges both windows. The memory backend is
+the single-process twin of the database function in migration
+``20260722000002_atomic_backtest_admission.sql``.
 """
 
 from __future__ import annotations

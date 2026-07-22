@@ -110,9 +110,8 @@ def run_backtest(
     )
     launch_payload_digest = backtest_admission.canonical_hash(normalized_payload)
 
-    # An exact replay resolves before quota, preflight, or compute. The
-    # reservation pre-read only decides whether preflight may run; the atomic
-    # admission operation stays the authority for replay/collision races.
+    # The pre-read only routes around preflight; atomic admission stays the
+    # authority for replay/collision races.
     if _direct_reservation_exists(user=user, idempotency_key=clean_idempotency_key):
         decision, job = _admit_direct_run(
             request,

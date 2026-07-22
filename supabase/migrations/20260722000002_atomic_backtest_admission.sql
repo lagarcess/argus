@@ -1,11 +1,7 @@
--- #230/#247: database-owned atomic backtest admission and idempotency.
--- Adds the approved reservation identity columns and one admission function
--- that resolves, in this exact order: exact replay or identity collision
--- first, unique-simulation allowance (hour and day windows) second, per-user
--- capacity third, global capacity fourth; only then inserts the job and
--- charges both allowance windows in the same transaction. A count-then-insert
--- sequence in the API is not conforming admission. Limits arrive as required
--- parameters so the backend policy module stays the single limit source.
+-- Database-owned atomic backtest admission. Decision order: replay/identity
+-- collision, allowance (hour and day), per-user capacity, global capacity,
+-- then insert plus both window charges in one transaction. Limits are
+-- required parameters; the backend policy module is the single limit source.
 
 alter table public.backtest_jobs
     add column if not exists operation_scope text not null
@@ -13,8 +9,7 @@ alter table public.backtest_jobs
         check (operation_scope in ('chat.run_backtest', 'backtests.run')),
     add column if not exists identity_hash text;
 
--- Approved direct-run disposition: a backtests.run job may have no
--- conversation; ownership remains user_id.
+-- A backtests.run job may have no conversation; ownership remains user_id.
 alter table public.backtest_jobs
     alter column conversation_id drop not null;
 
@@ -72,9 +67,8 @@ begin
         raise exception 'allowance limits are required';
     end if;
 
-    -- Serialize admissions on one advisory lock so replay/collision, stale
-    -- reconciliation, capacity counting, insert, and allowance charge cannot
-    -- interleave between transactions.
+    -- One advisory lock serializes the whole decision: replay, stale
+    -- reconciliation, capacity, insert, and charge never interleave.
     perform pg_advisory_xact_lock(hashtext('backtest_admission'));
 
     -- 1. Exact replay or identity collision, before every other boundary.
@@ -155,9 +149,8 @@ begin
         end if;
     end loop;
 
-    -- 3-4. Per-user capacity before global capacity. Direct admissions must
-    -- clear the queued and running ceilings at both scopes because they claim
-    -- a running slot immediately.
+    -- 3-4. Per-user capacity before global capacity; a direct admission
+    -- claims a running slot immediately, so both ceilings apply.
     select
         count(*) filter (where status = 'running' and user_id = p_user_id),
         count(*) filter (where status = 'queued' and user_id = p_user_id),
