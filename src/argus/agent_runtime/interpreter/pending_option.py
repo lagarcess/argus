@@ -514,10 +514,17 @@ def _missing_fields_after_pending_option(
             "recurring_contribution",
             "strategy_type",
         }
-        return [
+        filtered = [
             field
             for field in missing
             if _field_path_base(field) not in present_fields
             and _field_path_base(field) not in stale_fields
         ]
+        # A selection cannot silently default the test window: a draft without
+        # a date range still owes the user the historical-period question.
+        if "date_range" not in present_fields and "date_range" not in {
+            _field_path_base(field) for field in filtered
+        }:
+            filtered = [*filtered, "date_range"]
+        return filtered
     return _dca_contract_missing_fields(missing, draft=draft)

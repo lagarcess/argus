@@ -124,6 +124,32 @@ export async function startNewChat(page: Page) {
   });
 }
 
+export async function reopenConversation(page: Page, conversationId: string) {
+  const row = page.locator(`[data-conversation-id="${conversationId}"]`);
+  if (!(await row.first().isVisible().catch(() => false))) {
+    const expand = page.getByRole("button", { name: /expand sidebar/i });
+    if (await expand.count()) {
+      await expand.first().click();
+      await page.waitForTimeout(500);
+    }
+    // Conversation rows render inside the Recents panel after a fresh load.
+    const recents = page.getByRole("button", { name: /recents|recientes/i });
+    if (
+      !(await row.first().isVisible().catch(() => false)) &&
+      (await recents.count())
+    ) {
+      await recents.first().click();
+      await page.waitForTimeout(1_000);
+    }
+  }
+  await expect(row.first()).toBeVisible({ timeout: 15_000 });
+  await row.first().click();
+  await expect(page.locator('[data-testid="chat-input"]')).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.waitForTimeout(1_000);
+}
+
 export async function sendTurn(
   page: Page,
   context: BrowserContext,

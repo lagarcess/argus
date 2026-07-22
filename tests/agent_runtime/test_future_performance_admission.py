@@ -287,6 +287,48 @@ def test_selection_after_future_recovery_asks_for_period() -> None:
     assert "date_range" in replaced["missing_fields"]
 
 
+def test_future_performance_sidecar_reuses_public_unsupported_recovery_shape() -> None:
+    """`future_performance` travels only as a reason_code value inside the
+    existing `unsupported_recovery` sidecar kind — no new public shape."""
+
+    from argus.agent_runtime.clarification_contract import typed_clarification_contract
+
+    sidecar = typed_clarification_contract(
+        response_intent={
+            "kind": "unsupported_recovery",
+            "semantic_needs": ["simplification_choice"],
+            "requested_fields": ["unsupported_constraints"],
+            "facts": {
+                "unsupported_constraints": [
+                    {
+                        "category": FUTURE_PERFORMANCE_CATEGORY,
+                        "raw_value": "in ten years",
+                        "explanation": "Argus cannot predict future performance.",
+                    }
+                ],
+            },
+            "options": [
+                {
+                    "label": "Test this idea over a historical period",
+                    "replacement_values": {"requested_field": "date_range"},
+                },
+            ],
+        },
+        strategy=StrategySummary(
+            strategy_type="signal_strategy",
+            asset_universe=["NVDA"],
+            capital_amount=10000,
+        ),
+        prompt_source="llm_generated",
+    )
+    assert sidecar is not None
+    assert sidecar["kind"] == "unsupported_recovery"
+    assert sidecar["reason_code"] == FUTURE_PERFORMANCE_CATEGORY
+    assert sidecar["prompt_source"] == "llm_generated"
+    option_payloads = [option["replacement_values"] for option in sidecar["options"]]
+    assert {"requested_field": "date_range"} in option_payloads
+
+
 def test_selection_to_buy_and_hold_conserves_capital_and_asks_period() -> None:
     pending = StrategySummary(
         strategy_type="signal_strategy",

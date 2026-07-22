@@ -10,6 +10,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from argus.agent_runtime.interpreter.provider_context_assets import (
+    resolved_asset_symbols_from_strategy_context,
+)
 from argus.agent_runtime.interpreter.shared import (
     _llm_strategy_draft_has_concrete_execution_target,
 )
@@ -55,7 +58,10 @@ def future_performance_capability_clause() -> str:
         "requested future result executable. Set date_range_intent.kind="
         "future_window with the exact phrase as evidence; never convert the "
         "future horizon into rolling_window, calendar dates, or any "
-        "historical date_range. Still extract the compatible facts — "
+        "historical date_range. If you record a date_range evidence span for "
+        "a forward-looking period, the temporal intent must be future_window; "
+        "never leave the intent empty for forward-looking evidence. "
+        "Still extract the compatible facts — "
         "asset_universe, capital_amount, strategy_type, cadence — with "
         "evidence_spans so a later explicit historical test can reuse them. "
         "Author assistant_response with two separate facts in the user's "
@@ -241,6 +247,9 @@ def admitted_or_blocked_confirmation_result(
     )
     blocked_decision = decision.model_copy(
         update={
+            "candidate_strategy_draft": _draft_with_conserved_resolved_assets(
+                decision.candidate_strategy_draft
+            ),
             "requires_clarification": True,
             "unsupported_constraints": [*decision.unsupported_constraints, constraint],
             "reason_codes": list(
@@ -263,6 +272,20 @@ def admitted_or_blocked_confirmation_result(
         decision=blocked_decision,
         stage_patch=blocked_patch,
     )
+
+
+def _draft_with_conserved_resolved_assets(draft: Any) -> Any:
+    """Typed provider-validated assets survive the unsupported-recovery route.
+
+    Restores an empty asset_universe from the draft's own provider-resolved
+    records; unresolved asset text is never promoted."""
+
+    if any(str(symbol or "").strip() for symbol in draft.asset_universe):
+        return draft
+    symbols = resolved_asset_symbols_from_strategy_context(draft)[:5]
+    if not symbols:
+        return draft
+    return draft.model_copy(update={"asset_universe": symbols})
 
 
 def _typed_future_horizon(decision: InterpretDecision) -> dict[str, Any] | None:
@@ -298,8 +321,10 @@ def future_performance_admission_result(
     extra_parameters.pop("requested_date_range", None)
     extra_parameters.pop("effective_date_range", None)
     extra_parameters[FUTURE_HORIZON_EVIDENCE_KEY] = horizon
-    stripped_draft = draft.model_copy(
-        update={"date_range": None, "extra_parameters": extra_parameters}
+    stripped_draft = _draft_with_conserved_resolved_assets(
+        draft.model_copy(
+            update={"date_range": None, "extra_parameters": extra_parameters}
+        )
     )
     constraint = UnsupportedConstraint(
         category=FUTURE_PERFORMANCE_CATEGORY,
@@ -317,7 +342,9 @@ def future_performance_admission_result(
         update={
             "candidate_strategy_draft": stripped_draft,
             "requires_clarification": True,
-            "unsupported_constraints": [*decision.unsupported_constraints, constraint],
+            # The typed future boundary owns this turn's reason code, ahead of
+            # any model-authored constraint label.
+            "unsupported_constraints": [constraint, *decision.unsupported_constraints],
             "missing_required_fields": list(
                 dict.fromkeys([*decision.missing_required_fields, "date_range"])
             ),
