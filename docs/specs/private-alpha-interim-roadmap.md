@@ -192,6 +192,31 @@ implementation queue.
 Do not select the next slice from the archived issue dependency graph. Select
 it by user value, regression risk, and the smallest complete live journey.
 
+### Selected slice: Capability truth
+
+Status: **Founder-approved design; implementation not started**
+
+The locked vertical-slice contract is
+[`2026-07-22-capability-truth-executable-boundary-design.md`](../superpowers/specs/2026-07-22-capability-truth-executable-boundary-design.md).
+Issue #241 tracks the implementation evidence.
+
+This is acceptance and narrow gap-closing for the founder outcome, not a rebuild
+of the completed P2.1 registry work.
+
+The slice proves four end-to-end classes: a supported golden-cross control, a
+recognized but non-executable momentum-breakout request, an unsupported external
+news-sentiment rule, and the general future-performance boundary. The last class
+applies to any asset, strategy, amount, language, or future horizon. Argus says
+it cannot predict future performance and separately offers a supported
+historical test. Only an explicit user choice creates the historical draft;
+compatible asset and capital facts carry forward, while a future horizon never
+silently becomes a historical date range.
+
+This slice adds no forecasting engine, Search/discovery behavior, strategy,
+indicator, provider, or second capability registry. If exact-head reproduction
+is already correct, align tests and evidence only rather than manufacturing a
+runtime change.
+
 ## Retained Product Decisions
 
 ### Usage allowance (#247 — complete)
