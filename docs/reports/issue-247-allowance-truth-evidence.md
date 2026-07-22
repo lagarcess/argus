@@ -210,11 +210,10 @@ errors. Proofs (15 passed):
 - Deliberately not built: billing/entitlement machinery, frontend quota
   logic, background sweepers, GET-path stale reconciliation
   (`GET /backtest-jobs/{id}` reconcile affects staleness visibility, not
-  accounting truth; the locked reliability contract expects it on that
-  read, so the deferral is an open founder decision recorded in the
-  final-review-round section), and quota-specific runtime recovery copy
-  (typed codes flow through the existing recovery contract; copy polish
-  is a follow-up).
+  accounting truth; founder-dispositioned as a pre-existing P2 gap
+  recorded on issue #231 — see the final-review-round section), and
+  quota-specific runtime recovery copy (typed codes flow through the
+  existing recovery contract; copy polish is a follow-up).
 
 ## Remaining risks and rollback boundary
 
@@ -422,11 +421,47 @@ confirmed and fixed red-first, one awaits a founder decision:
   preflight-rejected request, violating the approved zero-charge rule.
 - The pre-existing locked reliability contract says
   `GET /backtest-jobs/{id}` performs owner-scoped stale reconciliation;
-  this lane deferred that path to #230/#231 with a passthrough handler.
-  The contradiction between the locked contract text and the approved
-  lane boundary is recorded as an open founder decision; accounting is
-  unaffected either way (the unit is charged exactly once at admission,
-  and the same-key replay path already reconciles the stale job).
+  this lane's handler is a passthrough for direct jobs. Founder
+  disposition: confirmed as a pre-existing P2 contract gap outside the
+  #247 Usage outcome, not implemented in PR #259, contract text
+  unweakened. Recorded on issue #231 (which owns the database-only GET
+  behavior; #230 owns any atomic primitive it requires) with the
+  required future behavior: owner-scoped GET reconciles a stale direct
+  job using database time and row locking, performs no Render call,
+  creates no admission or usage charge, returns the durable terminal
+  job, and is proven against real Postgres. Accounting is unaffected
+  either way (the unit is charged exactly once at admission, and the
+  same-key replay path already reconciles the stale job).
+
+## Final exact-head acceptance (2026-07-22, `b38fbb2`)
+
+One bounded production-parity pass at the exact final head on the
+isolated local stack (real local Supabase Auth, normal non-admin user;
+hosted Supabase untouched). All seven cases passed with three-way
+UI/API/database agreement at every step:
+
+1. Baseline parity: UI "197/57 messages, 48/8 simulations remaining" ==
+   `/me/usage` (3, 3, 2, 2 used with exact UTC `period_end`s) == the
+   four counter rows.
+2. One completed chat response settled exactly one message unit (3→4).
+3. One injected pre-terminal infrastructure failure (local-process
+   `ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS=1`) rendered the honest
+   recovery and settled nothing (day counter unchanged at 4; the hourly
+   window rolled over naturally during the pass and both surfaces
+   tracked the new window truthfully).
+4. One unique admitted direct simulation returned 200 with its run,
+   charged exactly one unit (day 2→3), and created exactly one durable
+   succeeded job for its key.
+5. The exact replay returned the same durable run id and charged zero.
+6. A 1990 data-window request rejected pre-admission with 422
+   `provider_history_start_unavailable`, zero simulations, zero
+   messages, and zero job rows for its key.
+7. Full reload preserved the truthful counters (196/47 remaining with
+   the fresh hourly window), and Settings → Security rendered fully.
+
+Independent review is complete: two review rounds plus the requested
+final review, with every finding fixed red-first or dispositioned and
+every thread resolved.
 
 ## Historical note — first hosted attempt
 
