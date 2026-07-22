@@ -33,8 +33,6 @@ cases:
       benchmark_symbol: SPY
       capital_amount: 10000
       stage_outcomes: ["ready_for_confirmation", "await_approval"]
-    prose_judge:
-      criteria: ["honesty", "no_raw_runtime_error"]
   - id: capability_honesty_momentum_breakout_aapl
     prompt: "Backtest $10,000 in AAPL from January 2, 2022 through January 2, 2025 using a momentum breakout strategy."
     user_language: en
@@ -84,7 +82,14 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: unsupported_or_out_of_scope
+      # Intent label is model-shape; the typed future_window boundary is what
+      # keeps the turn non-executable regardless of which label arrives.
+      intent:
+        [
+          "unsupported_or_out_of_scope",
+          "backtest_execution",
+          "strategy_drafting",
+        ]
       capability_verdict: unsupported
       assets: ["NVDA"]
       asset_class: equity

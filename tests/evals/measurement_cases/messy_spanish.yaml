@@ -72,7 +72,12 @@ cases:
     user_language: es-419
     ui_language: es-419
     expected:
-      intent: unsupported_or_out_of_scope
+      intent:
+        [
+          "unsupported_or_out_of_scope",
+          "backtest_execution",
+          "strategy_drafting",
+        ]
       capability_verdict: unsupported
       assets: ["NVDA"]
       asset_class: equity
