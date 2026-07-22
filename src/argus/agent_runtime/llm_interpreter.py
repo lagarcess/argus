@@ -275,7 +275,6 @@ from argus.agent_runtime.interpreter.strategy_builder import (  # noqa: F401
     _clean_evidence_spans,
     _clean_optional_text,
     _compact_asset_evidence_token,
-    _date_range_intent_from_bounded_evidence,
     _dca_amount_has_user_provenance,
     _dca_cadence_has_user_provenance,
     _dedupe_resolution_provenance,

@@ -655,7 +655,12 @@ def _focused_date_window_extraction_messages(
                 "with a count and time unit in any language, set has_date_window=true "
                 "and return date_range_intent kind=rolling_window with anchor=today. "
                 "Do not ask for start/end dates just because the current message uses "
-                "natural language. "
+                "natural language. If the stated period points forward from today "
+                "('in ten years', 'over the next 3 years', 'by 2031', any "
+                "language), set has_date_window=true and return "
+                "kind=future_window with count/unit or year and the exact phrase "
+                "as evidence; a forward-looking period is never a rolling_window "
+                "or a calendar range. "
                 "Return date_range_intent with kind=rolling_window, count, unit, "
                 "anchor=today, confidence, and evidence. For year-to-date, return "
                 "kind=year_to_date. For a calendar year, return kind=calendar_year "
@@ -708,6 +713,13 @@ def _response_from_focused_date_window_extraction(
                 latest_result_window=window,
             )
             draft.date_range = dict(window)
+            changed = True
+        elif str(extraction.date_range_intent.kind or "") == "future_window":
+            # A forward-looking horizon stays typed original intent; the
+            # future admission boundary owns the recovery. It never resolves
+            # into calendar dates here.
+            draft.date_range_intent = extraction.date_range_intent
+            draft.date_range = None
             changed = True
         else:
             intent_resolution = resolve_date_range_intent(
