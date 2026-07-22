@@ -13,7 +13,7 @@ from typing import Any
 
 from loguru import logger
 
-from argus.domain.backtest_admission import CHAT_RUN_SCOPE
+from argus.domain.backtest_admission import CHAT_RUN_SCOPE, validate_idempotency_key
 
 BACKPRESSURE_RECONCILE_SCAN_LIMIT = 16
 
@@ -33,12 +33,15 @@ def admit_durable_chat_job(
     launch_payload: dict[str, Any],
     reconcile_blockers: Callable[..., bool],
 ) -> ChatAdmissionResult:
-    idempotency_key = (context.idempotency_key or "").strip()
-    if not idempotency_key:
+    # #229 grammar, never normalized: the reservation key is the accepted
+    # header bytes exactly.
+    key_state, idempotency_key = validate_idempotency_key(context.idempotency_key)
+    if key_state != "ok" or idempotency_key is None:
         logger.warning(
-            "Chat run action reached admission without an idempotency key",
+            "Chat run action reached admission without a valid idempotency key",
             user_id=context.user_id,
             conversation_id=context.conversation_id,
+            key_state=key_state,
         )
         return ChatAdmissionResult(decision="missing_key")
 

@@ -159,6 +159,23 @@ def test_chat_entry_checks_but_never_consumes_message_allowance(mock_gateway):
     )
 
 
+def test_chat_stream_rejects_malformed_idempotency_keys_before_admission(
+    mock_gateway,
+):
+    for malformed in ("  padded-key  ", "inner space", "tab\tkey", "x" * 129):
+        response = client.post(
+            "/api/v1/chat/stream",
+            json={"conversation_id": "conv-1", "message": "Test TSLA dip idea"},
+            headers={
+                "Authorization": "Bearer test-token",
+                "Idempotency-Key": malformed,
+            },
+        )
+        assert response.status_code == 422, malformed
+        assert response.json()["code"] == "validation_error"
+    mock_gateway.admit_backtest_job.assert_not_called()
+
+
 def test_completed_turn_settles_exactly_one_message_unit_at_terminal(mock_gateway):
     response = client.post(
         "/api/v1/chat/stream",
@@ -685,6 +702,118 @@ def test_memory_direct_finalization_requires_a_running_job():
     assert result is None
     assert store.backtest_jobs[job_id]["status"] == "failed"
     assert store.backtest_jobs[job_id]["failure_code"] == "direct_execution_abandoned"
+
+
+def test_exhausted_precheck_still_replays_a_just_admitted_reservation(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+):
+    import pandas as pd
+    from argus.api.schemas import BacktestRun
+    from argus.domain import engine as domain_engine
+    from argus.domain.supabase_gateway import QuotaExceededError
+
+    def _fetch(symbol: str, **_: object) -> pd.DataFrame:
+        index = pd.to_datetime(
+            ["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"], utc=True
+        )
+        close = pd.Series(range(100, 100 + len(index)), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fetch)
+
+    body = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "start_date": "2024-01-02",
+        "end_date": "2024-01-05",
+    }
+    first = client.post(
+        "/api/v1/backtests/run",
+        json=body,
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "race-last-unit",
+        },
+    )
+    assert first.status_code == 200
+    created_run = first.json()["run"]
+
+    # The duplicate's pre-read misses, the winner fills the last unit, and
+    # only then does the duplicate reach the non-consuming precheck.
+    mock_gateway.get_backtest_job_reservation.side_effect = [
+        None,
+        {"id": "job-admitted-1"},
+    ]
+    mock_gateway.check_usage_limits.side_effect = QuotaExceededError(
+        "Quota exceeded for backtest_runs (hour)"
+    )
+    mock_gateway.admit_backtest_job.reset_mock()
+    mock_gateway.admit_backtest_job.return_value = {
+        "decision": "replay",
+        "job": {
+            "id": "job-admitted-1",
+            "status": "succeeded",
+            "result_run_id": created_run["id"],
+        },
+    }
+    mock_gateway.get_backtest_run.return_value = BacktestRun.model_validate(created_run)
+
+    duplicate = client.post(
+        "/api/v1/backtests/run",
+        json=body,
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "race-last-unit",
+        },
+    )
+
+    assert duplicate.status_code == 200
+    assert duplicate.json()["run"]["id"] == created_run["id"]
+    mock_gateway.admit_backtest_job.assert_called_once()
+
+
+def test_exhausted_precheck_still_reports_same_key_collisions(
+    mock_gateway,
+):
+    from argus.domain.supabase_gateway import QuotaExceededError
+
+    mock_gateway.get_backtest_job_reservation.side_effect = [
+        None,
+        {"id": "job-other"},
+    ]
+    mock_gateway.check_usage_limits.side_effect = QuotaExceededError(
+        "Quota exceeded for backtest_runs (hour)"
+    )
+    mock_gateway.admit_backtest_job.return_value = {"decision": "conflict"}
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["NVDA"],
+            "start_date": "2024-01-02",
+            "end_date": "2024-01-05",
+        },
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "race-collision-key",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "idempotency_conflict"
 
 
 def test_unexpected_direct_failure_still_settles_the_job_terminally(

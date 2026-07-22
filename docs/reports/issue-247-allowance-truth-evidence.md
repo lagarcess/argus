@@ -144,7 +144,7 @@ final SHA.
 | Gate | Result |
 | --- | --- |
 | Focused backend set (allowance accounting, alpha API memory+supabase, finalization, jobs shadow/async, evidence spine, chat state machine) | 235 passed at `f6fb982`; 155-test focused rerun green after the dated-payload fix |
-| Full backend suite `tests/` | 2273 passed, 1 failed (pre-existing, below), 17 skipped at `40769aa` (2271/1/17 at `f6fb982`) |
+| Full backend suite `tests/` | 2276 passed, 1 failed (pre-existing, below), 17 skipped at the final-review-round candidate (2273/1/17 at `40769aa`) |
 | Disposable-Postgres proofs (`tests/test_allowance_accounting_postgres.py`) | 15 passed; four runs across two fresh containers, including reuse-safety back-to-back runs (skip cleanly without the gate URL) |
 | Ruff check + format (`src`, touched tests) | clean |
 | Frontend unit suite (`bun test __tests__/`) | 422 passed |
@@ -209,10 +209,12 @@ errors. Proofs (15 passed):
   lifecycle train (out of lane).
 - Deliberately not built: billing/entitlement machinery, frontend quota
   logic, background sweepers, GET-path stale reconciliation
-  (`GET /backtest-jobs/{id}` reconcile remains #230/#231 follow-up; it
-  affects staleness visibility, not accounting truth), and quota-specific
-  runtime recovery copy (typed codes flow through the existing recovery
-  contract; copy polish is a follow-up).
+  (`GET /backtest-jobs/{id}` reconcile affects staleness visibility, not
+  accounting truth; the locked reliability contract expects it on that
+  read, so the deferral is an open founder decision recorded in the
+  final-review-round section), and quota-specific runtime recovery copy
+  (typed codes flow through the existing recovery contract; copy polish
+  is a follow-up).
 
 ## Remaining risks and rollback boundary
 
@@ -393,6 +395,38 @@ byte-identical to `f6fb982`, where items 1–4 executed):
     `updated_at`) was identical before and after panel opens, the
     "What counts?" toggle, close, reload, and reopen; the panel issues
     GETs only. The approved disclosure copy rendered verbatim.
+
+## Final-review round (2026-07-22)
+
+Codex's requested final review returned three findings; two were
+confirmed and fixed red-first, one awaits a founder decision:
+
+- The chat path never applied the #229 key grammar: the route and the
+  admission flow stripped and passed anything non-empty, so padded keys
+  aliased the trimmed reservation and malformed keys reached durable
+  admission. `/chat/stream` now validates the original header bytes and
+  rejects invalid keys with 422 `validation_error` before any work
+  (live-verified on the isolated stack: padded, inner-space, and
+  oversize keys all 422 with zero charge); the flow validates
+  defensively and never normalizes. Valid keys are byte-identical
+  through both layers, so no existing reservation changes meaning.
+- A duplicate racing the admission that consumed the last allowance
+  unit could hit the direct route's non-consuming precheck and receive
+  429 before atomic admission could resolve it as a replay (or a
+  collision as 409). The exhausted branch now re-reads the reservation
+  and, when one exists, resolves it through the atomic admission
+  operation — replay serves the durable result, collision returns the
+  non-disclosing 409 — before any 429. The reviewer's broader shape
+  (always resolving through admission before the 429) was declined: at
+  a window rollover it could admit before preflight and charge a
+  preflight-rejected request, violating the approved zero-charge rule.
+- The pre-existing locked reliability contract says
+  `GET /backtest-jobs/{id}` performs owner-scoped stale reconciliation;
+  this lane deferred that path to #230/#231 with a passthrough handler.
+  The contradiction between the locked contract text and the approved
+  lane boundary is recorded as an open founder decision; accounting is
+  unaffected either way (the unit is charged exactly once at admission,
+  and the same-key replay path already reconciles the stale job).
 
 ## Historical note — first hosted attempt
 

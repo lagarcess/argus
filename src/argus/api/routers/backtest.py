@@ -133,6 +133,22 @@ def run_backtest(
                 limits=SIMULATION_ALLOWANCE_LIMITS,
             )
         except QuotaExceededError as exc:
+            # A duplicate racing the admission that filled the window must
+            # still resolve replay/collision first.
+            if _direct_reservation_exists(
+                user=user, idempotency_key=clean_idempotency_key
+            ):
+                decision, job = _admit_direct_run(
+                    request,
+                    user=user,
+                    idempotency_key=clean_idempotency_key,
+                    identity_hash=identity_hash,
+                    payload_hash=launch_payload_digest,
+                    launch_payload=normalized_payload,
+                    conversation_id=payload.conversation_id,
+                )
+                if decision == "replay":
+                    return _replay_direct_job(request, user=user, job=job or {})
             raise problem(
                 request,
                 status_code=429,
