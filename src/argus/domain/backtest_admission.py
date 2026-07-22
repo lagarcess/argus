@@ -183,6 +183,9 @@ _DIRECT_PAYLOAD_FIELDS = (
     "start_date",
     "end_date",
     "timeframe",
+    "side",
+    "starting_capital",
+    "allocation_method",
     "parameters",
     "conversation_id",
     "strategy_id",
@@ -435,7 +438,7 @@ def finalize_direct_job_memory(
     moment = _utcnow()
     with store.backtest_admission_lock:
         job = store.backtest_jobs.get(job_id)
-        if job is None:
+        if job is None or job.get("status") != "running":
             return None
         job["status"] = status
         job["result_run_id"] = result_run_id

@@ -91,7 +91,10 @@ def mock_gateway():
         "decision": "admitted",
         "job": {"id": "job-admitted-1", "status": "running"},
     }
-    gateway.finalize_direct_backtest_job.return_value = None
+    gateway.finalize_direct_backtest_job.return_value = {
+        "id": "job-admitted-1",
+        "status": "succeeded",
+    }
     gateway.get_backtest_job.return_value = None
     finalization_store = AlphaStore()
     gateway.finalize_backtest_completion.side_effect = (
@@ -428,3 +431,121 @@ def test_me_usage_used_beyond_limit_clamps_remaining_to_zero(mock_gateway):
     assert backtests["day"]["used"] == 53
     assert backtests["day"]["remaining"] == 0
     assert backtests["available_now"] is False
+
+
+# ---------------------------------------------------------------------------
+# Direct-run identity and terminal finalization (#229/#230 review findings).
+# ---------------------------------------------------------------------------
+
+
+def test_direct_identity_covers_every_execution_field():
+    from argus.domain.backtest_admission import (
+        direct_run_identity_hash,
+        normalize_direct_launch_payload,
+    )
+
+    base = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "start_date": "2024-01-02",
+        "end_date": "2024-06-28",
+    }
+
+    def identity(payload):
+        return direct_run_identity_hash(
+            conversation_id=None,
+            strategy_id=None,
+            normalized_payload=normalize_direct_launch_payload(payload),
+        )
+
+    baseline = identity(base)
+    for field, changed in (
+        ("starting_capital", 250_000),
+        ("side", "long"),
+        ("allocation_method", "equal_weight"),
+    ):
+        assert identity({**base, field: changed}) != baseline, (
+            f"{field} must participate in the direct-run identity; reusing a "
+            "key with a changed execution field is a collision, not a replay."
+        )
+
+
+def test_late_direct_success_cannot_rewrite_reconciled_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+):
+    import pandas as pd
+    from argus.domain import engine as domain_engine
+
+    def _fetch(symbol: str, **_: object) -> pd.DataFrame:
+        index = pd.to_datetime(
+            ["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"], utc=True
+        )
+        close = pd.Series(range(100, 100 + len(index)), index=index, dtype=float)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fetch)
+    # The reconciler already settled this job as a terminal failure while the
+    # slow execution was still running: the conditional finalize finds no
+    # running row.
+    mock_gateway.finalize_direct_backtest_job.return_value = None
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2024-01-02",
+            "end_date": "2024-01-05",
+        },
+        headers={
+            "Authorization": "Bearer test-token",
+            "Idempotency-Key": "late-finalization-race",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "direct_execution_abandoned"
+    assert "run" not in response.json()
+
+
+def test_memory_direct_finalization_requires_a_running_job():
+    from argus.domain import backtest_admission
+
+    store = AlphaStore()
+    outcome = backtest_admission.admit_backtest_job_memory(
+        store,
+        user_id=USER_ID,
+        operation_scope="backtests.run",
+        idempotency_key="race-key",
+        identity_hash=f"sha256:{'e' * 64}",
+        payload_hash=f"sha256:{'f' * 64}",
+        launch_payload={"kind": "proof"},
+        initial_status="running",
+        allowance_limits=[("hour", 10), ("day", 50)],
+    )
+    job_id = outcome.job["id"]
+    store.backtest_jobs[job_id]["status"] = "failed"
+    store.backtest_jobs[job_id]["failure_code"] = "direct_execution_abandoned"
+
+    result = backtest_admission.finalize_direct_job_memory(
+        store,
+        job_id=job_id,
+        status="succeeded",
+        result_run_id="run-1",
+    )
+
+    assert result is None
+    assert store.backtest_jobs[job_id]["status"] == "failed"
+    assert store.backtest_jobs[job_id]["failure_code"] == "direct_execution_abandoned"

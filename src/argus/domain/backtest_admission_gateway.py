@@ -117,11 +117,14 @@ def finalize_direct_backtest_job(
     }
     if execution_metadata is not None:
         payload["execution_metadata"] = execution_metadata
+    # A reconciled terminal state is final: only a still-running job may be
+    # finalized, so a late process can never rewrite a stale failure.
     updated = (
         client.table("backtest_jobs")
         .update(payload)
         .eq("user_id", user_id)
         .eq("id", job_id)
+        .eq("status", "running")
         .execute()
     )
     row = _row_one(updated)

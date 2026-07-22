@@ -422,3 +422,118 @@ def test_admission_functions_are_service_role_only():
         assert anon is False
         assert authenticated is False
         assert service_role is True
+
+
+def test_legacy_reservation_replays_on_exact_payload_and_adopts_identity(owner):
+    with _connect() as connection:
+        key = str(uuid.uuid4())
+        legacy_payload_hash = f"sha256:{'1' * 64}"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into public.backtest_jobs"
+                " (user_id, conversation_id, operation_scope, idempotency_key,"
+                "  identity_hash, payload_hash, launch_payload, status,"
+                "  priority, attempts, max_attempts, queued_at)"
+                " values (%s, %s, 'chat.run_backtest', %s, null, %s,"
+                "  '{}'::jsonb, 'queued', 'normal', 0, 1, now())"
+                " returning id",
+                (
+                    owner["user_id"],
+                    owner["conversation_id"],
+                    key,
+                    legacy_payload_hash,
+                ),
+            )
+            legacy_job_id = cursor.fetchone()[0]
+
+        canonical_identity = f"sha256:{'2' * 64}"
+        replay = _admit(
+            connection,
+            owner,
+            idempotency_key=key,
+            identity_hash=canonical_identity,
+            payload_hash=legacy_payload_hash,
+        )
+        assert replay["decision"] == "replay"
+        assert str(replay["job"]["id"]) == str(legacy_job_id)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select identity_hash from public.backtest_jobs where id = %s",
+                (legacy_job_id,),
+            )
+            assert cursor.fetchone()[0] == canonical_identity
+
+        second = _admit(
+            connection,
+            owner,
+            idempotency_key=key,
+            identity_hash=canonical_identity,
+            payload_hash=legacy_payload_hash,
+        )
+        assert second["decision"] == "replay"
+        windows = _usage_rows(connection, owner["user_id"], "backtest_runs")
+        assert windows == {}  # replays never charge
+
+
+def test_legacy_reservation_with_different_payload_conflicts(owner):
+    with _connect() as connection:
+        key = str(uuid.uuid4())
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "insert into public.backtest_jobs"
+                " (user_id, conversation_id, operation_scope, idempotency_key,"
+                "  identity_hash, payload_hash, launch_payload, status,"
+                "  priority, attempts, max_attempts, queued_at)"
+                " values (%s, %s, 'chat.run_backtest', %s, null, %s,"
+                "  '{}'::jsonb, 'queued', 'normal', 0, 1, now())",
+                (
+                    owner["user_id"],
+                    owner["conversation_id"],
+                    key,
+                    f"sha256:{'3' * 64}",
+                ),
+            )
+        outcome = _admit(
+            connection,
+            owner,
+            idempotency_key=key,
+            payload_hash=f"sha256:{'4' * 64}",
+        )
+        assert outcome == {"decision": "conflict"}
+        assert _usage_rows(connection, owner["user_id"], "backtest_runs") == {}
+
+
+def test_direct_finalization_sql_guard_requires_running_status(owner):
+    with _connect() as connection:
+        admitted = _admit(
+            connection,
+            owner,
+            operation_scope="backtests.run",
+            initial_status="running",
+            conversation_id=None,
+        )
+        job_id = admitted["job"]["id"]
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "update public.backtest_jobs set status='failed',"
+                " failure_code='direct_execution_abandoned', retryable=true,"
+                " finished_at=now() where id = %s",
+                (job_id,),
+            )
+            # The Python finalizer adds status='running' to its predicate;
+            # this is the exact conditional it issues.
+            cursor.execute(
+                "update public.backtest_jobs set status='succeeded',"
+                " result_run_id=null, finished_at=now()"
+                " where user_id = %s and id = %s and status = 'running'"
+                " returning id",
+                (owner["user_id"], job_id),
+            )
+            assert cursor.fetchone() is None
+            cursor.execute(
+                "select status, failure_code from public.backtest_jobs" " where id = %s",
+                (job_id,),
+            )
+            status, failure_code = cursor.fetchone()
+        assert status == "failed"
+        assert failure_code == "direct_execution_abandoned"

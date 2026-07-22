@@ -451,7 +451,10 @@ def mock_gateway():
         "decision": "admitted",
         "job": {"id": "job-admitted-1", "status": "running"},
     }
-    gateway.finalize_direct_backtest_job.return_value = None
+    gateway.finalize_direct_backtest_job.return_value = {
+        "id": "job-admitted-1",
+        "status": "succeeded",
+    }
     gateway.get_backtest_job.return_value = None
     with (
         patch("argus.api.state.supabase_gateway", gateway),

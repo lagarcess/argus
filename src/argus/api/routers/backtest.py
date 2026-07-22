@@ -208,12 +208,28 @@ def run_backtest(
         )
         raise
 
-    _finalize_direct_job(
+    finalized = _finalize_direct_job(
         user=user,
         job_id=job_id,
         status="succeeded",
         result_run_id=run.id,
     )
+    if job_id and finalized is None:
+        # Stale reconciliation already settled this job as a terminal
+        # failure while the execution was still running; that outcome is
+        # final and this process must not deliver its obsolete success.
+        raise problem(
+            request,
+            status_code=503,
+            code="direct_execution_abandoned",
+            title="Backtest Execution Abandoned",
+            detail=(
+                "This execution ran past the staleness boundary and was "
+                "reconciled as abandoned. Start it again with a new "
+                "Idempotency-Key."
+            ),
+            context={"backtest_job_id": job_id, "retryable": True},
+        )
     return BacktestRunResponse(run=run)
 
 
@@ -447,9 +463,9 @@ def _finalize_direct_job(
     failure_detail: str | None = None,
     retryable: bool = False,
     failure_status: int | None = None,
-) -> None:
+) -> dict[str, Any] | None:
     if not job_id:
-        return
+        return None
     gateway = api_state.supabase_gateway
     if gateway is not None:
         metadata: dict[str, Any] | None = None
@@ -457,7 +473,7 @@ def _finalize_direct_job(
             job = gateway.get_backtest_job(user_id=user.id, job_id=job_id) or {}
             metadata = dict(job.get("execution_metadata") or {})
             metadata["failure_status"] = failure_status
-        gateway.finalize_direct_backtest_job(
+        return gateway.finalize_direct_backtest_job(
             user_id=user.id,
             job_id=job_id,
             status=status,
@@ -467,14 +483,13 @@ def _finalize_direct_job(
             retryable=retryable,
             execution_metadata=metadata,
         )
-        return
     with api_state.store.backtest_admission_lock:
         job = api_state.store.backtest_jobs.get(job_id)
         if job is not None and failure_status is not None:
             metadata = dict(job.get("execution_metadata") or {})
             metadata["failure_status"] = failure_status
             job["execution_metadata"] = metadata
-    backtest_admission.finalize_direct_job_memory(
+    return backtest_admission.finalize_direct_job_memory(
         api_state.store,
         job_id=job_id,
         status=status,  # type: ignore[arg-type]
