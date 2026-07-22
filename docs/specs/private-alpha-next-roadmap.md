@@ -18,21 +18,23 @@ half: linked versions (A1b), comparison (A2), and bounded freshness on return
 (A4). A1b unlocks A2; A4 remains the phase-last arc that completes the promise
 that Argus remembers, compares, and stays honest about staleness.
 
-## Active Post-Promotion Pointer — 2026-07-16
+## Active Post-Promotion Pointer — 2026-07-22
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
-`main` at `217ead12`. The current integration planning baseline is
-`2642b514`, whose two post-promotion branch commits reconcile product truth and
-remove the legacy v0.1 archive; this pointer does not claim that baseline is the
-deployed SHA.
+`main` at `217ead12`. The current stable integration checkpoint is `2eb6874`.
+It contains the founder-accepted graph-range, account-security, and Usage
+vertical slices from PRs #264, #261, and #259. This pointer does not claim that
+the integration checkpoint is deployed or exposed to testers.
 
-The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is now the
-authoritative dispatch and sequencing source for open issues #228-#253, with
-#213 excluded by founder direction. It distinguishes hard blockers from
-shared-file serialization, provides the parallel waves, and links one
-agent-ready sub-spec per issue. A1b, A2, and A4 are paused—not cancelled—until
-the interim exit criteria are met and the founder resumes P2.
+The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
+authoritative founder-outcome and live-QA source for this pivot, with #213
+excluded by founder direction. Issues #228-#253 remain supporting evidence and
+possible implementation material; they do not define the next slice or program
+completion. The retired issue dependency map and waves are preserved in
+[`docs/archive/private-alpha-interim-issue-roadmap-2026-07-21.md`](../archive/private-alpha-interim-issue-roadmap-2026-07-21.md).
+A1b, A2, and A4 are paused—not cancelled—until the interim exit criteria are
+met and the founder resumes P2.
 
 Statements below that say “A1b is next” or describe `main` promotion as still
 pending are preserved as pre-promotion history. They do not override this
@@ -78,17 +80,19 @@ options-idea nondeterminism; (4) release manifest + `main` promotion PR (merge
 commit, not squash, so this is the last all-of-history diff).
 #164 (post-result followup typing / approval-vs-pending-clarify policy) is the
 deferred follow-up, not a gate.
-Execution runs off the P2 execution board below: point an agent at any READY
-lane. The interpret/edit spine has exactly one owner lane at a time (currently
-unowned; A1b is next in the spine chain).
+The P2 execution board below is paused historical-forward context during the
+interim pivot. Do not dispatch one of its READY lanes until the founder closes
+the interim or explicitly resumes P2. When resumed, the interpret/edit spine
+still has exactly one owner at a time and A1b remains the next planned spine
+lane.
 Historical board date: 2026-07-09
 Branch family: `codex/private-alpha-next`
 Audience: Founder, Codex orchestrator, bounded subagents, reviewers
 
-This is the current execution board for Private Alpha Next after the clean P0
-continuity reintegration and P1 idea/evidence checkpoint. It turns the decision
-memo into ordered, testable slices without importing contaminated runtime work
-from quarantine.
+This is the preserved P2 execution board for after the interim pivot. It turns
+the decision memo into ordered, testable slices without importing contaminated
+runtime work from quarantine. The active interim board above decides current
+work.
 
 ## Source Order
 
@@ -101,7 +105,7 @@ Every agent starts here:
 5. `docs/DATA_MODEL.md`
 6. `.agent/designs/argus/DESIGN.md`
 7. This roadmap
-8. `docs/specs/private-alpha-interim-roadmap.md` when working on #228-#253
+8. `docs/specs/private-alpha-interim-roadmap.md` for every current interim slice
 9. `docs/specs/private-alpha-next-decision-memo.md`
 10. `docs/specs/private-alpha-ci-cd-sota.md`
 11. `docs/PRIVATE_LAUNCH_RUNBOOK.md`
@@ -409,18 +413,19 @@ disease cannot recur silently.
 Each slice owns a PMF gate, is demoable in a founder-guided session, and is one
 revertable slice family.
 
-##### P2 execution board: decision memo gates + unlock status (AUTHORITATIVE, 2026-07-07)
+##### P2 execution board: decision memo gates + unlock status (PAUSED, preserved 2026-07-07)
 
 Evidence-grounded after a live walkthrough + code grounding pass. The decision memo's
 moat is the loop where ideas are tested, remembered, compared, and trusted (memo §4.1,
 §5.6, §5.7). P2's remaining work is closing that loop. Treat the items below as
-execution gates, not as a second roadmap and not as hard order dependencies. The
-P2.x specs further below remain the per-slice detail (PMF gates, verification, stop
-conditions).
+future execution gates, not as a second current roadmap and not as hard order
+dependencies. The P2.x specs further below remain the per-slice detail (PMF
+gates, verification, stop conditions). None of these statuses authorizes work
+while the interim pivot is active.
 
-How to use this board: each gate lists lanes with an unlock status. Point an
-agent at any READY lane without waiting on the others; the status IS the
-authorization. Status legend:
+How to use this board after the founder resumes P2: each gate lists lanes with
+an unlock status. At that time, a READY lane may proceed without waiting on
+unrelated lanes. Status legend:
 
 - READY-BUILD: implement now (fresh worktree from `origin/codex/private-alpha-next`,
   child branch, tests, browser QA, review, one revertable slice family).
@@ -435,9 +440,8 @@ authorization. Status legend:
 
 Spine ownership rule: exactly one lane at a time may edit the interpret/edit
 spine (`agent_runtime/stages/*`, `agent_runtime/interpreter/*`,
-`llm_interpreter*.py`, `artifact_edit_planner.py`). The spine is currently
-between owners — A1 (#141), B1 (#140), and the B4 typed-prose series all landed;
-A1b is next in the chain. Parallel runtime lanes keep new logic in their own
+`llm_interpreter*.py`, `artifact_edit_planner.py`). When P2 resumes, A1b is the
+next planned spine lane. Parallel runtime lanes keep new logic in their own
 modules, touch shared dispatch minimally, and take rebase duty; the spine owner
 merges first.
 

@@ -2,8 +2,14 @@
 
 Status: Active integration staging/process context
 Date: 2026-06-10
+Last reconciled: 2026-07-22
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
+
+Current stable integration checkpoint: `2eb6874`. The accepted post-promotion
+vertical slices are graph range switching (PR #264), account recovery/session
+controls (PR #261), and truthful Usage allowances/accounting (PR #259). This is
+an integration checkpoint, not a deployed or tester-exposed SHA.
 
 Current note: for Private Alpha Next P1 product work, use
 `docs/specs/private-alpha-next-roadmap.md` as the active execution board and
@@ -176,6 +182,15 @@ Do not reopen these as debt unless a new bug is reproduced:
   confirmation card, `run_backtest` action, async job/run result, LLM readout
   voice, and persisted messages.
 - `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is archived historical context.
+- Adaptive result-chart range switching is complete at PR #264: viewport-only
+  presets and Custom/Reset preserve canonical result truth and passed live
+  EN/ES desktop/mobile QA.
+- Account recovery and session controls are complete at PR #261: Settings ->
+  Security is reachable and recovery, password change, and current/other/all
+  session actions passed real-auth QA.
+- Usage allowance truth is complete at PR #259: Settings -> Usage is reachable,
+  hourly/daily message and simulation truth is backend-owned, accounting is
+  durable and replay-safe, and exact-head real-auth/local-persistence QA passed.
 
 ## P0 Reintegration Checkpoint
 
@@ -192,32 +207,12 @@ The clean reintegration strategy is now part of the process model:
 
 Codex should own or closely supervise this:
 
-1. **Controlled alpha readiness slice**
-   - Active worker branch: `codex/private-alpha-readiness`, targeting
-     `codex/private-alpha-next` after review.
-   - Current local checkpoint: the language-agnostic runtime spine has focused
-     backend tests for messy English/Spanish buy-and-hold prompts with shorthand
-     capital (`100k`) and Codex browser QA for the English and Spanish
-     confirmation-card edit paths. The latest browser pass proved the English
-     `Change dates -> calendar 2024` and Spanish
-     `Cambiar fechas -> calendario 2024` flows update the active card instead
-     of silently re-confirming the prior rolling range or leaking macro-context
-     prose. The English `Change asset -> make it google instead` and Spanish
-     `Cambiar activo -> ponlo con google mejor` flows now update the active
-     card to provider-canonical `GOOGL` while preserving the rest of the setup.
-     A Spanish local browser pass also proved the full happy-path action chain:
-     confirmation, run, result card, Quick take, Explain result, Refine idea,
-     messy refinement into a new `GOOGL`/`$50,000`/six-month confirmation, and
-     structured cancellation. The local Spanish transcript matrix now passes
-     for DCA, missing DCA amount clarification, mixed-asset clarification,
-     currency pairs, unsupported valuation recovery, setup edits, approval, and
-     result follow-ups. A Spanish browser recovery pass now proves unsupported
-     valuation (`P/E`) clarifies into supported proxies, then a messy
-     buy-and-hold follow-up re-enters the normal confirmation funnel.
-   - Remaining before merge/release readiness: production-parity Render canary
-     and the rest of the controlled readiness slices recorded in archived
-     readiness context at
-     `docs/archive/private-alpha-controlled-readiness-panel.md`.
+1. **Founder-selected interim vertical slice**
+   - No old readiness branch or issue wave is automatically active.
+   - Select the next complete user journey from the remaining founder outcomes
+     in `docs/specs/private-alpha-interim-roadmap.md`.
+   - Start from the current integration checkpoint, use archived readiness work
+     only as evidence, and require proportional production-parity browser QA.
 
 2. **Evidence-aware idea loop source thesis**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
@@ -282,9 +277,9 @@ External agents must not touch:
 - Backtest engine execution semantics.
 - Frontend state that invents backend facts.
 
-## Documentation Hygiene Backlog
+## Documentation Hygiene
 
-The next docs pass should classify existing docs into:
+Use these classes:
 
 - **Canon**: `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`,
   `docs/API_CONTRACT.md`, `docs/DATA_MODEL.md`,
@@ -293,8 +288,12 @@ The next docs pass should classify existing docs into:
   future specs.
 - **Historical evidence**: completed launch/milestone closure reports and
   browser/canary evidence.
-- **Archive candidates**: stale plans superseded by merged implementation or
-  newer specs.
+- **Archive**: stale plans superseded by merged implementation or newer specs.
+
+The former interim issue dependency map and Wave 0 plan are archived at
+`docs/archive/private-alpha-interim-issue-roadmap-2026-07-21.md`. The active
+interim roadmap now contains only founder outcomes, retained decisions,
+delivery discipline, and current completion truth.
 
 Do not delete historical docs casually. Prefer adding a short status banner that
 points to the active source of truth, then archive only after review.
