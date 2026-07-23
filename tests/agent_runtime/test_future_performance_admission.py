@@ -329,6 +329,88 @@ def test_future_performance_sidecar_reuses_public_unsupported_recovery_shape() -
     assert {"requested_field": "date_range"} in option_payloads
 
 
+def test_historical_period_option_identity_is_stable_and_selectable() -> None:
+    """PR #266 review T6: positional identity is deterministic and selectable.
+
+    The contract template's option order is fixed, so the sidecar id is
+    stable across builds and reloads; selection matching uses the exact
+    replacement payload. A typed kind for `requested_field=date_range` would
+    collide with coverage-recovery's identical `change_dates` payload because
+    `_typed_options` prefers kinds over explicit ids."""
+
+    from argus.agent_runtime.clarification_contract import typed_clarification_contract
+    from argus.agent_runtime.simplification_option_contract import (
+        simplification_option_matches_selection,
+    )
+
+    def _sidecar() -> dict[str, Any]:
+        return typed_clarification_contract(
+            response_intent={
+                "kind": "unsupported_recovery",
+                "semantic_needs": ["simplification_choice"],
+                "requested_fields": ["unsupported_constraints"],
+                "facts": {
+                    "unsupported_constraints": [
+                        {
+                            "category": FUTURE_PERFORMANCE_CATEGORY,
+                            "raw_value": "in ten years",
+                            "explanation": "No prediction.",
+                        }
+                    ],
+                },
+                "options": [
+                    {
+                        "label": "Test this idea over a historical period",
+                        "replacement_values": {"requested_field": "date_range"},
+                    },
+                    {
+                        "label": "Compare with buy and hold historically",
+                        "replacement_values": {
+                            "strategy_type": "buy_and_hold",
+                            "requested_field": "date_range",
+                        },
+                    },
+                ],
+            },
+            strategy=StrategySummary(asset_universe=["NVDA"]),
+            prompt_source="llm_generated",
+        )
+
+    first, second = _sidecar(), _sidecar()
+    assert first["options"] == second["options"]
+    assert [option["id"] for option in first["options"]] == [
+        "option_0",
+        "buy_and_hold",
+    ]
+    # Selection matches on the exact typed payload, independent of the id.
+    assert simplification_option_matches_selection(
+        option_replacement_values={"requested_field": "date_range"},
+        selected_replacement_values={"requested_field": "date_range"},
+    )
+    # Coverage-recovery options with the identical payload keep their explicit
+    # ids today; a requested_field-keyed kind would override them.
+    coverage_sidecar = typed_clarification_contract(
+        response_intent={
+            "kind": "coverage_recovery",
+            "semantic_needs": ["simplification_choice"],
+            "requested_fields": ["date_range"],
+            "facts": {
+                "coverage": {"code": "no_common_data_window", "benchmark_symbol": "SPY"},
+                "strategy": {"asset_universe": ["AAPL"]},
+            },
+            "options": [
+                {
+                    "id": "change_dates",
+                    "replacement_values": {"requested_field": "date_range"},
+                },
+            ],
+        },
+        strategy=StrategySummary(asset_universe=["AAPL"]),
+    )
+    assert coverage_sidecar is not None
+    assert [option["id"] for option in coverage_sidecar["options"]] == ["change_dates"]
+
+
 def test_selection_to_buy_and_hold_conserves_capital_and_asks_period() -> None:
     pending = StrategySummary(
         strategy_type="signal_strategy",
