@@ -339,13 +339,14 @@ def future_performance_admission_result(
     decision: InterpretDecision,
     contract: Any,
     optional_parameter_values: dict[str, Any],
-    assistant_response: str | None,
 ) -> StageResult | None:
     """Fail closed when the typed horizon points forward from today.
 
     The horizon moves to original-intent evidence, compatible facts stay on the
     draft, and the historical period is re-requested after an explicit
-    supported-alternative selection."""
+    supported-alternative selection. Interpreter prose never crosses this
+    boundary — no typed field separates a refusal from a forecast — so the
+    clarify stage owns the replacement voice."""
 
     horizon = _typed_future_horizon(decision)
     if horizon is None:
@@ -396,8 +397,7 @@ def future_performance_admission_result(
             values=optional_parameter_values,
         )
     )
-    if assistant_response:
-        blocked_patch["assistant_response"] = assistant_response
+    blocked_patch["assistant_response"] = None
     return StageResult(
         outcome="needs_clarification",
         decision=blocked_decision,
@@ -422,7 +422,6 @@ def strategy_route_admission_result(
         decision=decision,
         contract=contract,
         optional_parameter_values=optional_parameter_values,
-        assistant_response=assistant_response,
     )
     if future_result is not None:
         return future_result

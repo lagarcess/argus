@@ -199,7 +199,9 @@ def test_spanish_future_window_fails_closed(
 def test_unsupported_verdict_with_future_window_uses_future_category(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A model that already refused still gets the typed future boundary."""
+    """A model that already refused still gets the typed future boundary, and
+    even its refusal prose is regenerated: no typed field separates a refusal
+    from a forecast, so the boundary trusts neither."""
 
     _stub_equity_asset_resolution(monkeypatch)
     refusal = "I cannot predict future performance, but I can test it historically."
@@ -213,7 +215,7 @@ def test_unsupported_verdict_with_future_window_uses_future_category(
         ),
     )
     _assert_future_blocked(result, evidence="in ten years")
-    assert result.patch.get("assistant_response") == refusal
+    assert result.patch.get("assistant_response") is None
 
 
 def test_strategy_drafting_with_future_window_fails_closed(
@@ -436,3 +438,196 @@ def test_selection_to_buy_and_hold_conserves_capital_and_asks_period() -> None:
     assert repaired.capital_amount == 10000
     assert repaired.date_range in (None, "", {}, [])
     assert "date_range" in replaced["missing_fields"]
+
+
+FORECAST_PROSE = (
+    "Based on historical growth, your $10,000 in NVDA could be worth about "
+    "$150,000 in ten years. Running that projection now."
+)
+
+
+def _future_recovery_clarify_state() -> RunState:
+    state = RunState.new(
+        current_user_message=EN_FUTURE_MESSAGE,
+        recent_thread_history=[],
+    )
+    state.intent = "strategy_drafting"
+    state.missing_required_fields = ["date_range"]
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="signal_strategy",
+        asset_universe=["NVDA"],
+        asset_class="equity",
+        capital_amount=10000,
+        extra_parameters={
+            FUTURE_HORIZON_EVIDENCE_KEY: _future_window_intent("in ten years"),
+        },
+    )
+    state.optional_parameter_status = {
+        "unsupported_constraints": [
+            {
+                "category": FUTURE_PERFORMANCE_CATEGORY,
+                "raw_value": "in ten years",
+                "explanation": "Argus cannot predict future performance.",
+                "simplification_options": [
+                    {
+                        "label": "Test this idea over a historical period",
+                        "replacement_values": {"requested_field": "date_range"},
+                    },
+                    {
+                        "label": "Compare with buy and hold historically",
+                        "replacement_values": {
+                            "strategy_type": "buy_and_hold",
+                            "requested_field": "date_range",
+                        },
+                    },
+                ],
+            }
+        ]
+    }
+    return state
+
+
+def test_future_admission_never_propagates_interpreter_prose(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The interpreter's own prose is untrusted at the future boundary: on the
+    guard route it can carry a numeric forecast, and no typed field can
+    distinguish a forecast from a refusal. The blocked patch never prefills
+    prose; the clarify stage owns the replacement voice."""
+
+    _stub_equity_asset_resolution(monkeypatch)
+    result = _run_interpret(
+        message=EN_FUTURE_MESSAGE,
+        response=_future_interpretation(
+            intent="backtest_execution",
+            evidence="in ten years",
+            assistant_response=FORECAST_PROSE,
+        ),
+    )
+    _assert_future_blocked(result, evidence="in ten years")
+    assert result.patch.get("assistant_response") is None
+
+
+def test_future_recovery_prose_is_llm_clarification_owned() -> None:
+    """With no prefilled prose, the existing clarification LLM voices the
+    boundary; its output is carried byte-exactly with llm_generated provenance."""
+
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.stages.clarify import clarify_stage
+
+    class RecordingClarifier:
+        def __init__(self, question: str | None) -> None:
+            self.question = question
+            self.requests: list[Any] = []
+
+        def __call__(self, request):
+            self.requests.append(request)
+            return self.question
+
+    honest = (
+        "I can't predict future performance, but I can test how the same "
+        "golden-cross idea performed historically. Which period should I use?"
+    )
+    clarifier = RecordingClarifier(honest)
+    result = clarify_stage(
+        state=_future_recovery_clarify_state(),
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+        language="en",
+        prefilled_assistant_prompt=None,
+    )
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == honest
+    assert clarifier.requests
+    clarification = result.patch["clarification"]
+    assert clarification["kind"] == "unsupported_recovery"
+    assert clarification["reason_code"] == FUTURE_PERFORMANCE_CATEGORY
+    assert clarification["prompt_source"] == "llm_generated"
+
+
+def test_future_recovery_generation_failure_uses_honest_fallback() -> None:
+    """A clarification-generation failure falls back to the deterministic
+    future-performance copy, never to interpreter prose."""
+
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.stages.clarify import clarify_stage
+
+    result = clarify_stage(
+        state=_future_recovery_clarify_state(),
+        contract=build_default_capability_contract(),
+        clarification_generator=None,
+        language="en",
+        prefilled_assistant_prompt=None,
+    )
+    assert result.outcome == "await_user_reply"
+    prompt = result.patch["assistant_prompt"]
+    assert "cannot predict future performance" in prompt
+    assert "historical period" in prompt
+    assert "$150,000" not in prompt
+    clarification = result.patch["clarification"]
+    assert clarification["reason_code"] == FUTURE_PERFORMANCE_CATEGORY
+    assert clarification["prompt_source"] == "degraded_fallback"
+
+
+def test_forecast_prose_full_route_reaches_honest_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """End to end: future_window plus forecast prose becomes future_performance
+    recovery whose visible prose carries no forecast, with facts conserved and
+    no executable artifact."""
+
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.stages.clarify import clarify_stage
+
+    _stub_equity_asset_resolution(monkeypatch)
+    interpret_result = _run_interpret(
+        message=EN_FUTURE_MESSAGE,
+        response=_future_interpretation(
+            intent="backtest_execution",
+            evidence="in ten years",
+            assistant_response=FORECAST_PROSE,
+        ),
+    )
+    _assert_future_blocked(interpret_result, evidence="in ten years")
+    assert interpret_result.patch.get("assistant_response") is None
+
+    state = RunState.new(
+        current_user_message=EN_FUTURE_MESSAGE,
+        recent_thread_history=[],
+    )
+    patch_payload = {
+        key: value
+        for key, value in interpret_result.patch.items()
+        if key in RunState.model_fields
+    }
+    state = state.model_copy(update=patch_payload)
+    decision = interpret_result.decision
+    assert decision is not None
+    state.candidate_strategy_draft = decision.candidate_strategy_draft
+    state.missing_required_fields = list(decision.missing_required_fields)
+
+    clarify_result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=None,
+        language="en",
+        prefilled_assistant_prompt=interpret_result.patch.get("assistant_response"),
+    )
+    prompt = clarify_result.patch["assistant_prompt"]
+    assert "$150,000" not in prompt
+    assert "cannot predict future performance" in prompt
+    assert clarify_result.patch.get("confirmation_payload") is None
+    clarification = clarify_result.patch["clarification"]
+    assert clarification["reason_code"] == FUTURE_PERFORMANCE_CATEGORY
+    strategy = clarification["payload"]["strategy"]
+    assert strategy["asset_universe"] == ["NVDA"]
+    assert strategy["capital_amount"] == 10000
+    horizon = (strategy.get("extra_parameters") or {}).get(FUTURE_HORIZON_EVIDENCE_KEY)
+    assert isinstance(horizon, dict)
+    assert horizon.get("evidence") == "in ten years"
