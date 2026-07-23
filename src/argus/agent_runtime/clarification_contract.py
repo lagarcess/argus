@@ -198,10 +198,18 @@ def _unsupported_recovery_fallback(
     raw_value = _unsupported_raw_value(response_intent)
     symbol = _primary_symbol(strategy)
     joined_options = _join_options(options)
-    subject = raw_value or "That rule"
     symbol_suffix = f" for {symbol}" if symbol else ""
+    # No unsupported reason code means "the rule is incomplete", so the copy
+    # states the capability boundary instead of judging the rule's contents.
+    if _unsupported_reason_code(response_intent) == "sentiment_news_rule":
+        return (
+            f"Argus can't test news or sentiment as an execution rule yet"
+            f"{symbol_suffix}. "
+            f"Which supported direction should I use: {joined_options}?"
+        )
+    subject = raw_value or "that rule"
     return (
-        f"{subject} does not define when to buy or sell{symbol_suffix} on its own. "
+        f"Argus can't run {subject} directly yet{symbol_suffix}. "
         f"Which supported direction should I use: {joined_options}?"
     )
 
