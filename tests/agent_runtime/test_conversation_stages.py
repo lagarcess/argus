@@ -823,7 +823,7 @@ def test_confirmation_action_assumption_uses_llm_voice_in_spanish() -> None:
     assert clarifier.requests[0].response_intent["semantic_needs"] == ["assumption"]
 
 
-def test_clarify_unsupported_recovery_prefers_prefilled_interpreter_prose() -> None:
+def test_clarify_unsupported_recovery_uses_user_facing_clarifier_voice() -> None:
     state = RunState.new(
         current_user_message="Test Apple when news sentiment turns positive.",
         recent_thread_history=[],
@@ -842,12 +842,22 @@ def test_clarify_unsupported_recovery_prefers_prefilled_interpreter_prose() -> N
             }
         ]
     }
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="signal_strategy",
+        strategy_thesis="Buy AAPL when news sentiment turns positive.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        date_range={"start": "2022-01-01", "end": "2025-01-01"},
+    )
     clarifier = RecordingClarifier(
-        "generated prose that must never replace the interpreter's refusal"
+        "I can't test news sentiment as a trading rule for AAPL yet. I kept your "
+        "$10,000 and January 2022 to January 2025 setup. Would you like an RSI "
+        "threshold, a moving-average crossover, or buy and hold instead?"
     )
     refusal = (
-        "News sentiment isn't executable yet — I can test an RSI rule or a plain "
-        "buy-and-hold on Apple instead."
+        "News sentiment is not supported in executable rule specs. It cannot be "
+        "converted to a runnable rule_spec for the signal engine."
     )
 
     result = clarify_stage(
@@ -858,8 +868,15 @@ def test_clarify_unsupported_recovery_prefers_prefilled_interpreter_prose() -> N
     )
 
     assert result.outcome == "await_user_reply"
-    assert result.patch["assistant_prompt"] == refusal
-    assert clarifier.requests == []
+    assert result.patch["assistant_prompt"] == clarifier.question
+    assert len(clarifier.requests) == 1
+    request = clarifier.requests[0]
+    assert request.candidate_strategy_draft.asset_universe == ["AAPL"]
+    assert request.candidate_strategy_draft.capital_amount == 10_000
+    assert request.candidate_strategy_draft.date_range == {
+        "start": "2022-01-01",
+        "end": "2025-01-01",
+    }
     assert result.patch["clarification"]["prompt_source"] == "llm_generated"
     assert [option["label"] for option in result.patch["simplification_options"]] == [
         "Use a supported RSI threshold rule",
@@ -874,7 +891,7 @@ def test_clarify_unsupported_recovery_prefers_prefilled_interpreter_prose() -> N
     )
 
     assert blank_prefill.patch["assistant_prompt"] == clarifier.question
-    assert clarifier.requests[0].unsupported_constraints[0]["category"] == (
+    assert clarifier.requests[-1].unsupported_constraints[0]["category"] == (
         "unsupported_strategy_logic"
     )
 

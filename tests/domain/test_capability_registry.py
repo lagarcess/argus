@@ -12,6 +12,7 @@ from typing import get_args
 
 import pandas as pd
 import pytest
+from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
 from argus.api.chat.strategies import strategy_template_from_run
 from argus.api.schemas import StrategyTemplate
 from argus.domain import capability_registry as registry
@@ -70,6 +71,19 @@ def test_supported_strategy_types_derived_from_executable_strategies() -> None:
         for capability in STRATEGY_CAPABILITIES.values()
         if capability.status == "executable" and capability.execution_strategy_type
     }
+
+
+def test_llm_requested_strategy_template_enum_is_derived_from_registry() -> None:
+    template_schema = LLMStrategyDraft.model_json_schema()["properties"].get(
+        "requested_strategy_template"
+    )
+    assert template_schema is not None
+    string_schema = next(
+        item
+        for item in template_schema.get("anyOf", [])
+        if item.get("type") == "string"
+    )
+    assert string_schema.get("enum") == sorted(STRATEGY_CAPABILITIES)
 
 
 # --- Derived allow-lists all read from the registry -----------------------------------

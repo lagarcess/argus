@@ -268,8 +268,12 @@ class OpenRouterClarificationGenerator:
                     "candidate strategy's asset, period, and unsupported rule when "
                     "available; name the limitation in product language; then offer "
                     "the provided simplification_options as concrete runnable next "
-                    "moves. Ask which direction to use. Do not claim the unsupported "
-                    "part is executable."
+                    "moves. Ask which direction to use. Say what Argus can or cannot "
+                    "test in plain user language. Do not use implementation terms "
+                    "such as rule_spec, signal engine, executable, provider, schema, "
+                    "registry, metadata, or reason code. Do not claim the unsupported "
+                    "part is executable or can become runnable after the user defines "
+                    "custom logic."
                 )
             ),
             SystemMessage(content=json.dumps(context, default=str, sort_keys=True)),

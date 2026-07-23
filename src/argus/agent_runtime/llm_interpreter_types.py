@@ -11,6 +11,7 @@ from argus.agent_runtime.stages.interpret_types import (
     ResultFollowupFocus,
 )
 from argus.agent_runtime.state.models import ResponseProfileOverrides
+from argus.domain.capability_registry import RegisteredStrategyTemplate
 
 
 class LLMRiskRule(BaseModel):
@@ -127,6 +128,16 @@ class LLMStrategyDraft(BaseModel):
             "Detected user-message language as a BCP-47-style code such as en, "
             "es, or es-419. This guides user-facing prose and bounded parsers; "
             "executable fields still use canonical Argus values."
+        ),
+    )
+    requested_strategy_template: RegisteredStrategyTemplate | None = Field(
+        default=None,
+        description=(
+            "Canonical registered strategy-template identity requested by the user. "
+            "Set this for both executable and recognized draft-only templates. Keep "
+            "it separate from strategy_type, which is the execution family, so a "
+            "recognized non-executable template is never silently converted into a "
+            "different runnable strategy."
         ),
     )
     strategy_type: str | None = None

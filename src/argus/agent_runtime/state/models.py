@@ -13,6 +13,8 @@ from pydantic import (
     model_validator,
 )
 
+from argus.domain.capability_registry import RegisteredStrategyTemplate
+
 ToneName = Literal["friendly", "concise"]
 VerbosityName = Literal["low", "medium", "high"]
 ExpertiseMode = Literal["beginner", "intermediate", "advanced"]
@@ -113,6 +115,7 @@ class ConversationMessage(BaseModel):
 
 class StrategySummary(BaseModel):
     raw_user_phrasing: str | None = None
+    requested_strategy_template: RegisteredStrategyTemplate | None = None
     strategy_type: str | None = None
     strategy_thesis: str | None = None
     asset_universe: list[str] = Field(default_factory=list)

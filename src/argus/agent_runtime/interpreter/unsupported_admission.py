@@ -28,8 +28,12 @@ from argus.agent_runtime.stages.interpret_types import (
 )
 from argus.agent_runtime.state.models import UnsupportedConstraint
 from argus.agent_runtime.strategy_contract import canonical_strategy_type
+from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 UNSUPPORTED_INTENT_ADMISSION_BLOCKED = "unsupported_intent_confirmation_blocked"
+RECOGNIZED_NON_EXECUTABLE_ADMISSION_BLOCKED = (
+    "recognized_non_executable_strategy_admission_blocked"
+)
 CAPABILITY_CONFLICT_INVERSE_REASON = "supported_strategy_capability_conflict_inverse"
 
 # Issue #241: a typed forward-looking horizon can never admit as an executable
@@ -212,6 +216,81 @@ def _admission_constraint_raw_value(decision: InterpretDecision) -> str:
         if value:
             return value
     return "the requested strategy"
+
+
+def _recognized_non_executable_template(decision: InterpretDecision) -> str | None:
+    template = decision.candidate_strategy_draft.requested_strategy_template
+    if template is None:
+        return None
+    capability = STRATEGY_CAPABILITIES[template]
+    return template if capability.status != "executable" else None
+
+
+def recognized_non_executable_strategy_admission_result(
+    *,
+    decision: InterpretDecision,
+    contract: Any,
+    optional_parameter_values: dict[str, Any],
+) -> StageResult | None:
+    """Fail closed when typed recognition and execution routing contradict."""
+
+    template = _recognized_non_executable_template(decision)
+    if template is None:
+        return None
+    capability = STRATEGY_CAPABILITIES[template]
+    draft = decision.candidate_strategy_draft.model_copy(
+        update={
+            "strategy_type": template,
+            "entry_rule": None,
+            "exit_rule": None,
+            "rule_spec": None,
+        }
+    )
+    constraint = UnsupportedConstraint(
+        category="unsupported_strategy_logic",
+        raw_value=capability.display_name,
+        explanation=(
+            f"Argus recognizes {capability.display_name}, but cannot run that "
+            "named strategy yet."
+        ),
+        simplification_options=contract.get_simplification_options(
+            "unsupported_strategy_logic"
+        ),
+    )
+    blocked_decision = decision.model_copy(
+        update={
+            "candidate_strategy_draft": _draft_with_conserved_resolved_assets(draft),
+            "requires_clarification": True,
+            "missing_required_fields": [
+                field
+                for field in decision.missing_required_fields
+                if field not in {"entry_logic", "exit_logic", "rule_spec"}
+            ],
+            "unsupported_constraints": [constraint],
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *decision.reason_codes,
+                        RECOGNIZED_NON_EXECUTABLE_ADMISSION_BLOCKED,
+                    ]
+                )
+            ),
+        }
+    )
+    blocked_patch = dict(
+        _optional_parameter_stage_patch(
+            decision=blocked_decision,
+            values=optional_parameter_values,
+        )
+    )
+    # The dedicated clarification model voices typed unsupported recovery. A
+    # contradictory interpreter response cannot leak into the user-visible turn.
+    blocked_patch["assistant_response"] = None
+    return StageResult(
+        outcome="needs_clarification",
+        decision=blocked_decision,
+        stage_patch=blocked_patch,
+    )
 
 
 def admitted_or_blocked_confirmation_result(
@@ -464,6 +543,15 @@ def strategy_route_admission_result(
     )
     if future_result is not None:
         return future_result
+    recognized_non_executable_result = (
+        recognized_non_executable_strategy_admission_result(
+            decision=decision,
+            contract=contract,
+            optional_parameter_values=optional_parameter_values,
+        )
+    )
+    if recognized_non_executable_result is not None:
+        return recognized_non_executable_result
     has_unsupported_verdict = (
         decision.intent == "unsupported_or_out_of_scope"
         or decision.semantic_turn_act == "unsupported_request"

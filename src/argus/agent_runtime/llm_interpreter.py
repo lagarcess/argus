@@ -362,6 +362,9 @@ from argus.agent_runtime.strategy_contract import (
 from argus.agent_runtime.turn_execution_evidence import (
     current_turn_has_material_execution_evidence,
 )
+from argus.domain.capability_registry import (
+    requested_strategy_template_capability_clause,
+)
 from argus.domain.market_data import is_ticker_like_query, resolve_asset
 from argus.llm.openrouter import (
     OpenRouterTask,
@@ -781,7 +784,8 @@ class OpenRouterStructuredInterpreter:
             "messy, or grammatically imperfect follow-ups as normal user input, not "
             "malformed requests; extract supported strategy intent, asset evidence, "
             "date/window intent, and language when those facts are visible.\n\n"
-            "Supported execution truth for Alpha: long-only backtests; buy_and_hold, "
+            + requested_strategy_template_capability_clause()
+            + "Supported execution truth for Alpha: long-only backtests; buy_and_hold, "
             "dca_accumulation, registry-backed indicator threshold rules, and "
             "schema-backed signal strategies are executable. RSI is executable with "
             "user-specified thresholds from 0 to 100, a default period of 14, a "

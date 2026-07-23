@@ -13,9 +13,60 @@ See `docs/specs/private-alpha-next-p2.1a-capability-registry-impl.md`.
 
 from __future__ import annotations
 
+from typing import Annotated
+
+from pydantic import AfterValidator, WithJsonSchema
+
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 # --- Strategy derivations -------------------------------------------------------------
+
+# Every named strategy Argus recognizes, including draft-only templates. This is a
+# derived view of STRATEGY_CAPABILITIES, not a second capability registry.
+REGISTERED_STRATEGY_TEMPLATES: frozenset[str] = frozenset(STRATEGY_CAPABILITIES)
+
+
+def _ensure_registered_strategy_template(value: str) -> str:
+    if value not in REGISTERED_STRATEGY_TEMPLATES:
+        raise ValueError(f"unrecognized strategy template: {value!r}")
+    return value
+
+
+RegisteredStrategyTemplate = Annotated[
+    str,
+    AfterValidator(_ensure_registered_strategy_template),
+    WithJsonSchema(
+        {
+            "type": "string",
+            "enum": sorted(REGISTERED_STRATEGY_TEMPLATES),
+            "title": "RegisteredStrategyTemplate",
+        }
+    ),
+]
+
+
+def requested_strategy_template_capability_clause() -> str:
+    """LLM contract generated from the canonical strategy capability registry."""
+
+    capability_rows = ", ".join(
+        f"{template}={STRATEGY_CAPABILITIES[template].status}"
+        for template in sorted(REGISTERED_STRATEGY_TEMPLATES)
+    )
+    return (
+        "Named strategy capability identity is separate from execution routing. "
+        "When the user names or clearly requests a registered strategy template, "
+        "set candidate_strategy_draft.requested_strategy_template to its canonical "
+        f"registry key. Registered template statuses are: {capability_rows}. "
+        "Preserve a draft template's identity even though it is not runnable: do "
+        "not relabel it as buy_and_hold, do not create a rule_spec, and do not ask "
+        "the user to define custom logic as though Argus could then run it. For a "
+        "draft template, classify the turn as unsupported_or_out_of_scope with "
+        "semantic_turn_act=unsupported_request, preserve the user's asset, amount, "
+        "and dates, explain that Argus cannot run that named strategy yet, and offer "
+        "only genuinely executable alternatives. For an executable template, set "
+        "requested_strategy_template too and use its normal execution family.\n\n"
+    )
+
 
 # User-facing templates that are reachable end-to-end (status == executable).
 EXECUTABLE_TEMPLATES: frozenset[str] = frozenset(
