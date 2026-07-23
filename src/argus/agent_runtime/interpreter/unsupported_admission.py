@@ -560,13 +560,6 @@ def strategy_route_admission_result(
 
     if not expects_strategy_route:
         return None
-    future_result = future_performance_admission_result(
-        decision=decision,
-        contract=contract,
-        optional_parameter_values=optional_parameter_values,
-    )
-    if future_result is not None:
-        return future_result
     recognized_non_executable_result = (
         recognized_non_executable_strategy_admission_result(
             decision=decision,
@@ -576,6 +569,13 @@ def strategy_route_admission_result(
     )
     if recognized_non_executable_result is not None:
         return recognized_non_executable_result
+    future_result = future_performance_admission_result(
+        decision=decision,
+        contract=contract,
+        optional_parameter_values=optional_parameter_values,
+    )
+    if future_result is not None:
+        return future_result
     has_unsupported_verdict = (
         decision.intent == "unsupported_or_out_of_scope"
         or decision.semantic_turn_act == "unsupported_request"

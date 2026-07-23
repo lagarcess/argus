@@ -23,6 +23,7 @@ from argus.agent_runtime.interpreter.unsupported_admission import (
     FUTURE_HORIZON_EVIDENCE_KEY,
     FUTURE_PERFORMANCE_ADMISSION_BLOCKED,
     FUTURE_PERFORMANCE_CATEGORY,
+    RECOGNIZED_NON_EXECUTABLE_ADMISSION_BLOCKED,
 )
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
@@ -179,6 +180,249 @@ def test_backtest_execution_with_future_window_fails_closed(
         ),
     )
     _assert_future_blocked(result, evidence="in ten years")
+
+
+def _momentum_future_summary() -> StrategySummary:
+    return StrategySummary(
+        requested_strategy_template="momentum_breakout",
+        strategy_type="buy_and_hold",
+        strategy_thesis="Momentum breakout strategy on AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10000,
+        extra_parameters={
+            "date_range_intent": _future_window_intent("ten years from now"),
+        },
+    )
+
+
+def test_named_unsupported_strategy_precedes_future_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The first recovery must address the unexecutable named strategy."""
+
+    _stub_equity_asset_resolution(monkeypatch)
+    result = _run_interpret(
+        message=(
+            "Backtest a momentum breakout strategy on AAPL with $10,000 "
+            "ten years from now."
+        ),
+        response=StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="Momentum breakout on AAPL ten years from now.",
+            candidate_strategy_draft=_momentum_future_summary(),
+            semantic_turn_act="new_idea",
+        ),
+    )
+
+    assert result.outcome == "needs_clarification"
+    decision = result.decision
+    assert decision is not None
+    assert RECOGNIZED_NON_EXECUTABLE_ADMISSION_BLOCKED in decision.reason_codes
+    assert FUTURE_PERFORMANCE_ADMISSION_BLOCKED not in decision.reason_codes
+    assert [constraint.category for constraint in decision.unsupported_constraints] == [
+        "unsupported_strategy_logic"
+    ]
+    draft = decision.candidate_strategy_draft
+    assert draft.requested_strategy_template == "momentum_breakout"
+    assert draft.strategy_type == "momentum_breakout"
+    assert draft.asset_universe == ["AAPL"]
+    assert draft.capital_amount == 10000
+    future_intent = (draft.extra_parameters or {}).get("date_range_intent")
+    assert isinstance(future_intent, dict)
+    assert future_intent["kind"] == "future_window"
+    assert FUTURE_HORIZON_EVIDENCE_KEY not in (draft.extra_parameters or {})
+    assert result.patch.get("confirmation_payload") is None
+
+
+def test_pending_summary_conversion_preserves_named_strategy_identity() -> None:
+    pending = _momentum_future_summary().model_copy(
+        update={"strategy_type": "momentum_breakout"}
+    )
+
+    draft = _llm_draft_from_strategy_summary(pending)
+
+    assert draft.requested_strategy_template == "momentum_breakout"
+
+
+def test_date_only_selection_does_not_replace_named_unsupported_strategy() -> None:
+    pending = _momentum_future_summary().model_copy(
+        update={"strategy_type": "momentum_breakout"}
+    )
+    draft = _llm_draft_from_strategy_summary(pending)
+
+    result = _apply_pending_response_option_replacement(
+        draft=draft,
+        replacement_values={
+            "requested_field": "date_range",
+            "date_range": {"start": "2022-01-01", "end": "2025-01-01"},
+        },
+        current_missing=[],
+    )
+
+    repaired = result["draft"]
+    assert repaired.requested_strategy_template == "momentum_breakout"
+    assert repaired.strategy_type == "momentum_breakout"
+    assert repaired.date_range == {"start": "2022-01-01", "end": "2025-01-01"}
+
+
+@pytest.mark.parametrize(
+    ("replacement_values", "expected_template", "expected_strategy_type"),
+    [
+        (
+            {
+                "strategy_type": "signal_strategy",
+                "rule_family": "moving_average_crossover",
+            },
+            "moving_average_crossover",
+            "signal_strategy",
+        ),
+        (
+            {"simplify_logic": "rsi_only"},
+            "rsi_mean_reversion",
+            "indicator_threshold",
+        ),
+        (
+            {"strategy_type": "buy_and_hold"},
+            "buy_and_hold",
+            "buy_and_hold",
+        ),
+    ],
+)
+def test_typed_supported_alternative_replaces_named_strategy_identity(
+    replacement_values: dict[str, Any],
+    expected_template: str,
+    expected_strategy_type: str,
+) -> None:
+    pending = _momentum_future_summary().model_copy(
+        update={"strategy_type": "momentum_breakout"}
+    )
+    draft = _llm_draft_from_strategy_summary(pending)
+
+    result = _apply_pending_response_option_replacement(
+        draft=draft,
+        replacement_values=replacement_values,
+        current_missing=[],
+    )
+
+    repaired = result["draft"]
+    assert repaired.requested_strategy_template == expected_template
+    assert repaired.strategy_type == expected_strategy_type
+    assert repaired.asset_universe == ["AAPL"]
+    assert repaired.capital_amount == 10000
+    assert (repaired.extra_parameters or {})["date_range_intent"]["kind"] == (
+        "future_window"
+    )
+
+
+def test_buy_hold_replacement_outranks_stale_rule_identity() -> None:
+    pending = _momentum_future_summary().model_copy(
+        update={
+            "strategy_type": "momentum_breakout",
+            "entry_rule": {
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+        }
+    )
+
+    result = _apply_pending_response_option_replacement(
+        draft=_llm_draft_from_strategy_summary(pending),
+        replacement_values={"strategy_type": "buy_and_hold"},
+        current_missing=[],
+    )
+
+    repaired = result["draft"]
+    assert repaired.requested_strategy_template == "buy_and_hold"
+    assert repaired.strategy_type == "buy_and_hold"
+    assert repaired.entry_rule is None
+
+
+def test_supported_selection_then_future_then_dates_reaches_confirmation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The three typed boundaries run in order without losing known facts."""
+
+    _stub_equity_asset_resolution(monkeypatch)
+    pending = _momentum_future_summary().model_copy(
+        update={"strategy_type": "momentum_breakout"}
+    )
+    replacement = _apply_pending_response_option_replacement(
+        draft=_llm_draft_from_strategy_summary(pending),
+        replacement_values={
+            "strategy_type": "signal_strategy",
+            "rule_family": "moving_average_crossover",
+        },
+        current_missing=[],
+    )
+    selected = StrategySummary.model_validate(
+        replacement["draft"].model_dump(mode="python", exclude_none=True)
+    )
+
+    future_result = _run_interpret(
+        message="Use the 50/200-day moving-average crossover instead.",
+        response=StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="Use a supported moving-average crossover.",
+            candidate_strategy_draft=selected,
+            semantic_turn_act="answer_pending_need",
+        ),
+    )
+
+    assert future_result.outcome == "needs_clarification"
+    future_decision = future_result.decision
+    assert future_decision is not None
+    assert FUTURE_PERFORMANCE_ADMISSION_BLOCKED in future_decision.reason_codes
+    future_draft = future_decision.candidate_strategy_draft
+    assert future_draft.requested_strategy_template == "moving_average_crossover"
+    assert future_draft.strategy_type == "signal_strategy"
+    assert future_draft.asset_universe == ["AAPL"]
+    assert future_draft.capital_amount == 10000
+    assert "date_range" in future_decision.missing_required_fields
+    horizon = (future_draft.extra_parameters or {}).get(FUTURE_HORIZON_EVIDENCE_KEY)
+    assert isinstance(horizon, dict)
+    assert horizon["kind"] == "future_window"
+    assert future_result.patch.get("confirmation_payload") is None
+
+    dated_draft = future_draft.model_copy(
+        update={"date_range": {"start": "2022-01-01", "end": "2025-01-01"}}
+    )
+    confirmation_result = _run_interpret(
+        message="Use January 1, 2022 through January 1, 2025.",
+        response=StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="Use the supplied historical period.",
+            candidate_strategy_draft=dated_draft,
+            semantic_turn_act="answer_pending_need",
+        ),
+    )
+
+    assert confirmation_result.outcome == "ready_for_confirmation"
+    confirmed = confirmation_result.decision
+    assert confirmed is not None
+    assert confirmed.candidate_strategy_draft.requested_strategy_template == (
+        "moving_average_crossover"
+    )
+    assert confirmed.candidate_strategy_draft.asset_universe == ["AAPL"]
+    assert confirmed.candidate_strategy_draft.capital_amount == 10000
+    assert confirmed.candidate_strategy_draft.date_range == {
+        "start": "2022-01-01",
+        "end": "2025-01-01",
+    }
+    assert (
+        "momentum_breakout"
+        not in (confirmed.candidate_strategy_draft.model_dump(mode="json")).values()
+    )
 
 
 def test_spanish_future_window_fails_closed(
