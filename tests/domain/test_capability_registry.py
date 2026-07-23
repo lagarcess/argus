@@ -84,6 +84,7 @@ def test_llm_requested_strategy_template_enum_is_derived_from_registry() -> None
         if item.get("type") == "string"
     )
     assert string_schema.get("enum") == sorted(STRATEGY_CAPABILITIES)
+    assert not hasattr(registry, "requested_strategy_template_capability_clause")
 
 
 # --- Derived allow-lists all read from the registry -----------------------------------

@@ -1193,7 +1193,20 @@ def test_clarifier_system_prompt_guides_unsupported_recovery_context() -> None:
                 ],
             }
         ],
-        response_intent={"kind": "unsupported_recovery"},
+        response_intent={
+            "kind": "unsupported_recovery",
+            "facts": {
+                "unsupported_constraints": [
+                    {
+                        "category": "unsupported_strategy_logic",
+                        "raw_value": "news sentiment turns positive",
+                        "explanation": (
+                            "Sentiment/news signals are not executable yet."
+                        ),
+                    }
+                ]
+            },
+        },
     )
 
     messages = clarifier._messages(request)
@@ -1206,6 +1219,7 @@ def test_clarifier_system_prompt_guides_unsupported_recovery_context() -> None:
     assert "Do not claim the unsupported part is executable" in system_prompt
     assert "AAPL" in context
     assert "news sentiment turns positive" in context
+    assert "Sentiment/news signals are not executable yet." not in context
 
 
 def test_clarifier_system_prompt_keeps_vague_ideas_on_supported_proxies() -> None:

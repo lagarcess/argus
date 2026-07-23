@@ -150,6 +150,7 @@ from argus.agent_runtime.interpreter.execution_cost_capability import (
 )
 from argus.agent_runtime.interpreter.unsupported_admission import (
     future_performance_capability_clause,
+    requested_strategy_template_capability_clause,
 )
 from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _apply_pending_response_option_replacement,
@@ -361,9 +362,6 @@ from argus.agent_runtime.strategy_contract import (
 )
 from argus.agent_runtime.turn_execution_evidence import (
     current_turn_has_material_execution_evidence,
-)
-from argus.domain.capability_registry import (
-    requested_strategy_template_capability_clause,
 )
 from argus.domain.market_data import is_ticker_like_query, resolve_asset
 from argus.llm.openrouter import (

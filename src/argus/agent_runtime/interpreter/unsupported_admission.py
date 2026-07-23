@@ -28,6 +28,7 @@ from argus.agent_runtime.stages.interpret_types import (
 )
 from argus.agent_runtime.state.models import UnsupportedConstraint
 from argus.agent_runtime.strategy_contract import canonical_strategy_type
+from argus.domain.capability_registry import REGISTERED_STRATEGY_TEMPLATES
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 UNSUPPORTED_INTENT_ADMISSION_BLOCKED = "unsupported_intent_confirmation_blocked"
@@ -46,6 +47,29 @@ _FUTURE_PERFORMANCE_EXPLANATION = (
     "Argus cannot predict future performance. It can test how the same idea "
     "performed over a historical period instead."
 )
+
+
+def requested_strategy_template_capability_clause() -> str:
+    """Interpreter prompt generated from the canonical capability registry."""
+
+    capability_rows = ", ".join(
+        f"{template}={STRATEGY_CAPABILITIES[template].status}"
+        for template in sorted(REGISTERED_STRATEGY_TEMPLATES)
+    )
+    return (
+        "Named strategy capability identity is separate from execution routing. "
+        "When the user names or clearly requests a registered strategy template, "
+        "set candidate_strategy_draft.requested_strategy_template to its canonical "
+        f"registry key. Registered template statuses are: {capability_rows}. "
+        "Preserve a draft template's identity even though it is not runnable: do "
+        "not relabel it as buy_and_hold, do not create a rule_spec, and do not ask "
+        "the user to define custom logic as though Argus could then run it. For a "
+        "draft template, classify the turn as unsupported_or_out_of_scope with "
+        "semantic_turn_act=unsupported_request, preserve the user's asset, amount, "
+        "and dates, explain that Argus cannot run that named strategy yet, and offer "
+        "only genuinely executable alternatives. For an executable template, set "
+        "requested_strategy_template too and use its normal execution family.\n\n"
+    )
 
 
 def future_performance_capability_clause() -> str:
