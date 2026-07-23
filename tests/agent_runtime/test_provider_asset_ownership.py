@@ -206,6 +206,30 @@ def test_ambiguous_runtime_context_never_becomes_executable_identity() -> None:
     assert draft.asset_universe == []
 
 
+def test_benchmark_role_rows_never_become_provider_records() -> None:
+    """PR #266 review T5 counter-evidence: typed benchmark rows stay out."""
+
+    benchmark_row = {
+        "raw_text": "S&P 500",
+        "role": "benchmark",
+        "status": "resolved",
+        "symbol": "SPY",
+        "asset_class": "equity",
+        "name": "SPDR S&P 500",
+        "raw_symbol": "SPY",
+        "provider": "alpaca",
+        "exchange": "ARCA",
+    }
+    normalized = response_with_provider_context_assets(
+        _refusal_response_with_model_records(),
+        asset_resolution_context=_context([benchmark_row]),
+        include_unsupported_request=True,
+    )
+    draft = normalized.candidate_strategy_draft
+    assert "provider_resolved_assets" not in (draft.extra_parameters or {})
+    assert draft.asset_universe == []
+
+
 def test_partial_basket_context_preserves_fuller_draft_without_model_records() -> None:
     response = LLMInterpretationResponse(
         intent="strategy_drafting",

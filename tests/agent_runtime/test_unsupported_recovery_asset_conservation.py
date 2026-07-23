@@ -190,6 +190,102 @@ def test_unresolved_asset_text_is_not_promoted(
     assert strategy.capital_amount == 10000
 
 
+def test_mixed_class_records_are_not_restored_as_a_runnable_universe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PR #266 review T4: conservation never rebuilds a mixed-class universe."""
+
+    _stub_crypto_asset_resolution(monkeypatch)
+    refusal = _self_authored_refusal(with_resolved_records=False)
+    draft = refusal.candidate_strategy_draft.model_copy(deep=True)
+    extra = dict(draft.extra_parameters or {})
+    extra["provider_resolved_assets"] = [
+        {
+            "raw_text": "Apple",
+            "symbol": "AAPL",
+            "asset_class": "equity",
+            "name": "Apple Inc.",
+            "raw_symbol": "AAPL",
+            "provider": "alpaca",
+            "exchange": "NASDAQ",
+        },
+        dict(PROVIDER_RESOLVED_BTC),
+    ]
+    draft.extra_parameters = extra
+    draft.asset_class = None
+    result = _run_interpret(
+        response=refusal.model_copy(update={"candidate_strategy_draft": draft})
+    )
+    assert result.outcome == "needs_clarification"
+    assert result.patch.get("confirmation_payload") is None
+    conserved = result.decision.candidate_strategy_draft
+    # Mixed equity+crypto records cannot become a runnable traded universe.
+    assert conserved.asset_universe == []
+
+
+def test_comparison_baseline_record_is_not_restored_into_traded_universe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PR #266 review T5: the benchmark never enters the traded universe."""
+
+    _stub_crypto_asset_resolution(monkeypatch)
+    refusal = _self_authored_refusal(with_resolved_records=False)
+    draft = refusal.candidate_strategy_draft.model_copy(deep=True)
+    extra = dict(draft.extra_parameters or {})
+    extra["provider_resolved_assets"] = [
+        {
+            "raw_text": "S&P 500",
+            "symbol": "SPY",
+            "asset_class": "equity",
+            "name": "SPDR S&P 500",
+            "raw_symbol": "SPY",
+            "provider": "alpaca",
+            "exchange": "ARCA",
+        },
+        {
+            "raw_text": "Apple",
+            "symbol": "AAPL",
+            "asset_class": "equity",
+            "name": "Apple Inc.",
+            "raw_symbol": "AAPL",
+            "provider": "alpaca",
+            "exchange": "NASDAQ",
+        },
+        {
+            "raw_text": "Microsoft",
+            "symbol": "MSFT",
+            "asset_class": "equity",
+            "name": "Microsoft",
+            "raw_symbol": "MSFT",
+            "provider": "alpaca",
+            "exchange": "NASDAQ",
+        },
+    ]
+    extra["field_provenance"] = {"comparison_baseline": "explicit_user"}
+    draft.extra_parameters = extra
+    draft.asset_class = "equity"
+    draft.comparison_baseline = "SPY"
+    result = _run_interpret(
+        response=refusal.model_copy(update={"candidate_strategy_draft": draft})
+    )
+    assert result.outcome == "needs_clarification"
+    conserved = result.decision.candidate_strategy_draft
+    assert conserved.asset_universe == ["AAPL", "MSFT"]
+    assert "SPY" not in conserved.asset_universe
+
+
+def test_matching_class_records_conserve_and_set_nothing_extra(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Single-class records matching the draft class still conserve."""
+
+    _stub_crypto_asset_resolution(monkeypatch)
+    result = _run_interpret(response=_self_authored_refusal(with_resolved_records=True))
+    conserved = result.decision.candidate_strategy_draft
+    assert conserved.asset_universe == ["BTC"]
+    assert conserved.asset_class == "crypto"
+
+
 def test_selection_after_refusal_reuses_resolved_asset_and_asks_period() -> None:
     pending = StrategySummary(
         strategy_type="buy_and_hold",

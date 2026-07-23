@@ -11,7 +11,7 @@ import json
 from typing import Any
 
 from argus.agent_runtime.interpreter.provider_context_assets import (
-    resolved_asset_symbols_from_strategy_context,
+    resolved_asset_records_from_strategy_context,
 )
 from argus.agent_runtime.interpreter.shared import (
     _llm_strategy_draft_has_concrete_execution_target,
@@ -278,14 +278,49 @@ def _draft_with_conserved_resolved_assets(draft: Any) -> Any:
     """Typed provider-validated assets survive the unsupported-recovery route.
 
     Restores an empty asset_universe from the draft's own provider-resolved
-    records; unresolved asset text is never promoted."""
+    records. Unresolved asset text is never promoted, the comparison baseline
+    never enters the traded universe, and only a single-class set is
+    structurally valid — mixed-class records keep the universe empty so
+    recovery keeps asking."""
 
     if any(str(symbol or "").strip() for symbol in draft.asset_universe):
         return draft
-    symbols = resolved_asset_symbols_from_strategy_context(draft)[:5]
+    extra_parameters = draft.extra_parameters or {}
+    field_provenance = extra_parameters.get("field_provenance")
+    baseline_is_user_stated = (
+        isinstance(field_provenance, dict)
+        and field_provenance.get("comparison_baseline") == "explicit_user"
+    )
+    # Only a user-stated comparison target is excluded from the traded set: a
+    # runtime-applied default benchmark can legitimately equal the traded
+    # asset (crypto -> BTC, currency pairs -> the pair itself).
+    baseline = (
+        str(draft.comparison_baseline or "").strip().upper()
+        if baseline_is_user_stated
+        else ""
+    )
+    draft_class = str(draft.asset_class or "").strip().lower()
+    symbols: list[str] = []
+    classes: set[str] = set()
+    for record in resolved_asset_records_from_strategy_context(draft):
+        symbol = str(record.get("symbol") or "").strip().upper()
+        record_class = str(record.get("asset_class") or "").strip().lower()
+        if not symbol or (baseline and symbol == baseline):
+            continue
+        if draft_class and record_class and record_class != draft_class:
+            continue
+        if symbol not in symbols:
+            symbols.append(symbol)
+            if record_class:
+                classes.add(record_class)
     if not symbols:
         return draft
-    return draft.model_copy(update={"asset_universe": symbols})
+    if not draft_class and len(classes) != 1:
+        return draft
+    update: dict[str, Any] = {"asset_universe": symbols[:5]}
+    if not draft_class and classes:
+        update["asset_class"] = next(iter(classes))
+    return draft.model_copy(update=update)
 
 
 def _typed_future_horizon(decision: InterpretDecision) -> dict[str, Any] | None:
