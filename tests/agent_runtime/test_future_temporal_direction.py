@@ -104,6 +104,42 @@ def _focused_extraction_response() -> LLMInterpretationResponse:
     )
 
 
+def test_focused_prompt_conditions_rolling_window_on_historical_lookback() -> None:
+    """The focused prompt may never instruct rolling_window unconditionally.
+
+    A forward-looking period must be taught as future_window, and every
+    rolling_window instruction must be scoped to a historical lookback so the
+    two rules cannot contradict each other."""
+
+    from argus.agent_runtime.interpreter.date_window_repair import (
+        _focused_date_window_extraction_messages,
+    )
+
+    messages = _focused_date_window_extraction_messages(
+        response=_focused_extraction_response(),
+        request=_interpretation_request(BTC_FUTURE_MESSAGE),
+    )
+    prompt = messages[0]["content"]
+
+    future_sentences = [
+        sentence for sentence in prompt.split(". ") if "future_window" in sentence
+    ]
+    assert future_sentences, "prompt must teach kind=future_window"
+    assert any(
+        "forward" in sentence for sentence in future_sentences
+    ), "future_window must be tied to forward-looking periods"
+
+    rolling_sentences = [
+        sentence for sentence in prompt.split(". ") if "kind=rolling_window" in sentence
+    ]
+    assert rolling_sentences, "prompt must keep the historical rolling_window rule"
+    for sentence in rolling_sentences:
+        assert "lookback" in sentence, (
+            "every rolling_window instruction must be conditioned on a "
+            f"historical lookback; unconditional sentence: {sentence!r}"
+        )
+
+
 def test_builder_does_not_synthesize_direction_from_untyped_evidence() -> None:
     """Directionless evidence never becomes a typed historical window."""
 
