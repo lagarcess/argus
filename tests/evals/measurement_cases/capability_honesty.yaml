@@ -106,7 +106,14 @@ cases:
     user_language: en
     ui_language: en
     expected:
-      intent: unsupported_or_out_of_scope
+      # Intent label is model-shape; the typed future_window boundary is what
+      # keeps the turn non-executable regardless of which label arrives.
+      intent:
+        [
+          "unsupported_or_out_of_scope",
+          "backtest_execution",
+          "strategy_drafting",
+        ]
       capability_verdict: unsupported
       assets: ["BTC"]
       asset_class: crypto

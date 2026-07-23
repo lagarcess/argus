@@ -156,6 +156,64 @@ def test_date_range_expectations_compare_iso_interval_and_dict_equivalently() ->
         assert failures == []
 
 
+def test_tolerant_intent_labels_never_loosen_final_capability_assertions() -> None:
+    """A tolerant intent list absorbs model-shape routing variance only; the
+    final capability truth checks stay exact for every listed label."""
+
+    case = harness.EvalCase(
+        id="tolerant-intent-contract",
+        category="capability_honesty",
+        prompt="If I invest $10,000 in Bitcoin, what will it be worth in ten years?",
+        user_language="en",
+        ui_language="en",
+        expected=harness.TypedExpectations(
+            intent=(
+                "unsupported_or_out_of_scope",
+                "backtest_execution",
+                "strategy_drafting",
+            ),
+            capability_verdict="unsupported",
+            assets=("BTC",),
+            capital_amount=10000,
+            clarification={
+                "kind": "unsupported_recovery",
+                "reason_code": "future_performance",
+            },
+        ),
+    )
+    honest_outcome = {
+        "intent": "backtest_execution",
+        "capability_verdict": "unsupported",
+        "assets": ["BTC"],
+        "capital_amount": 10000,
+        "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance",
+        },
+    }
+    assert harness.typed_expectation_failures(case=case, outcome=honest_outcome) == []
+
+    executable_leak = dict(honest_outcome)
+    executable_leak["capability_verdict"] = "executable"
+    failures = harness.typed_expectation_failures(case=case, outcome=executable_leak)
+    assert any(failure.startswith("capability_verdict") for failure in failures)
+
+    missing_recovery = dict(honest_outcome)
+    missing_recovery["clarification"] = None
+    failures = harness.typed_expectation_failures(case=case, outcome=missing_recovery)
+    assert any(failure.startswith("clarification") for failure in failures)
+
+    dropped_conservation = dict(honest_outcome)
+    dropped_conservation["assets"] = []
+    failures = harness.typed_expectation_failures(case=case, outcome=dropped_conservation)
+    assert any(failure.startswith("assets") for failure in failures)
+
+    unknown_label = dict(honest_outcome)
+    unknown_label["intent"] = "conversation_followup"
+    failures = harness.typed_expectation_failures(case=case, outcome=unknown_label)
+    assert any(failure.startswith("intent") for failure in failures)
+
+
 def test_prose_judge_cases_fail_when_assistant_text_is_missing(monkeypatch: Any) -> None:
     case = harness.EvalCase(
         id="missing-prose",
