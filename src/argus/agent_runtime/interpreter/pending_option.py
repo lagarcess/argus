@@ -27,7 +27,9 @@ from argus.agent_runtime.rule_specs import (
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import canonical_strategy_type
+from argus.domain.capability_registry import EXECUTABLE_TEMPLATES, indicator_template
 from argus.domain.indicators import normalize_indicator_parameters
+from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 
 def _response_needs_pending_response_option_selection_audit(
@@ -221,6 +223,7 @@ def _llm_draft_from_strategy_summary(strategy: StrategySummary) -> LLMStrategyDr
     date_range_intent = extra_parameters.get("date_range_intent")
     return LLMStrategyDraft(
         raw_user_phrasing=strategy.raw_user_phrasing,
+        requested_strategy_template=strategy.requested_strategy_template,
         strategy_type=strategy.strategy_type,
         strategy_thesis=strategy.strategy_thesis,
         asset_universe=list(strategy.asset_universe),
@@ -298,6 +301,9 @@ def _apply_pending_response_option_replacement(
             replacement_values["comparison_baseline"]
         ).strip()
     _apply_supported_logic_replacement(repaired, replacement_values)
+    selected_template = _selected_supported_template(repaired, replacement_values)
+    if selected_template is not None:
+        repaired.requested_strategy_template = selected_template
     strategy_type = canonical_strategy_type(repaired.strategy_type)
     if strategy_type in {
         "buy_and_hold",
@@ -321,6 +327,44 @@ def _apply_pending_response_option_replacement(
         current_missing=current_missing,
     )
     return {"draft": repaired, "missing_fields": missing_fields}
+
+
+def _selected_supported_template(
+    draft: LLMStrategyDraft,
+    replacement_values: dict[str, Any],
+) -> str | None:
+    """Resolve an explicit typed alternative through canonical capability data."""
+
+    if not {
+        "strategy_type",
+        "simplify_logic",
+        "rule_family",
+    }.intersection(replacement_values):
+        return None
+    replacement_strategy_type = replacement_values.get("strategy_type")
+    if replacement_strategy_type is not None:
+        requested_template = str(replacement_strategy_type).strip()
+        if requested_template in EXECUTABLE_TEMPLATES:
+            return requested_template
+        execution_type = canonical_strategy_type(requested_template)
+        candidates = [
+            template
+            for template, capability in STRATEGY_CAPABILITIES.items()
+            if capability.status == "executable"
+            and capability.execution_strategy_type == execution_type
+        ]
+        if len(candidates) == 1:
+            return candidates[0]
+    entry_rule = draft.entry_rule
+    if isinstance(entry_rule, dict):
+        rule_template = str(entry_rule.get("type") or "").strip()
+        if rule_template in EXECUTABLE_TEMPLATES:
+            return rule_template
+    indicator = str(draft.indicator or "").strip()
+    indicator_strategy = indicator_template(indicator)
+    if indicator_strategy in EXECUTABLE_TEMPLATES:
+        return indicator_strategy
+    return None
 
 
 def _apply_supported_logic_replacement(
@@ -514,10 +558,17 @@ def _missing_fields_after_pending_option(
             "recurring_contribution",
             "strategy_type",
         }
-        return [
+        filtered = [
             field
             for field in missing
             if _field_path_base(field) not in present_fields
             and _field_path_base(field) not in stale_fields
         ]
+        # A selection cannot silently default the test window: a draft without
+        # a date range still owes the user the historical-period question.
+        if "date_range" not in present_fields and "date_range" not in {
+            _field_path_base(field) for field in filtered
+        }:
+            filtered = [*filtered, "date_range"]
+        return filtered
     return _dca_contract_missing_fields(missing, draft=draft)

@@ -11,6 +11,7 @@ from argus.agent_runtime.stages.interpret_types import (
     ResultFollowupFocus,
 )
 from argus.agent_runtime.state.models import ResponseProfileOverrides
+from argus.domain.capability_registry import RegisteredStrategyTemplate
 
 
 class LLMRiskRule(BaseModel):
@@ -73,6 +74,7 @@ class LLMDateRangeIntent(BaseModel):
             "since",
             "endpoint_patch",
             "same_as_latest_result",
+            "future_window",
         ]
         | None
     ) = Field(
@@ -82,7 +84,13 @@ class LLMDateRangeIntent(BaseModel):
             "or semantic windows such as last 12 months or year to date instead "
             "of asking deterministic code to parse localized prose. Use "
             "same_as_latest_result when the user references the latest completed "
-            "test's window; the runtime binds the dates from the canonical run."
+            "test's window; the runtime binds the dates from the canonical run. "
+            "Use future_window whenever the user's period points forward from "
+            "today — in ten years, over the next 3 years, by 2031, dentro de "
+            "diez años — with count/unit or year filled and the exact phrase as "
+            "evidence. A future_window is never a historical test window: do "
+            "not emit rolling_window or calendar dates for a forward-looking "
+            "period."
         ),
     )
     start: str | None = Field(
@@ -120,6 +128,16 @@ class LLMStrategyDraft(BaseModel):
             "Detected user-message language as a BCP-47-style code such as en, "
             "es, or es-419. This guides user-facing prose and bounded parsers; "
             "executable fields still use canonical Argus values."
+        ),
+    )
+    requested_strategy_template: RegisteredStrategyTemplate | None = Field(
+        default=None,
+        description=(
+            "Canonical registered strategy-template identity requested by the user. "
+            "Set this for both executable and recognized draft-only templates. Keep "
+            "it separate from strategy_type, which is the execution family, so a "
+            "recognized non-executable template is never silently converted into a "
+            "different runnable strategy."
         ),
     )
     strategy_type: str | None = None

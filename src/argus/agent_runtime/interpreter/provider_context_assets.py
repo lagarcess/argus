@@ -34,12 +34,37 @@ def response_with_runtime_context_assets(
     )
 
 
+def _response_without_model_authored_provider_records(
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse:
+    """`provider_resolved_assets` is runtime-owned.
+
+    The model can write anything into `extra_parameters`; a hallucinated
+    record must never masquerade as provider truth. The reserved key is
+    cleared here, before enrichment, so only the actual runtime
+    provider-context rows can populate it on every path."""
+
+    extra_parameters = response.candidate_strategy_draft.extra_parameters or {}
+    if _PROVIDER_RESOLVED_ASSETS_KEY not in extra_parameters:
+        return response
+    cleaned = {
+        key: value
+        for key, value in extra_parameters.items()
+        if key != _PROVIDER_RESOLVED_ASSETS_KEY
+    }
+    draft = response.candidate_strategy_draft.model_copy(
+        update={"extra_parameters": cleaned}
+    )
+    return response.model_copy(update={"candidate_strategy_draft": draft})
+
+
 def response_with_provider_context_assets(
     response: LLMInterpretationResponse,
     *,
     asset_resolution_context: str | None,
     include_unsupported_request: bool = False,
 ) -> LLMInterpretationResponse:
+    response = _response_without_model_authored_provider_records(response)
     supported_intents = {"strategy_drafting", "backtest_execution"}
     if include_unsupported_request:
         supported_intents.add("unsupported_or_out_of_scope")
@@ -174,6 +199,18 @@ def response_with_grounded_partial_context(
             ),
         }
     )
+
+
+def resolved_asset_records_from_strategy_context(strategy: Any) -> list[dict[str, Any]]:
+    """Runtime-owned provider-resolved records attached to this draft."""
+
+    extra_parameters = getattr(strategy, "extra_parameters", None)
+    if not isinstance(extra_parameters, dict):
+        return []
+    records = extra_parameters.get(_PROVIDER_RESOLVED_ASSETS_KEY)
+    if not isinstance(records, list):
+        return []
+    return [record for record in records if isinstance(record, dict)]
 
 
 def resolved_asset_symbols_from_strategy_context(strategy: Any) -> list[str]:

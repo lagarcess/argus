@@ -226,6 +226,11 @@ def resolve_date_range_intent(
     kind = str(payload.get("kind") or "").strip()
     evidence = _intent_evidence_spans(payload)
 
+    if kind == "future_window":
+        # A forward-looking horizon is original intent, never a resolvable
+        # historical test window (issue #241 executable boundary).
+        return None
+
     if kind == "rolling_window":
         count = _positive_int(payload.get("count"))
         unit = _intent_unit(payload.get("unit"))

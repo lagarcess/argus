@@ -11,11 +11,9 @@ from argus.agent_runtime.asset_text_grounding import provider_ticker_mentions_fr
 from argus.agent_runtime.interpreter.shared import (
     _RECURRING_CAPITAL_SOURCES,
     _TOTAL_CAPITAL_SOURCES,
-    _bounded_date_evidence_candidates,
     _capital_source,
     _field_path_base,
     _has_complete_date_range_payload,
-    _natural_time_language_candidates_from_hints,
     _selected_requested_field_base,
     _supported_dca_cadence_value,
 )
@@ -54,10 +52,7 @@ from argus.domain.indicators import (
     executable_indicator_spec,
     normalize_indicator_parameters,
 )
-from argus.nlp.natural_time import (
-    resolve_date_range_intent,
-    resolve_rolling_window_intent_text,
-)
+from argus.nlp.natural_time import resolve_date_range_intent
 
 
 def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
@@ -76,8 +71,10 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload.setdefault("extra_parameters", {})["asset_universe_operation"] = (
             asset_universe_operation
         )
-    if not date_range_intent:
-        date_range_intent = _date_range_intent_from_bounded_evidence(draft)
+    # Directionless bounded evidence never becomes a typed window here: only the
+    # primary interpretation or the focused date-window extraction may establish
+    # temporal direction. Untyped evidence stays provenance and fails closed to a
+    # date clarification.
     initial_capital = payload.pop("initial_capital", None)
     total_capital = payload.pop("total_capital", None)
     recurring_contribution = payload.pop("recurring_contribution", None)
@@ -251,29 +248,6 @@ def _clean_date_range_intent_payload(value: Any) -> dict[str, Any]:
     if callable(model_dump):
         dumped = model_dump(mode="python")
         return dict(dumped) if isinstance(dumped, dict) else {}
-    return {}
-
-
-def _date_range_intent_from_bounded_evidence(
-    draft: LLMStrategyDraft,
-    *,
-    language: str | None = None,
-) -> dict[str, Any]:
-    evidence_candidates = _bounded_date_evidence_candidates(draft)
-    if not evidence_candidates:
-        return {}
-    language_candidates = _natural_time_language_candidates_from_hints(
-        draft.language,
-        language,
-    )
-    for candidate in evidence_candidates:
-        for languages in language_candidates:
-            intent = resolve_rolling_window_intent_text(
-                candidate,
-                languages=languages,
-            )
-            if intent is not None:
-                return intent
     return {}
 
 

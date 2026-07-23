@@ -952,7 +952,11 @@ def test_llm_strategy_draft_resolves_canonical_date_range_intent() -> None:
         "evidence": "durante los últimos 12 meses",
     }
 
-def test_llm_strategy_draft_recovers_rolling_intent_from_bounded_evidence() -> None:
+def test_llm_strategy_draft_keeps_untyped_evidence_as_provenance_only() -> None:
+    # Issue #241: the builder no longer establishes temporal direction from
+    # bounded evidence. Typed direction comes from the primary interpretation
+    # or the focused date-window extraction; explicit model dates stand as-is
+    # and evidence spans stay provenance.
     draft = LLMStrategyDraft(
         raw_user_phrasing=(
             "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
@@ -971,18 +975,9 @@ def test_llm_strategy_draft_recovers_rolling_intent_from_bounded_evidence() -> N
 
     strategy = _strategy_from_llm(draft)
 
-    assert strategy.extra_parameters["date_range_intent"] == {
-        "kind": "rolling_window",
-        "count": 12,
-        "unit": "month",
-        "anchor": "today",
-        "confidence": 0.65,
-        "evidence": "last 12 months",
-    }
-    assert strategy.date_range == {
-        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
-        "end": date.today().isoformat(),
-    }
+    assert "date_range_intent" not in strategy.extra_parameters
+    assert strategy.date_range == {"start": "2025-06-15", "end": "2026-06-15"}
+    assert strategy.extra_parameters["evidence_spans"]["window"] == "last 12 months"
 
 def test_current_message_run_field_contract_prefers_bounded_date_evidence_span() -> None:
     response = LLMInterpretationResponse(

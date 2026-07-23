@@ -291,16 +291,18 @@
       "rule_definition": "¿Qué regla de entrada o salida quieres probar?",
       "refinement": "¿Qué quieres ajustar de esta idea?",
       "refinement_for_asset": "¿Qué quieres cambiar, comparar o poner a prueba ahora para {{assetText}}?",
-      "unsupported_recovery": "Esa regla no define por sí sola cuándo comprar o vender. ¿Qué camino quieres usar: {{options}}?",
-      "unsupported_recovery_for_asset": "Esa regla no define por sí sola cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
-      "unsupported_recovery_with_raw_value": "{{rawValue}} no define por sí solo cuándo comprar o vender. ¿Qué camino quieres usar: {{options}}?",
-      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} no define por sí solo cuándo comprar o vender para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_recovery": "Argus todavía no puede ejecutar esa regla directamente. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_recovery_for_asset": "Argus todavía no puede ejecutar esa regla directamente para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_recovery_with_raw_value": "Argus todavía no puede ejecutar {{rawValue}} directamente. ¿Qué camino quieres usar: {{options}}?",
+      "unsupported_recovery_with_raw_value_for_asset": "Argus todavía no puede ejecutar {{rawValue}} directamente para {{symbol}}. ¿Qué camino quieres usar: {{options}}?",
       "unsupported_timeframe": "Ese tamaño de barra no es compatible. Elige barras diarias o de 1 hora.",
       "unsupported_timeframe_with_raw_value": "{{rawValue}} no es un tamaño de barra compatible. Elige barras diarias o de 1 hora.",
       "timeframe_actions": {
         "daily": "Usar barras diarias",
         "hour_1": "Usar barras de 1 hora"
-      }
+      },
+      "future_performance": "No puedo predecir el rendimiento futuro. Puedo probar cómo se comportó la misma idea en un período histórico. ¿Qué período histórico quieres examinar?",
+      "future_performance_with_options": "No puedo predecir el rendimiento futuro. Puedo probar cómo se comportó la misma idea en un período histórico: {{options}}?"
     },
     "coverage_recovery": {
       "no_common_data_window": "Esos activos y la referencia no comparten un rango de datos utilizable para una prueba confiable. Cambia las fechas, un activo o la referencia.",
@@ -315,7 +317,11 @@
     "simplification_options": {
       "rsi_threshold": "Usar una regla RSI compatible",
       "buy_and_hold": "Comparar con comprar y mantener",
-      "moving_average_crossover": "Usar un cruce de medias móviles compatible"
+      "moving_average_crossover": "Usar un cruce de medias móviles compatible",
+      "historical_period": "Probarlo en un período histórico"
+    },
+    "result_readout": {
+      "quick_take": "Lectura rápida"
     },
     "result_breakdown": {
       "aria_label": "Desglose del resultado",

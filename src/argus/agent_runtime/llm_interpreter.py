@@ -148,6 +148,10 @@ from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
 from argus.agent_runtime.interpreter.execution_cost_capability import (
     execution_cost_capability_clause,
 )
+from argus.agent_runtime.interpreter.unsupported_admission import (
+    future_performance_capability_clause,
+    requested_strategy_template_capability_clause,
+)
 from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _apply_pending_response_option_replacement,
     _clear_dca_recurring_fields,
@@ -237,6 +241,7 @@ from argus.agent_runtime.interpreter.shared import (  # noqa: F401
 )
 from argus.agent_runtime.interpreter.signal_rule import (  # noqa: F401
     _asset_recovery_query_is_explicit_ticker,
+    crossover_shorthand_prompt_clause,
     _audit_signal_rule_grounding_if_needed,
     _llm_draft_executable_indicator_spec,
     _llm_strategy_draft_has_non_asset_strategy_anchor,
@@ -271,7 +276,6 @@ from argus.agent_runtime.interpreter.strategy_builder import (  # noqa: F401
     _clean_evidence_spans,
     _clean_optional_text,
     _compact_asset_evidence_token,
-    _date_range_intent_from_bounded_evidence,
     _dca_amount_has_user_provenance,
     _dca_cadence_has_user_provenance,
     _dedupe_resolution_provenance,
@@ -754,8 +758,10 @@ class OpenRouterStructuredInterpreter:
             "date_range_intent with canonical fields: kind=rolling_window with "
             "count/unit, kind=year_to_date with optional year, kind=calendar_year "
             "with year, kind=since with start/year, kind=explicit_range with "
-            "ISO start/end, or kind=endpoint_patch with endpoint plus ISO date or "
-            "anchor=today and day_offset for relative day edits. When the user "
+            "ISO start/end, kind=endpoint_patch with endpoint plus ISO date or "
+            "anchor=today and day_offset for relative day edits, or "
+            "kind=future_window with count/unit or year when the period points "
+            "forward from today. When the user "
             "asks for the same window as the latest completed test, in any "
             "language ('same time period', 'mismo periodo', 'same dates as "
             "before'), set kind=same_as_latest_result with the reference phrase "
@@ -776,7 +782,8 @@ class OpenRouterStructuredInterpreter:
             "messy, or grammatically imperfect follow-ups as normal user input, not "
             "malformed requests; extract supported strategy intent, asset evidence, "
             "date/window intent, and language when those facts are visible.\n\n"
-            "Supported execution truth for Alpha: long-only backtests; buy_and_hold, "
+            + requested_strategy_template_capability_clause()
+            + "Supported execution truth for Alpha: long-only backtests; buy_and_hold, "
             "dca_accumulation, registry-backed indicator threshold rules, and "
             "schema-backed signal strategies are executable. RSI is executable with "
             "user-specified thresholds from 0 to 100, a default period of 14, a "
@@ -809,23 +816,14 @@ class OpenRouterStructuredInterpreter:
             f"The current runtime date is {date.today().isoformat()}; if the user "
             "says today, now, or current, preserve that endpoint as 'today' or the "
             "current runtime date, not a stale model date.\n\n"
-            "When the user says something like 'buy Nvidia when the 50-day moving average "
-            "crosses above the 200-day', classify it as signal_strategy, preserve "
-            "the crossover as entry_logic, and default the exit to the same fast "
-            "average crossing back below the slow average when the user leaves the "
-            "exit unspecified. Do not ask what the buy trigger is.\n\n"
-            "Common trader shorthand such as 'buy when the 50 crosses the 200', "
-            "'50/200 cross', or 'golden cross' also means a moving-average crossover. "
-            "If the user omits SMA/EMA, use SMA as the default assumption and expose "
-            "that assumption later in the confirmation card instead of asking them "
-            "to restate the trigger. Ask only for truly missing run facts such as "
-            "the asset or date window.\n\n"
-            "Do not turn vague momentum language such as 'starts rising', 'big drops', "
+            + crossover_shorthand_prompt_clause()
+            + "Do not turn vague momentum language such as 'starts rising', 'big drops', "
             "'breaks out', or 'looks strong' into a moving-average crossover or any "
             "other executable signal by yourself. If the user does not name the "
             "indicator, threshold, crossover, or price rule, mark the entry rule as "
             "missing or ask for the executable definition.\n\n"
-            "Valuation and fundamental language is valid investing intent, not user "
+            + future_performance_capability_clause()
+            + "Valuation and fundamental language is valid investing intent, not user "
             "error. If the user says a stock looked cheap, undervalued, expensive, "
             "or references P/E, earnings, revenue, margins, or fundamentals, preserve "
             "that meaning. The current engine cannot execute valuation or fundamental "

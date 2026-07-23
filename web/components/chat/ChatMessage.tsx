@@ -255,7 +255,10 @@ export default function ChatMessage({
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">
               <StrategyResultCard result={message.result} onAction={onAction} />
               {displayContent && (
-                <ResultReadout content={displayContent} />
+                <ResultReadout
+                  content={displayContent}
+                  label={t("chat.result_readout.quick_take", "Quick take")}
+                />
               )}
             </div>
           ) : message.kind === "backtest_job" && message.backtestJob ? (
@@ -393,15 +396,21 @@ export default function ChatMessage({
   );
 }
 
-function ResultReadout({ content }: { content: string }) {
+function ResultReadout({
+  content,
+  label,
+}: {
+  content: string;
+  label: string;
+}) {
   return (
-    <section
-      className="argus-result-readout prose dark:prose-invert max-w-none"
-      aria-label="Result readout"
-    >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-        {content}
-      </ReactMarkdown>
+    <section aria-label="Result readout">
+      <div className="argus-result-section-label">{label}</div>
+      <div className="argus-result-readout prose dark:prose-invert max-w-none">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {content}
+        </ReactMarkdown>
+      </div>
     </section>
   );
 }

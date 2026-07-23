@@ -13,9 +13,37 @@ See `docs/specs/private-alpha-next-p2.1a-capability-registry-impl.md`.
 
 from __future__ import annotations
 
+from typing import Annotated
+
+from pydantic import AfterValidator, WithJsonSchema
+
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 # --- Strategy derivations -------------------------------------------------------------
+
+# Every named strategy Argus recognizes, including draft-only templates. This is a
+# derived view of STRATEGY_CAPABILITIES, not a second capability registry.
+REGISTERED_STRATEGY_TEMPLATES: frozenset[str] = frozenset(STRATEGY_CAPABILITIES)
+
+
+def _ensure_registered_strategy_template(value: str) -> str:
+    if value not in REGISTERED_STRATEGY_TEMPLATES:
+        raise ValueError(f"unrecognized strategy template: {value!r}")
+    return value
+
+
+RegisteredStrategyTemplate = Annotated[
+    str,
+    AfterValidator(_ensure_registered_strategy_template),
+    WithJsonSchema(
+        {
+            "type": "string",
+            "enum": sorted(REGISTERED_STRATEGY_TEMPLATES),
+            "title": "RegisteredStrategyTemplate",
+        }
+    ),
+]
+
 
 # User-facing templates that are reachable end-to-end (status == executable).
 EXECUTABLE_TEMPLATES: frozenset[str] = frozenset(

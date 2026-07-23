@@ -140,7 +140,7 @@ describe("chat recovery display", () => {
     const text = recoveryDisplayText(display, tFromCatalog(esCatalog));
 
     expect(text).toBe(
-      "Esa regla no define por sí sola cuándo comprar o vender para NVDA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
+      "Argus todavía no puede ejecutar esa regla directamente para NVDA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
     );
     expect(text).not.toContain("invalid_chronological_date_range");
   });
@@ -177,7 +177,7 @@ describe("chat recovery display", () => {
     });
 
     expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
-      "ATR 14 no define por sí solo cuándo comprar o vender para TSLA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
+      "Argus todavía no puede ejecutar ATR 14 directamente para TSLA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
     );
   });
 
@@ -213,6 +213,119 @@ describe("chat recovery display", () => {
     expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
       "5m no es un tamaño de barra compatible. Elige barras diarias o de 1 hora.",
     );
+  });
+
+  test("renders degraded future-performance recovery truthfully in English and Spanish", () => {
+    const display = recoveryDisplayFromMetadata({
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "future_performance",
+        prompt_source: "degraded_fallback",
+        requested_field: "unsupported_constraints",
+        requested_fields: ["unsupported_constraints"],
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          raw_value: "in ten years",
+          strategy: { asset_universe: ["NVDA"], capital_amount: 10000 },
+        },
+        options: [
+          {
+            id: "historical_period",
+            replacement_values: { requested_field: "date_range" },
+          },
+          {
+            id: "buy_and_hold",
+            replacement_values: {
+              strategy_type: "buy_and_hold",
+              requested_field: "date_range",
+            },
+          },
+        ],
+      },
+    });
+
+    expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe(
+      "I can't predict future performance. I can test how the same idea performed over a historical period instead: Test it over a historical period or Compare with buy and hold?",
+    );
+    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
+      "No puedo predecir el rendimiento futuro. Puedo probar cómo se comportó la misma idea en un período histórico: Probarlo en un período histórico o Comparar con comprar y mantener?",
+    );
+  });
+
+  test("invalid historical date repair keeps its distinct backend labels", () => {
+    const display = recoveryDisplayFromMetadata({
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "invalid_date_range",
+        prompt_source: "degraded_fallback",
+        requested_field: "unsupported_constraints",
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          raw_value: "January 2025 through January 2020",
+          strategy: { asset_universe: ["AAPL"] },
+        },
+        options: [
+          {
+            id: "option_0",
+            compatibility_label: "Choose an end date after the start date",
+            replacement_values: { requested_field: "date_range" },
+          },
+          {
+            id: "option_1",
+            compatibility_label: "Choose a start date before the end date",
+            replacement_values: { requested_field: "date_range" },
+          },
+          {
+            id: "option_2",
+            compatibility_label: "Use a different date window",
+            replacement_values: { requested_field: "date_range" },
+          },
+        ],
+      },
+    });
+
+    const en = recoveryDisplayText(display, tFromCatalog(enCatalog));
+    expect(en).toContain("Choose an end date after the start date");
+    expect(en).toContain("Choose a start date before the end date");
+    expect(en).toContain("Use a different date window");
+    expect(en).not.toContain("Test it over a historical period");
+
+    const es = recoveryDisplayText(display, tFromCatalog(esCatalog));
+    expect(es).toContain("Choose an end date after the start date");
+    expect(es).not.toContain("Probarlo en un período histórico");
+  });
+
+  test("degraded momentum recovery is capability-honest in English and Spanish", () => {
+    const display = recoveryDisplayFromMetadata({
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "unsupported_strategy_logic",
+        prompt_source: "degraded_fallback",
+        requested_field: "unsupported_constraints",
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          raw_value: "a momentum breakout strategy",
+          strategy: { asset_universe: ["AAPL"] },
+        },
+        options: [
+          {
+            id: "rsi_threshold",
+            replacement_values: { simplify_logic: "rsi_only" },
+          },
+          {
+            id: "buy_and_hold",
+            replacement_values: { strategy_type: "buy_and_hold" },
+          },
+        ],
+      },
+    });
+
+    const en = recoveryDisplayText(display, tFromCatalog(enCatalog));
+    expect(en).toContain("a momentum breakout strategy");
+    expect(en).not.toContain("does not define");
+    const es = recoveryDisplayText(display, tFromCatalog(esCatalog));
+    expect(es).toContain("a momentum breakout strategy");
+    expect(es).not.toContain("no define");
   });
 
   test("renders provider-neutral coverage recovery in English and Spanish", () => {

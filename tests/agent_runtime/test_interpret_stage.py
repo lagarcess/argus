@@ -5001,6 +5001,53 @@ def test_non_executable_signal_rule_requires_rule_before_date(monkeypatch) -> No
     assert result.decision.missing_required_fields == ["entry_logic"]
 
 
+def test_recognized_non_executable_template_cannot_admit_as_buy_and_hold(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A typed recognized draft template outranks an erroneous executable route."""
+
+    _stub_equity_asset_resolution(monkeypatch)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=(
+            "Backtest a momentum breakout strategy on AAPL with $10,000 from "
+            "January 1, 2022 through January 1, 2025."
+        ),
+        candidate_strategy_draft=StrategySummary(
+            requested_strategy_template="momentum_breakout",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Momentum breakout strategy on AAPL.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            capital_amount=10_000,
+            date_range={"start": "2022-01-01", "end": "2025-01-01"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message=(
+            "Backtest a momentum breakout strategy on AAPL with $10,000 from "
+            "January 1, 2022 through January 1, 2025."
+        ),
+        response=response,
+    )
+
+    assert result.outcome == "needs_clarification"
+    draft = result.decision.candidate_strategy_draft
+    assert draft.requested_strategy_template == "momentum_breakout"
+    assert draft.strategy_type == "momentum_breakout"
+    assert draft.asset_universe == ["AAPL"]
+    assert draft.capital_amount == 10_000
+    assert draft.date_range == {"start": "2022-01-01", "end": "2025-01-01"}
+    assert "recognized_non_executable_strategy_admission_blocked" in (
+        result.decision.reason_codes
+    )
+    assert result.patch.get("confirmation_payload") is None
+
+
 def test_llm_vague_rule_clarifying_response_is_not_discarded() -> None:
     response = StructuredInterpretation(
         intent="unsupported_or_out_of_scope",

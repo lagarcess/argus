@@ -10,11 +10,15 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from argus.agent_runtime.interpreter.provider_context_assets import (
+    resolved_asset_records_from_strategy_context,
+)
 from argus.agent_runtime.interpreter.shared import (
     _llm_strategy_draft_has_concrete_execution_target,
 )
 from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
+    _educational_turn_has_strategy_baggage,
     _optional_parameter_stage_patch,
 )
 from argus.agent_runtime.stages.interpret_types import (
@@ -24,9 +28,77 @@ from argus.agent_runtime.stages.interpret_types import (
 )
 from argus.agent_runtime.state.models import UnsupportedConstraint
 from argus.agent_runtime.strategy_contract import canonical_strategy_type
+from argus.domain.capability_registry import REGISTERED_STRATEGY_TEMPLATES
+from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 UNSUPPORTED_INTENT_ADMISSION_BLOCKED = "unsupported_intent_confirmation_blocked"
+RECOGNIZED_NON_EXECUTABLE_ADMISSION_BLOCKED = (
+    "recognized_non_executable_strategy_admission_blocked"
+)
 CAPABILITY_CONFLICT_INVERSE_REASON = "supported_strategy_capability_conflict_inverse"
+
+# Issue #241: a typed forward-looking horizon can never admit as an executable
+# historical window; it survives only as original-intent evidence.
+FUTURE_PERFORMANCE_CATEGORY = "future_performance"
+FUTURE_PERFORMANCE_ADMISSION_BLOCKED = "future_performance_admission_blocked"
+FUTURE_HORIZON_EVIDENCE_KEY = "future_horizon_intent"
+
+_FUTURE_PERFORMANCE_EXPLANATION = (
+    "Argus cannot predict future performance. It can test how the same idea "
+    "performed over a historical period instead."
+)
+
+
+def requested_strategy_template_capability_clause() -> str:
+    """Interpreter prompt generated from the canonical capability registry."""
+
+    capability_rows = ", ".join(
+        f"{template}={STRATEGY_CAPABILITIES[template].status}"
+        for template in sorted(REGISTERED_STRATEGY_TEMPLATES)
+    )
+    return (
+        "Named strategy capability identity is separate from execution routing. "
+        "When the user names or clearly requests a registered strategy template, "
+        "set candidate_strategy_draft.requested_strategy_template to its canonical "
+        f"registry key. Registered template statuses are: {capability_rows}. "
+        "Preserve a draft template's identity even though it is not runnable: do "
+        "not relabel it as buy_and_hold, do not create a rule_spec, and do not ask "
+        "the user to define custom logic as though Argus could then run it. For a "
+        "draft template, classify the turn as unsupported_or_out_of_scope with "
+        "semantic_turn_act=unsupported_request, preserve the user's asset, amount, "
+        "and dates, explain that Argus cannot run that named strategy yet, and offer "
+        "only genuinely executable alternatives. For an executable template, set "
+        "requested_strategy_template too and use its normal execution family.\n\n"
+    )
+
+
+def future_performance_capability_clause() -> str:
+    """Interpreter-prompt contract for the future-performance boundary."""
+
+    return (
+        "Future-performance questions are a general class in any language and "
+        "for any asset, basket, strategy, or amount: what something will be "
+        "worth, return, become, or do over a future period ('in ten years', "
+        "'over the next 3 years', 'by 2031', 'dentro de diez años'). Argus "
+        "cannot predict future performance, so classify the request as "
+        "unsupported_or_out_of_scope with semantic_turn_act="
+        "unsupported_request, even when the user names a supported strategy "
+        "such as a golden cross; a supported strategy does not make the "
+        "requested future result executable. Set date_range_intent.kind="
+        "future_window with the exact phrase as evidence; never convert the "
+        "future horizon into rolling_window, calendar dates, or any "
+        "historical date_range. If you record a date_range evidence span for "
+        "a forward-looking period, the temporal intent must be future_window; "
+        "never leave the intent empty for forward-looking evidence. "
+        "Still extract the compatible facts — "
+        "asset_universe, capital_amount, strategy_type, cadence — with "
+        "evidence_spans so a later explicit historical test can reuse them. "
+        "Author assistant_response with two separate facts in the user's "
+        "language: Argus cannot predict future performance, and it can test "
+        "how the same idea performed over a historical period the user "
+        "chooses. Offer that historical test without selecting it for the "
+        "user and without presenting any historical result as a forecast.\n\n"
+    )
 
 # Byte-identical to the constraint-present audit framing previously inlined in
 # run_field_audits._supported_strategy_capability_conflict_messages.
@@ -170,6 +242,81 @@ def _admission_constraint_raw_value(decision: InterpretDecision) -> str:
     return "the requested strategy"
 
 
+def _recognized_non_executable_template(decision: InterpretDecision) -> str | None:
+    template = decision.candidate_strategy_draft.requested_strategy_template
+    if template is None:
+        return None
+    capability = STRATEGY_CAPABILITIES[template]
+    return template if capability.status != "executable" else None
+
+
+def recognized_non_executable_strategy_admission_result(
+    *,
+    decision: InterpretDecision,
+    contract: Any,
+    optional_parameter_values: dict[str, Any],
+) -> StageResult | None:
+    """Fail closed when typed recognition and execution routing contradict."""
+
+    template = _recognized_non_executable_template(decision)
+    if template is None:
+        return None
+    capability = STRATEGY_CAPABILITIES[template]
+    draft = decision.candidate_strategy_draft.model_copy(
+        update={
+            "strategy_type": template,
+            "entry_rule": None,
+            "exit_rule": None,
+            "rule_spec": None,
+        }
+    )
+    constraint = UnsupportedConstraint(
+        category="unsupported_strategy_logic",
+        raw_value=capability.display_name,
+        explanation=(
+            f"Argus recognizes {capability.display_name}, but cannot run that "
+            "named strategy yet."
+        ),
+        simplification_options=contract.get_simplification_options(
+            "unsupported_strategy_logic"
+        ),
+    )
+    blocked_decision = decision.model_copy(
+        update={
+            "candidate_strategy_draft": _draft_with_conserved_resolved_assets(draft),
+            "requires_clarification": True,
+            "missing_required_fields": [
+                field
+                for field in decision.missing_required_fields
+                if field not in {"entry_logic", "exit_logic", "rule_spec"}
+            ],
+            "unsupported_constraints": [constraint],
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *decision.reason_codes,
+                        RECOGNIZED_NON_EXECUTABLE_ADMISSION_BLOCKED,
+                    ]
+                )
+            ),
+        }
+    )
+    blocked_patch = dict(
+        _optional_parameter_stage_patch(
+            decision=blocked_decision,
+            values=optional_parameter_values,
+        )
+    )
+    # The dedicated clarification model voices typed unsupported recovery. A
+    # contradictory interpreter response cannot leak into the user-visible turn.
+    blocked_patch["assistant_response"] = None
+    return StageResult(
+        outcome="needs_clarification",
+        decision=blocked_decision,
+        stage_patch=blocked_patch,
+    )
+
+
 def admitted_or_blocked_confirmation_result(
     *,
     decision: InterpretDecision,
@@ -204,6 +351,9 @@ def admitted_or_blocked_confirmation_result(
     )
     blocked_decision = decision.model_copy(
         update={
+            "candidate_strategy_draft": _draft_with_conserved_resolved_assets(
+                decision.candidate_strategy_draft
+            ),
             "requires_clarification": True,
             "unsupported_constraints": [*decision.unsupported_constraints, constraint],
             "reason_codes": list(
@@ -228,6 +378,175 @@ def admitted_or_blocked_confirmation_result(
     )
 
 
+def _draft_with_conserved_resolved_assets(draft: Any) -> Any:
+    """Typed provider-validated assets survive the unsupported-recovery route.
+
+    Restores an empty asset_universe from the draft's own provider-resolved
+    records. Unresolved asset text is never promoted, the comparison baseline
+    never enters the traded universe, and only a single-class set is
+    structurally valid — mixed-class records keep the universe empty so
+    recovery keeps asking."""
+
+    if any(str(symbol or "").strip() for symbol in draft.asset_universe):
+        return draft
+    extra_parameters = draft.extra_parameters or {}
+    field_provenance = extra_parameters.get("field_provenance")
+    baseline_is_user_stated = (
+        isinstance(field_provenance, dict)
+        and field_provenance.get("comparison_baseline") == "explicit_user"
+    )
+    # Only a user-stated comparison target is excluded from the traded set: a
+    # runtime-applied default benchmark can legitimately equal the traded
+    # asset (crypto -> BTC, currency pairs -> the pair itself).
+    baseline = (
+        str(draft.comparison_baseline or "").strip().upper()
+        if baseline_is_user_stated
+        else ""
+    )
+    draft_class = str(draft.asset_class or "").strip().lower()
+    symbols: list[str] = []
+    classes: set[str] = set()
+    for record in resolved_asset_records_from_strategy_context(draft):
+        symbol = str(record.get("symbol") or "").strip().upper()
+        record_class = str(record.get("asset_class") or "").strip().lower()
+        if not symbol or (baseline and symbol == baseline):
+            continue
+        if draft_class and record_class and record_class != draft_class:
+            continue
+        if symbol not in symbols:
+            symbols.append(symbol)
+            if record_class:
+                classes.add(record_class)
+    if not symbols:
+        return draft
+    if not draft_class and len(classes) != 1:
+        return draft
+    update: dict[str, Any] = {"asset_universe": symbols[:5]}
+    if not draft_class and classes:
+        update["asset_class"] = next(iter(classes))
+    return draft.model_copy(update=update)
+
+
+def strategy_draft_future_horizon(draft: Any) -> dict[str, Any] | None:
+    """Typed future horizon carried by a strategy draft, route-label blind.
+
+    Capability truth lives on this typed field alone; callers use it to keep
+    any model-authored route label from bypassing the future boundary."""
+
+    extra_parameters = getattr(draft, "extra_parameters", None) or {}
+    intent = extra_parameters.get("date_range_intent")
+    if (
+        isinstance(intent, dict)
+        and str(intent.get("kind") or "").strip() == "future_window"
+    ):
+        return dict(intent)
+    return None
+
+
+def strategy_route_flags_with_future_precedence(
+    *,
+    interpretation: Any,
+    expects_strategy_route: bool,
+) -> tuple[bool, bool]:
+    """Typed future horizon forces the strategy route and disables educational
+    suppression, so admission fires regardless of the model's route label."""
+
+    if strategy_draft_future_horizon(interpretation.candidate_strategy_draft):
+        return True, False
+    return expects_strategy_route, _educational_turn_has_strategy_baggage(
+        interpretation=interpretation,
+        expects_strategy_route=expects_strategy_route,
+    )
+
+
+def _typed_future_horizon(decision: InterpretDecision) -> dict[str, Any] | None:
+    return strategy_draft_future_horizon(decision.candidate_strategy_draft)
+
+
+def future_performance_admission_result(
+    *,
+    decision: InterpretDecision,
+    contract: Any,
+    optional_parameter_values: dict[str, Any],
+) -> StageResult | None:
+    """Fail closed when the typed horizon points forward from today.
+
+    The horizon moves to original-intent evidence, compatible facts stay on the
+    draft, and the historical period is re-requested after an explicit
+    supported-alternative selection. Interpreter prose never crosses this
+    boundary — no typed field separates a refusal from a forecast — so the
+    clarify stage owns the replacement voice."""
+
+    horizon = _typed_future_horizon(decision)
+    if horizon is None:
+        return None
+    draft = decision.candidate_strategy_draft
+    extra_parameters = dict(draft.extra_parameters or {})
+    extra_parameters.pop("date_range_intent", None)
+    extra_parameters.pop("requested_date_range", None)
+    extra_parameters.pop("effective_date_range", None)
+    # Stale date evidence must not outlive the horizon move: the DCA contract
+    # rebuilds a window from these spans, which would skip the period question
+    # after a historical-period selection. Non-date evidence stays.
+    extra_parameters.pop("date_range_raw_text", None)
+    evidence_spans = extra_parameters.get("evidence_spans")
+    if isinstance(evidence_spans, dict) and "date_range" in evidence_spans:
+        remaining_spans = {
+            key: value for key, value in evidence_spans.items() if key != "date_range"
+        }
+        if remaining_spans:
+            extra_parameters["evidence_spans"] = remaining_spans
+        else:
+            extra_parameters.pop("evidence_spans", None)
+    extra_parameters[FUTURE_HORIZON_EVIDENCE_KEY] = horizon
+    stripped_draft = _draft_with_conserved_resolved_assets(
+        draft.model_copy(
+            update={"date_range": None, "extra_parameters": extra_parameters}
+        )
+    )
+    constraint = UnsupportedConstraint(
+        category=FUTURE_PERFORMANCE_CATEGORY,
+        raw_value=str(
+            horizon.get("evidence")
+            or decision.user_goal_summary
+            or "future performance"
+        ),
+        explanation=_FUTURE_PERFORMANCE_EXPLANATION,
+        simplification_options=contract.get_simplification_options(
+            FUTURE_PERFORMANCE_CATEGORY
+        ),
+    )
+    blocked_decision = decision.model_copy(
+        update={
+            "candidate_strategy_draft": stripped_draft,
+            "requires_clarification": True,
+            # The typed future boundary owns this turn's reason code, ahead of
+            # any model-authored constraint label.
+            "unsupported_constraints": [constraint, *decision.unsupported_constraints],
+            "missing_required_fields": list(
+                dict.fromkeys([*decision.missing_required_fields, "date_range"])
+            ),
+            "reason_codes": list(
+                dict.fromkeys(
+                    [*decision.reason_codes, FUTURE_PERFORMANCE_ADMISSION_BLOCKED]
+                )
+            ),
+        }
+    )
+    blocked_patch = dict(
+        _optional_parameter_stage_patch(
+            decision=blocked_decision,
+            values=optional_parameter_values,
+        )
+    )
+    blocked_patch["assistant_response"] = None
+    return StageResult(
+        outcome="needs_clarification",
+        decision=blocked_decision,
+        stage_patch=blocked_patch,
+    )
+
+
 def strategy_route_admission_result(
     *,
     expects_strategy_route: bool,
@@ -241,6 +560,22 @@ def strategy_route_admission_result(
 
     if not expects_strategy_route:
         return None
+    recognized_non_executable_result = (
+        recognized_non_executable_strategy_admission_result(
+            decision=decision,
+            contract=contract,
+            optional_parameter_values=optional_parameter_values,
+        )
+    )
+    if recognized_non_executable_result is not None:
+        return recognized_non_executable_result
+    future_result = future_performance_admission_result(
+        decision=decision,
+        contract=contract,
+        optional_parameter_values=optional_parameter_values,
+    )
+    if future_result is not None:
+        return future_result
     has_unsupported_verdict = (
         decision.intent == "unsupported_or_out_of_scope"
         or decision.semantic_turn_act == "unsupported_request"

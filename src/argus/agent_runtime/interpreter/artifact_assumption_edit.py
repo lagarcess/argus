@@ -191,15 +191,24 @@ def _apply_resolved_edit_to_draft(
             resolved.date_window,
             latest_result_window=latest_result_window,
         )
-        intent_resolution = (
-            resolve_date_range_intent(date_window_intent)
-            if date_window_intent is not None
-            else None
-        )
-        if intent_resolution is not None:
+        if (
+            date_window_intent is not None
+            and str(date_window_intent.kind or "").strip() == "future_window"
+        ):
+            # A forward-looking edit is original intent for the future
+            # admission boundary; it is never resolved, dropped, or partially
+            # applied alongside the other edits.
             draft.date_range_intent = date_window_intent
-            draft.date_range = intent_resolution.payload
-            field_provenance["date_range"] = "explicit_user"
+        else:
+            intent_resolution = (
+                resolve_date_range_intent(date_window_intent)
+                if date_window_intent is not None
+                else None
+            )
+            if intent_resolution is not None:
+                draft.date_range_intent = date_window_intent
+                draft.date_range = intent_resolution.payload
+                field_provenance["date_range"] = "explicit_user"
     if resolved.initial_capital is not None:
         draft.initial_capital = resolved.initial_capital
         field_provenance["initial_capital"] = "starting_capital"

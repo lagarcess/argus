@@ -187,9 +187,11 @@ class OpenRouterClarificationGenerator:
             ),
             "missing_required_fields": request.missing_required_fields,
             "ambiguous_fields": request.ambiguous_fields,
-            "unsupported_constraints": request.unsupported_constraints,
+            "unsupported_constraints": _unsupported_constraints_for_voice(
+                request.unsupported_constraints
+            ),
             "optional_parameter_choices": request.optional_parameter_choices,
-            "response_intent": request.response_intent,
+            "response_intent": _response_intent_for_voice(request.response_intent),
             "expected_question_targets": sorted(_expected_question_targets(request)),
             "expected_detail_targets": sorted(_expected_detail_targets(request)),
         }
@@ -268,14 +270,46 @@ class OpenRouterClarificationGenerator:
                     "candidate strategy's asset, period, and unsupported rule when "
                     "available; name the limitation in product language; then offer "
                     "the provided simplification_options as concrete runnable next "
-                    "moves. Ask which direction to use. Do not claim the unsupported "
-                    "part is executable."
+                    "moves. Ask which direction to use. Say what Argus can or cannot "
+                    "test in plain user language. Do not use implementation terms "
+                    "such as rule_spec, signal engine, executable, provider, schema, "
+                    "registry, metadata, or reason code. Do not claim the unsupported "
+                    "part is executable or can become runnable after the user defines "
+                    "custom logic."
                 )
             ),
             SystemMessage(content=json.dumps(context, default=str, sort_keys=True)),
             *history,
             HumanMessage(content=request.current_user_message),
         ]
+
+
+def _unsupported_constraints_for_voice(
+    constraints: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep typed recovery facts while withholding internal explanation copy."""
+
+    return [
+        {key: value for key, value in constraint.items() if key != "explanation"}
+        for constraint in constraints
+    ]
+
+
+def _response_intent_for_voice(response_intent: dict[str, Any]) -> dict[str, Any]:
+    sanitized = dict(response_intent)
+    facts = sanitized.get("facts")
+    if not isinstance(facts, dict):
+        return sanitized
+    sanitized_facts = dict(facts)
+    constraints = sanitized_facts.get("unsupported_constraints")
+    if isinstance(constraints, list) and all(
+        isinstance(item, dict) for item in constraints
+    ):
+        sanitized_facts["unsupported_constraints"] = (
+            _unsupported_constraints_for_voice(constraints)
+        )
+    sanitized["facts"] = sanitized_facts
+    return sanitized
 
 
 def _openrouter_wire_messages(messages: list[BaseMessage]) -> list[dict[str, str]]:
