@@ -1362,10 +1362,13 @@ async def _unsupported_recovery_prose_two_turn_proof(
     first_message: str,
     selection_message: str,
 ) -> None:
-    clarifier = RecordingClarifier("generated prose that must never replace the model's")
+    clarifier = RecordingClarifier(refusal)
     workflow = build_workflow(
         structured_interpreter=OptionsRefusalInterpreter(
-            refusal=refusal,
+            refusal=(
+                "Internal unsupported constraint explanation that must not become "
+                "the visible recovery."
+            ),
             language=user.language_preference,
         ),
         clarification_generator=clarifier,
@@ -1382,7 +1385,7 @@ async def _unsupported_recovery_prose_two_turn_proof(
     assert first["stage_outcome"] == "await_user_reply"
     assert first["assistant_prompt"] == refusal
     assert first["assistant_response"] == refusal
-    assert clarifier.requests == []
+    assert len(clarifier.requests) == 1
     clarification = first["clarification"]
     assert clarification["kind"] == "unsupported_recovery"
     assert clarification["prompt_source"] == "llm_generated"
@@ -1431,11 +1434,11 @@ async def _unsupported_recovery_prose_two_turn_proof(
     assert confirmed["strategy_type"] == "buy_and_hold"
     assert confirmed["asset_universe"] == ["TSLA"]
     assert second.get("assistant_prompt") is None
-    assert clarifier.requests == []
+    assert len(clarifier.requests) == 1
 
 
 @pytest.mark.asyncio
-async def test_unsupported_recovery_preserves_interpreter_prose_full_graph_en(
+async def test_unsupported_recovery_uses_clarifier_voice_full_graph_en(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import resolution as resolution_module
@@ -1457,7 +1460,7 @@ async def test_unsupported_recovery_preserves_interpreter_prose_full_graph_en(
 
 
 @pytest.mark.asyncio
-async def test_unsupported_recovery_preserves_interpreter_prose_full_graph_es(
+async def test_unsupported_recovery_uses_clarifier_voice_full_graph_es(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import resolution as resolution_module
