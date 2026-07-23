@@ -516,6 +516,87 @@ def test_plain_educational_question_stays_suppressed(
     assert result.patch.get("confirmation_payload") is None
 
 
+DCA_STALE_EVIDENCE_SPANS = {
+    "asset_universe": "Apple",
+    "capital_amount": "$500 every month",
+    "cadence": "every month",
+    "date_range": "from January 2022 through January 2024",
+}
+
+
+def _dca_future_decision_draft() -> StrategySummary:
+    return StrategySummary(
+        strategy_type="dca_accumulation",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=500,
+        cadence="monthly",
+        date_range={"start": "2022-01-01", "end": "2024-01-01"},
+        extra_parameters={
+            "date_range_intent": _future_window_intent("for the next two years"),
+            "date_range_raw_text": "from January 2022 through January 2024",
+            "evidence_spans": dict(DCA_STALE_EVIDENCE_SPANS),
+            "field_provenance": {"capital_amount": "explicit_user"},
+        },
+        field_provenance={"capital_amount": "explicit_user"},
+    )
+
+
+def test_future_boundary_clears_stale_date_evidence_for_dca_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Changing a dated DCA draft to a future horizon must not leave stale
+    date evidence behind: after the historical-period selection, the DCA
+    contract may not rebuild the prior window and skip the date question."""
+
+    _stub_equity_asset_resolution(monkeypatch)
+    result = _run_interpret(
+        message="Actually run that DCA for the next two years instead.",
+        response=StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User pointed an existing DCA at a future window.",
+            assistant_response=None,
+            candidate_strategy_draft=_dca_future_decision_draft(),
+            semantic_turn_act="refine_current_idea",
+        ),
+    )
+    decision = result.decision
+    assert decision is not None
+    assert FUTURE_PERFORMANCE_ADMISSION_BLOCKED in decision.reason_codes
+    conserved = decision.candidate_strategy_draft
+    assert conserved.date_range in (None, "", {}, [])
+    extra = conserved.extra_parameters or {}
+    assert "date_range_intent" not in extra
+    assert "date_range_raw_text" not in extra
+    spans = extra.get("evidence_spans") or {}
+    assert "date_range" not in spans
+    # Unrelated evidence and provenance survive.
+    assert spans.get("asset_universe") == "Apple"
+    assert spans.get("capital_amount") == "$500 every month"
+    assert spans.get("cadence") == "every month"
+    assert (extra.get("field_provenance") or {}).get("capital_amount") == (
+        "explicit_user"
+    )
+    horizon = extra.get(FUTURE_HORIZON_EVIDENCE_KEY)
+    assert isinstance(horizon, dict)
+    assert horizon.get("evidence") == "for the next two years"
+    assert conserved.capital_amount == 500
+    assert conserved.cadence == "monthly"
+    assert conserved.asset_universe == ["AAPL"]
+
+    draft = _llm_draft_from_strategy_summary(conserved)
+    replaced = _apply_pending_response_option_replacement(
+        draft=draft,
+        replacement_values={"requested_field": "date_range"},
+        current_missing=list(decision.missing_required_fields),
+    )
+    repaired = replaced["draft"]
+    assert repaired.date_range in (None, "", {}, [])
+    assert "date_range" in replaced["missing_fields"]
+
+
 def _future_recovery_clarify_state() -> RunState:
     state = RunState.new(
         current_user_message=EN_FUTURE_MESSAGE,

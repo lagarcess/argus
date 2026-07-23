@@ -382,6 +382,19 @@ def future_performance_admission_result(
     extra_parameters.pop("date_range_intent", None)
     extra_parameters.pop("requested_date_range", None)
     extra_parameters.pop("effective_date_range", None)
+    # Stale date evidence must not outlive the horizon move: the DCA contract
+    # rebuilds a window from these spans, which would skip the period question
+    # after a historical-period selection. Non-date evidence stays.
+    extra_parameters.pop("date_range_raw_text", None)
+    evidence_spans = extra_parameters.get("evidence_spans")
+    if isinstance(evidence_spans, dict) and "date_range" in evidence_spans:
+        remaining_spans = {
+            key: value for key, value in evidence_spans.items() if key != "date_range"
+        }
+        if remaining_spans:
+            extra_parameters["evidence_spans"] = remaining_spans
+        else:
+            extra_parameters.pop("evidence_spans", None)
     extra_parameters[FUTURE_HORIZON_EVIDENCE_KEY] = horizon
     stripped_draft = _draft_with_conserved_resolved_assets(
         draft.model_copy(
