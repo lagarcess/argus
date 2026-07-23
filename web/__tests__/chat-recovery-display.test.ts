@@ -252,6 +252,49 @@ describe("chat recovery display", () => {
     );
   });
 
+  test("invalid historical date repair keeps its distinct backend labels", () => {
+    const display = recoveryDisplayFromMetadata({
+      clarification: {
+        kind: "unsupported_recovery",
+        reason_code: "invalid_date_range",
+        prompt_source: "degraded_fallback",
+        requested_field: "unsupported_constraints",
+        semantic_needs: ["simplification_choice"],
+        payload: {
+          raw_value: "January 2025 through January 2020",
+          strategy: { asset_universe: ["AAPL"] },
+        },
+        options: [
+          {
+            id: "option_0",
+            compatibility_label: "Choose an end date after the start date",
+            replacement_values: { requested_field: "date_range" },
+          },
+          {
+            id: "option_1",
+            compatibility_label: "Choose a start date before the end date",
+            replacement_values: { requested_field: "date_range" },
+          },
+          {
+            id: "option_2",
+            compatibility_label: "Use a different date window",
+            replacement_values: { requested_field: "date_range" },
+          },
+        ],
+      },
+    });
+
+    const en = recoveryDisplayText(display, tFromCatalog(enCatalog));
+    expect(en).toContain("Choose an end date after the start date");
+    expect(en).toContain("Choose a start date before the end date");
+    expect(en).toContain("Use a different date window");
+    expect(en).not.toContain("Test it over a historical period");
+
+    const es = recoveryDisplayText(display, tFromCatalog(esCatalog));
+    expect(es).toContain("Choose an end date after the start date");
+    expect(es).not.toContain("Probarlo en un período histórico");
+  });
+
   test("degraded momentum recovery is capability-honest in English and Spanish", () => {
     const display = recoveryDisplayFromMetadata({
       clarification: {

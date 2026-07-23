@@ -137,7 +137,9 @@ export function recoveryDisplayText(
     }
     if (display.values.reasonCode === "future_performance") {
       const optionsText = joinLocalizedOptions(
-        display.values.options.map((option) => optionDisplayText(option, t)),
+        display.values.options.map((option) =>
+          optionDisplayText(option, t, display.values.reasonCode),
+        ),
         t,
       );
       return optionsText
@@ -147,7 +149,9 @@ export function recoveryDisplayText(
         : t("chat.clarification.future_performance");
     }
     const optionsText = joinLocalizedOptions(
-      display.values.options.map((option) => optionDisplayText(option, t)),
+      display.values.options.map((option) =>
+        optionDisplayText(option, t, display.values.reasonCode),
+      ),
       t,
     );
     if (!optionsText) {
@@ -518,8 +522,9 @@ function looksLikeInternalCode(value: string): boolean {
 function optionDisplayText(
   option: { label?: string; replacementValues?: Record<string, unknown> | null },
   t: TFunction,
+  reasonCode?: string,
 ): string {
-  const key = simplificationOptionKey(option.replacementValues);
+  const key = simplificationOptionKey(option.replacementValues, reasonCode);
   if (key) {
     return t(`chat.simplification_options.${key}`);
   }
@@ -528,6 +533,7 @@ function optionDisplayText(
 
 function simplificationOptionKey(
   values: Record<string, unknown> | null | undefined,
+  reasonCode?: string,
 ): string | null {
   if (!values) {
     return null;
@@ -552,7 +558,12 @@ function simplificationOptionKey(
   if (values.strategy_type === "buy_and_hold") {
     return "buy_and_hold";
   }
-  if (values.requested_field === "date_range") {
+  // The historical-period label belongs to future_performance recovery only;
+  // ordinary date repair keeps its distinct backend-provided labels.
+  if (
+    values.requested_field === "date_range" &&
+    reasonCode === "future_performance"
+  ) {
     return "historical_period";
   }
   return null;
