@@ -320,6 +320,9 @@
       "moving_average_crossover": "Usar un cruce de medias móviles compatible",
       "historical_period": "Probarlo en un período histórico"
     },
+    "result_readout": {
+      "quick_take": "Lectura rápida"
+    },
     "result_breakdown": {
       "aria_label": "Desglose del resultado",
       "label": "Desglose"

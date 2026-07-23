@@ -429,9 +429,23 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
     const css = readFileSync(join(root, "app/globals.css"), "utf-8");
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
 
     expect(message).toContain("function ResultReadout");
     expect(message).toContain('aria-label="Result readout"');
+    expect(message).toContain(
+      'label={t("chat.result_readout.quick_take", "Quick take")}',
+    );
+    expect(message).toContain(
+      '<div className="argus-result-section-label">{label}</div>',
+    );
+    expect(en.chat.result_readout.quick_take).toBe("Quick take");
+    expect(es.chat.result_readout.quick_take).toBe("Lectura rápida");
     expect(css).toContain(".argus-result-readout::before");
     expect(css).toContain("text-wrap: pretty");
     expect(css).not.toContain("argus-result-readout shadow");

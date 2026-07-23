@@ -320,6 +320,9 @@
       "moving_average_crossover": "Use a supported moving-average crossover",
       "historical_period": "Test it over a historical period"
     },
+    "result_readout": {
+      "quick_take": "Quick take"
+    },
     "result_breakdown": {
       "aria_label": "Result breakdown",
       "label": "Breakdown"
