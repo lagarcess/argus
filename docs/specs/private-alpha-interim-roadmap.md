@@ -4,17 +4,19 @@ Status: **ACTIVE — founder-outcome and live-QA execution source**
 
 Original roadmap date: 2026-07-16
 
-Last reconciled: 2026-07-22
+Last reconciled: 2026-07-23
 
 Current stable integration checkpoint: `codex/private-alpha-next` at
-`2eb687497fdd8559c7b715e0a316c29ee34fa411`.
+`bbd1d2bb44a298de2f048e361c92d5851e4c38d1`.
 
-That checkpoint contains three founder-accepted, independently revertible
+That checkpoint contains four founder-accepted, independently revertible
 vertical slices:
 
 - adaptive result-chart range switching from PR #264 at `0c0d481`;
 - account recovery and session controls from PR #261 at `a639566`; and
-- truthful Usage allowances and accounting from PR #259 at `2eb6874`.
+- truthful Usage allowances and accounting from PR #259 at `2eb6874`; and
+- executable capability truth from PR #266, with final candidate `e10bdd2` and
+  integration merge `bbd1d2b`.
 
 Read-only audit donor: `claude/argus-alpha-audit-c2d919` at
 `f1d03a1d847628e6a8d681b22337ad5fc6c5ebfd`.
@@ -67,11 +69,11 @@ deterministic test result by itself.
 | 1. Argus always progresses | Not yet accepted complete | No founder-accepted slice yet proves representative conversational journeys against the current integration checkpoint. |
 | 2. Security and usage are unlocked | **Complete** | #248/PR #261 delivered reachable recovery, password, and current/other/all-session controls with real Supabase Auth QA. #247/PR #259 delivered reachable Settings -> Usage, backend-owned hourly/daily message and simulation truth, exact reset instants, durable exactly-once accounting, EN/ES desktop/mobile behavior, and exact-head real-auth/local-persistence QA. |
 | 3. Graphs have range switching | **Complete** | #250/PR #264 delivered adaptive presets, Custom/Reset, daily/intraday presentation, EN/ES desktop/mobile browser proof, reload-to-ALL, immutable full-run truth, and zero range-interaction network calls. |
-| 4. Argus knows what it can and cannot do | Not yet accepted complete | No founder-accepted slice yet proves the supported/unsupported journey end to end on the current checkpoint. |
+| 4. Argus knows what it can and cannot do | **Complete** | #241/PR #266 proved supported golden-cross execution, fail-closed momentum-breakout and news-sentiment recovery, the general future-performance boundary, compatible fact preservation, explicit supported-alternative selection, localized Quick take, and exact-head founder-visible browser QA. Candidate `e10bdd2` landed as `bbd1d2b`. |
 | 5. Discovery is grounded and Argus can suggest | Not yet accepted complete | No founder-accepted slice yet proves grounded suggestions end to end on the current checkpoint. |
 | 6. Omnisearch lives up to its full capability | Not yet accepted complete | No founder-accepted slice yet proves the full Omnisearch journey end to end on the current checkpoint. |
 
-Outcomes 2 and 3 must not be redispatched unless a new regression is
+Outcomes 2, 3, and 4 must not be redispatched unless a new regression is
 reproduced. Their evidence remains useful as a regression baseline for later
 slices.
 
@@ -82,7 +84,7 @@ flowchart LR
     LIVE["Argus always progresses"]
     ACCESS["Security and usage unlocked — complete"]
     RANGE["Graph range switching — complete"]
-    TRUTH["Capability truth"]
+    TRUTH["Capability truth — complete"]
     DISCOVERY["Grounded discovery and suggestions"]
     OMNI["Full Omnisearch capability"]
 
@@ -185,20 +187,22 @@ implementation queue.
 | Outcome | Product proof still required |
 | --- | --- |
 | Argus always progresses | Representative messy-language journeys make progress, recover, and reload without loops or deterministic cul-de-sacs. |
-| Capability truth | Supported and unsupported requests both receive honest, useful behavior without model overpromising. |
 | Grounded discovery and suggestions | Search-backed suggestions carry source and provider truth and lead only to supported next actions. |
 | Full Omnisearch | Owner-scoped conversations, results, decisions, and evidence are retrievable with truthful previews and useful navigation. |
 
 Do not select the next slice from the archived issue dependency graph. Select
 it by user value, regression risk, and the smallest complete live journey.
 
-### Selected slice: Capability truth
+### Completed slice: Capability truth
 
-Status: **Founder-approved design; implementation not started**
+Status: **COMPLETE — PR #266 merged as `bbd1d2b`; issue #241 closed**
 
-The locked vertical-slice contract is
-[`2026-07-22-capability-truth-executable-boundary-design.md`](../superpowers/specs/2026-07-22-capability-truth-executable-boundary-design.md).
-Issue #241 tracks the implementation evidence.
+The completed vertical-slice contract is archived at
+[`2026-07-22-capability-truth-executable-boundary-design.md`](../archive/2026-07-22-capability-truth-executable-boundary-design.md).
+The original path remains as a compatibility pointer for existing issue and PR
+links. [Issue #241](https://github.com/lagarcess/argus/issues/241) and
+[PR #266](https://github.com/lagarcess/argus/pull/266) contain the detailed
+implementation and review evidence.
 
 This is acceptance and narrow gap-closing for the founder outcome, not a rebuild
 of the completed P2.1 registry work.
@@ -216,6 +220,39 @@ This slice adds no forecasting engine, Search/discovery behavior, strategy,
 indicator, provider, or second capability registry. If exact-head reproduction
 is already correct, align tests and evidence only rather than manufacturing a
 runtime change.
+
+Completion evidence:
+
+- deterministic runtime, registry, mocked-eval, frontend, modularity, and CI
+  gates passed on the candidate family;
+- the sanctioned interpreter suite passed 27/27 at `497e2b8`;
+- the final bounded correction passed independent review and exact-head
+  founder-visible browser QA at `e10bdd2`;
+- supported golden cross reached the ordinary confirmation/result path;
+- momentum breakout, news sentiment, and future-performance requests remained
+  non-executable and useful, with compatible facts preserved;
+- an explicit supported alternative plus historical period produced the correct
+  confirmation without carrying stale unsupported identity; and
+- the founder approved merge, PR #266 landed as `bbd1d2b`, and issue #241
+  closed as completed.
+
+### Next selected pillar: Argus always progresses
+
+Status: **READY TO SPEC — implementation not authorized**
+
+This pillar is next because it protects every later conversational surface.
+The first spec must choose one representative user journey on the latest
+integration checkpoint and prove that every accepted turn either advances
+typed state or reaches a clear, actionable stopping point. It must cover
+reload when the journey is durable and compare the candidate against the
+current Golden Path.
+
+This is not permission for a generic loop engine, broad runtime refactor, new
+intent taxonomy, phrase-based routing, or a sweep of historical issue debt.
+Related issues and the audit donor are evidence only. Implementation begins
+only after a founder-approved vertical-slice contract names the exact journey,
+allowed surfaces, no-touch areas, live-browser acceptance, rollback, and stop
+conditions.
 
 ## Retained Product Decisions
 

@@ -2,19 +2,21 @@
 
 Status: Active integration staging/process context
 Date: 2026-06-10
-Last reconciled: 2026-07-22
+Last reconciled: 2026-07-23
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Current stable integration checkpoint: `2eb6874`. The accepted post-promotion
+Current stable integration checkpoint: `bbd1d2b`. The accepted post-promotion
 vertical slices are graph range switching (PR #264), account recovery/session
-controls (PR #261), and truthful Usage allowances/accounting (PR #259). This is
-an integration checkpoint, not a deployed or tester-exposed SHA.
+controls (PR #261), truthful Usage allowances/accounting (PR #259), and
+executable capability truth (PR #266). This is an integration checkpoint, not
+a deployed or tester-exposed SHA.
 
-Current note: for Private Alpha Next P1 product work, use
-`docs/specs/private-alpha-next-roadmap.md` as the active execution board and
-`docs/specs/private-alpha-next-decision-memo.md` as the strategic north star.
-This document remains staging and branch-process context for
+Current note: while the interim pivot is active, use
+`docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
+slate, `docs/specs/private-alpha-next-roadmap.md` as the parent execution board,
+and `docs/specs/private-alpha-next-decision-memo.md` as the strategic north
+star. This document remains staging and branch-process context for
 `codex/private-alpha-next`.
 For release-gate and canary decisions, the decision memo is later-context only;
 use the CI/CD SOTA spec, launch runbook, and release manifest template instead.
@@ -191,6 +193,13 @@ Do not reopen these as debt unless a new bug is reproduced:
 - Usage allowance truth is complete at PR #259: Settings -> Usage is reachable,
   hourly/daily message and simulation truth is backend-owned, accounting is
   durable and replay-safe, and exact-head real-auth/local-persistence QA passed.
+- Executable capability truth is complete at PR #266 / issue #241: supported
+  golden cross reaches the ordinary runnable path; recognized non-executable
+  momentum breakout, news-sentiment rules, and future-performance requests stay
+  non-runnable; compatible facts survive recovery; and only an explicit
+  supported alternative plus a historical period creates a new confirmation.
+  Final candidate `e10bdd2` passed founder-visible browser QA and landed as
+  `bbd1d2b`.
 
 ## P0 Reintegration Checkpoint
 
@@ -207,12 +216,16 @@ The clean reintegration strategy is now part of the process model:
 
 Codex should own or closely supervise this:
 
-1. **Founder-selected interim vertical slice**
+1. **Argus always progresses — next pillar, ready to spec**
    - No old readiness branch or issue wave is automatically active.
-   - Select the next complete user journey from the remaining founder outcomes
-     in `docs/specs/private-alpha-interim-roadmap.md`.
-   - Start from the current integration checkpoint, use archived readiness work
-     only as evidence, and require proportional production-parity browser QA.
+   - Select one representative conversational journey from
+     `docs/specs/private-alpha-interim-roadmap.md` and prove that each accepted
+     turn advances typed state or reaches a clear, actionable stopping point.
+   - Start from `bbd1d2b`, use historical issues and archived work only as
+     evidence, and require proportional production-parity browser QA.
+   - Do not implement until the founder approves a bounded vertical-slice
+     contract with allowed surfaces, no-touch areas, rollback, and stop
+     conditions.
 
 2. **Evidence-aware idea loop source thesis**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,

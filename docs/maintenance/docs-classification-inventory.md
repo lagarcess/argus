@@ -8,16 +8,26 @@ decision memo. Refreshed again 2026-07-07 after the Gate A/B loop, the B4
 language-gate retirement, and execution realism landed — see the 2026-07-07 pass
 below and the updated rows for the moved/resolved docs.
 
+2026-07-23 pass: the interim slate was reconciled after graph range, account
+security, Usage, and capability truth landed. The completed chart-range design
+and plan plus the capability-truth design moved to `docs/archive/`; pointer
+stubs preserve old links. The duplicate active P2.1 audit was replaced with its
+existing archive pointer. The next founder-selected pillar is **Argus always
+progresses**, ready for specification only.
+
 Current source stack after the canon docs:
 
-1. `docs/specs/private-alpha-next-roadmap.md` is the active Private Alpha Next
-   execution board.
-2. `docs/specs/private-alpha-next-decision-memo.md` is the active strategic
+1. `docs/specs/private-alpha-interim-roadmap.md` is the active founder-outcome
+   and live-QA slate for the interim pivot.
+2. `docs/specs/private-alpha-next-roadmap.md` is the parent Private Alpha Next
+   execution board; its remaining P2 compounding loop is paused during the
+   interim.
+3. `docs/specs/private-alpha-next-decision-memo.md` is the active strategic
    north star and slice-onboarding source.
-3. `docs/specs/private-alpha-ci-cd-sota.md`,
+4. `docs/specs/private-alpha-ci-cd-sota.md`,
    `docs/PRIVATE_LAUNCH_RUNBOOK.md`, and
    `docs/release-manifests/TEMPLATE.md` are release-discipline references.
-4. `docs/specs/private-alpha-next-integration.md` is staging/process context.
+5. `docs/specs/private-alpha-next-integration.md` is staging/process context.
 
 Quarantine branches are reference material only. Do not broad cherry-pick
 runtime work from `codex/private-alpha-next-quarantine-fc231e8`; promote only
@@ -60,7 +70,8 @@ roadmap links.
 | `docs/API_CONTRACT.md` | canon | Defined as canon API contract source of truth. | None | Current |
 | `docs/DATA_MODEL.md` | canon | Defined as canon data model source of truth. | None | Current |
 | `.agent/designs/argus/DESIGN.md` | canon | Explicitly listed as canon design source of truth. | None | Current |
-| `docs/specs/private-alpha-next-roadmap.md` | current active roadmap | Active P1 board for done/next/deferred labels, slice stop criteria, and integration criteria. | Use as the first non-canon execution source for Private Alpha Next product work. | Created after P0 reintegration |
+| `docs/specs/private-alpha-interim-roadmap.md` | current interim execution slate | Owns founder outcomes, completion truth, selected pillar, live-QA discipline, and interim exit criteria. | Use as the first non-canon execution source while the interim pivot is active. | Capability truth complete; Argus always progresses ready to spec |
+| `docs/specs/private-alpha-next-roadmap.md` | active parent roadmap | Owns the broader Private Alpha Next P2 board, slice stop criteria, and integration criteria; points to the interim slate while the compounding loop is paused. | Use after the interim slate and resume its paused P2 sequencing only by founder direction. | Created after P0 reintegration |
 | `docs/specs/private-alpha-next-decision-memo.md` | active strategic source | Strategic north star for Private Alpha Next; contains the addenda and details each slice must onboard through. | Read relevant sections before planning or implementation. | Current |
 | `docs/specs/private-alpha-ci-cd-sota.md` | release-discipline reference | Completed CI/CD SOTA plan; still owns canary, manifest, Render validation, and deployment discipline. | Use for release gates, not product sequencing. | Completed/reference |
 | `docs/PRIVATE_LAUNCH_RUNBOOK.md` | release-discipline reference | Operational gate for controlled private-alpha validation and launch steps. | Keep as operator runbook. | Current release ops |
@@ -69,6 +80,10 @@ roadmap links.
 | `docs/archive/private-alpha-conversation-trust.md` | archived historical evidence / completed checkpoint | Marked as merged and deployed checkpoint; useful for conversation-trust design context but not current execution scope. | Keep archived for branch archaeology. | Completed |
 | `docs/archive/private-alpha-status-action-parity-audit.md` | archived historical evidence / implemented slice | Implemented and locally verified; useful as artifact lifecycle evidence but not current execution scope. | Keep archived for branch archaeology. | Completed |
 | `docs/archive/private-alpha-next-refine-to-version.md` | archived historical evidence / implemented slice | Shipped in issue #141 / PR #148; A1b/A2 sequencing now belongs to the active roadmap. | Keep archived for branch archaeology. | Moved 2026-07-08; pointer stub remains in `docs/specs/` |
+| `docs/archive/2026-07-19-adaptive-result-chart-range-design.md` | archived historical evidence / implemented slice | Issue #250 / PR #264 shipped and passed founder-visible browser QA. | Keep archived; pointer stub remains at the former spec path. | Moved 2026-07-23 |
+| `docs/archive/2026-07-19-adaptive-result-chart-range-implementation.md` | archived historical evidence / completed plan | Issue #250 / PR #264 completed the plan. | Keep archived; pointer stub remains at the former plan path. | Moved 2026-07-23 |
+| `docs/archive/2026-07-22-capability-truth-executable-boundary-design.md` | archived historical evidence / implemented slice | Issue #241 / PR #266 shipped the executable capability boundary and passed founder-visible browser QA. | Keep archived; pointer stub remains at the former spec path. | Moved 2026-07-23 |
+| `docs/archive/private-alpha-interim-issue-roadmap-2026-07-21.md` | archived superseded planning | The issue/wave dependency plan was retired when founder outcomes became the active sequencing unit. | Keep for issue-link compatibility and planning archaeology. | Active roadmap owns current selection |
 | `docs/archive/private-alpha-readiness-orchestration.md` | archived branch-specific context | Coordination note for `codex/private-alpha-readiness-clean`; not the current Private Alpha Next roadmap. | Keep archived for readiness-lane archaeology. | Readiness lane |
 | `docs/archive/private-alpha-controlled-readiness-panel.md` | archived branch/lane-specific context | Controlled-alpha readiness panel for readiness decisions; useful evidence but not the active roadmap. | Keep archived for readiness-lane archaeology. | Readiness lane |
 | `docs/archive/private-alpha-performance-readiness-audit.md` | archived branch/lane-specific context | Supporting performance addendum for the controlled readiness slice. | Keep archived for readiness-lane archaeology. | Readiness lane |

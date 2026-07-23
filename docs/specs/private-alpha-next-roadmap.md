@@ -22,10 +22,11 @@ that Argus remembers, compares, and stays honest about staleness.
 
 The Private Alpha Next runtime history was promoted to `main` by merge
 `5d1eec11`; the production-promotion documentation checkpoint completed on
-`main` at `217ead12`. The current stable integration checkpoint is `2eb6874`.
-It contains the founder-accepted graph-range, account-security, and Usage
-vertical slices from PRs #264, #261, and #259. This pointer does not claim that
-the integration checkpoint is deployed or exposed to testers.
+`main` at `217ead12`. The current stable integration checkpoint is `bbd1d2b`.
+It contains the founder-accepted graph-range, account-security, Usage, and
+capability-truth vertical slices from PRs #264, #261, #259, and #266. This
+pointer does not claim that the integration checkpoint is deployed or exposed
+to testers.
 
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
@@ -828,7 +829,7 @@ prevents real internet-based testing.
 - Stop conditions: if enforcing a rule requires changing runtime behavior, stop
   and split that into its owning milestone.
 
-##### P2.1 Capability truth (DONE — registry + edit contract landed; honesty polish deprioritized)
+##### P2.1 Capability truth (DONE — registry + executable boundary landed)
 
 - Outcome: Argus stops overpromising. It honestly tells the user, in their own
   language, what it can and cannot run yet (for example "I can't run MACD yet,
@@ -878,6 +879,18 @@ prevents real internet-based testing.
   capability truth as typed data, stop and redesign the data, not the gate.
 - PMF gate: users describe a decision Argus clarified; trust foundation for all
   later slices.
+
+Interim founder-outcome closure (2026-07-23): issue #241 and PR #266 completed
+the supported-versus-non-executable product journey without expanding the
+capability catalog. The final candidate `e10bdd2` preserved canonical strategy
+identity and compatible facts across unsupported and future-performance
+recovery, required explicit selection before creating a supported historical
+draft, restored localized Quick take, and passed founder-visible browser QA.
+It landed on `codex/private-alpha-next` as `bbd1d2b`. The completed design is
+archived at
+`docs/archive/2026-07-22-capability-truth-executable-boundary-design.md`;
+existing links continue through a pointer at the former spec path. The active
+interim roadmap now selects **Argus always progresses** for specification.
 
 ##### P2.2 Backtest credibility — fees/slippage realism (DONE — merged as PR #178, active by default)
 
