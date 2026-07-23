@@ -32,6 +32,7 @@ from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.interpreter import provider_context_assets
 from argus.agent_runtime.interpreter.unsupported_admission import (
     strategy_route_admission_result,
+    strategy_route_flags_with_future_precedence,
 )
 from argus.agent_runtime.presentation_i18n import (
     asset_universe_operation_clarification_message,
@@ -125,7 +126,6 @@ from argus.agent_runtime.stages.interpret_internal.asset_resolution import (  # 
     _dedupe_ambiguous_fields,
     _dedupe_resolution_provenance,
     _dedupe_unsupported_constraints,
-    _educational_turn_has_strategy_baggage,
     _extra_parameters_for_strategy_family,
     _filter_resolved_strategy_ambiguities,
     _fresh_complete_restatement_started_new_confirmation,
@@ -486,7 +486,10 @@ async def _stage_result_from_interpretation(
             interpretation.candidate_strategy_draft
         )
     )
-    educational_turn_has_strategy_baggage = _educational_turn_has_strategy_baggage(
+    (
+        expects_strategy_route,
+        educational_turn_has_strategy_baggage,
+    ) = strategy_route_flags_with_future_precedence(
         interpretation=interpretation,
         expects_strategy_route=expects_strategy_route,
     )

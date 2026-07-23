@@ -18,6 +18,7 @@ from argus.agent_runtime.interpreter.shared import (
 )
 from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
+    _educational_turn_has_strategy_baggage,
     _optional_parameter_stage_patch,
 )
 from argus.agent_runtime.stages.interpret_types import (
@@ -323,8 +324,13 @@ def _draft_with_conserved_resolved_assets(draft: Any) -> Any:
     return draft.model_copy(update=update)
 
 
-def _typed_future_horizon(decision: InterpretDecision) -> dict[str, Any] | None:
-    extra_parameters = decision.candidate_strategy_draft.extra_parameters or {}
+def strategy_draft_future_horizon(draft: Any) -> dict[str, Any] | None:
+    """Typed future horizon carried by a strategy draft, route-label blind.
+
+    Capability truth lives on this typed field alone; callers use it to keep
+    any model-authored route label from bypassing the future boundary."""
+
+    extra_parameters = getattr(draft, "extra_parameters", None) or {}
     intent = extra_parameters.get("date_range_intent")
     if (
         isinstance(intent, dict)
@@ -332,6 +338,26 @@ def _typed_future_horizon(decision: InterpretDecision) -> dict[str, Any] | None:
     ):
         return dict(intent)
     return None
+
+
+def strategy_route_flags_with_future_precedence(
+    *,
+    interpretation: Any,
+    expects_strategy_route: bool,
+) -> tuple[bool, bool]:
+    """Typed future horizon forces the strategy route and disables educational
+    suppression, so admission fires regardless of the model's route label."""
+
+    if strategy_draft_future_horizon(interpretation.candidate_strategy_draft):
+        return True, False
+    return expects_strategy_route, _educational_turn_has_strategy_baggage(
+        interpretation=interpretation,
+        expects_strategy_route=expects_strategy_route,
+    )
+
+
+def _typed_future_horizon(decision: InterpretDecision) -> dict[str, Any] | None:
+    return strategy_draft_future_horizon(decision.candidate_strategy_draft)
 
 
 def future_performance_admission_result(

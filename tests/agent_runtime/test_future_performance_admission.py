@@ -446,6 +446,76 @@ FORECAST_PROSE = (
 )
 
 
+def test_educational_label_with_future_window_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A typed future horizon is capability truth: an educational_question
+    label may not suppress the strategy route, wipe the draft, and ship the
+    model's forecast as a plain answer."""
+
+    _stub_equity_asset_resolution(monkeypatch)
+    result = _run_interpret(
+        message=EN_FUTURE_MESSAGE,
+        response=_future_interpretation(
+            intent="conversation_followup",
+            semantic_turn_act="educational_question",
+            evidence="in ten years",
+            assistant_response=FORECAST_PROSE,
+        ),
+    )
+    _assert_future_blocked(result, evidence="in ten years")
+    assert result.patch.get("assistant_response") is None
+
+
+def test_followup_label_with_future_window_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A conversation-followup label (result_followup act) may not keep the
+    strategy route unset and return the forecast unchanged."""
+
+    _stub_equity_asset_resolution(monkeypatch)
+    result = _run_interpret(
+        message="And what would that be worth in ten years?",
+        response=_future_interpretation(
+            intent="conversation_followup",
+            semantic_turn_act="result_followup",
+            evidence="in ten years",
+            assistant_response=FORECAST_PROSE,
+        ),
+    )
+    _assert_future_blocked(result, evidence="in ten years")
+    assert result.patch.get("assistant_response") is None
+
+
+def test_plain_educational_question_stays_suppressed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without a typed future horizon, educational suppression is unchanged:
+    the turn answers as prose with no clarification or artifact."""
+
+    _stub_equity_asset_resolution(monkeypatch)
+    answer = "A golden cross is a 50-day average crossing above the 200-day."
+    interpretation = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asked what a golden cross is.",
+        assistant_response=answer,
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="signal_strategy",
+            asset_universe=["NVDA"],
+        ),
+        semantic_turn_act="educational_question",
+    )
+    result = _run_interpret(
+        message="What is a golden cross?",
+        response=interpretation,
+    )
+    assert result.outcome == "ready_to_respond"
+    assert result.patch.get("assistant_response") == answer
+    assert result.patch.get("confirmation_payload") is None
+
+
 def _future_recovery_clarify_state() -> RunState:
     state = RunState.new(
         current_user_message=EN_FUTURE_MESSAGE,
