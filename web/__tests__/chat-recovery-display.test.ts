@@ -67,6 +67,27 @@ describe("chat recovery display", () => {
     );
   });
 
+  test("renders abandoned owning-row recovery in English and Spanish", () => {
+    const display = recoveryDisplayFromMetadata({
+      agent_runtime_turn: {
+        status: "abandoned",
+        failure_code: "turn_abandoned",
+        retryable: true,
+      },
+      recovery: {
+        code: "turn_abandoned",
+        retryable: true,
+      },
+    });
+
+    expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe(
+      "That turn stopped before finishing. Your message is saved, so you can retry.",
+    );
+    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
+      "Ese turno se detuvo antes de terminar. Tu mensaje está guardado, así que puedes reintentarlo.",
+    );
+  });
+
   test("does not replace live clarification prompts with generic recovery text", () => {
     const display = recoveryDisplayFromMetadata({
       response_intent: {

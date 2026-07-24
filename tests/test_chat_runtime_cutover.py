@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from argus.api import state as api_state
 from argus.api.main import app
+from argus.api.message_store import prepare_message
 from fastapi.testclient import TestClient
 
 
@@ -287,7 +289,6 @@ def test_post_admission_builder_failure_owns_recovery_and_evidence(
     ("route", "expected_terminal"),
     [
         ("onboarding_goal", "advanced"),
-        ("onboarding_clarification", "clarification"),
         ("cancel", "finished"),
         ("deterministic_recovery", "clarification"),
     ],
@@ -322,7 +323,7 @@ def test_early_accepted_routes_persist_one_typed_turn_summary(
         "conversation_id": conversation["id"],
         "language": "en",
     }
-    if route in {"onboarding_goal", "onboarding_clarification"}:
+    if route == "onboarding_goal":
         client.patch(
             "/api/v1/me",
             json={
@@ -334,17 +335,30 @@ def test_early_accepted_routes_persist_one_typed_turn_summary(
                 }
             },
         )
-        request_payload["message"] = (
-            "__ONBOARDING_GOAL__:test_stock_idea"
-            if route == "onboarding_goal"
-            else "I want to test Apple."
-        )
+        request_payload["message"] = "__ONBOARDING_GOAL__:test_stock_idea"
     elif route == "cancel":
         _set_onboarding_ready(client, primary_goal="test_stock_idea")
+        api_state.store.messages[conversation["id"]].append(
+            prepare_message(
+                conversation_id=conversation["id"],
+                role="assistant",
+                content="Review this draft.",
+                metadata={
+                    "confirmation_card": {
+                        "confirmation_id": "confirmation-1",
+                    }
+                },
+            )
+        )
         monkeypatch.setattr(
             agent_router,
             "checkpoint_has_pending_confirmation",
             lambda _values: True,
+        )
+        monkeypatch.setattr(
+            agent_router,
+            "confirmation_metadata_fallback_context",
+            lambda **_: None,
         )
         request_payload["action"] = {
             "type": "cancel_confirmation",
@@ -379,6 +393,74 @@ def test_early_accepted_routes_persist_one_typed_turn_summary(
     summary_json = json.dumps(summary)
     assert "__ONBOARDING_GOAL__" not in summary_json
     assert "That draft is no longer active." not in summary_json
+    assert active_turn_execution() is None
+
+
+def test_normal_onboarding_language_enters_runtime_and_persists_summary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.turn_execution import active_turn_execution
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+    persisted_receipt_metadata: list[dict[str, Any]] = []
+
+    async def _runtime_events(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "_turn_progress": {
+                "output_fingerprint": "b" * 64,
+                "progress_outcome": "advanced",
+                "terminal": "advanced",
+                "terminal_reason": "runtime_final",
+            },
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "I can help test Apple.",
+            },
+        }
+
+    def _capture_receipts(**kwargs: Any) -> None:
+        persisted_receipt_metadata.append(dict(kwargs["metadata"]))
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_events)
+    monkeypatch.setattr(agent_router, "persist_route_receipts", _capture_receipts)
+
+    client = _client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    client.patch(
+        "/api/v1/me",
+        json={
+            "onboarding": {
+                "stage": "primary_goal_selection",
+                "language_confirmed": True,
+                "primary_goal": None,
+                "completed": False,
+            }
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "I want to test Apple.",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 1
+    assert len(persisted_receipt_metadata) == 1
+    summary = persisted_receipt_metadata[0]["turn_execution"]
+    assert summary["terminal"] == "advanced"
+    assert summary["progress_outcome"] == "advanced"
+    assert summary["calls_reserved"] == 0
+    assert summary["provider_receipt_count"] == 0
+    assert "_turn_progress" not in response.text
     assert active_turn_execution() is None
 
 

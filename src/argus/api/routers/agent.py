@@ -33,6 +33,7 @@ from argus.api.chat.actions import (
     is_cancel_confirmation_action,
     is_confirmation_action,
     is_result_action,
+    latest_active_confirmation_id,
     missing_run_confirmation_action_id_message,
     persisted_chat_action,
     recent_metadata_invalidates_confirmation,
@@ -72,7 +73,10 @@ from argus.api.chat.recovery import (
     pending_strategy_metadata_fallback_context,
     runtime_checkpoint_values,
 )
-from argus.api.chat.request_admission import prepare_chat_request_admission
+from argus.api.chat.request_admission import (
+    prepare_chat_request_admission,
+    reject_invalid_non_run_confirmation_action,
+)
 from argus.api.chat.route_receipts import persist_route_receipts
 from argus.api.chat.runtime_worker import (
     runtime_worker_enabled,
@@ -91,9 +95,9 @@ from argus.api.chat.streaming import (
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.message_store import (
-    create_message,
     latest_unresolved_terminal_runtime_failure_metadata,
     load_runtime_thread_history,
+    reconcile_stale_chat_turns,
 )
 from argus.api.naming import get_starter_prompts, resolve_language
 from argus.api.schemas import (
@@ -347,7 +351,14 @@ async def chat_stream(
             conversation = api_state.store.conversations.get(payload.conversation_id)
     else:
         conversation = api_state.store.conversations.get(payload.conversation_id)
-    if not conversation:
+    memory_owner_id = api_state.store.conversation_owners.get(
+        payload.conversation_id
+    )
+    if not conversation or (
+        api_state.supabase_gateway is None
+        and memory_owner_id is not None
+        and memory_owner_id != user.id
+    ):
         raise problem(
             request,
             status_code=404,
@@ -355,7 +366,15 @@ async def chat_stream(
             title="Not Found",
             detail="Conversation not found.",
         )
+    reconcile_stale_chat_turns(
+        user_id=user.id,
+        conversation_id=conversation.id,
+    )
     recent_thread_history = load_runtime_thread_history(
+        user_id=user.id,
+        conversation_id=conversation.id,
+    )
+    terminal_failure_metadata = latest_unresolved_terminal_runtime_failure_metadata(
         user_id=user.id,
         conversation_id=conversation.id,
     )
@@ -374,7 +393,36 @@ async def chat_stream(
             or "en"
         ),
     )
-
+    confirmation_action_messages = (
+        _recent_messages_for_conversation(
+            user_id=user.id,
+            conversation_id=conversation.id,
+            limit=20,
+        )
+        if is_confirmation_action(payload)
+        else None
+    )
+    stale_confirmation_message = stale_confirmation_action_message(
+        payload=payload,
+        user_id=user.id,
+        conversation_id=conversation.id,
+        recent_messages=confirmation_action_messages,
+        language=language,
+    )
+    reject_invalid_non_run_confirmation_action(
+        payload=payload,
+        request=request,
+        active_confirmation_id=(
+            latest_active_confirmation_id(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                recent_messages=confirmation_action_messages,
+            )
+            if confirmation_action_messages is not None else None
+        ),
+        stale_confirmation_message=stale_confirmation_message,
+        language=language,
+    )
     request_admission = prepare_chat_request_admission(
         payload=payload,
         request=request,
@@ -382,73 +430,82 @@ async def chat_stream(
         conversation_id=conversation.id,
         display_message=display_message,
         mention_provenance=mention_provenance,
-        enabled=onboarding_goal is None and not cancel_confirmation_action,
+        enabled=True,
         language=language,
+        owner="message_only" if is_run_backtest_turn else "ordinary_turn",
     )
     runtime_fallback = RuntimeFallbackContext()
+    validated_option_source = request_admission.admit_response_option()
+    if validated_option_source is not None:
+        runtime_fallback = validated_option_source.runtime_fallback
+        accepted_option_request = request_admission.request_message_record
+        if accepted_option_request is None:
+            raise RuntimeError("Response-option admission returned no request.")
+        request_message = accepted_option_request.content
+        display_message = accepted_option_request.content
+        onboarding_goal = parse_onboarding_control_message(request_message)
+        if (
+            payload.action is not None
+            and payload.action.payload.get("request_message_id")
+        ):
+            mention_provenance = []
+    lifecycle_hooks = (
+        request_admission.lifecycle_hooks()
+        if validated_option_source is not None
+        else None
+    )
+    deterministic_control_turn = (
+        onboarding_goal is not None or cancel_confirmation_action
+    )
+    if deterministic_control_turn and lifecycle_hooks is None:
+        lifecycle_hooks = request_admission.lifecycle_hooks()
 
     workflow: Any | None = None
     retry_finalization_execution_identity: str | None = None
     try:
-        workflow = api_state.get_agent_runtime_workflow(request)
-        terminal_failure_metadata = latest_unresolved_terminal_runtime_failure_metadata(
-            user_id=user.id,
-            conversation_id=conversation.id,
-        )
-        retry_finalization_execution_identity = (
-            chat_retry.retryable_finalization_execution_identity(
-                terminal_failure_metadata,
-                request_message=request_message,
+        if deterministic_control_turn:
+            checkpoint_values = {}
+        else:
+            workflow = api_state.get_agent_runtime_workflow(request)
+            retry_finalization_execution_identity = (
+                chat_retry.retryable_finalization_execution_identity(
+                    terminal_failure_metadata,
+                    request_message=request_message,
+                )
             )
-        )
-        if terminal_failure_metadata is not None:
-            await mark_terminal_runtime_failure_checkpoint(
+            if terminal_failure_metadata is not None:
+                await mark_terminal_runtime_failure_checkpoint(
+                    workflow=workflow,
+                    conversation_id=conversation.id,
+                    user=runtime_user,
+                    message=request_message,
+                    recent_thread_history=recent_thread_history,
+                    failure_metadata=terminal_failure_metadata,
+                )
+            checkpoint_values = await runtime_checkpoint_values(
                 workflow=workflow,
                 conversation_id=conversation.id,
-                user=runtime_user,
-                message=request_message,
-                recent_thread_history=recent_thread_history,
-                failure_metadata=terminal_failure_metadata,
             )
-        checkpoint_values = await runtime_checkpoint_values(
-            workflow=workflow,
-            conversation_id=conversation.id,
-        )
     except Exception:
-        validated_option_source = request_admission.admit_response_option()
-        if validated_option_source is not None:
-            runtime_fallback = validated_option_source.runtime_fallback
         logger.exception(
             "Agent runtime initialization failed",
             conversation_id=conversation.id,
         )
-        request_admission.persist()
+        lifecycle_hooks = request_admission.lifecycle_hooks()
         language = (
             payload.language or conversation.language or current_user_profile.language
         )
         assistant_text = recovery_message("runtime_failure", language=language)
-        retry_metadata = chat_retry.retry_last_turn_metadata(
-            payload=payload,
-            request_message=request_message,
-        )
         recovery = recovery_state(
             "runtime_failure",
             language=language,
-            retryable=retry_metadata is not None,
+            retryable=not is_run_backtest_turn,
         )
         failure_metadata: dict[str, Any] = {
             "conversation_mode": "recovery",
             "agent_runtime_stage_outcome": "agent_runtime_failure",
-            "agent_runtime_turn": {
-                "status": "failed",
-                "terminal": True,
-                "conversation_id": conversation.id,
-                "request_id": request.state.request_id,
-            },
             "recovery": recovery,
         }
-        if retry_metadata is not None:
-            failure_metadata.update(retry_metadata)
         if workflow is not None:
             await mark_terminal_runtime_failure_checkpoint(
                 workflow=workflow,
@@ -458,17 +515,16 @@ async def chat_stream(
                 recent_thread_history=recent_thread_history,
                 failure_metadata=failure_metadata,
             )
-        retry_last_turn = (
-            retry_metadata.get("retry_last_turn")
-            if isinstance(retry_metadata, dict)
-            else None
-        )
-        assistant_message = create_message(
-            user_id=user.id,
-            conversation_id=conversation.id,
-            role="assistant",
+        assistant_message = lifecycle_hooks.recoverable_failure(
             content=assistant_text,
             metadata=failure_metadata,
+            failure_code="runtime_initialization_failed",
+            retryable=not is_run_backtest_turn,
+        )
+        retry_last_turn = (
+            assistant_message.metadata.get("retry_last_turn")
+            if isinstance(assistant_message.metadata, dict)
+            else None
         )
 
         async def initialization_failure_events() -> AsyncIterator[str]:
@@ -499,25 +555,6 @@ async def chat_stream(
             media_type="text/event-stream",
             headers=headers,
         )
-    validated_option_source = request_admission.admit_response_option()
-    if validated_option_source is not None:
-        runtime_fallback = validated_option_source.runtime_fallback
-    confirmation_action_messages = (
-        _recent_messages_for_conversation(
-            user_id=user.id,
-            conversation_id=conversation.id,
-            limit=20,
-        )
-        if is_confirmation_action(payload)
-        else None
-    )
-    stale_confirmation_message = stale_confirmation_action_message(
-        payload=payload,
-        user_id=user.id,
-        conversation_id=conversation.id,
-        recent_messages=confirmation_action_messages,
-        language=language,
-    )
     if stale_confirmation_message is not None:
         runtime_fallback = RuntimeFallbackContext(
             recovery_message=stale_confirmation_message,
@@ -527,7 +564,7 @@ async def chat_stream(
                 retryable=False,
             ),
         )
-    elif is_confirmation_action(payload):
+    elif is_confirmation_action(payload) and not cancel_confirmation_action:
         metadata_fallback = confirmation_metadata_fallback_context(
             user_id=user.id,
             conversation_id=conversation.id,
@@ -621,22 +658,8 @@ async def chat_stream(
                     )
                     if result_fallback is not None:
                         runtime_fallback = result_fallback
-    request_message_record = request_admission.persist()
-
-    # Onboarding feature flag on the API service. Default enabled so prod/QA/tests keep the
-    # flow; dev mode sets it false. The deployed API must set this to match the web
-    # service's NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED — enforced by the API release
-    # env audit in .github/render-env-sync.sh — so onboarding-off is honored on the API,
-    # not just the frontend. (Deliberately NOT read from the NEXT_PUBLIC_* var: that frontend
-    # flag is false in .env, which would disable the onboarding flow in dev/QA and tests.)
-    onboarding_enabled = (
-        os.getenv("ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED", "true").strip().lower()
-        != "false"
-    )
-    onboarding_required = onboarding_enabled and (
-        current_user_profile.onboarding.stage
-        in {"language_selection", "primary_goal_selection"}
-    )
+    lifecycle_hooks = request_admission.lifecycle_hooks()
+    request_message_record = lifecycle_hooks.request_message
 
     action_context = request_admission.runtime_action_context()
 
@@ -644,6 +667,7 @@ async def chat_stream(
         workflow_input: dict[str, Any],
         workflow_input_error: Exception | None = None,
     ) -> AsyncIterator[str]:
+        lifecycle_hooks.mark_running()
         active_finalization_execution_identity: str | None = None
         naming_language = (
             payload.language
@@ -652,8 +676,12 @@ async def chat_stream(
             or "en"
         )
         receipt_run_id: str | None = None
-        receipt_message_id: str | None = None
-        receipt_metadata: dict[str, Any] = {}
+        receipt_message_id: str | None = request_message_record.id
+        receipt_metadata: dict[str, Any] = {
+            "request_id": request.state.request_id,
+            "source": "api_turn",
+            "turn_id": request_message_record.id,
+        }
         receipt_token = begin_openrouter_route_receipt_capture()
 
         def persist_turn_evidence() -> None:
@@ -700,45 +728,6 @@ async def chat_stream(
                     conversation_id=conversation.id,
                     saved_strategy_id=saved_strategy_id,
                 )
-
-        if onboarding_required and onboarding_goal is None:
-            lang = (
-                payload.language
-                or conversation.language
-                or current_user_profile.language
-                or "en"
-            )
-            is_es = resolve_language(lang) == "es-419"
-            msg = (
-                "\u00bfCu\u00e1l es tu objetivo principal ahora? No te preocupes, "
-                "podr\u00e1s cambiarlo despu\u00e9s en Settings."
-                if is_es
-                else "What is your current primary goal? Don't worry, "
-                "you can change it later in Settings."
-            )
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=msg,
-                settle_usage=message_usage_settlement(),
-            )
-            record_control_exit("answer_pending_need", "clarification")
-            persist_turn_evidence()
-            yield sse_data({"type": "stage_start", "stage": "clarify"})
-            yield sse_data({"type": "token", "content": msg})
-            yield sse_data(
-                {
-                    "type": "final",
-                    "payload": {
-                        "stage_outcome": "await_user_reply",
-                        "assistant_response": msg,
-                        "message_id": assistant_message.id,
-                    },
-                }
-            )
-            yield sse_done()
-            return
 
         if onboarding_goal is not None:
             persist_onboarding_update(
@@ -795,11 +784,12 @@ async def chat_stream(
                     "surprise_me": "Great. I'll guide you with a starter idea to begin.",
                 }
             follow_up = mapping.get(onboarding_goal, mapping["surprise_me"])
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
+            assistant_message = lifecycle_hooks.complete(
                 content=follow_up,
+                metadata={
+                    "conversation_mode": "guide",
+                    "agent_runtime_stage_outcome": "ready_to_respond",
+                },
                 settle_usage=message_usage_settlement(),
             )
             record_control_exit("new_idea", "advanced")
@@ -830,12 +820,12 @@ async def chat_stream(
                 metadata["chat_action"] = persisted_chat_action(payload)
             if runtime_fallback.recovery is not None:
                 metadata["recovery"] = dict(runtime_fallback.recovery)
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
+            assistant_message = lifecycle_hooks.complete(
                 content=assistant_text,
                 metadata=metadata,
+                settle_usage=ordinary_turn_settlement(
+                    is_run_backtest_turn=is_run_backtest_turn
+                ),
             )
             record_control_exit("retry_failed_action", "clarification")
             persist_turn_evidence()
@@ -883,10 +873,7 @@ async def chat_stream(
                 "chat_action": persisted_chat_action(payload),
                 "artifact_event": artifact_event,
             }
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
+            assistant_message = lifecycle_hooks.complete(
                 content="",
                 metadata=metadata,
                 settle_usage=message_usage_settlement(),
@@ -978,6 +965,13 @@ async def chat_stream(
                 final_seen = True
                 apply_turn_progress_evidence(runtime_event.get("_turn_progress"))
                 runtime_result = dict(runtime_event.get("payload") or {})
+                recovery = runtime_result.get("recovery")
+                if (
+                    isinstance(recovery, dict)
+                    and recovery.get("retryable") is True
+                    and isinstance(runtime_result.get("retry_last_turn"), dict)
+                ):
+                    raise RuntimeError("agent_runtime_typed_recovery")
                 stage_status = runtime_stage_status(runtime_result)
                 assistant_text = runtime_result_message(runtime_result)
                 from argus.api.chat.confirmation import runtime_confirmation_card
@@ -1061,12 +1055,6 @@ async def chat_stream(
                         else "guide"
                     ),
                     "agent_runtime_stage_outcome": stage_status,
-                    "agent_runtime_turn": {
-                        "status": "succeeded",
-                        "terminal": True,
-                        "conversation_id": conversation.id,
-                        "request_id": request.state.request_id,
-                    },
                 }
                 if payload.action is not None:
                     metadata["chat_action"] = persisted_chat_action(payload)
@@ -1271,17 +1259,16 @@ async def chat_stream(
                     )
                     raise RuntimeError("agent_runtime_empty_final")
                 assistant_message = None
-                if persisted_text:
-                    assistant_message = create_message(
-                        user_id=user.id,
-                        conversation_id=conversation.id,
-                        role="assistant",
-                        content=persisted_text,
+                if persisted_text or lifecycle_hooks.turn_id is not None:
+                    assistant_message = lifecycle_hooks.complete(
+                        content=persisted_text or "",
                         metadata=metadata,
                         settle_usage=ordinary_turn_settlement(
                             is_run_backtest_turn=is_run_backtest_turn
                         ),
                     )
+                    if lifecycle_hooks.turn_id is not None:
+                        runtime_result.pop("retry_last_turn", None)
                     receipt_message_id = assistant_message.id
                 receipt_metadata = {
                     "request_id": request.state.request_id,
@@ -1343,33 +1330,25 @@ async def chat_stream(
                 "conversation_mode": "recovery",
                 "agent_runtime_stage_outcome": "agent_runtime_failure",
                 "failure_code": failure_code,
-                "retryable": finalization_failed,
-                "agent_runtime_turn": {
-                    "status": "failed",
-                    "terminal": True,
-                    "conversation_id": conversation.id,
-                    "request_id": request.state.request_id,
-                },
+                "retryable": finalization_failed or not is_run_backtest_turn,
             }
-            if runtime_diagnostics is not None:
-                failure_metadata["runtime_diagnostics"] = runtime_diagnostics
             if finalization_failed and active_finalization_execution_identity:
                 failure_metadata["backtest_finalization"] = {
                     "execution_identity": active_finalization_execution_identity,
                 }
-            retry_metadata = chat_retry.retry_last_turn_metadata(
-                payload=payload,
-                request_message=request_message,
-                include_structured_action=finalization_failed,
-            )
+            durable_retryable = finalization_failed or not is_run_backtest_turn
             recovery = recovery_state(
                 "runtime_failure",
                 language=runtime_user.language_preference,
-                retryable=finalization_failed or retry_metadata is not None,
+                retryable=durable_retryable,
             )
             failure_metadata["recovery"] = recovery
-            if retry_metadata is not None:
-                failure_metadata.update(retry_metadata)
+            if durable_retryable:
+                failure_metadata.update(
+                    chat_retry.durable_retry_last_turn_metadata(
+                        request_message_record,
+                    )
+                )
             await mark_terminal_runtime_failure_checkpoint(
                 workflow=workflow,
                 conversation_id=conversation.id,
@@ -1378,17 +1357,16 @@ async def chat_stream(
                 recent_thread_history=recent_thread_history,
                 failure_metadata=failure_metadata,
             )
-            retry_last_turn = (
-                retry_metadata.get("retry_last_turn")
-                if isinstance(retry_metadata, dict)
-                else None
-            )
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
+            assistant_message = lifecycle_hooks.recoverable_failure(
                 content=assistant_text,
                 metadata=failure_metadata,
+                failure_code=failure_code,
+                retryable=durable_retryable,
+            )
+            retry_last_turn = (
+                assistant_message.metadata.get("retry_last_turn")
+                if isinstance(assistant_message.metadata, dict)
+                else None
             )
             receipt_message_id = assistant_message.id
             receipt_metadata = {

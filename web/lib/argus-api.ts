@@ -391,17 +391,16 @@ export type ChatActionRequest = {
 };
 
 export class ChatStreamError extends Error {
-  status: number;
-  code: string;
-
-  constructor(message: string, status: number, code = "unknown") {
+  constructor(
+    message: string,
+    public status: number,
+    public code = "unknown",
+    public requestId: string | null = null,
+  ) {
     super(message);
     this.name = "ChatStreamError";
-    this.status = status;
-    this.code = code;
   }
 }
-
 const CHAT_STREAM_INTERRUPTED_MESSAGE =
   "The connection ended before Argus finished responding. Please try again.";
 
@@ -1036,7 +1035,7 @@ export async function streamChatMessage(
 ) {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const authHeaders: Record<string, string> = {};
-
+  const submittedRequestId = crypto.randomUUID();
   if (!isMockAuth) {
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -1052,6 +1051,7 @@ export async function streamChatMessage(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "X-Request-Id": submittedRequestId,
       "Idempotency-Key":
         (typeof input !== "string" && runActionIdempotencyKey(input)) ||
         crypto.randomUUID(),
@@ -1063,7 +1063,8 @@ export async function streamChatMessage(
       ...(typeof input === "string" && mentions.length > 0 ? { mentions } : {}),
       language: normalizeApiLanguage(language),
     }),
-  });
+  }).catch(() => { throw new ChatStreamError(CHAT_STREAM_INTERRUPTED_MESSAGE, 0, "stream_interrupted", submittedRequestId); });
+  const responseRequestId = response.headers.get("X-Request-Id")?.trim() || submittedRequestId;
   if (!response.ok || !response.body) {
     const body = await response.json().catch(() => ({}));
     const detail = (body as { detail?: unknown }).detail;
@@ -1079,15 +1080,13 @@ export async function streamChatMessage(
     throw new ChatStreamError(
       message,
       response.status,
-      typeof code === "string" ? code : "unknown",
+      typeof code === "string" ? code : "unknown", responseRequestId,
     );
   }
-
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let receivedDone = false;
-
   const dispatchParsedFrame = (part: string) => {
     const parsed = parseChatStreamFrame(part);
     if (!parsed) return;
@@ -1121,6 +1120,7 @@ export async function streamChatMessage(
       CHAT_STREAM_INTERRUPTED_MESSAGE,
       0,
       "stream_interrupted",
+      responseRequestId,
     );
   }
 
@@ -1128,7 +1128,7 @@ export async function streamChatMessage(
     throw new ChatStreamError(
       CHAT_STREAM_INTERRUPTED_MESSAGE,
       0,
-      "stream_interrupted",
+      "stream_interrupted", responseRequestId,
     );
   }
 }

@@ -23,6 +23,19 @@ def plain_text_preview(content: str, max_length: int = 180) -> str | None:
     return preview[:max_length]
 
 
+def accepted_user_message_preview(
+    content: str,
+    max_length: int = 180,
+) -> str | None:
+    """Hide typed onboarding controls from user-facing conversation previews."""
+
+    from argus.api.chat.onboarding import parse_onboarding_control_message
+
+    if parse_onboarding_control_message(content) is not None:
+        return None
+    return plain_text_preview(content, max_length=max_length)
+
+
 def is_degraded_clarification_compatibility_text(
     *,
     role: str,

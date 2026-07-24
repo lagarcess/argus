@@ -770,7 +770,13 @@ describe("Argus Alpha frontend contract", () => {
               controller.close();
             },
           }),
-          { status: 200, headers: { "Content-Type": "text/event-stream" } },
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "text/event-stream",
+              "X-Request-Id": "request-a",
+            },
+          },
         ),
       )) as typeof fetch;
 
@@ -795,6 +801,73 @@ describe("Argus Alpha frontend contract", () => {
     ]);
     expect(caught).toBeInstanceOf(ChatStreamError);
     expect((caught as ChatStreamError).code).toBe("stream_interrupted");
+    expect((caught as ChatStreamError).requestId).toBe("request-a");
+  });
+
+  test("chat stream preserves its submitted request id when CORS hides the response header", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH;
+    let submittedRequestId: string | null = null;
+
+    process.env.NEXT_PUBLIC_MOCK_AUTH = "true";
+    globalThis.fetch = ((_input, init) => {
+      submittedRequestId = new Headers(init?.headers).get("X-Request-Id");
+      return Promise.resolve(
+        new Response(new ReadableStream({ start: (controller) => controller.close() }), {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        }),
+      );
+    }) as typeof fetch;
+
+    let caught: unknown;
+    try {
+      await streamChatMessage("conversation-1", "test AAPL", "en", () => {});
+    } catch (err) {
+      caught = err;
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalMockAuth === undefined) {
+        delete process.env.NEXT_PUBLIC_MOCK_AUTH;
+      } else {
+        process.env.NEXT_PUBLIC_MOCK_AUTH = originalMockAuth;
+      }
+    }
+
+    expect(submittedRequestId).toBeTruthy();
+    expect(caught).toBeInstanceOf(ChatStreamError);
+    expect((caught as ChatStreamError).requestId).toBe(submittedRequestId);
+  });
+
+  test("chat stream preserves its submitted request id when fetch rejects before headers", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH;
+    let submittedRequestId: string | null = null;
+
+    process.env.NEXT_PUBLIC_MOCK_AUTH = "true";
+    globalThis.fetch = ((_input, init) => {
+      submittedRequestId = new Headers(init?.headers).get("X-Request-Id");
+      return Promise.reject(new TypeError("connection lost"));
+    }) as typeof fetch;
+
+    let caught: unknown;
+    try {
+      await streamChatMessage("conversation-1", "test AAPL", "en", () => {});
+    } catch (err) {
+      caught = err;
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalMockAuth === undefined) {
+        delete process.env.NEXT_PUBLIC_MOCK_AUTH;
+      } else {
+        process.env.NEXT_PUBLIC_MOCK_AUTH = originalMockAuth;
+      }
+    }
+
+    expect(submittedRequestId).toBeTruthy();
+    expect(caught).toBeInstanceOf(ChatStreamError);
+    expect((caught as ChatStreamError).status).toBe(0);
+    expect((caught as ChatStreamError).requestId).toBe(submittedRequestId);
   });
 
   test("chat stream treats backend error frames as terminal", async () => {
@@ -1155,7 +1228,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("readActiveConversationIdFromUrl");
     expect(chat).not.toContain("ACTIVE_CONVERSATION_STORAGE_KEY");
     expect(chat).not.toContain("readActiveConversationId()");
-    expect(chat).toContain("getConversationMessages(activeConversationId");
+    expect(chat).toContain(
+      "loadAllConversationMessagePages(activeConversationId",
+    );
     expect(chat).toContain(
       "const routeState = readActiveConversationRouteState();",
     );

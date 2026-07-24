@@ -6,6 +6,10 @@ from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
 
 from argus.api import state as api_state
+from argus.api.chat.onboarding import parse_onboarding_control_message
+from argus.api.chat.turn_lifecycle_projection import (
+    reconcile_and_project_chat_turns,
+)
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.message_store import (
     memory_conversation,
@@ -39,6 +43,17 @@ def _memory_conversation_owned_by(
     if owner_id is None:
         return allow_unowned
     return owner_id == user_id
+
+
+def _public_message_projection(messages: list[Message]) -> list[Message]:
+    return [
+        message
+        for message in messages
+        if not (
+            message.role == "user"
+            and parse_onboarding_control_message(message.content) is not None
+        )
+    ]
 
 
 @router.post("/conversations", response_model=ConversationResponse)
@@ -342,6 +357,12 @@ def list_messages(
 
     items.sort(key=lambda item: (item.created_at, item.id))
     items = reconcile_reload_message_metadata(items)
+    items = reconcile_and_project_chat_turns(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        messages=items,
+    )
+    items = _public_message_projection(items)
     filtered = items
     if cursor:
         cursor_created_at, cursor_id = decode_cursor(cursor, request)

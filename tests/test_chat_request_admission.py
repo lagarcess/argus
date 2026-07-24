@@ -90,3 +90,76 @@ def test_prepared_request_persists_exactly_once() -> None:
     assert first is not None
     assert second == first
     assert api_state.store.messages[conversation.id] == [first]
+
+
+def test_ordinary_turn_accepts_message_and_lifecycle_atomically() -> None:
+    api_state.store.reset()
+    conversation = memory_conversation(
+        title="New conversation",
+        title_source="system_default",
+        language="en",
+        user_id="user-1",
+    )
+    admission = prepare_chat_request_admission(
+        payload=ChatStreamRequest(
+            conversation_id=conversation.id,
+            message="Test AAPL",
+            language="en",
+        ),
+        request=_request("request-ordinary"),
+        user_id="user-1",
+        conversation_id=conversation.id,
+        display_message="Test AAPL",
+        mention_provenance=[],
+        enabled=True,
+        language="en",
+        owner="ordinary_turn",
+    )
+
+    accepted = admission.persist()
+
+    assert accepted is not None
+    assert api_state.store.messages[conversation.id] == [accepted]
+    assert api_state.store.chat_turn_lifecycles[accepted.id] == {
+        **api_state.store.chat_turn_lifecycles[accepted.id],
+        "turn_id": accepted.id,
+        "user_id": "user-1",
+        "conversation_id": conversation.id,
+        "request_id": "request-ordinary",
+        "status": "accepted",
+    }
+
+
+def test_message_only_admission_appends_without_chat_turn_lifecycle() -> None:
+    api_state.store.reset()
+    conversation = memory_conversation(
+        title="New conversation",
+        title_source="system_default",
+        language="en",
+        user_id="user-1",
+    )
+    admission = prepare_chat_request_admission(
+        payload=ChatStreamRequest(
+            conversation_id=conversation.id,
+            action=ChatActionPayload(
+                type="run_backtest",
+                label="Run backtest",
+                payload={"confirmation_id": "confirmation-1"},
+                presentation="confirmation",
+            ),
+        ),
+        request=_request("request-run"),
+        user_id="user-1",
+        conversation_id=conversation.id,
+        display_message="Run backtest",
+        mention_provenance=[],
+        enabled=True,
+        language="en",
+        owner="message_only",
+    )
+
+    appended = admission.persist()
+
+    assert appended is not None
+    assert api_state.store.messages[conversation.id] == [appended]
+    assert api_state.store.chat_turn_lifecycles == {}

@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, cast
 
-from argus.api.chat.previews import plain_text_preview
+from argus.api.chat.previews import accepted_user_message_preview, plain_text_preview
 from argus.api.schemas import Message
 from argus.domain.store import AlphaStore, utcnow
+from argus.domain.usage_limits import settle_memory_usage
 
 TurnStatus = Literal[
     "accepted",
@@ -208,6 +209,237 @@ class MemoryChatTurnLifecycleGateway:
             }
             return appended
 
+    def accept_response_option_chat_turn(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        request_id: str,
+        message: Message,
+        source_assistant_id: str | None,
+        expected_source_metadata: dict[str, Any] | None,
+        option_id: str | None,
+        replacement_values: dict[str, Any] | None,
+        request_message_id: str | None = None,
+    ) -> tuple[Message, Message] | None:
+        with (
+            self.store.chat_turn_lifecycle_lock,
+            self.store.conversation_message_lock,
+        ):
+            if self.store.conversation_owners.get(conversation_id) != user_id:
+                return None
+            if request_message_id is not None:
+                return self._accept_response_option_retry(
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    request_id=request_id,
+                    message=message,
+                    request_message_id=request_message_id,
+                )
+            if (
+                source_assistant_id is None
+                or expected_source_metadata is None
+                or option_id is None
+                or replacement_values is None
+            ):
+                return None
+            messages = self.store.messages.get(conversation_id, [])
+            existing = self._message_by_id(message.id)
+            if existing is None:
+                source = messages[-1] if messages else None
+            else:
+                preceding = [
+                    item
+                    for item in messages
+                    if (item.created_at, item.id)
+                    < (existing.created_at, existing.id)
+                ]
+                source = preceding[-1] if preceding else None
+            if (
+                source is None
+                or source.id != source_assistant_id
+                or source.role != "assistant"
+                or (source.metadata or {}) != expected_source_metadata
+                or not self._source_has_response_option(
+                    source,
+                    option_id=option_id,
+                    replacement_values=replacement_values,
+                )
+            ):
+                return None
+            accepted = self.accept_chat_turn(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                request_id=request_id,
+                message=message,
+            )
+            return source, accepted
+
+    def _accept_response_option_retry(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        request_id: str,
+        message: Message,
+        request_message_id: str,
+    ) -> tuple[Message, Message] | None:
+        if message.id == request_message_id:
+            return None
+        original = self._message_by_id(request_message_id)
+        lifecycle = self.store.chat_turn_lifecycles.get(request_message_id)
+        if (
+            original is None
+            or lifecycle is None
+            or original.role != "user"
+            or original.conversation_id != conversation_id
+            or lifecycle.get("user_id") != user_id
+            or lifecycle.get("conversation_id") != conversation_id
+            or not self._is_retryable_terminal(lifecycle)
+        ):
+            return None
+        action = self._response_option_action(original)
+        if action is None:
+            return None
+        action_payload = action["payload"]
+        option_id = action_payload["option_id"]
+        replacement_values = action_payload["replacement_values"]
+        messages = self.store.messages.get(conversation_id, [])
+        source = next(
+            (
+                item
+                for item in reversed(messages)
+                if (item.created_at, item.id)
+                < (original.created_at, original.id)
+                and item.role == "assistant"
+                and self._source_has_response_option(
+                    item,
+                    option_id=option_id,
+                    replacement_values=replacement_values,
+                )
+            ),
+            None,
+        )
+        if source is None:
+            return None
+        canonical_metadata = {
+            key: value
+            for key, value in (message.metadata or {}).items()
+            if key not in {"chat_action", "mentions", "resolution_provenance"}
+        }
+        canonical_metadata["chat_action"] = action
+        canonical_message = message.model_copy(
+            update={
+                "content": original.content,
+                "metadata": canonical_metadata,
+            }
+        )
+        existing = self._message_by_id(message.id)
+        if existing is not None:
+            existing_lifecycle = self.store.chat_turn_lifecycles.get(message.id)
+            if (
+                existing_lifecycle is None
+                or existing_lifecycle.get("user_id") != user_id
+                or existing_lifecycle.get("conversation_id") != conversation_id
+                or existing_lifecycle.get("request_id") != request_id
+                or not self._same_immutable_message(
+                    existing,
+                    canonical_message,
+                )
+            ):
+                return None
+            return source, existing
+        latest = messages[-1] if messages else None
+        expected_latest_id = (
+            original.id
+            if lifecycle["status"] == "abandoned"
+            else lifecycle.get("assistant_message_id")
+        )
+        if latest is None or latest.id != expected_latest_id:
+            return None
+        accepted = self.accept_chat_turn(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            request_id=request_id,
+            message=canonical_message,
+        )
+        return source, accepted
+
+    def finalize_chat_turn(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        turn_id: str,
+        request_id: str,
+        message: Message,
+        to_status: TurnStatus,
+        failure_code: str | None,
+        retryable: bool,
+        settle_usage: dict[str, Any] | None,
+    ) -> Message:
+        with (
+            self.store.chat_turn_lifecycle_lock,
+            self.store.conversation_message_lock,
+        ):
+            row = self.store.chat_turn_lifecycles.get(turn_id)
+            if (
+                row is None
+                or row["user_id"] != user_id
+                or row["conversation_id"] != conversation_id
+                or row["request_id"] != request_id
+                or row["status"] not in {"accepted", "running"}
+            ):
+                raise ValueError("Chat-turn finalization conflict.")
+            if (
+                message.role != "assistant"
+                or message.conversation_id != conversation_id
+                or to_status not in {"completed", "recoverable_failed"}
+                or (to_status == "completed" and (failure_code or retryable))
+                or (to_status == "recoverable_failed" and settle_usage is not None)
+            ):
+                raise ValueError("Chat-turn terminal payload is invalid.")
+            runtime_turn = _terminal_metadata(message)
+            if (
+                runtime_turn is None
+                or runtime_turn.get("turn_id") != turn_id
+                or runtime_turn.get("request_id") != request_id
+                or runtime_turn.get("status") != to_status
+                or runtime_turn.get("terminal") is not True
+                or (
+                    to_status == "recoverable_failed"
+                    and (
+                        runtime_turn.get("failure_code") != failure_code
+                        or runtime_turn.get("retryable") is not retryable
+                    )
+                )
+            ):
+                raise ValueError("Chat-turn terminal evidence is invalid.")
+            appended = self._append_message(message)
+            result = self.transition_chat_turn(
+                turn_id=turn_id,
+                to_status=to_status,
+                assistant_message_id=appended.id,
+                reconciled_outcome=None,
+                failure_code=failure_code,
+                retryable=retryable,
+            )
+            if result.outcome not in {"applied", "noop"}:
+                self.store.messages[conversation_id] = [
+                    item
+                    for item in self.store.messages.get(conversation_id, [])
+                    if item.id != appended.id
+                ]
+                raise ValueError("Chat-turn finalization conflict.")
+            if settle_usage is not None:
+                settle_memory_usage(
+                    self.store.usage_counters,
+                    user_id=user_id,
+                    resource=settle_usage["resource"],
+                    limits=settle_usage["limits"],
+                )
+            return appended
+
     def transition_chat_turn(
         self,
         *,
@@ -363,10 +595,7 @@ class MemoryChatTurnLifecycleGateway:
                 and row["conversation_id"] == conversation_id
                 and (
                     row.get("assistant_message_id") in ids
-                    or (
-                        row.get("assistant_message_id") is None
-                        and row["turn_id"] in ids
-                    )
+                    or row["turn_id"] in ids
                 )
             ]
         return sorted(rows, key=lambda row: row["turn_id"])
@@ -384,7 +613,11 @@ class MemoryChatTurnLifecycleGateway:
                 )
         messages.append(appended)
         conversation = self.store.conversations.get(message.conversation_id)
-        preview = plain_text_preview(message.content, max_length=180)
+        preview = (
+            accepted_user_message_preview(message.content, max_length=180)
+            if message.role == "user"
+            else plain_text_preview(message.content, max_length=180)
+        )
         if conversation is not None and preview:
             self.store.conversations[message.conversation_id] = (
                 conversation.model_copy(
@@ -402,6 +635,73 @@ class MemoryChatTurnLifecycleGateway:
                 if message.id == message_id:
                     return message
         return None
+
+    @staticmethod
+    def _source_has_response_option(
+        source: Message,
+        *,
+        option_id: str,
+        replacement_values: dict[str, Any],
+    ) -> bool:
+        metadata = source.metadata
+        clarification = (
+            metadata.get("clarification") if isinstance(metadata, dict) else None
+        )
+        options = (
+            clarification.get("options")
+            if isinstance(clarification, dict)
+            else None
+        )
+        if not isinstance(options, list):
+            return False
+        return any(
+            isinstance(option, dict)
+            and option.get("id") == option_id
+            and option.get("replacement_values") == replacement_values
+            for option in options
+        )
+
+    @staticmethod
+    def _response_option_action(message: Message) -> dict[str, Any] | None:
+        metadata = message.metadata
+        action = (
+            metadata.get("chat_action") if isinstance(metadata, dict) else None
+        )
+        if (
+            not isinstance(action, dict)
+            or action.get("type") != "select_response_option"
+        ):
+            return None
+        payload = action.get("payload")
+        option_id = payload.get("option_id") if isinstance(payload, dict) else None
+        replacement_values = (
+            payload.get("replacement_values")
+            if isinstance(payload, dict)
+            else None
+        )
+        if (
+            not isinstance(option_id, str)
+            or not option_id.strip()
+            or not isinstance(replacement_values, dict)
+        ):
+            return None
+        return {
+            **action,
+            "payload": {
+                "option_id": option_id,
+                "replacement_values": replacement_values,
+            },
+        }
+
+    @staticmethod
+    def _is_retryable_terminal(row: dict[str, Any]) -> bool:
+        if row.get("retryable") is not True:
+            return False
+        status = row.get("status")
+        return status in {"recoverable_failed", "abandoned"} or (
+            status == "reconciled"
+            and row.get("reconciled_outcome") == "recoverable_failed"
+        )
 
     @staticmethod
     def _same_immutable_message(left: Message, right: Message) -> bool:

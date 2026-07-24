@@ -95,11 +95,12 @@ describe("chat archive/delete lifecycle source contract", () => {
 
   test("persisted result cards are validated before structured hydration", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const hydration = readFileSync(join(root, "lib/chat-message-hydration.ts"), "utf-8");
     const hydrateStart = chat.indexOf("function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages");
     const hydrateEnd = chat.indexOf("function createPendingAssistantMessage", hydrateStart);
     const hydrateBlock = chat.slice(hydrateStart, hydrateEnd);
 
-    expect(chat).toContain("function isHydratableResultCard(value: unknown)");
+    expect(hydration).toContain("export function isHydratableResultCard(");
     expect(hydrateBlock).toContain("isHydratableResultCard(resultCard)");
     expect(hydrateBlock).not.toContain("resultCard &&\n      Array.isArray(resultCard.rows)");
   });
@@ -139,5 +140,91 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(conversationComposer).toContain("text-black/40 dark:text-white/40");
     expect(en.chat.disclaimer).toBe("Argus can make mistakes. For education only. Not financial advice.");
     expect(es.chat.disclaimer).toBe("Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.");
+  });
+
+  test("durable retry renders beside its owning row and creates a visible new attempt", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+
+    expect(chat).toContain("normalizeDurableRetryActionHistory");
+    expect(chat).toContain("retryLastTurnRequestMessageIdFromAction");
+    expect(chat).toContain("renderUserMessage: true");
+    expect(message).toContain("data-testid=\"user-turn-recovery\"");
+    expect(message).toContain("data-testid=\"user-turn-retry\"");
+  });
+
+  test("ordinary transport ambiguity follows durable pages and never builds composer retry", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const hydration = readFileSync(join(root, "lib/chat-message-hydration.ts"), "utf-8");
+    const catchStart = chat.indexOf("try {\n      await streamToConversation");
+    const catchEnd = chat.indexOf("const handleOnboardingGoalChoice", catchStart);
+    const sendCatch = chat.slice(catchStart, catchEnd);
+
+    expect(catchStart).toBeGreaterThan(-1);
+    expect(sendCatch).toContain("resolveOrdinaryTransportAmbiguityView");
+    expect(sendCatch).toContain("loadAllConversationMessagePages");
+    expect(sendCatch).toContain("conversationLoadFailureMessage");
+    expect(sendCatch).toContain("t('chat.status.checking')");
+    expect(hydration).toContain("resolveOrdinaryTransportAmbiguity");
+    expect(hydration).toContain('resolution.kind !== "terminal"');
+    expect(hydration).toContain("message.id !== fallback.assistantId");
+    expect(sendCatch).not.toContain(
+      "actions: retryLastTurnAction ? [retryLastTurnAction] : m.actions",
+    );
+  });
+
+  test("text and structured ordinary turns snapshot ids before paged reconciliation", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const sendStart = chat.indexOf("const handleSend = async");
+    const sendEnd = chat.indexOf("const handleOnboardingGoalChoice", sendStart);
+    const send = chat.slice(sendStart, sendEnd);
+
+    expect(send).toContain('action?.type !== "run_backtest"');
+    expect(send).toContain("snapshotOrdinaryTransportMessageIds");
+    expect(send).toContain("ordinaryTransportMessageIds");
+    expect(send).toContain("resolveOrdinaryTransportAmbiguityView");
+    expect(send).not.toContain(
+      'const isOrdinaryTransportAmbiguity =\n        !action?.type',
+    );
+    const ambiguityStart = send.indexOf("if (isOrdinaryTransportAmbiguity)");
+    const ambiguityEnd = send.indexOf(
+      "const canApplyOwnedUpdate",
+      ambiguityStart,
+    );
+    expect(send.slice(ambiguityStart, ambiguityEnd)).not.toContain(
+      "streamToConversation(",
+    );
+  });
+
+  test("onboarding typed stream errors cannot be overwritten by done or profile completion", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const start = chat.indexOf("const handleOnboardingGoalChoice");
+    const end = chat.indexOf("// ── Action routing", start);
+    const onboarding = chat.slice(start, end);
+
+    expect(onboarding).toContain("let onboardingStreamFailed = false");
+    expect(onboarding).toContain("onboardingStreamFailed = true");
+    expect(onboarding).toContain("if (onboardingStreamFailed) return");
+    expect(onboarding).toContain("setShowOnboardingGoalCards(true)");
+    expect(onboarding).not.toMatch(
+      /if \(event\.event === "done"\) \{\s+setStreamStatus/,
+    );
+    expect(onboarding.indexOf("if (onboardingStreamFailed) return")).toBeLessThan(
+      onboarding.indexOf("await patchMe"),
+    );
+  });
+
+  test("pending onboarding choices return when a recoverable conversation reloads", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const initStart = chat.indexOf("// ── Init conversation");
+    const initEnd = chat.indexOf("const updateScrollPositionState", initStart);
+    const init = chat.slice(initStart, initEnd);
+
+    expect(init).toContain(
+      '(stage === "language_selection" || stage === "primary_goal_selection")',
+    );
+    expect(init).not.toContain(
+      'hydrated.messages.length === 0\n              && (stage === "language_selection"',
+    );
   });
 });

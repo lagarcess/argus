@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,10 +15,26 @@ ACCEPTANCE_MIGRATION = (
         "20260723000002_chat_turn_acceptance_and_reconciliation.sql"
     )
 )
+LIFECYCLE_RPC_MIGRATION = (
+    ROOT
+    / (
+        "supabase/migrations/"
+        "20260723000003_chat_turn_option_acceptance_and_finalization.sql"
+    )
+)
+BASE_ACCEPTANCE_MIGRATION_SHA256 = (
+    "b0e7ade1d01b8c3290397b82dc76048f8c64477d4ef0f6eeea8a1b8c0b5dca3f"
+)
 
 
 def _normalized(path: Path) -> str:
     return " ".join(path.read_text(encoding="utf-8").lower().split())
+
+
+def test_committed_acceptance_migration_is_byte_immutable() -> None:
+    digest = hashlib.sha256(ACCEPTANCE_MIGRATION.read_bytes()).hexdigest()
+
+    assert digest == BASE_ACCEPTANCE_MIGRATION_SHA256
 
 
 def test_lifecycle_table_has_locked_constraints_indexes_and_owner_rls() -> None:
@@ -154,6 +171,71 @@ def test_acceptance_rpc_composes_serialized_append_in_one_transaction() -> None:
     assert "to service_role" in sql
 
 
+def test_option_acceptance_and_terminal_finalization_are_single_transactions() -> None:
+    assert LIFECYCLE_RPC_MIGRATION.exists()
+    sql = _normalized(LIFECYCLE_RPC_MIGRATION)
+
+    old_signature = (
+        "public.accept_chat_turn( uuid, uuid, uuid, text, text, jsonb, "
+        "timestamptz, text, text )"
+    )
+    assert f"drop function if exists {old_signature}" in sql
+
+    for parameter in (
+        "p_expected_source_assistant_id uuid",
+        "p_expected_source_metadata jsonb",
+        "p_option_id text",
+        "p_replacement_values jsonb",
+    ):
+        assert parameter in sql
+    assert "v_appended.source_message" in sql
+    assert "source_message jsonb" in sql
+
+    assert "create function public.finalize_chat_turn(" in sql
+    finalizer = sql.split(
+        "create function public.finalize_chat_turn(",
+        1,
+    )[1]
+    assert finalizer.index("from public.chat_turn_lifecycles") < finalizer.index(
+        "from public.append_conversation_message"
+    )
+    assert "for update" in finalizer
+    assert "from public.append_conversation_message_settling_usage(" in finalizer
+    assert "select public.transition_chat_turn(" in finalizer
+    assert "raise exception 'chat-turn finalization conflict.'" in finalizer
+    for role in ("public", "anon", "authenticated"):
+        assert f"from {role}" in finalizer
+    assert "grant execute on function public.finalize_chat_turn(" in finalizer
+    assert "to service_role" in finalizer
+
+
+def test_response_option_retry_matches_finalizer_lock_order() -> None:
+    sql = _normalized(LIFECYCLE_RPC_MIGRATION)
+    retry_branch = sql.split("if v_retry then", 1)[1].split(
+        "else v_canonical_content := p_content",
+        1,
+    )[0]
+
+    lifecycle_lock = retry_branch.index(
+        "from public.chat_turn_lifecycles as l"
+    )
+    conversation_lock = retry_branch.index("from public.conversations as c")
+    original_message_load = retry_branch.index("from public.messages as m")
+
+    assert lifecycle_lock < conversation_lock < original_message_load
+
+
+def test_forward_migration_leaves_only_service_role_rpc_execution() -> None:
+    sql = _normalized(LIFECYCLE_RPC_MIGRATION)
+
+    for function_name in ("accept_chat_turn", "finalize_chat_turn"):
+        for role in ("public", "anon", "authenticated"):
+            assert f"revoke all on function public.{function_name}(" in sql
+            assert f"from {role}" in sql
+        assert f"grant execute on function public.{function_name}(" in sql
+        assert "to service_role" in sql
+
+
 def test_reconciliation_is_bounded_locked_database_time_recovery() -> None:
     sql = _normalized(ACCEPTANCE_MIGRATION)
 
@@ -227,6 +309,7 @@ def test_gateway_source_uses_only_the_approved_server_boundaries() -> None:
     )
 
     assert 'self.client.rpc(\n            "accept_chat_turn"' in mixin
+    assert 'self.client.rpc(\n            "finalize_chat_turn"' in mixin
     assert 'self.client.rpc(\n            "transition_chat_turn"' in mixin
     assert 'self.client.rpc(\n            "reconcile_stale_chat_turns"' in mixin
     assert 'table("chat_turn_lifecycles").insert' not in mixin

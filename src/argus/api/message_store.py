@@ -14,6 +14,11 @@ from argus.api.chat.previews import (
 )
 from argus.api.dependencies import dev_memory_fallback_enabled
 from argus.api.schemas import Conversation, Message, MessageRole
+from argus.domain.chat_turn_lifecycle import (
+    MemoryChatTurnLifecycleGateway,
+    TransitionResult,
+    TurnStatus,
+)
 from argus.domain.store import utcnow
 from argus.domain.usage_limits import settle_memory_usage
 
@@ -34,6 +39,211 @@ _RUNTIME_FAILURE_SUPERSEDED_KEY = "agent_runtime_failure_superseded"
 class ResponseOptionActionClaim:
     source_message: Message
     request_message: Message
+
+
+def accept_chat_turn(
+    *,
+    user_id: str,
+    conversation_id: str,
+    request_id: str,
+    message: Message,
+) -> Message:
+    gateway = api_state.supabase_gateway
+    if gateway is not None:
+        try:
+            return gateway.accept_chat_turn(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                request_id=request_id,
+                message=message,
+            )
+        except Exception:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.opt(exception=True).warning(
+                "Supabase chat-turn acceptance failed; using memory fallback",
+                conversation_id=conversation_id,
+            )
+    return MemoryChatTurnLifecycleGateway(api_state.store).accept_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_id=request_id,
+        message=message,
+    )
+
+
+def accept_response_option_chat_turn(
+    *,
+    user_id: str,
+    conversation_id: str,
+    request_id: str,
+    message: Message,
+    source_assistant_id: str | None,
+    expected_source_metadata: dict[str, Any] | None,
+    option_id: str | None,
+    replacement_values: dict[str, Any] | None,
+    request_message_id: str | None = None,
+) -> ResponseOptionActionClaim | None:
+    gateway = api_state.supabase_gateway
+    claimed: tuple[Message, Message] | None
+    if gateway is not None:
+        try:
+            claimed = gateway.accept_response_option_chat_turn(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                request_id=request_id,
+                message=message,
+                source_assistant_id=source_assistant_id,
+                expected_source_metadata=expected_source_metadata,
+                option_id=option_id,
+                replacement_values=replacement_values,
+                request_message_id=request_message_id,
+            )
+        except ValueError:
+            return None
+        except Exception:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.opt(exception=True).warning(
+                "Supabase response-option acceptance failed; using memory fallback",
+                conversation_id=conversation_id,
+            )
+            claimed = None
+        else:
+            source, request_message = claimed
+            return ResponseOptionActionClaim(
+                source_message=source,
+                request_message=request_message,
+            )
+    claimed = MemoryChatTurnLifecycleGateway(
+        api_state.store
+    ).accept_response_option_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_id=request_id,
+        message=message,
+        source_assistant_id=source_assistant_id,
+        expected_source_metadata=expected_source_metadata,
+        option_id=option_id,
+        replacement_values=replacement_values,
+        request_message_id=request_message_id,
+    )
+    if claimed is None:
+        return None
+    source, request_message = claimed
+    return ResponseOptionActionClaim(
+        source_message=source,
+        request_message=request_message,
+    )
+
+
+def finalize_chat_turn(
+    *,
+    user_id: str,
+    conversation_id: str,
+    turn_id: str,
+    request_id: str,
+    message: Message,
+    to_status: TurnStatus,
+    failure_code: str | None,
+    retryable: bool,
+    settle_usage: dict[str, Any] | None,
+) -> Message:
+    gateway = api_state.supabase_gateway
+    if gateway is not None:
+        try:
+            return gateway.finalize_chat_turn(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                request_id=request_id,
+                message=message,
+                to_status=to_status,
+                failure_code=failure_code,
+                retryable=retryable,
+                settle_usage=settle_usage,
+            )
+        except Exception:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.opt(exception=True).warning(
+                "Supabase chat-turn finalization failed; using memory fallback",
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+            )
+    return MemoryChatTurnLifecycleGateway(api_state.store).finalize_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        request_id=request_id,
+        message=message,
+        to_status=to_status,
+        failure_code=failure_code,
+        retryable=retryable,
+        settle_usage=settle_usage,
+    )
+
+
+def transition_chat_turn(
+    *,
+    turn_id: str,
+    to_status: TurnStatus,
+) -> TransitionResult:
+    gateway = api_state.supabase_gateway
+    if gateway is not None:
+        return gateway.transition_chat_turn(
+            turn_id=turn_id,
+            to_status=to_status,
+            assistant_message_id=None,
+            reconciled_outcome=None,
+            failure_code=None,
+            retryable=None,
+        )
+    return MemoryChatTurnLifecycleGateway(api_state.store).transition_chat_turn(
+        turn_id=turn_id,
+        to_status=to_status,
+        assistant_message_id=None,
+        reconciled_outcome=None,
+        failure_code=None,
+        retryable=None,
+    )
+
+
+def reconcile_stale_chat_turns(
+    *,
+    user_id: str,
+    conversation_id: str,
+) -> list[dict[str, Any]]:
+    gateway = api_state.supabase_gateway
+    if gateway is not None:
+        return gateway.reconcile_stale_chat_turns(
+            user_id=user_id,
+            conversation_id=conversation_id,
+        )
+    return MemoryChatTurnLifecycleGateway(api_state.store).reconcile_stale_chat_turns(
+        user_id=user_id,
+        conversation_id=conversation_id,
+    )
+
+
+def list_projectable_chat_turns(
+    *,
+    user_id: str,
+    conversation_id: str,
+    message_ids: list[str],
+) -> list[dict[str, Any]]:
+    gateway = api_state.supabase_gateway
+    if gateway is not None:
+        return gateway.list_projectable_chat_turns(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_ids=message_ids,
+        )
+    return MemoryChatTurnLifecycleGateway(api_state.store).list_projectable_chat_turns(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_ids=message_ids,
+    )
 
 
 def memory_conversation(
@@ -598,7 +808,7 @@ def _is_terminal_owner_runtime_failure(metadata: dict[str, Any]) -> bool:
     turn = metadata.get("agent_runtime_turn")
     return (
         isinstance(turn, dict)
-        and turn.get("status") == "failed"
+        and turn.get("status") in {"failed", "recoverable_failed"}
         and turn.get("terminal") is True
         and _is_visible_runtime_failure(metadata)
     )

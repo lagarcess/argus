@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -658,6 +659,371 @@ def test_acceptance_is_atomic_idempotent_and_owner_scoped(
                 conversation_id=conversation_id,
             ),
         )
+
+
+def test_response_option_retry_uses_server_owned_request_and_accepts_once(
+    lifecycle: tuple[
+        MemoryChatTurnLifecycleGateway,
+        AlphaStore,
+        str,
+        str,
+    ],
+) -> None:
+    gateway, store, user_id, conversation_id = lifecycle
+    source = _message(
+        message_id=_id(),
+        conversation_id=conversation_id,
+        role="assistant",
+        content="Which timeframe?",
+        metadata={
+            "clarification": {
+                "options": [
+                    {
+                        "id": "daily",
+                        "replacement_values": {"timeframe": "1D"},
+                    }
+                ],
+                "payload": {"strategy": {"asset_universe": ["AAPL"]}},
+            }
+        },
+    )
+    store.messages[conversation_id].append(source)
+    original = _message(
+        message_id=_id(),
+        conversation_id=conversation_id,
+        content="Use daily bars",
+        metadata={
+            "agent_runtime_turn": {"request_id": "request-original"},
+            "chat_action": {
+                "type": "select_response_option",
+                "label": "Use daily bars",
+                "payload": {
+                    "option_id": "daily",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+                "presentation": None,
+            },
+        },
+    )
+    claim = gateway.accept_response_option_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_id="request-original",
+        message=original,
+        source_assistant_id=source.id,
+        expected_source_metadata=source.metadata,
+        option_id="daily",
+        replacement_values={"timeframe": "1D"},
+    )
+    assert claim == (source, original)
+    failure = _terminal_message(
+        store,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=original.id,
+        request_id="request-original",
+        status="recoverable_failed",
+        failure_code="runtime_failure",
+        retryable=True,
+    )
+    transitioned = gateway.transition_chat_turn(
+        turn_id=original.id,
+        to_status="recoverable_failed",
+        assistant_message_id=failure.id,
+        reconciled_outcome=None,
+        failure_code="runtime_failure",
+        retryable=True,
+    )
+    assert transitioned.outcome == "applied"
+
+    retry_candidate = _message(
+        message_id=_id(),
+        conversation_id=conversation_id,
+        content="tampered replay content",
+        metadata={
+            "agent_runtime_turn": {"request_id": "request-retry"},
+            "mentions": [{"id": "tampered"}],
+            "chat_action": {
+                "type": "select_response_option",
+                "label": "Tampered",
+                "payload": {
+                    "request_message_id": original.id,
+                    "source_assistant_id": _id(),
+                    "option_id": "tampered",
+                    "replacement_values": {"timeframe": "5m"},
+                },
+            },
+        },
+    )
+    retried = gateway.accept_response_option_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_id="request-retry",
+        message=retry_candidate,
+        source_assistant_id=None,
+        expected_source_metadata=None,
+        option_id=None,
+        replacement_values=None,
+        request_message_id=original.id,
+    )
+
+    assert retried is not None
+    accepted_source, accepted_retry = retried
+    assert accepted_source == source
+    assert accepted_retry.id == retry_candidate.id
+    assert accepted_retry.content == original.content
+    assert accepted_retry.metadata == {
+        "agent_runtime_turn": {"request_id": "request-retry"},
+        "chat_action": original.metadata["chat_action"],
+    }
+    assert store.chat_turn_lifecycles[original.id]["status"] == (
+        "recoverable_failed"
+    )
+    assert store.chat_turn_lifecycles[retry_candidate.id]["status"] == "accepted"
+
+    replay = gateway.accept_response_option_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_id="request-retry",
+        message=retry_candidate,
+        source_assistant_id=None,
+        expected_source_metadata=None,
+        option_id=None,
+        replacement_values=None,
+        request_message_id=original.id,
+    )
+    competing = gateway.accept_response_option_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_id="request-competing",
+        message=_message(
+            message_id=_id(),
+            conversation_id=conversation_id,
+            content="different replay",
+        ),
+        source_assistant_id=None,
+        expected_source_metadata=None,
+        option_id=None,
+        replacement_values=None,
+        request_message_id=original.id,
+    )
+
+    assert replay == (source, accepted_retry)
+    assert competing is None
+    assert sum(
+        row["status"] == "accepted"
+        for row in store.chat_turn_lifecycles.values()
+    ) == 1
+    successful_assistant = _message(
+        message_id=_id(),
+        conversation_id=conversation_id,
+        role="assistant",
+        content="Completed retry.",
+        metadata={
+            "agent_runtime_turn": {
+                "turn_id": accepted_retry.id,
+                "request_id": "request-retry",
+                "status": "completed",
+                "terminal": True,
+            }
+        },
+    )
+    gateway.finalize_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=accepted_retry.id,
+        request_id="request-retry",
+        message=successful_assistant,
+        to_status="completed",
+        failure_code=None,
+        retryable=False,
+        settle_usage={
+            "resource": "messages",
+            "limits": [("hour", 20), ("day", 100)],
+        },
+    )
+    assert store.chat_turn_lifecycles[original.id]["status"] == (
+        "recoverable_failed"
+    )
+    assert store.chat_turn_lifecycles[accepted_retry.id]["status"] == "completed"
+    assert {
+        key: row["used_count"]
+        for key, row in store.usage_counters.items()
+    } == {
+        (user_id, "messages", "hour"): 1,
+        (user_id, "messages", "day"): 1,
+    }
+
+
+@pytest.mark.parametrize(
+    "rejection_case",
+    [
+        "foreign_owner",
+        "foreign_conversation",
+        "completed",
+        "nonretryable",
+        "superseded",
+    ],
+)
+def test_response_option_retry_rejection_is_side_effect_free(
+    lifecycle: tuple[
+        MemoryChatTurnLifecycleGateway,
+        AlphaStore,
+        str,
+        str,
+    ],
+    rejection_case: str,
+) -> None:
+    gateway, store, user_id, conversation_id = lifecycle
+    source = _message(
+        message_id=_id(),
+        conversation_id=conversation_id,
+        role="assistant",
+        content="Which timeframe?",
+        metadata={
+            "clarification": {
+                "options": [
+                    {
+                        "id": "daily",
+                        "replacement_values": {"timeframe": "1D"},
+                    }
+                ]
+            }
+        },
+    )
+    store.messages[conversation_id].append(source)
+    original = _message(
+        message_id=_id(),
+        conversation_id=conversation_id,
+        content="Use daily bars",
+        metadata={
+            "chat_action": {
+                "type": "select_response_option",
+                "label": "Use daily bars",
+                "payload": {
+                    "option_id": "daily",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            }
+        },
+    )
+    assert gateway.accept_response_option_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_id="request-original",
+        message=original,
+        source_assistant_id=source.id,
+        expected_source_metadata=source.metadata,
+        option_id="daily",
+        replacement_values={"timeframe": "1D"},
+    )
+    terminal_status = (
+        "completed" if rejection_case == "completed" else "recoverable_failed"
+    )
+    retryable = rejection_case not in {"completed", "nonretryable"}
+    terminal = _terminal_message(
+        store,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        turn_id=original.id,
+        request_id="request-original",
+        status=terminal_status,
+        failure_code=(
+            "runtime_failure" if terminal_status == "recoverable_failed" else None
+        ),
+        retryable=retryable,
+    )
+    assert gateway.transition_chat_turn(
+        turn_id=original.id,
+        to_status=terminal_status,
+        assistant_message_id=terminal.id,
+        reconciled_outcome=None,
+        failure_code=(
+            "runtime_failure" if terminal_status == "recoverable_failed" else None
+        ),
+        retryable=retryable,
+    ).outcome == "applied"
+    if rejection_case == "superseded":
+        _accept(
+            gateway,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            request_id="request-later",
+        )
+
+    retry_user_id = _id() if rejection_case == "foreign_owner" else user_id
+    retry_conversation_id = conversation_id
+    if rejection_case == "foreign_conversation":
+        retry_conversation_id = _id()
+        store.conversation_owners[retry_conversation_id] = user_id
+        store.conversations[retry_conversation_id] = Conversation(
+            id=retry_conversation_id,
+            title="Other conversation",
+            title_source="system_default",
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        store.messages[retry_conversation_id] = []
+    retry_candidate = _message(
+        message_id=_id(),
+        conversation_id=retry_conversation_id,
+        content="tampered retry",
+    )
+    messages_before = deepcopy(store.messages)
+    lifecycles_before = deepcopy(store.chat_turn_lifecycles)
+    usage_before = deepcopy(store.usage_counters)
+
+    rejected = gateway.accept_response_option_chat_turn(
+        user_id=retry_user_id,
+        conversation_id=retry_conversation_id,
+        request_id="request-retry",
+        message=retry_candidate,
+        source_assistant_id=None,
+        expected_source_metadata=None,
+        option_id=None,
+        replacement_values=None,
+        request_message_id=original.id,
+    )
+
+    assert rejected is None
+    assert store.messages == messages_before
+    assert store.chat_turn_lifecycles == lifecycles_before
+    assert store.usage_counters == usage_before
+
+
+@pytest.mark.parametrize(
+    ("content", "expected_preview"),
+    [
+        ("Test this normal idea.", "Test this normal idea."),
+        ("__ONBOARDING_GOAL__:test_stock_idea", None),
+        ("__ONBOARDING_SKIP__", None),
+    ],
+)
+def test_acceptance_preview_keeps_normal_text_but_hides_typed_onboarding_controls(
+    lifecycle: tuple[
+        MemoryChatTurnLifecycleGateway,
+        AlphaStore,
+        str,
+        str,
+    ],
+    content: str,
+    expected_preview: str | None,
+) -> None:
+    gateway, store, user_id, conversation_id = lifecycle
+    message = _message(
+        message_id=_id(),
+        conversation_id=conversation_id,
+        content=content,
+    )
+
+    gateway.accept_chat_turn(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_id=f"request-{message.id}",
+        message=message,
+    )
+
+    assert store.conversations[conversation_id].last_message_preview == expected_preview
 
 
 def test_reconciliation_uses_stale_order_and_processes_at_most_twenty(

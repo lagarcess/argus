@@ -59,6 +59,53 @@ def _final_payload(stream: str) -> dict[str, Any]:
     return payload
 
 
+def _assert_durable_retry_on_linked_assistant(
+    messages: list[dict[str, Any]],
+    *,
+    persisted_content: str,
+    failure_code: str = "agent_runtime_failure",
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    user_message = next(message for message in messages if message["role"] == "user")
+    user_runtime_turn = user_message["metadata"]["agent_runtime_turn"]
+    assert user_runtime_turn == {
+        "status": "started",
+        "conversation_id": user_message["conversation_id"],
+        "request_id": user_runtime_turn["request_id"],
+        "started_at": user_runtime_turn["started_at"],
+    }
+    assert user_runtime_turn["request_id"]
+    assert user_runtime_turn["started_at"]
+    assert "retry_last_turn" not in user_message["metadata"]
+
+    linked_assistants = [
+        message
+        for message in messages
+        if message["role"] == "assistant"
+        and message["metadata"].get("agent_runtime_turn", {}).get("turn_id")
+        == user_message["id"]
+    ]
+    assert len(linked_assistants) == 1
+    assistant_message = linked_assistants[0]
+    assert assistant_message["metadata"]["agent_runtime_turn"] == {
+        "turn_id": user_message["id"],
+        "request_id": user_runtime_turn["request_id"],
+        "status": "recoverable_failed",
+        "terminal": True,
+        "reconciled_outcome": None,
+        "failure_code": failure_code,
+        "retryable": True,
+    }
+    expected_retry = {
+        "request_message_id": user_message["id"],
+        "message": persisted_content,
+    }
+    persisted_action = user_message["metadata"].get("chat_action")
+    if persisted_action is not None:
+        expected_retry["action"] = persisted_action
+    assert assistant_message["metadata"]["retry_last_turn"] == expected_retry
+    return user_message, assistant_message
+
+
 def test_finalization_retry_metadata_preserves_structured_action() -> None:
     from argus.api.chat.retry import retry_last_turn_metadata
     from argus.api.schemas import ChatActionPayload, ChatStreamRequest
@@ -871,14 +918,11 @@ def test_chat_stream_runtime_stall_emits_recoverable_error(
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
-    runtime_diagnostics = messages[-1]["metadata"]["runtime_diagnostics"]
-    assert runtime_diagnostics["code"] == "agent_runtime_event_timeout"
-    assert runtime_diagnostics["timeout_seconds"] == 0.01
-    assert runtime_diagnostics["last_event"] == {
-        "type": "stage_start",
-        "stage": "interpret",
-    }
-    assert runtime_diagnostics["event_count"] == 1
+    assert "runtime_diagnostics" not in response.text
+    assert all(
+        "runtime_diagnostics" not in (message["metadata"] or {})
+        for message in messages
+    )
 
 
 def test_chat_stream_visible_failure_path_is_terminal_for_turn(
@@ -987,6 +1031,13 @@ def test_chat_stream_visible_failure_path_is_terminal_for_turn(
     events = _data_events(response.text)
     error_events = [event for event in events if event.get("type") == "error"]
     final_events = [event for event in events if event.get("type") == "final"]
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    user_message, terminal_assistant = _assert_durable_retry_on_linked_assistant(
+        messages,
+        persisted_content=prompt,
+    )
     assert error_events == [
         {
             "type": "error",
@@ -997,15 +1048,15 @@ def test_chat_stream_visible_failure_path_is_terminal_for_turn(
                 "code": "runtime_failure",
                 "retryable": True,
             },
-            "retry_last_turn": {"message": prompt},
+            "retry_last_turn": {
+                "request_message_id": user_message["id"],
+                "message": prompt,
+            },
         }
     ]
     assert final_events == []
     assert response.text.count("data: [DONE]") == 1
 
-    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
-        "items"
-    ]
     assistant_messages = [
         message for message in messages if message["role"] == "assistant"
     ]
@@ -1015,17 +1066,20 @@ def test_chat_stream_visible_failure_path_is_terminal_for_turn(
         if message["metadata"].get("agent_runtime_stage_outcome")
         == "agent_runtime_failure"
     ]
-    assert len(failure_messages) == 1
-    failure_metadata = failure_messages[0]["metadata"]
+    assert failure_messages == [terminal_assistant]
+    failure_metadata = terminal_assistant["metadata"]
     assert failure_metadata["recovery"]["code"] == "runtime_failure"
-    assert failure_metadata["retry_last_turn"] == {"message": prompt}
+    assert failure_metadata["retry_last_turn"] == {
+        "request_message_id": user_message["id"],
+        "message": prompt,
+    }
     assert not any(
         message["metadata"].get("confirmation_payload")
         or message["metadata"].get("confirmation_card")
         or message["metadata"].get("result_card")
         or message["metadata"].get("result_run_id")
         for message in assistant_messages
-        if message["id"] != failure_messages[0]["id"]
+        if message["id"] != terminal_assistant["id"]
     )
 
 
@@ -1187,6 +1241,93 @@ async def test_runtime_keepalive_wrapper_cleans_pending_task_on_close(
     await wrapped_events.aclose()
 
     await asyncio.wait_for(cleanup_seen.wait(), timeout=1)
+
+
+@pytest.mark.asyncio
+async def test_stream_close_persists_provider_receipt_with_request_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+    from argus.api.schemas import ChatStreamRequest, User
+    from argus.llm.openrouter import record_openrouter_route_receipt
+    from starlette.requests import Request
+
+    persisted_receipts: list[dict[str, Any]] = []
+    runtime_closed = asyncio.Event()
+
+    async def _runtime_events(**_: Any):
+        try:
+            record_openrouter_route_receipt(
+                task="interpretation",
+                model_name="unit-test-model",
+                mode="json_schema",
+                schema_name="LLMInterpretationResponse",
+                latency_ms=5,
+                outcome="succeeded",
+            )
+            record_openrouter_route_receipt(
+                task="chat_composer",
+                model_name="unit-test-model",
+                mode="text",
+                schema_name=None,
+                latency_ms=3,
+                outcome="succeeded",
+            )
+            yield {"type": "stage_start", "stage": "interpret"}
+            await asyncio.Event().wait()
+        finally:
+            runtime_closed.set()
+
+    def _capture_receipts(**kwargs: Any) -> None:
+        persisted_receipts.append(kwargs)
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_events)
+    monkeypatch.setattr(agent_router, "persist_route_receipts", _capture_receipts)
+
+    client = _client()
+    conversation = _conversation(client)
+    user = User.model_validate(client.get("/api/v1/me").json()["user"])
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/chat/stream",
+            "query_string": b"",
+            "headers": [],
+            "scheme": "http",
+            "server": ("testserver", 80),
+            "client": ("testclient", 50000),
+            "app": app,
+        }
+    )
+    request.state.request_id = "request-disconnect"
+    response = await agent_router.chat_stream(
+        ChatStreamRequest(
+            conversation_id=conversation["id"],
+            message="Test AAPL.",
+            language="en",
+        ),
+        request,
+        idempotency_key=None,
+        user=user,
+    )
+
+    assert "stage_start" in str(await anext(response.body_iterator))
+    await response.body_iterator.aclose()
+    await asyncio.wait_for(runtime_closed.wait(), timeout=1)
+
+    durable_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    request_message = next(
+        message for message in durable_messages if message["role"] == "user"
+    )
+    assert len(persisted_receipts) == 1
+    assert len(persisted_receipts[0]["receipts"]) == 2
+    assert persisted_receipts[0]["message_id"] == request_message["id"]
+    assert persisted_receipts[0]["metadata"]["request_id"] == "request-disconnect"
+    assert persisted_receipts[0]["metadata"]["turn_id"] == request_message["id"]
+    assert persisted_receipts[0]["metadata"]["source"] == "api_turn"
 
 
 def test_chat_stream_missing_runtime_final_emits_recoverable_error(
@@ -1411,16 +1552,26 @@ def test_chat_stream_runtime_initialization_failure_emits_recoverable_error(
         "code": "runtime_failure",
         "retryable": True,
     }
-    assert events[0]["retry_last_turn"] == {"message": message}
     assert response.text.count("data: [DONE]") == 1
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
+    user_message, assistant_message = _assert_durable_retry_on_linked_assistant(
+        messages,
+        persisted_content=message,
+        failure_code="runtime_initialization_failed",
+    )
+    assert (
+        events[0]["retry_last_turn"]
+        == assistant_message["metadata"]["retry_last_turn"]
+    )
     assert [message["role"] for message in messages[-2:]] == ["user", "assistant"]
-    assistant_message = messages[-1]
+    assert messages[-1] == assistant_message
     assert assistant_message["content"] == events[0]["message"]
     assert assistant_message["metadata"]["recovery"] == events[0]["recovery"]
-    assert assistant_message["metadata"]["retry_last_turn"] == {"message": message}
+    assert assistant_message["metadata"]["retry_last_turn"]["request_message_id"] == (
+        user_message["id"]
+    )
 
 
 def test_chat_stream_runtime_failure_persists_retry_last_turn_metadata(
@@ -1452,11 +1603,14 @@ def test_chat_stream_runtime_failure_persists_retry_last_turn_metadata(
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
-    assistant_message = messages[-1]
-    assert assistant_message["role"] == "assistant"
-    assert assistant_message["metadata"]["retry_last_turn"] == {
-        "message": "what if I bought $125 of BTC every two weeks in 2022?"
-    }
+    user_message, assistant_message = _assert_durable_retry_on_linked_assistant(
+        messages,
+        persisted_content="what if I bought $125 of BTC every two weeks in 2022?",
+    )
+    assert messages[-1] == assistant_message
+    assert assistant_message["metadata"]["retry_last_turn"]["request_message_id"] == (
+        user_message["id"]
+    )
     assert assistant_message["metadata"]["recovery"] == {
         "code": "runtime_failure",
         "retryable": True,
@@ -1501,17 +1655,26 @@ def test_chat_stream_runtime_failure_emits_typed_recovery_for_spanish_user(
         "code": "runtime_failure",
         "retryable": True,
     }
-    assert error_event["retry_last_turn"] == {"message": message}
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
-    assistant_message = messages[-1]
+    user_message, assistant_message = _assert_durable_retry_on_linked_assistant(
+        messages,
+        persisted_content=message,
+    )
+    assert (
+        error_event["retry_last_turn"]
+        == assistant_message["metadata"]["retry_last_turn"]
+    )
+    assert messages[-1] == assistant_message
     assert assistant_message["content"] == error_event["message"]
-    assert assistant_message["metadata"]["retry_last_turn"] == {"message": message}
+    assert assistant_message["metadata"]["retry_last_turn"]["request_message_id"] == (
+        user_message["id"]
+    )
     assert assistant_message["metadata"]["recovery"] == error_event["recovery"]
 
 
-def test_chat_stream_final_persists_retry_last_turn_metadata(
+def test_chat_stream_typed_interpreter_recovery_uses_canonical_bound_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api.routers import agent as agent_router
@@ -1562,18 +1725,27 @@ def test_chat_stream_final_persists_retry_last_turn_metadata(
     )
 
     assert response.status_code == 200
-    final_payload = _final_payload(response.text)
-    assert final_payload["retry_last_turn"] == {
-        "message": "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+    events = _data_events(response.text)
+    assert [event["type"] for event in events] == ["stage_start", "error"]
+    error = events[-1]
+    assert error["code"] == "agent_runtime_failure"
+    assert error["recovery"] == {
+        "code": "runtime_failure",
+        "retryable": True,
     }
+    assert "Guardé tu mensaje" not in response.text
+    assert response.text.count("data: [DONE]") == 1
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
-    assistant_message = messages[-1]
-    assert assistant_message["metadata"]["retry_last_turn"] == final_payload[
-        "retry_last_turn"
-    ]
-    assert assistant_message["metadata"]["recovery"] == final_payload["recovery"]
+    user_message, assistant_message = _assert_durable_retry_on_linked_assistant(
+        messages,
+        persisted_content=(
+            "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+        ),
+    )
+    assert error["retry_last_turn"] == assistant_message["metadata"]["retry_last_turn"]
+    assert error["retry_last_turn"]["request_message_id"] == user_message["id"]
 
 
 def test_chat_stream_empty_final_persists_visible_recovery_for_user_turn(
@@ -1613,7 +1785,6 @@ def test_chat_stream_empty_final_persists_visible_recovery_for_user_turn(
     events = _data_events(response.text)
     assert events[-1]["type"] == "error"
     assert events[-1]["message"]
-    assert events[-1]["retry_last_turn"] == {"message": message}
     assert events[-1]["recovery"] == {
         "code": "runtime_failure",
         "retryable": True,
@@ -1623,10 +1794,20 @@ def test_chat_stream_empty_final_persists_visible_recovery_for_user_turn(
         "items"
     ]
     assert [message["role"] for message in messages[-2:]] == ["user", "assistant"]
-    assistant_message = messages[-1]
+    user_message, assistant_message = _assert_durable_retry_on_linked_assistant(
+        messages,
+        persisted_content=message,
+    )
+    assert (
+        events[-1]["retry_last_turn"]
+        == assistant_message["metadata"]["retry_last_turn"]
+    )
+    assert messages[-1] == assistant_message
     assert assistant_message["content"] == events[-1]["message"]
     assert assistant_message["metadata"]["conversation_mode"] == "recovery"
-    assert assistant_message["metadata"]["retry_last_turn"] == {"message": message}
+    assert assistant_message["metadata"]["retry_last_turn"]["request_message_id"] == (
+        user_message["id"]
+    )
     assert assistant_message["metadata"]["recovery"] == events[-1]["recovery"]
 
 
@@ -1660,13 +1841,12 @@ def test_chat_stream_persists_runtime_start_marker_on_user_message(
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
-    user_message = next(item for item in messages if item["role"] == "user")
-    runtime_marker = user_message["metadata"]["agent_runtime_turn"]
-    assert runtime_marker["status"] == "started"
-    assert runtime_marker["conversation_id"] == conversation["id"]
-    assert runtime_marker["request_id"]
-    assert runtime_marker["started_at"]
-    assert messages[-1]["metadata"]["agent_runtime_stage_outcome"] == (
+    _, terminal_assistant = _assert_durable_retry_on_linked_assistant(
+        messages,
+        persisted_content="Test AAPL and MSFT",
+    )
+    assert messages[-1] == terminal_assistant
+    assert terminal_assistant["metadata"]["agent_runtime_stage_outcome"] == (
         "agent_runtime_failure"
     )
 

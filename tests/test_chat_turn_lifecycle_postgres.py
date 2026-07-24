@@ -9,7 +9,9 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from threading import Event
 
 import pytest
 
@@ -91,6 +93,128 @@ def _accept(
     }
 
 
+def _accept_option(
+    connection,
+    owner: dict[str, str],
+    *,
+    source_assistant_id: str,
+    expected_source_metadata: dict[str, object],
+    option_id: str,
+    replacement_values: dict[str, object],
+    turn_id: str | None = None,
+    message_metadata: dict[str, object] | None = None,
+) -> dict[str, object] | None:
+    turn_id = turn_id or _id()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select * from public.accept_chat_turn("
+            " %s, %s, %s, 'user', 'Use daily bars', %s::jsonb,"
+            " now(), 'Use daily bars', %s, %s, %s::jsonb, %s, %s::jsonb)",
+            (
+                owner["user_id"],
+                owner["conversation_id"],
+                turn_id,
+                json.dumps(message_metadata or {}),
+                f"request-{turn_id}",
+                source_assistant_id,
+                json.dumps(expected_source_metadata),
+                option_id,
+                json.dumps(replacement_values),
+            ),
+        )
+        row = cursor.fetchone()
+    if row is None:
+        return None
+    return {
+        "message": row[0],
+        "lifecycle": row[1],
+        "replayed": row[2],
+        "source_message": row[3],
+    }
+
+
+def _accept_option_retry(
+    connection,
+    owner: dict[str, str],
+    *,
+    request_message_id: str,
+    turn_id: str,
+    request_id: str,
+) -> dict[str, object] | None:
+    metadata = {
+        "agent_runtime_turn": {"request_id": request_id},
+        "mentions": [{"id": "tampered"}],
+        "chat_action": {
+            "type": "select_response_option",
+            "payload": {
+                "request_message_id": request_message_id,
+                "source_assistant_id": _id(),
+                "option_id": "tampered",
+                "replacement_values": {"timeframe": "5m"},
+            },
+        },
+    }
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select * from public.accept_chat_turn("
+            " %s, %s, %s, 'user', 'tampered content', %s::jsonb,"
+            " now(), 'tampered preview', %s, %s, %s::jsonb, %s, %s::jsonb,"
+            " %s)",
+            (
+                owner["user_id"],
+                owner["conversation_id"],
+                turn_id,
+                json.dumps(metadata),
+                request_id,
+                _id(),
+                json.dumps({"tampered": True}),
+                "tampered",
+                json.dumps({"timeframe": "5m"}),
+                request_message_id,
+            ),
+        )
+        row = cursor.fetchone()
+    if row is None:
+        return None
+    return {
+        "message": row[0],
+        "lifecycle": row[1],
+        "replayed": row[2],
+        "source_message": row[3],
+    }
+
+
+def _append_option_source(
+    connection,
+    owner: dict[str, str],
+) -> tuple[str, dict[str, object]]:
+    source_id = _id()
+    metadata: dict[str, object] = {
+        "clarification": {
+            "options": [
+                {
+                    "id": "daily",
+                    "replacement_values": {"timeframe": "1D"},
+                }
+            ]
+        }
+    }
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select * from public.append_conversation_message("
+            " %s, %s, %s, 'assistant', 'Choose bars', %s::jsonb,"
+            " now(), 'Choose bars', null, null, null, null)",
+            (
+                owner["user_id"],
+                owner["conversation_id"],
+                source_id,
+                json.dumps(metadata),
+            ),
+        )
+        assert cursor.fetchone() is not None
+    return source_id, metadata
+
+
 def _append_terminal(
     connection,
     owner: dict[str, str],
@@ -159,6 +283,51 @@ def _transition(
     return result
 
 
+def _finalize(
+    connection,
+    owner: dict[str, str],
+    *,
+    turn_id: str,
+    request_id: str,
+    message_id: str | None = None,
+    status: str = "completed",
+    failure_code: str | None = None,
+    retryable: bool = False,
+) -> dict[str, object]:
+    message_id = message_id or _id()
+    runtime_turn: dict[str, object] = {
+        "turn_id": turn_id,
+        "request_id": request_id,
+        "status": status,
+        "terminal": True,
+    }
+    if status == "recoverable_failed":
+        runtime_turn.update(
+            failure_code=failure_code,
+            retryable=retryable,
+        )
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select * from public.finalize_chat_turn("
+            " %s, %s, %s, %s, %s, 'assistant', 'terminal response',"
+            " %s::jsonb, now(), 'terminal response', %s, %s, %s, null, null)",
+            (
+                owner["user_id"],
+                owner["conversation_id"],
+                turn_id,
+                request_id,
+                message_id,
+                json.dumps({"agent_runtime_turn": runtime_turn}),
+                status,
+                failure_code,
+                retryable,
+            ),
+        )
+        row = cursor.fetchone()
+    assert row is not None
+    return {"message": row[0]}
+
+
 def _age_turn(connection, turn_id: str, *, minutes: int = 30) -> None:
     with connection.cursor() as cursor:
         cursor.execute(
@@ -198,6 +367,529 @@ def test_acceptance_commits_message_and_lifecycle_once(owner) -> None:
                 (turn_id, turn_id),
             )
             assert cursor.fetchone() == (1, 1)
+
+
+def test_response_option_acceptance_is_atomic_and_rejects_replay_or_tampering(
+    owner,
+) -> None:
+    with _connect() as connection:
+        source_id, source_metadata = _append_option_source(connection, owner)
+        valid = _accept_option(
+            connection,
+            owner,
+            source_assistant_id=source_id,
+            expected_source_metadata=source_metadata,
+            option_id="daily",
+            replacement_values={"timeframe": "1D"},
+        )
+        assert valid is not None
+        assert valid["source_message"]["id"] == source_id
+        assert valid["message"]["id"] == valid["lifecycle"]["turn_id"]
+
+        rejected_turn_ids: list[str] = []
+
+        replayed_turn = _id()
+        rejected_turn_ids.append(replayed_turn)
+        assert (
+            _accept_option(
+                connection,
+                owner,
+                source_assistant_id=source_id,
+                expected_source_metadata=source_metadata,
+                option_id="daily",
+                replacement_values={"timeframe": "1D"},
+                turn_id=replayed_turn,
+            )
+            is None
+        )
+
+        tampered_source_id, tampered_source_metadata = _append_option_source(
+            connection,
+            owner,
+        )
+        tampered_turn = _id()
+        rejected_turn_ids.append(tampered_turn)
+        assert (
+            _accept_option(
+                connection,
+                owner,
+                source_assistant_id=tampered_source_id,
+                expected_source_metadata={
+                    **tampered_source_metadata,
+                    "injected": True,
+                },
+                option_id="daily",
+                replacement_values={"timeframe": "1D"},
+                turn_id=tampered_turn,
+            )
+            is None
+        )
+
+        mismatch_source_id, mismatch_source_metadata = _append_option_source(
+            connection,
+            owner,
+        )
+        mismatch_turn = _id()
+        rejected_turn_ids.append(mismatch_turn)
+        assert (
+            _accept_option(
+                connection,
+                owner,
+                source_assistant_id=mismatch_source_id,
+                expected_source_metadata=mismatch_source_metadata,
+                option_id="daily",
+                replacement_values={"timeframe": "5m"},
+                turn_id=mismatch_turn,
+            )
+            is None
+        )
+
+        stale_source_id, stale_source_metadata = _append_option_source(
+            connection,
+            owner,
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select * from public.append_conversation_message("
+                " %s, %s, %s, 'assistant', 'Later message', '{}'::jsonb,"
+                " now(), 'Later message', null, null, null, null)",
+                (owner["user_id"], owner["conversation_id"], _id()),
+            )
+            assert cursor.fetchone() is not None
+        stale_turn = _id()
+        rejected_turn_ids.append(stale_turn)
+        assert (
+            _accept_option(
+                connection,
+                owner,
+                source_assistant_id=stale_source_id,
+                expected_source_metadata=stale_source_metadata,
+                option_id="daily",
+                replacement_values={"timeframe": "1D"},
+                turn_id=stale_turn,
+            )
+            is None
+        )
+
+        foreign = _seed_owner(connection)
+        foreign_source_id, foreign_metadata = _append_option_source(
+            connection,
+            foreign,
+        )
+        injected_turn = _id()
+        rejected_turn_ids.append(injected_turn)
+        assert (
+            _accept_option(
+                connection,
+                owner,
+                source_assistant_id=foreign_source_id,
+                expected_source_metadata=foreign_metadata,
+                option_id="daily",
+                replacement_values={"timeframe": "1D"},
+                turn_id=injected_turn,
+            )
+            is None
+        )
+
+        failing_source_id, failing_source_metadata = _append_option_source(
+            connection,
+            owner,
+        )
+        failing_turn = _id()
+        rejected_turn_ids.append(failing_turn)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                create function pg_temp.reject_option_lifecycle_insert()
+                returns trigger
+                language plpgsql
+                as $$
+                begin
+                  raise exception 'forced option lifecycle insert failure';
+                end;
+                $$
+                """
+            )
+            cursor.execute(
+                """
+                create trigger task5_force_option_lifecycle_insert_failure
+                before insert on public.chat_turn_lifecycles
+                for each row execute function
+                  pg_temp.reject_option_lifecycle_insert()
+                """
+            )
+        try:
+            with pytest.raises(
+                psycopg.errors.DatabaseError,
+                match="forced option lifecycle insert failure",
+            ):
+                _accept_option(
+                    connection,
+                    owner,
+                    source_assistant_id=failing_source_id,
+                    expected_source_metadata=failing_source_metadata,
+                    option_id="daily",
+                    replacement_values={"timeframe": "1D"},
+                    turn_id=failing_turn,
+                )
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    drop trigger if exists
+                      task5_force_option_lifecycle_insert_failure
+                    on public.chat_turn_lifecycles
+                    """
+                )
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select count(*) from public.messages where id = any(%s::uuid[])",
+                (rejected_turn_ids,),
+            )
+            assert cursor.fetchone()[0] == 0
+            cursor.execute(
+                "select count(*) from public.chat_turn_lifecycles"
+                " where turn_id = any(%s::uuid[])",
+                (rejected_turn_ids,),
+            )
+            assert cursor.fetchone()[0] == 0
+
+
+def test_response_option_retry_is_server_owned_atomic_and_idempotent(owner) -> None:
+    with _connect() as connection:
+        source_id, source_metadata = _append_option_source(connection, owner)
+        original_turn_id = _id()
+        canonical_action = {
+            "type": "select_response_option",
+            "label": "Use daily bars",
+            "payload": {
+                "option_id": "daily",
+                "replacement_values": {"timeframe": "1D"},
+            },
+            "presentation": None,
+        }
+        original = _accept_option(
+            connection,
+            owner,
+            source_assistant_id=source_id,
+            expected_source_metadata=source_metadata,
+            option_id="daily",
+            replacement_values={"timeframe": "1D"},
+            turn_id=original_turn_id,
+            message_metadata={"chat_action": canonical_action},
+        )
+        assert original is not None
+        _finalize(
+            connection,
+            owner,
+            turn_id=original_turn_id,
+            request_id=f"request-{original_turn_id}",
+            status="recoverable_failed",
+            failure_code="runtime_failure",
+            retryable=True,
+        )
+
+        retry_turn_id = _id()
+        accepted = _accept_option_retry(
+            connection,
+            owner,
+            request_message_id=original_turn_id,
+            turn_id=retry_turn_id,
+            request_id=f"request-{retry_turn_id}",
+        )
+        assert accepted is not None
+        assert accepted["replayed"] is False
+        assert accepted["source_message"]["id"] == source_id
+        assert accepted["message"]["content"] == "Use daily bars"
+        assert accepted["message"]["metadata"] == {
+            "agent_runtime_turn": {"request_id": f"request-{retry_turn_id}"},
+            "chat_action": canonical_action,
+        }
+        assert accepted["lifecycle"]["status"] == "accepted"
+
+        replay = _accept_option_retry(
+            connection,
+            owner,
+            request_message_id=original_turn_id,
+            turn_id=retry_turn_id,
+            request_id=f"request-{retry_turn_id}",
+        )
+        competing_turn_id = _id()
+        competing = _accept_option_retry(
+            connection,
+            owner,
+            request_message_id=original_turn_id,
+            turn_id=competing_turn_id,
+            request_id=f"request-{competing_turn_id}",
+        )
+        assert replay is not None
+        assert replay["replayed"] is True
+        assert replay["message"]["id"] == retry_turn_id
+        assert competing is None
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select status, retryable from public.chat_turn_lifecycles"
+                " where turn_id = %s",
+                (original_turn_id,),
+            )
+            assert cursor.fetchone() == ("recoverable_failed", True)
+            cursor.execute(
+                "select count(*) from public.messages where id = any(%s::uuid[])",
+                ([retry_turn_id, competing_turn_id],),
+            )
+            assert cursor.fetchone()[0] == 1
+            cursor.execute(
+                "select count(*) from public.chat_turn_lifecycles"
+                " where turn_id = any(%s::uuid[])",
+                ([retry_turn_id, competing_turn_id],),
+            )
+            assert cursor.fetchone()[0] == 1
+
+
+@pytest.mark.parametrize(
+    "rejection_case",
+    [
+        "foreign_owner",
+        "foreign_conversation",
+        "completed",
+        "nonretryable",
+        "superseded",
+    ],
+)
+def test_response_option_retry_rejections_are_side_effect_free(
+    owner,
+    rejection_case: str,
+) -> None:
+    with _connect() as connection:
+        source_id, source_metadata = _append_option_source(connection, owner)
+        original_turn_id = _id()
+        original = _accept_option(
+            connection,
+            owner,
+            source_assistant_id=source_id,
+            expected_source_metadata=source_metadata,
+            option_id="daily",
+            replacement_values={"timeframe": "1D"},
+            turn_id=original_turn_id,
+            message_metadata={
+                "chat_action": {
+                    "type": "select_response_option",
+                    "label": "Use daily bars",
+                    "payload": {
+                        "option_id": "daily",
+                        "replacement_values": {"timeframe": "1D"},
+                    },
+                }
+            },
+        )
+        assert original is not None
+        status = (
+            "completed" if rejection_case == "completed" else "recoverable_failed"
+        )
+        _finalize(
+            connection,
+            owner,
+            turn_id=original_turn_id,
+            request_id=f"request-{original_turn_id}",
+            status=status,
+            failure_code=(
+                "runtime_failure" if status == "recoverable_failed" else None
+            ),
+            retryable=rejection_case not in {"completed", "nonretryable"},
+        )
+        if rejection_case == "superseded":
+            _accept(connection, owner)
+
+        retry_owner = owner
+        if rejection_case in {"foreign_owner", "foreign_conversation"}:
+            foreign = _seed_owner(connection)
+            retry_owner = (
+                {
+                    "user_id": foreign["user_id"],
+                    "conversation_id": owner["conversation_id"],
+                }
+                if rejection_case == "foreign_owner"
+                else {
+                    "user_id": owner["user_id"],
+                    "conversation_id": foreign["conversation_id"],
+                }
+            )
+        retry_turn_id = _id()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select count(*) from public.usage_counters"
+                " where user_id = %s",
+                (retry_owner["user_id"],),
+            )
+            usage_before = cursor.fetchone()[0]
+
+        rejected = _accept_option_retry(
+            connection,
+            retry_owner,
+            request_message_id=original_turn_id,
+            turn_id=retry_turn_id,
+            request_id=f"request-{retry_turn_id}",
+        )
+
+        assert rejected is None
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select (select count(*) from public.messages where id = %s),"
+                " (select count(*) from public.chat_turn_lifecycles"
+                " where turn_id = %s),"
+                " (select count(*) from public.usage_counters"
+                " where user_id = %s)",
+                (retry_turn_id, retry_turn_id, retry_owner["user_id"]),
+            )
+            assert cursor.fetchone() == (0, 0, usage_before)
+
+
+def test_terminal_finalization_rolls_back_message_when_transition_fails(
+    owner,
+) -> None:
+    with _connect() as connection:
+        accepted = _accept(connection, owner)
+        turn_id = str(accepted["message"]["id"])
+        request_id = str(accepted["lifecycle"]["request_id"])
+        assistant_id = _id()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                create function pg_temp.reject_lifecycle_terminal()
+                returns trigger
+                language plpgsql
+                as $$
+                begin
+                  raise exception 'forced lifecycle terminal failure';
+                end;
+                $$
+                """
+            )
+            cursor.execute(
+                """
+                create trigger task5_force_lifecycle_terminal_failure
+                before update on public.chat_turn_lifecycles
+                for each row execute function pg_temp.reject_lifecycle_terminal()
+                """
+            )
+        try:
+            with pytest.raises(
+                psycopg.errors.DatabaseError,
+                match="forced lifecycle terminal failure",
+            ):
+                _finalize(
+                    connection,
+                    owner,
+                    turn_id=turn_id,
+                    request_id=request_id,
+                    message_id=assistant_id,
+                )
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    drop trigger if exists
+                      task5_force_lifecycle_terminal_failure
+                    on public.chat_turn_lifecycles
+                    """
+                )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select (select count(*) from public.messages where id = %s),"
+                " (select status from public.chat_turn_lifecycles"
+                " where turn_id = %s)",
+                (assistant_id, turn_id),
+            )
+            assert cursor.fetchone() == (0, "accepted")
+
+
+def test_finalizer_lock_wins_over_stale_reconciliation(owner) -> None:
+    with _connect() as seed:
+        accepted = _accept(seed, owner)
+        turn_id = str(accepted["message"]["id"])
+        request_id = str(accepted["lifecycle"]["request_id"])
+        _age_turn(seed, turn_id)
+
+    with _connect() as finalizer, _connect() as reconciler:
+        finalizer.autocommit = False
+        with finalizer.cursor() as cursor:
+            cursor.execute(
+                "select turn_id from public.chat_turn_lifecycles"
+                " where turn_id = %s for update",
+                (turn_id,),
+            )
+        assert _reconcile(reconciler, owner) == []
+        result = _finalize(
+            finalizer,
+            owner,
+            turn_id=turn_id,
+            request_id=request_id,
+        )
+        finalizer.commit()
+
+    assert result["message"]["id"] is not None
+    with _connect() as check:
+        with check.cursor() as cursor:
+            cursor.execute(
+                "select status, assistant_message_id is not null"
+                " from public.chat_turn_lifecycles where turn_id = %s",
+                (turn_id,),
+            )
+            assert cursor.fetchone() == ("completed", True)
+
+
+def test_stale_reconciliation_lock_wins_over_terminal_finalizer(owner) -> None:
+    with _connect() as seed:
+        accepted = _accept(seed, owner)
+        turn_id = str(accepted["message"]["id"])
+        request_id = str(accepted["lifecycle"]["request_id"])
+        _age_turn(seed, turn_id)
+
+    started = Event()
+
+    def finalize_after_lock() -> str:
+        with _connect() as connection:
+            started.set()
+            with pytest.raises(
+                psycopg.errors.DatabaseError,
+                match="Chat-turn finalization conflict",
+            ):
+                _finalize(
+                    connection,
+                    owner,
+                    turn_id=turn_id,
+                    request_id=request_id,
+                )
+        return "conflict"
+
+    with _connect() as reconciler:
+        reconciler.autocommit = False
+        with reconciler.cursor() as cursor:
+            cursor.execute(
+                "select turn_id from public.chat_turn_lifecycles"
+                " where turn_id = %s for update",
+                (turn_id,),
+            )
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(finalize_after_lock)
+            assert started.wait(1)
+            [row] = _reconcile(reconciler, owner)
+            assert row["status"] == "abandoned"
+            reconciler.commit()
+            assert future.result(timeout=5) == "conflict"
+
+    with _connect() as check:
+        with check.cursor() as cursor:
+            cursor.execute(
+                "select status, assistant_message_id,"
+                " (select count(*) from public.messages"
+                " where metadata #>> '{agent_runtime_turn,turn_id}' = %s)"
+                " from public.chat_turn_lifecycles where turn_id = %s",
+                (turn_id, turn_id),
+            )
+            assert cursor.fetchone() == ("abandoned", None, 0)
 
 
 def test_acceptance_rolls_back_message_when_lifecycle_insert_fails(

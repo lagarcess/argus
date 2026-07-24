@@ -194,6 +194,10 @@ export default function ChatMessage({
   const actionLabel = (action: ChatActionOption) =>
     action.labelKey ? t(action.labelKey, action.label) : action.label;
   const retryAction = message.actions?.find(isRetryAction);
+  const userRecoveryText =
+    isUser && message.recoveryDisplay
+      ? recoveryDisplayText(message.recoveryDisplay, t).trim()
+      : "";
   const footerMessageActions = (message.actions ?? []).filter(
     (action) => !isRetryAction(action) && !actionHasCardScopedOwnership(action),
   );
@@ -216,20 +220,32 @@ export default function ChatMessage({
 
   if (isUser && message.kind === "action") {
     return (
-      <div className="flex w-full justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex w-full flex-col items-end animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="max-w-[85%] rounded-full border border-black/10 bg-black/[0.03] px-4 py-2.5 text-[14px] font-medium leading-[1.45] text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">
           {displayContent || (message.selectedAction ? actionLabel(message.selectedAction) : "")}
         </div>
+        <UserTurnRecovery
+          recoveryText={userRecoveryText}
+          retryAction={retryAction}
+          retryLabel={retryAction ? actionLabel(retryAction) : ""}
+          onAction={onAction}
+        />
       </div>
     );
   }
 
   if (isUser) {
     return (
-      <div className="flex w-full justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex w-full flex-col items-end animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="max-w-[85%] bg-black/5 dark:bg-white/10 text-black dark:text-white px-5 py-3.5 rounded-[24px] rounded-br-sm text-[16px] leading-[1.5] tracking-[0.24px] font-normal">
           <UserMessageContent content={displayContent} mentions={message.mentions ?? []} />
         </div>
+        <UserTurnRecovery
+          recoveryText={userRecoveryText}
+          retryAction={retryAction}
+          retryLabel={retryAction ? actionLabel(retryAction) : ""}
+          onAction={onAction}
+        />
       </div>
     );
   }
@@ -392,6 +408,45 @@ export default function ChatMessage({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function UserTurnRecovery({
+  recoveryText,
+  retryAction,
+  retryLabel,
+  onAction,
+}: {
+  recoveryText: string;
+  retryAction?: ChatActionOption;
+  retryLabel: string;
+  onAction?: (action: ChatActionOption) => void;
+}) {
+  if (!recoveryText && !retryAction) {
+    return null;
+  }
+  return (
+    <div className="mt-2 flex max-w-[85%] flex-wrap items-center justify-end gap-2">
+      {recoveryText ? (
+        <p
+          data-testid="user-turn-recovery"
+          className="text-right text-[13px] leading-[1.45] text-black/55 dark:text-white/55"
+        >
+          {recoveryText}
+        </p>
+      ) : null}
+      {retryAction ? (
+        <button
+          type="button"
+          data-testid="user-turn-retry"
+          onClick={() => onAction?.(retryAction)}
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-black/12 px-3 py-1.5 text-[13px] font-medium text-black/80 transition-colors hover:bg-black/5 dark:border-white/12 dark:text-white/80 dark:hover:bg-white/6"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          {retryLabel}
+        </button>
+      ) : null}
     </div>
   );
 }
