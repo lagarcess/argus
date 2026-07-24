@@ -33,6 +33,9 @@ from argus.domain.backtest_finalization import (
 from argus.domain.backtest_message_projection import (
     hydrate_completed_backtest_job_messages,
 )
+from argus.domain.chat_turn_lifecycle_gateway import (
+    ChatTurnLifecycleGatewayMixin,
+)
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
 from argus.domain.search_text import normalize_search_text, search_text_matches_query
 from argus.domain.store import utcnow
@@ -140,7 +143,11 @@ def _supabase_client_options() -> ClientOptions:
 
 
 @dataclass
-class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
+class SupabaseGateway(
+    ChatTurnLifecycleGatewayMixin,
+    ConversationMessagePersistenceMixin,
+    UsageCounterReader,
+):
     client: Client
     auth_client: Client | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
@@ -194,6 +201,7 @@ class SupabaseGateway(ConversationMessagePersistenceMixin, UsageCounterReader):
         for table in (
             "feedback",
             "usage_counters",
+            "chat_turn_lifecycles",
             "collection_strategies",
             "decision_notes",
             "evidence_artifacts",
