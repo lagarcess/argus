@@ -131,7 +131,7 @@ describe("chat archive/delete lifecycle source contract", () => {
 
     expect(chat).toContain("const showConversationDisclaimer = shouldShowConversationDisclaimer(");
     expect(coldStartBranch).not.toContain("chat.disclaimer");
-    expect(conversationComposer).toContain("showConversationDisclaimer &&");
+    expect(conversationComposer).toContain("showConversationDisclaimer ? (");
     expect(conversationComposer).toContain('data-testid="chat-disclaimer"');
     expect(conversationComposer).toContain('t("chat.disclaimer", "Argus can make mistakes. For education only. Not financial advice.")');
     expect(conversationComposer).toContain("text-[13px]");
