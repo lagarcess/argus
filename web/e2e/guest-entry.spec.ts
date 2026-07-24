@@ -70,7 +70,6 @@ async function mockGuestJourney(page: Page): Promise<GuestBootEvidence> {
     sentMessages: [],
     persistedMessages: [],
   };
-
   await page.route("**/api/v1/auth/guest", async (route) => {
     evidence.bootstrapCalls += 1;
     await fulfillJson(route, {
@@ -89,7 +88,8 @@ async function mockGuestJourney(page: Page): Promise<GuestBootEvidence> {
   });
 
   await page.route("**/api/v1/conversations**", async (route) => {
-    const pathname = new URL(route.request().url()).pathname;
+    const url = new URL(route.request().url());
+    const pathname = url.pathname;
     if (pathname.endsWith("/messages")) {
       await fulfillJson(route, {
         items: evidence.persistedMessages,

@@ -30,6 +30,12 @@ describe("shared starter actions", () => {
 
     expect(chat).toContain("<StarterActions");
     expect(chat).toContain("onSelect={handleSend}");
+    expect(chat).toContain(
+      "const [isHydratingConversation, setIsHydratingConversation] = useState(true)",
+    );
+    expect(chat).toContain(
+      "disabled={isStreamingResponse || isHydratingConversation}",
+    );
     expect(chat.match(/<StarterActions/g)?.length).toBe(1);
     expect(chat).not.toContain(
       "onClick={() => handleSend(t('chat.starter_actions.tsla.value'",

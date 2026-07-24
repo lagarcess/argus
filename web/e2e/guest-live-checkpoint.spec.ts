@@ -34,19 +34,19 @@ test("@guest-live thin anonymous entry, turn, and reload checkpoint", async ({
   });
   await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
 
+  const streamResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname.endsWith("/api/v1/chat/stream") &&
+      response.status() === 200,
+  );
   await page.getByTestId("chat-input").fill(intentionalPrompt);
   await page.getByTestId("chat-input").press("Enter");
   await expect(page.getByText(intentionalPrompt, { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Copy Plain Text").first()).toBeAttached({
-    timeout: 120_000,
-  });
+  await (await streamResponse).finished();
 
   const conversationId = new URL(page.url()).searchParams.get("conversation");
   expect(conversationId).toBeTruthy();
-  const assistantCountBeforeReload = await page
-    .getByLabel("Copy Plain Text")
-    .count();
-  expect(assistantCountBeforeReload).toBeGreaterThan(0);
 
   const reloadMeResponse = page.waitForResponse(
     (response) =>
@@ -54,18 +54,45 @@ test("@guest-live thin anonymous entry, turn, and reload checkpoint", async ({
       new URL(response.url()).pathname.endsWith("/api/v1/me") &&
       response.status() === 200,
   );
+  const messagesResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "GET" &&
+      new URL(response.url()).pathname.endsWith(
+        `/api/v1/conversations/${conversationId}/messages`,
+      ) &&
+      response.status() === 200,
+  );
   await page.reload({ waitUntil: "domcontentloaded" });
   const reloadMe = (await (await reloadMeResponse).json()) as {
     account_kind: string;
     user: { id: string };
   };
+  const durableMessages = (await (await messagesResponse).json()) as {
+    items: Array<{
+      role: string;
+      content: string;
+      metadata?: Record<string, unknown>;
+    }>;
+  };
 
   expect(reloadMe.account_kind).toBe("guest");
   expect(reloadMe.user.id).toBe(firstMe.user.id);
+  expect(
+    durableMessages.items.some(
+      (message) =>
+        message.role === "user" && message.content === intentionalPrompt,
+    ),
+  ).toBe(true);
+  const durableAssistantMessages = durableMessages.items.filter(
+    (message) => message.role === "assistant",
+  );
+  expect(durableAssistantMessages.length).toBeGreaterThan(0);
   await expect(page.getByText(intentionalPrompt, { exact: true })).toBeVisible({
     timeout: 30_000,
   });
-  await expect(page.getByLabel("Copy Plain Text").first()).toBeAttached();
+  await expect(page.getByLabel("Copy Plain Text").first()).toBeAttached({
+    timeout: 30_000,
+  });
   expect(new URL(page.url()).searchParams.get("conversation")).toBe(
     conversationId,
   );
@@ -86,7 +113,13 @@ test("@guest-live thin anonymous entry, turn, and reload checkpoint", async ({
       account_kind: reloadMe.account_kind,
       user_id: reloadMe.user.id,
       conversation_id: conversationId,
-      assistant_messages: await page.getByLabel("Copy Plain Text").count(),
+      assistant_messages: durableAssistantMessages.length,
+      confirmation_artifacts: durableAssistantMessages.filter(
+        (message) => message.metadata?.confirmation_card,
+      ).length,
+      result_artifacts: durableAssistantMessages.filter(
+        (message) => message.metadata?.result_card,
+      ).length,
       screenshot: screenshotPath,
     }),
   );

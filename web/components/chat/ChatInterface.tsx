@@ -647,7 +647,7 @@ export default function ChatInterface() {
   const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null);
   const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
-  const [isHydratingConversation, setIsHydratingConversation] = useState(false);
+  const [isHydratingConversation, setIsHydratingConversation] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showOnboardingGoalCards, setShowOnboardingGoalCards] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -979,6 +979,7 @@ export default function ChatInterface() {
             setConversationId(activeConversationId);
             setMessages(hydrated.messages);
             setInputActions(hydrated.inputActions);
+            setIsHydratingConversation(false);
             setShowOnboardingGoalCards(
               showRegisteredOnboarding && hydrated.messages.length === 0,
             );
@@ -1002,6 +1003,7 @@ export default function ChatInterface() {
               conversationLoadFailureMessage(activeConversationId, t('chat.error_load')),
             ]);
             setInputActions([]);
+            setIsHydratingConversation(false);
             setShowOnboardingGoalCards(false);
             return;
           }
@@ -1023,6 +1025,7 @@ export default function ChatInterface() {
             content: t('chat.error_offline'),
           },
         ]);
+        setIsHydratingConversation(false);
       }
     })();
     return () => {
@@ -2367,7 +2370,7 @@ export default function ChatInterface() {
                 )}
 
                 <StarterActions
-                  disabled={isStreamingResponse}
+                  disabled={isStreamingResponse || isHydratingConversation}
                   onSelect={handleSend}
                 />
 
