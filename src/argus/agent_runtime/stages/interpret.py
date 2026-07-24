@@ -80,6 +80,9 @@ from argus.agent_runtime.stages.interpret_actions import (
     artifact_followup_stage_result_if_applicable as _artifact_followup_stage_result_if_applicable,
 )
 from argus.agent_runtime.stages.interpret_actions import (
+    final_interpret_stage_result as _final_interpret_stage_result,
+)
+from argus.agent_runtime.stages.interpret_actions import (
     pending_artifact_followup_stage_result_if_applicable as _pending_artifact_followup_stage_result_if_applicable,
 )
 from argus.agent_runtime.stages.interpret_actions import (
@@ -1231,26 +1234,13 @@ async def _stage_result_from_interpretation(
     )
     if admission_result is not None:
         return admission_result
-    if requires_clarification:
-        stage_patch = dict(optional_parameter_stage_patch)
-        if interpretation.assistant_response:
-            stage_patch["assistant_response"] = interpretation.assistant_response
-        return StageResult(
-            outcome="needs_clarification",
-            decision=decision,
-            stage_patch=stage_patch,
-        )
-    return StageResult(
-        outcome="ready_to_respond",
+    return _final_interpret_stage_result(
         decision=decision,
-        stage_patch=(
-            {
-                **optional_parameter_stage_patch,
-                "assistant_response": interpretation.assistant_response,
-            }
-            if interpretation.assistant_response
-            else optional_parameter_stage_patch
-        ),
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+        optional_parameter_stage_patch=optional_parameter_stage_patch,
+        assistant_response=interpretation.assistant_response,
+        language=user.language_preference,
     )
 
 
