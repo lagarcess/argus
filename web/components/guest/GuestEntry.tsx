@@ -19,7 +19,6 @@ export default function GuestEntry() {
         const bootstrap = retry ? retryGuestSession : startGuestSession;
         await bootstrap(i18n.resolvedLanguage ?? i18n.language);
         router.replace("/chat");
-        router.refresh();
       } catch (cause) {
         setError(
           cause instanceof Error

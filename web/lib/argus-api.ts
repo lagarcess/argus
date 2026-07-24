@@ -638,10 +638,13 @@ async function persistBrowserSession(payload: AuthResponsePayload) {
   if (!supabase) {
     return;
   }
-  await supabase.auth.setSession({
+  const { error } = await supabase.auth.setSession({
     access_token: session.access_token,
     refresh_token: session.refresh_token,
   });
+  if (error) {
+    throw error;
+  }
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────

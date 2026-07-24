@@ -56,10 +56,17 @@ describe("guest session entry contract", () => {
 
   test("uses the existing server guest endpoint and persists the provider session", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+    const entry = readFileSync(
+      join(root, "components/guest/GuestEntry.tsx"),
+      "utf-8",
+    );
 
     expect(api).toContain("export async function bootstrapGuest");
     expect(api).toContain('"/auth/guest"');
     expect(api).toContain("persistBrowserSession(response)");
+    expect(api).toContain("if (error)");
+    expect(entry).toContain('router.replace("/chat")');
+    expect(entry).not.toContain("router.refresh()");
   });
 
   test("guest onboarding depends on verified account kind and never patches profile truth", () => {
