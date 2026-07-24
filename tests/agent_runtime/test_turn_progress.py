@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import date, datetime, timezone
+from enum import Enum
 
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -148,6 +150,77 @@ def test_equivalent_state_with_actionable_terminal_is_no_progress() -> None:
     )
 
 
+def test_stage_outcome_only_change_is_not_semantic_progress() -> None:
+    before_state = semantic_state()
+    before_state["stage_outcome"] = "needs_clarification"
+    after_state = deepcopy(before_state)
+    after_state["stage_outcome"] = "await_user_reply"
+
+    before = semantic_progress_snapshot(before_state)
+    after = semantic_progress_snapshot(after_state)
+
+    assert semantic_progress_fingerprint(before_state) == (
+        semantic_progress_fingerprint(after_state)
+    )
+    assert assess_progress(before, after, terminal=None) == ProgressAssessment(
+        outcome="no_progress",
+        changed_fields=(),
+    )
+
+
+def test_explicit_terminals_win_when_semantic_state_is_unchanged() -> None:
+    snapshot = semantic_progress_snapshot(semantic_state())
+
+    for terminal in ("clarification", "redirected", "finished"):
+        assessment = assess_progress(snapshot, snapshot, terminal=terminal)
+
+        assert assessment.outcome == terminal
+        assert assessment.changed_fields == ()
+
+
+def test_confirmed_only_task_snapshot_model_and_dict_are_equivalent() -> None:
+    task_snapshot = TaskSnapshot(confirmed_strategy_summary=_strategy())
+    model_snapshot = semantic_progress_snapshot(task_snapshot)
+
+    assert model_snapshot is not None
+    assert model_snapshot.projection["strategy"]["asset_universe"] == ["AAPL"]
+    assert model_snapshot == semantic_progress_snapshot(
+        {
+            "confirmed_strategy_summary": _strategy().model_dump(mode="python"),
+        }
+    )
+
+
+def test_different_confirmed_strategies_have_different_fingerprints() -> None:
+    aapl = TaskSnapshot(confirmed_strategy_summary=_strategy())
+    msft_strategy = _strategy().model_copy(
+        update={"asset_universe": ["MSFT"]},
+    )
+    msft = TaskSnapshot(confirmed_strategy_summary=msft_strategy)
+
+    assert semantic_progress_fingerprint({"latest_task_snapshot": aapl}) != (
+        semantic_progress_fingerprint({"latest_task_snapshot": msft})
+    )
+
+
+def test_empty_candidate_does_not_eclipse_confirmed_strategy() -> None:
+    confirmed = TaskSnapshot(confirmed_strategy_summary=_strategy())
+    confirmed_only = {"latest_task_snapshot": confirmed}
+    blank_candidate = {
+        "run_state": RunState(
+            current_user_message="Explain the result",
+            candidate_strategy_draft=StrategySummary(),
+        ),
+        "latest_task_snapshot": confirmed,
+    }
+
+    snapshot = semantic_progress_snapshot(blank_candidate)
+
+    assert snapshot is not None
+    assert snapshot.projection["strategy"]["asset_universe"] == ["AAPL"]
+    assert snapshot == semantic_progress_snapshot(confirmed_only)
+
+
 def test_nonmaterial_unknown_and_diagnostic_fields_are_ignored() -> None:
     left = semantic_state()
     right = deepcopy(left)
@@ -203,7 +276,7 @@ def test_known_executable_fields_and_rule_spec_are_material() -> None:
                 {
                     "left": {"kind": "indicator", "key": "rsi", "period": 14},
                     "operator": "below",
-                    "right": {"kind": "constant", "value": 30},
+                    "right": 30,
                 }
             ]
         }
@@ -215,11 +288,172 @@ def test_known_executable_fields_and_rule_spec_are_material() -> None:
     second_rule = deepcopy(first_rule)
     second_rule["pending_strategy"]["strategy"]["rule_spec"]["entry"]["conditions"][0][
         "right"
-    ]["value"] = 25
+    ] = 25
 
     assert semantic_progress_fingerprint(daily) != semantic_progress_fingerprint(hourly)
     assert semantic_progress_fingerprint(first_rule) != semantic_progress_fingerprint(
         second_rule
+    )
+
+
+def test_nested_rule_and_risk_presentation_fields_are_not_material() -> None:
+    baseline = semantic_state()
+    strategy = baseline["pending_strategy"]["strategy"]
+    strategy["entry_rule"] = {
+        "indicator": "rsi",
+        "operator": "below",
+        "threshold": 30,
+        "period": 14,
+    }
+    strategy["rule_spec"] = {
+        "entry": {
+            "combinator": "all",
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "rsi", "period": 14},
+                    "operator": "lt",
+                    "right": 30,
+                }
+            ],
+        },
+        "exit": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "rsi", "period": 14},
+                    "operator": "gt",
+                    "right": 70,
+                }
+            ]
+        },
+    }
+    strategy["risk_rules"] = [
+        {"type": "stop_loss", "value_pct": 5.0, "mode": "close"}
+    ]
+    decorated = deepcopy(baseline)
+    decorated_strategy = decorated["pending_strategy"]["strategy"]
+    decorated_strategy["entry_rule"].update(
+        {
+            "explanation": "Buy when RSI is low.",
+            "label": "Oversold entry",
+            "unknown": "presentation-only",
+        }
+    )
+    decorated_entry = decorated_strategy["rule_spec"]["entry"]
+    decorated_entry["provider"] = "internal-provider"
+    decorated_condition = decorated_entry["conditions"][0]
+    decorated_condition["explanation"] = "Localized explanation"
+    decorated_condition["left"]["timestamp"] = "2026-07-23T10:00:00Z"
+    decorated_strategy["risk_rules"][0].update(
+        {
+            "label": "Five percent stop",
+            "explanation": "Limit losses.",
+            "provider": "internal-provider",
+            "timestamp": "2026-07-23T10:00:00Z",
+            "unknown": {"localized": "ignored"},
+        }
+    )
+
+    assert semantic_progress_fingerprint(baseline) == (
+        semantic_progress_fingerprint(decorated)
+    )
+
+
+def test_executable_rule_and_risk_leaves_are_material() -> None:
+    baseline = semantic_state()
+    strategy = baseline["pending_strategy"]["strategy"]
+    strategy["entry_rule"] = {
+        "indicator": "rsi",
+        "operator": "below",
+        "threshold": 30,
+        "period": 14,
+    }
+    strategy["rule_spec"] = {
+        "entry": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "rsi", "period": 14},
+                    "operator": "lt",
+                    "right": 30,
+                }
+            ]
+        }
+    }
+    strategy["risk_rules"] = [
+        {"type": "stop_loss", "value_pct": 5.0, "mode": "close"}
+    ]
+
+    operator_change = deepcopy(baseline)
+    operator_change["pending_strategy"]["strategy"]["rule_spec"]["entry"][
+        "conditions"
+    ][0]["operator"] = "gt"
+    indicator_change = deepcopy(baseline)
+    indicator_change["pending_strategy"]["strategy"]["rule_spec"]["entry"][
+        "conditions"
+    ][0]["left"]["key"] = "sma"
+    period_change = deepcopy(baseline)
+    period_change["pending_strategy"]["strategy"]["rule_spec"]["entry"][
+        "conditions"
+    ][0]["left"]["period"] = 20
+    threshold_change = deepcopy(baseline)
+    threshold_change["pending_strategy"]["strategy"]["entry_rule"]["threshold"] = 25
+    risk_change = deepcopy(baseline)
+    risk_change["pending_strategy"]["strategy"]["risk_rules"][0]["value_pct"] = 8.0
+
+    baseline_fingerprint = semantic_progress_fingerprint(baseline)
+    for changed in (
+        operator_change,
+        indicator_change,
+        period_change,
+        threshold_change,
+        risk_change,
+    ):
+        assert semantic_progress_fingerprint(changed) != baseline_fingerprint
+
+
+def test_accepted_typed_rule_and_date_leaves_are_json_stable() -> None:
+    class RuleOperator(Enum):
+        BELOW = "below"
+
+    typed = semantic_state()
+    strategy = typed["pending_strategy"]["strategy"]
+    strategy["date_range"] = {
+        "start": date(2022, 1, 1),
+        "end": datetime(2025, 1, 1, 12, 30, tzinfo=timezone.utc),
+    }
+    strategy["entry_rule"] = {
+        "indicator": "rsi",
+        "operator": RuleOperator.BELOW,
+        "threshold": 30,
+        "period": 14,
+    }
+    serialized = deepcopy(typed)
+    serialized_strategy = serialized["pending_strategy"]["strategy"]
+    serialized_strategy["date_range"] = {
+        "start": "2022-01-01",
+        "end": "2025-01-01T12:30:00Z",
+    }
+    serialized_strategy["entry_rule"]["operator"] = "below"
+    typed_strategy = StrategySummary(
+        strategy_type="indicator_threshold",
+        asset_universe=["AAPL"],
+        date_range={
+            "start": date(2022, 1, 1),
+            "end": datetime(2025, 1, 1, 12, 30, tzinfo=timezone.utc),
+        },
+        entry_rule=strategy["entry_rule"],
+    )
+    typed_task = TaskSnapshot(confirmed_strategy_summary=typed_strategy)
+
+    typed_fingerprint = semantic_progress_fingerprint(typed)
+    model_fingerprint = semantic_progress_fingerprint(typed_task)
+
+    assert isinstance(typed_fingerprint, str)
+    assert typed_fingerprint == semantic_progress_fingerprint(serialized)
+    assert model_fingerprint == semantic_progress_fingerprint(
+        typed_task.model_dump(mode="python")
+    )
+    assert model_fingerprint == semantic_progress_fingerprint(
+        typed_task.model_dump(mode="json")
     )
 
 

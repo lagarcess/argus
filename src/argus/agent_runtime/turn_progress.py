@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from copy import deepcopy
 from dataclasses import dataclass
+from datetime import date, datetime
+from enum import Enum
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -39,10 +40,44 @@ _STRATEGY_SCALAR_FIELDS = (
     "position_size",
     "comparison_baseline",
 )
-_STRATEGY_OBJECT_FIELDS = (
-    "entry_rule",
-    "exit_rule",
-    "rule_spec",
+_SIGNAL_RULE_FIELDS = (
+    "type",
+    "indicator",
+    "operator",
+    "threshold",
+    "period",
+    "indicator_period",
+    "direction",
+    "fast_indicator",
+    "fast_period",
+    "slow_indicator",
+    "slow_period",
+    "signal_period",
+    "fast",
+    "slow",
+    "signal",
+    "cadence",
+)
+_RISK_RULE_FIELDS = (
+    "type",
+    "value_pct",
+    "mode",
+)
+_SERIES_REF_FIELDS = (
+    "kind",
+    "key",
+    "field",
+    "output",
+    "period",
+)
+_INDICATOR_PARAMETER_FIELDS = (
+    "period",
+    "fast",
+    "slow",
+    "signal",
+    "length",
+    "std",
+    "indicator_period",
 )
 _TASK_ARTIFACT_FIELDS = (
     "active_draft_reference",
@@ -69,6 +104,7 @@ _ACTION_TARGET_FIELDS = (
     "option_id",
     "request_message_id",
 )
+_UNSUPPORTED_LEAF = object()
 
 
 @dataclass(frozen=True)
@@ -98,7 +134,6 @@ def semantic_progress_snapshot(state: Any) -> ProgressSnapshot | None:
     pending_strategy = _as_mapping(root.get("pending_strategy"))
 
     projection: dict[str, Any] = {}
-    _set_string(projection, "stage_outcome", root.get("stage_outcome"))
     _set_string(projection, "response_intent_kind", response_intent.get("kind"))
     _set_string(
         projection,
@@ -225,8 +260,10 @@ def _task_snapshot(root: dict[str, Any]) -> dict[str, Any]:
     nested = _as_mapping(root.get("latest_task_snapshot"))
     if nested:
         return nested
-    if "pending_strategy_summary" in root or any(
-        field in root for field in _TASK_ARTIFACT_FIELDS
+    if (
+        "pending_strategy_summary" in root
+        or "confirmed_strategy_summary" in root
+        or any(field in root for field in _TASK_ARTIFACT_FIELDS)
     ):
         return root
     return {}
@@ -288,45 +325,154 @@ def _working_strategy(
         root.get("confirmation_payload"),
         run_state.get("confirmation_payload"),
     )
-    return _first_mapping(
+    candidates = (
         pending_strategy.get("strategy"),
         pending_strategy if "strategy_type" in pending_strategy else None,
         run_state.get("candidate_strategy_draft"),
         root.get("candidate_strategy_draft"),
         task_snapshot.get("pending_strategy_summary"),
+        task_snapshot.get("confirmed_strategy_summary"),
         confirmation_payload.get("strategy"),
     )
+    for candidate in candidates:
+        strategy = _as_mapping(candidate)
+        if strategy and _project_strategy(strategy):
+            return strategy
+    return {}
 
 
 def _project_strategy(strategy: dict[str, Any]) -> dict[str, Any]:
     projected: dict[str, Any] = {}
     for field in _STRATEGY_SCALAR_FIELDS:
-        value = strategy.get(field)
-        if isinstance(value, str):
-            value = _clean_string(value)
-        if _has_value(value):
-            projected[field] = value
+        _set_leaf(projected, field, strategy.get(field))
 
     symbols = _sorted_strings(strategy.get("asset_universe"))
     if symbols:
         projected["asset_universe"] = symbols
 
     date_range = _as_mapping(strategy.get("date_range"))
-    canonical_date_range = {
-        key: value for key in ("start", "end") if _has_value(value := date_range.get(key))
-    }
+    canonical_date_range: dict[str, Any] = {}
+    for key in ("start", "end"):
+        _set_leaf(canonical_date_range, key, date_range.get(key))
     if canonical_date_range:
         projected["date_range"] = canonical_date_range
 
-    risk_rules = strategy.get("risk_rules")
-    if isinstance(risk_rules, list) and risk_rules:
-        projected["risk_rules"] = deepcopy(risk_rules)
+    risk_rules = _project_risk_rules(strategy.get("risk_rules"))
+    if risk_rules:
+        projected["risk_rules"] = risk_rules
 
-    for field in _STRATEGY_OBJECT_FIELDS:
-        value = _as_mapping(strategy.get(field))
-        if value:
-            projected[field] = deepcopy(value)
+    for field in ("entry_rule", "exit_rule"):
+        rule = _project_signal_rule(strategy.get(field))
+        if rule:
+            projected[field] = rule
+    rule_spec = _project_rule_spec(strategy.get("rule_spec"))
+    if rule_spec:
+        projected["rule_spec"] = rule_spec
     return projected
+
+
+def _set_leaf(target: dict[str, Any], key: str, value: Any) -> None:
+    normalized = _accepted_leaf(value)
+    if normalized is _UNSUPPORTED_LEAF:
+        return
+    if isinstance(normalized, str):
+        normalized = _clean_string(normalized)
+    if _has_value(normalized):
+        target[key] = normalized
+
+
+def _accepted_leaf(value: Any) -> Any:
+    if isinstance(value, Enum):
+        value = value.value
+    if isinstance(value, datetime):
+        normalized = value.isoformat()
+        return f"{normalized[:-6]}Z" if normalized.endswith("+00:00") else normalized
+    if isinstance(value, date):
+        return value.isoformat()
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    return _UNSUPPORTED_LEAF
+
+
+def _project_leaf_fields(
+    value: Any,
+    fields: tuple[str, ...],
+) -> dict[str, Any]:
+    source = _as_mapping(value)
+    projected: dict[str, Any] = {}
+    for field in fields:
+        _set_leaf(projected, field, source.get(field))
+    return projected
+
+
+def _project_signal_rule(value: Any) -> dict[str, Any]:
+    return _project_leaf_fields(value, _SIGNAL_RULE_FIELDS)
+
+
+def _project_risk_rules(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list | tuple):
+        return []
+    projected = [
+        rule
+        for item in value
+        if (rule := _project_leaf_fields(item, _RISK_RULE_FIELDS))
+    ]
+    return projected
+
+
+def _project_rule_spec(value: Any) -> dict[str, Any]:
+    source = _as_mapping(value)
+    projected: dict[str, Any] = {}
+    for side in ("entry", "exit"):
+        group = _project_condition_group(source.get(side))
+        if group:
+            projected[side] = group
+    return projected
+
+
+def _project_condition_group(value: Any) -> dict[str, Any]:
+    source = _as_mapping(value)
+    projected: dict[str, Any] = {}
+    _set_leaf(projected, "combinator", source.get("combinator"))
+    raw_conditions = source.get("conditions")
+    if isinstance(raw_conditions, list | tuple):
+        conditions = [
+            condition
+            for item in raw_conditions
+            if (condition := _project_condition(item))
+        ]
+        if conditions:
+            projected["conditions"] = conditions
+    return projected
+
+
+def _project_condition(value: Any) -> dict[str, Any]:
+    source = _as_mapping(value)
+    projected: dict[str, Any] = {}
+    left = _project_operand(source.get("left"))
+    if left is not _UNSUPPORTED_LEAF:
+        projected["left"] = left
+    _set_leaf(projected, "operator", source.get("operator"))
+    right = _project_operand(source.get("right"))
+    if right is not _UNSUPPORTED_LEAF:
+        projected["right"] = right
+    return projected
+
+
+def _project_operand(value: Any) -> Any:
+    source = _as_mapping(value)
+    if not source:
+        normalized = _accepted_leaf(value)
+        return normalized if _has_value(normalized) else _UNSUPPORTED_LEAF
+
+    projected = _project_leaf_fields(source, _SERIES_REF_FIELDS)
+    parameters = _project_leaf_fields(
+        source.get("parameters"),
+        _INDICATOR_PARAMETER_FIELDS,
+    )
+    if parameters:
+        projected["parameters"] = parameters
+    return projected or _UNSUPPORTED_LEAF
 
 
 def _constraint_identities(
