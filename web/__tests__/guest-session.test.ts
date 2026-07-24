@@ -74,9 +74,17 @@ describe("guest session entry contract", () => {
       join(root, "components/onboarding/OnboardingGate.tsx"),
       "utf-8",
     );
+    const contextPath = join(root, "lib/account-context.tsx");
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
 
     expect(gate).toContain('me.account_kind === "guest"');
     expect(gate).toContain("setStep(\"done\")");
+    expect(existsSync(contextPath)).toBe(true);
+    expect(gate).toContain("<AccountProvider");
+    expect(chat).toContain("useAccount()");
     expect(gate).not.toMatch(
       /me\.account_kind === "guest"[\s\S]{0,500}patchMe\(\{[\s\S]{0,300}primary_goal/,
     );

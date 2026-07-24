@@ -16,6 +16,7 @@ import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar"
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import StarterActions from "@/components/chat/StarterActions";
+import { useAccount } from "@/lib/account-context";
 
 import {
   createConversation,
@@ -584,6 +585,7 @@ function chatStreamErrorText(detail: string | undefined, fallback: string) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatInterface() {
+  const account = useAccount();
   const { t, i18n } = useTranslation();
   const router = useRouter();
 
@@ -946,7 +948,10 @@ export default function ChatInterface() {
     let cancelled = false;
     (async () => {
       try {
-        const meResponse = await getMe().catch(() => null);
+        const meResponse = account;
+        if (!meResponse) {
+          throw new Error("Verified account context is unavailable.");
+        }
         const resolvedLanguage = meResponse?.user?.language ?? i18n.language;
         if (resolvedLanguage && resolvedLanguage !== i18n.language) {
           await i18n.changeLanguage(resolvedLanguage);

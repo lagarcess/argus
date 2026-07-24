@@ -17,6 +17,7 @@ import {
   normalizeEnabledLanguage,
 } from "@/lib/language-features";
 import { privateAlphaOnboardingEnabled } from "@/lib/private-alpha-flags";
+import { AccountProvider } from "@/lib/account-context";
 
 const GOAL_IDS = [
   "learn_basics",
@@ -55,7 +56,8 @@ export function OnboardingGate({
 }) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const [user, setUser] = useState<ApiUser | null>(null);
+  const [account, setAccount] = useState<UserResponse | null>(null);
+  const user = account?.user ?? null;
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState<"language" | "goal" | "done" | "error">("language");
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(() =>
@@ -79,12 +81,12 @@ export function OnboardingGate({
           await i18n.changeLanguage(profileLanguage);
         }
         if (me.account_kind === "guest") {
-          setUser(resolvedUser);
+          setAccount(me);
           setStep("done");
           return;
         }
         resolvedUser = await resolveRegisteredOnboarding(me);
-        setUser(resolvedUser);
+        setAccount({ ...me, user: resolvedUser });
         if (
           !privateAlphaOnboardingEnabled ||
           resolvedUser.onboarding.completed ||
@@ -101,7 +103,7 @@ export function OnboardingGate({
           : undefined;
 
         if (!isMockAuth && (status === 401 || status === 403)) {
-          setUser(null);
+          setAccount(null);
           setStep("done");
         } else {
           console.error("Argus API is unreachable or returned an error:", err);
@@ -143,7 +145,7 @@ export function OnboardingGate({
           primary_goal: user?.onboarding.primary_goal || null
         }
       });
-      setUser(response.user);
+      setAccount(response);
       setStep("goal");
     } catch (err) {
       console.error("Failed to update language:", err);
@@ -160,7 +162,7 @@ export function OnboardingGate({
           completed: true
         }
       });
-      setUser(response.user);
+      setAccount(response);
       setStep("done");
     } catch (err) {
       console.error("Failed to update goal:", err);
@@ -188,7 +190,7 @@ export function OnboardingGate({
     return (
       <>
         <DevModeBadge />
-        {children}
+        <AccountProvider account={account}>{children}</AccountProvider>
       </>
     );
   }
