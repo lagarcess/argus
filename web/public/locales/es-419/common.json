@@ -952,6 +952,9 @@
       "loading": "Creando cuenta...",
       "new_account": "¿nuevo en argus?"
     },
+    "legal": {
+      "continuing_prefix": "Al continuar, aceptas nuestros"
+    },
     "password": {
       "show": "Mostrar contrasena",
       "hide": "Ocultar contrasena"

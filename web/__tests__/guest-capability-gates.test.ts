@@ -104,6 +104,20 @@ describe("guest capability gate policy", () => {
     expect(composer).toContain("if (accepted === false) return");
   });
 
+  test("does not consume a confirmation action before guest admission", () => {
+    const chat = readFileSync(
+      join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const handleAction = chat.slice(
+      chat.indexOf("const handleAction ="),
+      chat.indexOf("// ── Chat options helpers"),
+    );
+
+    expect(handleAction).not.toContain("confirmationActionEffectFromAction");
+    expect(chat).toContain("consumeConfirmationActionOnMessages");
+  });
+
   test("carries the exact evidence artifact through the decision gate", () => {
     const result = readFileSync(
       join(import.meta.dir, "../components/chat/StrategyResultCard.tsx"),

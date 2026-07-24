@@ -162,7 +162,12 @@ export default function AuthForm({
       )}
 
       <p className="mt-5 w-full px-4 text-center text-[11px] tracking-tight text-zinc-500 md:text-[12px]">
-        {t("landing.legal_prefix", "By joining, you agree to our")}{" "}
+        {isSignup
+          ? t("landing.legal_prefix", "By signing up, you agree to our")
+          : t(
+              "auth.legal.continuing_prefix",
+              "By continuing, you agree to our",
+            )}{" "}
         <a
           href="/terms"
           className="font-semibold text-zinc-800 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-white"

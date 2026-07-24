@@ -952,6 +952,9 @@
       "loading": "Creating account...",
       "new_account": "new to argus?"
     },
+    "legal": {
+      "continuing_prefix": "By continuing, you agree to our"
+    },
     "password": {
       "show": "Show password",
       "hide": "Hide password"

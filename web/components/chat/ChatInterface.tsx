@@ -1998,14 +1998,6 @@ export default function ChatInterface() {
       void handleSend(action.label || value, action);
       return;
     }
-    const confirmationEffect = confirmationActionEffectFromAction(action);
-    if (confirmationEffect) {
-      setMessages((prev) =>
-        normalizeConfirmationHistory(
-          applyConfirmationActionEffects(prev, [confirmationEffect]),
-        ),
-      );
-    }
     setInputActions(consumeInputAction(action, inputActions));
     void handleSend(action.label || value, action.type ? action : undefined);
   };

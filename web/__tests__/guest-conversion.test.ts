@@ -108,6 +108,28 @@ describe("guest conversion contract", () => {
     expect(modal).toContain("restoreFocusRef");
   });
 
+  test("keeps the shared legal footer mode-safe in English and Spanish", () => {
+    const shared = readFileSync(
+      join(root, "components/auth/AuthForm.tsx"),
+      "utf-8",
+    );
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    expect(shared).toContain('"auth.legal.continuing_prefix"');
+    expect(shared).toContain('"landing.legal_prefix"');
+    expect(en.auth.legal.continuing_prefix).toBe(
+      "By continuing, you agree to our",
+    );
+    expect(es.auth.legal.continuing_prefix).toBe(
+      "Al continuar, aceptas nuestros",
+    );
+  });
+
   test("keeps account creation server-capability gated", () => {
     const modal = readFileSync(
       join(root, "components/guest/GuestConversionModal.tsx"),
