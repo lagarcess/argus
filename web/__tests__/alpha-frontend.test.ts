@@ -1095,6 +1095,10 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const toast = readFileSync(
+      join(root, "components/chat/ChatToast.tsx"),
+      "utf-8",
+    );
     const en = readFileSync(
       join(root, "public/locales/en/common.json"),
       "utf-8",
@@ -1119,10 +1123,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("onToast={showToast}");
     expect(chat).toContain("pb-[190px]");
     expect(chat).toContain('className="h-28"');
-    expect(chat).toContain("absolute inset-x-0 bottom-24");
-    expect(chat).toContain("flex justify-center");
-    expect(chat).toContain('role="status"');
-    expect(chat).toContain("dark:bg-[#1f2225]");
+    expect(toast).toContain("absolute inset-x-0 bottom-24");
+    expect(toast).toContain("flex justify-center");
+    expect(toast).toContain('role="status"');
+    expect(toast).toContain("dark:bg-[#1f2225]");
     expect(chat).not.toContain("rounded-full bg-black dark:bg-white");
     expect(en).toContain('"copy_success": "Copied"');
     expect(es).toContain('"copy_failed": "No se pudo copiar"');

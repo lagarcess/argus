@@ -16,10 +16,12 @@ import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar"
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import StarterActions from "@/components/chat/StarterActions";
+import ChatLegalNotice from "@/components/chat/ChatLegalNotice";
+import ChatToast from "@/components/chat/ChatToast";
+import EmptyChatHeading from "@/components/chat/EmptyChatHeading";
 import GuestHeader from "@/components/guest/GuestHeader";
-import GuestLegalFooter from "@/components/guest/GuestLegalFooter";
+import { useGuestShellActions } from "@/components/guest/useGuestShellActions";
 import { useAccount } from "@/lib/account-context";
-
 import {
   createConversation,
   deleteConversation,
@@ -588,15 +590,6 @@ function chatStreamErrorText(detail: string | undefined, fallback: string) {
 
 export default function ChatInterface() {
   const account = useAccount();
-  const isGuest = account?.account_kind === "guest";
-  const canCreateAdditionalConversation =
-    account?.capabilities.can_create_additional_conversation ?? true;
-  const canManageConversation =
-    account?.capabilities.can_manage_conversation ?? true;
-  const canSaveDecision =
-    account?.capabilities.can_save_decision ?? true;
-  const canUseOmnisearch =
-    account?.capabilities.can_use_omnisearch ?? true;
   const { t, i18n } = useTranslation();
   const router = useRouter();
 
@@ -729,37 +722,6 @@ export default function ChatInterface() {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
   }, []);
-
-  const requestOmnisearch = useCallback(() => {
-    if (isGuest && !canUseOmnisearch) {
-      showToast(
-        t(
-          "guest.shell.search_unavailable",
-          "Search isn't available for temporary chats yet.",
-        ),
-      );
-      return;
-    }
-    setSearchOverlayOpen(true);
-  }, [canUseOmnisearch, isGuest, showToast, t]);
-
-  const requestGuestSignIn = useCallback(() => {
-    showToast(
-      t(
-        "guest.shell.sign_in_unavailable",
-        "Sign in is not available in this preview. Your temporary chat stays here.",
-      ),
-    );
-  }, [showToast, t]);
-
-  const requestGuestDecision = useCallback(() => {
-    showToast(
-      t(
-        "guest.shell.decision_unavailable",
-        "Sign in to save this decision.",
-      ),
-    );
-  }, [showToast, t]);
 
   const clearConversationAttention = useCallback((nextConversationId?: string | null) => {
     setAttentionConversationIds((prev) =>
@@ -940,20 +902,6 @@ export default function ChatInterface() {
       // Local preferences are optional.
     }
   }, []);
-
-  useEffect(() => {
-    if (!omnisearchEnabled) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") {
-        return;
-      }
-      event.preventDefault();
-      requestOmnisearch();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [requestOmnisearch]);
 
   useEffect(() => {
     if (!strategiesEnabled && currentView === "strategies") {
@@ -1246,32 +1194,34 @@ export default function ChatInterface() {
     return null;
   }, [closeTransientSidebar, refreshHistory, resetToEmptyChatSurface]);
 
-  const requestNewChat = useCallback(() => {
-    if (
-      isGuest &&
-      !canCreateAdditionalConversation &&
-      (messages.length > 0 || conversationId !== null)
-    ) {
-      showToast(
-        t(
-          "guest.shell.new_chat_unavailable",
-          "Sign in to keep this conversation and start another.",
-        ),
-      );
-      closeTransientSidebar();
-      return;
-    }
-    void startNewChat();
-  }, [
-    canCreateAdditionalConversation,
-    closeTransientSidebar,
-    conversationId,
+  const {
     isGuest,
-    messages.length,
+    canManageConversation,
+    canSaveDecision,
+    canUseOmnisearch,
+    requestGuestDecision,
+    requestGuestFeedback,
+    requestGuestSignIn,
+    requestNewChat,
+    requestOmnisearch,
+  } = useGuestShellActions({
+    account,
+    hasConversation: messages.length > 0 || conversationId !== null,
+    closeTransientSidebar,
+    onOpenFeedback: () =>
+      setFeedbackState({
+        isOpen: true,
+        type: "general",
+        context: {
+          surface: "guest_header",
+          conversation_id: conversationId,
+        },
+      }),
+    onNewChat: startNewChat,
+    onOpenOmnisearch: () => setSearchOverlayOpen(true),
+    omnisearchShortcutEnabled: omnisearchEnabled,
     showToast,
-    startNewChat,
-    t,
-  ]);
+  });
 
   const handleConversationRemoved = useCallback((removedConversationId: string) => {
     setHistoryItems((prev) =>
@@ -2297,16 +2247,7 @@ export default function ChatInterface() {
               isGuest ? (
                 <GuestHeader
                   expiresAt={account?.guest?.expires_at ?? null}
-                  onFeedback={() => {
-                    setFeedbackState({
-                      isOpen: true,
-                      type: "general",
-                      context: {
-                        surface: "guest_header",
-                        conversation_id: conversationId,
-                      },
-                    });
-                  }}
+                  onFeedback={requestGuestFeedback}
                   onSignIn={requestGuestSignIn}
                 />
               ) : (
@@ -2415,28 +2356,7 @@ export default function ChatInterface() {
 
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
-                <h1 className={`font-display text-[40px] font-medium tracking-tight text-black dark:text-white ${
-                  isGuest ? "mb-3" : "mb-8"
-                }`}>
-                  argus
-                </h1>
-
-                {isGuest ? (
-                  <div className="mb-6 max-w-xl text-center">
-                    <p className="font-display text-[22px] font-medium tracking-tight text-black/85 dark:text-white/85">
-                      {t(
-                        "guest.shell.value_title",
-                        "Test an investing idea against history.",
-                      )}
-                    </p>
-                    <p className="mx-auto mt-2 max-w-lg text-[15px] leading-[1.55] text-black/50 dark:text-white/50">
-                      {t(
-                        "guest.shell.value_body",
-                        "Describe your idea naturally. Argus will clarify the setup, show what it can test, and run a historical simulation.",
-                      )}
-                    </p>
-                  </div>
-                ) : null}
+                <EmptyChatHeading isGuest={isGuest} />
 
                 <div className="w-full max-w-2xl">
                   <ChatInput
@@ -2445,12 +2365,11 @@ export default function ChatInterface() {
                     placeholder={chatInputPlaceholder}
                     onToast={showToast}
                   />
-                  {isGuest ? (
-                    <GuestLegalFooter
-                      expiresAt={account?.guest?.expires_at}
-                      variant="before_message"
-                    />
-                  ) : null}
+                  <ChatLegalNotice
+                    expiresAt={account?.guest?.expires_at}
+                    isGuest={isGuest}
+                    variant="before_message"
+                  />
                 </div>
 
                 {showOnboardingGoalCards && (
@@ -2614,19 +2533,12 @@ export default function ChatInterface() {
                       placeholder={chatInputPlaceholder}
                       onToast={showToast}
                     />
-                    {isGuest ? (
-                      <GuestLegalFooter
-                        expiresAt={account?.guest?.expires_at}
-                        variant="after_message"
-                      />
-                    ) : showConversationDisclaimer ? (
-                      <p
-                        data-testid="chat-disclaimer"
-                        className="mt-3 text-center text-[13px] font-normal leading-[1.45] text-black/40 dark:text-white/40"
-                      >
-                        {t("chat.disclaimer", "Argus can make mistakes. For education only. Not financial advice.")}
-                      </p>
-                    ) : null}
+                    <ChatLegalNotice
+                      expiresAt={account?.guest?.expires_at}
+                      isGuest={isGuest}
+                      showRegisteredDisclaimer={showConversationDisclaimer}
+                      variant="after_message"
+                    />
                   </div>
                 </div>
               </>
@@ -2662,18 +2574,7 @@ export default function ChatInterface() {
           />
         )}
 
-        {/* ── Toast ── */}
-        {toast && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-24 z-[100] flex justify-center px-4">
-            <div
-              role="status"
-              aria-live="polite"
-              className="max-w-[min(720px,calc(100vw-2rem))] animate-in rounded-full border border-black/10 bg-white px-5 py-2.5 text-center text-[14px] font-medium text-black/80 shadow-[0_18px_60px_rgba(15,23,42,0.18)] duration-300 fade-in slide-in-from-bottom-2 dark:border-white/10 dark:bg-[#1f2225] dark:text-white/80 dark:shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
-            >
-              {toast}
-            </div>
-          </div>
-        )}
+        <ChatToast message={toast} />
       </section>
 
       {/* ── Feedback Dialog ── */}
@@ -2692,7 +2593,6 @@ export default function ChatInterface() {
           onClose={() => setIsSidebarPreferenceModalOpen(false)}
         />
       )}
-
     </div>
   );
 }

@@ -11,15 +11,16 @@ function source(relativePath: string) {
 describe("guest shell contract", () => {
   test("renders guest chrome from verified account capabilities", () => {
     const chat = source("components/chat/ChatInterface.tsx");
+    const policy = source("components/guest/useGuestShellActions.ts");
     const headerPath = join(root, "components/guest/GuestHeader.tsx");
     const settingsPath = join(root, "components/guest/GuestSettingsMenu.tsx");
 
     expect(existsSync(headerPath)).toBe(true);
     expect(existsSync(settingsPath)).toBe(true);
-    expect(chat).toContain('const isGuest = account?.account_kind === "guest"');
-    expect(chat).toContain("account?.capabilities.can_manage_conversation");
-    expect(chat).toContain("account?.capabilities.can_use_omnisearch");
-    expect(chat).toContain("account?.capabilities.can_save_decision");
+    expect(policy).toContain('const isGuest = account?.account_kind === "guest"');
+    expect(policy).toContain("capabilities?.can_manage_conversation");
+    expect(policy).toContain("capabilities?.can_use_omnisearch");
+    expect(policy).toContain("capabilities?.can_save_decision");
     expect(chat).toContain("<GuestHeader");
     expect(chat).toContain("expiresAt={account?.guest?.expires_at");
   });

@@ -120,6 +120,7 @@ describe("chat archive/delete lifecycle source contract", () => {
 
   test("chat disclaimer appears only after conversation activity and is localized", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const legal = readFileSync(join(root, "components/chat/ChatLegalNotice.tsx"), "utf-8");
     const en = JSON.parse(readFileSync(join(root, "public/locales/en/common.json"), "utf-8"));
     const es = JSON.parse(readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"));
     const coldStartBranchStart = chat.indexOf("{messages.length === 0 ? (");
@@ -131,12 +132,14 @@ describe("chat archive/delete lifecycle source contract", () => {
 
     expect(chat).toContain("const showConversationDisclaimer = shouldShowConversationDisclaimer(");
     expect(coldStartBranch).not.toContain("chat.disclaimer");
-    expect(conversationComposer).toContain("showConversationDisclaimer ? (");
-    expect(conversationComposer).toContain('data-testid="chat-disclaimer"');
-    expect(conversationComposer).toContain('t("chat.disclaimer", "Argus can make mistakes. For education only. Not financial advice.")');
-    expect(conversationComposer).toContain("text-[13px]");
-    expect(conversationComposer).toContain("font-normal");
-    expect(conversationComposer).toContain("text-black/40 dark:text-white/40");
+    expect(conversationComposer).toContain(
+      "showRegisteredDisclaimer={showConversationDisclaimer}",
+    );
+    expect(legal).toContain('data-testid="chat-disclaimer"');
+    expect(legal).toContain('"chat.disclaimer"');
+    expect(legal).toContain("text-[13px]");
+    expect(legal).toContain("font-normal");
+    expect(legal).toContain("text-black/40 dark:text-white/40");
     expect(en.chat.disclaimer).toBe("Argus can make mistakes. For education only. Not financial advice.");
     expect(es.chat.disclaimer).toBe("Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.");
   });

@@ -1,12 +1,39 @@
 import {
-  bootstrapGuest,
   normalizeApiLanguage,
-  type GuestBootstrapResponse,
+  persistBrowserSession,
+  unauthenticatedApiFetch,
 } from "./argus-api";
 
 type GuestSessionInput = {
   language: string | null | undefined;
 };
+
+export type GuestBootstrapResponse = {
+  authenticated: true;
+  reused: boolean;
+  account_kind: "guest";
+  session?: {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+  } | null;
+  user?: Record<string, unknown> | null;
+};
+
+export async function bootstrapGuest(payload: {
+  captcha_token: string;
+  language: "en" | "es-419";
+}) {
+  const response = await unauthenticatedApiFetch<GuestBootstrapResponse>(
+    "/auth/guest",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+  await persistBrowserSession(response);
+  return response;
+}
 
 export function createGuestSessionBootstrapper<
   TInput,
