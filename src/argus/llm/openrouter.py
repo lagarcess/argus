@@ -39,6 +39,7 @@ OpenRouterTask = Literal[
     "result_breakdown",
     "name_suggestion",
 ]
+_OpenRouterRetryAttempt = tuple[OpenRouterTask, float, str, Literal["json_schema", "chat_model"], str | None, list[str] | None]
 OpenRouterModelTier = Literal["utility", "chat", "structured", "context"]
 OpenRouterReasoningEffort = Literal[
     "xhigh", "high", "medium", "low", "minimal", "none"
@@ -529,14 +530,16 @@ async def invoke_openrouter_json_schema(
         )
         try:
             async with httpx.AsyncClient(timeout=permit.timeout_seconds) as client:
-                response = await asyncio.wait_for(
+                if (response := await asyncio.wait_for(
                     _post_openrouter_json_schema(
                         client=client,
                         api_key=api_key,
                         payload=payload,
+                        retry_attempt=(task, profile.timeout_seconds, candidate_model, "json_schema", schema_name, context_packet_ids),
                     ),
                     timeout=permit.timeout_seconds,
-                )
+                )) is None:
+                    return None
             data = response.json()
             _raise_openrouter_payload_error(data)
             content = _openrouter_message_content(data)
@@ -642,9 +645,12 @@ async def invoke_openrouter_chat_completion(
                         client=client,
                         api_key=api_key,
                         payload=payload,
+                        retry_attempt=(task, profile.timeout_seconds, candidate_model, "chat_model", None, context_packet_ids),
                     ),
                     timeout=permit.timeout_seconds,
                 )
+                if response is None:
+                    return None
                 data = response.json()
                 _raise_openrouter_payload_error(data)
         except Exception as exc:
@@ -764,7 +770,10 @@ def invoke_openrouter_json_schema_sync(
                     client=client,
                     api_key=api_key,
                     payload=payload,
+                    retry_attempt=(task, profile.timeout_seconds, candidate_model, "json_schema", schema_name, context_packet_ids),
                 )
+            if response is None:
+                return None
             data = response.json()
             _raise_openrouter_payload_error(data)
             content = _openrouter_message_content(data)
@@ -971,29 +980,23 @@ async def _post_openrouter_json_schema(
     client: httpx.AsyncClient,
     api_key: str,
     payload: dict[str, object],
-) -> httpx.Response:
+    retry_attempt: _OpenRouterRetryAttempt,
+) -> httpx.Response | None:
     response = await client.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json=payload,
+        "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key), json=payload
     )
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code != 400 or "reasoning" not in payload:
             raise
-        fallback_payload = dict(payload)
-        fallback_payload.pop("reasoning", None)
+        if (permit := _reserve_openrouter_attempt(*retry_attempt)) is None:
+            return None
+        fallback_payload = {key: value for key, value in payload.items() if key != "reasoning"}
         response = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
+            "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key),
             json=fallback_payload,
+            timeout=permit.timeout_seconds,
         )
         response.raise_for_status()
     return response
@@ -1004,32 +1007,29 @@ def _post_openrouter_json_schema_sync(
     client: httpx.Client,
     api_key: str,
     payload: dict[str, object],
-) -> httpx.Response:
+    retry_attempt: _OpenRouterRetryAttempt,
+) -> httpx.Response | None:
     response = client.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json=payload,
+        "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key), json=payload
     )
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code != 400 or "reasoning" not in payload:
             raise
-        fallback_payload = dict(payload)
-        fallback_payload.pop("reasoning", None)
+        if (permit := _reserve_openrouter_attempt(*retry_attempt)) is None:
+            return None
+        fallback_payload = {key: value for key, value in payload.items() if key != "reasoning"}
         response = client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
+            "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key),
             json=fallback_payload,
+            timeout=permit.timeout_seconds,
         )
         response.raise_for_status()
     return response
+
+def _openrouter_headers(api_key: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
 
 def _raise_openrouter_payload_error(data: dict[str, object]) -> None:

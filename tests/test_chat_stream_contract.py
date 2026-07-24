@@ -1223,6 +1223,74 @@ def test_chat_stream_missing_runtime_final_emits_recoverable_error(
     assert response.text.count("data: [DONE]") == 1
 
 
+@pytest.mark.asyncio
+async def test_runtime_records_exact_graph_final_before_public_filtering() -> None:
+    from types import SimpleNamespace
+
+    from argus.agent_runtime.runtime import stream_agent_turn_events
+    from argus.agent_runtime.state.models import UserState
+    from argus.agent_runtime.turn_execution import turn_execution_scope
+    from argus.agent_runtime.turn_progress import semantic_progress_fingerprint
+
+    entry_state = {
+        "semantic_turn_act": "new_idea",
+        "response_intent": {
+            "kind": "clarification",
+            "requested_fields": ["asset_universe"],
+        },
+    }
+    exact_final_state = {
+        "semantic_turn_act": "refine_current_idea",
+        "response_intent": {
+            "kind": "clarification",
+            "requested_fields": ["date_range"],
+        },
+        "stage_outcome": "await_user_reply",
+        "assistant_response": "Which date range should I use?",
+    }
+
+    class _Workflow:
+        async def astream_events(self, *_: Any, **__: Any):
+            if False:
+                yield {}
+
+        async def aget_state(self, _config: dict[str, Any]) -> Any:
+            return SimpleNamespace(values=exact_final_state)
+
+    with turn_execution_scope(entry_state=entry_state) as execution:
+        events = [
+            event
+            async for event in stream_agent_turn_events(
+                workflow=_Workflow(),
+                user=UserState(user_id="user-1"),
+                thread_id="conversation-1",
+                message="Use a different date.",
+                workflow_input=entry_state,
+            )
+        ]
+
+    assert len(events) == 1
+    final_event = events[0]
+    assert final_event["type"] == "final"
+    assert "semantic_turn_act" not in final_event["payload"]
+    assert final_event["payload"]["assistant_response"] == (
+        "Which date range should I use?"
+    )
+    evidence = final_event["_turn_progress"]
+    assert set(evidence) == {
+        "output_fingerprint",
+        "progress_outcome",
+        "terminal",
+        "terminal_reason",
+    }
+    assert evidence["output_fingerprint"] == semantic_progress_fingerprint(
+        exact_final_state
+    )
+    assert evidence["progress_outcome"] == "clarification"
+    assert execution.exit_fingerprint == evidence["output_fingerprint"]
+    assert "semantic_turn_act" not in json.dumps(final_event["payload"])
+
+
 def test_chat_stream_runtime_initialization_failure_emits_recoverable_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

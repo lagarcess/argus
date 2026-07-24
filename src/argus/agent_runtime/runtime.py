@@ -19,6 +19,10 @@ from argus.agent_runtime.state.models import (
     UserState,
     dedupe_resolution_provenance_items,
 )
+from argus.agent_runtime.turn_execution import (
+    record_exit_progress,
+    turn_progress_evidence,
+)
 from argus.agent_runtime.workflow_contract import (
     TOKEN_STREAM_NODES,
     WORKFLOW_NODE_NAMES,
@@ -146,7 +150,28 @@ async def stream_agent_turn_events(
     logger.debug("Agent runtime final state fetch started", thread_id=thread_id)
     final_state = await _final_workflow_state(workflow=workflow, config=config)
     logger.debug("Agent runtime final state fetch completed", thread_id=thread_id)
-    yield {"type": "final", "payload": _public_result(final_state)}
+    record_exit_progress(
+        final_state,
+        terminal=_progress_terminal(final_state.get("stage_outcome")),
+    )
+    yield {
+        "type": "final",
+        "payload": _public_result(final_state),
+        "_turn_progress": turn_progress_evidence(),
+    }
+
+
+def _progress_terminal(stage_outcome: Any) -> str | None:
+    normalized = str(getattr(stage_outcome, "value", stage_outcome) or "")
+    if normalized in {"await_user_reply", "needs_clarification"}:
+        return "clarification"
+    if normalized == "execution_failed_recoverably":
+        return "recoverable_failed"
+    if normalized == "execution_failed_terminally":
+        return "terminal_failed"
+    if normalized == "end_run":
+        return "finished"
+    return None
 
 
 async def run_agent_turn(

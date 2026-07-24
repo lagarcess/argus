@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 import pytest
@@ -20,6 +21,17 @@ class _Clock:
 
 class _Schema(BaseModel):
     accepted: bool
+
+
+PROVEN_PRODUCTION_BUILDER_CORRIDOR = (
+    "asset_preflight.structured_primary",
+    "asset_preflight.structured_fallback",
+    "interpretation.structured_primary",
+    "interpretation.structured_fallback",
+    "readiness.focused_strategy_repair",
+    "clarification.chat_primary",
+    "clarification.chat_fallback",
+)
 
 
 def _typed_state() -> dict[str, Any]:
@@ -254,3 +266,315 @@ def test_provider_permit_uses_remaining_absolute_deadline(
 
     assert permit is not None
     assert permit.timeout_seconds == pytest.approx(0.15)
+
+
+@pytest.mark.asyncio
+async def test_async_reasoning_compatibility_retry_needs_its_own_permit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+    from argus.agent_runtime.turn_execution import turn_execution_scope
+    from argus.llm import openrouter
+
+    monkeypatch.setenv("ARGUS_TURN_CALL_ALLOWANCE", "1")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    posts: list[dict[str, object]] = []
+
+    class _AsyncClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> _AsyncClient:
+            return self
+
+        async def __aexit__(self, *_: Any) -> None:
+            return None
+
+        async def post(self, _url: str, **kwargs: Any) -> httpx.Response:
+            posts.append(dict(kwargs["json"]))
+            return httpx.Response(
+                400,
+                json={"error": {"message": "reasoning unsupported"}},
+                request=httpx.Request("POST", _url),
+            )
+
+    monkeypatch.setattr(openrouter.httpx, "AsyncClient", _AsyncClient)
+    receipt_token = openrouter.begin_openrouter_route_receipt_capture()
+    try:
+        with turn_execution_scope(entry_state=_typed_state()) as execution:
+            result = await openrouter.invoke_openrouter_json_schema(
+                task="interpretation",
+                messages=[{"role": "user", "content": "test"}],
+                schema_model=_Schema,
+                schema_name="_Schema",
+                model_name="structured/model",
+            )
+    finally:
+        receipts = openrouter.end_openrouter_route_receipt_capture(receipt_token)
+
+    assert result is None
+    assert execution.calls_reserved == 1
+    assert len(posts) == 1
+    assert "reasoning" in posts[0]
+    assert [(receipt.outcome, receipt.failure_mode) for receipt in receipts] == [
+        ("skipped", "turn_call_allowance_exhausted")
+    ]
+
+
+def test_sync_reasoning_compatibility_retry_needs_its_own_permit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+    from argus.agent_runtime.turn_execution import turn_execution_scope
+    from argus.llm import openrouter
+
+    monkeypatch.setenv("ARGUS_TURN_CALL_ALLOWANCE", "1")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    posts: list[dict[str, object]] = []
+
+    class _Client:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        def __enter__(self) -> _Client:
+            return self
+
+        def __exit__(self, *_: Any) -> None:
+            return None
+
+        def post(self, _url: str, **kwargs: Any) -> httpx.Response:
+            posts.append(dict(kwargs["json"]))
+            return httpx.Response(
+                400,
+                json={"error": {"message": "reasoning unsupported"}},
+                request=httpx.Request("POST", _url),
+            )
+
+    monkeypatch.setattr(openrouter.httpx, "Client", _Client)
+    receipt_token = openrouter.begin_openrouter_route_receipt_capture()
+    try:
+        with turn_execution_scope(entry_state=_typed_state()) as execution:
+            result = openrouter.invoke_openrouter_json_schema_sync(
+                task="interpretation",
+                messages=[{"role": "user", "content": "test"}],
+                schema_model=_Schema,
+                schema_name="_Schema",
+                model_name="structured/model",
+            )
+    finally:
+        receipts = openrouter.end_openrouter_route_receipt_capture(receipt_token)
+
+    assert result is None
+    assert execution.calls_reserved == 1
+    assert len(posts) == 1
+    assert [(receipt.outcome, receipt.failure_mode) for receipt in receipts] == [
+        ("skipped", "turn_call_allowance_exhausted")
+    ]
+
+
+@pytest.mark.asyncio
+async def test_chat_completion_first_post_is_accounted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+    from argus.agent_runtime.turn_execution import turn_execution_scope
+    from argus.llm import openrouter
+
+    monkeypatch.setenv("ARGUS_TURN_CALL_ALLOWANCE", "1")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    posts = 0
+
+    class _AsyncClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> _AsyncClient:
+            return self
+
+        async def __aexit__(self, *_: Any) -> None:
+            return None
+
+        async def post(self, _url: str, **_: Any) -> httpx.Response:
+            nonlocal posts
+            posts += 1
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": "hello"}}]},
+                request=httpx.Request("POST", _url),
+            )
+
+    monkeypatch.setattr(openrouter.httpx, "AsyncClient", _AsyncClient)
+    with turn_execution_scope(entry_state=_typed_state()) as execution:
+        result = await openrouter.invoke_openrouter_chat_completion(
+            task="chat_composer",
+            messages=[{"role": "user", "content": "test"}],
+            model_name="chat/model",
+        )
+
+    assert result == "hello"
+    assert posts == 1
+    assert execution.calls_reserved == 1
+
+
+@pytest.mark.asyncio
+async def test_calibrated_production_corridor_reaches_n_and_blocks_n_plus_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+    from argus.agent_runtime import turn_execution
+    from argus.agent_runtime.graph import workflow as workflow_module
+    from argus.agent_runtime.llm_clarifier import ClarificationRequest
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+    from argus.agent_runtime.state.models import UserState
+    from argus.api import state as api_state
+    from argus.llm import openrouter
+
+    captured_builder: dict[str, Any] = {}
+
+    def _capture_builder(**kwargs: Any) -> dict[str, Any]:
+        captured_builder.update(kwargs)
+        return kwargs
+
+    monkeypatch.setattr(workflow_module, "build_workflow", _capture_builder)
+    monkeypatch.setattr(api_state, "build_backtest_tool", object)
+    api_state.build_agent_runtime_workflow(checkpointer=object())
+    interpreter = captured_builder["structured_interpreter"]
+    clarifier = captured_builder["clarification_generator"]
+    assert interpreter.model_name is None
+    assert clarifier.model_name is None
+
+    monkeypatch.delenv("ARGUS_TURN_CALL_ALLOWANCE", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "structured/primary")
+    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "structured/fallback")
+    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/primary")
+    monkeypatch.setenv("ARGUS_CHAT_FALLBACK_MODEL", "chat/fallback")
+    posts: list[tuple[str, str]] = []
+
+    class _AsyncClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> _AsyncClient:
+            return self
+
+        async def __aexit__(self, *_: Any) -> None:
+            return None
+
+        async def post(self, _url: str, **kwargs: Any) -> httpx.Response:
+            payload = kwargs["json"]
+            schema_name = payload["response_format"]["json_schema"]["name"]
+            model = payload["model"]
+            posts.append((schema_name, model))
+            content = "{}"
+            if schema_name == "FocusedStrategyExtraction":
+                content = json.dumps(
+                    {
+                        "is_testable_strategy": True,
+                        "requires_clarification": True,
+                        "user_goal_summary": "Test a buy-and-hold idea.",
+                        "strategy_type": "buy_and_hold",
+                        "strategy_thesis": "Test a buy-and-hold idea.",
+                        "missing_required_fields": ["asset_universe", "date_range"],
+                        "confidence": 0.92,
+                    }
+                )
+            elif (
+                schema_name == "ClarificationResponse"
+                and model == "chat/fallback"
+            ):
+                content = json.dumps(
+                    {
+                        "question": "Which asset and date range should I test?",
+                        "direct_question": "",
+                        "question_targets": [],
+                        "directly_asks_user": True,
+                        "detail_targets": [],
+                    }
+                )
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": content}}]},
+                request=httpx.Request("POST", _url),
+            )
+
+    monkeypatch.setattr(openrouter.httpx, "AsyncClient", _AsyncClient)
+    receipt_token = openrouter.begin_openrouter_route_receipt_capture()
+    try:
+        with turn_execution.turn_execution_scope(
+            entry_state=_typed_state()
+        ) as execution:
+            interpretation = await interpreter.ainvoke(
+                InterpretationRequest(
+                    current_user_message="Test a buy-and-hold idea.",
+                    recent_thread_history=[],
+                    latest_task_snapshot=None,
+                    user=UserState(user_id="user-1"),
+                )
+            )
+            assert interpretation is not None
+            assert interpretation.requires_clarification is True
+            clarification = await clarifier.ainvoke(
+                ClarificationRequest(
+                    current_user_message="Test a buy-and-hold idea.",
+                    candidate_strategy_draft=interpretation.candidate_strategy_draft,
+                    missing_required_fields=interpretation.missing_required_fields,
+                )
+            )
+            assert clarification == "Which asset and date range should I test?"
+            blocked = await openrouter.invoke_openrouter_json_schema(
+                task="clarification",
+                messages=[{"role": "user", "content": "N+1"}],
+                schema_model=_Schema,
+                schema_name="_Schema",
+                model_name="model/blocked",
+            )
+            assessment = turn_execution.record_exit_progress(
+                _typed_state(),
+                terminal=None,
+            )
+    finally:
+        receipts = openrouter.end_openrouter_route_receipt_capture(receipt_token)
+
+    assert execution.call_allowance == len(PROVEN_PRODUCTION_BUILDER_CORRIDOR)
+    assert posts == [
+        ("LLMAssetMentionExtraction", "structured/primary"),
+        ("LLMAssetMentionExtraction", "structured/fallback"),
+        ("LLMInterpretationResponse", "structured/primary"),
+        ("LLMInterpretationResponse", "structured/fallback"),
+        ("FocusedStrategyExtraction", "structured/primary"),
+        ("ClarificationResponse", "chat/primary"),
+        ("ClarificationResponse", "chat/fallback"),
+    ]
+    assert [
+        (receipt.schema_name, receipt.model, receipt.outcome)
+        for receipt in receipts[:-1]
+    ] == [
+        ("LLMAssetMentionExtraction", "structured/primary", "succeeded"),
+        ("LLMAssetMentionExtraction", "structured/fallback", "succeeded"),
+        ("LLMInterpretationResponse", "structured/primary", "failed"),
+        ("LLMInterpretationResponse", "structured/fallback", "failed"),
+        ("FocusedStrategyExtraction", "structured/primary", "succeeded"),
+        ("ClarificationResponse", "chat/primary", "failed"),
+        ("ClarificationResponse", "chat/fallback", "succeeded"),
+    ]
+    assert blocked is None
+    assert assessment.outcome == "no_progress"
+    assert execution.terminal == "no_progress"
+    assert receipts[-1].outcome == "skipped"
+    assert receipts[-1].failure_mode == "turn_call_allowance_exhausted"
+
+
+def test_call_allowance_override_can_lower_but_not_raise_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import turn_execution
+
+    policy = len(PROVEN_PRODUCTION_BUILDER_CORRIDOR)
+    monkeypatch.setenv("ARGUS_TURN_CALL_ALLOWANCE", str(policy + 10))
+    with turn_execution.turn_execution_scope(entry_state={}) as execution:
+        assert execution.call_allowance == policy
+
+    monkeypatch.setenv("ARGUS_TURN_CALL_ALLOWANCE", "3")
+    with turn_execution.turn_execution_scope(entry_state={}) as execution:
+        assert execution.call_allowance == 3

@@ -23,10 +23,10 @@ if TYPE_CHECKING:
 
 
 DEFAULT_TURN_DEADLINE_SECONDS = 120.0
-# Maximum legitimate current route:
-# interpretation primary + fallback (2), conditional repair plan + audit (2),
-# one clarification/recovery composition (1), and one result composition (1).
-DEFAULT_TURN_CALL_ALLOWANCE = 6
+# Evidence-calibrated production-builder corridor: asset preflight primary and
+# fallback, interpretation primary and fallback, focused repair, then
+# clarification primary and fallback.
+DEFAULT_TURN_CALL_ALLOWANCE = 7
 
 _monotonic = time.monotonic
 
@@ -79,6 +79,14 @@ _ACTIVE_TURN_EXECUTION: ContextVar[TurnExecutionContext | None] = ContextVar(
 
 def active_turn_execution() -> TurnExecutionContext | None:
     return _ACTIVE_TURN_EXECUTION.get()
+
+
+def set_turn_entry_state(state: Any) -> None:
+    execution = active_turn_execution()
+    if execution is None:
+        return
+    execution.entry_fingerprint = semantic_progress_fingerprint(state)
+    execution._entry_snapshot = semantic_progress_snapshot(state)
 
 
 @contextmanager
@@ -187,6 +195,59 @@ def record_exit_progress(
         else "runtime_final",
     )
     return assessment
+
+
+def turn_progress_evidence() -> dict[str, Any]:
+    execution = active_turn_execution()
+    if execution is None:
+        return {}
+    return {
+        "output_fingerprint": execution.exit_fingerprint,
+        "progress_outcome": execution.progress_outcome,
+        "terminal": execution.terminal,
+        "terminal_reason": execution.terminal_reason,
+    }
+
+
+def apply_turn_progress_evidence(evidence: Any) -> None:
+    execution = active_turn_execution()
+    if execution is None or not isinstance(evidence, dict):
+        return
+    output_fingerprint = evidence.get("output_fingerprint")
+    outcome = evidence.get("progress_outcome")
+    terminal = evidence.get("terminal")
+    if (
+        isinstance(output_fingerprint, str)
+        and len(output_fingerprint) == 64
+        and all(char in "0123456789abcdef" for char in output_fingerprint)
+    ):
+        execution.exit_fingerprint = output_fingerprint
+    if outcome in {
+        "advanced",
+        "clarification",
+        "redirected",
+        "finished",
+        "no_progress",
+        "recoverable_failed",
+        "terminal_failed",
+    }:
+        execution.progress_outcome = outcome
+    if terminal in {
+        "advanced",
+        "clarification",
+        "redirected",
+        "finished",
+        "no_progress",
+        "recoverable_failed",
+        "terminal_failed",
+    }:
+        terminal_reason = evidence.get("terminal_reason")
+        if terminal_reason not in {"runtime_final", "unchanged_typed_state"}:
+            terminal_reason = "runtime_final"
+        claim_turn_terminal(
+            terminal,
+            terminal_reason,
+        )
 
 
 def turn_execution_summary(
@@ -377,4 +438,6 @@ def _turn_call_allowance() -> int:
         value = int(raw)
     except ValueError:
         return DEFAULT_TURN_CALL_ALLOWANCE
-    return value if value > 0 else DEFAULT_TURN_CALL_ALLOWANCE
+    if value <= 0:
+        return DEFAULT_TURN_CALL_ALLOWANCE
+    return min(value, DEFAULT_TURN_CALL_ALLOWANCE)

@@ -16,9 +16,11 @@ from argus.agent_runtime.turn_execution import (
     RuntimeEventTimeoutError as TurnRuntimeEventTimeoutError,
 )
 from argus.agent_runtime.turn_execution import (
+    apply_turn_progress_evidence,
     claim_turn_terminal,
     record_exit_progress,
     runtime_events_with_keepalive,
+    set_turn_entry_state,
     turn_execution_scope,
     turn_execution_summary,
 )
@@ -640,6 +642,7 @@ async def chat_stream(
 
     async def accepted_turn_events(
         workflow_input: dict[str, Any],
+        workflow_input_error: Exception | None = None,
     ) -> AsyncIterator[str]:
         active_finalization_execution_identity: str | None = None
         naming_language = (
@@ -648,6 +651,26 @@ async def chat_stream(
             or current_user_profile.language
             or "en"
         )
+        receipt_run_id: str | None = None
+        receipt_message_id: str | None = None
+        receipt_metadata: dict[str, Any] = {}
+        receipt_token = begin_openrouter_route_receipt_capture()
+
+        def persist_turn_evidence() -> None:
+            receipts = end_openrouter_route_receipt_capture(receipt_token)
+            receipt_metadata["turn_execution"] = turn_execution_summary(receipts)
+            persist_route_receipts(
+                receipts=receipts,
+                user_id=user.id,
+                conversation_id=conversation.id,
+                run_id=receipt_run_id,
+                message_id=receipt_message_id,
+                metadata=receipt_metadata,
+            )
+
+        def record_control_exit(semantic_turn_act: str, terminal: Any) -> None:
+            exit_state = {**workflow_input, "semantic_turn_act": semantic_turn_act}
+            record_exit_progress(exit_state, terminal=terminal)
 
         def schedule_artifact_naming(
             *,
@@ -693,7 +716,6 @@ async def chat_stream(
                 else "What is your current primary goal? Don't worry, "
                 "you can change it later in Settings."
             )
-            yield sse_data({"type": "stage_start", "stage": "clarify"})
             assistant_message = create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -701,6 +723,9 @@ async def chat_stream(
                 content=msg,
                 settle_usage=message_usage_settlement(),
             )
+            record_control_exit("answer_pending_need", "clarification")
+            persist_turn_evidence()
+            yield sse_data({"type": "stage_start", "stage": "clarify"})
             yield sse_data({"type": "token", "content": msg})
             yield sse_data(
                 {
@@ -712,7 +737,6 @@ async def chat_stream(
                     },
                 }
             )
-            record_exit_progress(workflow_input, terminal="clarification")
             yield sse_done()
             return
 
@@ -778,6 +802,8 @@ async def chat_stream(
                 content=follow_up,
                 settle_usage=message_usage_settlement(),
             )
+            record_control_exit("new_idea", "advanced")
+            persist_turn_evidence()
             yield sse_data({"type": "stage_start", "stage": "next_step"})
             yield sse_data({"type": "token", "content": follow_up})
             yield sse_data(
@@ -790,7 +816,6 @@ async def chat_stream(
                     },
                 }
             )
-            record_exit_progress(workflow_input, terminal="advanced")
             yield sse_done()
             return
 
@@ -812,6 +837,8 @@ async def chat_stream(
                 content=assistant_text,
                 metadata=metadata,
             )
+            record_control_exit("retry_failed_action", "clarification")
+            persist_turn_evidence()
             yield sse_data({"type": "stage_start", "stage": "clarify"})
             if runtime_fallback.recovery is None:
                 yield sse_data({"type": "token", "content": assistant_text})
@@ -830,7 +857,6 @@ async def chat_stream(
                     },
                 }
             )
-            record_exit_progress(workflow_input, terminal="clarification")
             yield sse_done()
             return
 
@@ -865,6 +891,8 @@ async def chat_stream(
                 metadata=metadata,
                 settle_usage=message_usage_settlement(),
             )
+            record_control_exit("approval", "finished")
+            persist_turn_evidence()
             yield sse_data(
                 {
                     "type": "final",
@@ -876,16 +904,10 @@ async def chat_stream(
                     },
                 }
             )
-            record_exit_progress(workflow_input, terminal="finished")
             yield sse_done()
             return
 
         streamed_text_parts: list[str] = []
-        receipt_run_id: str | None = None
-        receipt_message_id: str | None = None
-        receipt_metadata: dict[str, Any] = {}
-
-        receipt_token = begin_openrouter_route_receipt_capture()
         shadow_context_token = set_backtest_job_shadow_context(
             BacktestJobShadowContext(
                 user_id=user.id,
@@ -900,6 +922,8 @@ async def chat_stream(
             )
         )
         try:
+            if workflow_input_error is not None:
+                raise workflow_input_error
 
             def runtime_event_source(
                 active_workflow: Any,
@@ -952,6 +976,7 @@ async def chat_stream(
                     continue
 
                 final_seen = True
+                apply_turn_progress_evidence(runtime_event.get("_turn_progress"))
                 runtime_result = dict(runtime_event.get("payload") or {})
                 stage_status = runtime_stage_status(runtime_result)
                 assistant_text = runtime_result_message(runtime_result)
@@ -1272,15 +1297,6 @@ async def chat_stream(
                 )
                 if assistant_text and not runtime_result.get("assistant_response"):
                     runtime_result["assistant_response"] = assistant_text
-                record_exit_progress(
-                    runtime_result,
-                    terminal=(
-                        "clarification"
-                        if stage_status
-                        in {"await_user_reply", "needs_clarification"}
-                        else None
-                    ),
-                )
                 if (
                     not streamed_text_parts
                     and confirmation_card is None
@@ -1392,10 +1408,7 @@ async def chat_stream(
                     else failure_code
                 ),
             )
-            record_exit_progress(
-                workflow_input,
-                terminal="recoverable_failed",
-            )
+            record_exit_progress(workflow_input, terminal="recoverable_failed")
             yield sse_data(
                 {
                     "type": "error",
@@ -1415,35 +1428,32 @@ async def chat_stream(
         finally:
             reset_backtest_job_shadow_context(shadow_context_token)
             claim_turn_terminal("recoverable_failed", "stream_severed")
-            receipts = end_openrouter_route_receipt_capture(receipt_token)
-            receipt_metadata["turn_execution"] = turn_execution_summary(receipts)
-            persist_route_receipts(
-                receipts=receipts,
-                user_id=user.id,
-                conversation_id=conversation.id,
-                run_id=receipt_run_id,
-                message_id=receipt_message_id,
-                metadata=receipt_metadata,
-            )
+            persist_turn_evidence()
 
     async def events() -> AsyncIterator[str]:
-        workflow_input = build_workflow_input(
-            user=runtime_user,
-            message=request_message,
-            recent_thread_history=recent_thread_history,
-            context_hints=[
-                item.model_dump(mode="python") for item in mention_provenance
-            ],
-            action_context=action_context,
-            fallback_latest_task_snapshot=runtime_fallback.latest_task_snapshot,
-            fallback_selected_thread_metadata=(
-                runtime_fallback.selected_thread_metadata
-            ),
-            fallback_artifact_references=runtime_fallback.artifact_references,
-            fallback_confirmation_payload=runtime_fallback.confirmation_payload,
-        )
-        with turn_execution_scope(entry_state=workflow_input):
-            accepted_events = accepted_turn_events(workflow_input)
+        with turn_execution_scope(entry_state=checkpoint_values or {}):
+            workflow_input_error: Exception | None = None
+            try:
+                workflow_input = build_workflow_input(
+                    user=runtime_user,
+                    message=request_message,
+                    recent_thread_history=recent_thread_history,
+                    context_hints=[
+                        item.model_dump(mode="python") for item in mention_provenance
+                    ],
+                    action_context=action_context,
+                    fallback_latest_task_snapshot=runtime_fallback.latest_task_snapshot,
+                    fallback_selected_thread_metadata=(
+                        runtime_fallback.selected_thread_metadata
+                    ),
+                    fallback_artifact_references=runtime_fallback.artifact_references,
+                    fallback_confirmation_payload=runtime_fallback.confirmation_payload,
+                )
+                set_turn_entry_state(workflow_input)
+            except Exception as exc:
+                workflow_input = {}
+                workflow_input_error = exc
+            accepted_events = accepted_turn_events(workflow_input, workflow_input_error)
             try:
                 async for event in accepted_events:
                     yield event

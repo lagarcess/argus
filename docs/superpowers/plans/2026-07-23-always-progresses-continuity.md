@@ -677,9 +677,11 @@ the deadline or allowance is exhausted. Without an active visible-turn context,
 after-stream/background work keeps its existing task-local behavior.
 
 The default absolute deadline is the existing
-`ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS` value. Derive the default call allowance
-by recording the exact maximal legitimate current route in the Phase 0 ledger;
-do not invent a larger arbitrary ceiling.
+`ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS` value. Set the default call allowance to
+the smallest evidence-calibrated safety policy that covers the proven
+legitimate production-builder corridor. This policy is not a mathematical
+maximum of every theoretical predicate combination; do not invent a larger
+arbitrary ceiling.
 
 - [ ] **Step 4: Reserve at every actual OpenRouter attempt**
 
