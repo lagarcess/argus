@@ -143,9 +143,9 @@ above to reach their named guest-facing gates.
     - a gear control for theme, language, and feedback only; and
     - one compact Sign in control that opens a centered auth modal.
 17. The auth modal borrows the visual language and legal treatment of the
-    current landing auth experience. Contextual conversion moments open it in
-    create-account-first mode; the header Sign in control opens it in
-    sign-in-first mode.
+    current landing auth experience. It remains sign-in-first while public
+    accounts are off. Contextual conversion moments may open it in
+    create-account-first mode only after the server enables public accounts.
 18. Creating a new account preserves the temporary workspace by converting the
     anonymous identity in place.
 19. Signing in to an existing account also preserves the temporary workspace
@@ -160,6 +160,20 @@ above to reach their named guest-facing gates.
     candidate before public exposure.
 22. Public enablement is a separate founder decision. Building the slice does
     not authorize deployment or removal of private-alpha protections.
+23. When guest access is enabled, guest chat supersedes the current auth-first
+    landing page at `/`. The existing landing implementation remains in the
+    codebase as the auth-modal source and the configuration-first rollback
+    surface; it is not a second public entry experience.
+24. `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` remains `false` during the initial
+    guest traffic stage. Broader permanent-account creation is not enabled
+    until observed concurrency, provider cost, latency, backpressure, and
+    compute capacity are acceptable to the founder.
+25. While public-account access is off, permanent signup and login retain the
+    existing private-alpha allowlist gate. The guest shell offers Sign in, not
+    an unavailable public Create account promise. Invited users may use the
+    preserved allowlisted auth path. A later founder-approved public-account
+    stage may make ordinary accounts public while the allowlist becomes the
+    elevated-role source for admin/developer access.
 
 ## Non-Goals
 
@@ -251,7 +265,7 @@ guest branch.
 | Main chat | Full current chat experience within guest limits | Full current chat experience within account limits |
 | Starter actions | Existing three verified chips | Same existing three verified chips |
 | Conversation count | One temporary conversation | Multiple durable conversations |
-| New chat | Empty chat resets directly; non-empty chat offers Replace or Create account | Creates another durable conversation |
+| New chat | Empty chat resets directly; non-empty chat offers Replace or Sign in, changing to Create account only after public accounts open | Creates another durable conversation |
 | Recents/history | Visible; shows the current temporary conversation and its expiry, plus an account preservation affordance | Durable owner history |
 | Omnisearch | Visible; searches the temporary workspace and guest-safe grounded discovery only | Durable owner artifacts plus grounded discovery |
 | Clarification and confirmation | Available | Available |
@@ -363,6 +377,13 @@ recently deleted, notifications, or subscription placeholders.
 The Sign in button opens a centered modal. It does not navigate away from the
 conversation.
 
+During the initial guest traffic stage, the modal is sign-in-first and
+permanent access remains allowlist-gated. Public Create account calls to action
+are not shown while `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`. Invited users
+retain the existing allowlisted signup path. When the founder later enables
+public accounts, the same modal may expose create-account-first contextual
+conversion without restoring the landing wall.
+
 ### Bottom left
 
 The registered profile/settings control is hidden. The shell may show a quiet
@@ -446,7 +467,7 @@ Start a new chat?
 [ Start over ]
 Replace this temporary conversation.
 
-[ Create account ]
+[ Sign in ]
 Keep this conversation and start another.
 ```
 
@@ -455,9 +476,11 @@ temporary conversation before creating the replacement. It does not create a
 second guest conversation. It also does not reset the guest identity's expiry,
 message allowance, simulation allowance, or feedback allowance.
 
-`Create account` opens the auth modal with the preservation benefit stated
-above. After conversion, the old conversation remains and a new registered
-conversation opens.
+`Sign in` opens the auth modal with the preservation benefit stated above.
+While public accounts are off, only an existing allowlisted permanent account
+may continue. After public-account enablement, the choice becomes `Create
+account` and the new-account linking path may preserve the conversation before
+opening a new registered chat.
 
 ## Recents And History Contract
 
@@ -468,7 +491,10 @@ For a guest it contains only:
 - the one temporary conversation;
 - its most recent title/preview where available;
 - its exact expiry;
-- a quiet "Create account to keep your history" affordance.
+- a quiet "Sign in to keep your history" affordance while public accounts are
+  off;
+- a quiet "Create account to keep your history" affordance only after public
+  accounts are enabled.
 
 It must not render fake historical rows, other users' data, hidden saved
 objects, or a generic disabled-state wall.
@@ -508,7 +534,15 @@ The auth modal opens when the guest:
 - requests durable history beyond the temporary conversation;
 - invokes another implemented registered-only durable action.
 
-The modal states the concrete benefit:
+The modal states the concrete benefit. While public accounts are off, it uses
+Sign in language:
+
+- "Sign in to run another simulation."
+- "Sign in to save this decision."
+- "Sign in to keep this conversation and start another."
+
+After public-account enablement, the same moments may use Create account
+language:
 
 - "Create an account to run another simulation."
 - "Create an account to save this decision."
@@ -522,7 +556,8 @@ feature-count marketing.
 Opening or canceling the modal does not mutate the conversation, consume usage,
 or discard composer input.
 
-When conversion succeeds, the exact pending typed action resumes once:
+When authentication or conversion succeeds, the exact pending typed action
+resumes once:
 
 - a second Run uses a new idempotency identity;
 - Add decision uses the current result/evidence artifact id;
@@ -624,7 +659,8 @@ existing profiles but is not collected from guests.
 
 ## Public Access And The Private-Alpha Allowlist
 
-Guest implementation and public enablement are separate.
+Guest implementation, guest traffic enablement, and public permanent-account
+enablement are three separate decisions.
 
 Two server-side controls are required:
 
@@ -638,20 +674,43 @@ closed and is a release-profile error.
 
 Both default off outside explicitly configured QA.
 
+The first public guest stage intentionally uses:
+
+```text
+ARGUS_GUEST_ACCESS_ENABLED=true
+ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false
+```
+
+That makes guest chat the public front door without opening permanent accounts
+to uncalibrated traffic.
+
 While public access is off:
 
 - current private-alpha allowlist behavior remains unchanged for permanent
   signup/login;
 - no public traffic can create a guest session.
 
-When the founder enables public access:
+When the founder enables guest access but keeps public accounts off:
 
 - anonymous sessions are permitted;
+- `/` opens the guest chat rather than the auth-first landing page;
+- permanent signup/login remains allowlist-gated;
+- the guest shell offers Sign in rather than public Create account;
+- the current auth-first landing implementation remains available only as
+  reusable modal/rollback code.
+
+Only after traffic and compute calibration, when the founder separately enables
+public accounts:
+
 - standard permanent users may create or enter accounts without a pre-existing
   allowlist row;
 - existing allowlist rows continue to own staff roles such as admin/developer;
 - an explicitly disabled account remains blocked;
 - role elevation never comes from user-editable metadata.
+
+The allowlist table is not renamed or repurposed prematurely. During the initial
+stage it remains the existing private-alpha access gate; after public accounts
+open, it becomes the elevated-privilege source.
 
 The frontend flag may control visibility but is never the authorization
 boundary.
@@ -1141,7 +1200,9 @@ One visible journey must prove:
 10. Omnisearch returns only the guest workspace and approved grounded discovery.
 11. A second simulation opens conversion before admission and settles no unit.
 12. Add decision opens contextual conversion and preserves the typed action.
-13. New chat offers Replace versus Create account.
+13. New chat offers Replace versus Sign in in the initial staged mode, and
+    Replace versus Create account only in the separately tested
+    public-account-enabled mode.
 14. Canceling auth loses nothing.
 15. Creating a new account keeps the same owner UUID and resumes one pending
     action.
@@ -1177,9 +1238,12 @@ Guest mode is not ready for public exposure until all are true:
 - [ ] Independent code/product review has no blocking finding.
 - [ ] Branch-deployed canary matches the candidate SHA and expected flags.
 - [ ] Cost per completed guest result is measured and acceptable.
+- [ ] Guest concurrency, latency, backpressure, and compute saturation are
+      calibrated under representative traffic before public accounts open.
 - [ ] Guest and public-account server flags remain off by default.
 - [ ] Rollback is proven.
-- [ ] Founder explicitly authorizes public enablement.
+- [ ] Founder explicitly authorizes guest traffic enablement.
+- [ ] Founder separately authorizes public permanent-account enablement.
 
 No paid live-eval scorecard is required solely for guest-shell changes. If the
 implementation touches interpreter/runtime behavior despite this spec, it has

@@ -27,6 +27,13 @@
 - `ARGUS_GUEST_ACCESS_ENABLED` and
   `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` default off. The frontend flag is
   presentation-only.
+- The initial public guest stage targets
+  `ARGUS_GUEST_ACCESS_ENABLED=true` with
+  `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`. Guest chat supersedes `/`, but
+  permanent accounts remain allowlist-only until founder-approved
+  concurrency/cost/compute calibration passes.
+- Keep the current landing implementation as reusable auth-modal and rollback
+  code. Do not maintain it as a competing public entry when guest mode is on.
 - Public enablement, deployment, push, PR mutation, merge, and issue closure
   require separate founder authorization.
 - Stop immediately on a cross-owner read, partial ownership transfer,
@@ -289,6 +296,8 @@ immutable.
   - anonymous login never consults or mutates the allowlist;
   - private-alpha permanent signup/login still requires an active allowlist
     row when public account access is off;
+  - guest access can be enabled while public-account access stays off;
+  - that staged mode never advertises public account creation;
   - public account mode permits an ordinary user but never grants
     admin/developer status;
   - an explicitly disabled row remains blocked in both modes.
@@ -428,14 +437,18 @@ poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --limit 25
 
 - [ ] Red-test:
   - guest flag off keeps the current auth-first landing;
-  - guest flag on creates/reuses one anonymous session and opens `/chat`;
+  - guest flag on supersedes the landing, creates/reuses one anonymous session,
+    and opens `/chat`;
+  - guest-on/public-account-off shows Sign in without a public Create account
+    promise;
   - route reload keeps the same UUID and conversation;
   - a frontend-on/server-off mismatch shows a fail-closed retry state;
   - server-rendered guest responses are dynamic and never shared across
     visitors.
 - [ ] Implement server bootstrap as one idempotent call to `/auth/guest`.
-- [ ] Keep the current landing auth component reusable for the later modal;
-  do not delete the auth-first rollback path.
+- [ ] Keep the current landing auth component reusable for the later modal and
+  flag-based rollback. When guest mode is enabled, do not render it as a second
+  public entry path.
 
 ### Task 9: Extract and reuse the verified starter actions
 
@@ -520,7 +533,9 @@ poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --limit 25
 
 - [ ] Reuse the landing page's validated fields, password visibility,
   error treatment, legal copy, and API functions.
-- [ ] Support `signup-first` and `signin-first` entry modes plus a typed reason:
+- [ ] Support `signin-first` while public accounts are off and `signup-first`
+  only when the server capability says public account creation is enabled.
+  Both modes carry a typed reason:
 
 ```ts
 type GuestConversionReason =
@@ -556,6 +571,9 @@ type GuestConversionReason =
   - resumes the pending action at most once.
 - [ ] Failure leaves the guest workspace and pending artifact unchanged.
 - [ ] Do not use admin-created replacement users or frontend row copying.
+- [ ] Keep this route server-disabled for unlisted users while
+  `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`; exercise it only in isolated QA
+  with an explicit temporary public-account flag.
 
 ### Task 14: Implement the existing-account single-use claim
 
@@ -611,7 +629,8 @@ type GuestConversionReason =
 
 - [ ] Frontend behavior:
   - empty New chat resets;
-  - non-empty New chat offers Start over or Create account;
+  - non-empty New chat offers Start over or Sign in while public accounts are
+    off, and Create account only when the server capability enables it;
   - Add decision opens conversion and retains artifact ID;
   - the 11th attempted completed turn opens conversion before sending;
   - the second unique Run opens conversion before admission;
@@ -734,6 +753,11 @@ git diff --check
 
 - [ ] Use a real anonymous Supabase identity, real persistence, real
   interpreter, live provider-backed discovery, and the exact candidate SHA.
+- [ ] First prove the intended staged mode:
+  guest access on, public-account access off, guest chat at `/`, permanent auth
+  allowlist-gated, and no misleading public Create account CTA.
+- [ ] Exercise new-account conversion separately in isolated QA with the public
+  account flag temporarily enabled; restore it to false afterward.
 - [ ] Execute the 20 visible acceptance checks in the design once, with no
   hidden retries.
 - [ ] The QA agent must inspect the rendered chat, not only DOM/API state.
@@ -773,6 +797,10 @@ git diff --check
   - canary identity;
   - rollback;
   - remaining founder decisions.
+- [ ] Add a bounded load-calibration report covering concurrent guest sessions,
+  provider cost per completed result, p50/p95 turn latency, queue/backpressure
+  behavior, error rate, and compute saturation. This report informs—without
+  automatically authorizing—the later public-account flag.
 - [ ] Stop before push, PR state change, deployment, public enablement, merge,
   or issue closure unless the founder authorizes that exact operation.
 
@@ -808,6 +836,8 @@ The implementation candidate is complete only when:
 - registered behavior remains unchanged;
 - no runtime/interpreter file changed;
 - public flags remain off;
+- the initial exposure profile keeps public-account access off until the
+  founder accepts the traffic/compute calibration;
 - an independent security/privacy review and product/code review find no
   blocker;
 - the current Codex release captain and founder approve promotion.
