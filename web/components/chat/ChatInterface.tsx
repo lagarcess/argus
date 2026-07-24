@@ -670,6 +670,7 @@ export default function ChatInterface() {
   const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
   const activeConversationIdRef = useRef<string | null>(null);
   const activeStreamConversationIdRef = useRef<string | null>(null);
+  const hasAcceptedUserInputRef = useRef(false);
   const currentViewRef = useRef<View>("chat");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const canApplyConversationScopedUpdate = useCallback(
@@ -965,12 +966,13 @@ export default function ChatInterface() {
         let activeConversationId = readActiveConversationIdFromUrl();
         if (!activeConversationId && meResponse?.account_kind === "guest") {
           const { items } = await listConversations({ limit: 2 });
+          if (cancelled || hasAcceptedUserInputRef.current) return;
           activeConversationId = items[0]?.id ?? null;
         }
         if (activeConversationId) {
           try {
             const { items } = await getConversationMessages(activeConversationId, 50);
-            if (cancelled) return;
+            if (cancelled || hasAcceptedUserInputRef.current) return;
             const hydrated = hydrateMessagesFromApi(items);
             if (hydrated.messages.length === 0) {
               // clear empty persisted conversations from the active route.
@@ -1014,7 +1016,7 @@ export default function ChatInterface() {
           }
         }
 
-        if (cancelled) return;
+        if (cancelled || hasAcceptedUserInputRef.current) return;
         resetToEmptyChatSurface();
         setShowOnboardingGoalCards(
           showRegisteredOnboarding,
@@ -1253,6 +1255,7 @@ export default function ChatInterface() {
     const trimmed = text.trim();
     if (!trimmed) return;
     if (isStreamingResponse) return;
+    hasAcceptedUserInputRef.current = true;
     const mentions = Array.isArray(mentionsOrAction) ? mentionsOrAction : [];
     const action = Array.isArray(mentionsOrAction) ? actionArg : mentionsOrAction;
     const replacementAssistantId = options?.replacementAssistantId?.trim() || undefined;

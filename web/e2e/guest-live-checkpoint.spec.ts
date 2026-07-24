@@ -32,6 +32,7 @@ test("@guest-live thin anonymous entry, turn, and reload checkpoint", async ({
   await expect(page.getByTestId("chat-input")).toBeVisible({
     timeout: 30_000,
   });
+  await expect(page).toHaveURL(/\/chat(?:\?|$)/);
   await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
 
   const streamResponse = page.waitForResponse(

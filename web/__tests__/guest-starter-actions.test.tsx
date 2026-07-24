@@ -36,6 +36,10 @@ describe("shared starter actions", () => {
     expect(chat).toContain(
       "disabled={isStreamingResponse || isHydratingConversation}",
     );
+    expect(chat).toContain("hasAcceptedUserInputRef.current = true");
+    expect(chat).toContain(
+      "cancelled || hasAcceptedUserInputRef.current",
+    );
     expect(chat.match(/<StarterActions/g)?.length).toBe(1);
     expect(chat).not.toContain(
       "onClick={() => handleSend(t('chat.starter_actions.tsla.value'",
