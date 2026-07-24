@@ -1049,6 +1049,21 @@ proof.
 - Produces atomic acceptance, `running`, durable terminal transitions, stale
   reconciliation on next POST/read, and one persisted-content Retry action.
 
+**Non-negotiable Tasks 4-5 integration acceptance:**
+
+Using the real lifecycle owner and the real route-receipt and cost-ledger sinks,
+prove that onboarding, cancellation, deterministic recovery, and
+post-admission builder failure each produce:
+
+- exactly one durable lifecycle terminal;
+- zero route-receipt rows;
+- zero cost-ledger rows;
+- the correct typed terminal and progress outcome; and
+- no fingerprint or internal runtime state in SSE or public message metadata.
+
+This acceptance belongs to `chat_turn_lifecycles`. Never satisfy it with a
+synthetic provider receipt.
+
 - [ ] **Step 1: Write the red route matrix**
 
 Pin these routes:
